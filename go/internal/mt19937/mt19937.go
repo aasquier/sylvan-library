@@ -1,75 +1,72 @@
-// Package pyrand is CPython's `random.Random`, reproduced bit for bit.
+// Package mt19937 is the app's seeded generator: MT19937 with a fixed
+// seeding path and draw discipline, reproduced bit for bit against a
+// recorded corpus.
 //
 // It exists because three things this app shows a person are seeded, and a
 // seed is a promise. Tier 1's every simulation runs from one
-// (`simruns.DEFAULT_SEED`; an unseeded sample was what the app used to show
-// and is not reproducible). The tarot deal returns its seed and the browser
-// holds it, so a reload lays out the same three cards -- the reading is of
-// one person on one evening, and a spread that changed under them would be a
-// different reading of the same person. The Wheel of Fortune spins from one
-// too. None of that survives a backend rewrite that merely shuffles *well*.
+// (`simruns.DEFAULT_SEED`; an unseeded sample is not reproducible and is
+// not shown). The tarot deal returns its seed and the browser holds it, so
+// a reload lays out the same three cards -- the reading is of one person on
+// one evening, and a spread that changed under them would be a different
+// reading of the same person. The Wheel of Fortune spins from one too.
+// None of that survives a generator that merely shuffles *well*.
 //
-// So what breaks if this drifts is not a test. A client-held tarot seed deals
-// a different spread across the cutover, which is the one surface commandment
-// 15 says gets the most care. Every quoted Tier 1 number moves, and every
-// generated primer with it. And ADR 18's cache stops being *coherent*: its
-// keys carry an engine-source fingerprint, so cached rows re-key honestly and
-// nothing serves a stale number -- but a user who re-runs an old seed to see
-// the same game again would not see it, which is precisely what "seeded"
-// promised them. None of those three failures is loud. That is why this is a
-// reproduction held to a corpus rather than a generator held to a test.
+// So what breaks if this drifts is not a test. A client-held tarot seed
+// deals a different spread, which is the one surface commandment 15 says
+// gets the most care. Every quoted Tier 1 number moves, and every generated
+// primer with it. And ADR 18's cache stops being *coherent*: its keys carry
+// an engine-source fingerprint, so cached rows re-key honestly and nothing
+// serves a stale number -- but a user who re-runs an old seed to see the
+// same game again would not see it, which is precisely what "seeded"
+// promised them. None of those three failures is loud. That is why this is
+// a reproduction held to a corpus rather than a generator held to a test.
 //
-// # What is reproduced, and from what
+// # The shape of the package
 //
-// Two files, and the split here follows theirs, because it is the split that
-// localises a bug:
+// Two files, split where a bug localises:
 //
-//   - this file is `Modules/_randommodule.c` -- the state, `init_genrand`,
-//     `init_by_array`, `genrand_uint32`, `random_seed`, `_random_Random_random`
-//     and `_random_Random_getrandbits`. MT19937 itself, and the seeding path.
-//   - random.go is `Lib/random.py` -- `_randbelow_with_getrandbits`,
-//     `randrange`, `shuffle`, `choice`. Everything that only *consumes* the
-//     stream.
+//   - this file is the generator -- the state, the two seeding routines
+//     (`initGenrand`, `seedWords`), the raw word stream, `Float64` and
+//     `GetRandBits`.
+//   - random.go is everything that only *consumes* the stream --
+//     `RandBelow`, `RandRange`, `Shuffle`, `Choice`.
 //
-// Written from the algorithm and CPython's documented behaviour, not copied;
-// held to CPython by `testdata/draws.json`, which `tests/go_fixtures.py`
-// generates by asking a real interpreter. The corpus records the raw word
+// Held to `testdata/draws.json`, a frozen golden that records the raw word
 // stream separately from every method that consumes it, so a failure says
-// which half is wrong.
+// which half is wrong. The corpus is never regenerated: the recorded
+// stream is the promise every stored seed rests on.
 //
 // # The three details a reimplementation gets wrong
 //
-// **`random.Random(n)` does not seed like `init_genrand`.** It takes
-// `abs(n)`, splits it into little-endian 32-bit words, and runs
-// `init_by_array` over them -- so seed 7 and seed -7 are the same stream, and
-// the stream changes shape at 2**32 and again at 2**64 as the key grows a
-// word. Seeding an MT19937 with `init_genrand(7)` is a different generator
-// that looks equally random and agrees with CPython on nothing.
+// **`New(n)` does not seed like `initGenrand`.** It takes the absolute
+// value, splits it into little-endian 32-bit words, and runs `seedWords`
+// over them -- so seed 7 and seed -7 are the same stream, and the stream
+// changes shape at 2**32 and again at 2**64 as the key grows a word.
+// Seeding with `initGenrand(7)` directly is a different generator that
+// looks equally random and agrees with the corpus on nothing.
 //
-// **`random()` is two words, in that order**: `(a>>5) * 67108864.0 + (b>>6)`
+// **`Float64` is two words, in that order**: `(a>>5) * 67108864.0 + (b>>6)`
 // scaled by `1.0/9007199254740992.0`. Every value it can produce is exactly
 // representable, so the corpus compares float64 *bits* -- a tolerance here
 // would be hiding a bug rather than allowing for one.
 //
-// **`_randbelow` rejects, and where it rejects is part of the stream.**
-// `k = n.bit_length()` and draws `getrandbits(k)` until the value is below n,
-// so `_randbelow(2**20)` never rejects and `_randbelow(2**20 + 1)` rejects
+// **`RandBelow` rejects, and where it rejects is part of the stream.**
+// `k = bitLen(n)` and it draws `GetRandBits(k)` until the value is below n,
+// so `RandBelow(2**20)` never rejects and `RandBelow(2**20 + 1)` rejects
 // almost half the time. Get the rejection wrong and the first draw agrees,
 // the tenth does not, and every shuffle after it is a different deck.
 //
 // # What is deliberately absent
 //
-// Only what the served package calls is here: `Float64`, `RandRange`,
-// `Shuffle`, `Choice`, and the two primitives under them. `sample()` is named
-// in the migration plan and **has no caller** -- `tarot.py` says in as many
-// words why it cannot use it (no weights) -- so it is not here; nor are the
-// distributions, `randbytes`, or state get/set. `GetRandBits` stops at 64
-// bits for the same reason: `_randbelow` asks for `n.bit_length()`, no caller
-// passes an n beyond int64, and a big-integer path nothing exercises is a
-// liability rather than a feature.
+// Only what the served surfaces call is here: `Float64`, `RandRange`,
+// `Shuffle`, `Choice`, and the two primitives under them. Weighted
+// sampling, the distributions, random bytes and state get/set have no
+// caller -- the tarot deal cannot use weights, and says so where it deals
+// -- and a path nothing exercises is a liability rather than a feature.
+// `GetRandBits` stops at 64 bits for the same reason: `RandBelow` asks for
+// `bitLen(n)`, and no caller passes an n beyond int64.
 //
-// Nothing here is safe for concurrent use, exactly as `random.Random` is not.
-// A run owns its generator.
+// Nothing here is safe for concurrent use; a run owns its generator.
 package mt19937
 
 import (

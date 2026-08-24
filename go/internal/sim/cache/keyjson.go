@@ -10,12 +10,15 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 )
 
-// Python's `json.dumps(..., sort_keys=True, separators=(",", ":"),
-// ensure_ascii=True)`, written out rather than delegated to `encoding/json`.
+// The cache key's canonical JSON: sorted keys, minimal separators, every
+// non-ASCII rune escaped -- written out rather than delegated to
+// `encoding/json`.
 //
-// The key is a **sha256 over these bytes**, so this is one of the few places
-// in the port where "equivalent JSON" is not equivalent at all. Three
-// differences would each have produced a silently different key:
+// The key is a **sha256 over these bytes**, so this is one of the few
+// places where "equivalent JSON" is not equivalent at all: every stored key
+// was computed over exactly this layout, and a byte of drift silently
+// orphans every row. Three `encoding/json` behaviours would each have
+// produced a different key:
 //
 //   - **Go escapes `<`, `>` and `&`; Python does not.** `SetEscapeHTML(false)`
 //     fixes that one, and it is the one everybody knows.

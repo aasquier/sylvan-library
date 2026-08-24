@@ -12,12 +12,12 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// Python's `json.dumps`, for the two places this package hashes or hands
-// the model bytes that Python also writes.
+// The canonical JSON dialect, for the two places this package hashes bytes
+// or hands the model a rendered document.
 //
-// **The dossier's cache key hashes `json.dumps(RESPONSE_SCHEMA,
-// sort_keys=True)`**, and the key is how a dossier Python wrote is found and
-// served after the cutover -- so "equivalent JSON" is not equivalent here at
+// **The dossier's cache key hashes the sorted-key rendering of
+// RESPONSE_SCHEMA**, and the key is how a stored dossier is found and
+// served -- so "equivalent JSON" is not equivalent here at
 // all; the bytes are the key. Three things `encoding/json` would get wrong:
 // it escapes `<`, `>` and `&` where Python does not; it writes non-ASCII as
 // raw UTF-8 where `ensure_ascii=True` writes `\uXXXX` with a surrogate pair

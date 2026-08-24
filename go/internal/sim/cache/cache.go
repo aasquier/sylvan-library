@@ -15,35 +15,21 @@
 // engine is actually handed, plus the clamped parameters, the seed, a
 // fingerprint of the engine's own source, and `SimVersion`.
 //
-// # Two runtimes, one table, and rows that sit apart
+// # The fingerprint, and rows that age apart
 //
-// This is the question the port had to answer deliberately, and the answer is:
-// **a Go-computed row and a Python-computed row for the same deck and the same
-// seed have different keys and sit beside each other in `sim_cache`.** Each
-// runtime hits its own rows and neither can serve the other's.
+// ADR 18's second consequence is that the engine's source is part of the
+// key so that *no engine change can serve a pre-change number, including a
+// change nobody remembered to declare*. When the engine's code moves -- a
+// package rename, a one-character fix -- the fingerprint moves with it, old
+// rows stop matching any new request, and nothing serves a stale number
+// under a fresh engine's name. An answer one ulp adrift served under a
+// colliding key would be indistinguishable from correct on the screen,
+// which is the precise failure ADR 18 was written against.
 //
-// It falls out of `Fingerprint`, and it is the right answer rather than a
-// convenient one. ADR 18's second consequence is that the engine's source is
-// part of the key so that *no engine change can serve a pre-change number,
-// including a change nobody remembered to declare*. Two runtimes are the most
-// extreme engine change there is. Tier 1's port is bit-exact against
-// `REFERENCE_DIGEST` and the closed forms agree to zero epsilon -- but the
-// cache may not be the thing that **assumes** that, because if the two ever
-// diverge by one ulp, a colliding key would serve the other runtime's number
-// under this runtime's name, and that is indistinguishable from correct on the
-// screen. It is the precise failure ADR 18 was written against.
-//
-// The mechanical half of the argument is stronger than the prudential one:
-// **a collision could not be arranged honestly.** To collide, Go would have to
-// hash `engine.py` and `mana.py`'s bytes, which means reading Python source at
-// runtime -- and the container has no Python at all after Phase 8, so that
-// fingerprint would return "" and switch caching off on the very day the
-// migration finished.
-//
-// The cost is one recomputation per deck, per parameter set, per runtime,
-// during the window when both are live. Against `MAX_ROWS` = 2,000 and rows of
-// one or two kilobytes, the Python rows simply age out through the LRU once
-// nothing asks for them.
+// The cost is one recomputation per deck, per parameter set, per engine
+// change. Against `MaxRows` = 2,000 and rows of one or two kilobytes,
+// orphaned rows simply age out through the LRU once nothing asks for
+// them.
 //
 // # What it deliberately does not do
 //
@@ -81,17 +67,14 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 )
 
-// SimVersion is `cache.SIM_VERSION`: bumped when something changes what a
-// stored result *means* and neither the engine nor the mana solver moved --
-// the serialisation below, or a `sim/compile` fix that must invalidate cards
-// compiled before it.
+// SimVersion is bumped when something changes what a stored result *means*
+// while neither the engine nor the mana solver moved -- the serialisation
+// below, or a `sim/compile` fix that must invalidate cards compiled before
+// it.
 //
-// Held at Python's value on purpose. It is not a runtime marker -- the
-// fingerprint already separates the two runtimes, and doing the same job twice
-// would make it impossible to tell a deliberate semantic bump from an
-// accidental one. `tests/test_sim_cache.py` pins the Python constant against
-// `REFERENCE_DIGEST` as a pair; the generated corpus pins this one against
-// Python's.
+// It is not an engine marker -- the fingerprint already does that job, and
+// doing it twice would make it impossible to tell a deliberate semantic
+// bump from an accidental one.
 const SimVersion = 2
 
 // MaxRows is how many rows to keep. A mana result is ~1.5 kB and a land-sweep
@@ -103,17 +86,17 @@ const MaxRows = 2000
 // engineSources are the packages whose *code* decides the answer, in the order
 // they are hashed.
 //
-// `sim/compile` is deliberately absent, exactly as `compile.py` is absent from
-// Python's list: its output is the `sim.Card`s, which are hashed directly, so
+// `sim/compile` is deliberately absent: its output is the `sim.Card`s,
+// which are hashed directly, so
 // hashing its source as well would invalidate on changes that provably cannot
 // matter. `sim/mulligan` is absent for the same reason and a second one -- the
 // grid rides in `Input.Extra`, because a per-kind input belongs in a per-kind
 // key rather than in a global fingerprint that would throw away every stored
 // Tier 1 result each time a grid constant moved.
 //
-// `internal/sim`, `internal/floats` and `internal/mt19937` are present where
-// Python's counterparts are not; each package's `source.go` argues its own
-// case.
+// `internal/sim`, `internal/floats` and `internal/mt19937` are present
+// because their code decides the numbers; each package's `source.go` argues
+// its own case.
 //
 // **This list is the only guard against a file leaving a package.** Each
 // package's embed is held complete against its own directory by a test, and
@@ -150,14 +133,12 @@ var (
 // fallback for "I cannot tell which engine this is" must be to compute rather
 // than to guess.
 //
-// Python reads `engine.py` and `mana.py` off disk through `importlib`; a Go
-// binary has no source at runtime, so each fingerprinted package embeds its
-// own (see `mana.SourceFS`). The failure mode Python guards -- a frozen or
-// zipped install with no readable source -- cannot occur here, because the
-// bytes are in the binary; the empty-string branch is kept anyway, since a
-// caller that treats "" as a miss is one line and a caller that assumes a
-// fingerprint always exists is a silent wrong answer waiting for the first
-// build that surprises it.
+// A binary has no source on disk at runtime, so each fingerprinted package
+// embeds its own (see `mana.SourceFS`), and a missing file cannot arise --
+// the bytes are in the binary. The empty-string branch is kept anyway,
+// since a caller that treats "" as a miss is one line and a caller that
+// assumes a fingerprint always exists is a silent wrong answer waiting for
+// the first build that surprises it.
 //
 // Computed once per process. The files cannot change under a running binary.
 func Fingerprint() string {

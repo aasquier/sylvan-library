@@ -7,14 +7,13 @@ import (
 	"strings"
 )
 
-// `str.casefold()`, and the fourth reproduction of somebody else's
-// arithmetic in this port after `pyrand`, `pyyaml` and `pyfloat`.
+// Unicode full case folding, the app's case-insensitive equality.
 //
 // **`strings.ToLower` is not this function.** Casefolding is Unicode *full*
 // case folding, which lowercasing is not: `ß` folds to `ss`, `ſ` to `s`, `ς`
-// to `σ`, `ﬁ` to `fi`. 211 code points disagree with `str.lower()` and 104
-// of them fold to more than one character, so no rune-to-rune mapping can
-// express it.
+// to `σ`, `ﬁ` to `fi`. 211 code points disagree with plain lowercasing and
+// 104 of them fold to more than one character, so no rune-to-rune mapping
+// can express it.
 //
 // It earns its keep at exactly one place and that place is load-bearing:
 // `theme.Ground` folds the user's own turns and the quote the model claims

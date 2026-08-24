@@ -1,33 +1,34 @@
-// Package pyyaml reproduces PyYAML's emitter, byte for byte, for the shapes
-// `decks/edit.py` writes into a deck file.
+// Package yamlemit is the deck file's emitter: one recorded YAML style,
+// byte for byte.
 //
 // It exists because of what an edit *is* here. `deck.yaml` is the source of
 // truth (ADR 1) and `swaps.md` is literally a diff of it, so the size of an
-// edit is part of its correctness: a one-card swap has to be a one-card diff.
-// `edit.py` achieves that by rewriting only the lines it changes -- and the
-// lines it writes come out of PyYAML's emitter, at a given width, with
-// PyYAML's own choices about quoting and folding. A second emitter that
-// merely produced *valid* YAML would produce a different diff for the same
-// edit, and the two runtimes would disagree about what a swap looks like
-// while both were "right". So this is not a YAML writer; it is a
-// reproduction, and the test that matters is byte equality against a corpus
-// Python generated (`testdata/render.json`).
+// edit is part of its correctness: a one-card swap has to be a one-card
+// diff. The edit engine achieves that by rewriting only the lines it
+// changes -- and the lines it writes come out of this emitter, at a given
+// width, with fixed choices about quoting and folding. A second emitter
+// that merely produced *valid* YAML would produce a different diff for the
+// same edit, and two writers would disagree about what a swap looks like
+// while both were "right". So this is not a general YAML writer; it is one
+// recorded style, and the test that matters is byte equality against the
+// frozen corpus (`testdata/render.json`).
 //
-// Three things are ported rather than reinvented, each because a reasonable
-// reinvention gives a different answer:
+// Three decisions carry the style, each because a reasonable alternative
+// gives a different answer:
 //
-//   - `analyze_scalar`, which decides what styles a string may take. A
+//   - the scalar analysis, which decides what styles a string may take. A
 //     trailing space forbids the block style; a space before a line break
 //     forbids everything except double quotes.
 //   - the implicit resolver (resolve.go), because the plain style is only
-//     offered to a value that reads back as a string. YAML 1.1 rules, since
-//     that is what PyYAML implements.
-//   - the line breaking in `write_folded` and `write_plain`, which breaks
+//     offered to a value that reads back as a string -- and it reads back
+//     under YAML 1.1 rules, deliberately, not 1.2's.
+//   - the line breaking in `writeFolded` and `writePlain`, which breaks
 //     *after* the configured width rather than at it, and only at a single
 //     space.
 //
-// Everything here counts columns in **code points**, as Python does. A `why`
-// with an em dash in it wraps where Python wraps it, not one byte earlier.
+// Everything here counts columns in **code points**, not bytes. A `why`
+// with an em dash in it wraps where the corpus wraps it, not one byte
+// earlier.
 package yamlemit
 
 import (
@@ -36,7 +37,7 @@ import (
 	"strings"
 )
 
-// PyYAML's defaults for the knobs `edit.py` does not set.
+// The emitter's fixed defaults for the knobs the deck writer does not set.
 const (
 	bestIndent   = 2
 	defaultWidth = 80

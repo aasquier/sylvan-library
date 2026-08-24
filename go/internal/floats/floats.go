@@ -1,43 +1,31 @@
-// Package pyfloat is CPython's float arithmetic, reproduced rather than
-// approximated: `math.fsum`, both of `round`'s spellings, and the explicit
-// conversion that stops this machine improving on either.
+// Package floats is the exact float arithmetic the served numbers rest on:
+// `Fsum`, both roundings, the canonical decimal rendering (repr.go), and the
+// explicit conversion that stops this machine improving on any of them.
 //
-// The third of the `py*` packages, after `pyrand` (CPython's `random.Random`)
-// and `pyyaml` (PyYAML's emitter), and here for the same reason both of those
-// are: a value crosses the wire, so the port has to answer in Python's
-// dialect rather than in a better one. It lived in `internal/sim` until
-// 2026-08-22, when the float-sum sweep found the same trap in three packages
-// that are not the simulator -- `artifacts` renders a money total, `analyze`
-// sums three hypergeometrics into a served payload, `suggest` sums four
-// weighted products into a ranking key. Importing `internal/sim` from the
-// deliverables renderer would have said the renderer depends on the
-// simulator, which is false; a second transcription of Shewchuk's algorithm
-// would have been worse than either.
+// It lived in `internal/sim` until 2026-08-22, when a float-sum sweep found
+// the same trap in three packages that are not the simulator -- `artifacts`
+// renders a money total, `analyze` sums three hypergeometrics into a served
+// payload, `suggest` sums four weighted products into a ranking key.
+// Importing `internal/sim` from the deliverables renderer would have said
+// the renderer depends on the simulator, which is false; a second
+// transcription of Shewchuk's algorithm would have been worse than either.
 //
-// The reason to reproduce these at all is not tidiness. Every integer this
-// port has to agree with comes out of a `>=` against a float:
+// The reason to pin the arithmetic at all is not tidiness. Every integer
+// this package's callers agree on comes out of a `>=` against a float:
 // `required_sources` scans until `hypergeometric_at_least(...) >= target`,
 // `reliable_turn` scans until `castable_odds >= TARGET`, `_slots_to_target`
 // scans until `on_curve_odds >= target`, and `curve`'s advice branches on
 // `abs(per_land - per_ramp) < TOO_CLOSE`. A one-ulp disagreement in any of
 // them is not a rounding difference on a screen -- it is a different land
-// count, a different reliable turn, a different row order in the shelf, or a
-// different recommendation. So the float arithmetic is matched exactly, and
-// the epsilons the differential tests pin are consequences of that rather than
-// allowances made for it.
+// count, a different reliable turn, a different row order in the shelf, or
+// a different recommendation. So the arithmetic is pinned exactly, against
+// a frozen corpus that compares bits, and the epsilons tolerated elsewhere
+// are consequences of that rather than allowances made for it.
 //
-// # Which Python, when there is more than one
-//
-// `Fsum` is the answer to a question that only has one, which is the point of
-// reaching for it. **`sum()` is not**: CPython 3.12 gave `sum()` over floats
-// compensated (Neumaier) accumulation where 3.11 adds them left to right, and
-// this project supports both, tests both in CI, and ships 3.12 in the image.
-// A Go `for ... { total += x }` reproduces **3.11**, so a port written the
-// obvious way agrees with the interpreter the container is not running. Every
-// Python site that summed floats was moved to `math.fsum` on 2026-08-22, and
-// every Go site that mirrored one was moved to `Fsum`; a naive accumulation
-// loop over floats in this module is now a bug wherever it appears beside a
-// Python `fsum`.
+// `Fsum` is the answer to a question that only has one, which is the point
+// of reaching for it: a bare `for ... { total += x }` is order-sensitive in
+// its last bits. Every summing site over served floats goes through `Fsum`;
+// a naive accumulation loop beside one is a bug wherever it appears.
 package floats
 
 import (
@@ -45,8 +33,9 @@ import (
 	"math/big"
 )
 
-// Fsum is CPython's `math.fsum`: the correctly-rounded sum of a sequence,
-// Shewchuk's algorithm with the final half-even fix-up CPython applies.
+// Fsum is the correctly-rounded sum of a sequence: Shewchuk's
+// exact-partials algorithm, finished with a half-even fix-up so the answer
+// is the nearest float64 to the true sum.
 //
 // `karsten.castable_odds` sums a hundred small products of probabilities with
 // `fsum` deliberately -- its own comment says so -- and a naive left-to-right
@@ -54,15 +43,13 @@ import (
 // decimal place and visible in `CardOdds.reliable_turn`, which compares the
 // result against 0.90.
 //
-// Transcribed from `Modules/mathmodule.c:math_fsum_impl`, including the two
-// details a plausible implementation gets wrong: a zero running total is
-// *not* appended to the partials, and the final accumulation stops at the
-// first inexact addition and then corrects for half-even rounding across
-// partials.
+// Two details a plausible implementation gets wrong, both pinned by the
+// corpus: a zero running total is *not* appended to the partials, and the
+// final accumulation stops at the first inexact addition and then corrects
+// for half-even rounding across partials.
 //
-// Inputs are expected finite; every caller here sums probabilities. CPython
-// raises OverflowError on an intermediate overflow of finite inputs, which
-// cannot arise from values in [0, 1], so no error is returned and a
+// Inputs are expected finite; every caller here sums probabilities, an
+// intermediate overflow cannot arise from values in [0, 1], and a
 // non-finite input simply propagates through the same arithmetic.
 func Fsum(values []float64) float64 {
 	partials := make([]float64, 0, 8)
@@ -116,19 +103,16 @@ func Fsum(values []float64) float64 {
 	return hi
 }
 
-// Round is CPython's one-argument `round(float)`: to the nearest integer, ties
-// to even. Go's `math.Round` breaks ties away from zero, so `round(34.5)` is
-// 34 in Python and 35 in Go -- and `karsten.RegressionLands` rounds a land
-// count with it, where the difference is one land in the recommendation.
+// Round is the app's integer rounding: to the nearest integer, ties to
+// even. `math.Round` breaks ties away from zero, so 34.5 rounds to 34 here
+// and 35 there -- and `karsten.RegressionLands` rounds a land count with
+// this, where the difference is one land in the recommendation.
 //
-// The correction is CPython's own, from `Objects/floatobject.c:float___round__`.
-//
-// It returns an **int**, which is what CPython's one-argument round returns
-// and what every caller here wants. That is not a detail: a float64 return
-// would have to answer `Round(-0.5)`, where CPython's integer zero has no sign
-// and Go's `math.Round` produces a negative one. Returning an int deletes the
-// question rather than answering it wrongly, and the corpus pins integers for
-// the same reason.
+// It returns an **int**, which is what every caller wants. That is not a
+// detail: a float64 return would have to answer `Round(-0.5)`, where an
+// integer zero has no sign and `math.Round` produces a negative one.
+// Returning an int deletes the question rather than answering it wrongly,
+// and the corpus pins integers for the same reason.
 func Round(x float64) int {
 	r := math.Round(x)
 	if math.Abs(x-r) == 0.5 {
@@ -137,18 +121,17 @@ func Round(x float64) int {
 	return int(r)
 }
 
-// RoundTo is CPython's two-argument `round(float, ndigits)` for ndigits >= 0:
-// the value rounded half-to-even at `ndigits` decimal places, then taken back
-// to the nearest float64.
+// RoundTo is the app's decimal rounding, for ndigits >= 0: the value
+// rounded half-to-even at `ndigits` decimal places, then taken back to the
+// nearest float64.
 //
-// CPython does this by formatting with `_Py_dg_dtoa` in mode 3 and re-parsing
-// with `_Py_dg_strtod`, both correctly rounded. Done here in exact rationals
-// instead of through `strconv`, because the claim wanted is *what the
-// arithmetic is* rather than *what two libraries happen to agree about*: a
-// float64 is exactly a rational, `x * 10^n` is exact, rounding that to an
-// integer half-to-even is exact, and `big.Rat.Float64` is documented to give
-// the nearest float64 with ties to even -- which is the same value CPython's
-// re-parse lands on, by the same definition.
+// Done in exact rationals rather than through `strconv`'s format-and-parse,
+// because the claim wanted is *what the arithmetic is* rather than *what
+// two library calls happen to agree about*: a float64 is exactly a
+// rational, `x * 10^n` is exact, rounding that to an integer half-to-even
+// is exact, and `big.Rat.Float64` is documented to give the nearest float64
+// with ties to even -- the same value a correctly-rounded format-and-parse
+// lands on, by the same definition.
 //
 // `regression_lands` reports an average mana value at two places and
 // `curve`'s advice reports four odds at four; all six are stored rounded and
@@ -179,10 +162,10 @@ func RoundTo(x float64, ndigits int) float64 {
 	out := new(big.Rat).SetFrac(q, new(big.Int).Set(scale.Num()))
 	f, _ := out.Float64()
 	if f == 0 {
-		// `big.Rat` has no signed zero and CPython's dtoa/strtod round trip
-		// does: `round(-0.4)` is `-0.0` there, and the difference is a visible
-		// minus sign on any surface that formats the result. Found by the
-		// corpus, which compares bits rather than values.
+		// `big.Rat` has no signed zero and the recorded arithmetic does:
+		// rounding -0.4 to an integer place gives -0.0, and the difference
+		// is a visible minus sign on any surface that formats the result.
+		// Found by the corpus, which compares bits rather than values.
 		return math.Copysign(0, x)
 	}
 	return f
@@ -202,9 +185,10 @@ func sign(n *big.Int) int {
 // The Go specification permits an implementation to "combine multiple
 // floating-point operations into a single fused operation, possibly across
 // statements", and the arm64 backend takes that permission: `z + x*y` becomes
-// one FMADD, which rounds *once* where CPython rounds twice. That is a
-// one-ulp difference, on one of the two architectures CI builds and the
-// image ships, in exactly the accumulations these closed forms are made of --
+// one FMADD, which rounds *once* where the recorded arithmetic rounds
+// twice -- per multiply, then per add. That is a one-ulp difference, on one
+// of the two architectures CI builds and the image ships, in exactly the
+// accumulations these closed forms are made of --
 // and a one-ulp difference here is a different integer out of the `>=` scans
 // described at the top of this file, not a cosmetic one.
 //

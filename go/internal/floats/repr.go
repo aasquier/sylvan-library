@@ -7,19 +7,19 @@ import (
 	"strings"
 )
 
-// Repr is CPython's `repr(float)`, which is also what `json.dumps` writes for
-// one — `float.__repr__` is the encoder's number renderer.
+// Repr is the canonical float rendering: the one spelling every float in a
+// served payload wears.
 //
 // It moved here from `internal/sim/tier1`, where it was written for the
-// simulator's digest, when a second family needed it: the Forge result's five
-// float fields go onto a wire a person reads in DevTools, and
-// `encoding/json` writes `4` for the float64 `4.0` where Python writes `4.0`.
-// That is the third of the three ways `encoding/json` differs from
-// `json.dumps` (after HTML escaping and `ensure_ascii`), and the one with no
-// encoder option to turn it off.
+// simulator's digest, when a second family needed it: the Forge result's
+// five float fields go onto a wire a person reads in DevTools, and
+// `encoding/json` writes `4` for the float64 `4.0` where the recorded wire
+// says `4.0`. That is the third of the three ways `encoding/json` departs
+// from the recorded JSON dialect (after HTML escaping and ASCII escaping),
+// and the one with no encoder option to turn it off.
 //
 // The shortest decimal that round-trips, rendered fixed when the decimal
-// point sits within reach and exponential when it does not: Python switches
+// point sits within reach and exponential when it does not: the switch is
 // at a decimal exponent below -3 or above 16, so `1e16` reads `1e+16` while
 // `1e15` reads `1000000000000000.0`, and `0.0001` stays fixed while
 // `0.00001` becomes `1e-05`. A fixed rendering always carries a decimal
@@ -27,8 +27,8 @@ import (
 // `.0`, and its exponent is at least two digits.
 //
 // Go's shortest formatting supplies the digits; only the presentation is
-// Python's. The boundaries above are pinned by a corpus taken from CPython
-// rather than trusted from this comment.
+// pinned. The boundaries above are held by the frozen corpus rather than
+// trusted from this comment.
 func Repr(v float64) string {
 	switch {
 	case math.IsNaN(v):
