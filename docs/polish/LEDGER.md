@@ -61,7 +61,7 @@ state, never checklists.
        `internal/reference`" → now the actual file,
        `go/internal/reference/data/shelves.json`.
 
-     **And the command nobody can run.** Twenty-two lines across nine
+     **And the command nobody can run.** Twenty-four lines across eleven
      documents told a reader to reproduce a committed asset with
      `mtglab animist build <recipe>`. That family moved to `tools/` when the
      Python app retired; the binary has no `animist` subcommand and the CLI's
@@ -248,7 +248,7 @@ state, never checklists.
      scattering of hand-written per-route tests —
      `TestAnotherAccountsPrivateDeckIsA404ToEveryLifecycleVerb` covers two
      verbs; `argue`, `interview`, `wheel` and `claudedial` have one each —
-     against **23 `/api/decks/{owner}/…` patterns**, with no completeness
+     against **22 `/api/decks/{owner}/…` patterns**, with no completeness
      guard over the set. The structural half ADR 5 also asked for *is* in
      place: one accessor, `api.sourceFor` → `library.SourceFor`, and every
      deck handler read this run goes through it. So this is a missing guard,

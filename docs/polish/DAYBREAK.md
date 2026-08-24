@@ -23,7 +23,7 @@ had it — 57 routes classified, each filed with its argument. The Go tree has n
 equivalent: the door's sweeps derive public-vs-protected and the admin prefix
 from the route table (both genuinely machine-checked), but *whose data a route
 serves* is checked only by a scattering of hand-written per-route 404 tests
-with no completeness guard over the 23 `/api/decks/{owner}/…` patterns. The
+with no completeness guard over the 22 `/api/decks/{owner}/…` patterns. The
 structural half ADR 5 also asked for **is** in place — one accessor,
 `api.sourceFor` → `library.SourceFor`, and every deck handler read this run
 goes through it — so this is a missing guard rather than a known hole, and no
