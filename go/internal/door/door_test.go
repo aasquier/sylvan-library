@@ -378,7 +378,7 @@ func TestResponsesOverTheFloorAreCompressed(t *testing.T) {
 
 // --------------------------------------------------------------- the static
 
-func TestTheShellAndItsMountsAnswerAsPythonDoes(t *testing.T) {
+func TestTheShellAndItsMountsAnswerTheRecordedShapes(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
 	cases := []struct {
 		method, path string
@@ -448,9 +448,9 @@ func TestAnAssetRevalidatesWithA304(t *testing.T) {
 }
 
 func TestContentTypesMatchTheContainer(t *testing.T) {
-	// CPython 3.12's built-in table plus api/app.py's three registrations,
-	// with Starlette's charset on text/* -- what the deployed container
-	// answers for every extension the bundle and the tarot directory hold.
+	// The deployed container's recorded serving table, charset included on
+	// every text/* -- what the wire has always answered for every extension
+	// the bundle and the tarot directory hold.
 	want := map[string]string{
 		"x.css": "text/css; charset=utf-8", "x.html": "text/html; charset=utf-8",
 		"x.ico": "image/vnd.microsoft.icon", "x.js": "text/javascript; charset=utf-8",
@@ -486,6 +486,21 @@ func TestNoFrontendMeansNoShell(t *testing.T) {
 
 // -------------------------------------------------------------- the headers
 
+// "Every" is derived, not sampled -- and the distinction is load-bearing
+// rather than tidy. Three dismissed high-severity `go/reflected-xss` alerts
+// (door.go's 404 echo and the gzip layer's two writes) rest on one sentence:
+// every body this door writes is JSON or a disk asset, and `nosniff` reaches
+// all of them. A hand-written list of eight paths cannot hold that sentence,
+// because the route it does not name is exactly the one that breaks it. So
+// the API half comes from `servedPaths` -- the served route table -- and the
+// literals below are only the paths no route table names: the SPA shell, the
+// two static tiers and the door's own liveness answer.
+//
+// Anonymous, deliberately: a protected route is refused before its handler
+// runs and a public one answers for real, so the sweep costs nothing and
+// still crosses the middleware seam where the headers are stamped. The one
+// signed-in case is the admin prefix, whose 403 is written by a different
+// arm of the same middleware.
 func TestEveryDoorResponseCarriesTheSecurityHeaders(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
 	want := map[string]string{
@@ -493,17 +508,23 @@ func TestEveryDoorResponseCarriesTheSecurityHeaders(t *testing.T) {
 		"Referrer-Policy":    "same-origin",
 		"Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
 	}
-	for _, c := range []struct{ method, path, token string }{
-		{"GET", "/api/decks", ""}, {"GET", "/api/admin/users", "bob"}, {"GET", "/", ""},
+	cases := []struct{ method, path, token string }{
+		{"GET", "/", ""}, {"POST", "/", ""},
 		{"GET", "/tarot/00-fool.webp", ""}, {"GET", "/assets/nope.js", ""},
-		{"GET", DoorHealthPath, ""}, {"GET", "/api/health", ""}, {"POST", "/", ""},
-	} {
+		{"GET", DoorHealthPath, ""},
+		{"GET", "/api/admin/users", "bob"},
+	}
+	for _, route := range servedPaths(t) {
+		cases = append(cases, struct{ method, path, token string }{
+			"GET", concrete(t, route), ""})
+	}
+	for _, c := range cases {
 		resp := get(t, srv, c.method, c.path, c.token)
 		for name, value := range want {
-			// Values, not Get: a proxied response that carried Python's copy
-			// *and* the door's would read `nosniff` from Get and be wrong on
-			// the wire -- the contract suite's httpx joins them and saw
-			// `nosniff, nosniff` on the first run through the door.
+			// Values, not Get: a response carrying the header twice would
+			// read `nosniff` from Get and be wrong on
+			// the wire -- a client that joins repeated headers saw
+			// `nosniff, nosniff` on the door's first run.
 			if got := resp.Header.Values(name); len(got) != 1 || got[0] != value {
 				t.Errorf("%s %s as %q: %s = %q, want exactly [%q]", c.method, c.path, c.token, name, got, value)
 			}
@@ -531,7 +552,7 @@ func TestHSTSRidesOnlyWhenTLSFrontsTheApp(t *testing.T) {
 // --------------------------------------------------- the real resolver path
 
 func TestTheRealResolverReadsAppDB(t *testing.T) {
-	// An app.db in Python's shape (see internal/auth's tests for the DDL and
+	// A real app.db (see internal/auth's tests for the DDL and
 	// the vectors): alice's session admits her; a missing file is anonymous.
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "app.db")
@@ -592,7 +613,7 @@ func TestTheRealResolverReadsAppDB(t *testing.T) {
 	}
 }
 
-// ------------------------------------------------------- the ported routes
+// -------------------------------------------------------- the API routes
 
 func TestARouteAnswersTheEmbeddedPayload(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
@@ -647,7 +668,7 @@ func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
 			t.Errorf("%s landed on %s, want %s", path, hit, want)
 		}
 	}
-	// The same shape twice is the pair nothing could choose between.
+	// The same shape twice: two routes nothing could choose between.
 	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	if _, err := newRouteTable([]api.Route{
 		{Method: "GET", Pattern: "/api/decks/{owner}/{slug}", Handler: h},

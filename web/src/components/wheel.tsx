@@ -19,15 +19,15 @@
  * top of the crop — and the spin lands the chosen fate under the crowned
  * skull watching from the treetop, which sits at 0° and is the marker.
  *
- * The spin itself is the server's (`decks/wheel.py`): seeded dice over the
+ * The spin itself is the server's: seeded dice over the
  * pool, a fate and a card in the deck's colours that answers to it. The
  * client's whole job is theatre — ask first, then decelerate onto the
  * answer, then show the card once the wheel has stopped. The theatre now
  * has a soundtrack to match: `wheelTurn` in `lib/tablesounds.ts` ratchets a
  * pawl over the studs on the same deceleration curve the CSS uses, and it
- * obeys the same switch every other table sound does. `answered_by:
- * "python"` renders in the caveat, because a fortune wheel is exactly where
- * somebody would otherwise assume Claude.
+ * obeys the same switch every other table sound does. The server's
+ * dice-not-judgment caveat renders beside the card, because a fortune wheel
+ * is exactly where somebody would otherwise assume Claude.
  *
  * The reveal waits on `transitionend`, with a timer as the fallback — a
  * hidden tab never paints the transition, and a spin whose result never

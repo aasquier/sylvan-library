@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyyaml"
+	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
 // The nine operations. Each takes the file's text and hands back the text it
@@ -82,7 +82,7 @@ func ReplaceCard(text, oldName, newName, why string, category *string) (string, 
 func AddCard(text, name, category, why string, qty int, listKey string) (string, error) {
 	if !slices.Contains(CardLists, listKey) {
 		return "", failf("cards live in %s, not %s",
-			strings.Join(CardLists, " or "), pyRepr(listKey))
+			strings.Join(CardLists, " or "), quotedValue(listKey))
 	}
 	name = strings.TrimSpace(name)
 	category = strings.TrimSpace(category)
@@ -116,10 +116,10 @@ func AddCard(text, name, category, why string, qty int, listKey string) (string,
 				// graveyard copy carries the user's own `why` already, which
 				// is exactly what a return restores.
 				return "", failf("%s is in the graveyard; return it or exile it "+
-					"instead of adding a second entry", pyRepr(name))
+					"instead of adding a second entry", quotedValue(name))
 			}
 			return "", failf("%s is already in %s; change its quantity or "+
-				"rationale instead of adding a second entry", pyRepr(name), whereIs(key))
+				"rationale instead of adding a second entry", quotedValue(name), whereIs(key))
 		}
 	}
 	if err := refuseTheCommander(doc, name); err != nil {
@@ -234,7 +234,7 @@ func EntombCard(text, name string) (string, error) {
 	}
 	if listKey != "cards" {
 		return "", failf("%s is on the swap board, which has no graveyard; "+
-			"remove it instead", pyRepr(name))
+			"remove it instead", quotedValue(name))
 	}
 
 	content, cut := entryCut(lines, e, position, len(listOf(doc, "cards")), true)
@@ -287,7 +287,7 @@ func ReturnCard(text, name string) (string, error) {
 	}
 	_, position, e, err := locateCard(doc, lines, name, []string{Graveyard})
 	if err != nil {
-		return "", failf("%s is not in the graveyard", pyRepr(name))
+		return "", failf("%s is not in the graveyard", quotedValue(name))
 	}
 
 	moved := cardAt(listOf(doc, Graveyard), position)
@@ -302,7 +302,7 @@ func ReturnCard(text, name string) (string, error) {
 			card, ok := item.(map[string]any)
 			if ok && nameMatches(card, movedName) {
 				return "", failf("%s is already in %s; exile the graveyard copy "+
-					"instead of returning it", pyRepr(movedName), whereIs(key))
+					"instead of returning it", quotedValue(movedName), whereIs(key))
 			}
 		}
 	}
@@ -375,7 +375,7 @@ func ExileCard(text, name string) (string, error) {
 	}
 	_, position, e, err := locateCard(doc, lines, name, []string{Graveyard})
 	if err != nil {
-		return "", failf("%s is not in the graveyard", pyRepr(name))
+		return "", failf("%s is not in the graveyard", quotedValue(name))
 	}
 
 	_, cut := entryCut(lines, e, position, len(listOf(doc, Graveyard)), false)
@@ -403,7 +403,7 @@ func ExileCard(text, name string) (string, error) {
 func SetCardField(text, name, field string, value any) (string, error) {
 	if !slices.Contains(SettableFields, field) {
 		return "", failf("%s is not settable; choose one of %s",
-			pyRepr(field), strings.Join(SettableFields, ", "))
+			quotedValue(field), strings.Join(SettableFields, ", "))
 	}
 
 	doc, lines, err := open(text)
@@ -420,7 +420,7 @@ func SetCardField(text, name, field string, value any) (string, error) {
 	case "qty":
 		qty, err := asInt(value)
 		if err != nil {
-			return "", failf("quantity must be a whole number, not %s", pyRepr(value))
+			return "", failf("quantity must be a whole number, not %s", quotedValue(value))
 		}
 		if qty < 1 {
 			return "", failf("quantity must be at least 1; remove the card instead")
@@ -435,7 +435,7 @@ func SetCardField(text, name, field string, value any) (string, error) {
 		art := strings.TrimSpace(asString(value))
 		if art != "" && !printingID.MatchString(art) {
 			return "", failf("%s is not a Scryfall printing id. It should look "+
-				"like a UUID; the deck page's art picker sets this for you.", pyRepr(art))
+				"like a UUID; the deck page's art picker sets this for you.", quotedValue(art))
 		}
 		written = art
 	default:
@@ -501,7 +501,7 @@ func SetDeckField(text, field string, value any) (string, error) {
 	}
 	if !slices.Contains(SettableDeckFields, field) {
 		return "", failf("%s is not a settable deck field; choose one of %s",
-			pyRepr(field), strings.Join(SettableDeckFields, ", "))
+			quotedValue(field), strings.Join(SettableDeckFields, ", "))
 	}
 
 	doc, lines, err := open(text)
@@ -583,14 +583,14 @@ func SetDeckField(text, field string, value any) (string, error) {
 //
 // The tenth operation, and it exists because the ninth's comment above made a
 // claim that was not true: *nothing on the app's write path ever calls
-// `Deck.dump` on an existing file*. `FileDeckSource.set_shared` did, and it
-// was the only thing that did. A load-and-dump round trip rewrites the whole
-// file -- so one press of the deck page's share toggle took a hand-written
-// curated deck's section banners, its trailing comments, its folded blocks
-// and its `swap_board: []` with it, and since ADR 30 there is no revision to
-// get them back from. Found by this port, which had to reproduce the bytes
-// and so had to ask what they were; ruled by Aaron 2026-08-22 and fixed in
-// both runtimes at once, so the two still write the same file.
+// `Deck.dump` on an existing file*. The share toggle's original write did,
+// and it was the only thing that did. A load-and-dump round trip rewrites
+// the whole file -- so one press of the deck page's share toggle took a
+// hand-written curated deck's section banners, its trailing comments, its
+// folded blocks and its `swap_board: []` with it, and since ADR 30 there is
+// no revision to get them back from. Found by holding the write to the
+// recorded bytes, which meant asking what the bytes were; ruled by Aaron
+// 2026-08-22, and this surgical operation is the fix.
 //
 // Deliberately not a SettableDeckFields entry. `shared` is the one deck fact
 // the two tiers keep in different places -- `deck.yaml` here, a column in the
@@ -663,7 +663,7 @@ func SetNote(text, key, value string) (string, error) {
 		return "", failf("a note needs a key")
 	}
 	if !keyLine.MatchString(key + ":") {
-		return "", failf("%s is not a usable note key; use letters, digits and underscores", pyRepr(key))
+		return "", failf("%s is not a usable note key; use letters, digits and underscores", quotedValue(key))
 	}
 	if strings.TrimSpace(value) == "" {
 		// Symmetrical with a card's `why`: an empty note is not a note, and
@@ -699,7 +699,7 @@ func SetNote(text, key, value string) (string, error) {
 		for anchor > 0 && strings.TrimSpace(lines[anchor-1]) == "" {
 			anchor--
 		}
-		body, err := pyyaml.Render(key, value, 2, pyyaml.ProseWidth, true)
+		body, err := yamlemit.Render(key, value, 2, yamlemit.ProseWidth, true)
 		if err != nil {
 			return "", err
 		}
@@ -727,7 +727,7 @@ func SetNote(text, key, value string) (string, error) {
 			}
 			break
 		}
-		rendered, err := pyyaml.Render(key, value, indent, pyyaml.ProseWidth, true)
+		rendered, err := yamlemit.Render(key, value, indent, yamlemit.ProseWidth, true)
 		if err != nil {
 			return "", err
 		}
@@ -824,7 +824,7 @@ func whereIs(key string) string {
 func refuseTheCommander(doc map[string]any, name string) error {
 	for _, commander := range listOf(doc, "commander") {
 		if strings.EqualFold(strings.TrimSpace(asString(commander)), strings.TrimSpace(name)) {
-			return failf("%s is the commander, which sits outside the 99", pyRepr(name))
+			return failf("%s is the commander, which sits outside the 99", quotedValue(name))
 		}
 	}
 	return nil

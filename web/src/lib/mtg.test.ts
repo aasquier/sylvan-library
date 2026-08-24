@@ -66,7 +66,7 @@ describe('identityName', () => {
   })
 
   it('names four-colour identities with the taxonomy\'s canonical names', () => {
-    // These must match src/mtglab/colors.py, where the Scryfall/C16 names are
+    // These must match the colors table the server owns, where the Scryfall/C16 names are
     // canonical and the Nephilim names are aliases -- the Start-a-deck grid
     // renders the taxonomy's name, so a divergent row here would show one
     // deck under two names in the same session. GET /api/colors is the same
@@ -142,7 +142,7 @@ describe('splitManaText', () => {
   })
 
   it('expands a colour identity written as one brace', () => {
-    // `validate.py` writes an identity as {GW} -- one brace, two colours,
+    // The gate writes an identity as {GW} -- one brace, two colours,
     // because that is how Magic writes an identity. Two pips, not one blob.
     expect(pips('identity {GW} includes {W}, outside {G}')).toEqual(['G', 'W', 'W', 'G'])
   })

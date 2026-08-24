@@ -1,19 +1,17 @@
-// The schema ladder for `app.db` — owned here since Phase 8 of the Go
-// migration (docs/go-migration/PLAN.md §7), when the deployed instance
-// stopped carrying a Python interpreter to run `auth/db.py`'s.
+// The schema ladder for `app.db` — the ladder the deployed instance runs
+// at every boot.
 //
-// The twelve scripts under `migrations/` are that ladder's, byte for byte:
-// SQLite stores a CREATE statement's exact text in `sqlite_master`, so
-// executing identical SQL is what makes a Go-built `app.db` and a
-// Python-built one indistinguishable — which
-// `TestMigrateBuildsWhatPythonBuilt` holds against the generated
+// The twelve scripts under `migrations/` are the recorded schema, byte for
+// byte: SQLite stores a CREATE statement's exact text in `sqlite_master`,
+// so executing identical SQL is what keeps a freshly-minted `app.db`
+// indistinguishable from every one already in the field — which
+// `TestMigrateBuildsTheRecordedSchema` holds against
 // `authtest/app_schema.sql`, and which is the property every `mode=rw`
-// handle in this module quietly relies on. The Python remnant keeps its
-// copy of the ladder for the dev laptop; a change to either side fails that
-// test until the other side moves too, and a new rung is authored HERE
-// first, because this is the ladder the instance actually runs.
+// handle in this module quietly relies on. A new rung is a new script under
+// `migrations/`, and the recorded schema beside the tests moves in the
+// same change, never by drift.
 //
-// Two behaviours are the contract rather than detail, both inherited:
+// Two behaviours are the contract rather than detail:
 // foreign keys are OFF for the duration and `foreign_key_check` signs the
 // file off afterwards (rung 5 rebuilds `users`, which `sessions` and
 // `auth_tokens` reference ON DELETE CASCADE — with the pragma on, that DROP
@@ -104,8 +102,7 @@ func migrate(ctx context.Context, conn *sql.Conn) error {
 	// Off for the whole ladder, not just the rung that rebuilds a table: the
 	// pragma is a no-op inside a transaction, so a script that opens one
 	// could not set it — and the next rebuild inherits the safety instead of
-	// rediscovering the trap. `auth/db.py:_apply_migrations` argues this at
-	// length; the argument moved here with the ladder.
+	// rediscovering the trap.
 	if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
 		return fmt.Errorf("app.db: %w", err)
 	}

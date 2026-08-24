@@ -13,9 +13,9 @@ import (
 
 // cardsCommand is `mtglab cards`: the pool asked directly from the shell.
 // `show` is rule 1 of the non-negotiables made a command — "never evaluate a
-// card from memory; look it up" used to be a four-line Python snippet in
-// CLAUDE.md and the mtg-lab skill, and the snippet dies with the interpreter,
-// so the lookup becomes the binary's own.
+// card from memory; look it up" deserves a first-class door rather than a
+// snippet pasted around CLAUDE.md and the mtg-lab skill, so the lookup is
+// the binary's own.
 func cardsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cards",

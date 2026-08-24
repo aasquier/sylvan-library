@@ -12,8 +12,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 )
 
-// `sim/mulligan.py`, held to Python by `testdata/mulligan.json` (written by
-// `python tests/go_fixtures.py`) over the same fixture decks the closed forms
+// The mulligan search, held to the frozen corpus `testdata/mulligan.json`
+// over the same fixture decks the closed forms
 // use.
 //
 // # Every float is compared as bits, and here is why that is not excessive
@@ -21,8 +21,8 @@ import (
 // This module produces two kinds of number and both are read by a comparison
 // rather than by a person. `SpellsThroughT8` is the sort key of the table AND
 // the operand of `Gain`, which is then read against `Flat` -- so one ulp is a
-// different recommended rule, or a sweep that reports `flat` where Python
-// reports a winner. `MulliganRate` is the tie-breaker on both `Best` and
+// different recommended rule, or a sweep that reports `flat` where the
+// corpus reports a winner. `MulliganRate` is the tie-breaker on both `Best` and
 // `Gentlest`. There is no field here whose last decimal is decoration, which
 // is exactly `karsten`'s argument for the same choice.
 //
@@ -40,8 +40,9 @@ type numberJSON struct {
 	Value float64 `json:"value"`
 }
 
-// want is the `tier1.Number` Python recorded. The float leg arrives as bits
-// and the int leg as itself, because `statistics.median` really does answer
+// want is the `tier1.Number` the corpus recorded. The float leg arrives as
+// bits
+// and the int leg as itself, because the median really does answer
 // two types and the type is part of the answer.
 func (n *numberJSON) want() *tier1.Number {
 	if n == nil {
@@ -155,18 +156,19 @@ func load(t *testing.T) corpus {
 		t.Fatalf("decode corpus: %v", err)
 	}
 	if len(c.Sweeps) == 0 {
-		t.Fatal("the corpus is empty; regenerate with `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/mulligan.json is a frozen " +
+			"golden -- restore it from version control")
 	}
 	return c
 }
 
-func TestTheConstantsAreThePythonOnes(t *testing.T) {
+func TestTheConstantsAreTheRecordedOnes(t *testing.T) {
 	c := load(t)
 	if mulligan.Through != c.Through {
-		t.Errorf("Through = %d, Python says %d", mulligan.Through, c.Through)
+		t.Errorf("Through = %d, the corpus says %d", mulligan.Through, c.Through)
 	}
 	if got := math.Float64bits(mulligan.Flat); got != c.Flat {
-		t.Errorf("Flat = %v (bits %#x), Python says bits %#x",
+		t.Errorf("Flat = %v (bits %#x), the corpus says bits %#x",
 			mulligan.Flat, got, c.Flat)
 	}
 	for name, pair := range map[string][2][]int{
@@ -175,28 +177,28 @@ func TestTheConstantsAreThePythonOnes(t *testing.T) {
 		"MinPieces": {mulligan.MinPieces, c.MinPieces},
 	} {
 		if len(pair[0]) != len(pair[1]) {
-			t.Errorf("%s = %v, Python says %v", name, pair[0], pair[1])
+			t.Errorf("%s = %v, the corpus says %v", name, pair[0], pair[1])
 			continue
 		}
 		for i := range pair[0] {
 			if pair[0][i] != pair[1][i] {
-				t.Errorf("%s = %v, Python says %v", name, pair[0], pair[1])
+				t.Errorf("%s = %v, the corpus says %v", name, pair[0], pair[1])
 				break
 			}
 		}
 	}
 }
 
-// TestTheGridIsPythonsGrid checks the rules AND their order.
+// TestTheGridIsTheRecordedGrid checks the rules AND their order.
 //
 // The order is real input, not presentation: `Best` keeps the first maximum,
 // so two cells that tie on deployment and on mulligan rate are separated by
 // nothing except which came first out of the nested loops.
-func TestTheGridIsPythonsGrid(t *testing.T) {
+func TestTheGridIsTheRecordedGrid(t *testing.T) {
 	c := load(t)
 	got := mulligan.Candidates()
 	if len(got) != len(c.Candidates) {
-		t.Fatalf("the grid holds %d rules, Python says %d",
+		t.Fatalf("the grid holds %d rules, the corpus says %d",
 			len(got), len(c.Candidates))
 	}
 	for i, want := range c.Candidates {
@@ -205,16 +207,16 @@ func TestTheGridIsPythonsGrid(t *testing.T) {
 			g.MinManaPieces != want.MinManaPieces ||
 			g.CheapRampMV != want.CheapRampMV ||
 			g.MaxMulligans != want.MaxMulligans {
-			t.Errorf("rule %d = %+v, Python says %+v", i, g, want.ruleJSON)
+			t.Errorf("rule %d = %+v, the corpus says %+v", i, g, want.ruleJSON)
 		}
 		if g.Describe() != want.Describe {
-			t.Errorf("rule %d describes as %q, Python says %q",
+			t.Errorf("rule %d describes as %q, the corpus says %q",
 				i, g.Describe(), want.Describe)
 		}
 	}
 }
 
-func TestEverySweepAgreesWithPython(t *testing.T) {
+func TestEverySweepAgreesWithTheCorpus(t *testing.T) {
 	c := load(t)
 	decks := simDecks(t)
 	for _, want := range c.Sweeps {
@@ -237,11 +239,11 @@ func TestEverySweepAgreesWithPython(t *testing.T) {
 				t.Fatalf("search: %v", err)
 			}
 			if got.Games != want.Games || got.Turns != want.Turns || got.Seed != want.Seed {
-				t.Errorf("parameters echoed back as %d/%d/%d, Python says %d/%d/%d",
+				t.Errorf("parameters echoed back as %d/%d/%d, the corpus says %d/%d/%d",
 					got.Games, got.Turns, got.Seed, want.Games, want.Turns, want.Seed)
 			}
 			if len(got.Rows) != len(want.Rows) {
-				t.Fatalf("%d rows, Python says %d", len(got.Rows), len(want.Rows))
+				t.Fatalf("%d rows, the corpus says %d", len(got.Rows), len(want.Rows))
 			}
 			for i := range want.Rows {
 				checkRow(t, "rows["+itoa(i)+"]", got.Rows[i], want.Rows[i])
@@ -252,7 +254,7 @@ func TestEverySweepAgreesWithPython(t *testing.T) {
 			checkFloat(t, "spread", got.Spread, want.Spread)
 			checkFloat(t, "gain", got.Gain(), want.Gain)
 			if got.IsFlat() != want.Flat {
-				t.Errorf("flat = %v, Python says %v (gain %v)",
+				t.Errorf("flat = %v, the corpus says %v (gain %v)",
 					got.IsFlat(), want.Flat, got.Gain())
 			}
 		})
@@ -263,7 +265,7 @@ func checkRow(t *testing.T, what string, got mulligan.Row, want rowJSON) {
 	t.Helper()
 	if got.MinLands != want.MinLands || got.MaxLands != want.MaxLands ||
 		got.MinPieces != want.MinPieces {
-		t.Errorf("%s is rule %d-%d/%d, Python says %d-%d/%d", what,
+		t.Errorf("%s is rule %d-%d/%d, the corpus says %d-%d/%d", what,
 			got.MinLands, got.MaxLands, got.MinPieces,
 			want.MinLands, want.MaxLands, want.MinPieces)
 		return
@@ -274,17 +276,17 @@ func checkRow(t *testing.T, what string, got mulligan.Row, want rowJSON) {
 	checkFloat(t, what+".color_screw_rate", got.ColorScrewRate, want.ColorScrewRate)
 	checkFloat(t, what+".stalled_turns", got.StalledTurns, want.StalledTurns)
 	if got.Describe != want.Describe {
-		t.Errorf("%s.describe = %q, Python says %q", what, got.Describe, want.Describe)
+		t.Errorf("%s.describe = %q, the corpus says %q", what, got.Describe, want.Describe)
 	}
 	wantMedian := want.MedianCommanderTurn.want()
 	switch {
 	case wantMedian == nil && got.MedianCommanderTurn != nil:
-		t.Errorf("%s.median_commander_turn = %v, Python says None",
+		t.Errorf("%s.median_commander_turn = %v, the corpus says none",
 			what, *got.MedianCommanderTurn)
 	case wantMedian != nil && got.MedianCommanderTurn == nil:
-		t.Errorf("%s.median_commander_turn is nil, Python says %v", what, *wantMedian)
+		t.Errorf("%s.median_commander_turn is nil, the corpus says %v", what, *wantMedian)
 	case wantMedian != nil && *got.MedianCommanderTurn != *wantMedian:
-		t.Errorf("%s.median_commander_turn = %+v, Python says %+v",
+		t.Errorf("%s.median_commander_turn = %+v, the corpus says %+v",
 			what, *got.MedianCommanderTurn, *wantMedian)
 	}
 }
@@ -292,7 +294,7 @@ func checkRow(t *testing.T, what string, got mulligan.Row, want rowJSON) {
 func checkFloat(t *testing.T, what string, got float64, want uint64) {
 	t.Helper()
 	if bits := math.Float64bits(got); bits != want {
-		t.Errorf("%s = %v (bits %#x), Python says %v (bits %#x)",
+		t.Errorf("%s = %v (bits %#x), the corpus says %v (bits %#x)",
 			what, got, bits, math.Float64frombits(want), want)
 	}
 }
@@ -309,11 +311,11 @@ func itoa(n int) string {
 	return string(digits)
 }
 
-// TestSearchRefusesAnEmptyGrid is `ValueError("no keep rules to search")`.
+// TestSearchRefusesAnEmptyGrid is the empty-grid refusal.
 //
 // A caller can hand `Rules` an empty non-nil slice, which is a different thing
 // from handing it nil -- nil means "use the grid" and empty means "there is
-// nothing to run". Python distinguishes them with `rules is not None`, and Go
+// nothing to run". The two are distinguished
 // with a nil check rather than a length check, which is the line that is easy
 // to write the other way.
 func TestSearchRefusesAnEmptyGrid(t *testing.T) {
@@ -324,10 +326,11 @@ func TestSearchRefusesAnEmptyGrid(t *testing.T) {
 	}
 }
 
-// TestProgressIsCalledAsPythonCallsIt: once before each rule, and once more at
+// TestProgressIsCalledOncePerRulePlusOnce: once before each rule, and once
+// more at
 // the end. It consumes no randomness, so a watched sweep and a plain one must
 // answer identically -- which is also asserted here rather than assumed.
-func TestProgressIsCalledAsPythonCallsIt(t *testing.T) {
+func TestProgressIsCalledOncePerRulePlusOnce(t *testing.T) {
 	library := []*sim.Card{
 		{Name: "Forest", IsLand: true, Produces: []sim.Source{{Colors: []string{"G"}, Amount: 1}}},
 		{Name: "Bear", Cost: sim.Cost{Generic: 1, Pips: [][]string{{"G"}}}},

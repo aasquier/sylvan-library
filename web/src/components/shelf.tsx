@@ -1,6 +1,6 @@
 /**
  * The shelves (second punch list of 2026-08-15, item 7): one fact at a time
- * from `lore.py`'s volumes, under the Library masthead.
+ * from the served lore volumes, under the Library masthead.
  *
  * The first shelf strip borrowed one combination story from the colour
  * taxonomy; this is the grown version. The facts are checked-in prose served

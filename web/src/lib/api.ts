@@ -1,4 +1,4 @@
-/** Typed client for the mtglab API. Mirrors src/mtglab/api/service.py. */
+/** Typed client for the mtglab API. Mirrors the server's /api route families. */
 
 export interface Health {
   pool: boolean
@@ -277,8 +277,9 @@ export interface DeckStats {
 }
 
 /** One turn of the Wheel of Fortune — a fate, and (usually) a card in the
- *  deck's colours that answers to it. `answered_by: "python"` because the
- *  wheel is seeded dice over the pool, never a model. */
+ *  deck's colours that answers to it. `answered_by: "dice"` is the wire's
+ *  token for chance rather than judgment — seeded rolls over the pool, never
+ *  a model. Clients key on the token; nothing ever renders it. */
 export interface WheelSpin {
   pool_available: boolean
   symbol: 'cup' | 'heart' | 'sword' | 'skull' | null
@@ -394,7 +395,7 @@ export interface LandResult extends SimProvenance {
  * blocks a curated deck and changes nothing about mana; a banned card is
  * sitting in the 99 being shuffled, and an unresolved card was dropped, which
  * shrinks the very population every probability is computed over. The server
- * decides which is which — see `MOVES_THE_NUMBERS` in `api/simruns.py`.
+ * decides which is which — see `movesTheNumbers` in its sim-run routes.
  */
 export interface DeckCheck {
   ok: boolean
@@ -683,7 +684,7 @@ export interface DeckArtifact {
  * Never recomputed here. The server compares the stored snapshot against the
  * deck and this renders the answer — the readout rule the stance dial and the
  * labels editor already follow, for the same reason: a second copy of the
- * comparison in TypeScript would disagree with the Python one silently.
+ * comparison in TypeScript would disagree with the served one silently.
  */
 export interface DeckArtifacts {
   artifacts: DeckArtifact[]
@@ -725,8 +726,8 @@ export interface IdentifiedCard {
 
 /** A candidate the title tier offers. `score` is a string distance and is
  *  carried so a list can be ordered and shaded — **never so anything can
- *  threshold on it.** The scores of right and wrong answers overlap; see
- *  `cards/identify.py`. */
+ *  threshold on it.** The scores of right and wrong answers overlap; the
+ *  server's card reader carries the measurement. */
 export interface IdentifiedCandidate extends IdentifiedCard {
   score: number
 }
@@ -818,7 +819,7 @@ export interface Job {
   /** What is true *so far*, while the job is still running — and `null` the
    *  moment it is not.
    *
-   *  The server clears it on completion deliberately (`jobs.py`): `result` is
+   *  The server clears it on completion deliberately: `result` is
    *  the whole answer, so a partial left lying beside it is a stale second
    *  copy of the same match. Read it for a live view and read `result` for
    *  the record; never merge the two.
@@ -943,8 +944,8 @@ export interface AdminStorage {
   decks: { count: number; bytes: number | null; trashed: number }
 }
 
-/** One mode's ledger roll-up (`claude/ledger.py`): counters, a mode name,
- *  and nothing that could name a person, a deck or a question. */
+/** One mode's ledger roll-up (the server's Claude ledger): counters, a mode
+ *  name, and nothing that could name a person, a deck or a question. */
 export interface ClaudeUsageRow {
   mode: string
   /** The model that answered. Every row carries both axes; the one that was
@@ -957,7 +958,7 @@ export interface ClaudeUsageRow {
   /** How to name that Claude on a screen: "Sonnet", "Opus", "Several" for an
    *  aggregated row, "Another Claude" for a model this build does not know.
    *  Computed server-side, so there is no id-to-name table in TypeScript to
-   *  drift from the one in `claude/tiers.py`. */
+   *  drift from the server's own. */
   model_label: string
   conversations: number
   requests: number
@@ -1108,7 +1109,7 @@ export class ApiError extends Error {
  * the Admin page, or signed out in another tab.
  *
  * Handled here rather than in each route, and that is the same argument
- * `api/auth.py` makes for a middleware over a per-route dependency: eleven
+ * the door makes for auth middleware over a per-route check: eleven
  * routes each catching their own 401 is eleven chances to forget, and the one
  * added in a year is the one that renders a blank page with an unexplained
  * error. One place means every screen gets it, including the ones not written
@@ -1336,11 +1337,11 @@ export interface Glossary {
 }
 
 /**
- * The labelling vocabulary, from `GET /api/themes`. Mirrors
- * `mtglab.decks.model.THEMES` and `ARCHETYPES`.
+ * The labelling vocabulary, from `GET /api/themes`. Mirrors the server's
+ * theme and archetype tables.
  *
  * Served rather than copied into this file: TypeScript cannot check a string
- * against a Python tuple, so a copy would drift silently and start offering
+ * against the server's list, so a copy would drift silently and start offering
  * labels the server refuses.
  *
  * `archetypes` is the subset of `themes` that are *class* words. It is not a
@@ -1536,7 +1537,7 @@ export interface SlotCharge {
   strength: string
 }
 
-/** A card the model named as an alternative, *after* Python checked it. */
+/** A card the model named as an alternative, *after* the server checked it. */
 export interface SlotAlternative {
   name: string
   mana_cost?: string | null
@@ -1584,7 +1585,7 @@ export interface SlotArgumentReport {
     banned: string[]
     off_colour: string[]
     /** Suggestions the deck already runs — a swap to one would be a no-op,
-     *  so Python drops them before they are shown (punch list 2026-08-15). */
+     *  so the server drops them before they are shown (punch list 2026-08-15). */
     already_in_deck: string[]
     no_pool: string[]
   }
@@ -1921,8 +1922,8 @@ export interface PersonaRoster {
  * slot kinds, so a card is dealt *for* a slot and the readiness instrument is
  * untouched. `position` is what the reader calls that place out loud.
  *
- * There is no `meaning`, here or on the server. Python shuffles; the reader
- * reads.
+ * There is no `meaning`, here or on the server. The server shuffles; the
+ * reader reads.
  */
 export interface TarotDrawn {
   key: string
@@ -2242,7 +2243,7 @@ export const api = {
   // before anybody has committed to spending a penny.
   personas: () => get<PersonaRoster>('/api/claude/personas'),
   // Deal three cards. No model, no card pool, no network, no cost: a shuffle has
-  // a right answer, so Python does it (ADR 14). Pass the seed back to re-deal
+  // a right answer, so the server does it (ADR 14). Pass the seed back to re-deal
   // the same spread — which is what a reload does.
   tarotReading: (seed?: number) =>
     get<TarotReading>(
@@ -2264,8 +2265,8 @@ export const api = {
     post<{ detail: string }>('/api/auth/reset', { email }),
   // Redeem an emailed link. The token comes out of `location.hash` — never the
   // query string, which would put a live credential in every access log along
-  // the way; see `auth/invites.py`. This POST is the only request that carries
-  // it, in a JSON body rather than a URL.
+  // the way; the server's invite builder makes the same argument. This POST is
+  // the only request that carries it, in a JSON body rather than a URL.
   claim: (body: { token: string; password: string; username?: string }) =>
     post<ClaimResult>('/api/auth/claim', body),
   claimPreview: (body: { token: string }) =>
@@ -2311,7 +2312,7 @@ export const api = {
   simLands: (payload: Record<string, unknown>) => post<Job>('/api/sim/lands', payload),
   /** The closed form. Answers in the request rather than handing back a job —
    *  it is 40ms of arithmetic, and the one simulation route that is not a
-   *  job. See `api/shelfruns.py` for the measurement behind that. */
+   *  job. The server's shelf-run route carries the measurement behind that. */
   simShelf: (payload: Record<string, unknown>) =>
     post<ShelfResult>('/api/sim/shelf', payload),
   simPolicy: (payload: Record<string, unknown>) =>

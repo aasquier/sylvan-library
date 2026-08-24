@@ -23,13 +23,15 @@ non-compliant until he rules.
 
 Work the list:
 
-- `mtglab animist verify` passes: every committed asset matches its recipe
-  (ADR 29). Then sweep for binaries that *bypassed* the pipeline: compare
+- `cd tools && .venv/bin/animist verify` passes: every committed asset matches its
+  recipe (ADR 29) — the toolbox owns this command; `mtglab` has no `animist`
+  subcommand and never did. Then sweep for binaries that *bypassed* the
+  pipeline: compare
   `git ls-files` image/font/media files against what the recipes and
   `PROVENANCE.md` files account for. A hand-placed binary is a finding even
   if its licence turns out fine — the pipeline exists so nobody has to trust
   a memory.
-- The licence gate (`mtglab animist licence`) still has no `--force` and no
+- The licence gate (`animist licence`, from `tools/`) still has no `--force` and no
   code path around it. Check the code, not the docs.
 - Wizards' art is runtime-only, always: `PERSONA_ART` hotlinks with credit
   and nothing under `git ls-files` is a Wizards image. The tarot art is the
@@ -41,10 +43,11 @@ Work the list:
 - No monetization surface exists, even vestigially: no payment code, no
   donation links, no ad slots, nothing that takes a penny. Check the frontend
   too — a well-meaning "buy me a coffee" is a violation here.
-- Dependency licences: sweep Python (`pip install pip-licenses` is a new dev
-  dep — so do it with a throwaway venv or by reading metadata) and
-  `npm --prefix web ls` trees for licences incompatible with a free public
-  project (AGPL in a dependency is a finding to queue, not necessarily fatal
+- Dependency licences: sweep the Go module graph (`go-licenses report ./...`
+  from `go/`, installed on demand), the toolbox's own metadata in
+  `tools/pyproject.toml`, and `npm --prefix web ls` trees for licences
+  incompatible with a free
+  public project (AGPL in a dependency is a finding to queue, not necessarily fatal
   — Aaron rules). Record the sweep date in the ledger.
 - Fonts, CSS, and anything served: each has a named free licence. If the
   provenance argument lives nowhere, that is the finding.
@@ -55,7 +58,7 @@ The design intent: isolation is the first thought. Anyone keeping cards
 private on this site must actually have them private — from other users and
 from accidents, not just from attackers.
 
-- Every route is classified in `tests/test_isolation.py`, and the sweep is
+- Every route is classified by the door's own sweep tests (derived from the served route table), and the sweep is
   live: try adding a fake unclassified route locally and confirm the suite
   fails (then remove it). The middleware refuses before routing — verify any
   new prefix landed in the right list.
@@ -63,9 +66,10 @@ from accidents, not just from attackers.
   route to a non-admin is **403** (ADR 17, argued); deck writes are
   owner-only (ADR 22, #80). Check any route added since the last run against
   all three.
-- Email addresses: `User.as_dict()` omits the address unless asked; exactly
-  two callers may ask (`mtglab users list`, `api/admin.py`). Grep for new
-  serialisation paths, log lines, or tool results that could carry one.
+- Email addresses: `auth.User.AsDict` takes `includeEmail` and omits the
+  address unless asked; exactly two callers may ask (`mtglab users list`, the
+  admin routes). Grep for every call site each run — a third one is the
+  finding — and for new log lines or tool results that could carry an address.
 - Session hygiene: cookie flags (HttpOnly, Secure, SameSite), Argon2id
   parameters against current OWASP guidance, rate limiting on login/reset
   still answering 429 with Retry-After, reset responses still uniform for
@@ -79,8 +83,8 @@ from accidents, not just from attackers.
 - Supply chain and static analysis: read the latest CodeQL and
   dependency-review results rather than assuming green means examined; note
   anything dismissed and why.
-- SQL: everything through parameterized queries in `auth/db.py` and
-  `cards/db.py`; string-built SQL anywhere is a finding.
+- SQL: everything through parameterized queries behind `internal/auth` and
+  `internal/pool`; string-built SQL anywhere is a finding.
 
 ### Fixing a security finding — the hard-won protocol
 
@@ -88,20 +92,23 @@ A real fix landed here (the SPA catch-all path traversal, PR #126) and cost
 four commits to get green. The lessons are worth more than the fix:
 
 - **Two jobs, not one: close the hole *and* satisfy the scanner.** The bug is
-  fixed when the vulnerability is gone; the PR merges when CodeQL is also
-  green. These are different, because CodeQL's model may not recognise a
-  perfectly correct guard. Both `Path.is_relative_to` and a `startswith` on
-  the resolved paths *contained* the traversal correctly — the test proved it
-  — and CodeQL flagged both anyway, because it does not model them as
-  barriers on this query.
+  fixed when the vulnerability is gone; the work is *done* when CodeQL is
+  also green. Those are different — and neither is the merge gate, because
+  CodeQL is advisory here (Red's facet argues why), so nothing stops a red
+  scan shipping except you. They are different because CodeQL's model may not
+  recognise a perfectly correct guard. Two containment checks on the resolved
+  paths *contained* the traversal correctly — the test proved it — and CodeQL
+  flagged both anyway, because it does not model either as a barrier on this
+  query. Expect the same of `filepath.Clean` plus a prefix check: correct, and
+  not necessarily legible to the scanner.
 - **When a guard isn't recognised, break the taint provenance instead of
   hunting for a guard form the scanner likes.** Do not build the sensitive
-  value out of user input at all. The traversal fix stopped resolving
-  `WEB_DIST / full_path` and made `full_path` a pure dict key, so the served
-  `Path` comes from a trusted directory listing and no user input reaches the
-  filesystem call — nothing for the taint tracker to follow. This is both
-  safer *and* legible to the scanner, and it is the move to reach for first,
-  not fourth.
+  value out of user input at all. The traversal fix stopped joining the
+  request path onto the static root and made the request path a pure map key,
+  so the served file comes from a trusted directory listing and no user input
+  reaches the filesystem call — nothing for the taint tracker to follow. This
+  is both safer *and* legible to the scanner, and it is the move to reach for
+  first, not fourth.
 - **Mutation-verify every security test.** Revert the guard, watch the test
   fail, restore it. A security test that passes against the *broken* code is
   worse than none — it certifies a hole as shut.
@@ -116,104 +123,213 @@ four commits to get green. The lessons are worth more than the fix:
 
 ## Facet: testing discipline
 
-The 95% floor exists to make regressions loud, but Aaron's bar is the *right*
-tests, not coverage tests — and a suite that stays fast enough that adding
-tests never feels expensive.
+Aaron's bar is the *right* tests, not coverage tests — and a suite that stays
+fast enough that adding tests never feels expensive.
 
-- **Check the environment before believing the run.** Compare the local test
-  count against CI's, and `pytest -ra` against CI's pinned skip count — a
-  passing suite that ran *fewer tests than CI* is the failure mode this facet
-  exists for, and it reads exactly like success. It happened: the `dev` extra
-  was missing fastapi, so `pip install -e ".[dev]"` (what CLAUDE.md documents)
-  ran 1444 tests where CI ran 1918, silently skipping the entire HTTP layer
-  including `test_isolation.py`. `tests/test_packaging.py` now pins it, but the
-  general rule stands — a green local suite is evidence only once you know it
-  is the same suite.
-- **Once per cycle, install the documented setup from a clean checkout.** The
-  gap above was found by accident: a run happened to execute in a fresh
-  worktree, and a fresh worktree is a fresh checkout. Nothing reproduces that
-  signal on purpose any more — the serial rainbow runs colors in the main tree,
-  where `.venv` already holds everything ever installed into it, so the
-  documented instructions and the working environment can drift apart
-  indefinitely without anyone standing where a new contributor stands. So stand
-  there deliberately: `git worktree add` to a scratch path, follow CLAUDE.md's
-  Setup block *verbatim* — no extras nobody wrote down — and check the test
-  count, the skip count and `mypy` against CI's. `tests/test_packaging.py` pins
-  the one gap already found; this is what finds the next one, which by
-  definition is not that gap.
-- Measure first: `pytest -q --durations=25`. Record total wall time and the
-  slow tail in the ledger. A test that got slower has a reason; find it.
-- Hunt duplicated setup: fixtures and helpers belong in `tests/tiny_pool.py`,
-  `conftest.py`, and friends — three tests hand-rolling the same scaffolding
-  is a finding. But keep the repo's rule: `tiny_pool` is imported bare-name,
-  and helpers stay import-safe.
-- The skip gate is pinned at 2 (`needs_full_pool`), and `-ra` prints every
-  skip. Any drift in the skip count is a finding even when CI is green.
-- Measure the suite with the tool rather than by feel: `pytest -q
-  --durations=25` for the slow tail, and `mtglab bench run` for anything the
-  suite exercises that a *user* also waits on — a test that got slower and an
-  endpoint that got slower are the same regression seen twice.
-- Parallelism (`pytest-xdist`) is a new dev dependency → **queued, not
-  applied**. What a run *can* do: measure whether the suite is
-  parallel-safe (shared `data/` state, `config.use_paths` discipline) so the
-  queued item carries evidence.
+**The 95% floor is a claim no gate enforces, and saying so is this facet's
+own medicine.** It was a real gate once; today CI runs `go test -race
+-count=1 -cover ./...`, which prints a number and gates on nothing, and no
+threshold lives in `ci.yml`, `.golangci.yml` or any doc. A rule enforced by
+nothing had drifted, and only this file still asserted it. Measured
+2026-08-23: **80.3%** of statements covered by the whole suite, **74.1%**
+counting each package's own tests only. Until Aaron rules (it is in
+`docs/polish/DAYBREAK.md`), treat coverage as a **watched number, not a
+gate**: record both figures every run and treat a fall as a finding.
+
+Two traps in the measuring itself, one of which caught this run:
+
+- **`-coverpkg=./...` changes what every per-package line means.** With it,
+  each package reports its coverage *of the whole module* — so a determinism
+  kernel with excellent tests prints `0.4%` and reads like a hole. Use the
+  plain `-cover` run to rank packages and the `-coverpkg` run only for the
+  module total. Reading one number in the other's frame produces a confident,
+  completely wrong finding.
+- **Read the report for *meaningless* coverage too.** A package at 100%
+  through tests that assert nothing is worse than an honest gap, because it
+  reads as done. This is why the mutation work below outranks the percentage.
+
+- **Check the environment before believing the run.** Compare the local
+  package and test counts against CI's — a passing suite that ran *less than
+  CI ran* is the failure mode this facet exists for, and it reads exactly
+  like success. A green local suite is evidence only once you know it is the
+  same suite. On this Mac that means the three exports (toolchain PATH and
+  GOROOT, the CGO ldflag) are set, because without CGO neither `internal/pool`
+  nor anything above it typechecks and the linter silently covers less; and it
+  means remembering CI runs the suite on **two architectures** and this laptop
+  is one of them.
+- **Once per cycle, follow the documented setup from a clean checkout.**
+  `git worktree add` to a scratch path, follow CLAUDE.md's Setup block
+  *verbatim* — nothing nobody wrote down — and compare the test count with
+  CI's. The documented instructions and the working environment drift apart
+  indefinitely unless someone deliberately stands where a new contributor
+  stands. Two known snags to expect rather than rediscover: a fresh worktree
+  has no card pool and no `web/node_modules`, and a borrowed toolbox venv
+  runs the *other* tree's sources against this tree's tests.
+- Measure first: `go test -count=1 ./... 2>&1 | tail` for wall time, and
+  `go test -json` piped through a duration sort for the slow tail. Record
+  both in the ledger. A test that got slower has a reason; find it.
+### Keeping the suite fast — the standing sweep
+
+A slow suite is not a cosmetic problem: it is the thing that makes adding a
+test feel expensive, and Aaron's bar is the *right* tests, which is a bar you
+only clear when writing one is cheap. Go is unusually good at this, and the
+tree is using almost none of it.
+
+**Measure before touching anything, and record it.** `go test -count=1 ./...`
+for the wall clock; `go test -json` sorted by elapsed for the per-package
+tail. Two whole-suite facts to hold on to before optimising a single test:
+
+- **Go already runs different packages in parallel.** So the suite's wall time
+  is roughly its *slowest package*, not its total — which means the only work
+  that shortens the run is work on the tail. Optimising a fast package is
+  effort spent for zero seconds, and the tree makes the point unusually
+  starkly. Measured 2026-08-23 on this Mac, `go test -count=1 ./...`:
+
+  | | |
+  |---|---|
+  | whole suite, wall clock | **1m13s** |
+  | `internal/api` | **63.1s** |
+  | `internal/claude` | 33.9s |
+  | `internal/gate` | 13.2s |
+  | everything else | under 11s each |
+
+  Read that table twice. `internal/api` alone is **86% of the wall clock**, so
+  the suite's time is that one package's time and nothing else is worth a
+  minute of anyone's attention until it moves. The user column says 3m12s
+  against 1m13s wall — the machine is already three-way busy, which is the
+  package-level parallelism working and the reason within-package
+  serialisation is the whole remaining cost.
+- **`-count=1` deliberately defeats the test cache**, and CI passes it. That
+  is correct for a gate and wrong for a working loop: leaving it off locally
+  lets an untouched package answer instantly, so use it when you need the
+  truth and drop it while iterating.
+- **`-race` roughly halves throughput**, and it is worth every second — it is
+  what makes a parallelism sweep a safe fix rather than a gamble. Never quote
+  a race-detected time as the suite's time, or the trend line lies.
+
+Then the levers, in the order that pays:
+
+- **The expensive fixture, built once.** The card pool is the standing example
+  — a package that opens one per test is paying for it every time, and
+  `TestMain` plus a package-level handle (or `sync.OnceValue`) pays once.
+  Look for the same shape in database migrations and any golden that is parsed
+  per case rather than per package.
+- **`t.Parallel()`, from a standing start of zero.** Measured 2026-08-23:
+  **831 test functions across 115 files and not one call.** Within a package
+  every test waits its turn, and the slow packages here are one package each,
+  so this is the lever that acts directly on the tail:
+  - **The default is parallel; the exception is what needs arguing.** A test
+    earns its serial place by touching real shared state — the process
+    environment (`t.Setenv` makes a test un-parallelisable and the compiler
+    enforces it), the working directory, a fixed port, a shared database
+    handle written by more than one test, or a global the subject mutates.
+    Everything reading a `t.TempDir`, a fresh in-memory database, or a
+    `httptest.Server` of its own is parallel-safe by construction.
+  - **Subtests need it twice.** `t.Parallel()` in the parent starts the
+    package's other parallel tests; `t.Parallel()` inside each `t.Run` body is
+    what makes the table's rows run together. A table with one and not the
+    other is the common half-done case — and remember a parallel subtest's
+    body runs *after* the parent function returns, so anything the parent
+    deferred has already happened.
+  - **Prove it, do not assume it.** `go test -race -count=2 ./internal/<pkg>/`
+    on the packages touched: the race detector is the whole reason this is a
+    safe fix rather than a queued one, and `-count=2` catches state left
+    behind between runs. A conversion that cannot be proven green this way is
+    a finding *about the test*, not a reason to skip the conversion.
+  - Record in the ledger how many functions were converted, the package's wall
+    time before and after, and — the part that makes the next run cheaper —
+    **which tests were examined and left serial, with the reason.**
+- **Sleeps are the other half of the tail.** Every `time.Sleep` in a test is
+  wall time bought to avoid thinking about synchronisation, and it is both slow
+  *and* flaky — too short and it fails on a loaded runner, too long and
+  everyone pays. Replace with the thing actually being waited for: a channel, a
+  `sync.WaitGroup`, `httptest`'s own synchrony, or `testing/synctest` for code
+  that genuinely reasons about time, which gives a fake clock and makes the
+  wait free. A test that got a *longer* sleep to fix a flake is a finding.
+- **Split the subject, not the suite.** A test that needs the network, a real
+  pool, or a Forge install is a different animal from a unit test; the tree
+  already gates those on a real absence. Keep that honest rather than reaching
+  for `testing.Short()`, which mostly teaches people to run a subset and call
+  it the suite.
+- **A table beats twenty functions** for both speed and reading: one setup,
+  many cases, each a `t.Run` that can be parallel and named well enough to
+  fail informatively.
+- **Do not chase a fast suite into a weak one.** Every second saved by
+  deleting coverage is a second charged to a future bug. The trade is only
+  ever *the same assertions, less waiting* — and if a conversion makes a test
+  harder to read, it was not worth it. Record the wall time each run so the
+  trend is visible; a suite that got slower has a cause worth naming.
+- Hunt duplicated setup: fixtures and helpers belong in the shared test
+  helpers (`internal/pool/pooltest`, `internal/auth`'s authtest fixtures) —
+  three tests hand-rolling the same scaffolding is a finding.
+- **The determinism replay, once per cycle, against the live instance.**
+  Determinism is contract (CLAUDE.md): a seed is a promise — the tarot deal a
+  browser reloads, the Wheel's spin, every Tier 1 run. The goldens hold it
+  locally; this replays it where users live. Keep one recorded seed per
+  surface in the ledger with its full response, and each cycle ask the
+  deployed instance the same seed and byte-compare: the same tarot seed must
+  deal the same spread, the same wheel seed the same fate. One nuance for
+  Tier 1: its cache key includes the engine fingerprint, so after an engine
+  change a recompute under the same seed is *correct* — check the fingerprint
+  before calling a Tier 1 difference drift. Tarot and Wheel have no such out;
+  drift there is a broken promise and outranks everything else in this facet.
+- Skips are a budget, not a convenience: every `t.Skip` in the tree is
+  conditional on a real absence (a live instance, a Forge install, a full
+  pool), and a drift in the skip census is a finding even when CI is green.
 - No test sends mail, spends a token, or touches the network — confirm the
-  seams (`EmailSender`, faked `Turn`, faked `subprocess`) still hold for
-  anything added since last run.
+  seams (the mail sender, faked Claude turns, faked subprocesses) still
+  hold for anything added since last run.
+- **A test that asserts something about work *in flight* must hold the work in
+  flight.** Otherwise it races itself and its greenness is a fact about the
+  machine, not the code. The standing example: the Forge in-flight dedupe test
+  posted two identical asks and expected one job — with a stub that finished
+  instantly, so on a quick enough machine the first job was already done and a
+  second job was the *correct* answer. It passed on this laptop and went red
+  on CI's arm64 runner. The fix is a gate the test controls (this stub already
+  had one), never a sleep. **Diagnose this class by making the race certain**
+  — sleep between the two actions and watch it fail every time — then fix it
+  and confirm the fix survives that same sleep. Suspect every test whose
+  subject is a cache, a dedupe, a job, a lock or a stream.
 - Verify new guard tests by mutation, not by greenness: a test written to
-  hold a boundary gets the boundary broken locally once to prove it fires
-  (the conftest-hides-the-deployed-branch lesson).
-- **Mutation sampling, every run of this facet** (Aaron's ask, 2026-08-16;
-  tooled 2026-08-19). The bullet above checks tests you just wrote; this one
-  checks the suite nobody is watching. It is no longer a hand protocol:
+  hold a boundary gets the boundary broken locally once to prove it fires.
+  The standing example is a whole class of code that is maintainer-dependent
+  — it takes a different path for an admin than for anyone else — and whose
+  admin path the default fixtures never take, so it is untested and *looks*
+  tested.
+- **Mutation sampling is a live practice again, and `gremlins` is the tool**
+  (Aaron's standing ask since 2026-08-16, ruled 2026-08-23). It is a
+  standalone binary with mutation-score thresholds, so it installs on demand
+  exactly as `go-licenses` does and costs the project no `go.mod` entry:
 
   ```bash
-  mtglab mutate list                        # every site, and its defenders
-  mtglab mutate run --sample 12 --seed 0    # a reproducible draw
-  mtglab mutate run --sample 6 --full       # judged by the whole suite
-  mtglab mutate run --only decks/analyze.py:33   # is that survivor still alive?
+  go install github.com/go-gremlins/gremlins/cmd/gremlins@latest
+  gremlins unleash ./internal/floats/          # `run` and `r` are aliases
   ```
 
-  **Read the catalogue's size off `mutate list`, not off this file** — it was
-  1,231 across 16 modules when the harness landed and 1,260 across 18 by the
-  end of the same week, and a number written here is a number that drifts.
+  Read the report by status: **KILLED** is a test doing its job, **LIVED** is
+  the finding (a mutant the suite never noticed), **NOT COVERED** is a line no
+  test reaches at all, and **NOT VIABLE** means the mutation did not build and
+  says nothing about the tests. `--threshold-efficacy` fails the run below a
+  KILLED/(KILLED+LIVED) ratio, which is the flag to reach for once a package
+  has a number worth holding — **not before**, because a threshold invented
+  ahead of a baseline either fails at once or certifies nothing.
 
-  Every mutation is applied to a **throwaway copy** of the package and pytest
-  is pointed at the copy, so the working tree cannot be reached at all — the
-  hand version edited the real file and restored it, and an interrupted run
-  left a mutation in the tree with `git status` as the only thing between that
-  and a commit.
+  How to run it here, learned from the packages rather than from the docs:
+  **one package at a time, starting with the determinism kernels** —
+  `floats`, `mt19937`, `textutil`, `yamlemit`, `gate` — where correctness risk
+  concentrates and packages are small. **Never point it at `internal/api`**,
+  which is 63 seconds per test run before a single mutant is generated. Record
+  the score per package in the ledger the first time each is run; a mutation
+  score with nothing to compare against is a number, not a finding.
 
-  Four things to hold on to when reading the output. **Record the seed** —
-  a kill rate nobody can reproduce is a number that can only be quoted, and
-  the ledger wants a figure that trends. **A survivor is a question, not a
-  verdict**: some mutations are semantically equivalent and no test could ever
-  kill them, and telling those apart is reading work the tool does not do.
-  And **note what ran**: by default each mutation is judged by the test files
-  mapped to its module in `mutate/harness.py`, so a survivor of six files is a
-  weaker claim than a survivor of `--full`. A module with no mapping is a
-  finding of its own — add it there, and `tests/test_mutate.py` fails if a
-  mapping names a file that does not exist.
-
-  Fourth, and it is the one this facet kept skipping: **re-run the survivors
-  the last run recorded, by name.** A fresh seeded draw of 25 from 1,260 sites
-  will not revisit them, so a survivor left "worth a look next White run" is
-  worth a look forever — `decks/analyze.py:33` and `decks/companion.py:139`
-  sat that way for two runs and both are still alive. `--only` is that
-  question asked directly, it costs a second a site, and a pattern matching
-  nothing raises rather than reporting a flawless rate over no mutants.
-
-  `mutmut`/`cosmic-ray` stay **queued** as the escalation for an exhaustive
-  run over one module; the harness covers the routine sampling, and the
-  comparison is in the ledger.
+  Two things it does not replace. **A survivor is a question, not a task** —
+  a LIVED mutant in a branch the product never takes is noise, and saying so
+  in the ledger is the right answer. And the **hand protocol still stands** for
+  anything gremlins cannot reach (the frontend, `tools/`, a single guard test
+  you just wrote): break the thing on a *throwaway copy* of the package —
+  never the working tree — watch the test fail, restore it.
 - After the suite, **`git status data/` proves nothing** — `app.db` is
-  gitignored, so a test that writes the developer's real database leaves the
-  status clean. That check was in this file for one run and was blind the whole
-  time; it missed a test that was creating `data/app.db` on every run. Use
-  `ls -la data/` instead, and trust `conftest.py`'s `_real_app_db_untouched`,
-  which now fails any test that creates or writes the real file. If that
-  fixture is ever the thing that turns red, the test named in the failure is
-  reaching past its scratch directory — do not "fix" it by relaxing the guard.
-- Coverage: read the report for *meaningless* coverage too — a module at 100%
-  through tests that assert nothing is worse than an honest gap, because it
-  reads as done.
+  gitignored, so a test that writes the developer's real database leaves
+  the status clean. Use `ls -la data/` and treat a fresh mtime on
+  `data/app.db` as the finding; a test reaching past its scratch directory
+  gets fixed, never accommodated.

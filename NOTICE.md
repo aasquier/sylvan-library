@@ -37,15 +37,18 @@ their guidelines:
   contains no card data.** `mtglab data refresh` downloads it at runtime and
   `data/` is gitignored.
 - Use the daily bulk files rather than hammering the API card by card. The
-  ingest in `cards/db.py` makes one request per bulk file per day.
+  ingest in `go/internal/pool/refresh.go` asks the bulk index once and parks
+  each download as `<kind>-<date>`, skipping one already on disk — so a
+  refresh run twice in a day fetches nothing the second time.
 
 Card images are hotlinked or cached locally at runtime and are never committed.
 Artwork remains the property of its artists and Wizards of the Coast.
 
 ## Tesseract — the card reader, and the only code this project redistributes
 
-The camera door reads a card in the browser. `src/mtglab/ocr.py` downloads the
-engine once, pins every file by SHA-256, and serves it from `/api/ocr` (ADR 33's
+The camera door reads a card in the browser. `go/internal/shelves/shelves.go` downloads the
+engine once and pins every file by SHA-256 against the manifest in
+`go/internal/reference/data/shelves.json`, and `/api/ocr/{name}` serves it (ADR 33's
 arrangement applied to somebody else's compiler output). Nothing is hotlinked
 and nothing enters git — but the bytes do reach every visitor, and *that* is
 distribution in the ordinary way, unlike every other section in this file.
@@ -77,7 +80,7 @@ Three consequences, each with its discharge:
 2. **The Apache-2.0 text is at `licenses/Apache-2.0.txt`.** It covers the three
    files above and one more that is easy to miss: Vite bundles the
    main-thread half of `tesseract.js` into
-   `src/mtglab/web_dist/assets/reader.js`, which *is* committed, and the
+   `web_dist/assets/reader.js`, which *is* committed, and the
    minifier drops the legal comments on the way. The licence has to be carried
    here because it is no longer carried there.
 3. **Nothing about the reader renders, and that is correct rather than a
@@ -117,8 +120,9 @@ its own license applies to it. You install it yourself.
 distribution, not assumed. Three consequences, none of which bind this
 repository today but all of which bind a hosted instance that ships it:
 
-1. **This project stays MIT.** `sim/tier3/run.py` starts `forge.jar` as a
-   separate process and reads its stdout; nothing links to it and nothing
+1. **This project stays MIT.** `go/internal/sim/tier3/run.go` starts
+   `forge.jar` as a separate process (`os/exec`) and reads its stdout; nothing
+   links to it and nothing
    imports it. The FSF treats "pipes, sockets and command-line arguments" as
    the communication mechanisms normally used *between two separate programs*,
    which is exactly this boundary.
@@ -158,12 +162,17 @@ The animist's video encoders (ADR 31) run through
 binary is a **GPL build** (it links x264, among others), and the argument for
 why that binds nothing here is Forge's argument verbatim, one section up:
 
-1. It is a **build-time subprocess on the dev machine and CI** — `mtglab
-   animist build` starts it as a separate process and feeds it frames over a
+1. It is a **build-time subprocess on the dev machine and CI** — `animist
+   build`, run from `tools/`, starts it as a separate process and feeds it
+   frames over a
    pipe, the boundary the FSF names as the one between two separate programs.
    Nothing links it, and this project stays MIT.
-2. It is **never in the container image and never served to users**. The
-   `animist` extra is not installed by the image's `.[api,claude]`, so the
+2. It is **never in the container image and never served to users**, and the
+   argument is now structural rather than a question of which extra was
+   installed: `Dockerfile` copies `go`, `web_dist`, `assets/tarot` and the
+   entrypoint, and nothing else. `tools/` — the only thing in this repository
+   that has ever held imageio-ffmpeg — never enters the build context at all,
+   and the runtime stage carries no Python. So the
    only thing distributed to anybody is the encoded WebM/MP4 output — and an
    encoder's licence does not attach to the files it encodes.
 3. If a future change ever did put ffmpeg in a distributed image, the Forge

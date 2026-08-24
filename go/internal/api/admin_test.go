@@ -71,11 +71,10 @@ func TestEveryAdminRouteRefusesANonAdminItself(t *testing.T) {
 	}
 }
 
-// The twelfth registration, at last. Until Phase 8 a tripwire here pinned
-// its ABSENCE — `jobs.forget_owner` ran in the Python process, and a route
-// on this side would have deleted the account and stranded the jobs — and
-// the tripwire failing was the flip announcing itself. These are the pins
-// that replaced it.
+// Deletion is the one irreversible admin verb, and its pins are here:
+// the account's sessions and jobs go with the row, because `users.id` is
+// reissued by SQLite and anything left keyed on a freed id would be handed
+// to the next account created.
 
 func TestDeletingAnAccountTakesItsSessionsAndItsJobs(t *testing.T) {
 	rig := newAccountRig(t, true)
@@ -316,14 +315,14 @@ func TestAnInviteRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 	}{
 		{"no address at all", `{}`, 422, "an invite needs an email address"},
 		{"not shaped like an address", `{"email":"nope"}`, 422, "does not look like an email"},
-		// **Not a string at all**, which answered 500 in Python until
-		// 2026-08-22: `payload.get("email")` went to `normalise_email` raw, and
-		// `.strip()` on an int raises `AttributeError`, which is not the
-		// `InvalidEmail` the route catches. The door has always coerced here and
-		// so has always answered 422; both runtimes now say the same sentence,
-		// which is why the quoted forms are pinned rather than just the status.
-		// `0` and `false` are the interesting pair -- they are what a
-		// `str(... or "")` coercion would fold into "absent", reporting a
+		// **Not a string at all**, which was a bare 500 until
+		// 2026-08-22: the field once reached the normaliser raw, and a
+		// strip on an int is a crash, not the
+		// `InvalidEmail` the route catches. The route coerces first and
+		// so answers 422 -- since ruled the contract, and the sentence
+		// is pinned rather than just the status.
+		// `0` and `false` are the interesting pair -- they are what an
+		// or-empty coercion would fold into "absent", reporting a
 		// missing address for a body that plainly supplied one.
 		{"a number", `{"email":123}`, 422, "'123' does not look like an email"},
 		{"a zero", `{"email":0}`, 422, "'0' does not look like an email"},
@@ -459,7 +458,7 @@ func TestPatchRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 		{"a change that is not one", "/api/admin/users/bob", `{"is_admin":false}`, 422,
 			"nothing to change"},
 		// **An unknown tier against an account at the default is "nothing to
-		// change", not "no such tier"** -- measured against Python
+		// change", not "no such tier"** -- measured on the wire
 		// 2026-08-22, and it surprised this test before it surprised anybody
 		// else. Both sides are compared *through the roster*, where an
 		// unknown key resolves to the default, so the write is never reached
@@ -507,8 +506,8 @@ func TestPatchRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 	}
 }
 
-// FastAPI validates a declared body before the handler runs, so a malformed
-// body against a name nobody holds is a 422 there -- not the 404 the account
+// The body is validated before the account is looked up, so a malformed
+// body against a name nobody holds is a 422 -- not the 404 the account
 // would earn. The order is the wire's, not a preference.
 func TestAMalformedBodyBeatsAMissingAccount(t *testing.T) {
 	rig := newAccountRig(t, true)
@@ -519,7 +518,7 @@ func TestAMalformedBodyBeatsAMissingAccount(t *testing.T) {
 		t.Fatalf("a list body against a missing account answered %d", rec.Code)
 	}
 	if _, isList := body(t, rec)["detail"].([]any); !isList {
-		t.Errorf("that 422 is the handler's, not FastAPI's: %s", rec.Body)
+		t.Errorf("that 422 is the handler's, not the validation list: %s", rec.Body)
 	}
 }
 
@@ -637,7 +636,7 @@ func TestTheAdminSurfaceWithNoDatabase(t *testing.T) {
 	}
 	// Every per-account route is a 404, because there is no such account.
 	// (The stats six are not per-account — they answer over an absent
-	// database the way Python answers over the empty one it would mint:
+	// database as over a freshly-minted empty one:
 	// content, with nulls and zeroes.)
 	for _, route := range adminRoutes[2:6] {
 		rec := rig.call(t, adminScope, route.method, route.target, route.payload, "")

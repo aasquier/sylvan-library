@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// `auth/bootstrap.py`'s contract, driven through the same scratch `app.db` the
-// accounts tests use.
+// The maintainer reconciler's contract, driven through the same scratch
+// `app.db` the accounts tests use.
 //
 // Every test here sets *both* variables through t.Setenv -- including to "" --
 // because `EnsureMaintainer` reads the process environment, and a developer's
@@ -52,7 +52,7 @@ func TestEnsureMaintainerCreatesTheAccountUnclaimedAndAdmin(t *testing.T) {
 		t.Fatalf("no maintainer account was created (%v)", err)
 	}
 	// The handle is derived from the *normalised* address when the variable is
-	// unset -- lowercased with it, exactly as Python hands `username_for` the
+	// unset -- lowercased with it, because `UsernameFor` is handed the
 	// normalised form and never the raw one.
 	if account.Username != "ada.lovelace" {
 		t.Errorf("the handle is %q, not the normalised local part", account.Username)
@@ -197,7 +197,7 @@ func TestUsernameForManglesDeterministically(t *testing.T) {
 		// Too short for a handle after cleaning: the last resort is `admin`.
 		{"a@example.com", "admin"},
 		{"._-a@example.com", "admin"},
-		// Python's `isalnum` keeps the Unicode letter, and the ASCII handle
+		// The Unicode-wide keep-filter keeps the letter, and the ASCII handle
 		// pattern then refuses the whole -- `admin`, never a mangled `mller`.
 		{"müller@example.com", "admin"},
 		{"42fun@example.com", "42fun"},

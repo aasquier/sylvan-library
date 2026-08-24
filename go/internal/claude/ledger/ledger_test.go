@@ -128,7 +128,7 @@ func TestAnUnknownAxisIsRefusedRatherThanInterpolated(t *testing.T) {
 			continue
 		}
 		if !strings.HasPrefix(err.Error(), "cannot group by ") {
-			t.Errorf("%q: refusal is not Python's wording: %v", bad, err)
+			t.Errorf("%q: refusal is not the recorded wording: %v", bad, err)
 		}
 	}
 	// And the table is still there, which is the point of the paragraph above.
@@ -211,11 +211,11 @@ type ledgerCorpus struct {
 	} `json:"queries"`
 }
 
-// TestTheRollUpAgreesWithPython drives both axes and four `since` bounds
-// against Python's own answers.
+// TestTheRollUpAgreesWithTheCorpus drives both axes and four `since` bounds
+// against the recorded answers.
 //
 // The SQL is short and the temptation is to call it obvious. Three things in
-// it are not, and each has a shape a careful port still gets wrong. **Scan
+// it are not, and each is a shape a careful rewrite still gets wrong. **Scan
 // order depends on the axis** — the grouped column is SELECTed first, so mode
 // and model swap positions between the two queries, and a fixed scan order
 // puts the right numbers under the wrong names. **The marker fills the column
@@ -223,7 +223,7 @@ type ledgerCorpus struct {
 // arbitrary winner. And **`since` is a TEXT comparison**, inclusive at `>=`,
 // which the corpus probes at exactly a row's timestamp and one microsecond
 // past it.
-func TestTheRollUpAgreesWithPython(t *testing.T) {
+func TestTheRollUpAgreesWithTheCorpus(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("testdata", "ledger.json"))
 	if err != nil {
 		t.Fatalf("reading the ledger corpus: %v", err)

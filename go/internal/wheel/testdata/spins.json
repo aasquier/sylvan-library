@@ -10,7 +10,7 @@
     "G"
    ],
    "seed": 0,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":0,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":0,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -18,7 +18,7 @@
     "G"
    ],
    "seed": 1,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":1,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":1,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -26,7 +26,7 @@
     "G"
    ],
    "seed": 2,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands heads — the cup fills your hand: a card that draws.\",\"seed\":2,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"heads\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands heads — the cup fills your hand: a card that draws.\",\"seed\":2,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"heads\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -34,7 +34,7 @@
     "G"
    ],
    "seed": 3,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":3,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":3,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -42,7 +42,7 @@
     "G"
    ],
    "seed": 4,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":4,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":4,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -50,7 +50,7 @@
     "G"
    ],
    "seed": 5,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword is offered hilt-first — a weapon to take up: an equipment.\",\"seed\":5,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"hilt\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword is offered hilt-first — a weapon to take up: an equipment.\",\"seed\":5,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"hilt\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -58,7 +58,7 @@
     "G"
    ],
    "seed": 6,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":6,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":6,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -66,7 +66,7 @@
     "G"
    ],
    "seed": 7,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":{\"name\":\"Woodfall Primus\",\"mana_cost\":\"{5}{G}{G}{G}\",\"type_line\":\"Creature — Treefolk Shaman\",\"oracle_text\":\"Trample\\nWhen this creature enters, destroy target noncreature permanent.\\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)\",\"color_identity\":[\"G\"],\"image\":\"https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\"}}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":{\"name\":\"Woodfall Primus\",\"mana_cost\":\"{5}{G}{G}{G}\",\"type_line\":\"Creature — Treefolk Shaman\",\"oracle_text\":\"Trample\\nWhen this creature enters, destroy target noncreature permanent.\\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)\",\"color_identity\":[\"G\"],\"image\":\"https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\"}}"
   },
   {
    "deck": "mono-green",
@@ -74,7 +74,7 @@
     "G"
    ],
    "seed": 8,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":8,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":8,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -82,7 +82,7 @@
     "G"
    ],
    "seed": 9,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":9,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":9,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -90,7 +90,7 @@
     "G"
    ],
    "seed": 10,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":10,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":10,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -98,7 +98,7 @@
     "G"
    ],
    "seed": 11,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":11,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":11,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -106,7 +106,7 @@
     "G"
    ],
    "seed": 12,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":12,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":12,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -114,7 +114,7 @@
     "G"
    ],
    "seed": 13,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword is offered hilt-first — a weapon to take up: an equipment.\",\"seed\":13,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"hilt\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword is offered hilt-first — a weapon to take up: an equipment.\",\"seed\":13,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"hilt\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -122,7 +122,7 @@
     "G"
    ],
    "seed": 14,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands heads — the cup fills your hand: a card that draws.\",\"seed\":14,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"heads\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands heads — the cup fills your hand: a card that draws.\",\"seed\":14,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"heads\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -130,7 +130,7 @@
     "G"
    ],
    "seed": 15,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":15,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":15,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -138,7 +138,7 @@
     "G"
    ],
    "seed": 1180591620717411303424,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":1180591620717411303424,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":1180591620717411303424,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -150,7 +150,7 @@
     "G"
    ],
    "seed": 0,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":0,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":0,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -162,7 +162,7 @@
     "G"
    ],
    "seed": 1,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":1,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":{\"name\":\"Swords to Plowshares\",\"mana_cost\":\"{W}\",\"type_line\":\"Instant\",\"oracle_text\":\"Exile target creature. Its controller gains life equal to its power.\",\"color_identity\":[\"W\"],\"image\":\"https://cards.scryfall.io/normal/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\"}}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":1,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":{\"name\":\"Swords to Plowshares\",\"mana_cost\":\"{W}\",\"type_line\":\"Instant\",\"oracle_text\":\"Exile target creature. Its controller gains life equal to its power.\",\"color_identity\":[\"W\"],\"image\":\"https://cards.scryfall.io/normal/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\"}}"
   },
   {
    "deck": "mono-green",
@@ -174,7 +174,7 @@
     "G"
    ],
    "seed": 2,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands heads — the cup fills your hand: a card that draws.\",\"seed\":2,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"heads\",\"card\":{\"name\":\"Rhystic Study\",\"mana_cost\":\"{2}{U}\",\"type_line\":\"Enchantment\",\"oracle_text\":\"Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.\",\"color_identity\":[\"U\"],\"image\":\"https://cards.scryfall.io/normal/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146\"}}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands heads — the cup fills your hand: a card that draws.\",\"seed\":2,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"heads\",\"card\":{\"name\":\"Rhystic Study\",\"mana_cost\":\"{2}{U}\",\"type_line\":\"Enchantment\",\"oracle_text\":\"Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.\",\"color_identity\":[\"U\"],\"image\":\"https://cards.scryfall.io/normal/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/9/f/9f37c5b6-a59c-45cd-9a99-e9357fe9ea1b.jpg?1783919146\"}}"
   },
   {
    "deck": "mono-green",
@@ -186,7 +186,7 @@
     "G"
    ],
    "seed": 3,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":3,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":{\"name\":\"Swords to Plowshares\",\"mana_cost\":\"{W}\",\"type_line\":\"Instant\",\"oracle_text\":\"Exile target creature. Its controller gains life equal to its power.\",\"color_identity\":[\"W\"],\"image\":\"https://cards.scryfall.io/normal/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\"}}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":3,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":{\"name\":\"Swords to Plowshares\",\"mana_cost\":\"{W}\",\"type_line\":\"Instant\",\"oracle_text\":\"Exile target creature. Its controller gains life equal to its power.\",\"color_identity\":[\"W\"],\"image\":\"https://cards.scryfall.io/normal/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/b/4/b4e9c870-23c0-413a-ae39-265f09da16d1.jpg?1783903243\"}}"
   },
   {
    "deck": "mono-green",
@@ -198,7 +198,7 @@
     "G"
    ],
    "seed": 4,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":4,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":4,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -210,7 +210,7 @@
     "G"
    ],
    "seed": 5,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword is offered hilt-first — a weapon to take up: an equipment.\",\"seed\":5,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"hilt\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword is offered hilt-first — a weapon to take up: an equipment.\",\"seed\":5,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"hilt\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -222,7 +222,7 @@
     "G"
    ],
    "seed": 6,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":6,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":6,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -234,7 +234,7 @@
     "G"
    ],
    "seed": 7,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":{\"name\":\"Woodfall Primus\",\"mana_cost\":\"{5}{G}{G}{G}\",\"type_line\":\"Creature — Treefolk Shaman\",\"oracle_text\":\"Trample\\nWhen this creature enters, destroy target noncreature permanent.\\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)\",\"color_identity\":[\"G\"],\"image\":\"https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\"}}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":{\"name\":\"Woodfall Primus\",\"mana_cost\":\"{5}{G}{G}{G}\",\"type_line\":\"Creature — Treefolk Shaman\",\"oracle_text\":\"Trample\\nWhen this creature enters, destroy target noncreature permanent.\\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)\",\"color_identity\":[\"G\"],\"image\":\"https://cards.scryfall.io/normal/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/9/7/97914abe-71d5-4bd6-87d7-8e7379abf1aa.jpg?1783923235\"}}"
   },
   {
    "deck": "mono-green",
@@ -246,7 +246,7 @@
     "G"
    ],
    "seed": 8,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":8,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":8,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -258,7 +258,7 @@
     "G"
    ],
    "seed": 9,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":9,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":9,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -270,7 +270,7 @@
     "G"
    ],
    "seed": 10,
-   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":10,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"cup\",\"label\":\"The Cup\",\"meaning\":\"The coin lands tails — the cup spills into the water: a card that mills.\",\"seed\":10,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"coin\":\"tails\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -282,7 +282,7 @@
     "G"
    ],
    "seed": 11,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":11,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":11,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "mono-green",
@@ -294,25 +294,25 @@
     "G"
    ],
    "seed": 1180591620717411303425,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":1180591620717411303425,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart comes up broken — a card that drains life away.\",\"seed\":1180591620717411303425,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"broken\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "bare",
    "identity": [],
    "seed": 0,
-   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":0,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"skull\",\"label\":\"The Skull\",\"meaning\":\"The skull whispers — the grave gives back: a card that raises what was lost.\",\"seed\":0,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"skull_face\":\"risen\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "bare",
    "identity": [],
    "seed": 3,
-   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":3,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"heart\",\"label\":\"The Heart\",\"meaning\":\"The heart beats whole — a card that gives life back.\",\"seed\":3,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"heart_face\":\"whole\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   },
   {
    "deck": "bare",
    "identity": [],
    "seed": 7,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"python\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
   }
  ]
 }

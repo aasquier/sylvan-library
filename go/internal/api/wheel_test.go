@@ -17,10 +17,10 @@ func wheelAPI(t *testing.T) *API {
 	return New(Config{Pool: pooltest.Open(t), DecksDir: decksDir(t)})
 }
 
-// `int(seed)` over a value Python's grammar refuses raises where Python
-// raises: an uncaught 500 -- Starlette's plain-text three words, measured
-// before this was written. The same wart, reproduced rather than tidied.
-func TestASeedIntCannotReadIsPythonsUncaught500(t *testing.T) {
+// A seed the integer grammar refuses raises: an uncaught 500 -- the
+// plain-text three words, measured on the live wire
+// before this was written. The same wart, recorded rather than tidied.
+func TestASeedTheGrammarRefusesIsTheRecordedUncaught500(t *testing.T) {
 	a := wheelAPI(t)
 	for _, body := range []string{`{"seed":"abc"}`, `{"seed":[1]}`, `{"seed":{}}`} {
 		status, _, raw := call(t, a, http.MethodPost,
@@ -34,9 +34,10 @@ func TestASeedIntCannotReadIsPythonsUncaught500(t *testing.T) {
 	}
 }
 
-// A float truncates and a fullwidth digit reads -- `int()`'s grammar, not
-// `strconv`'s -- and the seed comes back as the number it became.
-func TestTheSeedGoesThroughPythonsIntGrammar(t *testing.T) {
+// A float truncates and a fullwidth digit reads -- the recorded integer
+// grammar, not `strconv`'s -- and the seed comes back as the number it
+// became.
+func TestTheSeedGoesThroughTheRecordedIntGrammar(t *testing.T) {
 	a := wheelAPI(t)
 	for body, want := range map[string]string{
 		`{"seed":3.9}`:   `"seed":3,`,

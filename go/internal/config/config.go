@@ -1,15 +1,22 @@
-// Package config is `mtglab/config.py` for the Go side: where things live on
-// disk and the switches the environment sets, read at call time and never
-// bound at start -- the rule that module exists to enforce (`use_paths` in a
-// test, a container's volume in production).
+// Package config is where things live on disk and the switches the
+// environment sets — read at call time and never bound at start, so a test
+// can point the process at a scratch directory and a container at its
+// volume without a restart ceremony.
 //
-// Two deliberate differences from the Python module. There is no `.env`
-// reader: the door is started by the container's CMD or by a developer who
-// exports what the Python server reads from its `.env`, and a file the
-// process found by walking up from its working directory is one more thing a
-// supervisor has to agree about. And secrets are not here at all, for the
-// reason Python's docstring gives -- a value we never hold is a value we
-// cannot log.
+// One deliberate absence and one deliberate exception.
+//
+// There is no `.env` reader: the door is started by the container's CMD or by
+// a developer who exports what it needs, and a file the process found by
+// walking up from its working directory is one more thing a supervisor has to
+// agree about.
+//
+// And **exactly one secret is named here**, [ResendAPIKey], because the mail
+// sender has to put that value in a header itself. Every other credential is
+// read where it is used and never through this package -- ANTHROPIC_API_KEY
+// by the SDK, FLY_METRICS_TOKEN and MTGLAB_FLY_API_TOKEN at their call sites
+// -- on the rule that a value we never hold is a value we cannot log. This
+// used to read "secrets are not here at all", which was the tidier sentence
+// and false about the function a hundred lines below it.
 package config
 
 import (
@@ -96,8 +103,24 @@ func BaseURL() string {
 	if v := strings.TrimRight(strings.TrimSpace(os.Getenv("MTGLAB_BASE_URL")), "/"); v != "" {
 		return v
 	}
-	return "http://127.0.0.1:8765"
+	return DefaultBaseURL
 }
+
+// DefaultBaseURL is where `mtglab ui` serves, and so the wrong-by-default
+// value above.
+//
+// Named rather than inlined because the boot summary has to be able to *ask*
+// whether this instance is still on it -- a deployment that never set
+// MTGLAB_BASE_URL mails links to a loopback address, and the first person to
+// find that out should not be someone waiting on a password reset. Deriving
+// the question from the answer keeps one reader for the switch: nothing else
+// in this package or above it reads MTGLAB_BASE_URL again to ask it.
+const DefaultBaseURL = "http://127.0.0.1:8765"
+
+// BaseURLIsDefault reports whether links this instance mails will point at the
+// local port. True when the variable is unset, and equally true when somebody
+// set it to the loopback address on purpose -- which is the same fact.
+func BaseURLIsDefault() bool { return BaseURL() == DefaultBaseURL }
 
 // EmailFrom is the From address on invites and resets. MTGLAB_EMAIL_FROM.
 //
@@ -108,8 +131,17 @@ func EmailFrom() string {
 	if v := strings.TrimSpace(os.Getenv("MTGLAB_EMAIL_FROM")); v != "" {
 		return v
 	}
-	return "mtglab <no-reply@localhost>"
+	return DefaultEmailFrom
 }
+
+// DefaultEmailFrom is the console sender's From line, and a value Resend will
+// refuse: `localhost` is nobody's verified sending domain.
+const DefaultEmailFrom = "mtglab <no-reply@localhost>"
+
+// EmailFromIsDefault reports whether the From address is still the one no
+// provider will accept -- the boot summary's question, for the same reason
+// [BaseURLIsDefault] exists.
+func EmailFromIsDefault() bool { return EmailFrom() == DefaultEmailFrom }
 
 // ClientIPHeader names the header a trusted proxy sets to the real client IP,
 // or empty.

@@ -26,7 +26,7 @@ func TestHealthWithNoPoolIsTheDegradedShapeExactly(t *testing.T) {
 }
 
 // A healthy pool reports its counts, the bulk files on the shelf, the deck
-// count and a false staleness flag -- with the keys in Python's order.
+// count and a false staleness flag -- with the keys in the recorded order.
 func TestHealthReportsThePoolTheShelfAndTheDecks(t *testing.T) {
 	scryfall := t.TempDir()
 	for _, name := range []string{"oracle_cards-2026-08-20.jsonl.gz",

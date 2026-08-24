@@ -8,11 +8,10 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// `decks/companion.py`: the companion deckbuilding restrictions. Two rules
-// shape it and both are the Python module's: the condition text comes from
-// the pool, never from memory (Kaheera's allowed creature types are parsed
-// out of her own oracle text), and an unknown condition is reported, never
-// passed -- a loud "not checked" rather than a silent "no violations" for a
+// The companion deckbuilding restrictions. Two rules shape this file, and
+// both are load-bearing: the condition text comes from the pool, never from
+// memory (Kaheera's allowed creature types are parsed out of her own oracle
+// text), and an unknown condition is reported, never passed -- a loud "not checked" rather than a silent "no violations" for a
 // rule that was never evaluated.
 
 // Entry is one card of the starting deck -- the 99 and the commander, never

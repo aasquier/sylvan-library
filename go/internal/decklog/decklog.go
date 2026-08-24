@@ -1,7 +1,6 @@
-// Package decklog is `decks/log.py` on the read side: what has been done to
-// a deck, newest first (ADR 28). Python still writes every entry from the
-// one call site (`service._commit`); this reads the rows back for the deck
-// page's History tab. `owner_id IS ?` rather than `= ?`, because the file
+// Package decklog is the deck activity log: what has been done to a deck,
+// newest first (ADR 28). Every entry is written from the one commit call
+// site, and the rows are read back for the deck page's History tab. `owner_id IS ?` rather than `= ?`, because the file
 // tier's owner is NULL and `NULL = NULL` is not true in SQL -- the whole
 // reason the query reads the way it does.
 package decklog

@@ -1,7 +1,7 @@
 /** The OCR engine, kept behind a door that only opens when the camera does.
  *
  * Tesseract is about six megabytes of WebAssembly and trained data. None of
- * it is in the bundle and none of it is in git: `mtglab/ocr.py` fetches the
+ * it is in the bundle and none of it is in git: the server fetches the
  * three files once, pins each by SHA-256, and serves them from `/api/ocr`
  * (the arrangement ADR 33 already uses for the mana symbols). The `import()`
  * below is what keeps the entry chunk free of even the small part — nobody

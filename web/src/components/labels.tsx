@@ -20,7 +20,7 @@ import { Badge, ErrorNote } from './ui'
  * **The archetype is not predicted while you edit.** It is a readout of what
  * the server resolved, the same rule the stance dial follows: a second copy of
  * the worst-piloted-wins reading, living in TypeScript, would disagree with
- * the Python one silently and nobody would learn which was right. So editing
+ * the served one silently and nobody would learn which was right. So editing
  * names the class words as class words — that is a fact about the vocabulary,
  * served in `archetypes` — and the deck shows its archetype again once saved.
  */

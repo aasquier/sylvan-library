@@ -16,7 +16,7 @@ import (
 )
 
 // The write routes' own tests. `internal/deckedit` already proves the *bytes*
-// against Python's; what these prove is the layer above it -- that the right
+// against its goldens; what these prove is the layer above it -- that the right
 // operation runs, that the pool checks happen before anything is written, that
 // the refusals land on the right status, and that every write leaves a deck
 // file and a log entry behind.

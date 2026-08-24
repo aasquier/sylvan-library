@@ -31,7 +31,7 @@ const Simulator = lazy(() => import('./routes/Simulator'))
 // are one or two words, and a word like "Laboratory" earns a sentence on
 // hover saying what is actually behind it. Native tooltips rather than the
 // glossary popover — these are wayfinding, not Magic vocabulary, so they do
-// not belong in `glossary.py`'s table.
+// not belong in the served glossary table.
 const NAV = [
   { to: '/', label: 'Library', end: true,
     hint: 'Your decks, and what other people here have shared' },

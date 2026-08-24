@@ -12,15 +12,15 @@ import (
 	"time"
 )
 
-// TestTheTimestampIsPythonsIsoformat covers the two details `internal/jobs`
+// TestTheTimestampIsTheRecordedFormat covers the two details `internal/jobs`
 // had to find the hard way, in the module where they are the **sort key**:
 // `last_used_at` is what eviction orders by, as text.
 //
-// The fraction vanishes entirely at a zero microsecond -- Python writes
-// `...:20+00:00`, not `...:20.000000+00:00` -- and the offset is spelled
+// The fraction vanishes entirely at a zero microsecond -- the format writes
+// `...:20+00:00`, never `...:20.000000+00:00` -- and the offset is spelled
 // `+00:00`, never `Z`. Both happen roughly once in a million, which is exactly
 // why neither shows up in a store test that stamps rows from the clock.
-func TestTheTimestampIsPythonsIsoformat(t *testing.T) {
+func TestTheTimestampIsTheRecordedFormat(t *testing.T) {
 	whole := time.Date(2026, 8, 22, 6, 10, 20, 0, time.UTC)
 	if got := stamp(whole); got != "2026-08-22T06:10:20+00:00" {
 		t.Errorf("a whole second stamps as %q", got)
@@ -29,8 +29,8 @@ func TestTheTimestampIsPythonsIsoformat(t *testing.T) {
 	if got := stamp(frac); got != "2026-08-22T06:10:20.123456+00:00" {
 		t.Errorf("a fractional second stamps as %q", got)
 	}
-	// Nanoseconds are truncated, not rounded: Python's datetime holds
-	// microseconds and a monotonic clock reading below one is simply lost.
+	// Nanoseconds are truncated, not rounded: the format has no unit finer
+	// than the microsecond, and a clock reading below one is simply lost.
 	nanos := time.Date(2026, 8, 22, 6, 10, 20, 123456999, time.UTC)
 	if got := stamp(nanos); got != "2026-08-22T06:10:20.123456+00:00" {
 		t.Errorf("sub-microsecond time stamps as %q", got)
@@ -42,7 +42,7 @@ func TestTheTimestampIsPythonsIsoformat(t *testing.T) {
 		t.Error("the microsecond-zero stamp does not sort first within its second")
 	}
 	// A non-UTC instant is carried to UTC rather than stamped with its own
-	// offset, because Python's is `datetime.now(UTC)`.
+	// offset: every recorded stamp is UTC, and the sort depends on it.
 	east := time.FixedZone("east", 3600)
 	if got := stamp(whole.In(east)); got != stamp(whole) {
 		t.Errorf("a non-UTC time stamps as %q", got)

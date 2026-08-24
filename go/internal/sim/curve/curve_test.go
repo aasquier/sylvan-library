@@ -12,9 +12,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/curve"
 )
 
-// `sim/curve.py`, held to Python by `testdata/curve.json` (written by
-// `python tests/go_fixtures.py`) and to its own documented findings by the
-// traps ported from `tests/test_curve.py`.
+// The curve, held to the frozen corpus `testdata/curve.json` and to its own
+// documented findings by the pinned traps at the end of this file.
 //
 // # The epsilon, pinned per function
 //
@@ -27,14 +26,14 @@ import (
 // wrong.
 const (
 	// expectedLandsInPlay: a running total of `capped * Exactly(...)`, summed
-	// in ascending k exactly as Python's generator yields it. Exact, and the
-	// one place `pyfloat.Rounded` is doing visible work -- without it arm64 fuses
+	// in ascending k, the recorded order. Exact, and the
+	// one place `floats.Rounded` is doing visible work -- without it arm64 fuses
 	// the multiply into the add and answers one ulp differently.
 	epsilonExpectedLands = 0.0
 
 	// expectedRamp: a running total over the accelerants in deck order. Exact
-	// for the same two reasons, plus one more: `min(1.0, seen/deck)` is
-	// Python's `min`, which returns its second operand only when it is
+	// for the same two reasons, plus one more: the cap at one
+	// returns its bound only when the ratio is not
 	// strictly smaller.
 	epsilonExpectedRamp = 0.0
 
@@ -56,7 +55,8 @@ const (
 	// curve: the assembled answer, including the four odds rounded to four
 	// places for the wire. Pinned separately because the rounding is applied
 	// to the *reported* figures while the decisions are made on the unrounded
-	// ones, and a port that rounded before deciding would agree on every
+	// ones, and an implementation that rounded before deciding would agree on
+	// every
 	// number in `turns` and disagree about what to do.
 	epsilonCurve = 0.0
 )
@@ -190,12 +190,12 @@ func exactFloats(epsilon float64) cmp.Option {
 func exactSlice(t *testing.T, label string, got, want []float64, epsilon float64) {
 	t.Helper()
 	if len(got) != len(want) {
-		t.Errorf("%s: %d buckets, Python has %d", label, len(got), len(want))
+		t.Errorf("%s: %d buckets, the corpus has %d", label, len(got), len(want))
 		return
 	}
 	for i := range want {
 		if !exact(got[i], want[i], epsilon) {
-			t.Errorf("%s[%d] = %v (%#016x), Python = %v (%#016x)",
+			t.Errorf("%s[%d] = %v (%#016x), the corpus says %v (%#016x)",
 				label, i, got[i], math.Float64bits(got[i]),
 				want[i], math.Float64bits(want[i]))
 		}
@@ -211,37 +211,37 @@ func pieceOf(row []int) *curve.Piece {
 
 // -------------------------------------------------- differentially, per function
 
-func TestTheConstantsAreStillPythons(t *testing.T) {
+func TestTheConstantsAreStillTheRecordedOnes(t *testing.T) {
 	corpus, _ := load(t)
 	if corpus.Horizon != curve.Horizon || corpus.DefaultTargetTurn != curve.DefaultTargetTurn ||
 		corpus.DefaultTarget != curve.DefaultTarget || corpus.TooClose != curve.TooClose {
-		t.Errorf("constants drifted: Python has horizon %d, turn %d, target %v, too-close %v",
+		t.Errorf("constants drifted: the corpus has horizon %d, turn %d, target %v, too-close %v",
 			corpus.Horizon, corpus.DefaultTargetTurn, corpus.DefaultTarget, corpus.TooClose)
 	}
 	rock := curve.GenericRock()
 	if corpus.GenericRock[0] != rock.Cost || corpus.GenericRock[1] != rock.Output ||
 		corpus.GenericRock[2] != rock.Delay {
-		t.Errorf("the stand-in accelerant is %v, Python's is %v", rock, corpus.GenericRock)
+		t.Errorf("the stand-in accelerant is %v, the corpus's is %v", rock, corpus.GenericRock)
 	}
 }
 
-func TestAccelerantsMatchPython(t *testing.T) {
+func TestAccelerantsMatchTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	for _, row := range corpus.Accelerants {
 		got := curve.Accelerants(decks[row.Deck].Library)
 		if len(got) != len(row.Value) {
-			t.Errorf("%s: %d accelerants, Python found %d", row.Deck, len(got), len(row.Value))
+			t.Errorf("%s: %d accelerants, the corpus found %d", row.Deck, len(got), len(row.Value))
 			continue
 		}
 		for i, want := range row.Value {
 			if got[i].Cost != want[0] || got[i].Output != want[1] || got[i].Delay != want[2] {
-				t.Errorf("%s[%d] = %v, Python = %v", row.Deck, i, got[i], want)
+				t.Errorf("%s[%d] = %v, the corpus says %v", row.Deck, i, got[i], want)
 			}
 		}
 	}
 }
 
-func TestExpectedLandsInPlayMatchesPython(t *testing.T) {
+func TestExpectedLandsInPlayMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	if len(corpus.ExpectedLands) < 300 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.ExpectedLands))
@@ -251,26 +251,26 @@ func TestExpectedLandsInPlayMatchesPython(t *testing.T) {
 		otp, want := asBool(row[3]), asFloat(row[4])
 		got := curve.ExpectedLandsInPlay(deckSize, lands, turn, otp)
 		if !exact(got, want, epsilonExpectedLands) {
-			t.Errorf("ExpectedLandsInPlay(%d, %d, %d, %v) = %v (%#016x), Python = %v (%#016x)",
+			t.Errorf("ExpectedLandsInPlay(%d, %d, %d, %v) = %v (%#016x), the corpus says %v (%#016x)",
 				deckSize, lands, turn, otp, got, math.Float64bits(got), want, math.Float64bits(want))
 		}
 	}
 }
 
-func TestExpectedRampMatchesPython(t *testing.T) {
+func TestExpectedRampMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	for _, row := range corpus.ExpectedRamp {
 		for i, want := range row.ByTurn {
 			got := curve.ExpectedRamp(decks[row.Deck].Library, i+1, row.OnThePlay)
 			if !exact(got, want, epsilonExpectedRamp) {
-				t.Errorf("ExpectedRamp(%s, turn %d, on_the_play=%v) = %v, Python = %v",
+				t.Errorf("ExpectedRamp(%s, turn %d, on_the_play=%v) = %v, the corpus says %v",
 					row.Deck, i+1, row.OnThePlay, got, want)
 			}
 		}
 	}
 }
 
-func TestLandDistributionMatchesPython(t *testing.T) {
+func TestLandDistributionMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	for _, row := range corpus.LandDistribution {
 		got := curve.LandDistribution(row.DeckSize, row.Lands, row.Turn, row.OnThePlay)
@@ -278,7 +278,7 @@ func TestLandDistributionMatchesPython(t *testing.T) {
 	}
 }
 
-func TestRampDistributionMatchesPython(t *testing.T) {
+func TestRampDistributionMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	for _, row := range corpus.RampDistribution {
 		got := curve.RampDistribution(decks[row.Deck].Library, row.Turn, row.OnThePlay,
@@ -287,7 +287,7 @@ func TestRampDistributionMatchesPython(t *testing.T) {
 	}
 }
 
-func TestOnCurveOddsMatchesPython(t *testing.T) {
+func TestOnCurveOddsMatchTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	if len(corpus.OnCurveOdds) < 3000 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.OnCurveOdds))
@@ -313,17 +313,17 @@ func TestOnCurveOddsMatchesPython(t *testing.T) {
 			&curve.Extra{Lands: extraLands, Ramp: ramp, RampCount: extraCount})
 		if !exact(got, want, epsilonOnCurveOdds) {
 			t.Errorf("OnCurveOdds(%s, turn %d, need %v, otp %v, +%d lands, ramp %v x%d) = "+
-				"%v (%#016x), Python = %v (%#016x)",
+				"%v (%#016x), the corpus says %v (%#016x)",
 				deck, turn, row[2], otp, extraLands, ramp, extraCount,
 				got, math.Float64bits(got), want, math.Float64bits(want))
 		}
 	}
 	if nullNeeds == 0 {
-		t.Fatal("no row asks the `need=None` question, which is the default the surface uses")
+		t.Fatal("no row asks the nil-need question, which is the default the surface uses")
 	}
 }
 
-func TestLandsForEveryDropMatchesPython(t *testing.T) {
+func TestLandsForEveryDropMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	nils := 0
 	for _, row := range corpus.LandsForEveryDrop {
@@ -333,14 +333,14 @@ func TestLandsForEveryDropMatchesPython(t *testing.T) {
 		if row[4] == nil {
 			nils++
 			if got != nil {
-				t.Errorf("LandsForEveryDrop(%d, %d, %v, %v) = %d, Python found none",
+				t.Errorf("LandsForEveryDrop(%d, %d, %v, %v) = %d, the corpus found none",
 					deckSize, turn, target, otp, *got)
 			}
 			continue
 		}
 		want := asInt(row[4])
 		if got == nil || *got != want {
-			t.Errorf("LandsForEveryDrop(%d, %d, %v, %v) = %v, Python = %d",
+			t.Errorf("LandsForEveryDrop(%d, %d, %v, %v) = %v, the corpus says %d",
 				deckSize, turn, target, otp, got, want)
 		}
 	}
@@ -349,20 +349,20 @@ func TestLandsForEveryDropMatchesPython(t *testing.T) {
 	}
 }
 
-func TestTypicalAccelerantMatchesPython(t *testing.T) {
+func TestTypicalAccelerantMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	for _, row := range corpus.TypicalAccelerant {
 		piece, generic := curve.TypicalAccelerant(decks[row.Deck].Library, row.Turn)
 		if generic != row.Generic {
-			t.Errorf("%s turn %d: generic = %v, Python = %v", row.Deck, row.Turn, generic, row.Generic)
+			t.Errorf("%s turn %d: generic = %v, the corpus says %v", row.Deck, row.Turn, generic, row.Generic)
 		}
 		if piece.Cost != row.Piece[0] || piece.Output != row.Piece[1] || piece.Delay != row.Piece[2] {
-			t.Errorf("%s turn %d: piece = %v, Python = %v", row.Deck, row.Turn, piece, row.Piece)
+			t.Errorf("%s turn %d: piece = %v, the corpus says %v", row.Deck, row.Turn, piece, row.Piece)
 		}
 	}
 }
 
-func TestTheWholeCurveMatchesPython(t *testing.T) {
+func TestTheWholeCurveMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	if len(corpus.Curves) < 50 {
 		t.Fatalf("the curve set has shrunk to %d cases", len(corpus.Curves))
@@ -375,7 +375,7 @@ func TestTheWholeCurveMatchesPython(t *testing.T) {
 			OnTheDraw:  !row.OnThePlay,
 		}))
 		if diff := cmp.Diff(row.Value, got, exactFloats(epsilonCurve)); diff != "" {
-			t.Errorf("Curve(%s, turn %d, mana %v, target %v, otp %v) differs (-python +go):\n%s",
+			t.Errorf("Curve(%s, turn %d, mana %v, target %v, otp %v) differs (-corpus +got):\n%s",
 				row.Deck, row.TargetTurn, row.TargetMana, row.Target, row.OnThePlay, diff)
 		}
 	}
@@ -406,7 +406,7 @@ func project(mc curve.ManaCurve) manaCurveCase {
 	return out
 }
 
-// ------------------------------------------------- the pinned Python traps
+// -------------------------------------------------------- the pinned traps
 
 func TestTheLandDistributionSumsToOneAndRespectsTheCap(t *testing.T) {
 	// You may play one land a turn, so turn 4 tops out at four in play. The

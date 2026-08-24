@@ -10,8 +10,8 @@ import (
 )
 
 // The lifecycle routes' own tests. `internal/deckimport` and `internal/deck`
-// already prove the *bytes* against Python's; what these prove is the layer
-// above -- that a refusal lands on the right status in the right order, that
+// already prove the *bytes* against their goldens; what these prove is the
+// layer above -- that a refusal lands on the right status in the right order, that
 // nothing is written when one fires, and that ADR 5 survives a write.
 
 func (r *writeRig) read(t *testing.T, slug string) (string, bool) {
@@ -59,7 +59,7 @@ func TestCreateWritesADraftAndNothingElse(t *testing.T) {
 	if d.Stage != "draft" || len(d.Cards) != 0 || d.Bracket == nil || *d.Bracket != 4 {
 		t.Errorf("the file does not say what the answer did:\n%s", text)
 	}
-	// Creation is outside `service._commit` in Python and therefore outside
+	// Creation is deliberately outside
 	// ADR 28's log. Keeping it outside is a decision, not an omission: adding
 	// it means a second call site, and one call site is the log's whole
 	// design.
@@ -103,9 +103,9 @@ func TestCreateRefusesBeforeWritingAnything(t *testing.T) {
 	}
 }
 
-// A bracket that is not a number is FastAPI's own refusal, raised before the
-// handler body -- so it is a 422 naming the field rather than one of the
-// editor's sentences.
+// A bracket that is not a number is the coercion's own refusal, raised
+// before the handler body -- so it is a 422 naming the field rather than
+// one of the editor's sentences.
 func TestCreateRefusesABracketThatIsNotANumber(t *testing.T) {
 	rig := newWriteRig(t)
 	defer rig.close()
@@ -317,9 +317,9 @@ func TestSharingNeedsTheFlag(t *testing.T) {
 	}
 }
 
-// Python's `bool()`, not Go's cast: `"no"` is true and `0` is false, which is
-// what this route has always done.
-func TestTheSharingFlagIsReadTheWayPythonReadsIt(t *testing.T) {
+// The recorded truthiness, not Go's cast: `"no"` is true and `0` is false,
+// which is what this route has always done.
+func TestTheSharingFlagIsReadWithTheRecordedTruthiness(t *testing.T) {
 	for body, want := range map[string]bool{
 		`{"shared":"no"}`: true,
 		`{"shared":0}`:    false,
@@ -344,8 +344,9 @@ func TestTheSharingFlagIsReadTheWayPythonReadsIt(t *testing.T) {
 
 // ADR 5 survives a write. Bob's private deck is absent from alice's source, so
 // every verb against it is a 404 -- and a 403 raised before the lookup would
-// confirm it exists. The contract suite caught this on the delete route the
-// day these four were written; the same ordering governs all of them.
+// confirm it exists. The delete route got this wrong the
+// day these four were written and a test caught it; the same ordering
+// governs all of them.
 func TestAnotherAccountsPrivateDeckIsA404ToEveryLifecycleVerb(t *testing.T) {
 	rig := newWriteRig(t)
 	defer rig.close()

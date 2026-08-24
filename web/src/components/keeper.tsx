@@ -3,7 +3,7 @@
  * Ludevic actually is, behind an About button in the Laboratory.
  *
  * The prose is checked in, because a character's story is exactly the kind
- * of fact that stopped moving years ago (`lore.py`'s argument) — but it is
+ * of fact that stopped moving years ago (the lore volumes' argument) — but it is
  * written *around the pool's own titles*. The exhibit case below the bio is
  * a live `searchCards` for his name: the four cards the pool holds — an
  * opus, a test subject, the man himself twice over, a hubris — each with

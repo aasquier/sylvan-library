@@ -12,15 +12,16 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
 
-// The dial's route. `internal/claude`'s corpus already holds the payload to
-// Python byte for byte across twenty resolutions; what is left here is
+// The dial's route. `internal/claude`'s corpus already holds the payload
+// byte for byte across twenty resolutions; what is left here is
 // everything the corpus cannot see, which is all of it request-shaped: which
 // query value wins, when the library is resolved, and in what order the two
 // refusals are decided.
 //
 // All of it was measured against the running app rather than read off the
-// source, because two of the three are emergent -- they follow from where
-// FastAPI evaluates a dependency argument, not from anything the handler says.
+// source, because two of the three are emergent -- they follow from when
+// the recorded contract resolves its arguments, not from anything the
+// handler says.
 
 func TestTheDialAnswersWithoutADeck(t *testing.T) {
 	a, done := deckAPI(t, true)
@@ -47,9 +48,9 @@ func TestTheDialAnswersWithoutADeck(t *testing.T) {
 // assertion sees and the settings gear renders in.
 //
 // `tier1.Number`'s lesson, and it has already paid here once: the corpus
-// caught `never` carrying a typographic apostrophe where Python writes an
-// ASCII one, a difference every structural check in this file would pass.
-func TestTheDialsKeyOrderIsPythons(t *testing.T) {
+// caught `never` carrying a typographic apostrophe where the record writes
+// an ASCII one, a difference every structural check in this file would pass.
+func TestTheDialsKeyOrderIsTheRecordedOne(t *testing.T) {
 	a, done := deckAPI(t, true)
 	defer done()
 	_, _, raw := as(t, a, alice, "/api/claude")
@@ -72,7 +73,7 @@ func TestTheDialsKeyOrderIsPythons(t *testing.T) {
 	want := []string{"installed", "configured", "model", "stance", "ceiling",
 		"default", "presets", "never", "modes"}
 	if strings.Join(keys, ",") != strings.Join(want, ",") {
-		t.Errorf("key order is\n  %v\nPython's is\n  %v", keys, want)
+		t.Errorf("key order is\n  %v\nthe record says\n  %v", keys, want)
 	}
 }
 
@@ -102,12 +103,12 @@ func TestTheDialReadsTheDecksStatus(t *testing.T) {
 // **The owner is resolved even when no deck is going to be read**, so
 // `?owner=nobody` with no slug at all is a 404 rather than a dial.
 //
-// That is not something the handler chooses; it follows from Python passing
-// `lib.source_for(owner or lib.my_owner)` as an *argument* to
-// `service.claude_status`, which evaluates before the call whether or not the
-// `if slug:` branch inside will ever run. Measured against the running app,
-// because reading it off the source is exactly how a port gets it wrong: the
-// natural Go shape resolves the source lazily and answers 200.
+// That is not something the handler chooses; it follows from the source
+// being resolved as an *argument*,
+// which evaluates before the call whether or not the
+// slug branch inside will ever run. Measured against the running app,
+// because reading it off the source is exactly how this gets written wrong:
+// the natural Go shape resolves the source lazily and answers 200.
 func TestAnUnknownOwnerIsA404EvenWithNoSlug(t *testing.T) {
 	a, done := deckAPI(t, true)
 	defer done()
@@ -153,7 +154,7 @@ func TestTheDeckIsRefusedBeforeTheStanceIs(t *testing.T) {
 	}
 }
 
-// Starlette's QueryParams.get returns the **last** repeated value; Go's
+// The recorded reading takes the **last** repeated value; Go's
 // Query().Get returns the first. Every one of this route's four parameters
 // goes through the same helper, so all four are checked -- the failure mode is
 // a client that appends rather than replaces, and it is silent.
@@ -194,7 +195,7 @@ func TestTheLastQueryValueWinsOnEveryParameter(t *testing.T) {
 // no deck to derive from, the dial beside it reported `off` while
 // `theme.stance_for` was about to run the conversation at `second-opinion`.
 //
-// And the branch's other half, which is the part a port drops: a surface with
+// And the branch's other half, which is the easy part to drop: a surface with
 // a default only applies **when there is no deck**, so a theme surface asking
 // about a built deck gets the deck's answer and not the surface's.
 func TestASurfacesDefaultAppliesOnlyWithNoDeck(t *testing.T) {
@@ -315,7 +316,7 @@ func TestTheDialsSlugCannotWalkOutOfTheLibrary(t *testing.T) {
 				"outside the library: %s", slug, status, raw)
 			continue
 		}
-		// The refusal is Python's own `no deck '<slug>'` and nothing more. It
+		// The refusal is the recorded `no deck '<slug>'` and nothing more. It
 		// ECHOES what the caller sent, which is not a leak -- they typed it --
 		// but it must not carry the server's own paths or the OS's errno text,
 		// which is what a handler reporting `os.ReadFile`'s error would do.

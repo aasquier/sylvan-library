@@ -9,11 +9,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// personaJSON is src/mtglab/claude/persona.py rendered by
-// tests/go_fixtures.py. Embedded rather than transcribed: a voice is ~1.7KB of
+// personaJSON is the recorded roster of voices. Embedded as data rather
+// than transcribed into code: a voice is ~1.7KB of
 // prose whose bytes reach a model, seven of them, and hand-copying 11KB of
-// English into a second language is precisely the drift this repo has a
-// generator to prevent. tests/test_go_fixtures.py fails when the two disagree.
+// English into string literals is precisely the drift the embed exists to
+// prevent.
 //
 //go:embed data/personas.json
 var personaJSON []byte
@@ -90,7 +90,7 @@ func init() {
 // UnknownPersonaError is a persona nobody has written. A 422, and it names
 // what there is.
 //
-// Its own type for the reason Python gives it its own exception: the caller's
+// Its own type because the caller's
 // answer is to send a different string, not to retry, and certainly not to
 // read it as the model failing.
 type UnknownPersonaError struct{ Requested any }
@@ -98,10 +98,10 @@ type UnknownPersonaError struct{ Requested any }
 func (e *UnknownPersonaError) Error() string {
 	quoted := make([]string, len(PersonaKeys))
 	for i, k := range PersonaKeys {
-		quoted[i] = wire.PyRepr(k)
+		quoted[i] = wire.Quote(k)
 	}
 	return fmt.Sprintf("no persona %s; there is %s",
-		pyReprAny(e.Requested), strings.Join(quoted, ", "))
+		literalAny(e.Requested), strings.Join(quoted, ", "))
 }
 
 // GetPersona resolves the persona for a request, refusing an unknown one

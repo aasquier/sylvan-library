@@ -7,7 +7,7 @@
  *   reading of the declared themes, and that reading is the server's. While
  *   editing, the editor names which ticked words are class words and stops
  *   there — it does not compute a winner. A second copy of worst-piloted-wins
- *   living here would disagree with the Python one silently.
+ *   living here would disagree with the served one silently.
  * - **The vocabulary is served, not copied.** The chips come from
  *   `GET /api/themes`; nothing in the client holds a theme list.
  * - **What is saved is sorted**, so a `deck.yaml` diff shows what changed

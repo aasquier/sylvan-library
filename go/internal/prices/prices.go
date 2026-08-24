@@ -1,21 +1,21 @@
-// Package prices is `claude/prices.py`: what the tokens cost, in money.
+// Package prices is the Claude ledger's price table: what the tokens cost,
+// in money.
 //
-// The Python module's whole preamble applies unchanged and is not repeated —
-// rates are dated and the date renders beside every figure; a rate known to
-// move is modelled as a window rather than flattened; a model the table does
-// not know is priced at nothing and **counted**, because charging it zero
-// silently would read as "cheap"; and the figure stays a floor, since cache
-// writes bill at 1.25x input and are recorded nowhere. Re-check rates by
-// reading the pricing page and editing `prices.py`; this table mirrors it
-// and `TestTheTableMatchesPython` holds the two equal through the generated
-// corpus, so an edit to either side fails a test until the other moves.
+// The standing rules, all load-bearing: rates are dated and the date
+// renders beside every figure; a rate known to move is modelled as a window
+// rather than flattened; a model the table does not know is priced at
+// nothing and **counted**, because charging it zero silently would read as
+// "cheap"; and the figure stays a floor, since cache writes bill at 1.25x
+// input and are recorded nowhere. Re-check rates by reading the pricing
+// page and editing `Table`; the corpus test holds the table to the recorded
+// rates, so a rate never drifts silently.
 package prices
 
 import (
 	"sort"
 	"time"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -53,7 +53,7 @@ func (p Priced) On(when string) Rate {
 	return p.Rate
 }
 
-// Table mirrors `prices.PRICES`. Sonnet 5 is the one with a scheduled
+// Table is the rate per model. Sonnet 5 is the one with a scheduled
 // change: $2/$10 introductory through 2026-08-31, $3/$15 after.
 var Table = map[string]Priced{
 	"claude-fable-5":    {Rate: Rate{10.00, 50.00}},
@@ -69,11 +69,11 @@ var Table = map[string]Priced{
 
 const perMillion = 1_000_000
 
-// Cost is `prices.cost`: what one conversation came to, or false for a model
-// with no rate — a conversation that cost nothing and one nobody can price
-// are different facts. Every product is fenced with `pyfloat.Rounded`,
-// because `a*b + c` is the shape arm64 fuses into one FMADDD and CPython
-// rounds twice.
+// Cost is what one conversation came to, or false for a model with no rate
+// — a conversation that cost nothing and one nobody can price are different
+// facts. Every product is fenced with `floats.Rounded`, because `a*b + c`
+// is the shape arm64 fuses into one FMADDD and the recorded arithmetic
+// rounds after every product.
 func Cost(model string, inputTokens, outputTokens, cacheReadTokens int64,
 	when string) (float64, bool) {
 	priced, ok := Table[model]
@@ -81,10 +81,10 @@ func Cost(model string, inputTokens, outputTokens, cacheReadTokens int64,
 		return 0, false
 	}
 	rate := priced.On(when)
-	total := pyfloat.Rounded(float64(inputTokens) * rate.Input)
-	total = pyfloat.Rounded(total + pyfloat.Rounded(float64(outputTokens)*rate.Output))
-	cache := pyfloat.Rounded(pyfloat.Rounded(float64(cacheReadTokens)*rate.Input) * CacheReadFraction)
-	total = pyfloat.Rounded(total + cache)
+	total := floats.Rounded(float64(inputTokens) * rate.Input)
+	total = floats.Rounded(total + floats.Rounded(float64(outputTokens)*rate.Output))
+	cache := floats.Rounded(floats.Rounded(float64(cacheReadTokens)*rate.Input) * CacheReadFraction)
+	total = floats.Rounded(total + cache)
 	return total / perMillion, true
 }
 
@@ -97,7 +97,7 @@ type Row struct {
 	CacheRead     int64
 }
 
-// Estimate is `prices.Estimate.as_dict()`: the total, and what could not be
+// Estimate is the total, and what could not be
 // priced — which is not a footnote, since an unpriced row contributes
 // nothing to `usd` and a caller rendering the figure without it is showing a
 // number that is wrong downward.
@@ -107,9 +107,9 @@ type Estimate struct {
 	UnpricedModels []string // sorted, "(none recorded)" for a blank model
 }
 
-// Over totals rows in order — a running `+=` like Python's, never a
-// compensated sum, because `estimate` accumulates with `+=` and the order of
-// additions is part of the answer's last bit.
+// Over totals rows in order — a plain running sum, never a compensated
+// one, deliberately: the recorded totals accumulate term by term, and the
+// order of additions is part of the answer's last bit.
 func Over(rows []Row, when string) Estimate {
 	out := Estimate{}
 	seen := map[string]bool{}
@@ -132,14 +132,14 @@ func Over(rows []Row, when string) Estimate {
 			}
 			continue
 		}
-		out.USD = pyfloat.Rounded(out.USD + amount)
+		out.USD = floats.Rounded(out.USD + amount)
 	}
 	sort.Strings(out.UnpricedModels)
 	return out
 }
 
-// AsDict is the wire shape, key order Python's: usd (rounded half-to-even
-// to four places, rendered as Python renders a float), unpriced,
+// AsDict is the wire shape, in the recorded key order: usd (rounded
+// half-to-even to four places, rendered canonically), unpriced,
 // unpriced_models, complete, checked.
 func (e Estimate) AsDict() wire.OrderedMap {
 	models := e.UnpricedModels
@@ -147,7 +147,7 @@ func (e Estimate) AsDict() wire.OrderedMap {
 		models = []string{}
 	}
 	return wire.OrderedMap{
-		{Key: "usd", Value: pyfloat.Float(pyfloat.RoundTo(e.USD, 4))},
+		{Key: "usd", Value: floats.Float(floats.RoundTo(e.USD, 4))},
 		{Key: "unpriced", Value: e.Unpriced},
 		{Key: "unpriced_models", Value: models},
 		{Key: "complete", Value: e.Unpriced == 0},
@@ -155,6 +155,5 @@ func (e Estimate) AsDict() wire.OrderedMap {
 	}
 }
 
-// Today is `date.today().isoformat()`: the local day, which on the instance
-// is UTC.
+// Today is the local day as an ISO date — on the instance, UTC.
 func Today() string { return time.Now().Format("2006-01-02") }

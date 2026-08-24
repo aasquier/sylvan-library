@@ -1,35 +1,35 @@
-// Package decklist reads a decklist the way people actually paste one:
-// `decks/decklist.py`, verbatim in every way that can change an answer.
+// Package decklist reads a decklist the way people actually paste one, and
+// the grammar is recorded contract in every way that can change an answer.
 //
 // Pure text in, structured lines out. No card pool, no filesystem, no
 // judgement about whether a card is real -- that is `deckimport`'s job, and
 // keeping the two apart is what lets the grammar be tested exhaustively
 // without a database.
 //
-// There is no decklist standard, so this parses the union of what the exports
-// people use actually emit; the Python docstring has the table, and the
-// patterns below are the same patterns.
+// There is no decklist standard, so this parses the union of what the
+// exports people use actually emit; the patterns below are that table.
 //
 // **Two things it deliberately does not do.** It never consults a card list to
 // disambiguate, and it never silently drops a line it could not read. Lines it
 // cannot turn into a name land in Unreadable with their line number, so the
 // importer can report them.
 //
-// Three places where Go's regexp is not Python's `re`, and each is closed here
-// rather than left to be discovered by somebody's paste:
+// Three places where the stock character classes are narrower than the
+// grammar this package promises, each closed here rather than left to be
+// discovered by somebody's paste:
 //
-//   - **`\s`**. Python's is `str.isspace()` -- which includes U+00A0, the
-//     separators, and U+001C-U+001F -- and Go's is five ASCII characters. A
-//     non-breaking space is exactly what arrives when a list is copied out of
-//     a web page, so the class is spelled out (`sp`) and used everywhere the
-//     original writes `\s`.
-//   - **`splitlines()`**. Python breaks on eleven characters, Go's
+//   - **space**. The grammar's space class includes U+00A0, the separator
+//     categories, and U+001C-U+001F; `\s` is five ASCII characters. A
+//     non-breaking space is exactly what arrives when a list is copied out
+//     of a web page, so the class is spelled out (`sp`) and used everywhere
+//     a narrower pattern would write `\s`.
+//   - **line boundaries**. The grammar breaks on eleven characters,
 //     `strings.Split` on one. A lone `\r` from an old export, or the U+2028
 //     a browser paste can carry, would otherwise be one enormous line.
-//   - **`\d`**. Python's matches any Unicode decimal digit and `int()` reads
-//     it; `[0-9]` would read `٣ Forest` as a card named "٣ Forest" where
-//     Python reads three Forests. `digitValue` is the six lines that keep
-//     them agreeing.
+//   - **digits**. A quantity is any Unicode decimal digit, read by value;
+//     `[0-9]` would read `٣ Forest` as a card named "٣ Forest" where the
+//     recorded grammar reads three Forests. `digitValue` is the six lines
+//     that keep it so.
 //
 // The one ambiguity that cannot be resolved here: a bare `3 Steps Ahead` is
 // either three copies of "Steps Ahead" or one copy of the blue instant.
@@ -83,9 +83,10 @@ func init() {
 	sectionWords["sorceries"] = "deck"
 }
 
-// sp is Python's `\s` for a str pattern: the characters `str.isspace()` is
-// true for. `\t-\r` is U+0009 to U+000D; `\p{Z}` is the separator categories,
-// which is where U+00A0 and the ordinary space live.
+// sp is the grammar's space class. `\t-\r` is U+0009 to U+000D; `\p{Z}` is
+// the separator categories, which is where U+00A0 and the ordinary space
+// live; U+001C-U+001F are the information separators an old export can
+// carry.
 const sp = `[\t-\r \x{1c}-\x{1f}\x{85}\p{Z}]`
 
 var (
@@ -94,19 +95,20 @@ var (
 	//
 	// Taken apart in `headerSection` rather than matched by one pattern, and
 	// the reason is measured: the single pattern this replaces let three
-	// separate `\s*` runs compete for the same run of spaces, and one
-	// 512-character line took 26 seconds. Both patterns here are unambiguous,
-	// so each is linear -- and RE2 could not backtrack anyway, which is
-	// exactly why the shape must not be reinvented: the Python side still can.
+	// separate space runs compete for the same run of spaces, and under a
+	// backtracking engine one 512-character line took 26 seconds. Both
+	// patterns here are unambiguous, so each is linear under any engine --
+	// the taken-apart shape is the guarantee, not the library.
 	headerCount = regexp.MustCompile(`\(` + sp + `*\p{Nd}+` + sp + `*\)$`)
 	headerWord  = regexp.MustCompile(`^[A-Za-z][A-Za-z ]*$`)
 
 	// A leading quantity. Capped at three digits so that `1996 World Champion`
 	// parses as a name rather than as 1,996 copies of "World Champion".
 	//
-	// Python writes a `(?=\S)` lookahead, which RE2 has not got. The pattern
-	// here matches the same prefix and the caller checks the next character
-	// itself -- see `leadingQty`, where the equivalence is argued.
+	// The grammar wants a trailing lookahead here -- the whitespace run
+	// must be followed by a non-space -- and RE2 has no lookahead. The
+	// pattern matches the same prefix and the caller checks the next
+	// character itself -- see `leadingQty`, where the equivalence is argued.
 	qtyRe = regexp.MustCompile(`^(\p{Nd}{1,3})` + sp + `*[xX]?` + sp + `+`)
 
 	// Trailing annotations, stripped right to left. Each is anchored to the
@@ -316,19 +318,20 @@ func headerSection(line string) (string, bool) {
 		return "", false
 	}
 	section, ok := sectionWords[strings.Join(strings.FieldsFunc(
-		strings.ToLower(text), isPySpace), " ")]
+		strings.ToLower(text), isListSpace), " ")]
 	return section, ok
 }
 
-// leadingQty is `_QTY.match` with its `(?=\S)` lookahead done by hand.
+// leadingQty is the quantity match with its trailing lookahead done by
+// hand.
 //
-// The lookahead makes the pattern require a non-space after the whitespace
-// run. Python's engine backtracks to find one: `sp+` is greedy, so it takes
-// every space and the lookahead then asks what follows. If that is a space the
-// match failed for good -- a shorter `sp+` only puts the engine back on
-// whitespace -- and if it is the end of the line, likewise. So "greedy match,
-// then the next character must exist and must not be a space" is the same
-// answer, and it is what this does.
+// The recorded grammar requires a non-space after the whitespace run. A
+// backtracking engine finds one by retreating: `sp+` is greedy, so it takes
+// every space and the lookahead then asks what follows. If that is a space
+// the match failed for good -- a shorter `sp+` only puts the engine back on
+// whitespace -- and if it is the end of the line, likewise. So "greedy
+// match, then the next character must exist and must not be a space" is the
+// same answer, and it is what this does.
 func leadingQty(body string) (int, string, bool) {
 	m := qtyRe.FindStringSubmatchIndex(body)
 	if m == nil {
@@ -338,7 +341,7 @@ func leadingQty(body string) (int, string, bool) {
 	if rest == "" {
 		return 0, body, false
 	}
-	if r, _ := utf8.DecodeRuneInString(rest); isPySpace(r) {
+	if r, _ := utf8.DecodeRuneInString(rest); isListSpace(r) {
 		return 0, body, false
 	}
 	qty := 0
@@ -363,7 +366,8 @@ func digitValue(r rune) int {
 	return 0
 }
 
-// splitLines is Python's `str.splitlines()`: eleven line boundaries, not one.
+// splitLines breaks on the grammar's eleven line boundaries, not `\n`
+// alone -- `isLineBreak` names them.
 func splitLines(text string) []string {
 	out := []string{}
 	start := 0
@@ -395,15 +399,16 @@ func isLineBreak(r rune) bool {
 	return false
 }
 
-// isPySpace is `str.isspace()`. Go's `unicode.IsSpace` is the same set minus
-// the four information separators, which Python counts and Go does not.
-func isPySpace(r rune) bool {
+// isListSpace is the grammar's space class as a rune test:
+// `unicode.IsSpace` plus the four information separators, which the grammar
+// counts and the stock test does not.
+func isListSpace(r rune) bool {
 	return unicode.IsSpace(r) || (r >= 0x1c && r <= 0x1f)
 }
 
-func trim(s string) string      { return strings.TrimFunc(s, isPySpace) }
-func trimLeft(s string) string  { return strings.TrimLeftFunc(s, isPySpace) }
-func trimRight(s string) string { return strings.TrimRightFunc(s, isPySpace) }
+func trim(s string) string      { return strings.TrimFunc(s, isListSpace) }
+func trimLeft(s string) string  { return strings.TrimLeftFunc(s, isListSpace) }
+func trimRight(s string) string { return strings.TrimRightFunc(s, isListSpace) }
 
 func firstRunes(s string, n int) string {
 	for i := range s {

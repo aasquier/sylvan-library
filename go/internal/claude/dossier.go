@@ -24,7 +24,7 @@ import (
 
 // The commander dossier: who this character is, and who says so.
 //
-// `claude/dossier.py`, and the first mode whose facts do not all come from the
+// The first mode whose facts do not all come from the
 // pool -- which is the whole reason ADR 19 exists. Three sources, each with a
 // narrow jurisdiction: **card facts come from the pool** (`Brief` assembles
 // them here, before the model is called), **the meta and the history come
@@ -32,8 +32,8 @@ import (
 // **Claude supplies voice and framing** and carries no factual weight.
 //
 // Three things enforce that and none of them is the system prompt. The
-// schema keeps prose and sources in different fields (it crossed as generated
-// data, in modes.json). **A cited page must be one the search actually
+// schema keeps prose and sources in different fields (data, in modes.json).
+// **A cited page must be one the search actually
 // returned** -- `KeepSources`, in sources.go, because with a response schema
 // in play the API attaches no citations and a URL in the payload is just a
 // string the model typed. And **every card the dossier names is looked up**:
@@ -43,7 +43,7 @@ import (
 // unsourced dossier renders as exactly the blended paragraph ADR 19 rejected,
 // arrived at by accident.
 //
-// # The cache, and why its key is Python's byte for byte
+// # The cache, and why its key is stable byte for byte
 //
 // A dossier is about a *character*, so it is cached on the commander's
 // `oracle_id` -- two decks led by Gyome are two lists and one Gyome -- plus a
@@ -51,22 +51,22 @@ import (
 // change can serve text written under a different one and a seat granted
 // Opus neither reads nor overwrites what Sonnet wrote.
 //
-// Unlike ADR 18's simulation cache, **a Go-written row and a Python-written
-// row for the same commander are the SAME row**, deliberately. The sim cache
-// keeps the two runtimes' rows apart because a one-ulp divergence would
-// otherwise serve one runtime's number under the other's name; a dossier is
-// the model's prose after a source check both runtimes hold to one corpus,
-// and the day this route flips, every commander already written would
-// otherwise cost a four-minute paid search to write again. So `Fingerprint`
-// reproduces `dossier._fingerprint` exactly -- the same version, the same
-// instruction bytes (they cross in modes.json), the same
-// `json.dumps(schema, sort_keys=True)` (pyjson.go) and the same model id --
-// and a corpus holds the keys to Python's. That is arrangeable honestly where
-// the sim cache's was not: nothing here has to read Python source at runtime.
+// Unlike ADR 18's simulation cache, **a fresh row and a row already stored
+// on the instance for the same commander are the SAME row**, deliberately.
+// The sim cache re-keys itself whenever the engine's own sources move,
+// because a one-ulp divergence would otherwise serve a stale number under a
+// fresh name; a dossier is the model's prose after a source check, and a key
+// that drifted would silently orphan every commander already written -- each
+// one a four-minute paid search to write again. So `Fingerprint` hashes only
+// recorded, served data -- the version, the instruction bytes (data in
+// modes.json), the sorted-key canonical schema rendering (canonjson.go) and
+// the model id -- and the corpus holds the expected keys byte for byte. That
+// stability is arrangeable honestly here where the sim cache's is not:
+// nothing in this key follows the engine.
 //
 // It writes nothing to a deck. `boundary_test.go` covers this file.
 
-// DossierVersion is `DOSSIER_VERSION`: bumped when a stored dossier's *shape*
+// DossierVersion is bumped when a stored dossier's *shape*
 // changes, so old rows are missed rather than rendered into a UI that expects
 // something else. 3 is "allies" joining the story's rivals as cited prose.
 const DossierVersion = 3
@@ -79,8 +79,8 @@ const DossierNever = "This is Claude's writing over cited pages. The card facts 
 // fine and there is simply nothing to write a dossier about. Its own type
 // because the caller's answer (422) differs from a missing deck's (404).
 //
-// `Slug` is the slug the caller asked by, which is Python's `brief(slug)` --
-// not the deck file's own, which can differ on the file tier.
+// `Slug` is the slug the caller asked by -- not the deck file's own, which
+// can differ on the file tier.
 type ErrNoCommander struct{ Slug string }
 
 func (e *ErrNoCommander) Error() string {
@@ -91,8 +91,8 @@ func (e *ErrNoCommander) Error() string {
 
 // ---------------------------------------------------------------- the facts
 
-// DossierBrief is `dossier.brief`: what the pool knows about this deck's
-// commander, before the call. `service.commander_dossier`'s payload, reused
+// DossierBrief is what the pool knows about this deck's
+// commander, before the call. `deckread.CommanderDossier`'s payload, reused
 // rather than re-queried, so the counted strip on the deck page and the facts
 // handed to the model are one query and the prose cannot disagree with the
 // strip. ErrNoCommander when `card` is null -- no commander, a commander the
@@ -109,10 +109,9 @@ func DossierBrief(ctx context.Context, conn *pool.Conn, slug string, d *deck.Dec
 	return facts, nil
 }
 
-// dossierOpening is `_ask_for`: the facts, then the ask. The brief is
-// rendered as Python renders it -- `json.dumps(..., indent=2)` -- which is why
-// a corpus row can hold the whole message to Python's bytes rather than its
-// key order alone.
+// dossierOpening is the facts, then the ask. The brief is rendered as
+// indented canonical JSON, which is why a corpus row can hold the whole
+// message as bytes rather than its key order alone.
 func dossierOpening(facts wire.OrderedMap) string {
 	card, _ := kv(facts, "card").(wire.OrderedMap)
 	name := asString(kv(card, "name"))
@@ -128,7 +127,7 @@ func dossierOpening(facts wire.OrderedMap) string {
 			"query rather than a recollection, and it is the authority on what " +
 			"the card does.",
 		"",
-		pyDumps(body, pyDumpOptions{Indent: 2}),
+		dumpJSON(body, dumpOptions{Indent: 2}),
 		"",
 		fmt.Sprintf("Write the dossier for %s. Search the web for the character's "+
 			"story, the archetype, the competitors, the rivals and the standing; "+
@@ -138,11 +137,11 @@ func dossierOpening(facts wire.OrderedMap) string {
 
 // ---------------------------------------------------------------- the cache
 
-// Fingerprint is `dossier._fingerprint(tier)`: a hash of what would change
+// Fingerprint is a hash of what would change
 // the answer's shape or content -- the version, the prompt, the schema and
 // the model id -- so editing the instructions misses every stored row, and
 // two tiers never share a commander's dossier. See the package note on why
-// these are Python's bytes exactly.
+// these bytes are exact and recorded.
 func Fingerprint(tier string) (string, error) {
 	mode, err := GetMode(ModeCommanderDossier)
 	if err != nil {
@@ -151,12 +150,12 @@ func Fingerprint(tier string) (string, error) {
 	digest := sha256.New()
 	digest.Write([]byte(strconv.Itoa(DossierVersion)))
 	digest.Write([]byte(mode.Instructions))
-	digest.Write([]byte(pyDumps(mode.ResponseSchema, pyDumpOptions{SortKeys: true})))
+	digest.Write([]byte(dumpJSON(mode.ResponseSchema, dumpOptions{SortKeys: true})))
 	digest.Write([]byte(ModelFor(tier)))
 	return hex.EncodeToString(digest.Sum(nil))[:16], nil
 }
 
-// CacheKey is `dossier.cache_key`: the key for one commander's dossier, or ""
+// CacheKey is the key for one commander's dossier, or ""
 // when there is no oracle id -- which disables caching for that deck rather
 // than colliding every uncatalogued commander onto one row.
 func CacheKey(oracleID, tier string) (string, error) {
@@ -177,9 +176,9 @@ func CacheKey(oracleID, tier string) (string, error) {
 // `mode=rw` handle the door already holds, because the ladder runs once at
 // boot and a file this created would be a database at version zero. A nil
 // handle is an instance with no app.db yet; every read misses and every
-// write warns. (Python's `get` would *create* app.db there, since
-// `auth.db.connect` makes the file and runs the ladder; a reader that
-// acquires a database is the one thing the Go side refuses to be.)
+// write warns. (A store that opened its own handle would *create* app.db on
+// such an instance and run the ladder as a side effect; a reader that
+// acquires a database is the one thing this store refuses to be.)
 type DossierStore struct {
 	db  *sql.DB
 	log *slog.Logger
@@ -205,7 +204,7 @@ type DossierHit struct {
 	CreatedAt string
 }
 
-// Get is `dossier.get`: a stored dossier, or nil. Never raises.
+// Get returns a stored dossier, or nil. A failure is a miss, never an error.
 func (s *DossierStore) Get(ctx context.Context, key string) *DossierHit {
 	if s == nil || s.db == nil || key == "" {
 		return nil
@@ -227,14 +226,15 @@ func (s *DossierStore) Get(ctx context.Context, key string) *DossierHit {
 	return &DossierHit{Result: json.RawMessage(blob), CreatedAt: createdAt}
 }
 
-// Put is `dossier.put`: store one dossier. Never raises.
+// Put stores one dossier. A failure is a warning, never an error.
 func (s *DossierStore) Put(ctx context.Context, key, oracleID, commander string, result any) {
 	if s == nil || s.db == nil || key == "" {
 		return
 	}
-	// Compact, as Python's `separators=(",", ":")` is. Non-ASCII stays UTF-8
-	// where Python would write `\uXXXX`; both parse to the same value, and the
-	// blob is served raw rather than hashed, so the bytes need not agree.
+	// Compact -- no space after `,` or `:`. Non-ASCII stays UTF-8, where rows
+	// already stored on the instance may spell it as `\uXXXX` escapes; both
+	// parse to the same value, and the blob is served raw rather than hashed,
+	// so the bytes need not agree.
 	blob, err := wire.Marshal(result)
 	if err != nil {
 		s.log.Warn("dossier is not storable", "err", err)
@@ -258,7 +258,7 @@ type Archetype struct {
 	SourceIDs []string `json:"source_ids"`
 }
 
-// DossierBody is the stored and served dossier, in Python's key order.
+// DossierBody is the stored and served dossier, in the recorded key order.
 type DossierBody struct {
 	Who         Passage      `json:"who"`
 	Archetype   Archetype    `json:"archetype"`
@@ -286,13 +286,13 @@ type Usage struct {
 	CacheReadTokens int `json:"cache_read_tokens"`
 }
 
-// emptyObject is Python's `{}` -- what `dossier` and `research` carry until
+// emptyObject is a literal `{}` -- what `dossier` and `research` carry until
 // there is a body, so a client never has to tell a missing key from an
 // absent answer.
 var emptyObject = json.RawMessage("{}")
 
 // DossierReport is one response shape for every outcome, including not
-// asking at all, in Python's key order.
+// asking at all, in the recorded key order.
 //
 // `answered_by` is ADR 14's third boundary as a field, and `sources` sits
 // beside the prose rather than under it for the same reason: a caller that
@@ -358,7 +358,7 @@ type DossierRequest struct {
 	Store *DossierStore
 }
 
-// DossierPlan is `DossierRequest` in Python: what `CheckDossier` settled and
+// DossierPlan is what `CheckDossier` settled and
 // everything `RunDossier` needs.
 //
 // The split exists for one measured reason -- a dossier took **236 seconds**
@@ -386,7 +386,7 @@ type DossierPlan struct {
 // NeedsCall reports whether anything still has to be asked of Anthropic.
 func (p *DossierPlan) NeedsCall() bool { return p.Answer == nil }
 
-// CheckDossier is `dossier.check_dossier`: everything that can be decided
+// CheckDossier is everything that can be decided
 // without spending anything. ErrNoCommander, ErrStanceRejected (wrapped) and
 // a pool error come back to the caller, which is what keeps their 422 rather
 // than collapsing them into a job error four minutes later.
@@ -446,8 +446,8 @@ type DossierRun struct {
 	OnTurn func(done, max int)
 }
 
-// RunDossier is `dossier.run_dossier`: make the call, check what came back,
-// and store it if it survived.
+// RunDossier makes the call, checks what came back,
+// and stores it if it survived.
 func RunDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, run DossierRun) (DossierReport, error) {
 	if plan.Answer != nil {
 		return *plan.Answer, nil
@@ -473,7 +473,7 @@ func RunDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, run Dos
 	return readDossier(ctx, conn, plan, turn)
 }
 
-// readDossier is the half of `run_dossier` after the call: the source check,
+// readDossier is the half of RunDossier after the call: the source check,
 // the competitors, the body, the store. Split from the call so the corpus can
 // drive it with a Turn built by hand.
 func readDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, turn Turn) (DossierReport, error) {
@@ -514,7 +514,7 @@ func readDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, turn T
 	body := DossierBody{
 		Who: Section(payload["who"], allowed),
 		Archetype: Archetype{
-			Name:      strings.TrimSpace(pyStrOr(archetypeRaw["name"])),
+			Name:      strings.TrimSpace(plainOr(archetypeRaw["name"])),
 			Prose:     archetype.Prose,
 			SourceIDs: archetype.SourceIDs,
 		},
@@ -550,16 +550,15 @@ func noSourceDetail(turn Turn, dropped int) string {
 
 // ---------------------------------------------------------- the free reading
 
-// CachedDossier is `service.claude_dossier_cached`'s answer for a deck whose
+// CachedDossier is the free reading's answer for a deck whose
 // commander the pool knows: a stored dossier, or a payload saying there is
 // none. Never calls Anthropic, so the deck page can ask for it on every load.
 //
-// **The row is looked up under the default tier's key**, which is what Python
-// does -- `cache_key(oracle_id)` with no tier -- so a seat granted another
+// **The row is looked up under the default tier's key** -- the key built
+// with no tier -- so a seat granted another
 // model is served the house model's dossier here and its own from the POST.
-// A wart, reproduced rather than fixed: the GET does not know who is asking
-// in Python either, and harmonising one runtime would put the two out of
-// step.
+// A wart, recorded rather than fixed: the GET has never known who is asking,
+// and the recorded corpus pins the answer it gives.
 type CachedDossier struct {
 	AnsweredBy  string  `json:"answered_by"`
 	Slug        string  `json:"slug"`
@@ -570,10 +569,10 @@ type CachedDossier struct {
 }
 
 // HeadlessDossier is the same route's answer when the deck has no commander
-// the pool can find: **five keys and no `answered_by`**, which is Python's
-// early-return shape and not a tidy one. Its own type because the difference
-// is which keys exist, and one struct with `omitempty` would reproduce it only
-// by accident.
+// the pool can find: **five keys and no `answered_by`**, which is the
+// recorded early-return shape and not a tidy one. Its own type because the
+// difference is which keys exist, and one struct with `omitempty` would
+// reproduce it only by accident.
 type HeadlessDossier struct {
 	Slug        string  `json:"slug"`
 	Commander   string  `json:"commander"`

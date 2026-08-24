@@ -11,7 +11,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 )
 
-// `sim/tier3/dck.py`: deck.yaml -> Forge's `.dck` format.
+// The deck exporter: deck.yaml -> Forge's `.dck` format.
 //
 // The format, read off the 13,994 `.dck` files Forge ships rather than
 // guessed:
@@ -80,7 +80,7 @@ func ToDck(d *deck.Deck, names map[string]string) string {
 	lines = append(lines, SectionMain)
 	// deck.yaml order is by category, which is how a human reads the deck.
 	// Sorted here because a `.dck` is machine input, and a stable order makes
-	// two exports diffable. `sorted(key=...)` is stable in Python, and
+	// two exports diffable. The recorded sort is stable, and
 	// `sort.SliceStable` is what reproduces that for two cards of one name.
 	entries := make([]deck.CardEntry, len(d.Cards))
 	copy(entries, d.Cards)
@@ -136,11 +136,11 @@ func WriteDck(d *deck.Deck, directory string, names map[string]string) (string, 
 		return "", fmt.Errorf("%q is not a usable slug -- lowercase letters, "+
 			"digits and single hyphens, e.g. 'arahbo-cats'", d.Slug)
 	}
-	if err := os.MkdirAll(directory, 0o755); err != nil { //nolint:gosec // matches Python's umask; Forge reads this directory as the same user
+	if err := os.MkdirAll(directory, 0o755); err != nil { //nolint:gosec // scratch input; Forge reads this directory as the same user
 		return "", err
 	}
 	path := filepath.Join(directory, d.Slug+".dck")
-	if err := os.WriteFile(path, []byte(ToDck(d, names)), 0o644); err != nil { //nolint:gosec // matches Python's umask; a `.dck` is scratch input to a simulator
+	if err := os.WriteFile(path, []byte(ToDck(d, names)), 0o644); err != nil { //nolint:gosec // a `.dck` is scratch input to a simulator, read as the same user
 		return "", err
 	}
 	return path, nil

@@ -6,14 +6,14 @@ import "embed"
 // `internal/mana.SourceFS` for why, and `internal/sim/cache.Fingerprint` for
 // the only reader.
 //
-// Fingerprinted for the same reason `internal/pyrand` is, one level down: in
-// Python the compiled card lives inside `engine.py`, so `sim/cache.py` covers
-// it by hashing one file. Here `Card` and `Equal` are a package of their own,
-// and `Equal` in particular decides which basic leaves a hand -- which
-// reorders the rest and picks the next land.
+// Fingerprinted for the same reason `internal/mt19937` is, one level down:
+// `Card` and `Equal` are a package of their own under the engine, and
+// `Equal` in particular decides which basic leaves a hand -- which reorders
+// the rest and picks the next land. A one-character change here moves
+// answers while `tier1/*.go` sits untouched, so the key must see it.
 //
-// **`pyfloat.go` used to be in this list and is not, because #249 moved it to
-// `internal/pyfloat`.** That package is fingerprinted in its own right; the
+// **`floats.go` used to be in this list and is not, because #249 moved it to
+// `internal/floats`.** That package is fingerprinted in its own right; the
 // list here shrank rather than the coverage. Worth one sentence because it is
 // the one way the guard on these lists can be evaded: a test holds each
 // package's embed complete against its own directory, and a file leaving the

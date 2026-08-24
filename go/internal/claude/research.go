@@ -12,11 +12,12 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // Research: the questions the pool cannot answer, with the pages that can.
 //
-// `claude/research.py`, and ADR 26 is the argument. The pool knows what every
+// ADR 26 is the argument. The pool knows what every
 // card does and the gate knows what is legal; neither knows what people think
 // of a card this month, what a ruling means when it comes up, or that a set
 // was spoiled last week.
@@ -70,21 +71,21 @@ type ErrQuestionRejected struct{ Msg string }
 
 func (e *ErrQuestionRejected) Error() string { return e.Msg }
 
-// CheckQuestion is `research.check_question`: the question as a string, or a
-// refusal. `str(raw or "").strip()` -- so a number is its digits and an
-// explicit null is empty -- with `len()` counting code points.
+// CheckQuestion reads the question as a string, or refuses. The read renders
+// a falsy value empty before stripping -- so a number is its digits and an
+// explicit null is empty -- and the ceiling counts code points, not bytes.
 //
 // Deliberately thin. There is no attempt to classify what the question is
 // *about*: a model deciding whether a question counts as "about a deck" is
 // exactly the judgement-call guard this project keeps refusing, and the
 // structural version is that the mode has no deck to reach.
 func CheckQuestion(raw any) (string, error) {
-	question := pyStrip(pyStrOr(raw))
+	question := textutil.Strip(plainOr(raw))
 	if question == "" {
 		return "", &ErrQuestionRejected{Msg: "Ask something. The research surface " +
 			"takes a question about Magic in plain words."}
 	}
-	if n := PyLen(question); n > MaxQuestion {
+	if n := textutil.Len(question); n > MaxQuestion {
 		return "", &ErrQuestionRejected{Msg: fmt.Sprintf(
 			"That question is %d characters, and the ceiling is %d. Anything "+
 				"longer is usually a pasted decklist, and this surface cannot see "+
@@ -93,31 +94,31 @@ func CheckQuestion(raw any) (string, error) {
 	return question, nil
 }
 
-// QuestionKey is `research.question_key`: an identity for "somebody is
-// asking this right now". Not a cache key -- nothing is stored -- but
-// `jobs.Plan.Key`, so a second click inside the minutes a search takes joins
-// the run already in flight. Whitespace and case are normalised because they
-// do not make it a different question; anything else does.
+// QuestionKey is an identity for "somebody is asking this right now". Not a
+// cache key -- nothing is stored -- but `jobs.Plan.Key`, so a second click
+// inside the minutes a search takes joins the run already in flight.
+// Whitespace and case are normalised because they do not make it a different
+// question; anything else does.
 //
-// **Python casefolds and this lowercases**, and the gap is recorded rather
-// than closed. `str.casefold()` is Unicode full case folding -- `ß` becomes
-// `ss`, `İ` becomes `i̇` -- where `strings.ToLower` maps rune for rune; they
+// **This lowercases where a full case folding would fold**, and the gap is
+// recorded rather than closed. Unicode full case folding rewrites `ß` to
+// `ss` and `İ` to `i̇`, where `strings.ToLower` maps rune for rune; the two
 // agree on every question a person has typed here and disagree on a handful
 // of characters. The key never leaves this process: it is not in a job's
-// payload, not on the wire, not in a store, and the two runtimes keep
-// separate registries -- so a Python key and a Go key for one question have
-// nothing to agree *with*. What the key is for, two requests in one process
-// joining, it does identically. A full casefold would be a dependency bought
-// for a property nobody can observe; `TestTheQuestionKeyLowercasesWhere\
-// PythonCasefolds` names the gap so it is known rather than found.
+// payload, not on the wire, not in a store -- so there is nothing outside
+// the process for it to agree *with*. What the key is for, two requests in
+// one process joining, it does identically under either folding. Folding
+// fully here would change the key for a property nobody can observe;
+// `TestTheQuestionKeyLowercasesWhereFullFoldingDiffers` names the gap so it
+// is known rather than found.
 func QuestionKey(question string) string {
-	normalised := strings.ToLower(pySplitJoin(question))
+	normalised := strings.ToLower(textutil.SplitJoin(question))
 	sum := sha256.Sum256([]byte(normalised))
 	return "research:" + hex.EncodeToString(sum[:])[:16]
 }
 
-// ResearchStanceFor is `research.stance_for`: this surface's default stance,
-// and the clamp over what was asked for. There is no deck to derive a
+// ResearchStanceFor is this surface's default stance, and the clamp over
+// what was asked for. There is no deck to derive a
 // default from, and `Resolve(nil, nil)` is `off` -- right for "I have no idea
 // what this is about" and wrong for a screen whose only control is a
 // question box. Somebody typing a question has asked for a call.
@@ -138,7 +139,7 @@ func ResearchStanceFor(requested any, limit *Stance) (Stance, error) {
 
 // ---------------------------------------------------------------- the answer
 
-// ResearchBody is the answer as served, in Python's key order.
+// ResearchBody is the answer as served, in the recorded key order.
 type ResearchBody struct {
 	Answer   string    `json:"answer"`
 	Findings []Finding `json:"findings"`
@@ -161,8 +162,8 @@ type ResearchBody struct {
 	Searched        int `json:"searched"`
 }
 
-// ResearchReport is one response shape for every outcome, in Python's key
-// order. This mode needs `answered_by` more than any built so far: its
+// ResearchReport is one response shape for every outcome, in the recorded
+// key order. This mode needs `answered_by` more than any built so far: its
 // output is prose about Magic with citations under it, which is the exact
 // look of something reproducible, and it is not.
 type ResearchReport struct {
@@ -202,8 +203,8 @@ func researchReport(turn *Turn, question string, effective Stance, body any,
 
 // ------------------------------------------------------------- the two halves
 
-// ResearchPlan is `ResearchRequest` in Python: what `CheckResearch` settled
-// and everything `RunResearch` needs.
+// ResearchPlan is what `CheckResearch` settled and everything `RunResearch`
+// needs.
 //
 // **Note what it does not carry, and could not**: a deck source, a slug, a
 // deck. ADR 26's first decision is visible in the type, and
@@ -223,8 +224,8 @@ type ResearchPlan struct {
 // NeedsCall reports whether anything still has to be asked of Anthropic.
 func (p *ResearchPlan) NeedsCall() bool { return p.Answer == nil }
 
-// CheckResearch is `research.check_research`: everything that can be decided
-// without spending anything. An `ErrQuestionRejected` and a stance rejection
+// CheckResearch is everything that can be decided without spending
+// anything. An `ErrQuestionRejected` and a stance rejection
 // come back to the caller, which is what keeps their 422 rather than
 // flattening two answers into one job in state `error` minutes later.
 func CheckResearch(raw any, requested any, tier string, limit *Stance) (*ResearchPlan, error) {
@@ -255,9 +256,8 @@ type ResearchRun struct {
 	OnTurn func(done, max int)
 }
 
-// RunResearch is `research.run_research`: make the call, check what came
-// back, and hand it over. Nothing is stored at the end, and the absence is
-// the decision (ADR 26).
+// RunResearch makes the call, checks what came back, and hands it over.
+// Nothing is stored at the end, and the absence is the decision (ADR 26).
 func RunResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, run ResearchRun) (ResearchReport, error) {
 	if plan.Answer != nil {
 		return *plan.Answer, nil
@@ -289,7 +289,7 @@ func RunResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, run R
 	return readResearch(ctx, conn, plan, turn)
 }
 
-// readResearch is the half of `run_research` after the call, split from it so
+// readResearch is the half of RunResearch after the call, split from it so
 // the corpus can drive it with a Turn built by hand.
 func readResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, turn Turn) (ResearchReport, error) {
 	question, effective := plan.Question, plan.Effective
@@ -326,9 +326,9 @@ func readResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, turn
 	if err != nil {
 		return ResearchReport{}, err
 	}
-	confidence := strings.TrimSpace(pyStrOr(payload["confidence"]))
+	confidence := strings.TrimSpace(plainOr(payload["confidence"]))
 	body := ResearchBody{
-		Answer:          strings.TrimSpace(pyStrOr(payload["answer"])),
+		Answer:          strings.TrimSpace(plainOr(payload["answer"])),
 		Findings:        findings,
 		Cards:           cards,
 		Confidence:      oneOf(confidence, ResearchConfidence, "thin"),
@@ -341,9 +341,9 @@ func readResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, turn
 	return researchReport(&turn, question, effective, body, true, ""), nil
 }
 
-// researchOpening is `_ask_for`: the question, framed as the user's rather
-// than as the tool's -- quoted rather than interpolated into an instruction,
-// so what follows reads as something a person typed.
+// researchOpening frames the question as the user's rather than as the
+// tool's -- quoted rather than interpolated into an instruction, so what
+// follows reads as something a person typed.
 func researchOpening(question string) string {
 	return strings.Join([]string{
 		"Here is the question, in the user's own words. Search for what you " +

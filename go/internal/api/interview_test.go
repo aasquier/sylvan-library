@@ -96,8 +96,8 @@ func answer(stop, content string) string {
 
 func said(s string) string { return fmt.Sprintf(`{"type":"text","text":%q}`, s) }
 
-// noCredential is an instance nobody has given a key to, which is CI and is
-// what the contract suite's own interview case asserts against. Set explicitly
+// noCredential is an instance nobody has given a key to, which is CI. Set
+// explicitly
 // because this machine's shell may well have one.
 func noCredential(t *testing.T) {
 	t.Helper()
@@ -142,12 +142,12 @@ func TestTheInterviewNeedsACard(t *testing.T) {
 	}
 }
 
-// A null card is NOT a missing card, which is the one input where
-// `str(payload.get("card", ""))` and `str(payload.get("card") or "")` disagree.
-// Python reaches `str(None)` and asks the deck about a card called "None"; the
+// A null card is NOT a missing card, which is the one input where the
+// absent-key read and the or-empty read disagree.
+// The recorded route asks the deck about a card called "None"; the
 // answer is still a 422, with a different sentence, and the sentence is the
 // contract.
-func TestANullCardIsThePythonStringNone(t *testing.T) {
+func TestANullCardIsTheFourLetterStringNone(t *testing.T) {
 	noCredential(t)
 	a, done := deckAPI(t, true)
 	defer done()
@@ -157,7 +157,7 @@ func TestANullCardIsThePythonStringNone(t *testing.T) {
 	}
 	detail, _ := payload["detail"].(string)
 	if !strings.Contains(detail, "'None' is not in kaheera") {
-		t.Errorf("a null card answered %q; Python asks about the four-letter "+
+		t.Errorf("a null card answered %q; the record asks about the four-letter "+
 			"string `None` and refuses it as a card the deck does not run", detail)
 	}
 }
@@ -176,32 +176,33 @@ func TestTheInterviewRefusesACardTheDeckDoesNotRun(t *testing.T) {
 	}
 }
 
-// A stance that will not parse is a 422, in both runtimes -- and for one day
+// A stance that will not parse is a 422 -- and for one day
 // it was a 502 here on purpose.
 //
-// `api/app.py` carries an `except ValueError` branch commented "A malformed
-// stance" that raises 422, and until 2026-08-23 it was unreachable:
-// `service.claude_interview` re-raised only three exception types and a stance
-// ValueError was not among them, so the broad `except Exception` had already
-// turned it into `ClaudeFailed`. **Measured against the running pair** when
-// this route flipped: Python answered 502, and so did the door -- the port
-// reproduces warts rather than quietly improving on one runtime, because a
-// flip that changes behaviour is not a flip. Then it was ruled, and both moved
-// together: `stance.StanceRejected` there, one line in `refuseClaude` here.
+// The recorded route *intended* a 422 for a malformed
+// stance, and until 2026-08-23 the branch was unreachable:
+// the stance refusal was not among the re-raised types, so the broad
+// catch-everything had already
+// turned it into a generic failure. **Measured on the live wire**: the
+// answer was 502, and this route
+// kept the wart rather than quietly improving on it, because a
+// byte-for-byte reproduction that changes behaviour is not one. Then it was
+// ruled with Aaron, and the 422 became the contract: `ErrStanceRejected`,
+// one line in `refuseClaude`.
 //
 // What was always asserted as correct is the sentence: the parser's own words,
 // so a person reads "'emperor' is not a stance preset" either way.
-func TestAMalformedStanceIs422InBothRuntimes(t *testing.T) {
+func TestAMalformedStanceIsThe422TheRulingMade(t *testing.T) {
 	noCredential(t)
 	a, done := deckAPI(t, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera,
 		`{"card":"Sol Ring","stance":"emperor"}`)
-	// 422 since 2026-08-23, in both runtimes at once. Python answered 502
-	// here -- measured -- because its service layer swallowed the stance's
-	// ValueError before the route's own 422 branch was reached; this route
-	// reproduced that for a day rather than improve on one runtime, then the
-	// ruling moved both. See refuseClaude.
+	// 422 since 2026-08-23, by ruling. The measured answer was 502
+	// -- the service layer swallowed the stance's
+	// refusal before the route's own 422 branch was reached; this route
+	// kept that for a day rather than improve on it unilaterally, then the
+	// ruling landed. See refuseClaude.
 	if status != 422 {
 		t.Fatalf("%d %s -- the request was wrong, not the call", status, raw)
 	}
@@ -224,9 +225,8 @@ func TestTheInterviewIs404ForADeckTheCallerCannotSee(t *testing.T) {
 	}
 }
 
-// The body is read before the deck, which is FastAPI's order: `payload` is
-// validated while the dependencies are being solved and `lib.source_for(owner)`
-// is not reached until the handler's first line.
+// The body is read before the deck -- the recorded order: the body is
+// validated before the owner is resolved.
 func TestAMissingCardIsAnsweredBeforeAMissingDeck(t *testing.T) {
 	noCredential(t)
 	a, done := deckAPI(t, true)
@@ -241,17 +241,16 @@ func TestAMissingCardIsAnsweredBeforeAMissingDeck(t *testing.T) {
 	}
 }
 
-// No key is 503 and not 502: no call was made at all. This is the contract
-// suite's own interview case, which runs on an instance with no credential.
+// No key is 503 and not 502: no call was made at all -- the case an
+// instance with no credential answers every day.
 //
 // **The sentence is asserted whole**, and that is not pedantry: it shipped
 // wrong once. `Require` wrapped the reason with `fmt.Errorf("%w: ...",
 // ErrUnavailable)`, so the door answered "claude is unavailable: no
-// ANTHROPIC_API_KEY ..." where Python's `str(ClaudeUnavailable(...))` is the
+// ANTHROPIC_API_KEY ..." where the recorded refusal is the
 // bare reason -- a prefix nobody wrote, rendered verbatim by the deck page.
 // A `strings.Contains(detail, "ANTHROPIC_API_KEY")` check passed both
-// spellings, which is exactly how it survived to be found by curling the
-// running pair instead.
+// spellings, which is exactly how it survived until a wire diff found it.
 func TestWithNoKeyTheInterviewIs503(t *testing.T) {
 	noCredential(t)
 	a, done := deckAPI(t, true)
@@ -263,7 +262,7 @@ func TestWithNoKeyTheInterviewIs503(t *testing.T) {
 	const want = "no ANTHROPIC_API_KEY in the environment -- put one in .env " +
 		"(see .env.example), or `fly secrets set` it when deployed"
 	if detail, _ := payload["detail"].(string); detail != want {
-		t.Errorf("the refusal is\n  %q\nPython's is\n  %q", detail, want)
+		t.Errorf("the refusal is\n  %q\nthe record says\n  %q", detail, want)
 	}
 }
 
@@ -292,8 +291,8 @@ func TestAtStanceOffNoCallIsMadeAndTheReportSaysSo(t *testing.T) {
 	}
 }
 
-// The whole report, through the marshaller, in Python's key order.
-func TestTheReportReachesTheWireInPythonsOrder(t *testing.T) {
+// The whole report, through the marshaller, in the recorded key order.
+func TestTheReportReachesTheWireInTheRecordedOrder(t *testing.T) {
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(
 		`{"questions":[{"question":"What does it accelerate into?","angle":"curve","fact":"ramp holds 1 slot"},`+
 			`{"question":"Would a Signet do?","angle":"alternatives","fact":"colour identity is G"},`+
@@ -306,7 +305,7 @@ func TestTheReportReachesTheWireInPythonsOrder(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("%d %s", status, raw)
 	}
-	// Field order is Python's dict order, and the goldens hold it.
+	// Field order is the recorded key order, and the goldens hold it.
 	want := []string{"answered_by", "mode", "model", "slug", "card", "asked",
 		"reason", "stance", "questions", "questions_dropped", "tool_calls",
 		"usage", "never"}
@@ -345,7 +344,7 @@ func TestTheReportReachesTheWireInPythonsOrder(t *testing.T) {
 		t.Errorf("the promise is %v", payload["never"])
 	}
 	if payload["tool_calls"] == nil {
-		t.Error("tool_calls marshalled as null; Python sends a list")
+		t.Error("tool_calls marshalled as null; the record sends a list")
 	}
 }
 
@@ -470,20 +469,20 @@ func TestAStanceMayArriveAsAnObjectOfAxes(t *testing.T) {
 		t.Fatalf("a well-formed stance object answered %d %s", status, raw)
 	}
 	// An axis that is not one takes the same path as a bad preset, so it is
-	// a 422 as well -- and the sentence carries Python's list repr rather
-	// than Go's.
+	// a 422 as well -- and the sentence carries the recorded list literal
+	// rather than Go's rendering.
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera,
 		`{"card":"Sol Ring","stance":{"vibe":"on-request"}}`)
 	if status != 422 {
 		t.Fatalf("an unknown axis answered %d %s", status, raw)
 	}
 	if detail, _ := payload["detail"].(string); !strings.Contains(detail, "['vibe'] are not stance axes") {
-		t.Errorf("the refusal was %q; it must carry Python's own list repr", detail)
+		t.Errorf("the refusal was %q; it must carry the recorded list literal", detail)
 	}
 }
 
 // Which Claude answers is a fact about the caller, read fresh off the request's
-// scope. It reached `auth.Scope` with this route: every earlier ported family
+// scope. It reached `auth.Scope` with this route: every earlier family
 // had no use for it, and the struct's comment said so.
 func TestATieredSeatIsAskedOfItsOwnModel(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
@@ -593,7 +592,7 @@ func TestAConversationThatNeverHappenedIsNotRecorded(t *testing.T) {
 
 // orderedAs checks that `keys` appear in the JSON text in the order given.
 // Key order is part of the payload here -- the deck page renders some of it
-// unsorted, and a Go map alphabetises where a Python dict does not.
+// unsorted, and a Go map alphabetises where the recorded bodies do not.
 func orderedAs(body string, keys []string) error {
 	at := 0
 	for _, key := range keys {

@@ -20,19 +20,20 @@ import (
 )
 
 // The account routes' own tests. `internal/auth` already proves the *engine*
-// against Python -- the hashes byte for byte, the last-admin guard, the
+// against its recorded corpus -- the hashes byte for byte, the last-admin
+// guard, the
 // token's single use -- so what these prove is the layer above: that a refusal
 // lands on the right status with the right sentence, that the cookie carries
-// the attributes Starlette writes, and that nothing here leaks what ADR 16 and
+// the recorded attributes, and that nothing here leaks what ADR 16 and
 // ADR 17 say it must not.
 //
 // **No test in this file sends mail.** Every one that would passes a
 // `recordedSender`, which is ADR 16's seam doing exactly the job it was built
 // for.
 //
-// The sentences matter more here than anywhere else the port has been. They
-// are answered *verbatim* to a browser, `tests/contract/golden/auth.json` and
-// `golden/admin.json` are the record, and `internal/auth`'s `failf` exists so
+// The sentences matter more here than anywhere else in the app. They
+// are answered *verbatim* to a browser, the assertions below are the
+// record, and `internal/auth`'s `failf` exists so
 // a Go sentinel's own words never get in front of one.
 
 const goodPassword = "correct-horse-battery-staple"
@@ -163,7 +164,7 @@ func (r *accountRig) call(t *testing.T, scope auth.Scope, method, target, body s
 	req := httptest.NewRequest(method, target, strings.NewReader(body)).
 		WithContext(auth.WithScope(context.Background(), scope))
 	if body != "" {
-		// Starlette parses a body as JSON only when the content type says so.
+		// A body is parsed as JSON only when the content type says so.
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if cookie != "" {
@@ -192,10 +193,10 @@ func detail(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return got
 }
 
-// maskedCookie is `tests/contract/checks.py:_masked_cookie`: the attributes
-// lowercased and sorted, the value dropped. The golden records this exact
-// string, so reproducing the masker here is what lets a Go test compare
-// against it rather than against a guess.
+// maskedCookie normalises a Set-Cookie header for comparison: the attributes
+// lowercased and sorted, the value dropped. The recorded expectations below
+// are written in this exact form, so the masker is what lets a test compare
+// against them rather than against a guess.
 func maskedCookie(header string) string {
 	first, rest, _ := strings.Cut(header, ";")
 	name, _, _ := strings.Cut(first, "=")
@@ -219,9 +220,9 @@ var anonymous = auth.Scope{}
 // ---- the caller's address --------------------------------------------------
 
 // `clientAddress` returns an address or nothing, and the "or nothing" is the
-// part with a story: CodeQL flagged the Python shape of this function the
-// moment it was written in Go -- "sensitive data returned by HTTP request
-// headers flows to a logging call" -- and it was right twice over. The
+// part with a story: CodeQL flagged the header-echoing shape of this
+// function the moment it was written -- "sensitive data returned by HTTP
+// request headers flows to a logging call" -- and it was right twice over. The
 // environment names a *header*, not a value, so a misconfiguration would put a
 // credential in every auth log line; and the value was otherwise unbounded, so
 // a client behind the proxy could put a kilobyte into the log and into a
@@ -276,12 +277,12 @@ func TestLoginHandsBackTheCookieTheGoldenRecords(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	// `tests/contract/golden/auth.json`, case `login`. The attributes are the
-	// contract; the value never is. No `secure` here because this instance's
-	// cookies are not secure, exactly as the harness runs it.
+	// The recorded login cookie. The attributes are the
+	// contract; the value never is. No `secure` here because this rig's
+	// cookies are not secure, exactly as a laptop runs it.
 	const want = "sid=*; httponly; max-age=1209600; path=/; samesite=lax"
 	if got := maskedCookie(rec.Header().Get("Set-Cookie")); got != want {
-		t.Errorf("Set-Cookie is\n  %s\nand the golden records\n  %s", got, want)
+		t.Errorf("Set-Cookie is\n  %s\nand the record says\n  %s", got, want)
 	}
 
 	// The body is `{"user": …}` and the user carries **no address** -- ADR 17
@@ -385,8 +386,8 @@ func TestLoginRefusesAnIncompleteBodyBeforeTouchingTheDatabase(t *testing.T) {
 			t.Errorf("%s said %q", payload, got)
 		}
 	}
-	// A body that is not an object at all is FastAPI's own 422, whose `detail`
-	// is a *list* rather than a sentence.
+	// A body that is not an object at all is the validation 422, whose
+	// `detail` is a *list* rather than a sentence.
 	rec := rig.call(t, anonymous, "POST", "/api/auth/login", `[1,2]`, "")
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("a list body answered %d", rec.Code)
@@ -484,13 +485,12 @@ func TestLogoutClearsTheCookieAndTheRow(t *testing.T) {
 	if body(t, rec)["authenticated"] != false {
 		t.Errorf("logout said %s", rec.Body)
 	}
-	// `golden/auth.json`, case `logout`. Starlette's `delete_cookie(name,
-	// path="/")` defaults `httponly` and `secure` to **False**, so the
-	// deletion cookie carries neither -- which is not the mirror of the one
+	// The recorded deletion cookie carries neither `httponly` nor
+	// `secure` -- which is not the mirror of the one
 	// login sets, and is what the record says.
 	const want = "sid=*; expires=*; max-age=0; path=/; samesite=lax"
 	if got := maskedCookie(rec.Header().Get("Set-Cookie")); got != want {
-		t.Errorf("Set-Cookie is\n  %s\nand the golden records\n  %s", got, want)
+		t.Errorf("Set-Cookie is\n  %s\nand the record says\n  %s", got, want)
 	}
 	if scope, _ := auth.Resolve(ctx, rig.db, token); scope.Authenticated {
 		t.Error("the session row outlived the logout")
@@ -510,7 +510,7 @@ func TestLogoutOfNothingSucceeds(t *testing.T) {
 
 // With auth off the row is deliberately left alone -- nothing reads it, and
 // the local app is one person who has not asked for a database to be touched.
-// Python's `if token and require:` is the line; this is it holding.
+// The require flag guards the delete; this is it holding.
 func TestLogoutLeavesTheRowAloneWithAuthOff(t *testing.T) {
 	rig := newAccountRig(t, false)
 	defer rig.close()
@@ -524,7 +524,7 @@ func TestLogoutLeavesTheRowAloneWithAuthOff(t *testing.T) {
 		t.Fatalf("%d", rec.Code)
 	}
 	if scope, _ := auth.Resolve(ctx, rig.db, token); !scope.Authenticated {
-		t.Error("with auth off, logout deleted a session row Python would have kept")
+		t.Error("with auth off, logout deleted a session row it must leave alone")
 	}
 }
 
@@ -834,9 +834,9 @@ func TestPreviewRefusesABadLinkAndADisabledAccountAlike(t *testing.T) {
 
 // ---- an absent database ----------------------------------------------------
 
-// An absent `app.db` is read as an **empty** one, never created. Measured
-// against Python: it creates the file on the first login and then answers 401
-// against it, because an empty `users` table has nobody in it. See
+// An absent `app.db` is read as an **empty** one, never created -- the
+// recorded contract: the first login on such an instance answers 401,
+// because an empty `users` table has nobody in it. See
 // `internal/auth/writes.go`.
 func TestWithNoDatabaseTheAnswersAreTheEmptyOnes(t *testing.T) {
 	dir := t.TempDir()

@@ -29,7 +29,7 @@ func loadSpins(t *testing.T) spinsFile {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/spins.json")
 	if err != nil {
-		t.Fatalf("spins.json: %v (regenerate with `python tests/go_fixtures.py`)", err)
+		t.Fatalf("spins.json: %v (testdata/spins.json is a frozen golden)", err)
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
@@ -40,12 +40,12 @@ func loadSpins(t *testing.T) spinsFile {
 	return fx
 }
 
-// TestEverySpinDealsWhatPythonDealt is the corpus: the same seed over the
+// TestEverySpinDealsTheRecordedFate is the corpus: the same seed over the
 // same pool and the same deck deals the same fate, the same face and the
-// same card, compared as the marshalled payload bytes -- every way the two
-// runtimes' JSON could differ presents as the same-looking value, so the
-// bytes are the claim.
-func TestEverySpinDealsWhatPythonDealt(t *testing.T) {
+// same card, compared as the marshalled payload bytes -- most ways an
+// encoding could drift present as the same-looking value, so the bytes are
+// the claim.
+func TestEverySpinDealsTheRecordedFate(t *testing.T) {
 	fx := loadSpins(t)
 	if len(fx.Cases) < 20 {
 		t.Fatalf("only %d spin cases; the corpus has thinned", len(fx.Cases))
@@ -90,9 +90,8 @@ func TestEverySpinDealsWhatPythonDealt(t *testing.T) {
 	}
 }
 
-// An unseeded spin invents its own seed -- under 2**32, like
-// `random.SystemRandom().randrange(2**32)` -- and reports it, so any spin
-// can be spun again.
+// An unseeded spin invents its own seed -- drawn from entropy, under
+// 2**32 -- and reports it, so any spin can be spun again.
 func TestAnUnseededSpinReportsAReplayableSeed(t *testing.T) {
 	fx := loadSpins(t)
 	d, err := deck.FromText(fx.Decks["mono-green"], "mono-green")

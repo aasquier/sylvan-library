@@ -1,12 +1,12 @@
 /**
  * The vocabulary, wherever a word turns up.
  *
- * Two surfaces over one table, which is the same arrangement `colors.py` has
- * with the wheel and the carousel. `/learn` renders every term at length;
+ * Two surfaces over one table, which is the same arrangement the colors table
+ * has with the wheel and the carousel. `/learn` renders every term at length;
  * `<Term>` and `<HelpTip>` render one of them at a sentence, next to the thing
  * being named. Neither holds a definition of its own — both look the key up in
- * what `/api/glossary` served, so `glossary.py` stays the one authority and a
- * term explained in two places cannot say two things.
+ * what `/api/glossary` served, so the served glossary stays the one authority
+ * and a term explained in two places cannot say two things.
  *
  * The fetch behind both is memoised at module scope in `lib/glossary.ts` — one
  * promise for the page, so a screen with a dozen marks on it costs one

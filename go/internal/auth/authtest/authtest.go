@@ -1,26 +1,24 @@
-// Package authtest hands out `app.db`'s schema as Python's migration ladder
-// leaves it, for the tests that need a real one.
+// Package authtest hands out `app.db`'s recorded schema,
+// for the tests that need a real one.
 //
 // It exists because the same fixture was written by hand in three places --
 // `internal/auth`, `internal/decklog` and `internal/door` -- each a
-// transcription of whichever rung of `auth/db.py`'s ladder the author had open
+// transcription of whichever rung of the ladder the author had open
 // at the time, and each therefore frozen at a different version. Two of the
-// three broke on the same afternoon when the accounts flip first read
+// three broke on the same afternoon when the accounts routes first read
 // `users.model_tier`, a column rung 10 adds; both failed as `no such column`,
 // from fixtures that had been quietly claiming to be a schema they were eight
 // rungs behind.
 //
-// So the bytes are generated rather than typed. `tests/go_fixtures.py` reads
-// `sqlite_master` out of a database the Python remnant's ladder just built and
-// writes `app_schema.sql` beside this file; `tests/test_go_fixtures.py` fails
-// when the committed copy is not what that ladder writes today. Since Phase 8
-// **the Go ladder owns the deployed file** (`internal/auth/schema.go`), and
-// this fixture is the lockstep between the two:
-// `TestMigrateBuildsWhatPythonBuilt` holds `auth.Migrate`'s result to these
-// bytes, so a rung added to either ladder fails a test until the other side
-// carries it too.
+// So the bytes are recorded rather than typed: `app_schema.sql`, beside this
+// file, is `sqlite_master` read out of a freshly-migrated database. **The
+// ladder in `internal/auth/schema.go` owns the deployed file**, and this
+// fixture is its recorded result:
+// `TestMigrateBuildsTheRecordedSchema` holds `auth.Migrate`'s output to
+// these bytes, so a new rung fails a test until this record moves in the
+// same change -- never by drift.
 //
-// The lesson is the fixture-decks one from Phase 4's edit engine, in a new
+// The lesson is the fixture-decks one from the edit engine, in a new
 // place: a fixture somebody wrote by hand is not the artefact it stands in
 // for. `internal/pool/pooltest` is the same arrangement for the card pool.
 //
@@ -43,7 +41,7 @@ import (
 var schema string
 
 // Schema is `app.db`'s DDL, including its `PRAGMA user_version`, so a database
-// built from it reports the version Python would refuse to migrate further.
+// built from it reports the ladder's full height and is never re-migrated.
 func Schema() string { return schema }
 
 // NewScratchDB builds an empty `app.db` at path and returns it, in WAL mode

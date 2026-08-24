@@ -16,13 +16,13 @@ import (
 // The commander dossier's two routes (ADR 19): `GET .../dossier`, the free
 // half, and `POST .../dossier`, which writes one -- as a **job**.
 //
-// `api/dossierruns.py`, and the one that had to be written twice. The
+// The surface that had to be written twice. The
 // dossier was measured at **236 seconds on the deployed instance** -- longer
 // than the theme proposal the job pattern was built for -- and stayed a
 // synchronous POST because nobody re-measured it when that pattern landed.
 // Deployed, it presented as a spinner and then Safari's `Load failed`: a
 // transport error, so no status code reached the client, and no access-log
-// line was written either, because uvicorn writes one when a response
+// line was written either, because the log line lands when a response
 // completes and that one never did. The work itself was fine and sat in
 // `dossier_cache` while the page showed a failure. A job id is what turns
 // that from a coincidence into the contract.
@@ -75,10 +75,9 @@ func (a *API) claudeDossierCached(w http.ResponseWriter, r *http.Request) {
 	wire.JSON(w, http.StatusOK, payload)
 }
 
-// claudeDossier is `POST .../dossier` -- `dossierruns.plan_dossier` behind
-// `app.claude_dossier`. Returns a job, not a dossier.
+// claudeDossier is `POST .../dossier`. Returns a job, not a dossier.
 func (a *API) claudeDossier(w http.ResponseWriter, r *http.Request) {
-	// The body first, then the deck, as FastAPI resolves them -- see
+	// The body first, then the deck -- the recorded order; see
 	// rationaleInterview.
 	body, ok := readBody(w, r)
 	if !ok {
@@ -93,14 +92,14 @@ func (a *API) claudeDossier(w http.ResponseWriter, r *http.Request) {
 	if a.refuse(w, "dossier", err) {
 		return
 	}
-	// `payload.get("stance") or None` and `bool(payload.get("refresh"))`.
+	// The or-nothing stance read, and the truthy refresh flag.
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	req := claude.DossierRequest{
 		Requested: requested,
-		Refresh:   pyTruthy(body["refresh"]),
+		Refresh:   truthy(body["refresh"]),
 		Tier:      auth.ScopeFrom(r.Context()).ModelTier,
 		Store:     a.dossierStore(),
 	}
@@ -138,8 +137,9 @@ func (a *API) claudeDossier(w http.ResponseWriter, r *http.Request) {
 		Key: plan.Key,
 		Run: func(rep jobs.Progress) (any, error) {
 			// The request is over by the time this runs, and its context with
-			// it -- so the job takes its own, as Python's thread pool takes
-			// none. The pool lease is held for the conversation, which is a
+			// it -- so the job takes its own, never the request's (a
+			// cancelled context is the sim cache's old bug). The pool lease
+			// is held for the conversation, which is a
 			// count and not a lock: the model's `get_cards` calls and the
 			// competitor lookup both need the connection, and the pool stays
 			// open for as long as anything holds one.
@@ -199,9 +199,10 @@ func (a *API) leasePool(ctx context.Context, fn func(c *pool.Conn) error) error 
 	return err
 }
 
-// claudeJobError is what a failed Claude job records, in the words Python
-// records: `str(exc)` for the turn ceiling and for a key that vanished
-// between the check and the worker, and `explain(exc)` for everything else
+// claudeJobError is what a failed Claude job records, in the recorded
+// words: the error's own sentence for the turn ceiling and for a key that
+// vanished
+// between the check and the worker, and `claude.Explain` for everything else
 // -- the function that turns a 401 into "your key may have expired" rather
 // than a stack trace in a job's error field.
 func claudeJobError(err error) error {

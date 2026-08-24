@@ -1,6 +1,6 @@
 /**
  * One small drawn sign per card category — the 13 canonical names from
- * `decks/model.py`, the UI's own `commander`, and a spark for anything a
+ * the server's deck model, the UI's own `commander`, and a spark for anything a
  * hand-edited deck file invents (the gate only *warns* on an unknown
  * category, so the fallback is load-bearing, not decorative).
  *

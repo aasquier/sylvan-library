@@ -1,13 +1,14 @@
 # sylvan-library
 
-Commander toolkit: deck files on disk, Monte Carlo simulation,
-Scryfall-validated decklists, generated primers, and a table where a
-fortune-teller reads your cards. One Go binary serves all of it; a React
-frontend renders it; the deployed instance's volume holds the library — a
-checkout carries the engine, never the decks.
+Commander toolkit: a deck is one YAML file and that file is the truth,
+Monte Carlo simulation, Scryfall-validated decklists, generated primers, and
+a table where a fortune-teller reads your cards. One Go binary serves all of
+it; a React frontend renders it; the deployed instance's volume holds the
+library — a checkout carries the engine, never the decks.
 
-Go 1.26 (CGO on — DuckDB) · React/TypeScript · `tools/` holds the one piece
-of Python: the local picture/video pipeline that makes the committed art.
+Go 1.26 (CGO on — DuckDB) · React/TypeScript · `tools/` holds the project's
+Python: the local picture/video pipeline that makes the committed art. (The
+repo's only other `.py` is `.claude/hooks/guard-git.py`, a harness guard.)
 The binary and CLI are named `mtglab`; the repo is `sylvan-library`. That
 mismatch is intentional and not a bug to fix.
 
@@ -141,9 +142,12 @@ go vet ./... && go test -race ./... && ~/go/bin/golangci-lint run ./...
 
 `gofmt -l .` should print nothing. Frontend: `npm --prefix web run check`,
 then `npm --prefix web run build` if anything under `web/src` changed (the
-bundle is committed at `web_dist/`). Toolbox: `cd tools && ruff check . &&
-mypy && python -m pytest tests/ -q` when `tools/` moved. `gh`, `npm`, `node`
-and `fly` need a login shell here (`bash -lc`).
+bundle is committed at `web_dist/`). Toolbox: from `tools/`, its own venv's
+binaries — `.venv/bin/ruff check .`, `.venv/bin/mypy`, `.venv/bin/python -m
+pytest tests/ -q` — when `tools/` moved; nothing puts `ruff` or a 3.12
+`pytest` on `PATH` here. `gh`, `npm`, `node` and `fly` resolve in a plain
+call (re-verified 2026-08-24); the old `bash -lc` wrapper still works and is
+now noise.
 
 ## Architecture
 
@@ -163,8 +167,9 @@ go/internal/sim           tier1 goldfish, karsten + curve (tier 1.5),
                           mulligan grid, compile, ADR 18 cache, tier3 Forge
 go/internal/claude        the pipe, stance, personas, all seven modes
 go/internal/tarot         the 78-card deck and the seeded spread
-go/internal/py*           bit-exact reproductions of CPython behaviors the
-                          app's promises rest on (see Determinism below)
+go/internal/mt19937,      the determinism kernels: seeded generator, exact
+  floats, textutil,       float arithmetic + rendering, recorded string
+  yamlemit                semantics, the deck file's one YAML style
 web/                      React frontend; web/README.md is the conventions map
 web_dist/                 the committed bundle (CI proves it rebuilds)
 assets/tarot/             the 1909 Rider deck; PROVENANCE.md is not optional
@@ -212,7 +217,9 @@ errors; promotion to curated is refused while any card is blank (ADR 13).
 credentials — CI enforces by filename and content scan. `app.db` holds
 password hashes and email addresses; an address may be serialised only into a
 response an admin authenticated for. Secrets travel by environment
-(`.env.example` documents the names; `fly secrets` deployed).
+(`.env.example` documents the names — and `configrecord_test.go` holds that
+list equal to what the code reads, both ways, so it is a gate rather than a
+promise; `fly secrets` deployed).
 
 ## The load-bearing invariants
 
@@ -222,14 +229,14 @@ response an admin authenticated for. Secrets travel by environment
   routes are 403 by prefix (ADR 17, argued there). The door's sweeps derive
   from the served route table, so a new route is deny-by-default.
 - **Determinism is contract.** A seed is a promise — the tarot deal a
-  browser reloads, the Wheel's spin, every Tier 1 run. `go/internal/pyrand`
-  is MT19937 bit-for-bit; the `py*` packages beside it (yaml emitter, float
-  repr/fsum, casefold, text splitting) pin the arithmetic the recorded
-  goldens and stored cache keys rest on. **The `testdata/` corpora are
-  frozen goldens — never regenerate them, and never "fix" arithmetic that
-  matches them.** Floating-point sums use `pyfloat.Fsum` and FMA-sensitive
-  expressions use `sim.Rounded`; a scan against `>=` one ulp away is a
-  different recommendation.
+  browser reloads, the Wheel's spin, every Tier 1 run. `go/internal/mt19937`
+  is the seeded generator, bit-for-bit; `floats` (fsum, both roundings, the
+  canonical rendering), `textutil`, `yamlemit` and claude's casefold table
+  pin the arithmetic the recorded goldens and stored cache keys rest on.
+  **The `testdata/` corpora are frozen goldens — never regenerate them, and
+  never "fix" arithmetic that matches them.** Floating-point sums use
+  `floats.Fsum` and FMA-sensitive expressions use `floats.Rounded`; a scan
+  against `>=` one ulp away is a different recommendation.
 - **Tier 1 results are cached on the compiled input** (ADR 18) plus seed and
   an engine fingerprint (a hash of five embedded packages —
   `internal/sim/cache`'s `engineSources` is the list). Every result carries
@@ -244,9 +251,9 @@ response an admin authenticated for. Secrets travel by environment
   tarot lore (`internal/reference`'s embedded JSON): finite, editable, free.
   Card facts inside it still resolve through the pool; an unresolvable name
   is dropped and counted.
-- **Python decides nothing.** The historical split "deterministic code
-  decides, Claude advises" (ADR 14) still governs: legality, identity, mana,
-  simulation and price are deterministic Go, tested without a network.
+- **Deterministic code decides; Claude advises** (ADR 14): legality,
+  identity, mana, simulation and price are deterministic Go, tested without
+  a network.
   Claude owns opinions and research, through seven read-only modes with
   structural guards: the interview returns only questions; the slot argument
   has no field for a defence (ADR 25); research cannot see a deck (ADR 26);
@@ -301,12 +308,17 @@ is. `docs/adr/` is immutable once accepted: supersede, don't edit.
 
 ## The decks
 
-Six curated decks live on the instance's volume (arahbo cats, atla dinos,
-goreclaw stompy, tivit cEDH, gyome food, trostani tokens) plus one empty
-draft (adrix). Goreclaw fails the gate on a banned card by design — a live
-invalid example, never a test fixture. Statuses, stages and labels are facts
-about volume files: **check with `fly ssh console -C "mtglab decks validate
-<slug>"`, don't inherit them from prose** — including this paragraph.
+**There is no roster here, deliberately.** Decks are the app's data, not the
+project's furniture: Aaron adds them, users add their own, and any list
+written down goes wrong without anything failing. Ask the library instead —
+`fly ssh console -C "mtglab decks list"`, then `mtglab decks validate <slug>`
+for one deck's real status, stage and labels. Every count, name and status in
+any document, this one included, is a claim to re-check.
+
+One standing fact, because it is a rule rather than a roster: **at least one
+curated deck fails the gate on purpose** — a banned card left in place as a
+live invalid example, never a test fixture. A session that "fixes" it has
+removed the only honest demonstration the gate has.
 
 ## Out of scope
 

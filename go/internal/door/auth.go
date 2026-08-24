@@ -10,15 +10,15 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 )
 
-// CookieName is the session cookie Python sets (`api/auth.py:COOKIE_NAME`).
+// CookieName is the session cookie's name.
 const CookieName = "sid"
 
-// PublicPaths is `api/auth.py:PUBLIC_PATHS`: reachable with no session when
+// PublicPaths is the allowlist: reachable with no session when
 // auth is on. Everything else under /api is refused before routing. It is
-// code, not a file read at request time, exactly as it is in Python -- and
-// `TestTheCodeMatchesTheSharedTable` holds it equal to
-// `tests/contract/routes.json`, the table both doors are checked against,
-// so a route added to one place and not the other fails a test on each side.
+// code, not a file read at request time -- and the door's sweeps derive
+// from the served route table (`TestEveryPublicPathIsServed` and its
+// siblings), so an entry here that nothing serves fails a test and a new
+// route is deny-by-default.
 var PublicPaths = map[string]bool{
 	"/api/health":             true,
 	"/api/auth/login":         true,
@@ -29,22 +29,22 @@ var PublicPaths = map[string]bool{
 	"/api/auth/claim/preview": true,
 }
 
-// AdminPrefix is `api/auth.py:ADMIN_PREFIX`: refused, before routing, to a
+// AdminPrefix is refused, before routing, to a
 // caller who is not an admin -- 403, not ADR 5's 404, and ADR 17 says why.
 const AdminPrefix = "/api/admin"
 
 // The two sentences the middleware answers with. The frontend does not match
-// on them; the contract suite and the deployed smoke test do, and an
+// on them; the door's tests and the deployed smoke test do, and an
 // operator greps for them.
 const (
 	noSession = "authentication required"
 	adminOnly = "admin only"
 )
 
-// NormalisePath is `api/auth.py:normalise_path`: the one form the allowlist
+// NormalisePath is the one form the allowlist
 // is checked against, so the check is never *more permissive* than the
-// router. `posixpath.normpath("/" + path.lstrip("/"))` collapses repeated
-// slashes and resolves `.` and `..`; `path.Clean` does the same for a path
+// router: repeated slashes collapse and `.` and `..` resolve --
+// `path.Clean` does exactly that for a path
 // that starts with one slash, and the guard below gives it one. A trailing
 // slash is dropped, and an empty result is `/`.
 func NormalisePath(p string) string {
@@ -56,15 +56,16 @@ func NormalisePath(p string) string {
 	return cleaned
 }
 
-// isAPI is the test both the middleware and the SPA catch-all make in
-// Python: `normalised.startswith("/api")` -- a prefix test, deliberately not
-// a segment test, because that is what the Python code does and the door
-// must be at least as strict.
+// isAPI is the test both the middleware and the SPA catch-all make:
+// a prefix test, deliberately not
+// a segment test -- `/apix` counts as API and is refused rather than handed
+// the shell, which is the recorded rule and the stricter of the two
+// readings.
 func isAPI(normalised string) bool {
 	return strings.HasPrefix(normalised, "/api")
 }
 
-// IsPublic is `api/auth.py:is_public`: anything outside /api is the built
+// IsPublic: anything outside /api is the built
 // frontend and has to load for a login form to exist; under /api only the
 // allowlist passes.
 func IsPublic(p string) bool {
@@ -75,7 +76,7 @@ func IsPublic(p string) bool {
 	return PublicPaths[normalised]
 }
 
-// IsAdminPath is `api/auth.py:is_admin_path`, with the same `/` in the second
+// IsAdminPath carries the `/` in the second
 // test so `/api/administrators` is not swept in.
 func IsAdminPath(p string) bool {
 	normalised := NormalisePath(p)
@@ -105,7 +106,7 @@ func (r dbResolver) Resolve(ctx context.Context, token string) (auth.Scope, erro
 	return auth.Resolve(ctx, r.db, token)
 }
 
-// authenticate is `api/auth.py:authenticate`, the middleware: resolve the
+// authenticate is the middleware: resolve the
 // caller, then refuse anything not on the allowlist. The 401 comes before the
 // 403 so an anonymous request for an admin path is told it needs a session
 // rather than that it needs to be somebody else.

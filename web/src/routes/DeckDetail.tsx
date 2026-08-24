@@ -1827,7 +1827,7 @@ export default function DeckDetail() {
 /**
  * What has been done to this deck, and by whom (ADR 28).
  *
- * The sentences are the server's — `decks/log.py:describe` renders them and
+ * The sentences are the server's — the activity log's `Describe` renders them and
  * `mtglab decks log` prints the same strings. Nothing is composed here, which
  * is what stops the panel and the CLI drifting into two accounts of the same
  * edit. All this adds is the shape: a verb chip you can scan down, the actor,

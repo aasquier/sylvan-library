@@ -16,7 +16,7 @@ import (
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
-// scratch builds an app.db from the schema Python's ladder produces, which is
+// scratch builds an app.db from the schema the real ladder produces, which is
 // the point of `authtest`: four packages had each transcribed the ladder by
 // hand and frozen it at a different rung, and two broke the day a new column
 // was first read.
@@ -224,8 +224,8 @@ func TestRecordNeverFailsTheMatchThatProducedIt(t *testing.T) {
 				game(1, 200, intp(2), nil, false, false),
 			}, decks)
 		}()},
-		// **A seed past SQLite's 64-bit INTEGER**, which is where Python
-		// raises an OverflowError its broad `except` turns into a warning.
+		// **A seed past SQLite's 64-bit INTEGER**, which the recorder
+		// refuses whole rather than truncating -- see seedForSQL.
 		{"a seed too large for the column", func() Match {
 			seed, _ := new(big.Int).SetString("1180591620717411303424", 10)
 			return matchOf(seed, good, decks)

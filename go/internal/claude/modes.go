@@ -12,29 +12,29 @@ import (
 // The mode definitions, embedded.
 //
 // A mode is a system prompt, a tool set and a response schema, and all three
-// cross as **generated data** rather than as transcribed source -- the same
+// live as **recorded data** rather than as string literals -- the same
 // split `tools` makes, for the same reason at greater scale. A prompt is prose
 // whose bytes reach a model; `theme-proposal`'s alone runs to thousands of
-// words. Hand-copying seven of them into a second language is the drift the
-// generator exists to prevent, and unlike a persona's voice a mistyped
+// words. Hand-copying seven of them into source code is the drift the
+// embed exists to prevent, and unlike a persona's voice a mistyped
 // instruction here changes what the model is *allowed to do* rather than how
 // it sounds.
 //
-// **The response schemas are the sharpest case for generating them.** ADR 25's
+// **The response schemas are the sharpest case for keeping them data.** ADR 25's
 // slot argument has no `defence`, `verdict` or `summary` property and forbids
 // extra ones, so a balanced answer -- the attractive one, and the one that is
 // a rationale generator wearing a hat -- has nowhere to go. ADR 34's scan has
 // no field for a card name. Those **absences are the features**, and an
 // absence is precisely what a hand-copy drops with nothing looking wrong.
 //
-// All seven definitions load, including the modes whose orchestration has not
-// crossed. The definition is data; the code that assembles a brief and reads
-// an answer back is the mode's own.
+// All seven definitions load. The definition is data; the code that
+// assembles a brief and reads an answer back is the mode's own.
 //
-// **Seven, and this comment said six until 2026-08-23.** The generator's first
-// version grepped for `= Mode(` and silently lost `scan.py`, which spells it
-// `modes.Mode(...)`; #257 fixed the generator to discover modes by type and
-// the prose describing it kept the old number. A count in a comment is a claim
+// **Seven, and this comment said six until 2026-08-23.** The file's first
+// builder worked from a hand list and silently lost the scan mode, whose
+// definition is spelled differently from its siblings; #257 rebuilt it to
+// discover modes by type, and the prose describing it kept the old number. A
+// count in a comment is a claim
 // to re-check against the data, which is why `ModeNames` is derived and no
 // number is written down anywhere a test cannot read it.
 
@@ -82,7 +82,7 @@ func (s serverToolSpec) param() (anthropic.ToolUnionParam, error) {
 	}
 }
 
-// modes is every mode Python defines, by name.
+// modes is every defined mode, by name.
 //
 // A package-level var rather than an `init()`, deliberately: Go runs a
 // package's `init` functions in **file-name order**, which has emptied a

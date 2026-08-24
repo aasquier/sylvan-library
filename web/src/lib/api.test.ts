@@ -10,7 +10,7 @@
  * none, and the interval is asserted rather than waited out.
  *
  * The second half of the file is the 401 interceptor, which is the frontend's
- * version of the argument `api/auth.py` makes for a middleware: one place, so
+ * version of the argument the door makes for auth middleware: one place, so
  * no screen can forget. Its two carve-outs are the interesting part -- a 401
  * from `login` is an answer about a password, not a session that ended.
  */
@@ -28,7 +28,7 @@ function job(overrides: Partial<Job> = {}): Job {
     percent: 0,
     label: 'gyome-food: mana, 20,000 games',
     result: null,
-    // Always on the wire (`jobs.py` serialises it unconditionally) and
+    // Always on the wire (the server serialises it unconditionally) and
     // null unless the job is a running one with something to say so far.
     partial: null,
     error: null,

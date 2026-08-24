@@ -311,11 +311,12 @@ export default function Research() {
           {busy && (
             <Spinner label={`reading pages… ${elapsed}s`} />
           )}
+          {/* One sentence, because the other arm was unreachable: the client
+              is linked into the binary, so the dial's `installed` is a
+              constant and only the key is ever missing. */}
           {unavailable && (
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {status?.installed
-                ? 'Claude has no key to call with on this server.'
-                : 'Claude isn’t installed on this server.'}
+              Claude has no key to call with on this server.
             </span>
           )}
         </div>

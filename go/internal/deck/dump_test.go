@@ -9,26 +9,26 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
 )
 
-// The dump oracle: `Deck.dump` over every field combination the two lifecycle
-// writers can produce, beside the exact bytes PyYAML gives for it
-// (`tests/go_fixtures.py`, which writes testdata/dumps.json).
+// The dump oracle: `Dump` over every field combination the two lifecycle
+// writers can produce, beside the exact recorded bytes for each
+// (testdata/dumps.json, a frozen golden that is never regenerated).
 //
-// Driven as parse-then-dump -- read the case's source, dump it, compare bytes
-// with what Python's parse of that same source dumped to -- rather than by
-// rebuilding each fixture deck in Go, which would be a dozen constructions
-// free to drift from the dozen Python ones. It catches everything either half
-// could get wrong about a shape that survives a parse: a key in the wrong
+// Driven as parse-then-dump -- read the case's source, dump it, compare
+// bytes with the recorded dump of that same source -- rather than by
+// rebuilding each fixture deck in code, which would be a dozen
+// constructions free to drift from the dozen recorded ones. It catches
+// everything a parse-surviving shape could go wrong on: a key in the wrong
 // order, a default asserted that should have been omitted, a scalar quoted
-// differently, a fold at the wrong column. The one branch it cannot reach is
-// the archetype the dump *drops*, which has its own test below.
+// differently, a fold at the wrong column. The one branch it cannot reach
+// is the archetype the dump *drops*, which has its own test below.
 //
-// For a deck Python *constructed*, `source` is its own dump and this is the
-// round trip the oracle has always run. For the hand-written decks it is the
-// file a person typed, which is the only shape that proves anything about
-// reading one: a recorded dump has already been through PyYAML's choices, so
-// feeding it back in shows both parsers the tidied version and hides every
-// disagreement about the untidied one.
-func TestDumpWritesWhatPythonWrites(t *testing.T) {
+// For a constructed deck, `source` is its own dump and this is the round
+// trip the oracle has always run. For the hand-written decks it is the file
+// a person typed, which is the only shape that proves anything about
+// reading one: a recorded dump has already been through the emitter's
+// choices, so feeding it back in shows the parser the tidied version and
+// hides every disagreement about the untidied one.
+func TestDumpWritesTheRecordedBytes(t *testing.T) {
 	raw, err := os.ReadFile("testdata/dumps.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
@@ -38,7 +38,7 @@ func TestDumpWritesWhatPythonWrites(t *testing.T) {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(cases) == 0 {
-		t.Fatal("the oracle is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the oracle is empty; testdata/dumps.json is a frozen golden and should never be")
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestDumpWritesWhatPythonWrites(t *testing.T) {
 				t.Fatalf("dumping: %v", err)
 			}
 			if got != c.Want {
-				t.Errorf("dump differs from Python's\n--- want ---\n%s\n--- got ---\n%s",
+				t.Errorf("dump differs from the recorded bytes\n--- want ---\n%s\n--- got ---\n%s",
 					c.Want, got)
 			}
 		})
@@ -59,10 +59,10 @@ func TestDumpWritesWhatPythonWrites(t *testing.T) {
 }
 
 // A blank rationale is written on a draft and omitted on a curated deck, and
-// on a draft it lands *after* `qty` -- because `to_obj` writes `why` in second
-// place only when there is one, and Python's `setdefault` appends a key the
-// mapping has not got. Pinned apart from the oracle because it is the one
-// ordering rule that looks like a mistake.
+// on a draft it lands *after* `qty` -- `why` sits in second place only when
+// there is one, and the draft's blank entry is appended after every present
+// field. Pinned apart from the oracle because it is the one ordering rule
+// that looks like a mistake.
 func TestADraftsBlankRationaleFollowsTheQuantity(t *testing.T) {
 	d := &Deck{Slug: "d", Name: "D", Status: "theoretical", Stage: "draft",
 		Commander: []string{"Gyome, Master Chef"},
@@ -159,10 +159,10 @@ cards:
 	}
 }
 
-// A deck whose notes are the same pairs in a different order is a *different*
-// deck to `_baseline_state`, because in Python that comparison is `dump() ==
-// dump()` and the two files differ. A Go map would have called them equal and
-// reported artifacts as `current` that were not.
+// A deck whose notes are the same pairs in a different order is a
+// *different* deck to the baseline comparison, because that comparison is
+// dump against dump and the two files differ. A bare map would have called
+// them equal and reported artifacts as `current` that were not.
 func TestReorderedNotesAreADifferentDeck(t *testing.T) {
 	head := "slug: d\nname: D\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\n"
 	tail := "cards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana.\n"
@@ -192,8 +192,7 @@ func TestAStrategyThatIsNotProseRefusesToDump(t *testing.T) {
 		t.Fatal("a strategy that is not prose must not be dumped")
 	}
 	// A note the emitter has no way to write is the same refusal one field
-	// over: Python reaches it as a traceback out of `_note`, and both sides
-	// answer 500.
+	// over, and the route answers it as a 500.
 	d.Strategy = ""
 	d.Notes = deckyaml.Map{{Key: "mulligan", Value: 1.5}}
 	if _, err := d.Dump(); err == nil {

@@ -1,22 +1,23 @@
-// The write side of the pool: `cards/db.py`'s refresh, moved here at Phase 8
-// so the deployed runbook's `mtglab data refresh` needs no interpreter.
+// The write side of the pool: the refresh behind `mtglab data refresh`.
 //
-// The shape is Python's — the bulk index asked with the same User-Agent, the
+// The shape is the recorded one — the bulk index asked with the same
+// User-Agent, the
 // download parked as `<kind>-<date><suffix>` and skipped when already there,
 // written to a `.part` and renamed only once complete; the same skip rules
 // (art-series and token layouts out of `oracle_cards`, digital printings out
 // of `printings`); the same row builders, front-face fallback included,
 // because a pool that recorded a double-faced card's mana cost as NULL once
-// cast Etali on turn one. Two deliberate differences, both sanctioned by the
-// phase plan: the rows go in through DuckDB's **Appender** rather than a
-// prepared statement per row (the ledger's queued 28-minute item — `load_
-// printings` measured ~110 rows/second on the old path), and the DELETE and
+// cast Etali on turn one. Two deliberate upgrades, both sanctioned: the
+// rows go in through DuckDB's **Appender** rather than a
+// prepared statement per row (the ledger's queued 28-minute item — the
+// printings load measured ~110 rows/second on the old path), and the DELETE
+// and
 // the load share **one transaction**, closing the window where an
 // interrupted refresh left the pool with no printings at all.
 //
-// One knowing divergence: Python stores `legalities` and `card_faces` as
-// `json.dumps` text (ASCII-escaped); this writes Go's marshalling (raw
-// UTF-8). Nothing reads those columns except `json_extract_string` and a
+// One knowing divergence: older pools store `legalities` and `card_faces`
+// as ASCII-escaped JSON text; this writes raw
+// UTF-8. Nothing reads those columns except `json_extract_string` and a
 // JSON parse, so the difference is invisible to every query — the refresh
 // corpus therefore compares those two columns *parsed* and everything else
 // exactly.
@@ -37,13 +38,14 @@ import (
 	"time"
 )
 
-// BulkIndex and RefreshUserAgent are `cards/db.py`'s constants, verbatim.
+// BulkIndex and RefreshUserAgent are long-standing constants, verbatim --
+// the User-Agent identifies this tool to Scryfall and must stay stable.
 const (
 	BulkIndex        = "https://api.scryfall.com/bulk-data"
 	RefreshUserAgent = "mtg-lab/0.1 (local personal deckbuilding tool)"
 )
 
-// addedColumns is `_ADDED_COLUMNS`: the ALTERs an existing pool needs before
+// addedColumns is the ALTERs an existing pool needs before
 // the loaders may bind the newer columns. `IF NOT EXISTS` makes them no-ops
 // on a fresh file, whose schema already carries everything.
 var addedColumns = map[string][][2]string{

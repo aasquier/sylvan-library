@@ -36,7 +36,7 @@ func TestTheModelPrecedenceIsEnvThenTierThenHouse(t *testing.T) {
 // second, so if these two ever drifted apart, a request with no account
 // attached and a request from a default seat would quietly run on different
 // models -- and every measurement taken through one door would be about the
-// other. Python collapses the same two branches the same way.
+// other.
 func TestTheHouseModelAndTheDefaultTierAgree(t *testing.T) {
 	t.Setenv("MTGLAB_CLAUDE_MODEL", "")
 	if got := tiers.Resolve(tiers.DefaultKey); got != Model {
@@ -60,8 +60,8 @@ func TestACredentialIsAskedAboutAndNeverRead(t *testing.T) {
 	} else if !strings.Contains(err.Error(), ".env") {
 		t.Errorf("the refusal should say how to fix it: %v", err)
 	}
-	// A blank key is not a credential. Python needs config.py to delete it
-	// before this function can be right; Go gets that for free, and this is
+	// A blank key is not a credential: `os.Getenv` reads unset and blank the
+	// same way, so "exported but empty" cannot fool the check -- and this is
 	// what says so.
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	if CredentialPresent() {
@@ -110,10 +110,10 @@ func TestCheckReportsWhatTheSmallestCallProved(t *testing.T) {
 	}
 }
 
-// The report's field order is Python's dict order, and it is rendered by both
+// The report's field order is the recorded one, and it is rendered by both
 // the CLI and a health route -- so it is checked through encoding/json rather
 // than field by field.
-func TestTheCheckReportKeepsPythonsFieldOrder(t *testing.T) {
+func TestTheCheckReportKeepsTheRecordedFieldOrder(t *testing.T) {
 	raw, err := json.Marshal(CheckReport{
 		Model: "m", OK: true, ServedBy: "s", StopReason: "end_turn",
 		Text: "t", InputTokens: 1, OutputTokens: 2,

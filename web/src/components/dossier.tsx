@@ -125,9 +125,9 @@ export function CommanderDossierPanel({
       .then(settle)
       .catch((e) => {
         setError(e instanceof ApiError && e.status === 404
-          // Jobs live in the server's memory and die with it (`api/jobs.py`).
-          // Say that rather than showing a bare 404 for something nobody asked
-          // to look up.
+          // Jobs live in the server's memory and die with it. Say that
+          // rather than showing a bare 404 for something nobody asked to
+          // look up.
           ? 'That run is gone — the server restarted while it was working. Ask again.'
           : errorMessage(e))
       })

@@ -52,14 +52,17 @@ mtglab data refresh                  # once a day at most
 mtglab decks validate gyome-food     # gate — fix errors before proceeding
 mtglab sim mana gyome-food           # baseline consistency
 mtglab sim lands gyome-food 30 40    # is the land count right?
-git add -A && git commit             # snapshot BEFORE editing deck.yaml
-# ... edit decks/gyome-food/deck.yaml ...
+mtglab decks build gyome-food        # snapshot BEFORE editing (stashes the baseline)
+# ... edit the deck (UI editor, or the YAML on the instance's volume) ...
 mtglab decks validate gyome-food
-mtglab decks build gyome-food --against <(git show HEAD:decks/gyome-food/deck.yaml)
+mtglab decks build gyome-food        # swaps.md diffs against the stashed snapshot
 ```
 
-The swap list is a **git diff**, not a hand-kept changelog. Commit before
-editing so the diff is meaningful.
+Decks are **not in git** (ADR 30) — the deployed volume holds the library,
+and `swaps.md` diffs against the previous build's own snapshot. That is why
+the rule is **build before editing**: the build is what stashes the
+baseline the next build diffs against. Deck history is the activity log
+(ADR 28), not git.
 
 ## Reading simulation output
 

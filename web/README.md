@@ -8,7 +8,7 @@ session; the argument for each rule lives where the rule is enforced, and
 ## What serves what
 
 The app you see at `mtglab ui` is the **committed bundle** in
-`src/mtglab/web_dist/` — a change under `web/src` is invisible until
+`web_dist/` — a change under `web/src` is invisible until
 `npm --prefix web run build`, and CI fails if the committed bundle drifts from
 source. For live iteration use the `web-dev` entry in `.claude/launch.json`
 (Vite with HMR, proxying `/api` — and *only* `/api`, which is why package-data
@@ -19,17 +19,25 @@ them as separate steps on purpose, so a type error reports as a type error.
 
 ## Conventions that are load-bearing
 
-- **The browser floor is Safari 16.4** (declared 2026-08-19), and it is a
-  declared value rather than a remembered one: `FLOOR` in
-  `tests/test_browser_floor.py`, checked against the *committed bundle* rather
-  than against `web/src`, because every feature that ever moved it arrived
-  through a dependency. Two independent things hold it — Tailwind v4's
-  `@property` and `color-mix(in lab, …)`, and the camera door's SIMD wasm core
-  — so lowering it means answering both. That file's docstring is the whole
-  argument; do not re-derive it here.
+- **The browser floor is Safari 16.4** (declared 2026-08-19), and it is
+  enforced by `go/cmd/mtglab/browserfloor_test.go`, whose comment carries the
+  argument. Two independent things hold it — Tailwind v4's `@property` and
+  `color-mix(in lab, …)`, and the camera door's SIMD wasm core — so lowering it
+  means answering both, and the test pins each separately. **It reads the
+  committed bundle, not `web/src`**, and that is the lesson worth keeping:
+  every feature that ever moved this floor arrived through a **dependency**,
+  so a grep of what we wrote could never have caught one and did not.
+- **Every animation has to be reachable by a reduced-motion guard**, and
+  `go/cmd/mtglab/reducedmotion_test.go` holds that against the same artifact,
+  for the same reason: the two that once escaped were Tailwind utilities that
+  exist only in the built stylesheet.
 - **Routes are lazy.** Every non-landing screen is a `React.lazy` line in
-  `App.tsx`; a new screen wants one, not a top-level import. The entry chunk
-  is ~266 kB and stays that way by this rule.
+  `App.tsx`; a new screen wants one, not a top-level import. Three are
+  deliberately eager — `Library`, `Login`, `Claim`, the screens you arrive on.
+  The entry chunk (`web_dist/assets/app.js`) is **285 kB raw / 91 kB
+  gzipped**, measured 2026-08-24; it was written here as ~266 kB and nothing
+  re-measures it, so treat the figure as a claim to check rather than a
+  budget that is enforced.
 - **A deck is addressed by `DeckRef`** — `{owner, slug}` as an object, never
   two positional strings (transposed strings are a runtime 404 against
   somebody else's library; named fields are a compile error). `deckUrl` in
@@ -53,10 +61,15 @@ them as separate steps on purpose, so a type error reports as a type error.
   is two colours no single glyph states. A drawn pip carries `role="img"` and
   the colour's name, because a drawing contributes nothing to the
   accessibility tree on its own.
-- **Glossary keys are pinned from Python.** `Term`/`HelpTip` names must exist
-  in `glossary.py`; `SIMULATOR_KEYS` in `tests/test_glossary.py` fails when a
-  control on the simulator has no entry, because TypeScript cannot check a
-  string against a Python table.
+- **Glossary keys are pinned to the served table.** A `Term` or `HelpTip` name
+  must exist in `go/internal/reference/data/glossary.json`, which the app
+  fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip
+  and nothing else — deliberately). The consequence is that a typo'd key fails
+  **silently**: TypeScript cannot check a string against a JSON table, and a
+  component test cannot either, because the glossary is mocked away there. The
+  check that failed when a simulator control had no entry is gone; rebuilding
+  it over the Go table is a queued item, so until then a new `Term` gets its
+  key confirmed against that file by hand.
 - **Page nameplates are `PageMasthead`** (`components/ui.tsx`): the painting
   whole at its own ratio beside the title, never a cropped band behind it —
   `art_crop` is 1.37:1 and a full-bleed band keeps less than half of it, a
@@ -68,7 +81,7 @@ them as separate steps on purpose, so a type error reports as a type error.
   (rule 5, ADR 6).
 - **A committed asset comes from a recipe.** The exception to the rule above
   is CC0/public-domain imagery that must be ours (the ivy under
-  `src/assets/ambience/`), and it arrives only through `mtglab animist`
+  `src/assets/ambience/`), and it arrives only through `animist`
   (ADR 29): a `*.recipe.yaml` beside the assets records source, per-file
   API-confirmed licence, and every transform; the tool writes the
   PROVENANCE.md entry, and the suite verifies the committed files against

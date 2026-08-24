@@ -1,19 +1,14 @@
-// Package reference is the checked-in prose as the Go module serves it: the
-// 32 colour combinations, the glossary, the lore shelves, the tarot deck's
-// facts, and the labelling vocabulary. Nothing here is authored in Go.
-// `src/mtglab/reference.py` renders each payload -- exactly what the Python
-// route serves today -- `tests/go_fixtures.py` writes them into `data/`, and
-// `tests/test_go_fixtures.py` holds the committed files equal to a fresh
-// render; this package embeds them, so the two runtimes answer the same words
-// or the suite says so. It is the `web_dist` pattern applied to prose
-// (docs/go-migration/PLAN.md, Phase 3), and at retirement the JSON here
-// becomes the authoritative text, edited directly -- which is what checked-in
-// prose is for (`colors.py`: bland prose is fixed by editing).
+// Package reference is the checked-in prose as the app serves it: the 32
+// colour combinations, the glossary, the lore shelves, the tarot deck's
+// facts, and the labelling vocabulary. Nothing here is authored at runtime.
+// The JSON under `data/` is the authoritative text, embedded and edited
+// directly -- which is what checked-in prose is for: bland prose is fixed
+// by editing, never by generating (finite, editable, free).
 //
 // Two things a reader should know. The raw payloads (`ColorsJSON`,
 // `GlossaryJSON`, `ThemesJSON`) are served as they are, compacted once at
-// start to the separators FastAPI writes, so `/api/glossary` is the same
-// bytes from either door. And the typed views are for Go code that has to
+// start to the recorded wire shape, so `/api/glossary` is the same bytes
+// every boot. And the typed views are for code that has to
 // *read* the prose -- `Combination` for `/api/colors/{key}`'s resolution
 // through the pool, the vocabulary for the gate's theme check -- never for
 // re-rendering it: a field this package forgot would be missing from the
@@ -182,12 +177,11 @@ type TarotLore struct {
 	Facts []TarotFact `json:"facts"`
 }
 
-// Model is the deck model's spoken vocabulary (`decks/model.py`,
-// `decks/validate.py`, `decks/analyze.py`): the categories a card may be
-// filed under, the two statuses and two stages, the basics the singleton
+// Model is the deck model's spoken vocabulary: the categories a card may
+// be filed under, the two statuses and two stages, the basics the singleton
 // rule exempts, the conventional category targets and the Game Changer
-// limits per bracket -- rendered so the Go gate says exactly what the Python
-// gate says.
+// limits per bracket -- rendered into data so the gate's sentences quote
+// one vocabulary rather than carrying a second copy of it.
 type Model struct {
 	Categories        []string         `json:"categories"`
 	DeckStatuses      []string         `json:"deck_statuses"`
@@ -206,17 +200,17 @@ type OCRAsset struct {
 }
 
 // Effect is one card-art effect as the serving tier needs it: the
-// fingerprint the build wrote into `attribution.json`, computed by Python
-// (`cardmotion/effects.py:Effect.fingerprint`) and not re-derived here.
+// fingerprint the build wrote into `attribution.json`, computed by the
+// cardmotion toolbox when the art is made and not re-derived here.
 type Effect struct {
 	Fingerprint string `json:"fingerprint"`
 	NeedsDepth  bool   `json:"needs_depth"`
 }
 
-// RuntimeShelves is the three runtime shelves' configuration (`symbols.py`, `ocr.py`,
-// `cardmotion/cache.py` + `effects.py`): where the mana symbols come from
-// and the shape a code may take, the reading engine's pinned files and its
-// versioned cache stamp, and the effects table with Python's fingerprints.
+// RuntimeShelves is the three runtime shelves' configuration: where the
+// mana symbols come from and the shape a code may take, the reading
+// engine's pinned files and its versioned cache stamp, and the effects
+// table with the toolbox's fingerprints.
 type RuntimeShelves struct {
 	Symbols struct {
 		CDN      string `json:"cdn"`
@@ -265,10 +259,10 @@ func init() {
 }
 
 // mustCompact parses one embedded file into its typed view and returns the
-// same document compacted to FastAPI's separators. A file that does not
-// parse is a build that must not ship: the data is generated and tested on
-// the Python side, so a panic here means the embed and the generator have
-// come apart, not that a user did anything.
+// same document compacted to the recorded wire shape. A file that does not
+// parse is a build that must not ship: the data is committed and tested, so
+// a panic here means the embedded file itself is damaged, not that a user
+// did anything.
 func mustCompact(name string, raw []byte, into any) []byte {
 	if err := json.Unmarshal(raw, into); err != nil {
 		panic(fmt.Sprintf("reference: %s does not parse: %v", name, err))
@@ -340,9 +334,9 @@ func CombinationByKey(key string) (*Combination, bool) {
 // WUBRG is the canonical order every key is written in.
 const WUBRG = "WUBRG"
 
-// KeyFor is `colors.key_for`: the canonical key for a set of colour codes --
-// `{"G","W"}` is "WG" -- and "C" for none. Anything that is not one of the
-// five letters is ignored, as the Python set comprehension ignores it.
+// KeyFor is the canonical key for a set of colour codes -- `{"G","W"}` is
+// "WG" -- and "C" for none. Anything that is not one of the five letters is
+// ignored, never an error: the recorded behaviour, kept.
 func KeyFor(codes []string) string {
 	have := map[string]bool{}
 	for _, c := range codes {

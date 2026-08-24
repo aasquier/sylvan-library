@@ -12,16 +12,17 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
-// Research, held to Python by `testdata/research.json`.
+// Research, held to the recorded corpus in `testdata/research.json`.
 //
 // What a person controls here is the question, so the corpus is heaviest
-// where the body can vary: `str(raw or "")` over a number, a list, a null;
-// `len()` in code points; whitespace as Python counts it. Every outcome of a
-// run is compared as bytes, as the dossier's are. And the structural claim
-// ADR 26 makes -- that nothing here can hold a deck -- is a test over the
-// types rather than a sentence in a comment.
+// where the body can vary: the plain rendering over a number, a list, a
+// null; length in code points; the wider whitespace the recorded grammar
+// strips. Every outcome of a run is compared as bytes, as the dossier's are.
+// And the structural claim ADR 26 makes -- that nothing here can hold a deck
+// -- is a test over the types rather than a sentence in a comment.
 
 type researchCorpus struct {
 	Questions []struct {
@@ -69,14 +70,14 @@ func loadResearchCorpus(t *testing.T) researchCorpus {
 		t.Fatalf("decoding the corpus: %v", err)
 	}
 	if len(corpus.Questions) == 0 || len(corpus.Reports) == 0 {
-		t.Fatal("the corpus is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/research.json is a frozen golden and always carries both")
 	}
 	return corpus
 }
 
 // ------------------------------------------------------------ the question
 
-func TestCheckQuestionAgreesWithPython(t *testing.T) {
+func TestCheckQuestionMatchesTheRecordedCorpus(t *testing.T) {
 	corpus := loadResearchCorpus(t)
 	sawRejection, sawOddShape := false, false
 	for _, row := range corpus.Questions {
@@ -86,19 +87,19 @@ func TestCheckQuestionAgreesWithPython(t *testing.T) {
 			sawRejection = true
 			var rejected *ErrQuestionRejected
 			if !errors.As(err, &rejected) {
-				t.Errorf("%v: Python refused, Go answered %q / %v", row.Raw, got, err)
+				t.Errorf("%v: the corpus refuses, this answered %q / %v", row.Raw, got, err)
 				continue
 			}
 			if rejected.Error() != *row.Rejected {
-				t.Errorf("%v: refusal\n go     %q\n python %q", row.Raw, rejected.Error(), *row.Rejected)
+				t.Errorf("%v: refusal\n got    %q\n corpus %q", row.Raw, rejected.Error(), *row.Rejected)
 			}
 		default:
 			if err != nil {
-				t.Errorf("%v: Python accepted %q, Go refused: %v", row.Raw, *row.Question, err)
+				t.Errorf("%v: the corpus accepts %q, this refused: %v", row.Raw, *row.Question, err)
 				continue
 			}
 			if got != *row.Question {
-				t.Errorf("%v: question\n go     %q\n python %q", row.Raw, got, *row.Question)
+				t.Errorf("%v: question\n got    %q\n corpus %q", row.Raw, got, *row.Question)
 			}
 			if _, isString := row.Raw.(string); !isString {
 				sawOddShape = true
@@ -111,27 +112,27 @@ func TestCheckQuestionAgreesWithPython(t *testing.T) {
 	}
 }
 
-// Whitespace as Python counts it: the four information separators are
-// whitespace to `str.strip()` and not to `strings.TrimSpace`, so a question
-// that is only `\x1c\x1d` is empty to both runtimes only because pyIsSpace
-// says so. The corpus holds that case; this names the mechanism.
-func TestTheInformationSeparatorsAreWhitespaceAsPythonCounts(t *testing.T) {
+// The recorded grammar counts the four information separators as whitespace
+// where `strings.TrimSpace` does not, so a question that is only `\x1c\x1d`
+// is empty only because textutil.IsSpace says so. The corpus holds that
+// case; this names the mechanism.
+func TestTheInformationSeparatorsCountAsWhitespace(t *testing.T) {
 	if strings.TrimSpace("\x1c\x1d") == "" {
 		t.Skip("Go's TrimSpace now strips the information separators; the helper is redundant")
 	}
-	if pyStrip("\x1c\x1dq\x1e") != "q" {
-		t.Errorf("pyStrip did not strip the information separators: %q", pyStrip("\x1c\x1dq\x1e"))
+	if textutil.Strip("\x1c\x1dq\x1e") != "q" {
+		t.Errorf("textutil.Strip did not strip the information separators: %q", textutil.Strip("\x1c\x1dq\x1e"))
 	}
 	if _, err := CheckQuestion("\x1c\x1d"); err == nil {
-		t.Error("a question of information separators was accepted; Python refuses it as empty")
+		t.Error("a question of information separators was accepted; the recorded grammar refuses it as empty")
 	}
 }
 
-func TestTheQuestionKeyAgreesWithPython(t *testing.T) {
+func TestTheQuestionKeyMatchesTheRecordedCorpus(t *testing.T) {
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.Keys {
 		if got := QuestionKey(row.Question); got != row.Key {
-			t.Errorf("question_key(%q) = %q, python %q", row.Question, got, row.Key)
+			t.Errorf("QuestionKey(%q) = %q, corpus %q", row.Question, got, row.Key)
 		}
 	}
 	// Two spellings of one question are one job.
@@ -143,17 +144,18 @@ func TestTheQuestionKeyAgreesWithPython(t *testing.T) {
 	}
 }
 
-// The one recorded gap, pinned so it is known rather than found: Python
-// casefolds (`ß` -> `ss`) and this lowercases. The key never leaves the
-// process -- not in a payload, not in a store -- so nothing can observe the
-// difference; what it is FOR, two requests in one process joining, both do.
-// If this test ever fails because the two agree, a casefold arrived and the
-// comment on QuestionKey is the thing to delete.
-func TestTheQuestionKeyLowercasesWherePythonCasefolds(t *testing.T) {
+// The one recorded gap, pinned so it is known rather than found: Unicode
+// full case folding rewrites `ß` to `ss` where this lowercases rune for
+// rune. The key never leaves the process -- not in a payload, not in a store
+// -- so nothing can observe the difference; what it is FOR, two requests in
+// one process joining, either folding does. If this test ever fails because
+// the two keys agree, a full folding arrived and the comment on QuestionKey
+// is the thing to delete.
+func TestTheQuestionKeyLowercasesWhereFullFoldingDiffers(t *testing.T) {
 	corpus := loadResearchCorpus(t)
 	gap := corpus.CasefoldGap
 	if got := QuestionKey(gap.Question); got != gap.LowercasedKey {
-		t.Errorf("question_key(%q) = %q, want the lowercased key %q", gap.Question, got, gap.LowercasedKey)
+		t.Errorf("QuestionKey(%q) = %q, want the lowercased key %q", gap.Question, got, gap.LowercasedKey)
 	}
 	if gap.Key == gap.LowercasedKey {
 		t.Fatal("the corpus's casefold gap is not a gap; pick an input that casefolds differently")
@@ -162,7 +164,7 @@ func TestTheQuestionKeyLowercasesWherePythonCasefolds(t *testing.T) {
 
 // ------------------------------------------------------------ the stance
 
-func TestResearchStanceForAgreesWithPython(t *testing.T) {
+func TestResearchStanceForAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.StanceFor {
 		ceiling := ""
@@ -175,7 +177,7 @@ func TestResearchStanceForAgreesWithPython(t *testing.T) {
 			t.Errorf("ceiling %q requested %v: %v", ceiling, row.Requested, err)
 			continue
 		}
-		assertSameJSONValue(t, "ceiling "+ceiling+" requested "+pyReprJSON(row.Requested),
+		assertSameJSONValue(t, "ceiling "+ceiling+" requested "+literalJSON(row.Requested),
 			Describe(got), row.Describe)
 	}
 }
@@ -208,18 +210,18 @@ func TestTheDefaultResearchStanceIsNotOff(t *testing.T) {
 	}
 }
 
-func TestTheResearchOpeningIsPythons(t *testing.T) {
+func TestTheResearchOpeningIsTheRecordedShape(t *testing.T) {
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.AskFor {
 		if got := researchOpening(row.Question); got != row.Message {
-			t.Errorf("opening for %q:\n go     %q\n python %q", row.Question, got, row.Message)
+			t.Errorf("opening for %q:\n got    %q\n corpus %q", row.Question, got, row.Message)
 		}
 	}
 }
 
 // ------------------------------------------------------------- the runs
 
-func TestEveryResearchOutcomeAgreesWithPython(t *testing.T) {
+func TestEveryResearchOutcomeMatchesTheGolden(t *testing.T) {
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadResearchCorpus(t)
@@ -234,13 +236,13 @@ func TestEveryResearchOutcomeAgreesWithPython(t *testing.T) {
 			var report ResearchReport
 			if row.Turn == nil {
 				if plan.Answer == nil {
-					t.Errorf("%s: the plan wants a call and Python made none", row.Note)
+					t.Errorf("%s: the plan wants a call and the corpus made none", row.Note)
 					continue
 				}
 				report = *plan.Answer
 			} else {
 				if plan.Answer != nil {
-					t.Errorf("%s: the plan answered without a call and Python called", row.Note)
+					t.Errorf("%s: the plan answered without a call and the corpus called", row.Note)
 					continue
 				}
 				report, err = readResearch(ctx, c, plan, row.Turn.turn(ModeResearch))
@@ -284,8 +286,8 @@ func TestTheResearchPlanCannotHoldADeck(t *testing.T) {
 	}
 }
 
-// And the mode itself offers no deck tool -- the structural half, which the
-// Python suite pins per tool and this pins as a set.
+// And the mode itself offers no deck tool -- the structural half, pinned
+// here as a set rather than tool by tool.
 func TestTheResearchModeOffersNoDeckTool(t *testing.T) {
 	mode, err := GetMode(ModeResearch)
 	if err != nil {

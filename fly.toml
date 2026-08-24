@@ -30,8 +30,8 @@ primary_region = "iad"          # change to the region nearest you
 
   # Auth on. The local default is off and stays off — one person on a laptop
   # does not need a login — but a shared instance is the case the whole of §1
-  # was written for. With this set, `api/auth.py`'s middleware refuses every
-  # path outside `PUBLIC_PATHS` before routing, and `App.tsx` renders the login
+  # was written for. With this set, the door's middleware refuses every path
+  # outside `door.PublicPaths` before routing, and `App.tsx` renders the login
   # screen in place of the app.
   MTGLAB_REQUIRE_AUTH = "1"
 
@@ -54,8 +54,8 @@ primary_region = "iad"          # change to the region nearest you
   # one, because the app comes up looking entirely healthy and the sign-in page
   # simply has nobody behind it who is you.
 
-  # Who administers this instance (ADR 17). `auth/bootstrap.py` reconciles this
-  # account to admin-and-enabled at every boot, creating it unclaimed if
+  # Who administers this instance (ADR 17). `auth.EnsureMaintainer` reconciles
+  # this account to admin-and-enabled at every boot, creating it unclaimed if
   # absent, so a demotion or a restored backup is repaired by a restart. There
   # is deliberately no `MTGLAB_ADMIN_PASSWORD`; the account is claimed from the
   # sign-in page's reset link.
@@ -79,7 +79,7 @@ primary_region = "iad"          # change to the region nearest you
   MTGLAB_BASE_URL = "https://sylvan-libraries.com"
 
   # The sending address, which must be on the domain verified with Resend.
-  # `RESEND_API_KEY` is a secret and is not here; `sender_from_env()` refuses
+  # `RESEND_API_KEY` is a secret and is not here; `auth.SenderFromEnv` refuses
   # to start without it when auth is on, deliberately — the console fallback
   # would print recipient addresses into Fly's logs, which ADR 16 forbids.
   #
@@ -90,7 +90,7 @@ primary_region = "iad"          # change to the region nearest you
   # The header naming the real client, for login rate limiting.
   #
   # **Not optional here, and its absence is worse than it looks.** Unset,
-  # `auth.client_address` falls back to the socket address — which behind Fly's
+  # `clientAddress` falls back to the socket address — which behind Fly's
   # proxy is the proxy, so every login attempt from everybody shares one bucket
   # and one person mistyping their password 429s the whole instance. The
   # default is off because a header any client can set is a rate limit any
@@ -116,8 +116,8 @@ primary_region = "iad"          # change to the region nearest you
   MTGLAB_CLIENT_IP_HEADER = "Fly-Client-IP"
 
   # Tier 3 runs on the worker machine (ADR 35), not in this container — there
-  # is no JVM here and `desktop_jar` answers accordingly. The dial alone is
-  # not enough to flip the gate: `worker.configured()` also requires
+  # is no JVM here and `tier3.DesktopJar` answers accordingly. The dial alone
+  # is not enough to flip the gate: `tier3.Configured` also requires
   # `MTGLAB_FLY_API_TOKEN` (a deploy token, `fly secrets set`, never here —
   # the repo is public), so a deploy before that secret exists still answers
   # `/api/forge` honestly with `available: false`. `MTGLAB_FORGE_SHIM_TOKEN`
@@ -130,9 +130,9 @@ primary_region = "iad"          # change to the region nearest you
   destination = "/data"
   # 3GB, sized in §4 step 3 to hold the ~63MB pool, the ~98MB of Scryfall
   # downloads it is built from, `app.db`, the decks, and a backup. Both halves
-  # of that download now actually land here — until 2026-08-12 `download_bulk`
-  # wrote to a relative `data/scryfall`, which in this container would have
-  # been the ephemeral layer rather than the volume this line sizes.
+  # of that download actually land here: the Scryfall directory is derived from
+  # `MTGLAB_DATA_DIR` rather than from the working directory, which in this
+  # container would be the ephemeral layer rather than the volume this sizes.
   initial_size = "3gb"
 
 [http_service]
@@ -147,8 +147,8 @@ primary_region = "iad"          # change to the region nearest you
   # interfering with testing badly enough that the money is not the deciding
   # term. Restore the block below this one *then*, and not on a calendar.
   #
-  # What it costs while it stands: a `shared-cpu-1x`/1GB machine held up around
-  # the clock is roughly $0.19/day, against near-zero when it scales to zero
+  # What it costs while it stands: a `shared-cpu-2x`/1GB machine held up around
+  # the clock is roughly $0.22/day, against near-zero when it scales to zero
   # between visits. Cheap enough to be the wrong thing to optimise mid-build,
   # and worth actually reverting once the building stops.
   #
@@ -187,9 +187,9 @@ primary_region = "iad"          # change to the region nearest you
 
   [http_service.concurrency]
     # One process, so these are request-level guards rather than a worker
-    # count. See the Dockerfile's CMD for why a second worker is not safe:
-    # `api/jobs.py` keeps its registry in a module-level dict, so a sim
-    # submitted to one process is a 404 from the other.
+    # count, and one process is the design: the job registry lives in the
+    # memory of the process that submitted the job, so a sim submitted to one
+    # process would be a 404 from another.
     type = "requests"
     soft_limit = 20
     hard_limit = 40
@@ -207,8 +207,23 @@ primary_region = "iad"          # change to the region nearest you
     path = "/api/health"
 
 [[vm]]
-  size = "shared-cpu-1x"
-  # 512mb is too tight: DuckDB, numpy, an Argon2id hash at its configured cost,
-  # and a Tier 1 sweep all want headroom at once. §7 flags this as the number to
-  # watch if Forge is ever added, which is most of why that would mean Hetzner.
+  # **Two cores since 2026-08-23**, up from `shared-cpu-1x`, for about $0.70 a
+  # month.
+  #
+  # **What the second core buys, stated exactly, because the tempting sentence
+  # is wrong.** A Tier 1 run is single-goroutine — there is no concurrency
+  # inside `internal/sim/tier1` at all — so a second core does *not* make one
+  # sweep finish sooner. What widens is the CPU job lane, whose width is
+  # `GOMAXPROCS` (`jobs.defaultCPUWorkers`): the instance goes from running one
+  # sim at a time to two, and a request arriving mid-sim no longer waits behind
+  # it on the only core there was. Throughput and responsiveness, not latency.
+  #
+  # `performance-1x` is the next real step and costs five times this. It would
+  # buy dedicated rather than shared time — which *would* move a single sweep —
+  # and it wants a measured wall time behind it, never a hunch.
+  size = "shared-cpu-2x"
+  # This size ships 512mb, which is too tight: DuckDB, an Argon2id hash at its
+  # configured cost, and a Tier 1 sweep all want headroom at once — and two
+  # cores means two sweeps' worth of it. §7 flags this as the number to watch
+  # if Forge is ever added, which is most of why that would mean Hetzner.
   memory = "1gb"
