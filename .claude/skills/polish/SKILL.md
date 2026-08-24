@@ -1,6 +1,6 @@
 ---
 name: polish
-description: "The recurring, ledger-driven quality pass over the sylvan-library repo and its infrastructure, organised as the five colors of Magic plus colorless and a cleanup step. It runs at night while Aaron sleeps: independent, improvements only, and anything it cannot settle alone goes to the daybreak queue (docs/polish/DAYBREAK.md) for the morning. Covers Go craft and the modern-Go sweep (concurrency, goroutines, errgroup, RWMutex, stale pre-generics idioms); TypeScript/React craft; controls and UI/UX quality (dull buttons, missing hover/focus/press states, actions that never disable, links doing a toggle's job); testing discipline, suite speed, t.Parallel, mutation testing and the live determinism replay; performance, profiling and benchmarks; security and user isolation; accessibility for every player (keyboard, screen reader, contrast) and the newcomer walk; licensing and free-use compliance; Claude API spend and the modes' prompt craft; CI/CD and alerting, with the expiry calendar, restore drills and the hot-spot patrol (proactive profiling for where the time goes); cloud resources, infrastructure cost and upgrades; browser and mobile compatibility; scalability; hosted-first alignment (anything the product needs that exists only on a laptop); the relic audit of early-dev leftovers; the Claude-facing docs and the code's own comments; and the spirit of Magic, preferring the game's terminology and iconography over plain conversational English. Use whenever Aaron asks for a polish pass, quality pass, sweep or audit; on any color invocation (polish white/blue/black/red/green/colorless/cleanup); on 'polish converge' or 'polish all' (five colors, one merged report), 'polish rainbow' (all seven at full depth, one at a time), 'run the polish pass' or 'run the night pass'; when asked what the overnight run found, what is in the daybreak queue, or which findings are still outstanding or waiting on a ruling; and on any 'are we doing X right?' question about one of those areas, even if the word polish never appears."
+description: "The recurring, ledger-driven quality pass over the sylvan-library repo and its infrastructure, organised as the five colors of Magic plus colorless and a cleanup step. It runs at night while Aaron sleeps: independent, improvements only, and anything it cannot settle alone goes to the daybreak queue (docs/polish/DAYBREAK.md) for the morning. Covers Go craft and the modern-Go sweep (concurrency, goroutines, errgroup, RWMutex, stale pre-generics idioms); TypeScript/React craft; controls and UI/UX quality (dull buttons, missing hover/focus/press states, actions that never disable, links doing a toggle's job); testing discipline, suite speed, t.Parallel, mutation testing and the live determinism replay; performance, profiling and benchmarks; security and user isolation; accessibility for every player (keyboard, screen reader, contrast) and the newcomer walk; licensing and free-use compliance; Claude API spend and the modes' prompt craft; CI/CD and alerting, with the expiry calendar, restore drills and the hot-spot patrol (proactive profiling for where the time goes); cloud resources, infrastructure cost and upgrades; browser and mobile compatibility; scalability; hosted-first alignment (anything the product needs that exists only on a laptop); the relic audit of early-dev leftovers at file and comment granularity (comments exist to help Claude develop, never to record dates or process); the Claude-facing docs; and the spirit of Magic, preferring the game's terminology and iconography over plain conversational English. Use whenever Aaron asks for a polish pass, quality pass, sweep or audit; on any color invocation (polish white/blue/black/red/green/colorless/cleanup); on 'polish converge' or 'polish all' (five colors, one merged report), 'polish rainbow' (all seven at full depth, one at a time), 'run the polish pass' or 'run the night pass'; when asked what the overnight run found, what is in the daybreak queue, or which findings are still outstanding or waiting on a ruling; and on any 'are we doing X right?' question about one of those areas, even if the word polish never appears."
 ---
 
 # The Polish Pass
@@ -22,6 +22,19 @@ is free forever and lawful about it, surgical trims over mass restructuring,
 and CI is never a surprise. When a checklist item here conflicts with a
 Commandment or an ADR, the checklist loses — and note the conflict in the
 ledger so the checklist gets fixed.
+
+And hold the frame CLAUDE.md sets in its first commandment: **Claude is this
+project's primary developer.** Aaron architects and rules; the hands on the
+code are Claude sessions that begin with no memory of each other. So
+"maintainable" has a precise meaning here — *legible to a fresh Claude
+session* — and every artifact in the tree is judged by that one reader:
+docs, names, tests, tooling, and above all comments. **A comment's only
+audience is a future Claude session**, and its only job is discovery of the
+code itself — the invariant, the trap, what would break, why the obvious
+alternative loses. Dates, development process, who found what when: git and
+the ledger hold history; comments hold discovery. Anything in the tree that
+helps only a human historian is a relic; anything that helps the next
+session is the house style.
 
 ## Nightbound — this pass runs while Aaron sleeps
 
@@ -144,11 +157,11 @@ or out of things that did not need him.
 | Color | Theme | Facets |
 |---|---|---|
 | **White** | Law & Protection | Free-use/licensing compliance (triple-checked); security & user isolation; testing discipline, including the live determinism replay |
-| **Blue** | Craft & Knowledge | Go craft *and the modern-Go sweep*; TypeScript/React craft; the animist toolbox in `tools/`; Claude-first docs & memory audit, *including the code's own comments*; the spirit of Magic — terminology, iconography, and the truth of the reference shelves (commandment 3) |
+| **Blue** | Craft & Knowledge | Go craft *and the modern-Go sweep*; TypeScript/React craft; the animist toolbox in `tools/`; Claude-first docs & memory audit; the spirit of Magic — terminology, iconography, and the truth of the reference shelves (commandment 3) |
 | **Black** | Ruthless Efficiency | Claude API spend *and the modes' craft, one reading*; static assets over hotlinks; performance & efficiency |
 | **Red** | Speed & Alarum | CI/CD pipeline; alerting & self-healing (the expiry calendar, the dated restore drill); the hot-spot patrol — proactive profiles that find where time goes while it is still smoke; **controls** — commandment 17 made checkable, because a control's virtue is the speed of its reply |
 | **Green** | Growth & Resilience | Browser, mobile & accessibility — every player's device and every player, with the newcomer's walk (commandment 2); cloud resource watch (pool staleness, the held-awake trigger); scalability & user adaptability; hosted-first alignment |
-| **Colorless** | The Artifacts | The pass auditing itself: did last cycle's findings land; is each checklist still finding things; the dev tooling (the retired shelf's Go rebuild, `animist`); the relic sweep; cross-color leftovers |
+| **Colorless** | The Artifacts | The pass auditing itself: did last cycle's findings land; is each checklist still finding things; the dev tooling (the retired shelf's Go rebuild, `animist`); the relic sweep at file *and comment* granularity — comments exist for Claude's discovery, never for history; cross-color leftovers |
 | **Cleanup** | The End Step | Not a color and not an audit: the phase where the stragglers every color queued are put in front of Aaron and **landed** |
 
 Each color has a reference file — `references/white.md` and so on — holding

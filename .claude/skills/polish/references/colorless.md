@@ -1,6 +1,6 @@
 # Colorless — The Artifacts
 
-One facet with four parts, and a single question underneath all of them:
+One facet with five parts, and a single question underneath all of them:
 **is the pass itself still working?**
 
 Colorless is the sixth run and it goes last, after White, Blue, Black, Red and
@@ -11,10 +11,11 @@ tooling, the ledger and this skill are exactly that. They serve every colour
 and no colour owns them, so without a run of their own they are the thing
 nobody ever sweeps.
 
-It is also the cheapest run in the cycle by a distance. Nothing here needs the
-live instance, a card pool or a network — it is reading, arithmetic, and one
-or two tool invocations — so a rainbow that has run long is still worth
-finishing.
+It is also the cheapest run in the cycle. Nothing here needs the live
+instance or a network — parts one through four are reading, arithmetic, and
+one or two tool invocations, and part five's comment sweep adds only local
+edits proved by the local gauntlet — so a rainbow that has run long is still
+worth finishing.
 
 ## Part one — is the ledger telling the truth?
 
@@ -183,13 +184,49 @@ This is where they get a home.
   passes were actually run, because a sweep that ran two of six and reported
   "nothing found" is the failure mode this whole entry exists to stop.
 
+## Part five — the comments are artifacts too
+
+The relic sweep at line granularity, and Aaron's standard for it is one
+sentence: **the only thing that should ever be in a comment is what helps
+Claude develop the code** — the primary-developer frame in SKILL.md. This
+repo deliberately writes comments that carry an argument, and that rule is
+not in question; what creeps in beside the argument is *residue of the
+making* — the date somebody noticed, the punch list it came off, the PR that
+fixed it, the sentence it used to say. Measured 2026-08-23 from a standing
+start: **88 dated comments in Go (60 outside tests) and 101 more under
+`web/src`.**
+
+The line, and it is sharp:
+
+- **Keep** what serves discovery of the code itself: the invariant, the trap,
+  the thing that looks wrong and is not, the reason the obvious alternative
+  was rejected. *"Anchored, because a bare pattern also matches the embedded
+  data directories"* is doing work forever.
+- **Cut** everything that serves history: when it happened, who found it,
+  which run fixed it, what it used to say — unless the old shape is one a
+  reader would otherwise reintroduce, and then one clause is the whole
+  budget.
+- **A date stays only when the date is the fact**: an expiry, a version
+  floor, a pricing cutover, a deprecation window.
+
+The test for every comment: **would a fresh Claude session, reading only the
+code, act differently for having read this sentence?** If no, it goes; if
+yes, it stays whatever its style. Convert rather than delete when a real
+point is buried in narration — the point survives, the diary does not. Sweep
+a bounded slice each run (a package, or one route family) and record in the
+ledger which slices are done, so the sweep finishes over cycles instead of
+restarting every one.
+
 ## What this run never does
 
 - **It does not re-audit the five colours.** If it finds a real bug in code,
   it records it in that colour's section as a finding for that colour's next
   run — this run's diff belongs to the skill, the ledger and the tooling.
   A colourless run that starts fixing product code has stopped being
-  colourless.
+  colourless. **One carve-out, Aaron's: comment-only diffs are this run's to
+  make.** A comment is not product behaviour — the binary and the committed
+  bundle come out byte-identical — so part five's sweep breaks no rule about
+  touching product code, and the gauntlet still runs to prove exactly that.
 - It does not open a PR for the ledger alone. Same rule as every other run:
   a doc change rides the branch that does the work. If the only output is
   ledger text and skill edits, that *is* the work and the PR is legitimate —

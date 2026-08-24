@@ -179,36 +179,17 @@ files against them.
 - **Doc changes ride the run's branch** — this facet is the one place a
   mostly-doc PR is legitimate, because the corrections are the work. Still
   batch them; still never open a PR for one paragraph.
-- **Scrub the code's comments of provenance, and keep the argument** (Aaron's
-  ask, 2026-08-23). This repo deliberately writes comments that carry an
-  argument, and that rule is not in question — what has crept in beside it is
-  *provenance*: the date somebody noticed, the punch list it came off, the PR
-  that fixed it. Measured 2026-08-23: **88 dated comments in Go (60 outside
-  tests) and 101 more under `web/src`.** They are a running cost with no
-  reader — git already knows when, `docs/HISTORY.md` already knows why it
-  happened, and a comment that spends its first clause on a date spends the
-  reader's attention before reaching the point.
-
-  The line, and it is a sharp one:
-
-  - **Keep** what tells the next writer what will break: the invariant, the
-    trap, the thing that looks wrong and is not, the reason the obvious
-    alternative was rejected. *"Anchored, because a bare pattern also matches
-    the embedded data directories"* is doing work forever.
-  - **Cut** when it happened, who found it, and what it used to say — unless
-    the old shape is something a reader would otherwise reintroduce, and then
-    one clause is the whole budget. *"Reworded on the second 2026-08-15 punch
-    list"* tells the next writer nothing they can act on.
-  - **Keep a date only when the date is the fact**: a credential's expiry, a
-    pricing change with a cutover, a version floor, a deprecation window.
-    Those are load-bearing and stay.
-
-  The test to apply to each one: **would a reader who has never seen this
-  repository's history behave differently for having read this sentence?** If
-  no, it goes. Convert rather than delete where the sentence has a real point
-  buried in the narration — the point survives, the diary does not. Do a
-  bounded slice each run (a package, or one route family); this is a sweep
-  that would otherwise become the mass restructure the pass forbids.
+- **The comment standard, held at review time.** A comment's only audience is
+  a future Claude session and its only job is discovery of the code itself
+  (the primary-developer frame in SKILL.md): the invariant, the trap, what
+  would break, why the obvious alternative loses. Dates, development process,
+  who found what when — git and the ledger hold history; comments hold
+  discovery. The one date that stays is a date that *is* the fact: an expiry,
+  a version floor, a cutover. This facet holds that bar on every line of code
+  it reviews and every line a fix writes; **the sweep of the existing stock
+  belongs to Colorless** (part five of its reference), where the artifact
+  pass owns relics at every granularity — one owner per job, which is that
+  file's own rule.
 - **Scrub context that has stopped earning its tokens** (Aaron's ask,
   2026-08-16). These files are read by Claude at the top of every session,
   so their length is a per-session cost and their clarity is a correctness
