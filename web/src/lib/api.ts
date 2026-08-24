@@ -754,6 +754,24 @@ export interface IdentifyResult {
   message?: string
 }
 
+/** A name that was misspelled, and the card the pool read it as.
+ *
+ *  Applied, not offered: the deck contains the real card by the time this is
+ *  reported (`deckimport.Respell`). It is here so nothing is silent. */
+export interface Correction {
+  written: string
+  read: string
+  score: number
+}
+
+/** A shortlist for a name that could NOT be read confidently — the close-run
+ *  field and the genuine non-word. Offered, never applied. */
+export interface DidYouMean {
+  /** Exactly as it was pasted. */
+  written: string
+  candidates: { name: string; score: number }[]
+}
+
 export interface ImportResult {
   slug: string
   /** Whose library it landed in — always the caller's. Sent back rather than
@@ -771,8 +789,20 @@ export interface ImportResult {
   land_count: number
   swap_board: string[]
   needs_rationale: number
-  /** Names the pool does not know. Kept in the deck verbatim, never guessed. */
+  /** Misspellings the pool read as the card they are nearest to. The deck
+   *  holds the real card; this is the saying-so. */
+  read: Correction[]
+  /** Names that could not be read as anything either. Kept in the deck
+   *  verbatim, and reported by the gate as `unknown-card`. */
   unknown: string[]
+  /** A shortlist beside each name that survived the reading unresolved.
+   *  Offered rather than applied, because by construction no single card was
+   *  clearly enough what these meant. */
+  did_you_mean: DidYouMean[]
+  /** Unresolved names that got no shortlist because the list had more of
+   *  them than the server will run scans for. Reported rather than hidden:
+   *  a silent cap reads as "there was nothing to suggest". */
+  did_you_mean_skipped: number
   unreadable: { line: number; text: string }[]
   skipped: { line: number; text: string }[]
   notes: string[]

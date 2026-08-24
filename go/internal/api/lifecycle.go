@@ -1,15 +1,18 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/aasquier/sylvan-library/go/internal/cards"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckimport"
 	"github.com/aasquier/sylvan-library/go/internal/decklist"
@@ -235,6 +238,104 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 
 // ---- import ----------------------------------------------------------------
 
+// ---- reading a misspelled name ---------------------------------------------
+
+// poolReader is `deckimport.Reader` over a live pool connection.
+//
+// The scoring is `cards.ByTitle`, unchanged and unwrapped -- the same
+// function the camera door resolves a photographed title through (ADR 34).
+// One scorer for both doors, so a name typed into the import box and a name
+// read off a photograph are judged by the same measure and answer to the same
+// thresholds.
+type poolReader struct{ conn *pool.Conn }
+
+func (p poolReader) Nearest(ctx context.Context, written string, limit int) (
+	[]deckimport.Candidate, error) {
+
+	found, err := cards.ByTitle(ctx, p.conn, written, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]deckimport.Candidate, 0, len(found))
+	for _, c := range found {
+		out = append(out, deckimport.Candidate{Name: c.Name, Score: c.Score})
+	}
+	return out, nil
+}
+
+func (p poolReader) Cards(ctx context.Context, names []string) (
+	map[string]*pool.CardRecord, error) {
+
+	return p.conn.GetCards(ctx, names)
+}
+
+// Where a suggestion stops being help and starts being noise.
+//
+// This is the FALLBACK tier, and it is what is left after `deckimport.Respell`
+// has already read every name it could read with confidence. What reaches
+// here is the close-run field and the genuine non-word: a shortlist somebody
+// has to choose from, offered at a lower bar than a correction is made at
+// (`deckimport.nearFloor`), because offering three names costs nothing and
+// picking the wrong one of them is impossible without a click.
+const mentionFloor = 0.90
+
+// nearMisses is how many names are asked about. A list can arrive with
+// ninety-nine names the pool has never heard of -- a paste of the wrong thing
+// entirely, or a pool that was never refreshed -- and ninety-nine full-table
+// similarity scans to tell somebody their paste was wrong is work nobody
+// wanted done. The rest are still reported as unknown; they simply arrive
+// without a shortlist, and the response says how many were skipped.
+const nearMisses = 12
+
+// suggestion is one written name and the pool names closest to it.
+type suggestion struct {
+	Written    string          `json:"written"`
+	Candidates []suggestedCard `json:"candidates"`
+}
+
+type suggestedCard struct {
+	Name  string  `json:"name"`
+	Score float64 `json:"score"`
+}
+
+// didYouMean builds a shortlist for each name that survived `Respell`
+// unresolved -- so by construction, every one of these is a name no single
+// card was clearly enough.
+//
+// A miss is not always a misspelling: a card printed since the last
+// `data refresh` is absent from a pool that is otherwise perfect, and the
+// closest thing to its name will be a real card that is not it. That is the
+// case this tier exists for, and why it offers rather than decides.
+func didYouMean(ctx context.Context, c *pool.Conn, names []string) ([]suggestion, int) {
+	out := []suggestion{}
+	skipped := 0
+	for i, written := range names {
+		if i >= nearMisses {
+			skipped = len(names) - nearMisses
+			break
+		}
+		found, err := cards.ByTitle(ctx, c, written, 4)
+		if err != nil {
+			// A shortlist nobody could build is not a failed import. The name
+			// is already reported as unknown, which is the load-bearing half.
+			continue
+		}
+		shown := []suggestedCard{}
+		for _, cand := range found {
+			if cand.Score < mentionFloor || len(shown) == 3 {
+				continue
+			}
+			shown = append(shown, suggestedCard{
+				Name: cand.Name, Score: math.Round(cand.Score*10000) / 10000})
+		}
+		if len(shown) == 0 {
+			continue
+		}
+		out = append(out, suggestion{Written: written, Candidates: shown})
+	}
+	return out, skipped
+}
+
 // importDeck is `POST /api/decks/import` -- `service.import_deck`.
 //
 // Turns a pasted decklist into a draft deck. Declared as a literal beside
@@ -309,14 +410,25 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 
 	var report *deckimport.Report
 	var verdict *gate.Report
+	var nearby []suggestion
+	var over int
 	err = a.usePool(r.Context(), func(c *pool.Conn) error {
-		found, err := c.GetCards(r.Context(), deckimport.NamesIn(parsed, commander, companion))
+		wanted := deckimport.NamesIn(parsed, commander, companion)
+		found, err := c.GetCards(r.Context(), wanted)
+		if err != nil {
+			return err
+		}
+		// Before the deck is built, so a corrected card is simply a card by
+		// the time anything downstream sees it -- the count, the category,
+		// the colour identity and the gate all read the real record.
+		corrections, err := deckimport.Respell(r.Context(), poolReader{c}, wanted, found)
 		if err != nil {
 			return err
 		}
 		built, err := deckimport.BuildDeck(parsed, found, deckimport.Options{
 			Slug: slug, Name: str(body, "name"), Commander: commander,
-			Companion: companion, Bracket: bracket, Status: status})
+			Companion: companion, Bracket: bracket, Status: status,
+			Read: corrections})
 		if err != nil {
 			return err
 		}
@@ -330,11 +442,16 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		cards, err := deckread.PoolFor(r.Context(), c, built.Deck)
+		known, err := deckread.PoolFor(r.Context(), c, built.Deck)
 		if err != nil {
 			return err
 		}
-		verdict = gate.Validate(built.Deck, cards, gate.DefaultSize)
+		verdict = gate.Validate(built.Deck, known, gate.DefaultSize)
+		// Last, and inside the same pool lease: the shortlist is the only
+		// part of this that is allowed to fail quietly.
+		// Whatever is still unresolved after the reading: the close-run
+		// fields and the genuine non-words.
+		nearby, over = didYouMean(r.Context(), c, built.Unknown)
 		return nil
 	})
 	if errors.Is(err, pool.ErrNoPool) {
@@ -364,7 +481,15 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		"commander": d.Commander, "companion": companionOrNil(d.Companion),
 		"total_cards": d.TotalCards(), "land_count": d.LandCount(),
 		"swap_board": swaps, "needs_rationale": report.NeedsRationale(),
-		"unknown":    report.Unknown,
+		"unknown": report.Unknown,
+		// The shortlist beside the misses, and how many misses did not get
+		// one. Never applied here: see `didYouMean`.
+		"did_you_mean":         nearby,
+		"did_you_mean_skipped": over,
+		// What was misspelled and what it was read as. On the wire in its own
+		// right as well as in `notes`, so the page can put it where somebody
+		// will look rather than at the end of a list of remarks.
+		"read":       report.Read,
 		"unreadable": reportedLines(report.Unreadable),
 		"skipped":    reportedLines(report.Skipped),
 		"notes":      orEmpty(report.Notes), "yaml": report.YAML,

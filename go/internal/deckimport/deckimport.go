@@ -4,11 +4,33 @@
 // *mean* against the pool and writes a deck file. Split that way because
 // resolution is the half with an opinion, and the opinion is short:
 //
-// **Nothing is guessed.** Rule 1 says never evaluate a card from memory, and
-// the same discipline applies to a name: a line that does not resolve is
-// reported with what was written, kept in the deck verbatim so the list stays
-// the size the user pasted, and left for the gate to flag as `unknown-card`.
-// Dropping it would quietly hand back a 96-card deck.
+// **A name is READ against the pool, and every reading is stated.** This is
+// the rule that changed on 2026-08-24, and it is worth writing down carefully
+// because the sentence it replaces said the opposite.
+//
+// It used to be "nothing is guessed": a line that did not resolve was kept
+// verbatim and reported as `unknown-card`, full stop. The reasoning was rule
+// 1 -- never evaluate a card from memory -- and the reasoning was sound but
+// the conclusion was too wide. Rule 1 forbids *recall*. It does not forbid
+// asking the pool, and asking the pool which of its 35,393 names is nearest
+// to `Sol Rng` is a measurement, not a memory: the same jaro-winkler the
+// camera door has scored titles with since ADR 34.
+//
+// So a name the pool does not know is looked up, and when one card is clearly
+// what was meant -- `nearFloor` and `nearLead` below, both measured -- the
+// deck gets that card, and the import SAYS SO, by name, in `Report.Read`.
+// Aaron's ruling (2026-08-24): "we should do the fuzzy matching on the
+// backend, not allow misspelled things in." A deck of real cards that reports
+// four corrections is worth more than a deck of four broken strings that
+// reports four errors, and the person still sees exactly what was decided.
+//
+// What has NOT changed is the floor under it. A reading that is not clear is
+// not made: the name is kept in the deck exactly as written so the list stays
+// the size the user pasted, and it is reported for the gate to flag as
+// `unknown-card`. Dropping it would quietly hand back a 96-card deck, and
+// silently *substituting* for it would be worse -- which is why the bar is
+// high enough that no measured typo has ever come near failing it and no
+// measured non-word has ever come near passing it.
 //
 // **Nothing is invented.** Every card arrives with an empty `why` and the deck
 // is written as `stage: draft`, so the gate reports those as warnings and
@@ -23,8 +45,10 @@
 package deckimport
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -73,9 +97,12 @@ func IsRefused(err error) bool {
 type Report struct {
 	Deck *deck.Deck
 	YAML string
-	// Names the pool does not have. Kept in the deck; reported here and by the
-	// gate as `unknown-card`.
+	// Names the pool does not have, and could not be read as anything either.
+	// Kept in the deck; reported here and by the gate as `unknown-card`.
 	Unknown []string
+	// What was misspelled and what it was read as. Never silent: this is the
+	// other half of being allowed to correct at all.
+	Read []Correction
 	// Lines the parser could not read at all.
 	Unreadable []decklist.Line
 	// Lines under a section that is not part of the deck, e.g. Tokens.
@@ -104,10 +131,144 @@ func NamesIn(parsed decklist.List, commander []string, companion string) []strin
 	}
 	for _, c := range commander {
 		add(c)
+		// Both readings of a comma, so `commanderReading` can decide between
+		// them by lookup rather than by guessing. Fetching a few extra names
+		// costs one entry in a list that is already ~100 long.
+		for _, parts := range pairParts(c) {
+			for _, part := range parts {
+				add(part)
+			}
+		}
 	}
 	add(companion)
 	slices.Sort(names)
 	return names
+}
+
+// ---- reading a misspelling -------------------------------------------------
+
+// Where a reading is clear enough to make, and both numbers are measured
+// against this pool rather than chosen.
+//
+// Asked for real typos, jaro-winkler puts the intended card at 0.975 or
+// better every time -- `Sol Rng` -> Sol Ring 0.975, `Cultivater` -> Cultivate
+// 0.980, `Path to Exil` -> Path to Exile 0.985, `Swords to Plowshars` ->
+// Swords to Plowshares 0.990, a doubled letter in Rhystic Study 0.986 --
+// while the runner-up in each of those sits between 0.87 and 0.92, and a line
+// of keyboard mash tops out at 0.71 against the whole pool.
+//
+// So `nearFloor` is well above every non-word measured and well below every
+// typo measured, and `nearLead` is the second half of the same guard: a
+// reading is made only when one card is CLEARLY what was meant, never when it
+// merely wins a close field. `Cultivater` beats its runner-up by 0.075;
+// two similarly-named cards a genuine new printing might sit between would
+// not clear 0.04 between them.
+const (
+	nearFloor = 0.95
+	nearLead  = 0.04
+)
+
+// Correction is a name the pool did not know, and the card it was read as.
+type Correction struct {
+	Written string  `json:"written"`
+	Read    string  `json:"read"`
+	Score   float64 `json:"score"`
+}
+
+// Candidate is one scored name, as a Speller returns it.
+type Candidate struct {
+	Name  string
+	Score float64
+}
+
+// Reader is what Respell needs from the card pool: a way to score names
+// against a written one, and a way to fetch the records it settles on.
+//
+// An interface rather than a `*pool.Conn` so this package stays testable
+// without a database -- and so the scoring stays in one place. The production
+// implementation wraps `cards.ByTitle`, which is the same function the camera
+// door resolves photographed titles through (ADR 34): one scorer, so a name
+// typed by hand and a name read off a photograph are judged by one measure.
+type Reader interface {
+	// Nearest is the pool names closest to `written`, best first.
+	Nearest(ctx context.Context, written string, limit int) ([]Candidate, error)
+	// Cards is `pool.Conn.GetCards`: whole records, by name.
+	Cards(ctx context.Context, names []string) (map[string]*pool.CardRecord, error)
+}
+
+// Respell reads the names the pool could not resolve.
+//
+// `cards` is the lookup `BuildDeck` will use, and this ADDS to it: a reading
+// is installed under the name that was WRITTEN, so `canonicalName` finds the
+// record and hands back the card's real name, and every count, category and
+// colour downstream is the real card's. Nothing else in the pipeline needs to
+// know a correction happened -- which is exactly the point, because a
+// corrected card must be as real as one that was typed correctly.
+//
+// Only names that failed are read. A name the pool knows is never
+// second-guessed, so a correctly spelled card can never be swapped for a
+// better-scoring neighbour.
+//
+// Two passes, because a per-name record fetch would be one query per typo:
+// score everything first, then fetch every winner at once.
+func Respell(ctx context.Context, reader Reader, names []string,
+	cards map[string]*pool.CardRecord) ([]Correction, error) {
+
+	if reader == nil {
+		return nil, nil
+	}
+	type pick struct {
+		written string
+		name    string
+		score   float64
+	}
+	picks := []pick{}
+	seen := map[string]bool{}
+	for _, written := range names {
+		if strings.TrimSpace(written) == "" || seen[written] {
+			continue
+		}
+		seen[written] = true
+		if _, rec := canonicalName(written, cards); rec != nil {
+			continue
+		}
+		found, err := reader.Nearest(ctx, written, 2)
+		if err != nil {
+			return nil, err
+		}
+		if len(found) == 0 || found[0].Score < nearFloor {
+			continue
+		}
+		if len(found) > 1 && found[0].Score-found[1].Score < nearLead {
+			continue
+		}
+		picks = append(picks, pick{written: written, name: found[0].Name,
+			score: found[0].Score})
+	}
+	if len(picks) == 0 {
+		return nil, nil
+	}
+	wanted := make([]string, 0, len(picks))
+	for _, p := range picks {
+		wanted = append(wanted, p.name)
+	}
+	records, err := reader.Cards(ctx, wanted)
+	if err != nil {
+		return nil, err
+	}
+	out := []Correction{}
+	for _, p := range picks {
+		rec := records[p.name]
+		if rec == nil {
+			// The pool scored a name it will not hand over. Nothing is
+			// invented on the way past: the miss stays a miss.
+			continue
+		}
+		cards[p.written] = rec
+		out = append(out, Correction{Written: p.written, Read: rec.Name,
+			Score: math.Round(p.score*10000) / 10000})
+	}
+	return out, nil
 }
 
 // Options are `build_deck`'s keyword arguments.
@@ -118,6 +279,91 @@ type Options struct {
 	Companion string
 	Bracket   *int
 	Status    string
+	// Read is what `Respell` decided before this was called, so the report
+	// carries the corrections and the notes say them out loud. Passed in
+	// rather than done here because reading a name needs the pool and this
+	// function is handed a finished lookup.
+	Read []Correction
+}
+
+// pairSeparators is how one field might be holding two commanders, best
+// first. `+` is what players write between partners and appears in no card
+// name; a comma is what somebody types anyway, and is tried last because it
+// is also punctuation inside most legendary names.
+var pairSeparators = []string{" + ", "+", ","}
+
+// pairParts is every way this string might be two or more names, in the order
+// worth trying. Its own function so `NamesIn` and `commanderReading` cannot
+// disagree about what the parts of a name are -- one fetches them, the other
+// chooses between them, and a fetch that missed a reading would make that
+// reading permanently unavailable.
+func pairParts(name string) [][]string {
+	out := [][]string{}
+	for _, sep := range pairSeparators {
+		if !strings.Contains(name, sep) {
+			continue
+		}
+		parts := []string{}
+		for _, p := range strings.Split(name, sep) {
+			if t := strings.TrimSpace(p); t != "" {
+				parts = append(parts, t)
+			}
+		}
+		if len(parts) >= 2 {
+			out = append(out, parts)
+		}
+	}
+	return out
+}
+
+// commanderReading decides between "one card whose name contains a comma" and
+// "two partners written with a comma between them".
+//
+// **A comma is part of a legendary creature's name far more often than it
+// separates two of them.** Arahbo, Roar of the World. Atla Palani, Nest
+// Tender. Gyome, Master Chef. Tivit, Seller of Secrets. Every deck in this
+// library is led by a name with a comma in it, and the import page used to
+// split its commander field on commas before it ever reached the wire -- so
+// typing the commander in by hand produced *two* commanders, neither of them
+// a card, and a deck reporting `unknown-card` twice for the two halves of one
+// legend. It was found on 2026-08-24 by typing the name of the deck the whole
+// library is built around.
+//
+// The choice is made by asking the pool, which is why this is not a guess and
+// not a violation of the package's first rule: **if the whole string is a
+// card, it is one commander.** Only when it is not, and every comma-separated
+// part is, does the pair reading win. When neither reading resolves, nothing
+// is invented -- the original string stays exactly as written and is reported
+// as unknown, with the shortlist beside it.
+func commanderReading(wanted []string, cards map[string]*pool.CardRecord) ([]string, string) {
+	if len(wanted) != 1 {
+		return wanted, ""
+	}
+	whole := wanted[0]
+	if _, rec := canonicalName(whole, cards); rec != nil {
+		return wanted, ""
+	}
+	for _, parts := range pairParts(whole) {
+		resolved := make([]string, 0, len(parts))
+		for _, part := range parts {
+			name, rec := canonicalName(part, cards)
+			if rec == nil {
+				break
+			}
+			resolved = append(resolved, name)
+		}
+		// Every part had to be a card. A reading where one half resolves and
+		// the other does not is not a pairing with a typo in it -- it is the
+		// wrong reading, and the next separator may be the right one.
+		if len(resolved) != len(parts) {
+			continue
+		}
+		return resolved, fmt.Sprintf(
+			"%q is not a card, but the %d names inside it are, so it was read "+
+				"as a pairing: %s. Write one commander per entry if that is "+
+				"wrong.", whole, len(resolved), strings.Join(resolved, " + "))
+	}
+	return wanted, ""
 }
 
 // BuildDeck resolves a parsed list into a draft deck.
@@ -154,6 +400,12 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	}
 	if len(wanted) == 0 {
 		return nil, &Refused{Reason: noCommanderMessage(parsed)}
+	}
+	// Before the count is checked, because the whole point is that one name
+	// with a comma in it is one commander and not two.
+	wanted, pairing := commanderReading(wanted, cards)
+	if pairing != "" {
+		notes = append(notes, pairing)
 	}
 	if len(wanted) > 2 {
 		return nil, refusef("%d commanders listed (%s); Commander allows at most "+
@@ -229,6 +481,12 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 		notes = append(notes, companionHints(swaps, cards)...)
 	}
 
+	// Deliberately NOT a note. `Report.Read` is the saying-so, and it is a
+	// typed list of pairs rather than a sentence -- so a caller renders it
+	// where it belongs (the import page puts it above the errors, because a
+	// correction changed what the deck contains) instead of parsing prose out
+	// of `Notes`. A note as well was two copies of one fact on one screen.
+
 	name := strings.TrimSpace(opts.Name)
 	if name == "" {
 		name = opts.Slug
@@ -256,7 +514,7 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	}
 	text := fmt.Sprintf(Header, time.Now().Format("2006-01-02")) + "\n" + body
 
-	return &Report{Deck: built, YAML: text, Unknown: unknown,
+	return &Report{Deck: built, YAML: text, Unknown: unknown, Read: opts.Read,
 		Unreadable: parsed.Unreadable, Skipped: parsed.Skipped, Notes: notes}, nil
 }
 

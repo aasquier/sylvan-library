@@ -47,6 +47,9 @@ function result(overrides: Partial<ImportResult> = {}): ImportResult {
     swap_board: [],
     needs_rationale: 85,
     unknown: [],
+    read: [],
+    did_you_mean: [],
+    did_you_mean_skipped: 0,
     unreadable: [],
     skipped: [],
     notes: [],
@@ -144,17 +147,56 @@ describe('Import', () => {
       .toHaveBeenCalledWith('/decks/aasquier/arahbo-cats'))
   })
 
-  it('splits a comma-separated commander field into a partner pair', async () => {
+  /**
+   * The commander field is sent WHOLE, and this test used to assert the
+   * opposite.
+   *
+   * It split on commas here, before the request, because a partner pair is
+   * two commanders — and `Ley Weaver, Lore Weaver` really is a pair. What the
+   * old test could not see is that the same rule turned `Arahbo, Roar of the
+   * World` into two commanders, neither of them a card: a comma is
+   * punctuation inside most legendary names, and every deck in this library
+   * is led by one.
+   *
+   * Telling those apart takes the card pool, which is on the other side of
+   * this wire. So the client sends what was typed and the server decides by
+   * looking both readings up (`deckimport.commanderReading`) — the pairing
+   * still works, and now it works because the parts are cards rather than
+   * because a comma was present.
+   */
+  it('sends the commander field whole, commas and all', async () => {
     renderImport()
     paste('1 Sol Ring')
     fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
     fireEvent.change(screen.getByLabelText('Commander'), {
-      target: { value: 'Ley Weaver, Lore Weaver' },
+      target: { value: 'Arahbo, Roar of the World' },
     })
     fireEvent.click(screen.getByText('Preview'))
     await waitFor(() => expect(api.importDeck).toHaveBeenCalled())
     expect(vi.mocked(api.importDeck).mock.calls[0]?.[0].commander)
-      .toEqual(['Ley Weaver', 'Lore Weaver'])
+      .toEqual(['Arahbo, Roar of the World'])
+  })
+
+  it('sends a pairing whole too, and lets the pool decide', async () => {
+    renderImport()
+    paste('1 Sol Ring')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    fireEvent.change(screen.getByLabelText('Commander'), {
+      target: { value: 'Ley Weaver + Lore Weaver' },
+    })
+    fireEvent.click(screen.getByText('Preview'))
+    await waitFor(() => expect(api.importDeck).toHaveBeenCalled())
+    expect(vi.mocked(api.importDeck).mock.calls[0]?.[0].commander)
+      .toEqual(['Ley Weaver + Lore Weaver'])
+  })
+
+  it('sends no commander at all when the field is blank', async () => {
+    renderImport()
+    paste('1 Sol Ring')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    fireEvent.click(screen.getByText('Preview'))
+    await waitFor(() => expect(api.importDeck).toHaveBeenCalled())
+    expect(vi.mocked(api.importDeck).mock.calls[0]?.[0].commander).toEqual([])
   })
 
   // -------------------------------------------------------------- the report
@@ -195,7 +237,11 @@ describe('Import', () => {
     await waitFor(() =>
       expect(screen.getByText(/1 name the\s+pool does not know/)).toBeTruthy())
     expect(screen.getByText('Sol Rng')).toBeTruthy()
-    expect(screen.getByText(/Nothing was guessed/)).toBeTruthy()
+    // The name is reported as written and the list is untouched. This
+    // mattered before shortlists existed and it matters more now.
+    expect(screen.getByText(/nothing below has been applied/)).toBeTruthy()
+    expect((screen.getByLabelText('Decklist') as HTMLTextAreaElement).value)
+      .toBe('1 Sol Rng')
   })
 
   it('names the lines it could not read, with their numbers', async () => {
@@ -251,5 +297,149 @@ describe('the deck that exists nowhere online', () => {
   it('states the export cap rather than letting it be discovered', () => {
     render(<MemoryRouter><Import /></MemoryRouter>)
     expect(screen.getByText(/100 cards a session/)).toBeTruthy()
+  })
+})
+
+/**
+ * The shortlist beside a name the pool does not know.
+ *
+ * The strictness is the feature -- `deckimport` guesses nothing, ever -- so
+ * everything here is about the person accepting a correction, and about the
+ * pasted list staying the one source of what gets written.
+ */
+describe('did you mean', () => {
+  const TYPOS = result({
+    unknown: ['Sol Rng', 'Cultivate', 'Wgrsdlkj'],
+    did_you_mean: [
+      { written: 'Sol Rng',
+        candidates: [{ name: 'Sol Ring', score: 0.975 }] },
+      { written: 'Cultivate',
+        candidates: [{ name: 'Cultivator Drone', score: 0.905 },
+                     { name: 'Cultivator Colossus', score: 0.902 }] },
+    ],
+    did_you_mean_skipped: 0,
+  })
+
+  async function preview(text: string, payload = TYPOS) {
+    vi.mocked(api.importDeck).mockResolvedValue(payload)
+    renderImport()
+    paste(text)
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    fireEvent.click(screen.getByText('Preview'))
+    await screen.findByRole('heading', { name: /does not know/ })
+  }
+
+  it('offers the near names, and applies none of them by itself', async () => {
+    await preview('1 Sol Rng\n1 Cultivate\n1 Wgrsdlkj')
+    expect(screen.getByRole('button', { name: 'Sol Ring' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cultivator Drone' })).toBeTruthy()
+    expect((screen.getByLabelText('Decklist') as HTMLTextAreaElement).value)
+      .toContain('Sol Rng')
+  })
+
+  it('says so when nothing in the pool is close', async () => {
+    await preview('1 Sol Rng\n1 Cultivate\n1 Wgrsdlkj')
+    expect(screen.getByText('Wgrsdlkj')).toBeTruthy()
+    expect(screen.getByText(/nothing in the pool is close to this one/))
+      .toBeTruthy()
+  })
+
+  it('warns that a miss can be a new card rather than a typo', async () => {
+    await preview('1 Sol Rng')
+    expect(screen.getByText(/printed since this pool was last refreshed/))
+      .toBeTruthy()
+  })
+
+  it('rewrites the pasted list when a name is pressed, and previews again',
+     async () => {
+    await preview('4 Forest\n1 Sol Rng\n1 Cultivate')
+    vi.mocked(api.importDeck).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Sol Ring' }))
+
+    const box = screen.getByLabelText('Decklist') as HTMLTextAreaElement
+    expect(box.value).toBe('4 Forest\n1 Sol Ring\n1 Cultivate')
+    // And the preview is re-run from the corrected list rather than from
+    // state that has not landed yet.
+    await waitFor(() => expect(api.importDeck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: '4 Forest\n1 Sol Ring\n1 Cultivate', dry_run: true })))
+  })
+
+  it('rewrites whole names, never substrings of a card that was right',
+     async () => {
+    // `Cultivate` is the misspelling here AND a substring of a correct card
+    // on the line above it. A bare replace would corrupt the good one.
+    await preview('1 Cultivator Colossus\n1 Cultivate')
+    fireEvent.click(screen.getByRole('button', { name: 'Cultivator Drone' }))
+    expect((screen.getByLabelText('Decklist') as HTMLTextAreaElement).value)
+      .toBe('1 Cultivator Colossus\n1 Cultivator Drone')
+  })
+
+  it('reports the misses it did not check rather than hiding the cap',
+     async () => {
+    await preview('1 Sol Rng', result({
+      unknown: ['Sol Rng'],
+      did_you_mean: [{ written: 'Sol Rng',
+        candidates: [{ name: 'Sol Ring', score: 0.975 }] }],
+      did_you_mean_skipped: 20,
+    }))
+    expect(screen.getByText(/20 more went unchecked/)).toBeTruthy()
+  })
+})
+
+/**
+ * The correction itself, which happens on the server and is only reported
+ * here.
+ *
+ * Aaron's ruling, 2026-08-24: do the matching on the backend and do not let
+ * misspelled things in. So by the time this page renders, the deck already
+ * holds the real card -- and the whole obligation on the client is to say so
+ * where somebody will see it.
+ */
+describe('names that were read', () => {
+  const READ = result({
+    read: [
+      { written: 'Sol Rng', read: 'Sol Ring', score: 0.975 },
+      { written: 'Rhystic Studdy', read: 'Rhystic Study', score: 0.9857 },
+    ],
+  })
+
+  async function preview(payload: ImportResult) {
+    vi.mocked(api.importDeck).mockResolvedValue(payload)
+    renderImport()
+    paste('1 Sol Rng\n1 Rhystic Studdy')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    fireEvent.click(screen.getByText('Preview'))
+  }
+
+  it('says what was read, and as what', async () => {
+    await preview(READ)
+    await waitFor(() =>
+      expect(screen.getByText(/2 names were read as the card/)).toBeTruthy())
+    expect(screen.getByText('Sol Rng')).toBeTruthy()
+    expect(screen.getByText('Sol Ring')).toBeTruthy()
+    expect(screen.getByText('Rhystic Study')).toBeTruthy()
+  })
+
+  it('says the deck holds the real card, not the string that was typed',
+     async () => {
+    await preview(READ)
+    await waitFor(() =>
+      expect(screen.getByText(/its cost, its colours and its\s+legality/))
+        .toBeTruthy())
+  })
+
+  it('counts one correction in the singular', async () => {
+    await preview(result({
+      read: [{ written: 'Sol Rng', read: 'Sol Ring', score: 0.975 }],
+    }))
+    await waitFor(() =>
+      expect(screen.getByText(/1 name was read as the card/)).toBeTruthy())
+  })
+
+  it('says nothing at all when nothing needed reading', async () => {
+    await preview(result())
+    await waitFor(() => expect(screen.getByText(/99 cards in the 99/)).toBeTruthy())
+    expect(screen.queryByText(/read as the card/)).toBeNull()
   })
 })

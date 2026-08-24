@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, deckUrl, errorMessage, type ImportResult } from '../lib/api'
+import {
+  api, deckUrl, errorMessage, type Correction, type ImportResult,
+} from '../lib/api'
 import CameraDoor from '../components/camera'
 import {
   Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
@@ -57,14 +59,32 @@ export default function Import() {
   const [slugTouched, setSlugTouched] = useState(false)
   const effectiveSlug = slugTouched ? slug : slugify(name)
 
-  function body(dryRun: boolean) {
+  function body(dryRun: boolean, override?: string) {
     return {
       slug: effectiveSlug,
-      text,
+      // `override` rather than the state, and only where one is passed: a
+      // correction sets the text and previews in the same handler, and a
+      // `setState` is not visible to the call that follows it.
+      text: override ?? text,
       name: name.trim(),
-      // One field, split on commas, because a partner pair is two commanders
-      // and asking for two boxes for a case most decks do not have is worse.
-      commander: commander.split(',').map((c) => c.trim()).filter(Boolean),
+      // Sent whole, and NOT split on commas.
+      //
+      // It used to be split here, on the reasoning that a partner pair is two
+      // commanders and two boxes for a rare case is worse than one. Both
+      // halves of that were right and the conclusion was still wrong: a comma
+      // is part of a legendary creature's name far more often than it
+      // separates two of them, and every deck in this library is led by one
+      // -- Arahbo, Roar of the World; Gyome, Master Chef; Tivit, Seller of
+      // Secrets. Typing any of them into this box produced two commanders,
+      // neither of them a card, and a deck that reported `unknown-card` twice
+      // for the two halves of one legend.
+      //
+      // The client cannot tell the readings apart: it takes a card pool to
+      // know whether "Arahbo, Roar of the World" is one card or two. So it
+      // sends what was typed and `deckimport.commanderReading` decides by
+      // looking both up -- a pairing still works, and now it works because
+      // the parts are cards rather than because a comma was present.
+      commander: commander.trim() ? [commander.trim()] : [],
       companion: companion.trim(),
       bracket: bracket ? Number(bracket) : null,
       status,
@@ -72,11 +92,46 @@ export default function Import() {
     }
   }
 
-  async function run(dryRun: boolean) {
+  /**
+   * Accept one spelling, or every obvious one at once.
+   *
+   * The pasted list is the truth this page works from -- the preview is the
+   * real import with `dry_run`, and the deck that gets written is built from
+   * whatever is in the box. So a correction edits the box and previews again,
+   * rather than being carried alongside as a promise to apply later. Nothing
+   * about the resolution, the gate or the deck.yaml on screen is a
+   * description of what would happen; it is what happened, and that stays
+   * true only if there is one source for it.
+   *
+   * Rewritten by whole line rather than by substring, and that matters: a
+   * decklist line is a quantity and a name, and a bare replace of "Cultivate"
+   * inside "1 Cultivator Colossus" would quietly corrupt a card that was
+   * already right. The written name has to be the whole of what follows the
+   * count.
+   */
+  function applyFixes(fixes: { written: string; chosen: string }[]) {
+    const by = new Map(fixes.map((f) => [f.written.toLowerCase(), f.chosen]))
+    const next = text.split('\n').map((line) => {
+      // The count, whatever separator followed it, and the rest of the line.
+      const m = /^(\s*(?:\d+\s*[xX]?\s+|[xX]\s*\d+\s+)?)(.*?)(\s*)$/.exec(line)
+      if (!m) return line
+      const [, lead, name, trail] = m
+      const chosen = by.get((name ?? '').toLowerCase())
+      return chosen === undefined ? line : `${lead}${chosen}${trail}`
+    }).join('\n')
+    setText(next)
+    // Preview again from the corrected list, so the count, the gate and the
+    // YAML on screen are about what is now in the box.
+    void runWith(next, true)
+  }
+
+  const run = (dryRun: boolean) => runWith(undefined, dryRun)
+
+  async function runWith(override: string | undefined, dryRun: boolean) {
     setBusy(dryRun ? 'preview' : 'create')
     setError(null)
     try {
-      const result = await api.importDeck(body(dryRun))
+      const result = await api.importDeck(body(dryRun, override))
       setPreview(result)
       // `result.owner` rather than an assumption about whose library it
       // landed in: the server chooses the tier, and the deck's address
@@ -189,7 +244,7 @@ export default function Import() {
                      onChange={(v) => { setSlugTouched(true); setSlug(v) }}
                      placeholder="arahbo-cats" />
           <TextField label="Commander" value={commander} onChange={setCommander}
-                     placeholder="left blank, the list's own is used" />
+                     placeholder="blank uses the list's own; a pair is A + B" />
           <TextField label="Companion" value={companion} onChange={setCompanion}
                      placeholder="optional; sits outside the 100" />
           <div className="flex flex-wrap gap-3">
@@ -244,15 +299,157 @@ export default function Import() {
       {busy === 'preview' && !preview && <Spinner label="Resolving names…" />}
       {preview && !preview.created && <Preview result={preview}
                                                showYaml={showYaml}
-                                               onToggleYaml={() => setShowYaml((v) => !v)} />}
+                                               onToggleYaml={() => setShowYaml((v) => !v)}
+                                               onFix={applyFixes} />}
     </div>
   )
 }
 
-function Preview({ result, showYaml, onToggleYaml }: {
+/**
+ * The names that did not resolve, and what the pool thinks they nearly are.
+ *
+ * Aaron's complaint was that the import is "way too strict on spelling cards
+ * in a printed list". It is, and deliberately: `deckimport`'s first rule is
+ * that **nothing is guessed** -- a name the pool does not know is kept exactly
+ * as written so the list stays the size it was pasted, and it is reported
+ * rather than silently dropped, because a quietly-shortened deck is the worst
+ * thing this page could do. That rule is not the problem. The problem was
+ * that being told "Sol Rng is not a card" and nothing else leaves the whole
+ * job to the person, one name at a time, in a textarea.
+ *
+ * So the strictness stays and a shortlist arrives beside it. The server
+ * measures the similarity and never applies it; pressing a name rewrites the
+ * pasted list, which re-runs the same preview against the same gate. What you
+ * approve is still exactly what gets written -- the list in the box is the
+ * truth, and this edits the box.
+ *
+ * The distinction the copy has to make, and the reason none of this is
+ * automatic: **a miss is not always a misspelling.** A card spoiled since the
+ * last pool refresh is absent from a pool that is otherwise perfect, and the
+ * nearest name to it will be a real card that is not it. Nobody but the
+ * person holding the list can tell those apart.
+ */
+/**
+ * The misspellings that were read, and what they were read as.
+ *
+ * Aaron's ruling, 2026-08-24: "we should do the fuzzy matching on the
+ * backend, not allow misspelled things in." The deck already holds the real
+ * card by the time this renders -- `deckimport.Respell` installs the record
+ * under the written name before `BuildDeck` ever runs, so the count, the
+ * category, the colour identity and the gate are all about the actual card.
+ *
+ * Which is the argument for doing it this way rather than offering a
+ * shortlist: a misspelled `Rhystic Studdy` used to be an `unknown-card` and
+ * nothing else. Read as Rhystic Study, it is a blue card, and a Selesnya deck
+ * holding it now fails colour identity -- a real problem the old behaviour
+ * hid behind a spelling complaint.
+ *
+ * So this is the saying-so, and it is deliberately loud and deliberately
+ * above the errors. A correction changed what the deck contains, and the one
+ * thing that would make it wrong to do at all is doing it quietly.
+ */
+function NamesRead({ read }: { read: Correction[] }) {
+  return (
+    <div className="rounded-lg px-4 py-3 text-sm"
+         style={{
+           background: 'color-mix(in srgb, var(--series-1) 10%, transparent)',
+           borderLeft: '2px solid var(--series-1)',
+         }}>
+      <strong style={{ color: 'var(--text-primary)' }}>
+        {read.length} name{read.length === 1 ? ' was' : 's were'} read as the
+        card {read.length === 1 ? 'it is' : 'they are'} nearest to.
+      </strong>{' '}
+      <span style={{ color: 'var(--text-secondary)' }}>
+        The deck below holds the real card — its cost, its colours and its
+        legality are all the real card’s. If one of these is not what you
+        meant, correct it in the list above and preview again.
+      </span>
+      <ul className="mt-2 space-y-0.5 text-xs">
+        {read.map((c) => (
+          <li key={c.written} className="flex flex-wrap items-baseline gap-2">
+            <span className="font-mono" style={{ color: 'var(--text-muted)' }}>
+              {c.written}
+            </span>
+            <span aria-hidden style={{ color: 'var(--text-muted)' }}>→</span>
+            <span style={{ color: 'var(--text-primary)' }}>{c.read}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function UnknownNames({ result, onFix }: {
+  result: ImportResult
+  onFix: (fixes: { written: string; chosen: string }[]) => void
+}) {
+  const shortlists = result.did_you_mean ?? []
+  const byName = new Map(shortlists.map((s) => [s.written, s]))
+  const bare = result.unknown.filter((n) => !byName.has(n))
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h3 className="text-sm font-semibold">
+          {result.unknown.length} name{result.unknown.length === 1 ? '' : 's'} the
+          pool does not know
+        </h3>
+      </div>
+      <p className="max-w-2xl text-xs" style={{ color: 'var(--text-muted)' }}>
+        These are the ones no single card was clearly enough — the obvious
+        misspellings have already been read above. Each is kept exactly as
+        written, so the deck stays the size you pasted, and nothing below has
+        been applied: pressing a name rewrites it in the list above and
+        previews again. Bear in mind that a name the pool does not know is not
+        always a misspelling — a card printed since this pool was last
+        refreshed is missing from it, and the closest match to that card’s
+        name will be a different card.
+      </p>
+      <ul className="space-y-1.5">
+        {shortlists.map((s) => (
+          <li key={s.written} className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs"
+                  style={{ color: 'var(--status-warning)' }}>
+              {s.written}
+            </span>
+            <span aria-hidden style={{ color: 'var(--text-muted)' }}>→</span>
+            {s.candidates.map((c) => (
+              <button key={c.name} type="button"
+                      onClick={() => onFix([{ written: s.written, chosen: c.name }])}
+                      title={`Rewrite “${s.written}” as “${c.name}” in the list above`}
+                      className="chip-toggle text-xs">
+                {c.name}
+              </button>
+            ))}
+          </li>
+        ))}
+        {bare.map((n) => (
+          <li key={n} className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs"
+                  style={{ color: 'var(--status-warning)' }}>{n}</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              nothing in the pool is close to this one
+            </span>
+          </li>
+        ))}
+      </ul>
+      {result.did_you_mean_skipped > 0 && (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {result.did_you_mean_skipped} more went unchecked — a list with this
+          many unknown names is usually a pool that needs refreshing rather
+          than {result.did_you_mean_skipped} typos.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Preview({ result, showYaml, onToggleYaml, onFix }: {
   result: ImportResult
   showYaml: boolean
   onToggleYaml: () => void
+  /** Accept a spelling: `written` becomes `chosen` in the pasted list. */
+  onFix: (fixes: { written: string; chosen: string }[]) => void
 }) {
   return (
     <section className="card-surface space-y-4 rounded-xl p-5">
@@ -288,21 +485,10 @@ function Preview({ result, showYaml, onToggleYaml }: {
         </ul>
       )}
 
+      {result.read.length > 0 && <NamesRead read={result.read} />}
+
       {result.unknown.length > 0 && (
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold">
-            {result.unknown.length} name{result.unknown.length === 1 ? '' : 's'} the
-            pool does not know
-          </h3>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Kept exactly as written so the deck stays the size you pasted.
-            Nothing was guessed — fix the spelling here, or in deck.yaml after
-            importing.
-          </p>
-          <ul className="font-mono text-xs" style={{ color: 'var(--status-warning)' }}>
-            {result.unknown.map((n) => <li key={n}>{n}</li>)}
-          </ul>
-        </div>
+        <UnknownNames result={result} onFix={onFix} />
       )}
 
       {result.unreadable.length > 0 && (
