@@ -22,7 +22,8 @@ import (
 // `app.db` open for the process's life -- the door opens its own handles with
 // its own lifetimes.
 func TestTheMaintainerReconciliationAtBootIsAWholeTransaction(t *testing.T) {
-	dir := scratchDataDir(t)
+	t.Parallel()
+	dir := t.TempDir()
 	cfg := config.Config{DataDir: dir}
 
 	// No address: nothing to reconcile, and no database is acquired for it --
@@ -80,8 +81,8 @@ func TestTheMaintainerReconciliationAtBootIsAWholeTransaction(t *testing.T) {
 // starting: an instance that refuses to boot over a mistyped environment
 // variable is worse than one that boots and says so.
 func TestAnUnusableAdminEmailDoesNotStopTheBoot(t *testing.T) {
-	dir := scratchDataDir(t)
-	cfg := config.Config{DataDir: dir, AdminEmail: "not-an-address"}
+	t.Parallel()
+	cfg := config.Config{DataDir: t.TempDir(), AdminEmail: "not-an-address"}
 	if err := auth.Migrate(cfg.AppDBPath()); err != nil {
 		t.Fatal(err)
 	}
@@ -95,6 +96,7 @@ func TestAnUnusableAdminEmailDoesNotStopTheBoot(t *testing.T) {
 // this point means the volume did not mount, and an instance that carried on
 // would serve with no maintainer and no complaint.
 func TestAMissingDatabaseFailsTheReconciliation(t *testing.T) {
+	t.Parallel()
 	err := ensureMaintainerAtBoot(config.Config{
 		DataDir:    filepath.Join(t.TempDir(), "never-mounted"),
 		AdminEmail: "keeper@example.com"})
@@ -104,7 +106,11 @@ func TestAMissingDatabaseFailsTheReconciliation(t *testing.T) {
 }
 
 // envOr is the fallback every boot flag reads through, and an empty value is
-// an absent one -- an environment variable set to the empty string is how a
+// an absent one. **Serial, and the last environment reader in this package on
+// purpose**: Cobra needs `--web-dist` and `--tarot` to have defaults while it
+// is building the command tree, before a [config.Load] could have run, so
+// these two are read here rather than passed. ADR 39 named the exception and
+// ADR 40 left it standing -- an environment variable set to the empty string is how a
 // container spells "not set", and taking it literally would override a
 // working default with nothing.
 func TestEnvOrTreatsAnEmptyValueAsAbsent(t *testing.T) {

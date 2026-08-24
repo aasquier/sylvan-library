@@ -151,20 +151,31 @@ now noise.
 
 ## Testing
 
-**A new test calls `t.Parallel` unless it is holding something shared.** The
-suite runs in ~1m25 because 663 of its tests do (ADR 39). Two things forbid it,
-and both travel through helpers — including methods, in other files — so
-neither is visible from the test itself:
+**A new test calls `t.Parallel` unless it is holding something shared.** Over
+1,100 of them do (ADR 39, ADR 40). Three things forbid it, and all three travel
+through helpers — including methods, in other files — so none is visible from
+the test itself:
 
 - **`t.Setenv`**, which Go panics on inside a parallel test. Configuration is a
-  value now (`config.Config`, resolved once by `config.Load`); describe a
-  deployment with a struct literal rather than installing one on the process.
-  The remaining serial tests are the ones genuinely about the environment:
-  `config.Load`'s own, the CLI tests that drive a real command, and the Claude
-  and Forge tests still waiting on the second injection ADR 39 names.
+  value: `config.Config` from `config.Load`, `tier3.Settings` from
+  `tier3.LoadSettings`, `claude.Endpoint`. Describe a deployment with a struct
+  literal rather than installing one on the process. `cmd/mtglab` tests build a
+  `deployment` (`clitest_test.go`) and call `d.run(t, "decks", "list")`.
 - **Writing anything package-level**, which `-race` reports and nothing else
-  will. `internal/sim/cache` swaps `engineSources` and friends to fingerprint a
-  different source set; its callers are serial for that reason alone.
+  will. `internal/sim/cache` swaps `engineSources` and friends;
+  `internal/sim/tier3`'s coverage index is guarded, so `-race` stays quiet and
+  only a reading catches the collision.
+- **Anything else the whole process shares** — `os.Stdout`, `os.Stdin`, `PATH`,
+  a signal. Commands write through `cmd.OutOrStdout()` and prompt through
+  `cmd.InOrStdin()` for exactly this reason; a test that swaps a process stream
+  is a test that has to run alone.
+
+**To find out which, do not read — measure.** Add `t.Parallel()` and run the
+test alone; Go panics with "can not use t.Parallel" on the genuinely blocked
+ones. That answers *"does Go refuse this"*, which is not the same question as
+*"is this safe"* — `TestTheServerBootsAnswersAndStopsOnASignal` passes alone
+and sends SIGTERM to the whole process. Every serial test says why where it
+stands.
 
 Serial and parallel tests never overlap — Go finishes the serial ones before
 resuming the parallel ones — so mixing them in a package is safe.

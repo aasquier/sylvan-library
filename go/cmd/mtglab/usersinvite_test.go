@@ -19,9 +19,10 @@ import (
 // handle comes from the address' local part unless one is given, and the
 // account cannot log in until the link is used.
 func TestAnInviteCreatesAnUnclaimedAccountAndSaysWhatHappens(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 
-	out, err := runUsers(t, "", "invite", "grove.keeper@example.com")
+	out, err := d.run(t, "users", "invite", "grove.keeper@example.com")
 	if err != nil {
 		t.Fatalf("invite: %v", err)
 	}
@@ -39,7 +40,7 @@ func TestAnInviteCreatesAnUnclaimedAccountAndSaysWhatHappens(t *testing.T) {
 	}
 
 	// The account exists and is unclaimed, which is what the list shows.
-	listed, err := runUsers(t, "", "list")
+	listed, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,9 +56,10 @@ func TestAnInviteCreatesAnUnclaimedAccountAndSaysWhatHappens(t *testing.T) {
 // account an admin -- both said back, because an invite that quietly granted
 // admin would be a surprise nobody could audit.
 func TestAnInviteTakesAHandleAndAGrantAndSaysSo(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 
-	out, err := runUsers(t, "", "invite", "keeper@example.com",
+	out, err := d.run(t, "users", "invite", "keeper@example.com",
 		"--username", "grove-keeper", "--admin")
 	if err != nil {
 		t.Fatalf("invite: %v", err)
@@ -74,10 +76,11 @@ func TestAnInviteTakesAHandleAndAGrantAndSaysSo(t *testing.T) {
 // rather than a mangling -- an invited person has to be told the handle they
 // were given, so it cannot be invented for them.
 func TestAnAddressThatCannotProduceAHandleAsksForOne(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 
 	// A local part that is not a usable username.
-	_, err := runUsers(t, "", "invite", "!!@example.com")
+	_, err := d.run(t, "users", "invite", "!!@example.com")
 	if err == nil {
 		t.Fatal("an unusable handle was invented anyway")
 	}
@@ -89,13 +92,14 @@ func TestAnAddressThatCannotProduceAHandleAsksForOne(t *testing.T) {
 // A handle somebody already holds is refused by name, and the refusal says
 // which flag chooses another.
 func TestAnInviteRefusesAHandleThatIsTaken(t *testing.T) {
-	scratchDataDir(t)
-	if _, err := runUsers(t, "hunter2hunter2\nhunter2hunter2\n",
+	t.Parallel()
+	d := scratchDeployment(t)
+	if _, err := d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users",
 		"add", "keeper"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := runUsers(t, "", "invite", "keeper@example.com")
+	_, err := d.run(t, "users", "invite", "keeper@example.com")
 	if err == nil {
 		t.Fatal("a taken handle was reused")
 	}
@@ -109,12 +113,11 @@ func TestAnInviteRefusesAHandleThatIsTaken(t *testing.T) {
 // authentication and has no mail provider says so rather than inviting into
 // the void.
 func TestAnInviteRefusesWhenTheOnlySenderWouldLogTheAddress(t *testing.T) {
-	scratchDataDir(t)
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "1")
-	t.Setenv("MTGLAB_RESEND_API_KEY", "")
-	t.Setenv("RESEND_API_KEY", "")
+	t.Parallel()
+	d := scratchDeployment(t)
+	d.RequireAuth = true
 
-	_, err := runUsers(t, "", "invite", "keeper@example.com")
+	_, err := d.run(t, "users", "invite", "keeper@example.com")
 	if err == nil {
 		t.Fatal("an invite was sent with nothing to send it with")
 	}
@@ -131,9 +134,10 @@ func TestAnInviteRefusesWhenTheOnlySenderWouldLogTheAddress(t *testing.T) {
 // An account is created with an address so invites and resets have somewhere
 // to go, and a malformed one is refused by name rather than stored.
 func TestAnAccountIsCreatedWithAnAddressOrRefusedByName(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 
-	out, err := runUsers(t, "hunter2hunter2\nhunter2hunter2\n",
+	out, err := d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users",
 		"add", "keeper", "--email", "keeper@example.com", "--admin")
 	if err != nil {
 		t.Fatalf("add: %v", err)
@@ -144,21 +148,21 @@ func TestAnAccountIsCreatedWithAnAddressOrRefusedByName(t *testing.T) {
 
 	// A second account on the same address is refused, because a reset link
 	// that could resolve to two accounts resolves to neither.
-	_, err = runUsers(t, "hunter2hunter2\nhunter2hunter2\n",
+	_, err = d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users",
 		"add", "second", "--email", "keeper@example.com")
 	if err == nil {
 		t.Error("two accounts share an address")
 	}
 
 	// A malformed address is refused rather than stored.
-	_, err = runUsers(t, "hunter2hunter2\nhunter2hunter2\n",
+	_, err = d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users",
 		"add", "third", "--email", "not-an-address")
 	if err == nil {
 		t.Error("a malformed address was stored")
 	}
 
 	// A handle that is not a handle, likewise.
-	_, err = runUsers(t, "hunter2hunter2\nhunter2hunter2\n", "add", "!! not a handle !!")
+	_, err = d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users", "add", "!! not a handle !!")
 	if err == nil {
 		t.Error("an unusable handle was created")
 	}
@@ -167,14 +171,15 @@ func TestAnAccountIsCreatedWithAnAddressOrRefusedByName(t *testing.T) {
 // The password floor is checked before the account is touched, so a weak one
 // never becomes a stored hash.
 func TestAWeakPasswordIsRefusedBeforeAnythingIsWritten(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 
 	for _, tc := range []struct{ name, entry string }{
 		{"too short", "short\nshort\n"},
 		{"empty", "\n\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := runUsers(t, tc.entry, "add", "keeper")
+			_, err := d.runWithInput(t, tc.entry, "users", "add", "keeper")
 			if err == nil {
 				t.Fatal("a weak password was accepted")
 			}
@@ -182,7 +187,7 @@ func TestAWeakPasswordIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 	}
 
 	// Nothing was created while it was refusing.
-	out, err := runUsers(t, "", "list")
+	out, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,20 +201,21 @@ func TestAWeakPasswordIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 // chosen anything" has one spelling in the column whichever door it came
 // through.
 func TestTheTierGrantClearsRatherThanNamingTheDefault(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
 	// A real tier.
-	out, err := runUsers(t, "", "list")
+	out, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
 	before := out
 
-	if _, err := runUsers(t, "", "tier", "keeper", "--tier", "default"); err != nil {
+	if _, err := d.run(t, "users", "tier", "keeper", "--tier", "default"); err != nil {
 		t.Fatalf("clearing the tier: %v", err)
 	}
-	after, err := runUsers(t, "", "list")
+	after, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +225,7 @@ func TestTheTierGrantClearsRatherThanNamingTheDefault(t *testing.T) {
 
 	// An unknown tier is refused with the roster, because the caller's next
 	// move is to pick one that exists.
-	_, err = runUsers(t, "", "tier", "keeper", "--tier", "nonsense")
+	_, err = d.run(t, "users", "tier", "keeper", "--tier", "nonsense")
 	if err == nil {
 		t.Fatal("an unknown tier was granted")
 	}
@@ -232,15 +238,16 @@ func TestTheTierGrantClearsRatherThanNamingTheDefault(t *testing.T) {
 // name -- and `--yes` is the scripted door, which still refuses an account
 // that is not there.
 func TestDeletingIsConfirmedByNameOrByFlag(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
-	seedAccount(t, "player")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
+	seedAccount(t, d, "player")
 
 	// The wrong name is a refusal, and the account survives.
-	if _, err := runUsers(t, "wrong-name\n", "delete", "player"); err == nil {
+	if _, err := d.runWithInput(t, "wrong-name\n", "users", "delete", "player"); err == nil {
 		t.Error("a mistyped confirmation deleted the account")
 	}
-	out, err := runUsers(t, "", "list")
+	out, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,10 +256,10 @@ func TestDeletingIsConfirmedByNameOrByFlag(t *testing.T) {
 	}
 
 	// The right name goes through.
-	if _, err := runUsers(t, "player\n", "delete", "player"); err != nil {
+	if _, err := d.runWithInput(t, "player\n", "users", "delete", "player"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	out, err = runUsers(t, "", "list")
+	out, err = d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +269,7 @@ func TestDeletingIsConfirmedByNameOrByFlag(t *testing.T) {
 
 	// And an account that is not there is refused rather than reported as
 	// deleted.
-	if _, err := runUsers(t, "ghost\n", "delete", "ghost"); err == nil {
+	if _, err := d.runWithInput(t, "ghost\n", "users", "delete", "ghost"); err == nil {
 		t.Error("deleting an account that is not there succeeded")
 	}
 }
@@ -271,10 +278,11 @@ func TestDeletingIsConfirmedByNameOrByFlag(t *testing.T) {
 // is still refused for the last admin, because `--yes` answers "am I sure",
 // not "may I lock myself out".
 func TestTheScriptedDeleteStillGuardsTheLastAdmin(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
-	_, err := runUsers(t, "", "delete", "keeper", "--yes")
+	_, err := d.run(t, "users", "delete", "keeper", "--yes")
 	if err == nil {
 		t.Fatal("the last admin deleted itself with --yes")
 	}
@@ -283,8 +291,8 @@ func TestTheScriptedDeleteStillGuardsTheLastAdmin(t *testing.T) {
 	}
 
 	// With a second admin it goes through without a prompt.
-	seedAccount(t, "second", "--admin")
-	if _, err := runUsers(t, "", "delete", "keeper", "--yes"); err != nil {
+	seedAccount(t, d, "second", "--admin")
+	if _, err := d.run(t, "users", "delete", "keeper", "--yes"); err != nil {
 		t.Errorf("--yes was refused with two admins: %v", err)
 	}
 }

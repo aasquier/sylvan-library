@@ -12,7 +12,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +19,6 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
-	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 	simcache "github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
@@ -29,36 +27,27 @@ import (
 // simHome points MTGLAB_DATA_DIR and MTGLAB_DECKS_DIR at a scratch tree, so
 // no command in this file can see a real library. With `withPool` the
 // 21-card DuckDB lands where `config.DBPath()` will look for it.
-func simHome(t *testing.T, withPool bool) string {
+// simHome is a scratch machine, with the 21-card pool on it or without.
+func simHome(t *testing.T, withPool bool) deployment {
 	t.Helper()
-	dataDir := t.TempDir()
-	t.Setenv("MTGLAB_DATA_DIR", dataDir)
-	t.Setenv("MTGLAB_DECKS_DIR", filepath.Join(dataDir, "decks"))
+	d := scratchDeployment(t)
 	if withPool {
-		raw, err := os.ReadFile(pooltest.Build(t))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dataDir, "mtg.duckdb"), raw, 0o644); err != nil {
-			t.Fatal(err)
-		}
+		d = d.withPool(t)
 	}
-	return dataDir
+	return d
 }
 
-func writeSimDeck(t *testing.T, slug, text string) {
+func writeSimDeck(t *testing.T, d deployment, slug, text string) {
 	t.Helper()
-	dir := filepath.Join(settings().DecksDir, slug)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	dir := filepath.Join(d.DecksDir, slug)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "deck.yaml"), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "deck.yaml"), []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// monoGreenText is the gate corpus's mono-green 99 -- Goreclaw over the
-// 21-card pool, 95 Forests, and the deliberately banned Titan.
 func monoGreenText(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "internal", "gate",
@@ -72,38 +61,15 @@ func monoGreenText(t *testing.T) string {
 // runSim executes one `mtglab sim ...` invocation on a fresh command tree and
 // returns what it printed to os.Stdout. cobra's own chatter (usage on a
 // refusal) is discarded; the commands themselves print plainly.
-func runSim(t *testing.T, args ...string) (string, error) {
-	t.Helper()
-	cmd := simCommand()
-	cmd.SetArgs(args)
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-	old := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Stdout = w
-	read := make(chan string, 1)
-	go func() {
-		b, _ := io.ReadAll(r)
-		read <- string(b)
-	}()
-	runErr := cmd.Execute()
-	os.Stdout = old
-	_ = w.Close()
-	out := <-read
-	_ = r.Close()
-	return out, runErr
-}
 
 // ------------------------------------------------------------------- mana
 
 func TestSimManaReportsTheGoldfish(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 
-	out, err := runSim(t, "mana", "mono-green", "--games", "30", "--turns", "6", "--seed", "7")
+	out, err := d.run(t, "sim", "mana", "mono-green", "--games", "30", "--turns", "6", "--seed", "7")
 	if err != nil {
 		t.Fatalf("sim mana: %v", err)
 	}
@@ -130,7 +96,7 @@ func TestSimManaReportsTheGoldfish(t *testing.T) {
 	}
 
 	// A seed is a promise: the same run twice is the same text twice.
-	again, err := runSim(t, "mana", "mono-green", "--games", "30", "--turns", "6", "--seed", "7")
+	again, err := d.run(t, "sim", "mana", "mono-green", "--games", "30", "--turns", "6", "--seed", "7")
 	if err != nil {
 		t.Fatalf("second sim mana: %v", err)
 	}
@@ -139,24 +105,26 @@ func TestSimManaReportsTheGoldfish(t *testing.T) {
 	}
 
 	// Unseeded still answers -- it is merely not reproducible.
-	if _, err := runSim(t, "mana", "mono-green", "--games", "10", "--turns", "4"); err != nil {
+	if _, err := d.run(t, "sim", "mana", "mono-green", "--games", "10", "--turns", "4"); err != nil {
 		t.Fatalf("unseeded sim mana: %v", err)
 	}
 }
 
 func TestSimManaRefusesAMissingDeck(t *testing.T) {
-	simHome(t, false)
-	_, err := runSim(t, "mana", "nope")
-	want := "no deck at " + filepath.Join(settings().DecksDir, "nope", "deck.yaml")
+	t.Parallel()
+	d := simHome(t, false)
+	_, err := d.run(t, "sim", "mana", "nope")
+	want := "no deck at " + filepath.Join(d.DecksDir, "nope", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
 }
 
 func TestSimManaRefusesWithoutThePool(t *testing.T) {
-	simHome(t, false)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
-	_, err := runSim(t, "mana", "mono-green")
+	t.Parallel()
+	d := simHome(t, false)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
+	_, err := d.run(t, "sim", "mana", "mono-green")
 	want := "simulation needs the card pool -- run `mtglab data refresh` first"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
@@ -170,8 +138,9 @@ func TestSimManaRefusesWithoutThePool(t *testing.T) {
 // `compile.Deck`, which never returns it -- only `compile.Compile` does,
 // and the CLI never calls that.
 func TestSimManaRefusesADeckThePoolCannotSee(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "nobody", strings.Join([]string{
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "nobody", strings.Join([]string{
 		"slug: nobody",
 		"name: Nobody",
 		"commander:",
@@ -179,7 +148,7 @@ func TestSimManaRefusesADeckThePoolCannotSee(t *testing.T) {
 		"cards: []",
 		"",
 	}, "\n"))
-	_, err := runSim(t, "mana", "nobody")
+	_, err := d.run(t, "sim", "mana", "nobody")
 	want := "simulation needs the card pool -- run `mtglab data refresh` first"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
@@ -189,10 +158,11 @@ func TestSimManaRefusesADeckThePoolCannotSee(t *testing.T) {
 // ------------------------------------------------------------------ lands
 
 func TestSimLandsSweepsTheRange(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 
-	out, err := runSim(t, "lands", "mono-green", "30", "32", "--games", "15")
+	out, err := d.run(t, "sim", "lands", "mono-green", "30", "32", "--games", "15")
 	if err != nil {
 		t.Fatalf("sim lands: %v", err)
 	}
@@ -212,7 +182,7 @@ func TestSimLandsSweepsTheRange(t *testing.T) {
 		t.Errorf("footer = %q", lines[len(lines)-1])
 	}
 
-	again, err := runSim(t, "lands", "mono-green", "30", "32", "--games", "15")
+	again, err := d.run(t, "sim", "lands", "mono-green", "30", "32", "--games", "15")
 	if err != nil {
 		t.Fatalf("second sim lands: %v", err)
 	}
@@ -225,9 +195,10 @@ func TestSimLandsSweepsTheRange(t *testing.T) {
 // header, footer, exit 0. The recorded behaviour, kept rather than
 // improved -- a refusal here would be an invention.
 func TestSimLandsEmptyRangeIsHeaderAndFooterOnly(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
-	out, err := runSim(t, "lands", "mono-green", "32", "30", "--games", "5")
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
+	out, err := d.run(t, "sim", "lands", "mono-green", "32", "30", "--games", "5")
 	if err != nil {
 		t.Fatalf("sim lands: %v", err)
 	}
@@ -240,8 +211,9 @@ func TestSimLandsEmptyRangeIsHeaderAndFooterOnly(t *testing.T) {
 }
 
 func TestSimLandsRefusesADeckWithNoLands(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "no-lands", strings.Join([]string{
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "no-lands", strings.Join([]string{
 		"slug: no-lands",
 		"name: No Lands",
 		"commander:",
@@ -252,15 +224,16 @@ func TestSimLandsRefusesADeckWithNoLands(t *testing.T) {
 		"    why: fixture",
 		"",
 	}, "\n"))
-	_, err := runSim(t, "lands", "no-lands", "30", "40", "--games", "5")
+	_, err := d.run(t, "sim", "lands", "no-lands", "30", "40", "--games", "5")
 	if err == nil || err.Error() != "deck has no lands to sweep" {
 		t.Fatalf("err = %v, want the no-lands refusal", err)
 	}
 }
 
 func TestSimLandsRefusesANonIntegerBound(t *testing.T) {
-	simHome(t, false)
-	_, err := runSim(t, "lands", "whatever", "a", "30")
+	t.Parallel()
+	d := simHome(t, false)
+	_, err := d.run(t, "sim", "lands", "whatever", "a", "30")
 	if err == nil || err.Error() != "argument low: invalid int value: 'a'" {
 		t.Fatalf("err = %v", err)
 	}
@@ -269,10 +242,11 @@ func TestSimLandsRefusesANonIntegerBound(t *testing.T) {
 // ------------------------------------------------------------------ shelf
 
 func TestSimShelfReadsTheClosedForm(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 
-	out, err := runSim(t, "shelf", "mono-green")
+	out, err := d.run(t, "sim", "shelf", "mono-green")
 	if err != nil {
 		t.Fatalf("sim shelf: %v", err)
 	}
@@ -301,7 +275,7 @@ func TestSimShelfReadsTheClosedForm(t *testing.T) {
 	}
 
 	// The closed form is arithmetic: no seed, so twice is identical.
-	again, err := runSim(t, "shelf", "mono-green")
+	again, err := d.run(t, "sim", "shelf", "mono-green")
 	if err != nil {
 		t.Fatalf("second sim shelf: %v", err)
 	}
@@ -309,7 +283,7 @@ func TestSimShelfReadsTheClosedForm(t *testing.T) {
 		t.Error("the closed form moved between two reads")
 	}
 
-	drawn, err := runSim(t, "shelf", "mono-green", "--on-the-draw", "--target", "0.8")
+	drawn, err := d.run(t, "sim", "shelf", "mono-green", "--on-the-draw", "--target", "0.8")
 	if err != nil {
 		t.Fatalf("sim shelf --on-the-draw: %v", err)
 	}
@@ -321,10 +295,11 @@ func TestSimShelfReadsTheClosedForm(t *testing.T) {
 // --------------------------------------------------------------- mulligan
 
 func TestSimMulliganSearchesTheGrid(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 
-	out, err := runSim(t, "mulligan", "mono-green", "--games", "12", "--seed", "7", "--top", "3")
+	out, err := d.run(t, "sim", "mulligan", "mono-green", "--games", "12", "--seed", "7", "--top", "3")
 	if err != nil {
 		t.Fatalf("sim mulligan: %v", err)
 	}
@@ -369,13 +344,14 @@ func TestSimMulliganSearchesTheGrid(t *testing.T) {
 // ------------------------------------------------------------------ cache
 
 func TestSimCacheListsAndClears(t *testing.T) {
-	dataDir := simHome(t, false)
-	path := filepath.Join(dataDir, "app.db")
+	t.Parallel()
+	d := simHome(t, false)
+	path := filepath.Join(d.DataDir, "app.db")
 
 	// An absent app.db is read as an empty one, never minted -- the door's
 	// rule is that a reader never acquires a database, and the printed
 	// words are identical to a real empty store's.
-	out, err := runSim(t, "cache")
+	out, err := d.run(t, "sim", "cache")
 	if err != nil {
 		t.Fatalf("sim cache: %v", err)
 	}
@@ -398,7 +374,7 @@ func TestSimCacheListsAndClears(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err = runSim(t, "cache")
+	out, err = d.run(t, "sim", "cache")
 	if err != nil {
 		t.Fatalf("sim cache: %v", err)
 	}
@@ -413,7 +389,7 @@ func TestSimCacheListsAndClears(t *testing.T) {
 		}
 	}
 
-	out, err = runSim(t, "cache", "--clear")
+	out, err = d.run(t, "sim", "cache", "--clear")
 	if err != nil {
 		t.Fatalf("sim cache --clear: %v", err)
 	}
@@ -421,7 +397,7 @@ func TestSimCacheListsAndClears(t *testing.T) {
 		t.Errorf("clear = %q, want %q", out, want)
 	}
 
-	out, err = runSim(t, "cache")
+	out, err = d.run(t, "sim", "cache")
 	if err != nil {
 		t.Fatalf("sim cache after clear: %v", err)
 	}
@@ -433,11 +409,12 @@ func TestSimCacheListsAndClears(t *testing.T) {
 // ---------------------------------------------------------------- matches
 
 func TestSimMatchesOnAnEmptyLedger(t *testing.T) {
-	dataDir := simHome(t, false)
+	t.Parallel()
+	d := simHome(t, false)
 	want := "no matches recorded yet -- `mtglab sim forge` records as it plays\n"
 
 	// No app.db at all.
-	out, err := runSim(t, "matches")
+	out, err := d.run(t, "sim", "matches")
 	if err != nil {
 		t.Fatalf("sim matches: %v", err)
 	}
@@ -446,10 +423,10 @@ func TestSimMatchesOnAnEmptyLedger(t *testing.T) {
 	}
 
 	// An app.db with the tables and no rows says the same thing.
-	if err := auth.Migrate(filepath.Join(dataDir, "app.db")); err != nil {
+	if err := auth.Migrate(filepath.Join(d.DataDir, "app.db")); err != nil {
 		t.Fatal(err)
 	}
-	out, err = runSim(t, "matches")
+	out, err = d.run(t, "sim", "matches")
 	if err != nil {
 		t.Fatalf("sim matches: %v", err)
 	}
@@ -459,8 +436,9 @@ func TestSimMatchesOnAnEmptyLedger(t *testing.T) {
 }
 
 func TestSimMatchesRendersTheLedger(t *testing.T) {
-	dataDir := simHome(t, false)
-	path := filepath.Join(dataDir, "app.db")
+	t.Parallel()
+	d := simHome(t, false)
+	path := filepath.Join(d.DataDir, "app.db")
 	if err := auth.Migrate(path); err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +495,7 @@ func TestSimMatchesRendersTheLedger(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runSim(t, "matches")
+	out, err := d.run(t, "sim", "matches")
 	if err != nil {
 		t.Fatalf("sim matches: %v", err)
 	}
@@ -547,27 +525,29 @@ func TestSimMatchesRendersTheLedger(t *testing.T) {
 // will (the live proof is MTGLAB_LIVE_FORGE=1 in internal/sim/tier3).
 
 func TestSimForgeNeedsTwoDecks(t *testing.T) {
-	simHome(t, false)
-	t.Setenv("MTGLAB_FORGE_HOME", filepath.Join(t.TempDir(), "missing"))
-	writeSimDeck(t, "solo", "slug: solo\nname: Solo\ncards: []\n")
-	_, err := runSim(t, "forge", "solo")
+	t.Parallel()
+	d := simHome(t, false)
+	d.Forge = tier3.Settings{Home: filepath.Join(t.TempDir(), "missing")}
+	writeSimDeck(t, d, "solo", "slug: solo\nname: Solo\ncards: []\n")
+	_, err := d.run(t, "sim", "forge", "solo")
 	if err == nil || err.Error() != "a game needs at least two decks" {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestSimForgeRefusesWithoutForge(t *testing.T) {
-	simHome(t, false)
-	home := filepath.Join(t.TempDir(), "missing")
-	t.Setenv("MTGLAB_FORGE_HOME", home)
-	writeSimDeck(t, "a", "slug: a\nname: A\ncards: []\n")
-	writeSimDeck(t, "b", "slug: b\nname: B\ncards: []\n")
+	t.Parallel()
+	d := simHome(t, false)
+	// A machine whose Forge home is not there at all.
+	d.Forge = tier3.Settings{Home: filepath.Join(t.TempDir(), "missing")}
+	writeSimDeck(t, d, "a", "slug: a\nname: A\ncards: []\n")
+	writeSimDeck(t, d, "b", "slug: b\nname: B\ncards: []\n")
 
 	for _, args := range [][]string{
 		{"forge", "a", "b"},
 		{"forge", "a", "--check-only"},
 	} {
-		_, err := runSim(t, args...)
+		_, err := d.run(t, append([]string{"sim"}, args...)...)
 		if err == nil {
 			t.Fatalf("%v did not refuse", args)
 		}
@@ -578,8 +558,8 @@ func TestSimForgeRefusesWithoutForge(t *testing.T) {
 	}
 
 	// A deck that does not exist is refused before Forge is even looked for.
-	_, err := runSim(t, "forge", "a", "zz")
-	want := "no deck at " + filepath.Join(settings().DecksDir, "zz", "deck.yaml")
+	_, err := d.run(t, "sim", "forge", "a", "zz")
+	want := "no deck at " + filepath.Join(d.DecksDir, "zz", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}

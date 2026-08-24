@@ -2,7 +2,7 @@ package main
 
 // `mtglab decks` -- the deck-facing quarter of the runbook surface (Phase 8:
 // the binary carries the runbook). The CLI is the LOCAL user at a terminal,
-// so it reads the file tier rooted at `settings().DecksDir` -- always the
+// so it reads the file tier rooted at `cfg.DecksDir` -- always the
 // config-resolved paths, never a hard-wired directory -- and the activity
 // log's file-tier rows (`owner_id IS NULL`), which on a deployed instance
 // are the maintainer's own decks too.
@@ -30,6 +30,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/artifacts"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
@@ -37,28 +38,37 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// osExit ends the process for the one command that exits nonzero with no
-// sentence to print: `decks validate` on a failing deck. A variable so a test
-// can observe the code instead of dying with the process.
-var osExit = os.Exit
+// errFailedGate is `decks validate`'s verdict on a failing deck: exit
+// nonzero, print nothing beyond the report and its counts.
+//
+// **An error rather than a call to [os.Exit].** It used to be a package-level
+// `osExit` variable that a test swapped for a recorder -- the only way to
+// observe the code instead of dying with the process. That is process-global
+// state, so the tests that used it could never run in parallel with anything,
+// and `-race` is the only thing that would ever have said so. Returning a
+// sentinel is the shape Cobra already has: [main] maps it to a status and
+// prints nothing, which is what the recorded behaviour is, and a test asserts
+// on a returned value like every other test here. It also means the deferred
+// closes actually run on the way out, which [os.Exit] skipped.
+var errFailedGate = errors.New("the gate found errors")
 
 // decksCommand is the `mtglab decks` family: the library on disk.
-func decksCommand() *cobra.Command {
+func decksCommand(cfg config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "decks",
 		Short: "The library: list decks, run the gate, build artifacts, read the history",
 	}
-	cmd.AddCommand(decksListCommand())
-	cmd.AddCommand(decksValidateCommand())
-	cmd.AddCommand(decksBuildCommand())
-	cmd.AddCommand(decksLogCommand())
+	cmd.AddCommand(decksListCommand(cfg))
+	cmd.AddCommand(decksValidateCommand(cfg))
+	cmd.AddCommand(decksBuildCommand(cfg))
+	cmd.AddCommand(decksLogCommand(cfg))
 	return cmd
 }
 
 // deckAt reads the deck at `<decks>/<slug>/deck.yaml`, or refuses with the
 // recorded clean sentence when there is nothing there.
-func deckAt(slug string) (*deck.Deck, error) {
-	path := filepath.Join(settings().DecksDir, slug, "deck.yaml")
+func deckAt(cfg config.Config, slug string) (*deck.Deck, error) {
+	path := filepath.Join(cfg.DecksDir, slug, "deck.yaml")
 	if _, err := os.Stat(path); err != nil {
 		return nil, fmt.Errorf("no deck at %s", path)
 	}
@@ -85,8 +95,8 @@ func deckFile(path string) (*deck.Deck, error) {
 // graveyard for the deck page. The gate reads none of the extra entries, so
 // the two are indistinguishable to every caller here, but the narrower list
 // is this command's recorded behaviour and stays its own.
-func poolCards(cmd *cobra.Command, d *deck.Deck) (map[string]*pool.CardRecord, error) {
-	dbPath := settings().DBPath()
+func poolCards(cfg config.Config, cmd *cobra.Command, d *deck.Deck) (map[string]*pool.CardRecord, error) {
+	dbPath := cfg.DBPath()
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil, nil //nolint:nilnil // no pool, no error: absence is a degraded mode, not a fault
 	}
@@ -137,13 +147,14 @@ func renderReport(rep *gate.Report) string {
 // decksListCommand is `cmd_decks_list`: one line per deck. Only drafts are
 // flagged -- curated is the norm and labelling it would make the one thing
 // worth noticing harder to see.
-func decksListCommand() *cobra.Command {
+func decksListCommand(cfg config.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "Every deck in the library, one line each",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			root := settings().DecksDir
+			out := cmd.OutOrStdout()
+			root := cfg.DecksDir
 			if _, err := os.Stat(root); err != nil {
 				return errors.New("no decks/ directory")
 			}
@@ -166,7 +177,7 @@ func decksListCommand() *cobra.Command {
 				if d.Stage == "draft" {
 					draft = fmt.Sprintf("  draft, %d to justify", len(d.Unjustified()))
 				}
-				fmt.Printf("  %-22s %-4s %3d cards   %s%s\n",
+				fmt.Fprintf(out, "  %-22s %-4s %3d cards   %s%s\n",
 					d.Slug, bracket, d.TotalCards(), commander, draft)
 			}
 			return nil
@@ -177,25 +188,26 @@ func decksListCommand() *cobra.Command {
 // decksValidateCommand is the gate, rendered as text, and the exit code is
 // the verdict -- nonzero on any error, with nothing printed beyond the
 // report and its counts.
-func decksValidateCommand() *cobra.Command {
+func decksValidateCommand(cfg config.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate <slug>",
 		Short: "The gate -- run before anything else",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := deckAt(args[0])
+			out := cmd.OutOrStdout()
+			d, err := deckAt(cfg, args[0])
 			if err != nil {
 				return err
 			}
-			cards, err := poolCards(cmd, d)
+			cards, err := poolCards(cfg, cmd, d)
 			if err != nil {
 				return err
 			}
 			rep := gate.Validate(d, cards, gate.DefaultSize)
-			fmt.Println(renderReport(rep))
-			fmt.Printf("\n%d error(s), %d warning(s)\n", len(rep.Errors()), len(rep.Warnings()))
+			fmt.Fprintln(out, renderReport(rep))
+			fmt.Fprintf(out, "\n%d error(s), %d warning(s)\n", len(rep.Errors()), len(rep.Warnings()))
 			if len(rep.Errors()) > 0 {
-				osExit(1)
+				return errFailedGate
 			}
 			return nil
 		},
@@ -211,7 +223,7 @@ func decksValidateCommand() *cobra.Command {
 // wrong. A DRAFT is refused by the renderer and no flag here reaches it: a
 // draft is not wrong, it is unfinished, and the way out is to write the
 // rationales and promote it (ADR 13), not to pass a flag.
-func decksBuildCommand() *cobra.Command {
+func decksBuildCommand(cfg config.Config) *cobra.Command {
 	var against string
 	var force bool
 	cmd := &cobra.Command{
@@ -219,18 +231,19 @@ func decksBuildCommand() *cobra.Command {
 		Short: "Generate the artifacts",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			slug := args[0]
-			d, err := deckAt(slug)
+			d, err := deckAt(cfg, slug)
 			if err != nil {
 				return err
 			}
-			cards, err := poolCards(cmd, d)
+			cards, err := poolCards(cfg, cmd, d)
 			if err != nil {
 				return err
 			}
 			rep := gate.Validate(d, cards, gate.DefaultSize)
 			if n := len(rep.Errors()); n > 0 && !force {
-				fmt.Println(renderReport(rep))
+				fmt.Fprintln(out, renderReport(rep))
 				// The recorded refusal opens with a blank line to stand
 				// apart from the report; the blank line is printed here and
 				// the sentence rides the error, so the root's `mtglab: `
@@ -242,10 +255,10 @@ func decksBuildCommand() *cobra.Command {
 			if len(rep.Warnings()) > 0 {
 				// The report, a trailing space, and a blank line -- the
 				// recorded bytes exactly, odd space included.
-				fmt.Print(renderReport(rep) + " \n\n")
+				fmt.Fprint(out, renderReport(rep)+" \n\n")
 			}
 
-			outdir := filepath.Join(settings().DecksDir, slug, "artifacts")
+			outdir := filepath.Join(cfg.DecksDir, slug, "artifacts")
 
 			// The baseline for swaps.md, resolved before `Store` moves it: an
 			// explicit --against wins, and otherwise the previous build's
@@ -279,7 +292,7 @@ func decksBuildCommand() *cobra.Command {
 				return err
 			}
 			for _, name := range written {
-				fmt.Printf("  wrote %s\n", filepath.Join(outdir, name))
+				fmt.Fprintf(out, "  wrote %s\n", filepath.Join(outdir, name))
 			}
 			return nil
 		},
@@ -306,18 +319,19 @@ func fileExists(path string) bool {
 // The deck is loaded first, so a slug that is not a deck says so rather than
 // printing an empty history, which is the same fact wearing a misleading
 // face.
-func decksLogCommand() *cobra.Command {
+func decksLogCommand(cfg config.Config) *cobra.Command {
 	var limit int
 	cmd := &cobra.Command{
 		Use:   "log <slug>",
 		Short: "What has been done to this deck",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := deckAt(args[0])
+			out := cmd.OutOrStdout()
+			d, err := deckAt(cfg, args[0])
 			if err != nil {
 				return err
 			}
-			db, err := openAppDB()
+			db, err := openAppDB(cfg)
 			if err != nil {
 				return err
 			}
@@ -329,8 +343,8 @@ func decksLogCommand() *cobra.Command {
 				return err
 			}
 			if len(rows) == 0 {
-				fmt.Printf("\n  %s: nothing recorded yet.\n", d.Name)
-				fmt.Print("  Edits made before this log existed were never recorded.\n\n")
+				fmt.Fprintf(out, "\n  %s: nothing recorded yet.\n", d.Name)
+				fmt.Fprint(out, "  Edits made before this log existed were never recorded.\n\n")
 				return nil
 			}
 
@@ -338,7 +352,7 @@ func decksLogCommand() *cobra.Command {
 			if len(rows) == limit {
 				capped = " (most recent; raise --limit for more)"
 			}
-			fmt.Printf("\n  %s -- %d entries%s\n\n", d.Name, len(rows), capped)
+			fmt.Fprintf(out, "\n  %s -- %d entries%s\n\n", d.Name, len(rows), capped)
 			for _, row := range rows {
 				// An empty actor is whoever is at this machine: the CLI
 				// itself, and the app with auth off. Not an unknown actor --
@@ -347,9 +361,9 @@ func decksLogCommand() *cobra.Command {
 				if row.Actor != nil && *row.Actor != "" {
 					who = *row.Actor
 				}
-				fmt.Printf("  %-17s %-14s %s\n", logStamp(row.CreatedAt), who, row.Summary)
+				fmt.Fprintf(out, "  %-17s %-14s %s\n", logStamp(row.CreatedAt), who, row.Summary)
 			}
-			fmt.Println()
+			fmt.Fprintln(out)
 			return nil
 		},
 	}
@@ -361,8 +375,8 @@ func decksLogCommand() *cobra.Command {
 // exists, and nil when it does not -- a deck with no history. It must never
 // create the file: the ladder belongs to the serving command, and a reader
 // that acquires a database is the one thing this surface refuses to be.
-func openAppDB() (*sql.DB, error) {
-	path := settings().AppDBPath()
+func openAppDB(cfg config.Config) (*sql.DB, error) {
+	path := cfg.AppDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return nil, nil //nolint:nilerr,nilnil // an absent app.db is an empty history, not a failure
 	}

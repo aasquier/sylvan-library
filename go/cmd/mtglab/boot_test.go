@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // The boot sequence's two claims, held here rather than believed: that the
@@ -25,7 +26,7 @@ func renderSummary(t *testing.T, cfg config.Config, webDist, tarot string, pool 
 	t.Helper()
 	var buf bytes.Buffer
 	slog.New(slog.NewTextHandler(&buf, nil)).Info("configuration",
-		bootSummary(cfg, webDist, tarot, pool)...)
+		bootSummary(cfg, tier3.Settings{}, webDist, tarot, pool)...)
 	return buf.String()
 }
 

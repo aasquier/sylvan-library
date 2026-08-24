@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -15,59 +14,10 @@ import (
 // refusals come out as refusals — because a CLI whose glue was never driven
 // is how a runbook command breaks on the box it was written for.
 
-func runUsers(t *testing.T, stdin string, args ...string) (string, error) {
-	t.Helper()
-	oldIn, oldOut := os.Stdin, os.Stdout
-	t.Cleanup(func() { os.Stdin, os.Stdout = oldIn, oldOut })
-
-	inR, inW, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := inW.WriteString(stdin); err != nil {
-		t.Fatal(err)
-	}
-	_ = inW.Close()
-	os.Stdin = inR
-
-	outR, outW, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Stdout = outW
-
-	cmd := usersCommand()
-	cmd.SetArgs(args)
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-	runErr := cmd.Execute()
-
-	_ = outW.Close()
-	out := make([]byte, 0, 1024)
-	buf := make([]byte, 1024)
-	for {
-		n, readErr := outR.Read(buf)
-		out = append(out, buf[:n]...)
-		if readErr != nil {
-			break
-		}
-	}
-	os.Stdin, os.Stdout = oldIn, oldOut
-	return string(out), runErr
-}
-
-func scratchDataDir(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("MTGLAB_DATA_DIR", dir)
-	t.Setenv("MTGLAB_ADMIN_EMAIL", "")
-	t.Setenv("MTGLAB_ADMIN_USERNAME", "")
-	return dir
-}
-
 func TestUsersListOnAFreshDirectorySaysSo(t *testing.T) {
-	dir := scratchDataDir(t)
-	out, err := runUsers(t, "", "list")
+	t.Parallel()
+	d := scratchDeployment(t)
+	out, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -76,14 +26,15 @@ func TestUsersListOnAFreshDirectorySaysSo(t *testing.T) {
 		t.Errorf("unexpected empty-list answer:\n%s", out)
 	}
 	// The connect helper ran the ladder: the file exists now, schema and all.
-	if _, err := os.Stat(filepath.Join(dir, "app.db")); err != nil {
+	if _, err := os.Stat(d.AppDBPath()); err != nil {
 		t.Errorf("the ladder did not create app.db: %v", err)
 	}
 }
 
 func TestUsersAddNoPasswordThenList(t *testing.T) {
-	scratchDataDir(t)
-	out, err := runUsers(t, "", "add", "keeper", "--no-password")
+	t.Parallel()
+	d := scratchDeployment(t)
+	out, err := d.run(t, "users", "add", "keeper", "--no-password")
 	if err != nil {
 		t.Fatalf("add: %v", err)
 	}
@@ -91,7 +42,7 @@ func TestUsersAddNoPasswordThenList(t *testing.T) {
 		!strings.Contains(out, "cannot log in yet") {
 		t.Errorf("unexpected add output:\n%s", out)
 	}
-	out, err = runUsers(t, "", "list")
+	out, err = d.run(t, "users", "list")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -101,9 +52,10 @@ func TestUsersAddNoPasswordThenList(t *testing.T) {
 }
 
 func TestUsersAddPromptedPasswordViaTheFallback(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 	// Two matching entries down the pipe — getpass's non-tty fallback.
-	out, err := runUsers(t, "correct-horse-battery\ncorrect-horse-battery\n",
+	out, err := d.runWithInput(t, "correct-horse-battery\ncorrect-horse-battery\n", "users",
 		"add", "keeper")
 	if err != nil {
 		t.Fatalf("add with password: %v", err)
@@ -111,7 +63,7 @@ func TestUsersAddPromptedPasswordViaTheFallback(t *testing.T) {
 	if !strings.Contains(out, "created keeper") {
 		t.Errorf("unexpected output:\n%s", out)
 	}
-	out, err = runUsers(t, "", "list")
+	out, err = d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,32 +73,35 @@ func TestUsersAddPromptedPasswordViaTheFallback(t *testing.T) {
 }
 
 func TestUsersAddRefusesMismatchedEntries(t *testing.T) {
-	scratchDataDir(t)
-	_, err := runUsers(t, "one-entry-here\nanother-entry\n", "add", "keeper")
+	t.Parallel()
+	d := scratchDeployment(t)
+	_, err := d.runWithInput(t, "one-entry-here\nanother-entry\n", "users", "add", "keeper")
 	if err == nil || !strings.Contains(err.Error(), "did not match") {
 		t.Fatalf("want the two-entries refusal, got %v", err)
 	}
 }
 
 func TestUsersPasswdOnAMissingAccountRefuses(t *testing.T) {
-	scratchDataDir(t)
-	_, err := runUsers(t, "", "passwd", "nobody")
+	t.Parallel()
+	d := scratchDeployment(t)
+	_, err := d.run(t, "users", "passwd", "nobody")
 	if err == nil || !strings.Contains(err.Error(), "refused: no account 'nobody'") {
 		t.Fatalf("want the no-account refusal, got %v", err)
 	}
 }
 
 func TestUsersTierRefusalNamesTheRoster(t *testing.T) {
-	scratchDataDir(t)
-	if _, err := runUsers(t, "", "add", "keeper", "--no-password"); err != nil {
+	t.Parallel()
+	d := scratchDeployment(t)
+	if _, err := d.run(t, "users", "add", "keeper", "--no-password"); err != nil {
 		t.Fatal(err)
 	}
-	_, err := runUsers(t, "", "tier", "keeper", "--tier", "imaginary")
+	_, err := d.run(t, "users", "tier", "keeper", "--tier", "imaginary")
 	if err == nil || !strings.Contains(err.Error(), "no such tier 'imaginary'") ||
 		!strings.Contains(err.Error(), "default, ") {
 		t.Fatalf("want the roster in the refusal, got %v", err)
 	}
-	out, err := runUsers(t, "", "tier", "keeper", "--tier", "default")
+	out, err := d.run(t, "users", "tier", "keeper", "--tier", "default")
 	if err != nil {
 		t.Fatalf("clearing the tier: %v", err)
 	}
@@ -156,27 +111,29 @@ func TestUsersTierRefusalNamesTheRoster(t *testing.T) {
 }
 
 func TestUsersDemoteGuardsTheLastAdmin(t *testing.T) {
-	scratchDataDir(t)
-	if _, err := runUsers(t, "pw-that-is-long-enough\npw-that-is-long-enough\n",
+	t.Parallel()
+	d := scratchDeployment(t)
+	if _, err := d.runWithInput(t, "pw-that-is-long-enough\npw-that-is-long-enough\n", "users",
 		"add", "root", "--admin"); err != nil {
 		t.Fatal(err)
 	}
-	_, err := runUsers(t, "", "demote", "root")
+	_, err := d.run(t, "users", "demote", "root")
 	if err == nil || !strings.Contains(err.Error(), "refused:") {
 		t.Fatalf("demoting the only signable admin must refuse, got %v", err)
 	}
 }
 
 func TestUsersDeleteConfirmsByTypedName(t *testing.T) {
-	scratchDataDir(t)
-	if _, err := runUsers(t, "", "add", "keeper", "--no-password"); err != nil {
+	t.Parallel()
+	d := scratchDeployment(t)
+	if _, err := d.run(t, "users", "add", "keeper", "--no-password"); err != nil {
 		t.Fatal(err)
 	}
-	_, err := runUsers(t, "somebody-else\n", "delete", "keeper")
+	_, err := d.runWithInput(t, "somebody-else\n", "users", "delete", "keeper")
 	if err == nil || !strings.Contains(err.Error(), "that is not the username") {
 		t.Fatalf("a wrong confirmation must refuse, got %v", err)
 	}
-	out, err := runUsers(t, "KEEPER\n", "delete", "keeper")
+	out, err := d.runWithInput(t, "KEEPER\n", "users", "delete", "keeper")
 	if err != nil {
 		t.Fatalf("a case-folded confirmation deletes, got %v", err)
 	}
@@ -186,19 +143,20 @@ func TestUsersDeleteConfirmsByTypedName(t *testing.T) {
 }
 
 func TestUsersInviteWithoutMailRefuses(t *testing.T) {
-	scratchDataDir(t)
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "1")
-	t.Setenv("RESEND_API_KEY", "")
-	_, err := runUsers(t, "", "invite", "friend@example.com")
+	t.Parallel()
+	d := scratchDeployment(t)
+	d.RequireAuth = true
+	_, err := d.run(t, "users", "invite", "friend@example.com")
 	if err == nil || !strings.Contains(err.Error(), "refused:") {
 		t.Fatalf("an invite with no mail sender must refuse, got %v", err)
 	}
 }
 
 func TestConnectUsersReconcilesTheMaintainer(t *testing.T) {
-	scratchDataDir(t)
-	t.Setenv("MTGLAB_ADMIN_EMAIL", "aaron@example.com")
-	out, err := runUsers(t, "", "list")
+	t.Parallel()
+	d := scratchDeployment(t)
+	d.AdminEmail = "aaron@example.com"
+	out, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}

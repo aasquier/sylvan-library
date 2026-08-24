@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 )
 
@@ -24,15 +26,15 @@ import (
 // Every subcommand goes through `connectUsers`, which runs the ladder and
 // reconciles the maintainer (ADR 17) — so the CLI and the app agree about who
 // administers the instance no matter which one ran last.
-func usersCommand() *cobra.Command {
+func usersCommand(cfg config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "users",
 		Short: "Accounts: create, invite, list, and administer",
 	}
-	cmd.AddCommand(usersAddCommand(), usersInviteCommand(), usersListCommand(),
-		usersPasswdCommand(), usersDisableCommand(), usersEnableCommand(),
-		usersPromoteCommand(), usersDemoteCommand(), usersTierCommand(),
-		usersDeleteCommand())
+	cmd.AddCommand(usersAddCommand(cfg), usersInviteCommand(cfg), usersListCommand(cfg),
+		usersPasswdCommand(cfg), usersDisableCommand(cfg), usersEnableCommand(cfg),
+		usersPromoteCommand(cfg), usersDemoteCommand(cfg), usersTierCommand(cfg),
+		usersDeleteCommand(cfg))
 	return cmd
 }
 
@@ -40,8 +42,8 @@ func usersCommand() *cobra.Command {
 // maintainer reconciled first. The ladder rather than a bare open, because
 // on a laptop the first `users add` is what creates the file — an open that
 // could not mint the schema would strand the very first command.
-func connectUsers(ctx context.Context) (*sql.DB, error) {
-	path := settings().AppDBPath()
+func connectUsers(ctx context.Context, cfg config.Config) (*sql.DB, error) {
+	path := cfg.AppDBPath()
 	if err := auth.Migrate(path); err != nil {
 		return nil, err
 	}
@@ -49,7 +51,7 @@ func connectUsers(ctx context.Context) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := auth.EnsureMaintainer(ctx, db, settings()); err != nil {
+	if err := auth.EnsureMaintainer(ctx, db, cfg); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -60,16 +62,68 @@ func refused(format string, a ...any) error {
 	return fmt.Errorf("refused: "+format, a...)
 }
 
-// promptNewPassword reads a password twice, from the terminal, never from an
-// argument. When stdin is not a terminal it falls back to reading a line in
-// the clear and warns that it may echo — the recorded fallback, and also
-// what makes this path testable.
-func promptNewPassword(who string) (string, error) {
-	first, err := readSecret(fmt.Sprintf("  new password for %s: ", who))
+// prompt is where a command asks the operator something and hears the answer:
+// this command's input, this command's error stream.
+//
+// **A value, not the process's own streams.** `readSecret` read [os.Stdin]
+// directly and a package-level `stdinLines` cached a [bufio.Reader] over it,
+// rebuilt whenever the file changed identity -- a mechanism that existed for
+// exactly one reason, which the old comment stated outright: "which is how
+// the tests hand each command its own pipe". A test that has to swap a
+// process global to be heard cannot run beside another test, and a cache
+// keyed on the identity of that global is a bug waiting for two of them.
+//
+// The buffered reader is still shared *within one prompt*, and for the
+// original reason: a second [bufio.Reader] would lose whatever the first
+// buffered past its own line, which with two piped password entries is the
+// second entry. It is now shared by being a field rather than by being global.
+type prompt struct {
+	in    io.Reader
+	err   io.Writer
+	lines *bufio.Reader
+}
+
+// newPrompt reads from this command's input and prompts on its error stream.
+func newPrompt(cmd *cobra.Command) *prompt {
+	in := cmd.InOrStdin()
+	return &prompt{in: in, err: cmd.ErrOrStderr(), lines: bufio.NewReader(in)}
+}
+
+func (p *prompt) line() (string, error) {
+	line, err := p.lines.ReadString('\n')
+	if err != nil && line == "" {
+		return "", err
+	}
+	return strings.TrimRight(line, "\r\n"), nil
+}
+
+// secret reads one password, from the terminal when there is one and never
+// from an argument. When the input is not a terminal it falls back to reading
+// a line in the clear and warns that it may echo -- the recorded fallback,
+// and also what makes this path testable.
+func (p *prompt) secret(text string) (string, error) {
+	fmt.Fprint(p.err, text)
+	// Only a real file can be a terminal; a pipe or a buffer never is, which
+	// is the test's shape and the shape a script piping a password has.
+	if f, ok := p.in.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		raw, err := term.ReadPassword(int(f.Fd()))
+		fmt.Fprintln(p.err)
+		if err != nil {
+			return "", err
+		}
+		return string(raw), nil
+	}
+	fmt.Fprintln(p.err, "Warning: Password input may be echoed.")
+	return p.line()
+}
+
+// newPassword reads a password twice and holds it to the strength rules.
+func (p *prompt) newPassword(who string) (string, error) {
+	first, err := p.secret(fmt.Sprintf("  new password for %s: ", who))
 	if err != nil {
 		return "", err
 	}
-	again, err := readSecret("  again: ")
+	again, err := p.secret("  again: ")
 	if err != nil {
 		return "", err
 	}
@@ -82,45 +136,7 @@ func promptNewPassword(who string) (string, error) {
 	return first, nil
 }
 
-// stdinLines is the one buffered reader over stdin, shared by every prompt in
-// the process: a second `bufio.NewReader` would lose whatever the first one
-// buffered past its own line, which with two piped password entries is the
-// second entry. Rebuilt when os.Stdin itself is swapped, which is how the
-// tests hand each command its own pipe.
-var stdinLines = struct {
-	file   *os.File
-	reader *bufio.Reader
-}{}
-
-func readStdinLine() (string, error) {
-	if stdinLines.file != os.Stdin {
-		stdinLines.file = os.Stdin
-		stdinLines.reader = bufio.NewReader(os.Stdin)
-	}
-	line, err := stdinLines.reader.ReadString('\n')
-	if err != nil && line == "" {
-		return "", err
-	}
-	return strings.TrimRight(line, "\r\n"), nil
-}
-
-func readSecret(prompt string) (string, error) {
-	fd := int(os.Stdin.Fd())
-	fmt.Fprint(os.Stderr, prompt)
-	if term.IsTerminal(fd) {
-		raw, err := term.ReadPassword(fd)
-		fmt.Fprintln(os.Stderr)
-		if err != nil {
-			return "", err
-		}
-		return string(raw), nil
-	}
-	// The non-terminal fallback, recorded warning included.
-	fmt.Fprintln(os.Stderr, "Warning: Password input may be echoed.")
-	return readStdinLine()
-}
-
-func usersAddCommand() *cobra.Command {
+func usersAddCommand(cfg config.Config) *cobra.Command {
 	var email string
 	var admin, noPassword bool
 	cmd := &cobra.Command{
@@ -128,15 +144,16 @@ func usersAddCommand() *cobra.Command {
 		Short: "Create an account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
 			password := ""
 			if !noPassword {
 				var err error
-				if password, err = promptNewPassword(args[0]); err != nil {
+				if password, err = newPrompt(cmd).newPassword(args[0]); err != nil {
 					return err
 				}
 			}
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -161,9 +178,9 @@ func usersAddCommand() *cobra.Command {
 			if user.IsAdmin {
 				role = " (admin)"
 			}
-			fmt.Printf("  created %s%s in %s\n", user.Username, role, settings().AppDBPath())
+			fmt.Fprintf(out, "  created %s%s in %s\n", user.Username, role, cfg.AppDBPath())
 			if password == "" {
-				fmt.Println("  no password set -- this account cannot log in yet.")
+				fmt.Fprintln(out, "  no password set -- this account cannot log in yet.")
 			}
 			return nil
 		},
@@ -175,7 +192,7 @@ func usersAddCommand() *cobra.Command {
 	return cmd
 }
 
-func usersInviteCommand() *cobra.Command {
+func usersInviteCommand(cfg config.Config) *cobra.Command {
 	var username string
 	var admin bool
 	cmd := &cobra.Command{
@@ -183,6 +200,7 @@ func usersInviteCommand() *cobra.Command {
 		Short: "Create an unclaimed account and mail its owner a claim link",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
 			address, err := auth.NormaliseEmail(args[0])
 			if err != nil {
@@ -191,11 +209,11 @@ func usersInviteCommand() *cobra.Command {
 			if address == "" {
 				return refused("an invite needs an email address to send to")
 			}
-			sender, err := auth.SenderFor(auth.MailSettingsFrom(settings()), nil)
+			sender, err := auth.SenderFor(auth.MailSettingsFrom(cfg), nil)
 			if err != nil {
 				return refused("%s", err)
 			}
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -244,8 +262,8 @@ func usersInviteCommand() *cobra.Command {
 			if user.IsAdmin {
 				role = " (admin)"
 			}
-			fmt.Printf("  invited %s%s\n", user.Username, role)
-			fmt.Println("  they choose their own password; the link works once and " +
+			fmt.Fprintf(out, "  invited %s%s\n", user.Username, role)
+			fmt.Fprintln(out, "  they choose their own password; the link works once and "+
 				"expires in a week.")
 			return nil
 		},
@@ -256,14 +274,15 @@ func usersInviteCommand() *cobra.Command {
 	return cmd
 }
 
-func usersListCommand() *cobra.Command {
+func usersListCommand(cfg config.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "Every account, its state and its sessions",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -273,11 +292,11 @@ func usersListCommand() *cobra.Command {
 				return err
 			}
 			if len(everyone) == 0 {
-				fmt.Printf("  no accounts in %s\n", settings().AppDBPath())
-				fmt.Println("  create one with `mtglab users add <name>`")
+				fmt.Fprintf(out, "  no accounts in %s\n", cfg.AppDBPath())
+				fmt.Fprintln(out, "  create one with `mtglab users add <name>`")
 				return nil
 			}
-			fmt.Printf("  %-20s %-28s %-12s %-12s sessions\n",
+			fmt.Fprintf(out, "  %-20s %-28s %-12s %-12s sessions\n",
 				"username", "email", "state", "answered by")
 			for _, user := range everyone {
 				state := "no password"
@@ -310,24 +329,25 @@ func usersListCommand() *cobra.Command {
 				if email == "" {
 					email = "-"
 				}
-				fmt.Printf(" %s%-20s %-28s %-12s %-12s %d\n", star,
+				fmt.Fprintf(out, " %s%-20s %-28s %-12s %-12s %d\n", star,
 					user.Username, email, state,
 					tiers.Get(user.ModelTier).Label, live)
 			}
-			fmt.Println("\n  * admin")
+			fmt.Fprintln(out, "\n  * admin")
 			return nil
 		},
 	}
 }
 
-func usersPasswdCommand() *cobra.Command {
+func usersPasswdCommand(cfg config.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "passwd <username>",
 		Short: "Set a password; ends every session",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -339,7 +359,7 @@ func usersPasswdCommand() *cobra.Command {
 			if user == nil {
 				return refused("no account %s", quoted(args[0]))
 			}
-			password, err := promptNewPassword(user.Username)
+			password, err := newPrompt(cmd).newPassword(user.Username)
 			if err != nil {
 				return err
 			}
@@ -347,23 +367,24 @@ func usersPasswdCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("  password set for %s\n", user.Username)
+			fmt.Fprintf(out, "  password set for %s\n", user.Username)
 			if ended > 0 {
-				fmt.Printf("  %d session(s) ended -- every device signs in again.\n", ended)
+				fmt.Fprintf(out, "  %d session(s) ended -- every device signs in again.\n", ended)
 			}
 			return nil
 		},
 	}
 }
 
-func setDisabledCommand(use, short string, disabled bool) *cobra.Command {
+func setDisabledCommand(cfg config.Config, use, short string, disabled bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " <username>",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -387,31 +408,32 @@ func setDisabledCommand(use, short string, disabled bool) *cobra.Command {
 			if disabled {
 				word = "disabled"
 			}
-			fmt.Printf("  %s is now %s\n", user.Username, word)
+			fmt.Fprintf(out, "  %s is now %s\n", user.Username, word)
 			if ended > 0 {
-				fmt.Printf("  %d session(s) ended.\n", ended)
+				fmt.Fprintf(out, "  %d session(s) ended.\n", ended)
 			}
 			return nil
 		},
 	}
 }
 
-func usersDisableCommand() *cobra.Command {
-	return setDisabledCommand("disable", "Shut an account off; ends its sessions", true)
+func usersDisableCommand(cfg config.Config) *cobra.Command {
+	return setDisabledCommand(cfg, "disable", "Shut an account off; ends its sessions", true)
 }
 
-func usersEnableCommand() *cobra.Command {
-	return setDisabledCommand("enable", "Turn a disabled account back on", false)
+func usersEnableCommand(cfg config.Config) *cobra.Command {
+	return setDisabledCommand(cfg, "enable", "Turn a disabled account back on", false)
 }
 
-func setAdminCommand(use, short string, isAdmin bool) *cobra.Command {
+func setAdminCommand(cfg config.Config, use, short string, isAdmin bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " <username>",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -428,7 +450,7 @@ func setAdminCommand(use, short string, isAdmin bool) *cobra.Command {
 				already = "an admin"
 			}
 			if user.IsAdmin == isAdmin {
-				fmt.Printf("  %s is already %s\n", user.Username, already)
+				fmt.Fprintf(out, "  %s is already %s\n", user.Username, already)
 				return nil
 			}
 			if err := auth.SetAdmin(ctx, db, user.ID, isAdmin); err != nil {
@@ -445,33 +467,34 @@ func setAdminCommand(use, short string, isAdmin bool) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("  %s is now %s\n", user.Username, already)
+			fmt.Fprintf(out, "  %s is now %s\n", user.Username, already)
 			if isAdmin && !claimed {
 				// The case where the command appears to have worked and the
 				// instance still has nobody who can administer it.
-				fmt.Println("  they have no password yet, so they cannot sign in to use it.")
+				fmt.Fprintln(out, "  they have no password yet, so they cannot sign in to use it.")
 			}
-			fmt.Printf("  %d admin(s) can sign in.\n", len(admins))
+			fmt.Fprintf(out, "  %d admin(s) can sign in.\n", len(admins))
 			return nil
 		},
 	}
 }
 
-func usersPromoteCommand() *cobra.Command {
-	return setAdminCommand("promote", "Grant admin", true)
+func usersPromoteCommand(cfg config.Config) *cobra.Command {
+	return setAdminCommand(cfg, "promote", "Grant admin", true)
 }
 
-func usersDemoteCommand() *cobra.Command {
-	return setAdminCommand("demote", "Revoke admin", false)
+func usersDemoteCommand(cfg config.Config) *cobra.Command {
+	return setAdminCommand(cfg, "demote", "Revoke admin", false)
 }
 
-func usersTierCommand() *cobra.Command {
+func usersTierCommand(cfg config.Config) *cobra.Command {
 	var tier string
 	cmd := &cobra.Command{
 		Use:   "tier <username>",
 		Short: "Choose which Claude answers an account",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
 			// `default` clears the grant rather than naming the default tier,
 			// so "nobody has chosen anything" has one spelling in the column
@@ -480,7 +503,7 @@ func usersTierCommand() *cobra.Command {
 			if wanted == "default" {
 				wanted = ""
 			}
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -504,8 +527,8 @@ func usersTierCommand() *cobra.Command {
 				return err
 			}
 			chosen := tiers.Get(wanted)
-			fmt.Printf("  %s is answered by %s\n", user.Username, chosen.Label)
-			fmt.Printf("  %s\n", chosen.Blurb)
+			fmt.Fprintf(out, "  %s is answered by %s\n", user.Username, chosen.Label)
+			fmt.Fprintf(out, "  %s\n", chosen.Blurb)
 			return nil
 		},
 	}
@@ -515,15 +538,16 @@ func usersTierCommand() *cobra.Command {
 	return cmd
 }
 
-func usersDeleteCommand() *cobra.Command {
+func usersDeleteCommand(cfg config.Config) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <username>",
 		Short: "Delete an account for good; confirm by typing the name",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
-			db, err := connectUsers(ctx)
+			db, err := connectUsers(ctx, cfg)
 			if err != nil {
 				return err
 			}
@@ -543,11 +567,11 @@ func usersDeleteCommand() *cobra.Command {
 			if user.IsAdmin {
 				role = " (admin)"
 			}
-			fmt.Printf("  %s%s, %d session(s)\n", user.Username, role, live)
-			fmt.Println("  deleted for good -- there is no undo and no trash")
+			fmt.Fprintf(out, "  %s%s, %d session(s)\n", user.Username, role, live)
+			fmt.Fprintln(out, "  deleted for good -- there is no undo and no trash")
 			if !yes {
-				fmt.Printf("  type '%s' to delete it: ", user.Username)
-				line, _ := readStdinLine()
+				fmt.Fprintf(out, "  type '%s' to delete it: ", user.Username)
+				line, _ := newPrompt(cmd).line()
 				// Usernames are ASCII by the handle pattern, so a simple fold
 				// and a full Unicode casefold cannot disagree about a match.
 				if !strings.EqualFold(strings.TrimSpace(line), user.Username) {
@@ -563,9 +587,9 @@ func usersDeleteCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("  %s is gone\n", user.Username)
+			fmt.Fprintf(out, "  %s is gone\n", user.Username)
 			if ended > 0 {
-				fmt.Printf("  %d session(s) ended.\n", ended)
+				fmt.Fprintf(out, "  %d session(s) ended.\n", ended)
 			}
 			return nil
 		},

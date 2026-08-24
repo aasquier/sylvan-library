@@ -24,9 +24,17 @@ import (
 // tells an old app from a new one, and the bearer token that must be compared
 // in constant time.
 
+// shimServer is the worker's door on a machine with no Forge and no lock.
 func shimServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(&shim{state: newShimState()})
+	return shimServerWith(t, tier3.Settings{})
+}
+
+// shimServerWith is the same door serving a described machine -- the token it
+// demands, and where its distribution is.
+func shimServerWith(t *testing.T, forge tier3.Settings) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(&shim{state: newShimState(), forge: forge})
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -97,8 +105,8 @@ func TestAnUnknownRouteIs404(t *testing.T) {
 // **Absent, the token gates nothing** — which is what a laptop running the
 // shim by hand wants, and what every test above relies on.
 func TestTheTokenGatesEveryRequest(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "s3cret")
-	srv := shimServer(t)
+	t.Parallel()
+	srv := shimServerWith(t, tier3.Settings{ShimToken: "s3cret"})
 	for _, c := range []struct {
 		note, method, path, token string
 		want                      int
@@ -237,16 +245,18 @@ func errOf(s string) error { return simpleErr(s) }
 // only thing standing in for Fly is the socket. Opt-in, because CI has no
 // distribution — see the live test in `internal/sim/tier3`.
 func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("MTGLAB_LIVE_FORGE") != "1" {
 		t.Skip("set MTGLAB_LIVE_FORGE=1 to run a real Forge match")
 	}
-	if _, err := tier3.DesktopJar(""); err != nil {
+	forge := tier3.LoadSettings()
+	if _, err := forge.DesktopJar(); err != nil {
 		t.Skipf("no Forge distribution: %v", err)
 	}
 
-	srv := shimServer(t)
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", srv.URL)
-	if !tier3.Configured() {
+	srv := shimServerWith(t, forge)
+	hosted := tier3.Settings{WorkerURL: srv.URL}
+	if !hosted.Configured() {
 		t.Fatal("a worker URL did not configure the hosted path")
 	}
 
@@ -263,7 +273,8 @@ func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
 		decks = append(decks, d)
 	}
 
-	worker := &tier3.Worker{Boot: 30 * time.Second, Sleep: func(d time.Duration) { time.Sleep(d) }}
+	worker := &tier3.Worker{Settings: hosted, Boot: 30 * time.Second,
+		Sleep: func(d time.Duration) { time.Sleep(d) }}
 
 	// The pre-flight first, exactly as the route does it — on the machine
 	// where the card scripts live.
@@ -350,6 +361,7 @@ func bigOf(n int64) *big.Int { return big.NewInt(n) }
 //	MTGLAB_LIVE_FORGE=1 MTGLAB_OLD_SHIM_URL=http://127.0.0.1:8899 \
 //	  go test ./cmd/... -run RecordedShimWire -v
 func TestTheClientReadsTheRecordedShimWire(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("MTGLAB_LIVE_FORGE") != "1" {
 		t.Skip("set MTGLAB_LIVE_FORGE=1 to run a real Forge match")
 	}
@@ -357,7 +369,7 @@ func TestTheClientReadsTheRecordedShimWire(t *testing.T) {
 	if url == "" {
 		t.Skip("set MTGLAB_OLD_SHIM_URL to a running forge-shim from an older release")
 	}
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", url)
+	hosted := tier3.Settings{WorkerURL: url}
 
 	var decks []*deck.Deck
 	for _, name := range []string{"mono-green-clean", "kaheera"} {
@@ -372,7 +384,8 @@ func TestTheClientReadsTheRecordedShimWire(t *testing.T) {
 		decks = append(decks, d)
 	}
 
-	worker := &tier3.Worker{Boot: 30 * time.Second, Sleep: func(d time.Duration) { time.Sleep(d) }}
+	worker := &tier3.Worker{Settings: hosted, Boot: 30 * time.Second,
+		Sleep: func(d time.Duration) { time.Sleep(d) }}
 
 	// The pre-flight: reports computed by the older shim's coverage, decoded
 	// by this client.

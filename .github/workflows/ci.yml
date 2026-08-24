@@ -218,9 +218,16 @@ jobs:
       # Raise MINIMUM when the tree passes a higher number. Never lower it to
       # make a red check green: a diff that drops coverage is a diff that
       # added untested code, which is the thing this is here to notice.
+      #
+      # **The number below is what `go tool cover -func` reports**, which is
+      # not quite what a hand merge of the profile reports -- the two disagree
+      # by a tenth or two, because `-coverpkg` emits every block once per test
+      # binary and the two ways of folding those duplicates round differently.
+      # `docs/polish/COVERAGE.md` explains it; this line is the one that gates,
+      # so this is the formula to raise it against.
       - name: Coverage floor
         env:
-          MINIMUM: "89.5"
+          MINIMUM: "90.0"
         run: |
           go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > /dev/null
           TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}' | tr -d '%')
@@ -240,7 +247,10 @@ jobs:
       #   cmd/mtglab/shim.go          match, matchStreamed, watchdog (os.Exit)
       #   cmd/mtglab/sim.go           sim forge's own reporting
       #   cmd/mtglab/data.go          refresh, which downloads from Scryfall
-      #   cmd/mtglab/claude.go        claude check, which spends a real call
+      #
+      # `claude check` was on that list and is not any more: ADR 40 made the
+      # endpoint an argument, so the command now runs against a stub Anthropic
+      # over real HTTP and only the network is missing.
       #
       # Their seams ARE covered: the Forge worker client and its shim door
       # both run against stubs, `pool.DownloadBulkFrom` runs against a stub

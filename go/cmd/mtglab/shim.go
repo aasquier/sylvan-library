@@ -60,20 +60,15 @@ import (
 // machine; the `.dck` directory this process hands to Forge is racy under two
 // JVMs, so the worker enforces its own invariant rather than inheriting one.
 
-// idleDefault is seconds of quiet before the process exits and the machine
-// stops. Three minutes keeps a follow-up match on a warm machine (the JVM
-// restarts per match either way; this saves the machine start) at a cost of
-// well under a cent, and `0` means never — which is what a laptop running the
-// shim by hand would want.
-const idleDefault = 180
+// The two settings this door used to own -- how long it stays up when nobody
+// asks, and how much heap a match gets -- now live on [tier3.Settings] as
+// [tier3.DefaultIdleSeconds] and [tier3.DefaultMemoryMB], beside the rest of
+// the Forge environment. They were read here through a local `envInt`, which
+// meant the shim tests could describe an idle timeout only by setting a
+// variable on the process; ADR 40 moved the read to one place and left the
+// argument for the numbers where the numbers are.
 
-// memoryDefault is the JVM heap ceiling, below [tier3.MemoryDefault] on
-// purpose: the worker machine has 4GB total and the heap is not the only
-// resident — metaspace, the card database's off-heap share, and this process
-// all live beside it. Measured heads-up games run well inside this.
-const memoryDefault = 3072
-
-func shimCommand() *cobra.Command {
+func shimCommand(forge tier3.Settings) *cobra.Command {
 	return &cobra.Command{
 		Use:   "forge-shim",
 		Short: "Serve Forge matches to the app over the private network (ADR 35)",
@@ -81,18 +76,9 @@ func shimCommand() *cobra.Command {
 			"holds the JVM, and stops its own machine when idle.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return serveShim(cmd.Context())
+			return serveShim(cmd.Context(), forge)
 		},
 	}
-}
-
-func envInt(name string, fallback int) int {
-	if raw := os.Getenv(name); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil {
-			return n
-		}
-	}
-	return fallback
 }
 
 // shimState is what the idle watchdog judges: when work last happened, and
@@ -136,10 +122,12 @@ func (s *shimState) idleFor() time.Duration {
 type shim struct {
 	state *shimState
 	log   *log.Logger
+	// forge is the distribution this door serves and the token it demands.
+	forge tier3.Settings
 }
 
 func (s *shim) authorised(r *http.Request) bool {
-	token := os.Getenv("MTGLAB_FORGE_SHIM_TOKEN")
+	token := s.forge.ShimToken
 	if token == "" {
 		return true
 	}
@@ -222,7 +210,7 @@ func (s *shim) coverage(w http.ResponseWriter, body map[string]json.RawMessage) 
 		s.fail(w, http.StatusBadRequest, "ValueError: %v", err)
 		return
 	}
-	index, err := tier3.ImplementedNames("")
+	index, err := s.forge.ImplementedNames()
 	if err != nil {
 		s.fail(w, http.StatusServiceUnavailable, "%v", err)
 		return
@@ -271,8 +259,8 @@ func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
 		s.matchStreamed(w, decks, ask)
 		return
 	}
-	run, err := tier3.RunGames(decks, tier3.RunOptions{Games: ask.Games,
-		Clock: ask.Clock, Seed: ask.Seed, Memory: envInt("MTGLAB_FORGE_MEMORY_MB", memoryDefault)})
+	run, err := s.forge.RunGames(decks, tier3.RunOptions{Games: ask.Games,
+		Clock: ask.Clock, Seed: ask.Seed, Memory: s.forge.MemoryMB})
 	if err != nil {
 		if errors.Is(err, tier3.ErrForgeNotInstalled) {
 			s.fail(w, http.StatusServiceUnavailable, "%v", err)
@@ -320,9 +308,9 @@ func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matc
 	// The row rides the tick (the match theater): the game the parser just
 	// completed crosses beside its count, in the same encoding the final
 	// result will carry it.
-	run, err := tier3.RunGames(decks, tier3.RunOptions{Games: ask.Games,
+	run, err := s.forge.RunGames(decks, tier3.RunOptions{Games: ask.Games,
 		Clock: ask.Clock, Seed: ask.Seed,
-		Memory: envInt("MTGLAB_FORGE_MEMORY_MB", memoryDefault),
+		Memory: s.forge.MemoryMB,
 		OnGame: func(n int, g tier3.GameResult) {
 			emit(map[string]any{"game": n, "row": tier3.GameToWire(g)})
 		}})
@@ -356,16 +344,11 @@ func failureText(err error) string {
 	return "RuntimeError: " + err.Error()
 }
 
-func serveShim(ctx context.Context) error {
-	host := os.Getenv("MTGLAB_FORGE_SHIM_HOST")
-	if host == "" {
-		host = "::"
-	}
-	port := envInt("MTGLAB_FORGE_SHIM_PORT", 8080)
-	limit := envInt("MTGLAB_FORGE_IDLE_SECONDS", idleDefault)
+func serveShim(ctx context.Context, forge tier3.Settings) error {
+	host, port, limit := forge.ShimHost, forge.ShimPort, forge.IdleSeconds
 
 	state := newShimState()
-	handler := &shim{state: state, log: log.Default()}
+	handler := &shim{state: state, log: log.Default(), forge: forge}
 
 	if limit > 0 {
 		go watchdog(state, time.Duration(limit)*time.Second)
@@ -373,7 +356,7 @@ func serveShim(ctx context.Context) error {
 	// Warm the coverage index while nobody is waiting: the first `/coverage`
 	// after a cold boot would otherwise pay the ~2s zip scan inside somebody's
 	// request thread.
-	if _, err := tier3.ImplementedNames(""); err != nil {
+	if _, err := forge.ImplementedNames(); err != nil {
 		// A worker image without Forge is misbuilt; say so and keep serving,
 		// because /healthz answering is what lets the app read the 503s.
 		fmt.Printf("forge shim: %v\n", err)

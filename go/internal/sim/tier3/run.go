@@ -27,32 +27,6 @@ import (
 // matters.
 const JavaMinimum = 17
 
-// ForgeHome is where the distribution is unpacked.
-//
-// A function rather than a constant, deliberately. Forge is optional — a base
-// install has no JVM and never wants one — so the path is resolved when
-// something reaches for it, and a machine that installs Forge mid-session does
-// not need the process restarted. It is also the only path in this project
-// that points outside both the checkout and its data directory, which is the
-// point: nothing under it may ever be tracked.
-func ForgeHome() string {
-	if override := os.Getenv("MTGLAB_FORGE_HOME"); override != "" {
-		return override
-	}
-	return filepath.Join(homeDir(), ".local", "share", "mtglab", "forge")
-}
-
-func homeDir() string {
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return os.Getenv("HOME")
-}
-
-func bundledJDK() string {
-	return filepath.Join(homeDir(), ".local", "share", "mtglab", "jdk-21")
-}
-
 // ------------------------------------------------------------------ the JVM
 
 var javaVersionRe = regexp.MustCompile(`version "(\d+)`)
@@ -94,14 +68,14 @@ func javaMajor(binary string) (int, bool) {
 //
 // `MTGLAB_JAVA` wins, then the JDK unpacked beside the distribution, then
 // whatever is on PATH. The PATH entry is checked rather than trusted.
-func JavaBinary() (string, error) {
+func (s Settings) JavaBinary() (string, error) {
 	var candidates []string
-	if override := os.Getenv("MTGLAB_JAVA"); override != "" {
-		candidates = append(candidates, override)
+	if s.Java != "" {
+		candidates = append(candidates, s.Java)
 	}
 	candidates = append(candidates,
-		filepath.Join(bundledJDK(), "Contents", "Home", "bin", "java"),
-		filepath.Join(bundledJDK(), "bin", "java"))
+		filepath.Join(s.BundledJDK, "Contents", "Home", "bin", "java"),
+		filepath.Join(s.BundledJDK, "bin", "java"))
 	if found, err := exec.LookPath("java"); err == nil {
 		candidates = append(candidates, found)
 	}
@@ -134,11 +108,8 @@ func JavaBinary() (string, error) {
 }
 
 // DesktopJar is the distribution's simulator jar.
-func DesktopJar(forgeHome string) (string, error) {
-	home := forgeHome
-	if home == "" {
-		home = ForgeHome()
-	}
+func (s Settings) DesktopJar() (string, error) {
+	home := s.Home
 	// A directory this process cannot even look inside is a directory with no
 	// Forge in it. Deployed, the home directory is `/root` while the app runs
 	// as `mtglab`, so the glob's stat raises a permission error — and the gate
@@ -185,8 +156,8 @@ var jarVersionRe = regexp.MustCompile(`^forge-gui-desktop-(.+)-jar-with-dependen
 // ratings computed across an unversioned upgrade would silently mix two
 // judges. Empty when the name does not parse, which the ledger stores as "not
 // reported" rather than guessing.
-func ForgeVersion(forgeHome string) string {
-	jar, err := DesktopJar(forgeHome)
+func (s Settings) ForgeVersion() string {
+	jar, err := s.DesktopJar()
 	if err != nil {
 		return ""
 	}
@@ -199,19 +170,6 @@ func ForgeVersion(forgeHome string) string {
 
 // -------------------------------------------------------------- the profile
 
-// ForgeProfile is Forge's user data directory, ours rather than the user's own.
-//
-// Forge defaults to `~/Library/Application Support/Forge` on macOS. Writing
-// generated decks into that would mix machine-generated files into whatever
-// the person has saved by hand, so `forge.profile.properties` points Forge at
-// a directory this project owns. `MTGLAB_FORGE_PROFILE` overrides.
-func ForgeProfile() string {
-	if override := os.Getenv("MTGLAB_FORGE_PROFILE"); override != "" {
-		return override
-	}
-	return filepath.Join(homeDir(), ".local", "share", "mtglab", "forge-profile")
-}
-
 // EnsureProfile writes `forge.profile.properties` and returns the commander
 // deck directory.
 //
@@ -219,16 +177,13 @@ func ForgeProfile() string {
 // Forge reads that file from its own program directory and nowhere else. It is
 // rewritten only when the contents would change, so a run does not needlessly
 // touch a shared install.
-func EnsureProfile(forgeHome string) (string, error) {
-	home := forgeHome
-	if home == "" {
-		home = ForgeHome()
-	}
+func (s Settings) EnsureProfile() (string, error) {
+	home := s.Home
 	if _, err := os.Stat(home); err != nil {
 		return "", NotInstalled("no Forge distribution at %s", home)
 	}
 
-	profile := ForgeProfile()
+	profile := s.Profile
 	wanted := fmt.Sprintf("userDir=%s\ncacheDir=%s\ncardPicsDir=%s\n",
 		profile, filepath.Join(profile, "cache"),
 		filepath.Join(profile, "cache", "pics"))
@@ -298,7 +253,6 @@ type RunOptions struct {
 	// different number than the request named.
 	Seed   *big.Int
 	Memory int
-	Home   string
 	// Timeout bounds the whole subprocess. Zero means the derived
 	// default.
 	Timeout time.Duration
@@ -337,7 +291,7 @@ func (e *timedOut) Is(target error) bool { return target == ErrTimedOut }
 // `games * clock` plus an allowance for JVM start is the honest ceiling — and
 // an unbounded wait is not hypothetical here, since one measured Trostani game
 // ran 134 seconds.
-func RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
+func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 	if len(decks) < 2 {
 		return nil, errors.New("a game needs at least two decks")
 	}
@@ -354,18 +308,15 @@ func RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 		opt.Timeout = time.Duration(60+opt.Games*opt.Clock) * time.Second
 	}
 
-	reports, err := CheckCoverage(decks, opt.Home)
+	reports, err := s.CheckCoverage(decks)
 	if err != nil {
 		return nil, err
 	}
-	deckDir, err := EnsureProfile(opt.Home)
+	deckDir, err := s.EnsureProfile()
 	if err != nil {
 		return nil, err
 	}
-	home := opt.Home
-	if home == "" {
-		home = ForgeHome()
-	}
+	home := s.Home
 
 	var names []string
 	seats := map[int]string{}
@@ -378,11 +329,11 @@ func RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 		seats[i+1] = d.Slug
 	}
 
-	java, err := JavaBinary()
+	java, err := s.JavaBinary()
 	if err != nil {
 		return nil, err
 	}
-	jar, err := DesktopJar(home)
+	jar, err := s.DesktopJar()
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +357,7 @@ func RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 	}
 	run.Seats = seats
 	run.Coverage = reports
-	run.ForgeVersion = ForgeVersion(home)
+	run.ForgeVersion = s.ForgeVersion()
 
 	if !run.Output.Trustworthy() {
 		var lines []string

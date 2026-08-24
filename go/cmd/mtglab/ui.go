@@ -30,14 +30,14 @@ import (
 // and the card pool are found under MTGLAB_DATA_DIR (`internal/config`); the
 // server has no `.env` reader, so on a laptop export what you need, or leave
 // auth off, which is the local default.
-func uiCommand() *cobra.Command {
+func uiCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 	var host, port, webDist, tarot string
 	cmd := &cobra.Command{
 		Use:   "ui",
 		Short: "Serve the app",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return serve(host, port, webDist, tarot)
+			return serve(cfg, forge, host, port, webDist, tarot)
 		},
 	}
 	f := cmd.Flags()
@@ -76,7 +76,7 @@ func envOr(name, fallback string) string {
 // at all: the mail provider renders as *which sender was chosen*, never as its
 // credential, and no ANTHROPIC_ or _TOKEN value appears in any form.
 // `TestTheBootSummaryLeaksNoSecret` holds that.
-func bootSummary(cfg config.Config, webDist, tarot string, poolPresent bool) []any {
+func bootSummary(cfg config.Config, forge tier3.Settings, webDist, tarot string, poolPresent bool) []any {
 	state := func(on bool, yes, no string) string {
 		if on {
 			return yes
@@ -94,7 +94,7 @@ func bootSummary(cfg config.Config, webDist, tarot string, poolPresent bool) []a
 		"pool", state(poolPresent, "present", "absent"),
 		"base_url", cfg.BaseURL,
 		"mail", state(cfg.ResendAPIKey != "", "provider", "console"),
-		"forge_worker", tier3.Configured(),
+		"forge_worker", forge.Configured(),
 	}
 }
 
@@ -141,12 +141,8 @@ func configComplaints(cfg config.Config) []string {
 	return out
 }
 
-func serve(host, port, webDist, tarot string) error {
+func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot string) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	// The environment, read once, here. Everything below is handed the
-	// resulting value, so the door and the summary describing it cannot
-	// disagree about what this process was configured to be.
-	cfg := settings()
 	// The schema ladder, before anything opens the file: creating `app.db`
 	// and bringing it to `auth.SchemaVersion` is this command's job, and a
 	// ladder that cannot be applied is a refusal to serve, not a warning — a
@@ -159,7 +155,7 @@ func serve(host, port, webDist, tarot string) error {
 	// anything can fail below, because a boot that dies wants its own
 	// configuration in the log above the error.
 	_, poolErr := os.Stat(cfg.DBPath())
-	log.Info("configuration", bootSummary(cfg, webDist, tarot, poolErr == nil)...)
+	log.Info("configuration", bootSummary(cfg, forge, webDist, tarot, poolErr == nil)...)
 	for _, complaint := range configComplaints(cfg) {
 		log.Warn(complaint)
 	}
@@ -185,7 +181,7 @@ func serve(host, port, webDist, tarot string) error {
 		AdminEmail:  cfg.AdminEmail,
 		// Read once here, like every other setting (ADR 39): the routes are
 		// handed where the calls go rather than looking it up per request.
-		Claude: claude.SettingsFromEnv(),
+		Forge: forge, Claude: claude.SettingsFromEnv(),
 		Logger: log,
 	})
 	if err != nil {

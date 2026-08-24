@@ -132,6 +132,17 @@ type Config struct {
 	// refuses -- which is the state CI runs in, and the state a test that says
 	// nothing about Claude should get rather than the developer's own key.
 	Claude claude.Settings
+	// Forge is where Forge lives on this machine and how the hosted worker is
+	// reached. The zero value names no distribution and no Fly app, so
+	// `/api/forge` answers `available: false` with the reason -- which is the
+	// state CI runs in, and the state a test that says nothing about Forge
+	// should get rather than the developer's own installation.
+	//
+	// Passed rather than looked up for the reason ADR 40 argues: the gate used
+	// to read `MTGLAB_FORGE_HOME` inside the handler, so a test could only
+	// describe a machine without Forge by unsetting a variable on the process
+	// every other test shared.
+	Forge tier3.Settings
 }
 
 // API holds the routes' dependencies.
@@ -155,6 +166,7 @@ type API struct {
 	mail           auth.MailSettings
 	clientIPHeader string
 	claude         claude.Settings
+	forge          tier3.Settings
 	jobs           *jobs.Registry
 	simCache       *cache.Store
 	matchLedgerOf  *matchledger.Recorder
@@ -203,7 +215,7 @@ func New(cfg Config) *API {
 		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
 		forgeClient: cfg.ForgeWorker,
 		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader,
-		claude: cfg.Claude}
+		claude: cfg.Claude, forge: cfg.Forge}
 }
 
 // background runs fn after the response has gone, which is, for the one

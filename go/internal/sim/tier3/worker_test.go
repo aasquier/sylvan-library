@@ -27,8 +27,13 @@ import (
 // reader and the real error classification -- everything except Fly's control
 // plane, which is asked for separately below with a stubbed transport.
 //
-// Serial for the same reason the install tests are: every path here reads the
-// environment, and `t.Setenv` panics inside a parallel test.
+// **These run in parallel now, and one of them could not have existed before.**
+// Until ADR 40 the client read `MTGLAB_FORGE_WORKER_URL` from the process, so
+// a stub shim published its address into the single global slot the process
+// has -- which made every test here serial, and made *two* stub shims in one
+// test impossible. [TestTheShimTokenRidesOnEveryRequest] wants exactly that:
+// one shim that demands a token and one that does not, running at once. It
+// now gets it, because a [Worker] carries the [Settings] naming its own shim.
 //
 // The distinction that matters most here is **503 versus everything else**: a
 // shim saying "no distribution" has to stay [ErrForgeNotInstalled] all the way
@@ -86,8 +91,19 @@ func newStubShim(t *testing.T) *stubShim {
 	})
 	s.Server = httptest.NewServer(mux)
 	t.Cleanup(s.Close)
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", s.URL)
 	return s
+}
+
+// worker is a client pointed at this shim and nothing else, which does not
+// actually sleep between health polls -- so a test of the retry loop costs
+// wall-clock nothing. `token` is what the shim will demand; empty is a door
+// with no lock.
+func (s *stubShim) worker(boot time.Duration, token string) *Worker {
+	return &Worker{
+		Settings: Settings{WorkerURL: s.URL, ShimToken: token},
+		Boot:     boot,
+		Sleep:    func(time.Duration) {},
+	}
 }
 
 func (s *stubShim) record(r *http.Request) {
@@ -115,10 +131,12 @@ func (s *stubShim) on(which string, h func(http.ResponseWriter, *http.Request)) 
 	}
 }
 
-// noWait is a worker that does not actually sleep between health polls, so a
-// test of the retry loop costs nothing.
-func noWait(boot time.Duration) *Worker {
-	return &Worker{Boot: boot, Sleep: func(time.Duration) {}}
+// flyWorker talks to Fly's control plane through a stub transport, with the
+// deployment described rather than exported.
+func flyWorker(fly *httptest.Server, s Settings) *Worker {
+	w := &Worker{Settings: s, HTTP: fly.Client(), Sleep: func(time.Duration) {}}
+	w.HTTP.Transport = rewriteTo(fly.URL)
+	return w
 }
 
 func testDeck(slug string) *deck.Deck {
@@ -130,38 +148,32 @@ func testDeck(slug string) *deck.Deck {
 // the same contract `/api/claude` set, where reachability is discovered when
 // work is actually asked for.
 func TestTheWorkerIsConfiguredByTheEnvironmentAlone(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	t.Setenv("MTGLAB_FORGE_WORKER", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "")
-	if Configured() {
-		t.Error("an unconfigured environment reported a worker")
-	}
-
-	// The dial alone is not enough: without a token there is nothing to
-	// start the machine with.
-	t.Setenv("MTGLAB_FORGE_WORKER", "1")
-	if Configured() {
-		t.Error("the dial without a token reported a worker")
-	}
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	if !Configured() {
-		t.Error("the dial and a token did not report a worker")
-	}
-
-	// A direct URL skips the Machines API entirely, so it is sufficient on
-	// its own -- this is how a laptop talks to a hand-started shim.
-	t.Setenv("MTGLAB_FORGE_WORKER", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "")
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "http://127.0.0.1:9999")
-	if !Configured() {
-		t.Error("a direct worker URL did not report a worker")
+	for _, c := range []struct {
+		what string
+		s    Settings
+		want bool
+	}{
+		{"an unconfigured environment", Settings{}, false},
+		// The dial alone is not enough: without a token there is nothing to
+		// start the machine with.
+		{"the dial without a token", Settings{WorkerEnabled: true}, false},
+		{"a token without the dial", Settings{FlyAPIToken: "tok"}, false},
+		{"the dial and a token", Settings{WorkerEnabled: true, FlyAPIToken: "tok"}, true},
+		// A direct URL skips the Machines API entirely, so it is sufficient on
+		// its own -- this is how a laptop talks to a hand-started shim.
+		{"a direct worker URL", Settings{WorkerURL: "http://127.0.0.1:9999"}, true},
+	} {
+		if got := c.s.Configured(); got != c.want {
+			t.Errorf("%s reported configured=%v, want %v", c.what, got, c.want)
+		}
 	}
 
 	// Whitespace is not a dial: an empty-looking value must not read as on.
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
+	// That is a fact about the *reader*, which is what keeps this one serial.
 	t.Setenv("MTGLAB_FORGE_WORKER", "   ")
 	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	if Configured() {
+	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
+	if LoadSettings().Configured() {
 		t.Error("a whitespace dial read as on")
 	}
 }
@@ -169,38 +181,44 @@ func TestTheWorkerIsConfiguredByTheEnvironmentAlone(t *testing.T) {
 // A direct URL is used as given, minus a trailing slash -- otherwise every
 // path would be requested with a double slash.
 func TestADirectWorkerURLSkipsTheMachinesAPI(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "http://shim.internal:8080/")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "")
-	base, err := (&Worker{}).BaseURL(context.Background())
+	t.Parallel()
+	// No transport at all: if this reached the Machines API it would fail
+	// rather than quietly succeed, which is the assertion. Trimming the
+	// trailing slash is [LoadSettings]'s job and is asked of the reader, in
+	// `TestTheOverridesWinAndTheFallbacksAgreeOnTheLayout`.
+	base, err := (&Worker{
+		Settings: Settings{WorkerURL: "http://shim.internal:8080"},
+	}).BaseURL(context.Background())
 	if err != nil {
 		t.Fatalf("a direct URL was refused: %v", err)
 	}
 	if base != "http://shim.internal:8080" {
-		t.Errorf("the base URL is %q -- the trailing slash was kept", base)
+		t.Errorf("the base URL is %q", base)
 	}
 }
 
 // The shim's token rides on every request when it is set, and the header is
 // simply absent when it is not.
 func TestTheShimTokenRidesOnEveryRequest(t *testing.T) {
-	shim := newStubShim(t)
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "s3cret")
+	t.Parallel()
+	// Two shims, running at the same time, in one test. Before ADR 40 the
+	// client read the shim's address out of the process, so there was exactly
+	// one slot for it and this had to be two sequential halves that each
+	// rewrote the environment. Now each worker carries its own.
+	locked, open := newStubShim(t), newStubShim(t)
 
-	if _, err := noWait(time.Second).Ready(context.Background()); err != nil {
+	if _, err := locked.worker(time.Second, "s3cret").Ready(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	for _, got := range shim.headers() {
+	if _, err := open.worker(time.Second, "").Ready(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, got := range locked.headers() {
 		if got != "Bearer s3cret" {
-			t.Errorf("a request carried %q", got)
+			t.Errorf("a request to the locked shim carried %q", got)
 		}
 	}
-
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
-	shim2 := newStubShim(t)
-	if _, err := noWait(time.Second).Ready(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	for _, got := range shim2.headers() {
+	for _, got := range open.headers() {
 		if got != "" {
 			t.Errorf("an unset token still sent %q", got)
 		}
@@ -211,6 +229,7 @@ func TestTheShimTokenRidesOnEveryRequest(t *testing.T) {
 // and the poll waits; a shim that never answers becomes a 503 that carries
 // the last thing it said.
 func TestReadyWaitsForTheShimToComeUp(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	var calls int
 	shim.on("healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -222,7 +241,7 @@ func TestReadyWaitsForTheShimToComeUp(t *testing.T) {
 		_, _ = io.WriteString(w, `{"ok":true}`)
 	})
 
-	base, err := noWait(10 * time.Second).Ready(context.Background())
+	base, err := shim.worker(10*time.Second, "").Ready(context.Background())
 	if err != nil {
 		t.Fatalf("a shim that came up late was refused: %v", err)
 	}
@@ -235,12 +254,13 @@ func TestReadyWaitsForTheShimToComeUp(t *testing.T) {
 }
 
 func TestAShimThatNeverAnswersBecomesANotInstalledRefusal(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("healthz", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "still unpacking", http.StatusServiceUnavailable)
 	})
 
-	_, err := noWait(50 * time.Millisecond).Ready(context.Background())
+	_, err := shim.worker(50*time.Millisecond, "").Ready(context.Background())
 	if err == nil {
 		t.Fatal("a dead shim was reported ready")
 	}
@@ -260,11 +280,12 @@ func TestAShimThatNeverAnswersBecomesANotInstalledRefusal(t *testing.T) {
 // A health endpoint that answers something other than the agreed shape is
 // not healthy, rather than being read as healthy by default.
 func TestAnUnreadableHealthAnswerIsNotHealthy(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `this is not json`)
 	})
-	if _, err := noWait(50 * time.Millisecond).Ready(context.Background()); err == nil {
+	if _, err := shim.worker(50*time.Millisecond, "").Ready(context.Background()); err == nil {
 		t.Fatal("a shim answering garbage was reported ready")
 	}
 }
@@ -272,6 +293,7 @@ func TestAnUnreadableHealthAnswerIsNotHealthy(t *testing.T) {
 // The pre-flight is computed where the card scripts live and re-raised here,
 // so the route's 422 does not care which machine read the zip.
 func TestThePreFlightCrossesTheWireAndComesBackTheSameShape(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("coverage", func(w http.ResponseWriter, r *http.Request) {
 		// The deck crossed as `deck.yaml` text, because `deck.FromText` is
@@ -291,7 +313,7 @@ func TestThePreFlightCrossesTheWireAndComesBackTheSameShape(t *testing.T) {
 			`"resolved":{"Sol Ring":"Sol Ring"},"missing":[]}]}`)
 	})
 
-	reports, err := noWait(time.Second).CheckCoverage(context.Background(),
+	reports, err := shim.worker(time.Second, "").CheckCoverage(context.Background(),
 		[]*deck.Deck{testDeck("gyome")})
 	if err != nil {
 		t.Fatalf("a covered deck failed the remote pre-flight: %v", err)
@@ -305,13 +327,14 @@ func TestThePreFlightCrossesTheWireAndComesBackTheSameShape(t *testing.T) {
 // fails, because coverage is checked before and after precisely so a dropped
 // card is never silent.
 func TestARemotePreFlightFailureIsStillACoverageFailure(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("coverage", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"reports":[{"slug":"gyome","checked":2,`+
 			`"resolved":{},"missing":["Nonexistent Card"]}]}`)
 	})
 
-	_, err := noWait(time.Second).CheckCoverage(context.Background(),
+	_, err := shim.worker(time.Second, "").CheckCoverage(context.Background(),
 		[]*deck.Deck{testDeck("gyome")})
 	if !errors.Is(err, ErrCoverageFailed) {
 		t.Fatalf("a missing card failed as %v, want ErrCoverageFailed", err)
@@ -325,6 +348,7 @@ func TestARemotePreFlightFailureIsStillACoverageFailure(t *testing.T) {
 // ErrForgeNotInstalled all the way up so the route answers 503; anything else
 // is a runtime failure the job records.
 func TestAShimRefusalKeepsItsClassAllTheWayUp(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name         string
 		code         int
@@ -345,7 +369,7 @@ func TestAShimRefusalKeepsItsClassAllTheWayUp(t *testing.T) {
 				w.WriteHeader(tc.code)
 				_, _ = io.WriteString(w, tc.body)
 			})
-			_, err := noWait(time.Second).CheckCoverage(context.Background(),
+			_, err := shim.worker(time.Second, "").CheckCoverage(context.Background(),
 				[]*deck.Deck{testDeck("gyome")})
 			if err == nil {
 				t.Fatal("the refusal was not raised")
@@ -365,6 +389,7 @@ func TestAShimRefusalKeepsItsClassAllTheWayUp(t *testing.T) {
 // callback is the same one a local run takes, so the API cannot tell the two
 // paths apart.
 func TestAStreamedMatchTicksPerGameAndRebuildsTheRun(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("match", func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
@@ -414,7 +439,7 @@ func TestAStreamedMatchTicksPerGameAndRebuildsTheRun(t *testing.T) {
 	}
 	var ticks []tick
 	seed := big.NewInt(42)
-	run, err := noWait(time.Second).RunMatch(context.Background(),
+	run, err := shim.worker(time.Second, "").RunMatch(context.Background(),
 		[]*deck.Deck{testDeck("gyome"), testDeck("trostani")}, 2, 300, seed,
 		func(finished int, g *GameResult) {
 			ticks = append(ticks, tick{finished, g != nil})
@@ -461,6 +486,7 @@ func TestAStreamedMatchTicksPerGameAndRebuildsTheRun(t *testing.T) {
 // are accepted so a deploy that updates the app before its worker never
 // breaks a match over it.
 func TestAPreStreamingShimIsStillUnderstood(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("match", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -469,7 +495,7 @@ func TestAPreStreamingShimIsStillUnderstood(t *testing.T) {
 			`"timed_out":false}],"seats":{"1":"gyome"},"wall_seconds":2.0}`)
 	})
 
-	run, err := noWait(time.Second).RunMatch(context.Background(),
+	run, err := shim.worker(time.Second, "").RunMatch(context.Background(),
 		[]*deck.Deck{testDeck("gyome")}, 1, 300, big.NewInt(1), nil)
 	if err != nil {
 		t.Fatalf("an old shim's answer was refused: %v", err)
@@ -487,12 +513,13 @@ func TestAPreStreamingShimIsStillUnderstood(t *testing.T) {
 // A flat answer that is not a run at all is refused rather than rebuilt into
 // an empty match that would look like a legitimate zero-game result.
 func TestAnUnreadableFlatAnswerIsRefused(t *testing.T) {
+	t.Parallel()
 	shim := newStubShim(t)
 	shim.on("match", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `["not", "a", "run"]`)
 	})
-	_, err := noWait(time.Second).RunMatch(context.Background(),
+	_, err := shim.worker(time.Second, "").RunMatch(context.Background(),
 		[]*deck.Deck{testDeck("gyome")}, 1, 300, big.NewInt(1), nil)
 	if err == nil {
 		t.Fatal("a nonsense answer rebuilt into a run")
@@ -505,6 +532,7 @@ func TestAnUnreadableFlatAnswerIsRefused(t *testing.T) {
 // The stream's own failure modes: an error line, a not-installed error line,
 // an unreadable line, and a stream that simply stops.
 func TestTheMatchStreamsFailureModes(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name         string
 		lines        string
@@ -527,7 +555,7 @@ func TestTheMatchStreamsFailureModes(t *testing.T) {
 				w.Header().Set("Content-Type", "application/x-ndjson")
 				_, _ = io.WriteString(w, tc.lines)
 			})
-			_, err := noWait(time.Second).RunMatch(context.Background(),
+			_, err := shim.worker(time.Second, "").RunMatch(context.Background(),
 				[]*deck.Deck{testDeck("gyome")}, 1, 300, big.NewInt(1), nil)
 			if err == nil {
 				t.Fatal("the stream's failure was not raised")
@@ -603,14 +631,10 @@ func TestTheStallBudgetIsPerReadRatherThanPerMatch(t *testing.T) {
 // Without a Fly token there is nothing to start a machine with, and that is a
 // 503 rather than a panic on an empty header.
 func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-
+	t.Parallel()
 	// The app name is asked for first, because there is no URL to call
 	// without one.
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FLY_APP", "")
-	t.Setenv("FLY_APP_NAME", "")
-	_, err := (&Worker{}).BaseURL(context.Background())
+	_, err := (&Worker{Settings: Settings{FlyAPIToken: "tok"}}).BaseURL(context.Background())
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Errorf("no app name failed as %v", err)
 	}
@@ -618,37 +642,27 @@ func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
 		t.Errorf("no app name said %q", err)
 	}
 
-	// Fly injects FLY_APP_NAME into every machine; the override exists for
-	// tests and for talking to the instance from a laptop.
-	t.Setenv("FLY_APP_NAME", "mtglab")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "")
-	_, err = (&Worker{}).BaseURL(context.Background())
+	_, err = (&Worker{Settings: Settings{FlyApp: "mtglab"}}).BaseURL(context.Background())
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Errorf("no token failed as %v", err)
 	}
 	if err == nil || !strings.Contains(err.Error(), "MTGLAB_FLY_API_TOKEN") {
 		t.Errorf("the refusal said %q", err)
 	}
+}
 
-	// The override wins over Fly's own injection.
+// Fly injects FLY_APP_NAME into every machine; MTGLAB_FLY_APP overrides it,
+// for tests and for talking to the instance from a laptop. Which of the two
+// won is a question about the reader, so it is asked of the reader.
+func TestTheFlyAppOverrideWinsOverFlysOwnInjection(t *testing.T) {
+	t.Setenv("FLY_APP_NAME", "mtglab")
+	t.Setenv("MTGLAB_FLY_APP", "")
+	if got := LoadSettings().FlyApp; got != "mtglab" {
+		t.Errorf("Fly's own injection lost: %q", got)
+	}
 	t.Setenv("MTGLAB_FLY_APP", "somewhere-else")
-	if got, err := appName(); err != nil || got != "somewhere-else" {
-		t.Errorf("appName() = %q, %v -- the override lost", got, err)
-	}
-	// And the machine name has its own default.
-	t.Setenv("MTGLAB_FORGE_MACHINE", "")
-	if got := machineName(); got != "forge-worker" {
-		t.Errorf("the default machine is %q", got)
-	}
-	// A shim port that will not parse falls back rather than becoming zero,
-	// which would build a URL nothing answers on.
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", "not-a-port")
-	if got := shimPort(); got != 8080 {
-		t.Errorf("an unparseable port became %d", got)
-	}
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", "9999")
-	if got := shimPort(); got != 9999 {
-		t.Errorf("an explicit port became %d", got)
+	if got := LoadSettings().FlyApp; got != "somewhere-else" {
+		t.Errorf("the override lost: %q", got)
 	}
 }
 
@@ -656,6 +670,7 @@ func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
 // minutes, and the deploy workflow does it. A missing machine says so rather
 // than provisioning infrastructure from a request thread.
 func TestAMissingMachineIsReportedRatherThanCreated(t *testing.T) {
+	t.Parallel()
 	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Errorf("the client tried to %s %s -- creation is not its job", r.Method, r.URL.Path)
@@ -664,13 +679,8 @@ func TestAMissingMachineIsReportedRatherThanCreated(t *testing.T) {
 	}))
 	defer fly.Close()
 
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FLY_APP", "mtglab")
-	t.Setenv("MTGLAB_FORGE_MACHINE", "forge-worker")
-
-	w := &Worker{HTTP: fly.Client(), Sleep: func(time.Duration) {}}
-	w.HTTP.Transport = rewriteTo(fly.URL)
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine})
 	_, err := w.BaseURL(context.Background())
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Fatalf("a missing machine failed as %v", err)
@@ -685,6 +695,7 @@ func TestAMissingMachineIsReportedRatherThanCreated(t *testing.T) {
 // A stopped machine is started and waited for, and the base URL is built
 // from the machine's own id on the private network.
 func TestAStoppedMachineIsStartedAndWaitedFor(t *testing.T) {
+	t.Parallel()
 	var paths []string
 	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.Method+" "+r.URL.Path)
@@ -697,14 +708,8 @@ func TestAStoppedMachineIsStartedAndWaitedFor(t *testing.T) {
 	}))
 	defer fly.Close()
 
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FLY_APP", "mtglab")
-	t.Setenv("MTGLAB_FORGE_MACHINE", "forge-worker")
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", "8080")
-
-	w := &Worker{HTTP: fly.Client(), Sleep: func(time.Duration) {}}
-	w.HTTP.Transport = rewriteTo(fly.URL)
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine, ShimPort: DefaultShimPort})
 	base, err := w.BaseURL(context.Background())
 	if err != nil {
 		t.Fatalf("starting the machine: %v", err)
@@ -723,6 +728,7 @@ func TestAStoppedMachineIsStartedAndWaitedFor(t *testing.T) {
 
 // An already-started machine is used as-is: no start, no wait.
 func TestAStartedMachineIsUsedAsIs(t *testing.T) {
+	t.Parallel()
 	var paths []string
 	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
@@ -730,13 +736,8 @@ func TestAStartedMachineIsUsedAsIs(t *testing.T) {
 	}))
 	defer fly.Close()
 
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FLY_APP", "mtglab")
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", "")
-
-	w := &Worker{HTTP: fly.Client(), Sleep: func(time.Duration) {}}
-	w.HTTP.Transport = rewriteTo(fly.URL)
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine, ShimPort: DefaultShimPort})
 	base, err := w.BaseURL(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -756,18 +757,15 @@ func TestAStartedMachineIsUsedAsIs(t *testing.T) {
 // diagnosis available -- truncated at 300 code points so a multibyte rune is
 // never split.
 func TestTheMachinesAPIsOwnWordsReachTheCaller(t *testing.T) {
+	t.Parallel()
 	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = io.WriteString(w, `{"error":"token expired"}`)
 	}))
 	defer fly.Close()
 
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FLY_APP", "mtglab")
-
-	w := &Worker{HTTP: fly.Client(), Sleep: func(time.Duration) {}}
-	w.HTTP.Transport = rewriteTo(fly.URL)
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine})
 	_, err := w.BaseURL(context.Background())
 	if err == nil {
 		t.Fatal("a 401 was not raised")
@@ -781,17 +779,14 @@ func TestTheMachinesAPIsOwnWordsReachTheCaller(t *testing.T) {
 // list, which would present as "no machine named forge-worker" and send
 // somebody looking at the deploy workflow.
 func TestAnUnreadableMachineListIsSaidPlainly(t *testing.T) {
+	t.Parallel()
 	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"machines": "not a list"}`)
 	}))
 	defer fly.Close()
 
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FLY_APP", "mtglab")
-
-	w := &Worker{HTTP: fly.Client(), Sleep: func(time.Duration) {}}
-	w.HTTP.Transport = rewriteTo(fly.URL)
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine})
 	_, err := w.BaseURL(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "could not read") {
 		t.Errorf("an unreadable list said %q", err)

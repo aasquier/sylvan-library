@@ -8,6 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/claude"
+	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
+
 	"github.com/spf13/cobra"
 )
 
@@ -213,7 +217,7 @@ func TestTheDevServersAskThisBinaryForCommandsItHas(t *testing.T) {
 			}
 			verb := rest[0]
 			var cmd *cobra.Command
-			for _, c := range newRoot().Commands() {
+			for _, c := range newRoot(config.Config{}, tier3.Settings{}, claude.Endpoint{}).Commands() {
 				if c.Name() == verb {
 					cmd = c
 				}
@@ -247,7 +251,7 @@ func TestTheDevServersAskThisBinaryForCommandsItHas(t *testing.T) {
 
 func commandNames() map[string]bool {
 	have := map[string]bool{}
-	for _, c := range newRoot().Commands() {
+	for _, c := range newRoot(config.Config{}, tier3.Settings{}, claude.Endpoint{}).Commands() {
 		have[c.Name()] = true
 	}
 	return have
