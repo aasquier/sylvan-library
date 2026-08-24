@@ -1978,6 +1978,13 @@ search: no-text, WITHOUT price subquery                          median    38.40
     at 0.1×. Every one matches, the window is modelled rather than flattened
     (`Priced.On`), and `Checked = 2026-08-18` renders beside every figure.
     **The window closes in seven days** and the code needs no change for it.
+  - **Refusable-before-the-call survived the crossing, on every paid
+    surface.** `scan` refuses an unknown media type, bad base64, an empty
+    capture or an oversized frame before a payload exists (`ErrScanRefused`);
+    research reads the question's shape and refuses in the request rather than
+    minutes later; and `Converse` validates the request and builds the mode's
+    schemas *above* its first `Messages.New`, so a mode cannot error after
+    spending. Nothing new has been added below that line.
   - **The seven prompts carry no dated-model cruft.** Scanned for the
     patterns that drift under a newer model — chain-of-thought prodding,
     "take a deep breath", `<thinking>` tags, JSON-only nagging that structured
