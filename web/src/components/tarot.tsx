@@ -309,18 +309,32 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
 
   return (
     <div className={`tarot-slot${small ? ' is-small' : ''}`} style={style}>
-      {/* The place printed on the cloth, under the card that fills it. Only
-          on the felt: in the folded strip the cards are context for the
-          conversation, and a marked position with a card already in it is a
-          label for something nobody is about to do. */}
-      {!small && <span className="tarot-place" aria-hidden="true" />}
-      {onTurn && !faceUp
-        ? (
-          <button onClick={onTurn} className="tarot-hinge" aria-label={`Turn over ${card.position}`}>
-            {inner}
-          </button>
-          )
-        : <div className="tarot-hinge" role="img" aria-label={label}>{inner}</div>}
+      {/* The card, and the place printed on the cloth under it, in a box of
+          their own.
+
+          The place used to take its size from the whole slot, which is the
+          same box as the card only while the legend is absolutely
+          positioned. On a touch screen it is not -- `(hover: hover)` keeps
+          those lines in flow, because a phone has no pointer to rest and a
+          newcomer must still be able to read what the cards are. So the slot
+          grew by however many lines that card's legend ran to, and the gold
+          frame grew with it: three cards carrying two, three and four lines
+          printed three different-sized places on the cloth, and they crossed
+          both each other and their neighbours. An `inset` off this box
+          cannot disagree with the card it frames. Only on the felt: in the
+          folded strip the cards are context for the conversation, and a
+          marked position with a card already in it is a label for something
+          nobody is about to do. */}
+      <div className="tarot-seat">
+        {!small && <span className="tarot-place" aria-hidden="true" />}
+        {onTurn && !faceUp
+          ? (
+            <button onClick={onTurn} className="tarot-hinge" aria-label={`Turn over ${card.position}`}>
+              {inner}
+            </button>
+            )
+          : <div className="tarot-hinge" role="img" aria-label={label}>{inner}</div>}
+      </div>
       <div className="tarot-legend">
       <p className="tarot-caption mt-2 text-center text-[11px] uppercase tracking-wide">
         {card.position}

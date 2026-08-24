@@ -229,6 +229,27 @@ body {
   filter: brightness(1.12) saturate(1.1);
 }
 
+/* A masthead that MOVES, shown at the size a moving picture earns.
+ *
+ * The still mastheads are card art -- 626x457, one painting beside the words
+ * -- and 260px of column is the right size for one. The two authored loops
+ * (the Simulator's goldfish, About Claude's aisle) are 16:9 and were wearing
+ * the same 260px column: 260x191 on a 1232px band, which is a fifth of the
+ * width with a quarter of the picture cropped away by `object-cover`. The
+ * goldfish's whole complaint -- that the fish barely moves -- is partly this.
+ * A fish turning through 180 degrees is not visible in a 260px letterbox.
+ *
+ * So a loop keeps its own 16:9 and takes a share of the row instead. The
+ * `max-width` is what stops it from eating an ultrawide window, and
+ * `align-self` is load-bearing rather than tidy: a flex item stretches by
+ * default, and a stretched cross size beats `aspect-ratio` outright -- which
+ * would put the crop straight back. */
+.masthead-loop {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  align-self: center;
+}
+
 .hero-scrim {
   position: absolute;
   inset: 0;
@@ -527,6 +548,9 @@ body {
 .tarot-slot {
   position: relative;
   width: 168px;
+  /* How much a turned card grows under the pointer. One number, read by the
+     hinge's own transform and by the legend that has to stay off it. */
+  --tarot-zoom: 1.35;
   /* The scans are 400x693-700 — a percent or so apart, because they are
      photographs of ninety-year-old cardboard rather than renders. A fixed box
      with `cover` on the image keeps the three the same size; the alternative,
@@ -545,6 +569,15 @@ body {
   width: 96px;
   /* The strip is a row again. The arc is ceremony and the strip is not. */
   margin-top: 0;
+}
+
+/* The seat: the card, and the place printed on the cloth under it. Nothing
+   else is in this box, and that is the point — `.tarot-place` derives from
+   THIS rather than from the slot, because the two are the same box only
+   while the legend is absolutely positioned, which it is on a pointer and
+   is not on a phone. `TarotCard` carries the argument. */
+.tarot-seat {
+  position: relative;
 }
 
 /* ── the places printed on the cloth ────────────────────────────────────────
@@ -566,7 +599,7 @@ body {
  * something stamped into baize rather than a border drawn on top of it. */
 .tarot-place {
   position: absolute;
-  /* An even margin round the slot, not a box of its own (Aaron, 2026-08-18:
+  /* An even margin round the card, not a box of its own (Aaron, 2026-08-18:
      "clipped on the bottom of all of them"). It used to be sized by
      `width: calc(100% + 30px)` and its own `aspect-ratio`, which is 30px
      wider than the card and therefore *52px* taller — offset only 15px up,
@@ -574,9 +607,16 @@ body {
      underneath and gave the slot the height to hold it; the moment they
      moved onto hover, the slot became exactly as tall as the card and the
      overhang ran into the table panel's `overflow: hidden`.
-     `inset` derives both from the slot, so the frame cannot disagree with
-     the card it frames. */
-  inset: -15px;
+     `inset` derives both from the seat, so the frame cannot disagree with
+     the card it frames.
+     The margin is a custom property rather than a number, and that is half
+     of a second fix rather than tidiness: the spread's gap is derived from
+     the same property, so the frame's bleed and the space between two
+     frames cannot disagree. They did, on a phone — 15px of bleed each side
+     against a 16.9px gap is 13px of one place printed across the next
+     (Aaron, 2026-08-24: "the borders around cards are overlapping each
+     other on mobile"). */
+  inset: calc(-1 * var(--place-inset, 15px));
   border-radius: 14px;
   border: 1px solid rgba(226, 194, 122, 0.38);
   box-shadow:
@@ -664,8 +704,11 @@ button.tarot-hinge {
 }
 
 /* The folded strip zooms harder, because it starts smaller: 96px is a stamp
-   and 1.35 of a stamp is still a stamp. */
-.tarot-spread.is-small .tarot-hinge {
+   and 1.35 of a stamp is still a stamp.
+   Declared on the SLOT rather than on the hinge that reads it, and that is
+   what lets the legend below clear a card that has grown: a custom property
+   inherits down and the legend is the hinge's sibling, not its child. */
+.tarot-spread.is-small .tarot-slot {
   --tarot-zoom: 2.1;
 }
 
@@ -984,6 +1027,24 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-caption {
     margin-top: 0;
     color: #6b4f2a;
+  }
+
+  /* Above a card that has GROWN, which is a different height from the card
+     that has not (Aaron, 2026-08-24: "the reminder text appears awkwardly on
+     the desktop clipping the top of the card").
+     The two rules that make this necessary are three lines apart and neither
+     is wrong: the slip stands at the top of the slot, and a turned card
+     scales from `center bottom`, so its top rises by (zoom - 1) of the
+     slot's height and swallows the slip whole. At 1280px that is 205px of
+     card growing 72px upward into a slip standing 8px clear of it — painted,
+     opaque, and over the picture somebody hovered in order to look at.
+     `100%` here is the slot's height, which is the card's, so
+     `100% * zoom + 0.5rem` is the same 8px of clearance measured off the top
+     of the card as it is actually drawn. Only where a card is face up, since
+     a face-down card does not grow and a slip floating 72px over one would
+     be this bug with the sign flipped. */
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up) .tarot-legend {
+    bottom: calc(100% * var(--tarot-zoom, 1.35) + 0.5rem);
   }
 
   .tarot-ceremony .tarot-slot:hover .tarot-legend,
@@ -1649,7 +1710,14 @@ button:hover .tarot-fan-card {
      the cards; with the sphere centred and nothing flanking it, three cards
      flung to the table's corners read as three separate objects rather than
      as one spread laid in front of the reader. */
-  gap: 0 clamp(1rem, 4.5vw, 64px);
+  /* The bleed of a place and the space between two of them, from one
+     number. The gap can never fall below what two bleeds and a hairline of
+     felt need, so however hard flex shrinks the cards — and at 375px it
+     shrinks them to 87px, well under their 110px base — the three places
+     stay separate objects printed on the cloth. */
+  --place-inset: clamp(6px, 1.4vw, 15px);
+  gap: 0 max(clamp(1rem, 4.5vw, 64px),
+             calc(2 * var(--place-inset) + 10px));
   flex-wrap: nowrap;
 }
 
