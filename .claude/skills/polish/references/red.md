@@ -1,11 +1,58 @@
 # Red — Speed & Alarum
 
-Three facets: the CI/CD pipeline, alerting & self-healing, and the controls —
-commandment 17 made checkable. Red is speed, the fire alarm, and the answered
-impulse: the pipeline that answers fast, the bell that rings before Aaron's
-friends notice the site is down, and the button that replies the instant a
-hand reaches for it. A control belongs to Red for the same reason lightning
-does — its whole virtue is the speed of its reply.
+Four facets: the CI/CD pipeline, alerting & self-healing, the hot-spot
+patrol, and the controls — commandment 17 made checkable. Red is speed, the
+fire alarm, and the answered impulse: the pipeline that answers fast, the
+bell that rings before Aaron's friends notice the site is down, the patrol
+that finds where the time goes while it is still smoke, and the button that
+replies the instant a hand reaches for it. A control belongs to Red for the
+same reason lightning does — its whole virtue is the speed of its reply.
+
+## Facet: the hot-spot patrol
+
+Black profiles when a number looks wrong; until this facet, nobody profiled
+when nothing did. The patrol is the proactive half — find where the time
+actually goes while it is still nobody's complaint — and it sits beside the
+fire alarm because that is what it is: a hot spot is smoke, and smoke found
+early is a fix chosen calmly instead of a Saturday debugging session.
+
+**The division of labor is one sentence: Red finds *where*; Black owns
+*whether and how*.** The patrol produces a ranking and never an optimisation.
+Anything worth chasing is handed to Black's discipline — benchstat
+before/after, the alloc analysis, the fingerprint caveat that stops a 2% win
+from dumping the Tier 1 cache — because an optimisation taken without that
+discipline is how the expensive mistakes in Black's ledger got made.
+
+The method, with the tools that exist today:
+
+- **Profile the hot packages under test-shaped load.** The serving process
+  has no profiling mount (checked 2026-08-23 — no pprof anywhere in the
+  tree), so the patrol profiles at the package seam: `-cpuprofile` and
+  `-memprofile` over the suites of the packages the routes lean on
+  (`library`, `deckread`, `gate`, `sim/tier1`, `api` itself), then
+  `go tool pprof -top -nodecount=25` on each. Test-shaped load is not
+  request-shaped load — say so in the ledger line — but a function fat in
+  both is fat.
+- **Clock every route a session actually hits, from outside, warm and cold**
+  — shared with the alerting facet's probe, one measurement recorded once
+  (the rule Green and Black already follow). The route clock is what catches
+  the flat-profile case: a request spending its time in cgo or in waiting
+  shows a quiet profile and a loud clock, and the difference *is* the
+  finding.
+- **The record is a ranking, and the trend is the alarm.** Top-10 CPU and
+  top-10 alloc into the ledger each patrol, beside last patrol's. A function
+  that climbed three places is news even when the wall time has not moved —
+  that is smoke before flame, the whole reason this lives in Red.
+- **Two standing blind spots, so the patrol never files a false alarm**: cgo
+  (pool time lands under `runtime.cgocall` with no shape — clock the
+  database at the query, per Black's shelf) and the sampling floor (a
+  sampled profile cannot see a function that runs two milliseconds per
+  request; the route clock catches what the profiler cannot).
+
+The upgrade that would let the patrol profile the *serving process itself* —
+a pprof mount, dev-local and perhaps admin-gated live — is a door change and
+therefore Aaron's, queued in `DAYBREAK.md` with the security argument that
+makes it his call.
 
 ## Facet: CI/CD
 

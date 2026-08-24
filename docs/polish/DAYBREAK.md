@@ -101,6 +101,23 @@ derives its expectation from the source of truth rather than restating it (the
 pass's own rule), and it would have caught four of the five above at commit
 time. A colorless run's natural first job.
 
+**7. A pprof mount, so the hot-spot patrol can profile the serving process
+itself.** Red's new patrol profiles at the package seam because the door has
+no profiling endpoint at all — the tree contains no pprof anywhere. Two
+halves, separable: (a) **dev-local**, mounting `net/http/pprof` only when
+auth is off, which is a laptop-only surface and lets a patrol profile
+`mtglab ui` under real request-shaped load; (b) **live**, the same mount
+admin-gated behind ADR 17's 403-by-prefix, which is what would catch a hot
+spot that only exists against the real pool and the real library. · *Cost of
+leaving it:* the patrol reads test-shaped load and outside clocks, which is
+honest but blind to request-shaped hot spots. · **Recommendation:** (a) yes —
+small, laptop-only, no deployed surface; (b) is genuinely useful but is a
+door change with a real caveat: **heap profiles carry process memory**, and
+this process's memory holds session tokens and Argon2id parameters, so live
+would mean CPU-profile-only and admin-gated, and commandment 10 keeps it
+invisible to users either way. (b) is your call, and it can wait for a hot
+spot the local mount cannot explain.
+
 ---
 
 ## Answered

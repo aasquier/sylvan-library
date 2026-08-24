@@ -88,6 +88,12 @@ performance bug in the codebase sat inside that number for three days. A
 millisecond is a datum. **A large millisecond is a question**, and nothing
 here used to say so.
 
+Red's hot-spot patrol is this facet's scout: it profiles on schedule, with no
+number needing to look wrong first, and hands over a ranking. What arrives
+from it is a *where*, never a mandate — the discipline below decides whether
+any line of that ranking is worth its diff, and everything it hands over goes
+through the same benchstat-and-caveats gauntlet as a finding born here.
+
 The purpose-built `bench` command retired with the old backend and its Go
 rebuild is an open ledger item, so this facet runs on the stock toolchain.
 That is a trade up, not down: Go ships a sampling profiler, an allocation
