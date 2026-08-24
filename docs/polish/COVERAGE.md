@@ -192,6 +192,16 @@ and `ci.yml` gated on the other.
 - **`/api/jobs` does not read `app.db`.** The registry is in-memory, so `[]` is
   honest whatever the database is doing. A hand-kept "these read the database"
   list put it on the wrong side and failed the sweep on correct behaviour.
+- **A free port is not a held one.** `net.Listen(":0")`, read the number,
+  close — and between that close and the bind, anything on the machine may take
+  it. `go test ./...` runs forty-odd binaries at once, most standing up
+  `httptest.Server`s out of the same ephemeral range, so widening parallelism
+  makes this *more* likely rather than less. It cost one red `main` after #291,
+  on amd64 only. Worse than the flake was the message: the test polled for two
+  seconds and reported **"the server never answered"** when the truth was "the
+  port was taken", which sends the next person after a bug that is not there.
+  `bootServer`/`bootShim` in `cmd/mtglab/serve_test.go` retry on a fresh port
+  and watch the boot channel, so a real refusal is still a real refusal.
 - **A sweep that sweeps nothing passes.** Every table-driven sweep here carries
   a floor (`if swept < 15`), because a pattern filler that stops matching the
   route table is silent otherwise — and silent is indistinguishable from green.

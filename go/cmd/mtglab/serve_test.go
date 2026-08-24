@@ -48,6 +48,19 @@ func atoi(t *testing.T, port string) int {
 // freePort takes an ephemeral port and gives it straight back, so the caller
 // can name it. A race in principle; in practice the kernel does not hand the
 // same port out twice in the microseconds between.
+// **A free port is not a held one.** `:0` asks the kernel for an unused port
+// and this hands it back the moment it has the number, so between the close
+// here and the bind in whatever is about to use it, anything on the machine
+// may take it — and `go test ./...` runs forty-odd test binaries at once, most
+// of them standing up `httptest.Server`s out of the same ephemeral range.
+//
+// That is a race with no fix at this level, which is why nothing here trusts
+// one port: [bootServer] and [bootShim] retry on a fresh one, and both watch
+// the boot for a bind failure rather than waiting out a timeout that would
+// report the wrong thing. **A test that reports "the server never answered"
+// when the truth is "the port was taken" sends the next person after a bug
+// that is not there** — this failed exactly once on CI, on amd64 only, and
+// said the former.
 func freePort(t *testing.T) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -79,22 +92,9 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 	signal.Notify(guard, syscall.SIGTERM)
 	defer signal.Stop(guard)
 
-	port := freePort(t)
-	done := make(chan error, 1)
-	go func() { done <- serve(d.Config, tier3.Settings{}, "127.0.0.1", port, t.TempDir(), t.TempDir()) }()
-
 	// The ladder ran on the way up, which is the first thing the boot owes.
-	base := "http://127.0.0.1:" + port
-	client := &http.Client{Timeout: 2 * time.Second}
-	var resp *http.Response
-	var err error
-	for i := 0; i < 100; i++ {
-		resp, err = client.Get(base + "/api/health")
-		if err == nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	port, base, done := bootServer(t, d)
+	resp, err := waitForHealth(t, base+"/api/health")
 	if err != nil {
 		t.Fatalf("the server never answered on %s: %v", base, err)
 	}
@@ -134,6 +134,103 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 	} else {
 		_ = l.Close()
 	}
+}
+
+// bootServer starts `serve` on a port nothing else is holding and returns once
+// it is listening. Retries on a fresh port when the bind loses the race
+// described on [freePort], and fails loudly on any other refusal — a boot that
+// died for a real reason must not be reported as a boot that was slow.
+func bootServer(t *testing.T, d deployment) (port, base string, done chan error) {
+	t.Helper()
+	for attempt := range 4 {
+		port = freePort(t)
+		base = "http://127.0.0.1:" + port
+		done = make(chan error, 1)
+		go func() {
+			done <- serve(d.Config, tier3.Settings{}, "127.0.0.1", port, t.TempDir(), t.TempDir())
+		}()
+		if err := listening(base + "/api/health"); err == nil {
+			return port, base, done
+		}
+		// It is not answering. Either the bind lost the port, in which case
+		// `serve` has already returned and we take a new one, or it is simply
+		// still coming up -- and then `done` is empty and we let it be.
+		select {
+		case err := <-done:
+			if err != nil && strings.Contains(err.Error(), "listen on") {
+				t.Logf("boot attempt %d lost the port (%v); taking another", attempt+1, err)
+				continue
+			}
+			t.Fatalf("the boot ended for a reason that is not the port: %v", err)
+		default:
+			return port, base, done
+		}
+	}
+	t.Fatal("four ports in a row were taken between the pick and the bind")
+	return "", "", nil
+}
+
+// bootShim is [bootServer] for the worker's door: the same race, the same
+// retry, and the same refusal to report a lost port as a slow boot.
+//
+// **Zero idle seconds means never stop**, which is what a laptop running the
+// shim by hand wants -- and what keeps this test from having its own process
+// exited out from under it by the watchdog.
+func bootShim(t *testing.T, ctx context.Context) string {
+	t.Helper()
+	for attempt := range 4 {
+		port := freePort(t)
+		forge := tier3.Settings{
+			ShimHost: "127.0.0.1", ShimPort: atoi(t, port),
+			Home: t.TempDir(), IdleSeconds: 0,
+		}
+		done := make(chan error, 1)
+		go func() { done <- serveShim(ctx, forge) }()
+
+		base := "http://127.0.0.1:" + port
+		if err := listening(base + "/healthz"); err == nil {
+			return base
+		}
+		select {
+		case err := <-done:
+			t.Logf("shim attempt %d lost the port (%v); taking another", attempt+1, err)
+			continue
+		default:
+			return base
+		}
+	}
+	t.Fatal("four ports in a row were taken between the pick and the bind")
+	return ""
+}
+
+// listening polls until something answers, for about two seconds.
+func listening(target string) error {
+	client := &http.Client{Timeout: 2 * time.Second}
+	var err error
+	for range 100 {
+		var resp *http.Response
+		if resp, err = client.Get(target); err == nil {
+			_ = resp.Body.Close()
+			return nil
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return err
+}
+
+// waitForHealth is [listening] again, keeping the response this time.
+func waitForHealth(t *testing.T, target string) (*http.Response, error) {
+	t.Helper()
+	client := &http.Client{Timeout: 2 * time.Second}
+	var resp *http.Response
+	var err error
+	for range 100 {
+		if resp, err = client.Get(target); err == nil {
+			return resp, nil
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return nil, err
 }
 
 // A port already in use is a refusal that names the address, because the
@@ -262,32 +359,10 @@ func runProbe(t *testing.T, url string) error {
 // its health route, and is not holding a JVM to do it.
 func TestTheShimListensAndAnswersItsHealthRoute(t *testing.T) {
 	t.Parallel()
-	port := freePort(t)
-	forge := tier3.Settings{
-		ShimHost: "127.0.0.1",
-		ShimPort: atoi(t, port),
-		Home:     t.TempDir(),
-		// **Zero means never**, which is what a laptop running the shim by
-		// hand wants -- and what keeps this test from having its process
-		// exited out from under it by the idle watchdog.
-		IdleSeconds: 0,
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- serveShim(ctx, forge) }()
+	base := bootShim(t, ctx)
 
-	base := "http://127.0.0.1:" + port
-	client := &http.Client{Timeout: 2 * time.Second}
-	var resp *http.Response
-	var err error
-	for i := 0; i < 100; i++ {
-		resp, err = client.Get(base + "/healthz")
-		if err == nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	resp, err := waitForHealth(t, base+"/healthz")
 	if err != nil {
 		cancel()
 		t.Fatalf("the shim never answered on %s: %v", base, err)
