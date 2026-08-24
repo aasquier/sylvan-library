@@ -172,6 +172,39 @@ and the recorded worker-wire corpus pins the shape from both sides. The
 image holds GPL'd Forge and is pushed only to the app's private registry —
 deployment, never distribution.
 
+### Forge's AI is not single-threaded, and starving it changes the game
+
+A match looks single-threaded. Forge plays one game at a time and `-n 10`
+plays ten of them in sequence, so the obvious guess is that a second core does
+nothing for one match. **The guess is wrong**, and `/usr/bin/time` says so on
+two real three-game matches:
+
+| run | wall | CPU (user+sys) | parallelism |
+|-----|------|----------------|-------------|
+| 1   | 44.8s | 102.6s        | 2.29× |
+| 2   | 21.5s | 53.7s         | 2.50× |
+
+Forge's AI simulates ahead on a thread pool —
+`AiController.chooseSpellAbilityToPlayFromList` runs inside a `FutureTask` —
+so a single game wants between two and three cores.
+
+**What starvation costs is not only time.** That pool is wrapped in
+`TimeLimitedCodeBlock`, and the first run above printed
+`java.util.concurrent.TimeoutException` out of `chooseSpellAbilityToPlay`: the
+AI's deliberation cut short and a worse move played. A CPU-starved worker does
+not return the same match more slowly, it returns a **differently played**
+match. That is ADR 36's argument about Forge's version applied to the
+hardware — the instrument has to be steady for the readings to compare.
+
+The worker is `performance-4x` (4 cores, 8192MB) for that reason. Four rather
+than six: 2.5× is what the AI saturated on an 8-core machine that was not
+rationing it.
+
+It is also why **sharding one match across concurrent JVMs is not the win it
+looks like**. A single match already wants most of two-and-a-half cores, so
+two of them on four cores contend rather than scale. Throughput across *many*
+matches — a nightly sweep — is a different question and still open.
+
 ### The worker carries a quarter of the distribution
 
 The release is one download for every way Forge can be played — an Adventure

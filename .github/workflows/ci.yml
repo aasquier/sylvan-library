@@ -752,12 +752,39 @@ jobs:
 
           # Dedicated CPU is ADR 35's core sizing argument: on throttled
           # shared cores the measured tail stretches into the clock and
-          # clock-outs are corrupted measurements, not slow ones. 2 vCPUs and
-          # 4GB against a 3GB JVM heap ceiling (the shim's default) — resize
-          # against measurement, not upward by reflex.
+          # clock-outs are corrupted measurements, not slow ones.
+          #
+          # **`performance-4x` since 2026-08-24, and the reason is a
+          # measurement that contradicted the obvious guess.** A match looks
+          # single-threaded — Forge plays one game at a time and `-n 10` plays
+          # ten of them in sequence — so two vCPUs looked like plenty. It is
+          # not: `/usr/bin/time` on two real three-game matches read 102.6s of
+          # CPU against 44.8s of wall, and 53.7s against 21.5s. That is 2.3×
+          # and 2.5× — **Forge's AI simulates ahead on a thread pool**
+          # (`AiController.chooseSpellAbilityToPlayFromList` runs inside a
+          # `FutureTask`), so a single game wants somewhere between two and
+          # three cores and had exactly two.
+          #
+          # **What starvation costs is not only time.** That thread pool is
+          # wrapped in `TimeLimitedCodeBlock`, and the first of those runs
+          # printed `java.util.concurrent.TimeoutException` out of
+          # `chooseSpellAbilityToPlay` — the AI's deliberation cut short and a
+          # worse move played. So a CPU-starved worker does not return the
+          # same match more slowly; it returns a *differently played* match.
+          # That is the ADR 36 argument about Forge's version applied to the
+          # hardware: the instrument has to be steady for the readings to
+          # compare.
+          #
+          # Four rather than six or eight: 2.5× is what the AI saturated on an
+          # 8-core machine that was not rationing it, so four covers the
+          # measured appetite with room for the JVM's own threads and buys
+          # nothing above that. `performance-4x` is 4 cores and 8192MB
+          # (`fly platform vm-sizes`); the JVM heap stays at the shim's 3GB
+          # default because nothing measured says it was ever short. Resize
+          # against measurement, not upward by reflex — which is what this is.
           config=$(jq -n --arg img "$IMAGE" '{
             image: $img,
-            guest: {cpu_kind: "performance", cpus: 2, memory_mb: 4096},
+            guest: {cpu_kind: "performance", cpus: 4, memory_mb: 8192},
             restart: {policy: "no"},
             auto_destroy: false,
             metadata: {mtglab_role: "forge-worker"}
