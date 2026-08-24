@@ -81,6 +81,89 @@ masthead and shows **one fact at a time from a random opening offset**, so
 finding this one means clicking **Another** up to 42 times. Nothing animates
 and there is no cycle time to wait out. Ledger: Blue, 2026-08-24.
 
+**Black —**
+
+**1. PR #284 is green and unmerged, and nothing in it renders.** Three fixes,
+all backend: `/api/health` answers in **2.0ms instead of 4.4ms** (it was
+asking eight database statements to answer a question that needs two — the
+platform's own health check is one of its callers); the card-search page's
+**opening query drops 87.7ms to 53.1ms** and a type filter 71.6ms to 52.9ms,
+because the search was buying a price for every row the top-sixty was about to
+throw away; and the standing claim *"the served app hotlinks nothing it could
+serve itself"* is now machine-checked over the built bundle instead of
+re-verified by hand every quarter. The JSON on the wire is byte-for-byte what
+it was — same cards, same order, same prices — so there is nothing to walk. ·
+*Cost of leaving it:* the wins sit on a branch, and the hotlink guard is not
+protecting anything until it runs in CI. · **Recommendation:** merge it; it
+only stopped because tonight's harness refused `gh pr merge`. Ledger: Black,
+2026-08-24.
+
+**2. The Claude spend ledger lost its command line in the crossing, so the
+deployed instance's bill can only be read by signing in.** The accounting
+itself is fine — every conversation is recorded, and the Admin panel rolls it
+up — but Python's `mtglab claude usage` did not come across, and Claude never
+signs in to anything. The practical result is that the polish pass can only
+ever report the *laptop's* spend, which is nearly idle (≈$1.71 since
+2026-08-16, three conversations in the last five days), while the instance is
+where the money actually goes. · *Cost of leaving it:* every future spend
+number in the ledger is the wrong machine's, and the one place a runaway cost
+would show up is a page nobody opens. Worth noticing now rather than later:
+the Sonnet 5 introductory rate ends **2026-08-31**, and the same traffic costs
+50% more from 1 September (the code already models the change; nothing needs
+editing). · **Recommendation:** yes — restore `mtglab claude usage`, so
+`fly ssh console -C "mtglab claude usage"` answers it from anywhere. It is
+about eighty lines over machinery that already exists; the only real questions
+are what it prints by default (per mode, per model, or both) and whether it
+shows dollars beside the tokens. Say which and it can be built in one sitting.
+Ledger: Black, 2026-08-24.
+
+**3. A price limit on the card search filters the results *after* the search
+has already picked sixty, so a budget shows a fraction of what matches.**
+Measured tonight: asking for sixty cards under $1 returns **23**; asking for
+two hundred returns **74**. The page always asks for sixty, so a newcomer who
+sets a budget sees a short list and reasonably concludes that is all there is.
+Nothing is wrong with the prices themselves — it is the order the two steps
+run in. · *Cost of leaving it:* the one filter a beginner is most likely to
+reach for is the one that quietly lies about how much of the game they can
+afford, which is commandment 2 failing in the exact place it matters. ·
+**Recommendation:** yes — make the price a condition of the search rather than
+a filter over its answer, so "sixty cards under $1" means sixty cards under
+$1. It is a small change and it is a *behaviour* change (different cards
+appear), which is the only reason it is a question rather than a fix. Ledger:
+Black, 2026-08-24.
+
+**4. The card pool's memory is thrown away every time nobody has asked it
+anything for ten seconds, and the lore shelf pays 84× for that.** Measured
+tonight on the full pool: the shelf answers in **0.9ms** while the pool is
+held open and **75.6ms** on the first request after a ten-second gap, because
+the remembered card lookups are filed under the *open* rather than under the
+pool file — and the pool is handed back on a timer so that `mtglab data
+refresh` can always get in, which is a rule worth keeping and must not be
+touched. A reap and a refresh are not the same event, though: only a refresh
+makes the old answers wrong. · *Cost of leaving it:* on a quiet instance
+almost every visitor is the first one, so almost everybody pays the slow
+number and nobody sees the fast one; the front page's own shelf is the worst
+case. · **Recommendation:** yes — let the remembered lookups survive a
+hand-back as long as the pool file has not changed underneath them, which is
+the rule the code already says it follows. It is a change to how long
+something is remembered rather than to what is remembered, which is the only
+reason it waited for daylight. Ledger: Black, 2026-08-24.
+
+**5. Five of the seven `Loading…` labels are flat text with no motion, and one
+of them is the door into the fortune-teller's table.** Blue found them by
+driving the real site (their ledger has the list); this run timed what each
+one is waiting for, because "it feels slow" and "it *is* slow" want different
+answers. **It is not slow.** Every one of the five waits on a single request
+that the server answers in well under a millisecond — so there is nothing to
+speed up, and the whole of it is the page sitting still while it waits. ·
+*Cost of leaving it:* the site's promise is that it is alive and moving, and
+the five places it visibly is not include the way in to the reading — the one
+room that is meant to get the best of everything. · **Recommendation:** yes —
+give them the same treatment the two good ones already have (`App.tsx` uses a
+proper spinner in both of its waits), or a held frame so nothing jumps when
+the answer lands. It renders, so it wants your eye before it merges. Ledger:
+Blue and Black, 2026-08-24.
+
 ## Open — 2026-08-23
 
 **1. The 95% coverage floor is gone, and the drop is half unit-change and half

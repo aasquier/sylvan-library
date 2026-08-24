@@ -2010,9 +2010,386 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow), plus two
-  un-run entries from the same week — the targeted performance pass and the
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19, 2026-08-16, plus
+  two un-run entries from that week — the targeted performance pass and the
   measuring shelf — both kept below.
+- **Everything below the 2026-08-24 block is about the Python app.** `bench
+  run`, `bench caches`, `cards/db.py`, `modes.py`, the pandas import storm,
+  the cache register: none of those files or commands exist. The *lessons*
+  hold and several are why this run went where it went; **no number, path or
+  command name in them is a current fact.** This run re-baselines the whole
+  facet in Go.
+
+### 2026-08-24 (rainbow)
+
+Night run, PR #284. The night's merge capability was gone by this leg (the
+harness refused `gh pr merge`), so everything below stopped at a green PR
+rather than deploying — the live numbers are v208's, and the fixes are
+unwalked because they never shipped.
+
+- **Fixed this run:**
+  1. **`/api/health` asked eight statements to answer a question that needs
+     two.** `pool.Stale` walks four probes and two `Columns` lookups on every
+     call, and the verdict it computes is a property of the pool **file** —
+     which is opened read-only and re-opened by a refresh, so the answer
+     cannot change under an open. `Columns` was already memoised per open
+     beside it; the staleness verdict was not. It matters because of *who
+     asks*: the platform's own health check is a caller, and the shell asks on
+     every visit. Now memoised per open. **`GET /api/health`: 4.4ms → 2.0ms
+     p50 (15 samples, this Mac, full pool), 8 statements → 2.** The test
+     counts the memo's own hits rather than milliseconds, and two mutations
+     were checked: disabling the read (`&& false`) and dropping the write
+     (`rememberStaleness`) each fail it on the line that should catch them.
+  2. **The card search bought a price for every row the LIMIT was about to
+     throw away.** `(SELECT min(p.price_usd) FROM printings p WHERE
+     p.oracle_id = o.oracle_id)` reads as the tidier query and is the
+     expensive one: DuckDB decorrelates it into an aggregate over all 107,355
+     printings joined against **every** row that survived the WHERE, so the
+     whole wide result — oracle text included — has to be materialised before
+     the top-N can cut it to sixty. Split into a second statement over the
+     kept oracle ids, through a list parameter so one SQL string serves every
+     result size (`GetCards`'s idiom, for its reason). Route medians, this
+     Mac, full pool, 10–12 samples:
+
+     | route | before | after |
+     |---|---:|---:|
+     | `/api/cards/search` (no text — **the card page's own opening query**) | 87.7ms | **53.1ms** |
+     | `/api/cards/search?type_line=creature` | 71.6ms | **52.9ms** |
+     | `/api/cards/search?identity=WU` | 50.7ms | **36.6ms** |
+     | `/api/cards/search?q=goblin` | 41.1ms | 40.4ms |
+     | `/api/cards/search?identity=WU&commanders_only=1` | 39.6ms | 38.1ms |
+
+     **Nothing regressed and the wins are where the user did not type.**
+     `CardSearch` fires the empty query 250ms after mount (`useEffect` +
+     debounce), and NewDeck's guided carousel fires an identity query per
+     combination; a narrow text search is a wash, because the fixed ~9ms of
+     the second statement roughly cancels what the split saves. Measured at
+     the query, on the real pool, since a CPU profile is blind inside cgo:
+
+     ```
+     search: full query (with correlated price subquery)              median    38.68ms
+     search: same query WITHOUT the price subquery                    median    27.48ms
+     search: no-text query (identity only, the picker's default)       median    84.80ms
+     search: no-text, WITHOUT price subquery                          median    38.40ms
+       step2 shape: unnest(?::VARCHAR[]) -- the landed form           median     8.87ms
+       step2 shape: IN (60 literals)                                  median     8.99ms
+       step2 shape: = ANY(list literal)                               median     9.04ms
+       step2 shape: single id lookup (index probe)                    median     0.81ms
+       step2 shape: whole map GROUP BY oracle_id (35k rows out)       median    24.65ms
+       narrow (NewDeck): OLD correlated subquery                      median    27.21ms
+       narrow (NewDeck): NEW main query                               median    16.37ms
+       narrow (NewDeck): NEW step 2 for 3 ids                         median     7.37ms
+     ```
+
+     The test derives its expectation from the printings table rather than
+     restating it, and doctors two extra Sol Ring printings (0.42 and 99.99)
+     into its own temp copy of the fixture — because the recorded fixture has
+     no card with two *different* prices, so `max` in place of `min` passed a
+     first draft of it. Three mutations checked: `max` for `min`, attaching at
+     `oracleIDs[0]`, and returning no prices at all.
+  3. **"The served app hotlinks nothing it could serve itself" was enforced by
+     nothing** — the pass's standing question, answered for this facet. It is
+     re-verified by hand every quarter and it is one `npm install` from being
+     false: a dependency that pulls a webfont from Google, a component library
+     that reaches for a stylesheet, a worker that fetches its own
+     WebAssembly. Each ships silently, works perfectly, and is **invisible to
+     a source grep**, because it only appears in the built bundle. Three
+     guards over `web_dist` now, each about a shape that *fetches* rather than
+     a string that appears (a minified bundle is full of inert absolute URLs
+     and a test that failed on those would be deleted within a month): no
+     code/font CDN host anywhere; no absolute `url()` or `@import` in any
+     stylesheet; and every URL in the shell relative except exactly one
+     `preconnect`, which must be the card-art host. Mutation-verified three
+     ways — a `fonts.gstatic.com` `@font-face`, an `unpkg.com` script tag, and
+     a second preconnect. The jsdelivr allowance is tied to the OCR overrides
+     being *in the bundle*, not in the same chunk: today the tesseract default
+     is in `reader.js` and `lib/reader.ts`'s overrides land in `Import.js`, so
+     a same-file rule would fail on a build detail rather than on a hotlink.
+- **Queued for Aaron (new this run):**
+  1. **The spend instrument lost its CLI in the crossing, and this facet
+     cannot read the number it exists to track.** The accounting itself
+     crossed intact — `claude_usage` is written from `converse` on every way
+     out of a conversation, and `ledger.Summarise` rolls it up by mode or
+     model — but the only *reader* in the Go tree is the Admin panel, a
+     signed-in browser surface. Python had `mtglab claude usage`; `mtglab
+     claude` now offers exactly one subcommand, `check`. The consequence is
+     structural rather than cosmetic: **Claude never signs in** (credentials
+     are Aaron's to type), so a night run can read the laptop's ledger with
+     `sqlite3` and can read the *instance's* only by asking Aaron to open a
+     browser. Every spend figure in this entry is therefore local, and local
+     spend is nearly idle — the deployed instance is where the money is.
+     `fly ssh console -C "mtglab claude usage"` is the shape that fixes it,
+     and it is perhaps eighty lines over machinery that already exists.
+     Queued rather than landed because what it prints is a design call:
+     which axis by default, whether a `--since` window, and whether the price
+     column renders (`prices.Table` is right there, and its figure is a floor
+     — see the carried item below).
+- **Queued for Aaron (carried from 2026-08-16/19, re-checked against the Go
+  tree this run — the code is new, the findings survived it):**
+  1. **Cache-write tokens are still invisible, and still the priciest class.**
+     Unchanged in substance and now re-verified in Go: `converse.go` adds
+     `resp.Usage.InputTokens`, `OutputTokens` and `CacheReadInputTokens`, and
+     `cache_creation_input_tokens` appears **nowhere in the tree** — not in
+     `ledger.Row`, not in `claude_usage` (migration `0007.sql`), not in
+     `prices`. Writes bill at 1.25× input, so every figure this facet quotes
+     is a floor; `prices`'s own package comment says so. Still a schema
+     migration on a forward-only ladder, so still Aaron's window.
+  2. **The theme conversation's second cache breakpoint still cannot be read
+     back on the next turn.** The Go port carries the Python shape exactly:
+     `themeMessages` marks the **closing instruction**, which is stripped and
+     re-appended every turn, so turn N's marked region is not a byte-prefix of
+     turn N+1's request. Its own comment claims the opposite ("everything up
+     to here is settled, and the next turn appends"). The bound from
+     2026-08-19 still holds — 99.2% of this mode's prompt is already served
+     from cache, so the fix is worth at most ~0.8% of its input — which keeps
+     it small rather than urgent. Item 1 remains the instrument that would
+     show it working.
+  3. **The pool refresh's row-at-a-time ingest.** Not re-measured: the loader
+     was rewritten in Go against DuckDB's Appender rather than a Python
+     `executemany`, which is the bulk path the old finding asked for. The
+     *robustness* half — `DELETE FROM printings` before the load, so an
+     interrupted refresh leaves the pool with no printings at all — was not
+     re-derived this run and should be re-checked against `pool/refresh.go`
+     before this item is closed.
+- **Deferred (re-checked):**
+  - **Interview and single-card argue still have neither a cache nor an
+    in-flight dedupe key**, and every other paid surface has one: dossier by
+    `plan.Key` *and* the `dossier_cache` table, the argue sweep by
+    `slug:fingerprint`, scan and research by their own keys, theme
+    deliberately by neither with the argument written down (`api/theme.go`
+    says so at the call site). Trigger unchanged: either single-card endpoint
+    becoming a job, or gaining a caller that is not the deck page.
+  - **Long max-age for the immutable media.** Unchanged and still blocked on
+    the same thing (`assetFileNames: 'assets/[name].[ext]'`), but the stake
+    has grown a lot: `web_dist/assets` is now **7.99MB raw**, and the largest
+    fourteen files are dominated by the motion loops —
+    `claude-library-loop.mp4` 1,338,606 · `.webm` 784,451 ·
+    `bookworm-loop.mp4` 588,763 · `wisps-loop.webm` 454,704 ·
+    `seance-room-loop.mp4` 440,428. They revalidate to 304 rather than
+    re-downloading, so the cost is still one RTT each, and each loop is
+    fetched only where its component mounts. Trigger unchanged: content-hash
+    the *media* names only.
+- **Measurements (2026-08-24, this Mac, quiet, full pool at
+  `data/mtg.duckdb`; live figures against v208):**
+  - **Local routes, warm** (`curl -w '%{time_total}'`, 15 samples, p50 —
+    **and the whole Python-era table below is superseded**; the three
+    reference shelves are between 6× and 9× faster in Go):
+
+| route | 2026-08-19 (Python) | 2026-08-24 (Go, before this run) | after |
+|---|---:|---:|---:|
+| `GET /api/health` | 7.3ms | 4.4ms | **2.0ms** |
+| `GET /api/lore` | 5.9ms | **0.9ms** | 0.9ms |
+| `GET /api/colors` | 6.1ms | **0.7ms** | 0.7ms |
+| `GET /api/glossary` | 4.5ms | **0.7ms** | 0.7ms |
+| `GET /api/tarot/reading` (a fresh seeded deal) | — | **0.7ms** | 0.7ms |
+| `GET /api/themes` | — | **0.6ms** | 0.6ms |
+| `GET /api/claude/personas` | — | **0.7ms** | 0.7ms |
+| `GET /` (the shell) | — | **0.7ms** | 0.7ms |
+| `GET /api/cards/search?q=goblin` | 43.8ms | 41.1ms | 40.4ms |
+| `GET /api/cards/search` (no text) | — | 87.7ms | **53.1ms** |
+
+  - **Held versus reaped: the ten-second lease is the biggest single number
+    in this facet, and it is nowhere in the warm tables above.** `fly.toml`
+    health-checks `GET /api/health` every **30s**; the pool's `IdleLease` is
+    **10s**; so the reaper hands the database back twenty seconds before every
+    check re-opens it, and an idle instance opens a 100MB DuckDB file roughly
+    **2,880 times a day**. Driving one process, this Mac:
+
+    ```
+    first ever /api/health (pool never opened): 43.9ms
+      held /api/health #1: 2.1ms   #2: 2.1ms   #3: 2.1ms   #4: 2.2ms   #5: 2.1ms
+    waiting 16s for the reaper...
+    after the lease expired: 37.7ms
+      held again #1: 1.9ms   #2: 2.0ms   #3: 2.1ms
+    lore cold: 75.6ms
+      lore held #1: 0.8ms   #2: 0.9ms   #3: 0.9ms
+    search cold: 62.5ms
+      search held #1: 40.8ms   #2: 40.1ms
+    ```
+
+    **The lease must not simply be lengthened.** 10s-under-30s is exactly what
+    guarantees a `data refresh` can take DuckDB's write lock, and an app
+    keeper that outlived the health check is the 2026-08-19 failure `pool.go`
+    records in its own comment. Two consequences follow that the warm tables
+    hide. First, **every warm number in this facet is the second request of a
+    visit** — the first pays ~40ms of open. Second, and this is the finding:
+    **`GetCards`'s memo is thrown away by the reaper, and a reap is not a
+    refresh.** `pool.go`'s package comment says caching is keyed on the
+    *stamp* — "a refresh rewrites the file, changes `mtime_ns` and size, and
+    every entry keyed on the old stamp becomes unreachable" — but the memo is
+    keyed on the *open*, and an open ends for two different reasons. The lore
+    shelf asks the same ~120 names forever and pays **75.6ms instead of
+    0.9ms**, an 84× difference, every time the pool has been idle ten seconds.
+    Queued rather than fixed: a cache *lifetime* change on the card pool wants
+    daylight, not 5am.
+  - **⚠️ Time the route you meant, and check the status code.** A first pass
+    of this table carried `/api/tarot/lore` at 0.7ms. There is no such route:
+    it 404s, and the 404 is *fast*, so the row looked like the healthiest
+    number on the board. The API router answers its own JSON 404 rather than
+    falling through to the shell, which is what made it catchable at all —
+    but nothing in a timing script notices, and this is the same shape as
+    2026-08-19's HEAD-instead-of-GET near-miss. The tarot table's real route
+    is `/api/tarot/reading`.
+  - **Do not read the health win as something a visitor can feel.** 2.4ms off
+    a 172ms round trip is invisible from outside, and the live table below
+    will not move. What it buys is *server work per request* on a machine with
+    two shared cores that answers a platform health check on a fixed cadence
+    forever: six DuckDB statements a call, gone. Keep it in proportion,
+    though — see the lease measurement below: on the instance a health check
+    usually finds the pool *reaped*, so it pays ~40ms of DuckDB open and the
+    2.4ms is a slice of about fifty, not of four. A win measured locally and
+    quoted as a user-facing speed-up would be this facet's own worst habit.
+  - **`/api/decks` is unmeasured this run and that is a gap, not a fact.**
+    The laptop's library is empty (ADR 30: the decks live on the instance's
+    volume), so the shelf route answers in 0.7ms with nothing to build. The
+    Python-era 16.5ms warm / 134.2ms cold numbers below are **not**
+    comparable to anything in Go. Re-measuring properly means pulling decks
+    from the instance as scratch, which this run deliberately did not do at
+    4am.
+  - **Live instance, time-to-first-byte** (7 samples, p50, from this Mac to
+    `sjc`). The floor is RTT and everything sits on it — the *whole* spread
+    between the slowest and fastest route is 8ms:
+
+| target | 2026-08-16 | 2026-08-19 | 2026-08-24 |
+|---|---:|---:|---:|
+| `/api/health` | 211ms | 213ms | **171.8ms** |
+| `/` | 240ms | 237ms | **167.8ms** |
+| `/assets/app.js` | 192ms | 222ms | **169.2ms** |
+| `/assets/index.css` | — | — | **173.5ms** |
+| `/api/lore` | — | — | **165.3ms** |
+
+  - **The ETag is gone and the revalidation contract still holds — read this
+    before recording a regression.** Both earlier runs recorded "a strong
+    `etag`". The Go door serves through `http.ServeContent`, which supplies
+    **`Last-Modified` and no ETag**: `last-modified: Mon, 24 Aug 2026
+    09:33:07 GMT` on `/assets/app.js`, which is the container's own mtime and
+    therefore deploy-fresh. Verified live: `If-Modified-Since` → **304, 0
+    bytes, 171ms**; unconditional gzip → 200, 91,301 bytes, 246ms;
+    `If-None-Match` → 200 (there is no ETag to match). So the cost is still
+    one revalidation RTT per navigation rather than a re-download, and —
+    unlike in the Python era — **the claim is machine-checked**:
+    `door_test.go`'s `TestAnAssetRevalidatesWithA304` fails if the validator
+    ever goes. Headers live: `cache-control: no-cache`, `content-encoding:
+    gzip`, `vary: Accept-Encoding`, `x-content-type-options: nosniff`. Still
+    no brotli.
+  - **Bundle** (committed `web_dist`, gzip -9): `charts.js` 399,398 /
+    **111,241** · `app.js` 291,776 / **90,938** · `index.css` 104,218 /
+    **22,818** · four self-hosted `.woff2` faces (`im-fell-english` ×3,
+    `parisienne`). `app.js` and `charts.js` are within a kilobyte of
+    2026-08-19 — no drift; `index.css` has grown 99,824 → 104,218 raw. The
+    motion loops are the weight now (see the deferred item above):
+    **7,992,593 bytes raw across `web_dist/assets`, 5,958,672 of it video.**
+  - **Static assets over hotlinks**: unchanged and now guarded. Exactly one
+    external host is fetched at runtime — `cards.scryfall.io`, kept as a
+    hotlink by White's licensing verdict, warmed by the single `preconnect`.
+    No CDN for code, fonts, CSS or scripts; no `@import`; no absolute `url()`
+    in any stylesheet; every webfont is a `.woff2` this app serves. The other
+    hosts in the bundle are inert or clickable: `github.com`, `react.dev`,
+    `reactrouter.com`, `redux.js.org`, `tailwindcss.com`, `rolldown.rs`,
+    `opencollective.com` and `bit.ly` inside vendored package metadata and
+    minified error text; `console.anthropic.com`, `fly-metrics.net` and
+    `edhrec.com` are links a person clicks. Nothing in category (c).
+  - **Claude spend to date** (the *laptop's* ledger, `data/app.db`, all of it
+    `claude-sonnet-5`): 89 conversations / 100 requests / **20,301 input /
+    130,261 output / 1,821,915 cache reads**, every row `end_turn`. At the
+    introductory rate that is **≈$1.71**; on 2026-09-01 the identical traffic
+    is **≈$2.56**. Per mode:
+
+| mode | conv | req | input | output | cache reads |
+|---|---:|---:|---:|---:|---:|
+| `theme-conversation:fortune-teller` | 74 | 74 | 9,815 | 92,990 | 1,252,433 |
+| `scan` | 6 | 6 | 7,305 | 212 | 0 |
+| `theme-proposal:fortune-teller` | 3 | 11 | 30 | 21,892 | 321,797 |
+| `slot-argument` | 2 | 4 | 2,313 | 5,483 | 17,236 |
+| `commander-dossier` | 1 | 2 | 832 | 9,241 | 230,449 |
+| `theme-conversation:{chef,storyteller,therapist}` | 3 | 3 | 6 | 443 | 0 |
+
+  - **Spend since 2026-08-19 is ≈$0.07** — three conversations, all of them
+    exercising the crossing rather than using the app. The interview and
+    research modes have still never run locally.
+  - **Prompt cache ratio 89.7:1**, down from 105:1, and the drop is `scan`
+    again: 7,305 input tokens and **zero** cache reads, because its 478-token
+    prefix clears no model's minimum. Excluding scan the ratio is **140:1**.
+    `slot-argument`'s own 7.5:1 is the second pull and is correct — a
+    single-card argue is a short conversation whose first request *writes*
+    the 3,298-token prefix and whose second reads it.
+  - **The mode table, counted from `data/modes.json` rather than from
+    prose** — seven modes, and every knob deliberate:
+
+    | mode | max_tokens | effort | own tools | web_search max_uses |
+    |---|---:|---|---|---:|
+    | `commander-dossier` | 16,384 | high | `get_cards` | 4 |
+    | `research` | 16,384 | high | `get_cards` | 4 |
+    | `theme-proposal` | 16,384 | high | `search_cards`, `get_cards` | 3 |
+    | `rationale-interview` | 8,192 | high | 4 pool/deck tools | — |
+    | `slot-argument` | 8,192 | high | 5 pool/deck tools | — |
+    | `theme-conversation` | 8,192 | high | — | 1 |
+    | `scan` | 2,048 | **low** | — | — |
+
+    `MaxToolTurns` 6. `scan`'s `low` is argued as accuracy rather than thrift
+    (ADR 34 forbids a transcriber inferring). No mode declares `thinking`,
+    which on Sonnet 5 is adaptive by default — and `MaxTokens` is a ceiling
+    over thinking and answer together, which is why the searching modes carry
+    16,384.
+  - **`prices.Table` re-verified rate by rate against the `claude-api`
+    skill's current pricing table**: Fable 5 and Mythos 5 $10/$50, Opus 5 /
+    4.8 / 4.7 / 4.6 $5/$25, Sonnet 5 **$2/$10 introductory through
+    2026-08-31** then $3/$15, Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5, cache reads
+    at 0.1×. Every one matches, the window is modelled rather than flattened
+    (`Priced.On`), and `Checked = 2026-08-18` renders beside every figure.
+    **The window closes in seven days** and the code needs no change for it.
+  - **Refusable-before-the-call survived the crossing, on every paid
+    surface.** `scan` refuses an unknown media type, bad base64, an empty
+    capture or an oversized frame before a payload exists (`ErrScanRefused`);
+    research reads the question's shape and refuses in the request rather than
+    minutes later; and `Converse` validates the request and builds the mode's
+    schemas *above* its first `Messages.New`, so a mode cannot error after
+    spending. Nothing new has been added below that line.
+  - **The seven prompts carry no dated-model cruft.** Scanned for the
+    patterns that drift under a newer model — chain-of-thought prodding,
+    "take a deep breath", `<thinking>` tags, JSON-only nagging that structured
+    outputs now guarantee, assistant prefill, role reassurance, length
+    hedges. **Zero hits across all seven.** The system-block breakpoint is
+    still placed correctly (tools render first, so it covers both) and
+    `converse`'s moving marker on the newest tool-result block is still the
+    right second breakpoint for a searching mode.
+  - **Cache hit rates, the Go answer.** The Python register retired with the
+    backend, so the pool's two memos had no hit count at all — the exact
+    "correct, tested, and never once used" shape this facet warns about. They
+    now carry one (`MemoColumns`, `MemoCards`, `MemoStale`), per open, read by
+    the package's own tests and rendered nowhere (commandment 10). Measured
+    through the fixture: the staleness memo answers 4 hits / 1 miss over five
+    `/api/health`-shaped asks, and `columns` 0/2 inside the walk. **The
+    `dossier_cache` and `sim_cache` tables still have no hit count** — they
+    are durable tables whose hit rate is answerable by SQL rather than by a
+    counter, which is a different and adequate instrument; the laptop holds 3
+    dossier rows.
+- **Handed to Red, with the measurement it was missing.** Blue found seven
+  rendered `Loading…` strings and filed the five bare ones as possibly
+  Black's, since they touch perceived performance. **They are not.** Each of
+  the five waits on exactly one endpoint, and every one of those endpoints
+  does **0.6–0.7ms** of work: `tarot.tsx:828` on `/api/claude/personas`,
+  `theme.tsx:844` on `/api/claude` (the stance-and-readiness status),
+  `NewDeck.tsx:378` and `Learn.tsx:572` on `/api/colors`, `Learn.tsx:422` on
+  `/api/glossary` — each timed by driving it, after the tarot near-miss
+  above. So the string is on
+  screen for one round trip — ~170–250ms on the instance — and **there is no
+  server work to remove.** The entire cost is perceived, which makes it
+  commandment 17's ground (and commandment 15's, for the one that gates the
+  fortune-teller's table), not this facet's. All five are also the exact
+  anti-pattern commandment 17 names: `<p style={{ color: … }}>` with no
+  motion, where the two good ones use `<Spinner label="Loading…" />`
+  (`App.tsx:228` and `:367`).
+- **Not touched, deliberately.** Tier 1 and `internal/sim`: no engine change,
+  so the ADR 18 fingerprint did not move and no stored result was orphaned.
+  The determinism kernels were not opened. No Claude call was made — every
+  spend figure here is read from a ledger, not bought.
+
+### 2026-08-19 (rainbow) and the Python era
+
+Everything from here down is about the retired Python app. Kept for its
+reasoning and its trend lines; **no path, command or number in it is current.**
+
 - **Measured out of band (2026-08-20, ADR 35 live — the hosted Forge's cost
   shape, from the first paid matches on the instance):** wake from `stopped`
   is **~5s** (hand-timed against the real machine; `worker.BOOT_SECONDS=90`
