@@ -771,7 +771,6 @@ func TestTheDoorCountsWhatItAnswers(t *testing.T) {
 	}
 	d.resolver = fakeResolver{}
 	srv := httptest.NewServer(d.Handler())
-	defer srv.Close()
 
 	get(t, srv, "GET", "/api/glossary", "alice")    // a route, by its pattern
 	get(t, srv, "GET", "/api/health", "")           // public: the template, anonymously
@@ -783,6 +782,12 @@ func TestTheDoorCountsWhatItAnswers(t *testing.T) {
 	get(t, srv, "GET", "/api/nonexistent", "alice") // the catch-all's 404
 	get(t, srv, "GET", "//api/glossary", "alice")   // non-canonical: the same 404
 
+	// Close BEFORE the flush: a count is recorded by the handler goroutine
+	// after the client already has its response, and Close is the barrier
+	// that waits those goroutines out. Flushing first is a born-flaky read
+	// of a buffer someone may still be writing -- arm64's race scheduler
+	// found it on the first try.
+	srv.Close()
 	d.traffic.Flush()
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
 	if err != nil {
