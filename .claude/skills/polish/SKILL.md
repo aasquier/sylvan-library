@@ -222,6 +222,12 @@ Four rules, each bought by a real wrong answer:
   so the database half must be timed *at the query* and never inferred from
   the profile or found by subtraction. This is the retired shelf's hardest
   lesson in its Go form: profile the Go half, clock the cgo half.
+  **The allocation profile is not blind there, and it is the move when the CPU
+  profile comes back featureless** — `-memprofile` read with
+  `-sample_index=alloc_space` sees Go-side allocation regardless of what the C
+  half is doing. Two colors hit the blind spot in one night and the one that
+  switched instruments got the night's finding out of it; the one that only
+  read `-top` got a picture of `runtime.cgocall`.
 - **A cache can be correct, tested, and never once used.** Only a counter
   finds that; no test can. A cache added since the last run with no hit
   count is a finding.

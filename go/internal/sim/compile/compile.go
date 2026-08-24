@@ -22,10 +22,11 @@
 // carry it, kept only because most callers really do just want the cards.
 //
 // **`ManaProduced` reads the amount off the ORACLE TEXT.** Scryfall's
-// `produced_mana` names colours and never amounts, so until 2026-08-21 every
-// mana source in this project compiled to exactly one mana -- Sol Ring
-// produced one, Mana Vault one, Gilded Lotus one -- and both tiers understated
-// every deck's acceleration, the fast-mana decks most.
+// `produced_mana` names colours and never amounts, so trusting it alone
+// compiles every mana source in this project to exactly one mana -- Sol Ring
+// one, Mana Vault one, Gilded Lotus one -- and understates every deck's
+// acceleration, the fast-mana decks most. Both tiers did exactly that before
+// the oracle-text read below existed, which is why it exists.
 //
 // # What is deliberately absent
 //
@@ -179,8 +180,8 @@ var clauseSplit = regexp.MustCompile(`,| or `)
 // this permanent actually nets.
 //
 // Scryfall's `produced_mana` says *which colours* a card can make and never
-// **how many**, so every mana source in this project compiled to exactly one
-// mana until 2026-08-21. The amount is read off the oracle text,
+// **how many**, so trusting it alone compiles every mana source to exactly one
+// mana. The amount is read off the oracle text,
 // conservatively: anything this cannot parse stays at one. Five things it has
 // to get right, each of which is a real card:
 //

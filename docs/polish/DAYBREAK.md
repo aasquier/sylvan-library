@@ -164,6 +164,45 @@ proper spinner in both of its waits), or a held frame so nothing jumps when
 the answer lands. It renders, so it wants your eye before it merges. Ledger:
 Blue and Black, 2026-08-24.
 
+**Colorless —**
+
+**1. Four of the six questions asked yesterday morning exist only in this
+file.** The pass's own rule is that a waiting item lives in two places — one
+line here, the full record in `LEDGER.md` — and yesterday's run wrote six lines
+and no records. Two of the six made it into the ledger as one-liners in a
+backlog list; the coverage floor, the night-merge rule, the skill-prose guard
+and the pprof mount have nothing anywhere else. That is worse than being
+invisible: this file says an answered item *leaves*, so **answering one of
+those four destroys the only copy of why it was asked**. Tonight's run wrote
+recovered records for all four into the Colorless section, so nothing is
+currently at risk — the question is whether the rule gets a guard. ·
+*Cost of leaving it:* it has happened once in six items and will happen again
+the next time a run is short of night; each time, the price is paid by the
+person answering. · **Recommendation:** yes — a small test asserting every open
+item here names the ledger section holding its record, with the section names
+read out of `LEDGER.md`'s own headings rather than restated, and a failure when
+it finds no items at all so an inert guard cannot pass quietly. It was not
+built tonight because the whole 2026-08-23 block would fail it — none of those
+six names a ledger section and four have none to name — and repairing them
+means editing that block, which this rainbow was told to leave alone.
+Ledger: Colorless, 2026-08-24.
+
+**2. Editing a comment in five particular packages silently throws away the
+deployed instance's whole simulation cache.** `internal/sim`,
+`internal/sim/tier1`, `internal/mana`, `internal/floats` and
+`internal/mt19937` embed their own source, and ADR 18 hashes those bytes into
+the key every stored Tier 1 result is filed under — so reflowing a sentence in
+a doc comment changes the key and the instance recomputes everything it had
+already paid for. Nothing fails and no test speaks. Found by doing it: three
+such edits were made during tonight's comment sweep and reverted, and the
+warning now sits in the code, in the skill, and beside the rule that had said a
+comment-only diff is always free. · *Cost of leaving it:* nothing breaks, ever
+— it is wasted compute on the instance and a trap that reads as safe. ·
+**Recommendation:** rule that prose-only edits in those five packages are not
+made; a comment that is genuinely wrong there gets raised with its cost
+attached and fixed alongside a real change to the same package, so the cache is
+discarded once for a reason rather than twice for tidiness. Ledger: Colorless,
+2026-08-24.
 ## Open — 2026-08-23
 
 **1. The 95% coverage floor is gone, and the drop is half unit-change and half
