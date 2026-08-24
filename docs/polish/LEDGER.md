@@ -3433,20 +3433,22 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
      cleanup should do it**, once they land.
   2. **The skills-doc guard 2026-08-23's daybreak item 5 asks for is harder
      than the licensing one, and the difficulty is now measured rather than
-     guessed.** The skill files write repository paths against **four different
-     implied roots** — `go/` for packages (`internal/pool`, `cmd/mtglab/ui.go`),
-     `web/src/` for the frontend (`lib/api.ts`, `components/lazycharts.tsx`),
-     the skill's own directory for `references/*.md`, and a shorthand in
-     `references/red.md` (`sim/tier1` for `go/internal/sim/tier1`). Of 24
-     path-like backticked tokens across `SKILL.md` and the six reference files,
-     **20 resolve under none of the roots a naive `Stat(root/p)` would try, and
-     all 24 resolve under one of the four** — so the guard White's helpers make
-     cheap would fail 20 times on a healthy tree. **This is not a re-ask**;
-     item 5 and White's item 2 both stand exactly as written. It is the
-     implementation note whichever of them lands will need: resolve a token
+     guessed.** The skill files write repository paths against **five different
+     implied roots**: the repository itself (`docs/polish/LEDGER.md`,
+     `web/vite.config.ts`), `go/` for packages (`internal/pool`,
+     `cmd/mtglab/ui.go`), `web/src/` for the frontend (`lib/api.ts`,
+     `components/lazycharts.tsx`), the skill's own directory
+     (`references/white.md`), and `go/internal/` for one shorthand in
+     `references/red.md` (`sim/tier1`). Counted across `SKILL.md` and the six
+     reference files: **42 distinct path-like backticked tokens, 17 resolving
+     at the repository root, 25 resolving only under one of the other four, 0
+     resolving nowhere.** So the guard White's helpers make cheap — a plain
+     `Stat(root/p)` — **would fail 25 times on a healthy tree.** **This is not
+     a re-ask**; item 5 and White's item 2 both stand exactly as written. It is
+     the implementation note whichever of them lands will need: resolve a token
      against a small ordered list of roots and fail only when it resolves under
-     none. Audited by hand tonight in place of the guard: **all 24 paths
-     resolve**, and the one dead command (`mtglab animist` in
+     none of them. Audited by hand tonight in place of the guard: **every one
+     of the 42 resolves**, and the one dead command (`mtglab animist` in
      `.claude/skills/yas-queen/references/house-codes.md`) is already fixed on
      Blue's PR #282, so it is deliberately not touched here.
 
@@ -3520,11 +3522,13 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
                                                          101, unreproducible)
       #NNN / vNNN residue in internal/sim       3 → 0
 
-  The skill's own surface: **7 files** (`SKILL.md` plus six references), **24
-  path-like backticked tokens, 24 resolving, 0 dead**; **7 distinct
-  `mtglab <verb>` mentions**, one dead (`animist`, fixed on PR #282). Relic
-  sweep pass 6 scoped: **14 rows, 0 findings.** Daybreak two-places audit:
-  **6 items opened 2026-08-23, 2 with any ledger entry, 4 with none.**
+  The skill's own surface: **7 files** (`SKILL.md` plus six references), **42
+  distinct path-like backticked tokens, 42 resolving, 0 dead** (17 at the
+  repository root, 25 under one of four other implied roots); **17 `mtglab
+  <verb>` mentions over 7 distinct verbs**, one dead (`animist`, fixed on PR
+  #282). Relic sweep pass 1: **47 `go/internal` packages, 47 with a package
+  doc, 0 without.** Pass 6 scoped: **14 rows, 0 findings.** Daybreak two-places
+  audit: **6 items opened 2026-08-23, 2 with any ledger entry, 4 with none.**
   Gauntlet on this branch: `gofmt -l .` silent, `go vet ./...` clean,
   `go test -race ./...` **0 failures**, `golangci-lint run ./...` **0 issues**,
   `npm --prefix web run check` **38 files / 615 tests passed in 26.11s**.
