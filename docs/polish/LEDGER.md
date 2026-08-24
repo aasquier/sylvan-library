@@ -1858,8 +1858,8 @@ search: no-text, WITHOUT price subquery                          median    38.40
 - **Measurements (2026-08-24, this Mac, quiet, full pool at
   `data/mtg.duckdb`; live figures against v208):**
   - **Local routes, warm** (`curl -w '%{time_total}'`, 15 samples, p50 —
-    **and the whole Python-era table below is superseded**; the Go door is
-    between 5× and 9× faster on every shelf route):
+    **and the whole Python-era table below is superseded**; the three
+    reference shelves are between 6× and 9× faster in Go):
 
 | route | 2026-08-19 (Python) | 2026-08-24 (Go, before this run) | after |
 |---|---:|---:|---:|

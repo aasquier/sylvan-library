@@ -123,7 +123,9 @@ type Pool struct {
 // The memo names `counts` are kept under. Named constants rather than
 // literals at the call sites, because a typo in a counter's name is a
 // silently separate counter that always reads zero -- which looks exactly
-// like the dead cache the counter exists to find.
+// like the dead cache the counter exists to find. Exported because the tests
+// that read the counters live in `package pool_test`; nothing in the app
+// names them.
 const (
 	MemoColumns = "columns"
 	MemoCards   = "cards"
