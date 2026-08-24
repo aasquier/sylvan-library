@@ -189,10 +189,11 @@ The game hands us hundreds of thousands of real paintings. Rules of engagement:
   painting at its own ratio beside the title, never as a cropped band behind
   it — a full-bleed band throws away more than half the painting, and this
   project learned that four separate times. Do not re-buy that lesson.
-- **A committed image arrives only through a recipe.** `mtglab animist`
-  (ADR 29) records source, per-file API-confirmed licence and every
-  transform, writes the PROVENANCE entry, and the suite verifies the committed
-  files against it. Never hand-place a `.webp`. Mind Vite's
+- **A committed image arrives only through a recipe.** `animist` (ADR 29 —
+  the dev bench in `tools/`, run from there, never part of the `mtglab`
+  binary) records source, per-file API-confirmed licence and every transform,
+  writes the PROVENANCE entry, and its own suite verifies the committed files
+  against it. Never hand-place a `.webp`. Mind Vite's
   `assets/[name].[ext]` rule: basenames must be unique app-wide or the
   committed bundle diverges between macOS and CI Linux.
 - **The exceptions are ours because their licences allow it**: the 1909 Rider
