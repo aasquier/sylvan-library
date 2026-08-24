@@ -131,8 +131,9 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 	}
 	for _, theme := range d.Themes {
 		if !reference.IsTheme(theme) {
-			rep.add("warn", "unknown-theme", fmt.Sprintf("theme %s is not in the vocabulary; the list "+
-				"grows by editing THEMES in decks/model.py", wire.Quote(theme)), "")
+			rep.add("warn", "unknown-theme", fmt.Sprintf("theme %s is not in the vocabulary, so no filter "+
+				"will find this deck by it; the deck page's labels editor sets themes from the "+
+				"curated list", wire.Quote(theme)), "")
 		}
 	}
 

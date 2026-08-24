@@ -6,18 +6,29 @@ before Aaron's friends notice the site is down.
 
 ## Facet: CI/CD
 
-Six checks are **required** on `main`, and they are not the six this file
-used to name. Read from the protection setting rather than from memory
-(2026-08-16): `test (3.11)`, `test (3.12)`, `frontend`, `image`,
-`no-secrets-or-card-data`, `dependency-review`. So `ci.yml` supplies five
-contexts and not four — `test` is a matrix and each leg gates separately —
-and **CodeQL is not among them**. It runs on every pull request and on a
-schedule, and `codeql.yml`'s own header says why it is deliberately advisory:
-a scanner that blocks merges on a query-pack update is a gate that gets
-disabled in anger. Treat "green" as those six plus a CodeQL run somebody
-actually read. A green main deploys itself (ADR 23). The audit is runtime
-trend, robustness, and whether the free tier has grown new capabilities worth
-adopting.
+**Never write the required checks down. Read them back, every run:**
+
+```bash
+gh api repos/aasquier/sylvan-library/branches/main/protection \
+  --jq .required_status_checks.contexts
+```
+
+This file named six for months and the answer is now eight; the list changed
+under it twice without a word of prose noticing, which is precisely why
+CLAUDE.md calls it a read-back rather than a count. Two structural facts about
+that list *are* worth holding, because they are what a count hides:
+
+- **A matrix leg gates separately.** `go` is a two-architecture matrix, so it
+  supplies `go (amd64)` and `go (arm64)` as distinct contexts, and `image` has
+  an arm64 sibling. Adding an architecture adds a required check.
+- **CodeQL is not among them, deliberately.** It runs on every pull request
+  and on a schedule, and `codeql.yml`'s own header argues the case: a scanner
+  that blocks merges on a query-pack update is a gate that gets disabled in
+  anger. Treat "green" as the required list *plus* a CodeQL run somebody
+  actually read.
+
+A green `main` deploys itself (ADR 23). The audit is runtime trend,
+robustness, and whether the free tier has grown capabilities worth adopting.
 
 - **Measure runtimes first**: `bash -lc 'gh run list --workflow ci.yml
   --limit 20 --json databaseId,conclusion,createdAt,updatedAt'` and per-job
@@ -25,8 +36,10 @@ adopting.
   ledger; the question is the trend, not today's number. A job that grew 40%
   since last run has a cause — new tests, cold caches, runner changes — name
   it.
-- Cache health: pip and npm caches actually hitting (read a recent run's
-  log, don't assume), keys not invalidating on every run.
+- Cache health: the Go module and build caches (`setup-go` keys on
+  `go/go.sum`) and npm's actually hitting — read a recent run's log, do not
+  assume — and keys not invalidating on every run. The Go build cache is the
+  one that pays: a cold one rebuilds the DuckDB bindings on both architectures.
 - Concurrency: superseded runs on the same branch should cancel
   (`concurrency` groups) — pushing three fixups should not queue three full
   suites. Check it is configured; add it if not (safe fix).
@@ -34,29 +47,31 @@ adopting.
   non-GitHub-authored), permissions blocks minimal (`contents: read` unless
   a job needs more), no `pull_request_target` foot-guns. This repo is
   public; its workflows are an attack surface.
-- The pinned invariants stay pinned: the skip gate at 2 — **that is CI's
-  number, and the local suite skips 0**, because this Mac has the pool and
-  both `needs_full_pool` tests run — the `image` job as the only container
-  build (never runnable on this Mac), and deploy `needs` every other job in
-  `ci.yml`. The last of those is a test now
-  (`test_the_deploy_job_waits_for_every_other_job_in_the_file`), and it
-  **derives** the expected set from the file's own job list rather than
-  restating it, so adding a job and forgetting `needs` fails locally instead
-  of shipping a red suite. Verify the rest, don't assume.
+- The pinned invariants stay pinned: `image` and `image-arm64` as the only
+  container builds anywhere (neither runnable on this Mac), the `go` matrix as
+  the only arm64 compiler this project has, and **`deploy` naming every other
+  job in `ci.yml` in its `needs`.** Verify that last one by reading both lists
+  in the file, because *nothing checks it any more* — it used to be a test
+  that derived the expected set from the file's own job list, and that test
+  died with the old suite. An unguarded invariant is this pass's own standing
+  lesson: rebuilding it in Go is a queued item, and until it lands, a job
+  added without `needs` deploys off a partial suite and nothing says so.
 - **Free-tier feature audit**: check GitHub's changelog for features now free
   for public repos — merge queue, artifact attestations, better caching,
   required workflows. Adoptions that change contributor workflow are queued;
   pure-win config (a better cache key) is a safe fix.
 - Local/CI parity: everything CI checks must be runnable locally except
-  **three** — `image` (no container runtime on this Mac), `dependency-review`
-  (it diffs a base against a head, and a laptop has no base), and **CodeQL**,
-  which wants the CodeQL CLI and its query packs and is in neither the
-  `[dev]` extra nor the runbook. The third is the one that bites: White's
-  first run spent four commits teaching a correct guard to satisfy
-  `py/path-injection`, which is "CI is a surprise" happening. It is tolerable
-  only because CodeQL does not gate merging — budget for it on a security fix
-  and never let it become required without the local story first. A *fourth*
-  such check violates the rule outright — flag it.
+  **four** — `image` and `image-arm64` (no container runtime on this Mac),
+  `dependency-review` (it diffs a base against a head, and a laptop has no
+  base), and **CodeQL**, which wants the CLI and its query packs and is in no
+  runbook. The arm64 leg is a half-exception worth naming: the tests
+  themselves run locally, but only on amd64, so an arm64-specific failure is
+  CI's to find. CodeQL is the one that bites: White's first run spent four
+  commits teaching a correct guard to satisfy a path-injection query, which is
+  "CI is a surprise" happening. It is tolerable only because CodeQL does not
+  gate merging — budget for it on a security fix and never let it become
+  required without the local story first. A *fifth* such check violates the
+  rule outright — flag it.
 
 ## Facet: alerting & self-healing
 

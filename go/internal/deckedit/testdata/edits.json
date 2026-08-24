@@ -587,7 +587,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -1270,7 +1270,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -1953,7 +1953,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -2636,7 +2636,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -3352,7 +3352,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -4035,7 +4035,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -4718,7 +4718,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -5401,7 +5401,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -6084,7 +6084,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -6838,7 +6838,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -7521,7 +7521,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -8275,7 +8275,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },
@@ -8958,7 +8958,7 @@
       ]
      },
      "ok": false,
-     "error": "'not-a-theme' is not in the theme vocabulary; the list grows by editing THEMES in decks/model.py, never by typo. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
+     "error": "'not-a-theme' is not in the theme vocabulary; the list is a curated shelf, and a typo would file this deck where no filter looks. Known themes: aggro, angels, aristocrats, artifacts, auras, big-mana, blink, cats, cedh, clues, combo, control, counters, dinosaurs, dragons, elves, enchantments, equipment, food, goblins, graveyard, group-hug, landfall, lands, lifegain, midrange, mill, politics, ramp, reanimator, sacrifice, spellslinger, spirits, stax, stompy, superfriends, tempo, tokens, treasure, vehicles, voltron, wheels, zombies"
     }
    ]
   },

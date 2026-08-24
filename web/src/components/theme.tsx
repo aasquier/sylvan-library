@@ -843,19 +843,16 @@ export function ThemeInterview({
   if (!status) {
     return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
   }
-  // Three states kept apart, because collapsing them tells somebody their key
-  // is missing when they have simply not installed the extra.
+  // One way this door stays shut: no key. The second arm this branch used to
+  // carry — Claude absent from the server — cannot happen, because the client
+  // is linked into the binary and the dial's `installed` is a constant.
   if (!status.installed || !status.configured) {
     return (
       <div className="card-surface rounded-xl px-6 py-8">
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          {status.installed
-            ? 'This door needs Claude, and this server has no key for it yet.'
-            : 'This door needs Claude, which isn’t installed on this server.'}
+          This door needs Claude, and this server has no key for it yet.
           <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-            {status.installed
-              ? <>Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.</>
-              : <><code>pip install -e &quot;.[claude]&quot;</code> adds it.</>}
+            Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.
           </span>
         </p>
         <button onClick={onLeave} className="btn btn-quiet btn-sm mt-3">

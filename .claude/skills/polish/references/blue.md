@@ -1,11 +1,13 @@
 # Blue — Craft & Knowledge
 
-Four facets: Go best practices (plus the tools/ toolbox's Python),
-TypeScript/React best practices, the Claude-first documentation and memory
-audit, and the spirit of Magic. Blue is
-the color of perfected craft and of knowing things — including knowing
-yourself, which is what the third facet is, and knowing the game whose name
-is on the door, which is the fourth.
+Five facets: Go craft (plus the animist toolbox in `tools/`),
+TypeScript/React craft, **controls** — commandment 17 made checkable — the
+Claude-first documentation and memory audit, and the spirit of Magic. Blue is
+the color of perfected craft and of knowing things: knowing the language well
+enough to write this year's Go rather than the Go with the most text behind
+it, knowing what the hand expects when it reaches for a control, knowing
+yourself (the fourth facet), and knowing the game whose name is on the door
+(the fifth).
 
 ## Facet: Go craft
 
@@ -33,12 +35,79 @@ have fallen behind.
 - Platform-tagged files are only type-checked where they build — CI's lint
   is the first reader of a `_linux.go` file, so treat a green local lint as
   a partial answer on this Mac.
-- The tools/ toolbox keeps its own Python gates (`ruff check .`, `mypy`,
-  `pytest`, strict, from `tools/`); ADR 24's no-autoformatter call still
-  binds there, and the revisit trigger is still a second human contributor.
+- **`t.Parallel()` belongs to White's testing facet, but its *cause* is often
+  here**: a test that cannot run in parallel is usually a subject reaching for
+  process-wide state — the environment, the working directory, a package-level
+  variable. When White reports a test left serial, ask whether the design is
+  what is serial.
+- The `tools/` toolbox is the one thing here that is not Go, and it keeps its
+  own gates (`ruff check .`, `mypy`, `pytest`, strict, all from `tools/`). It
+  is the animist and cardmotion media pipelines only — dev-machine tooling
+  that never ships and never serves — so a proposal to grow it is a proposal
+  to grow the one non-Go surface, and belongs in the queue. ADR 24's
+  no-autoformatter call still binds there, and its revisit trigger is still a
+  second human contributor.
 - Performance-adjacent craft belongs to Black; here the question is
   readability, naming, and structure. A function that needs a comment to
   parse is a finding; so is a comment restating its line.
+
+### The modern-Go sweep, and why it is a standing item
+
+**Assume your Go is out of date.** A model's sense of idiomatic Go is
+weighted toward the years with the most text in them, which is the years
+before generics — so the *default* suggestion skews old, and it skews old in
+a way that reads fine and passes review. This facet is where that gets
+corrected on purpose, every run, rather than left to whichever session
+happens to notice.
+
+Two habits, and the first is the one that keeps this alive:
+
+- **Audit the toolchain's release notes, not your memory.** Read the notes
+  for every Go release since the version recorded in the ledger, and write
+  the version you audited *to* in the ledger. New library packages,
+  deprecations, `go vet` checks and language changes each get one question:
+  *does this tree contain the thing it replaces?* This is the same shape as
+  the Anthropic-currency bullet below, for the same reason — the platform
+  moves and prose does not.
+- **Grep for the old spelling, not for the new one.** The tree cannot tell
+  you what it is missing; it can tell you what it still has. A sweep is a
+  list of *outgoing* forms, and this one starts from a real inventory taken
+  2026-08-23: `interface{}` 0, `ioutil` 0, `rand.Seed` 0, `strings.Title` 0
+  — this tree is already clean of the classic tells — against
+  **`sort.Slice` 18**, which is the live one.
+
+The sweep list, roughly by how much the replacement buys:
+
+| Still in the tree | The modern spelling | Note |
+|---|---|---|
+| `sort.Slice` / `sort.SliceStable` | `slices.SortFunc` / `slices.SortStableFunc` | **Not a free swap here** — see the warning below |
+| hand-rolled contains/index loops | `slices.Contains`, `slices.Index`, `maps.Keys` | plainer, and harder to get wrong |
+| `interface{}` | `any` | |
+| a `for` loop counting to n | `for range n` | |
+| a loop variable copied into the body | nothing — per-iteration since 1.22 | delete the copy, keep the comment if it explains *why it used to be there* |
+| `errors.Is` chains built by hand | `errors.Join`, `%w` | |
+| a mutex guarding a read-mostly map | `sync.RWMutex`, or `atomic.Pointer` for swap-whole | **0 `RWMutex` against 15 `sync.Mutex`** — worth one honest look, not a blanket conversion |
+| `var wg sync.WaitGroup` + `wg.Add(1)` + `go func(){defer wg.Done()…}` | `wg.Go(func(){…})` | one line, and it cannot leak an `Add`/`Done` mismatch |
+| a `WaitGroup` plus a shared error variable | `errgroup.Group` | **already available**: `golang.org/x/sync` is an indirect dependency, so this costs no new module — only promoting it to direct |
+| `time.Sleep` in a concurrency test | `testing/synctest` | fake clock; the flake goes away rather than getting a longer sleep |
+
+**Two warnings, both load-bearing here:**
+
+- **A sort swap can move ties, and ties are what the goldens record.** This
+  repo's `testdata/` corpora are frozen, and `sort.Slice` is unstable exactly
+  like `slices.SortFunc`, so an "identical" swap can still reorder equal
+  elements under a different algorithm. Convert one call site, run the
+  package, and if a golden moves the conversion is **wrong** — not the
+  golden. Prefer the `Stable` form anywhere the output is recorded.
+- **Concurrency is not free and this app is not starved for it.** Adding a
+  goroutine to something already fast buys nothing and costs a race surface.
+  The question is never "could this be concurrent" but "what is waiting" —
+  and if the answer is a profile Black has not taken yet, the finding belongs
+  to Black. What belongs *here* is the shape: a goroutine with no way to
+  report its error, a `context` that is accepted and never checked, a
+  goroutine whose lifetime is longer than the request that started it, a
+  channel where a mutex would read plainer. **Every new goroutine gets a
+  race-detected test** — `go test -race -count=2` — or it is not a safe fix.
 
 ## Facet: TypeScript / React craft
 
@@ -74,6 +143,59 @@ have fallen behind.
   seams is a finding.
 - If anything under `web/src` changed, the committed bundle must be rebuilt —
   and after any rebase, rebuilt again.
+
+## Facet: controls — commandment 17, made checkable
+
+Commandment 17 says every control answers the hand that reaches for it. It is
+the commandment most often satisfied *in the abstract* and missed on the
+actual element, because a control can look finished while doing none of it.
+Aaron's standing complaint, 2026-08-23: dull buttons, buttons that keep
+accepting clicks after the first one, and links doing a toggle's job.
+
+**Walk the surfaces in a real browser and press things.** jsdom cannot see a
+hover state, a focus ring, or a second click landing. Then work the list —
+each item is a grep or a press, not a judgment call:
+
+- **Does it reply to hover, focus *and* press?** Three separate states, and
+  focus is the one that gets skipped: keyboard users get no hover, so a
+  control with `:hover` styling and no `:focus-visible` is invisible to them.
+  A control that changes on hover alone is two-thirds done.
+- **Is it in the shared control vocabulary?** `web/src/index.css` holds the
+  `.btn` family for actions and `.chip-toggle` / `.strip-tab` and their
+  siblings for controls that are *places* rather than actions. Measured
+  2026-08-23: **131 button tags outside tests, 21 of them wearing no class
+  from that vocabulary.** Not all 21 are bugs — the tarot reader tiles, the
+  art picker and the wheel are deliberately bespoke and carry their own named
+  classes — so the test is not "does it have a `.btn`" but **"is there one
+  named place where this control's three states are defined?"** A control
+  styled only by inline `style={{…}}` fails that by construction, because
+  **a `:hover` can never reach an inline style** — which is how the last
+  hundred dull buttons happened, and there are 648 inline style props under
+  `web/src` for the sweep to work through.
+- **Does a click that starts work stop accepting clicks?** Measured
+  2026-08-23: **19 buttons start async work on click and 6 of them never
+  disable** — including `save()` and the deck page's return-a-card control,
+  which are *writes*, so the failure mode is a double edit rather than a
+  double read. The pattern is a busy flag driving `disabled` **and** a visible
+  pending state (the shared `Spinner`, or the button's own label changing).
+  Disabling with no visible change reads as broken; a spinner with no
+  `disabled` still double-submits. Both halves or neither.
+- **Is it the right element for the job?** A link navigates; a button acts; a
+  thing with an on and an off state is a toggle and should say so with
+  `aria-pressed` or `role="switch"`, not be a link that happens to change
+  colour. Aaron named this one specifically. An `<a>` with an `onClick` and no
+  `href` is the tell.
+- **Is the disabled reason legible?** A control disabled with no explanation
+  is a dead end, and commandment 2 makes that a real cost — a newcomer
+  assumes they broke it. A `title`, a helper line, or a tooltip saying *what
+  would enable this* is part of the control.
+- **Does it survive the keyboard and the phone?** Tab to it, press Enter and
+  Space; then check it at a touch size (Green owns the 44px floor, this facet
+  owns whether the hit target is the visible thing).
+
+Record which surfaces were walked and which controls were fixed, and — the
+part that keeps this from restarting every cycle — **which were examined and
+deliberately left bespoke, with the reason.**
 
 ## Facet: Claude-first docs & memory audit
 
@@ -112,6 +234,36 @@ files against them.
 - **Doc changes ride the run's branch** — this facet is the one place a
   mostly-doc PR is legitimate, because the corrections are the work. Still
   batch them; still never open a PR for one paragraph.
+- **Scrub the code's comments of provenance, and keep the argument** (Aaron's
+  ask, 2026-08-23). This repo deliberately writes comments that carry an
+  argument, and that rule is not in question — what has crept in beside it is
+  *provenance*: the date somebody noticed, the punch list it came off, the PR
+  that fixed it. Measured 2026-08-23: **88 dated comments in Go (60 outside
+  tests) and 101 more under `web/src`.** They are a running cost with no
+  reader — git already knows when, `docs/HISTORY.md` already knows why it
+  happened, and a comment that spends its first clause on a date spends the
+  reader's attention before reaching the point.
+
+  The line, and it is a sharp one:
+
+  - **Keep** what tells the next writer what will break: the invariant, the
+    trap, the thing that looks wrong and is not, the reason the obvious
+    alternative was rejected. *"Anchored, because a bare pattern also matches
+    the embedded data directories"* is doing work forever.
+  - **Cut** when it happened, who found it, and what it used to say — unless
+    the old shape is something a reader would otherwise reintroduce, and then
+    one clause is the whole budget. *"Reworded on the second 2026-08-15 punch
+    list"* tells the next writer nothing they can act on.
+  - **Keep a date only when the date is the fact**: a credential's expiry, a
+    pricing change with a cutover, a version floor, a deprecation window.
+    Those are load-bearing and stay.
+
+  The test to apply to each one: **would a reader who has never seen this
+  repository's history behave differently for having read this sentence?** If
+  no, it goes. Convert rather than delete where the sentence has a real point
+  buried in the narration — the point survives, the diary does not. Do a
+  bounded slice each run (a package, or one route family); this is a sweep
+  that would otherwise become the mass restructure the pass forbids.
 - **Scrub context that has stopped earning its tokens** (Aaron's ask,
   2026-08-16). These files are read by Claude at the top of every session,
   so their length is a per-session cost and their clarity is a correctness

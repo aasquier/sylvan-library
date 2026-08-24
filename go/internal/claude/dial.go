@@ -12,9 +12,11 @@ package claude
 // through the same narrow `DeckStatused` the stance takes, so this file adds
 // no dependency at all.
 //
-// **It answers three separate questions and a UI that collapses them lies.**
-// Installed, configured and wanted can each be false on their own, and "no
-// opinions here" reads very differently from "you have not set a key".
+// **It answers separate questions and a UI that collapses them lies.**
+// Configured and wanted can each be false on their own, and "no opinions
+// here" reads very differently from "you have not set a key". `installed` is
+// the third, and here it is a constant -- argued at the field, and the reason
+// the frontend renders one unavailable sentence rather than two.
 // Nothing here reaches a network: the stance is arithmetic over a table and
 // availability is a fact about the environment, so this answers on an
 // instance with no pool, no account and no credential.

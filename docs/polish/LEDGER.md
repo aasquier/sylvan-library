@@ -2,9 +2,11 @@
 
 The memory of the recurring polish pass (`.claude/skills/polish/`). One
 section per color, plus **Colorless** — the artifacts run that audits this
-file, the skill and the developer tooling, and goes last in a rainbow. Each
-run updates its own section **on the branch that did the work**; Colorless is
-the one allowed to correct another section, which is its job. Queued findings wait on Aaron and are not re-litigated;
+file, the skill and the developer tooling — and **Cleanup**, the end phase
+that empties the queue those runs fill and closes a rainbow. Each run updates
+its own section **on the branch that did the work**; Colorless is the one
+allowed to correct another section, which is its job, and Cleanup is the one
+allowed to close another section's queued item, which is its whole purpose. Queued findings wait on Aaron and are not re-litigated;
 deferred items name the trigger that revives them; measurements are recorded
 even when healthy, because today's healthy number is next quarter's baseline.
 
@@ -3478,3 +3480,37 @@ skill, the ledger and the tooling): README/CONTRIBUTING quickstart drift —
 the entry sits in Blue's own section, dated tonight. It is the same
 completeness-claim class this project has caught three times, in the two
 files `test_the_setup_section_names_every_extra` does not read.
+
+---
+
+## Cleanup — The End Step
+
+The phase that empties what the six runs fill. Not an audit: its input is the
+queue above, its output is landed work and closed items. Each entry records
+the **queue depth before and after**, what Aaron ruled, what was landed, and —
+for anything still in hand — *what would have to be true* for the next cleanup
+to land it. An item carried three cleanups with no stated reason is a finding
+about this phase, not about the item.
+
+### Not yet run
+
+The phase was created 2026-08-23 at Aaron's ask, alongside the skill's
+Go-toolchain refresh. Its first run has a standing backlog waiting for it:
+every queued and deferred item in the six sections above, plus three opened
+that night and recorded here so the first cleanup starts from a complete list
+rather than a memory.
+
+- **ADR 38 cites `docs/go-migration/`, which no longer exists.** The
+  zero-trace sweep deleted the directory; the ADR links it twice, in its
+  header and its context. ADRs are immutable, so the options are a
+  superseding note, restoring the directory as an appendix, or accepting a
+  dead link in an accepted record — Aaron's ruling, and the first relic the
+  new enumerative sweep would have caught.
+- **The `deploy` job's `needs` list is an invariant nothing checks.** The
+  test that derived the expected job set from `ci.yml`'s own job list died
+  with the old suite. Until it is rebuilt in Go, a job added without `needs`
+  deploys off a partial suite silently. Red's section carries the detail.
+- **The measuring shelf's Go rebuild**, with the live question Colorless now
+  asks each run: what would it measure that the stock toolchain does not? The
+  honest answer today is a cache hit register and a benchmark ledger, which
+  is a much smaller tool than the one that retired.

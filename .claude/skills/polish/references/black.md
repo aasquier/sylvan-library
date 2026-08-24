@@ -48,13 +48,13 @@ Aaron's rule: prefer assets we serve over links we chase — spend the effort
 once, deploy it, and be fast forever.
 
 - Inventory every external URL the served app references: images, fonts,
-  CSS, scripts. `grep -rn "https://" web/src src/mtglab/web_dist --include`
-  patterns, then classify each: (a) committable through the animist —
-  do it (recipe, licence gate, PROVENANCE, `mtglab animist build`); (b)
-  licence-bound to stay runtime (Wizards art) — leave it, with credit;
-  (c) dead or replaceable — remove it.
+  CSS, scripts. `grep -rn "https://" web/src web_dist` (the built bundle is
+  the half a source grep cannot see), then classify each: (a) committable
+  through the animist — do it (recipe, licence gate, PROVENANCE, then
+  `animist build` from `tools/`); (b) licence-bound to stay runtime (Wizards
+  art) — leave it, with credit; (c) dead or replaceable — remove it.
 - The animist is the only road for (a): never hand-place a binary, and run
-  `mtglab animist measure` to pick the size knee rather than guessing.
+  `animist measure` to pick the size knee rather than guessing.
 - No CDN dependencies for code or fonts, ever — a CDN is a hotlink with
   better marketing, plus a privacy leak of every visitor's IP.
 - Check caching headers on what we already serve — but **do not propose a long
@@ -78,58 +78,90 @@ performance bug in the codebase sat inside that number for three days. A
 millisecond is a datum. **A large millisecond is a question**, and nothing
 here used to say so.
 
-`mtglab bench` is that instruction in code. Run it rather than hand-timing:
+The purpose-built `bench` command retired with the old backend and its Go
+rebuild is an open ledger item, so this facet runs on the stock toolchain.
+That is a trade up, not down: Go ships a sampling profiler, an allocation
+profiler, a blocking profiler and a race detector, and none of them need a
+harness. Everything below is from `go/` with the three exports set.
 
 ```bash
-mtglab bench run                 # the declared suite, warm, ledger-ready table
-mtglab bench run --cold          # every cache emptied between samples
-mtglab bench profile decks       # one target: database, imports, frames
-mtglab bench caches              # hit rates
-mtglab mutate list               # (White's facet, same shelf)
+go test -run '^$' -bench . -benchmem -count=10 ./internal/<pkg>/ > new.txt
+benchstat old.txt new.txt                     # the only honest before/after
+go test -run TestX -cpuprofile cpu.out -memprofile mem.out ./internal/<pkg>/
+go tool pprof -top -nodecount=25 cpu.out      # -http=: for flame and graph
+go tool pprof -top -sample_index=alloc_objects mem.out
+go build -gcflags=-m ./internal/<pkg>/ 2>&1 | grep escapes
 ```
 
-- **Cold and warm are two measurements, not one.** The shelf went 201ms to
-  16ms warm and did not move at all cold, and a ledger row with one slot for a
-  number can hold neither honestly. Record both, labelled. `bench run --cold`
-  empties every registered cache between samples, which is only possible
-  because it runs in-process.
-- **Anything over the threshold gets profiled, and the profile goes in the
-  ledger — not just the millisecond.** `bench run` does this unasked at 25ms.
-  Paste the budget breakdown, not the headline.
-- **Three budgets, and only one of them is yours to fix.** `bench profile`
-  reports the database exactly (measured at the query probe,
-  never subtracted), the import-machinery call count, and everything else.
-  The reason it is measured: **cProfile raises no event for an extension
-  method**, so a database call can land in the self-time of whatever
-  called it — a profile of the card search blamed 38ms on a function whose
-  body is three string joins. cProfile's frame table is a **ranking of which
-  line**, never a budget of how many milliseconds; its clock is inflated per
-  call, and the deck shelf profiles at 188ms against a 19ms wall.
-- **A pattern sweep complements a profile and never replaces it.** The
-  standing example is the one that got away: an AST sweep for n+1 lookups
-  found the one real n+1 in the tree and was blind to everything *inside*
-  `get_cards`, where DuckDB was probing `import pandas` twice per bound
-  parameter — 1,768 failed imports, 162ms of a 200ms endpoint, all inside the
-  import machinery. The statement **count** in `bench profile` is the n+1
-  detector that needs no pattern; the import call count is the storm detector.
-  **Read that count against `IMPORT_CALLS_SUSPECT` (200), never against
-  zero** — this line said zero until 2026-08-19 and zero is not reachable.
-  #181 *answered* DuckDB's probe with a `sys.modules` sentinel rather than
-  removing it, so a warm bind still enters the import machinery: exactly two
-  calls per bound value, and the warm suite runs 7–31 across its targets. A
-  run holding the old sentence files a false finding on every profile it
-  takes.
-- **Every cache gets a hit-rate check, not only a correctness test.** `mtglab
-  bench caches` reported the retired register. A cache that never hits
-  is complexity wearing a win's clothes, and the standing example was correct,
-  tested, and dead: `oracle_columns` keyed on the connection object, in an app
-  where every endpoint opens one handle, asks one question and closes it. No
-  test could have found that; only a counter did. **A cache added since last
-  run that is not in the register is a finding**, and the register's own test
-  fails on it.
+- **Benchmark the function; probe the route.** A Go benchmark answers about a
+  function, and most of what this facet chases is an HTTP route. Time the
+  route from outside (`curl -w '%{time_total}'` warm and cold, local and
+  live), then take the number that is too big *into* a benchmark or a profile
+  of the package behind it. The route number is the question; the profile is
+  the answer.
+- **`ns/op` without `allocs/op` is half a measurement.** In Go the usual cause
+  of a slow path is allocation and the garbage it makes, and the alloc profile
+  (`-sample_index=alloc_objects`) names the line. `-gcflags=-m` says which
+  values escaped to the heap and why — often a one-word fix (a pre-sized
+  slice, a value receiver, a `strings.Builder`).
+- **A single run is not a result.** Go benchmarks on a laptop move several
+  percent between runs on thermal noise alone. `-count=10` through `benchstat`,
+  and a delta it marks insignificant (`~`) is not a finding — writing it down
+  as one is how a run reports a win it did not have.
+- **The profiler is nearly blind inside cgo, which is exactly where the card
+  pool lives.** DuckDB work arrives as `runtime.cgocall` with no shape under
+  it, so a pool-heavy route's profile will look mysteriously flat. **Clock the
+  database at the query** and profile the Go half; never infer the database's
+  share by subtracting what the profile shows. This is the retired shelf's
+  hardest-won lesson, and it survived the language change intact — the reason
+  changed, the discipline did not.
+- **The n+1 detector that needs no pattern is a statement count.** Count
+  queries per request (a counting `sql.DB` wrapper in a test, or the pool's own
+  instrumentation) rather than grepping for loops around calls: a sweep over
+  source finds the n+1s it has a shape for and is blind to the ones inside a
+  helper, which is where the expensive ones live.
+- **Contention is its own profile.** `-blockprofile` and `-mutexprofile` find
+  what a CPU profile cannot: goroutines waiting rather than working. The
+  standing suspects are the single-writer database and any shared handle —
+  worth a look whenever a route is fast alone and slow under a load probe.
+- **Concurrency is a throughput tool, and this facet owns the question of
+  whether it bought anything.** Blue owns the *shape* of concurrent code —
+  which primitive, whose error, whose lifetime — and refuses a goroutine
+  added on a hunch. Black owns the number that would justify one. The order
+  is fixed and the wrong order is how concurrency gets added to code that was
+  never the bottleneck: **profile, then find the wait, then parallelise the
+  wait.** Three shapes that actually pay here, each needing a measurement
+  first:
+  - **Fan-out over independent work** — several pool queries or file reads a
+    request makes in sequence and could make at once. `errgroup` bounds it and
+    carries the first error out; `golang.org/x/sync` is already an indirect
+    dependency, so it costs no new module.
+  - **A read-mostly structure behind a plain mutex.** `sync.RWMutex` or an
+    `atomic.Pointer` swap only wins when readers actually contend — and the
+    inventory is **15 `sync.Mutex` and zero `RWMutex`**, which is a question
+    to ask with `-mutexprofile`, never a blanket conversion. Under low
+    contention `RWMutex` is *slower*.
+  - **Work sized to the machine.** `GOMAXPROCS` follows the machine and the
+    machine now has two shared cores, so a lane sized by a literal does not
+    take the second one. A worker count that is a constant is a finding worth
+    at least a comment saying why it is constant.
+
+  And the standing caution, because it is the expensive mistake: **more
+  goroutines on a two-core shared machine mostly buys scheduling.** A win that
+  exists on this 8-core laptop and not on the instance is not a win; measure
+  where it ships.
+- **Every cache gets a hit-rate check, not only a correctness test.** A cache
+  that never hits is complexity wearing a win's clothes, and the standing
+  example was correct, tested, and dead — keyed on a per-request handle in an
+  app where every request opens its own. No test could have found that; only a
+  counter did. The register that used to hold every cache retired with the old
+  backend, so until the Go shelf is rebuilt, **a cache added since last run
+  with no hit count anywhere is a finding**, and rebuilding the register is
+  the standing proposal.
 - **Backend numbers** for the routes a session actually hits, on the live
-  instance as well as locally — the bench is in-process and cannot see the
-  proxy, TLS, or the machine's own contention. Record; compare to last run.
+  instance as well as locally — a local measurement cannot see the proxy, TLS,
+  or the machine's own contention, and since 2026-08-23 the machine has two
+  shared cores rather than one. Record; compare to last run.
 - **Frontend: read the import graph, not the size table.** A size table cannot
   answer *when* a chunk loads, and that gap cost 113kB gzipped on three
   routes: `charts.js` was route-split and recorded as "loaded only where a
@@ -138,16 +170,22 @@ mtglab mutate list               # (White's facet, same shelf)
   component-splitting.** Check `lib/deferred.tsx` and `components/lazycharts.tsx`
   for the pattern, and verify in a real browser's network waterfall which
   chunks a page actually pulls.
-- Tier 1 hot path: `internal/sim/tier1` runs one goroutine per queued job on
-  one CPU worker by design. Profile before touching; a vectorisation win needs
-  the determinism digest respected — engine changes move `SIM_VERSION`, which
-  invalidates the ADR 18 cache, so a micro-win that dumps every cached result
-  is not a win.
-- Job pools: CPU pool at one worker (deliberate), NET pool for socket-bound
-  work — confirm new job types landed in the right pool.
-- FastAPI: response models that over-serialise (payload sizes in the browser's
-  network panel), gzip/brotli on the deployed instance (check response headers
-  live), static file serving with sane cache headers.
+- **Tier 1 is the one hot path where a win can cost more than it saves.** The
+  ADR 18 cache is keyed partly on an **engine fingerprint** — a hash of five
+  embedded packages, listed in `internal/sim/cache`'s `engineSources` — so any
+  change inside them rotates the key and orphans every stored result. A
+  micro-optimisation that dumps the cache is not a win; measure the saving
+  against a cold recompute of everything before proposing it. Determinism
+  binds too: the seeded generator and the exact-float helpers are contract,
+  and a faster sum that disagrees with the frozen goldens is a bug.
+- Concurrency shape: the job lanes are CPU-bound and socket-bound work kept
+  apart — confirm a new job type landed in the right one. `GOMAXPROCS` follows
+  the machine, so the second core widens the CPU lane with no code change and
+  a lane sized by a literal `1` would silently not take it.
+- The door: check what the served payloads actually weigh in the browser's
+  network panel, that compression is on for them at the deployed instance
+  (read the response headers live, not the handler), and that the static tiers
+  still send what `web/vite.config.ts`'s stable filenames require.
 - React: re-render hygiene on the interactive surfaces — profile with the React
   DevTools profiler in a real browser, not by eye. Commandment 6 wants motion;
   motion must come from transforms and compositor-friendly properties, never

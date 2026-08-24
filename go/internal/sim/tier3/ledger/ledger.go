@@ -105,10 +105,9 @@ type Match struct {
 	// not reproducible, and the ledger says so rather than inventing a number.
 	//
 	// A `*big.Int` for the reason the run options carry one — and a seed past
-	// SQLite's 64-bit INTEGER is refused: the recorded behaviour is
-	// a warning and a match recorded nowhere.
-	// [seedForSQL] reproduces that rather than truncating, because a
-	// truncated seed is a row claiming a reproducibility it does not have.
+	// SQLite's 64-bit INTEGER is refused rather than truncated: a warning, and
+	// a match recorded nowhere. [seedForSQL] is that refusal, and truncating
+	// instead would write a row claiming a reproducibility it does not have.
 	Seed           *big.Int
 	Clock          int
 	GamesRequested int
@@ -231,20 +230,16 @@ func orEmpty(v []string) []string {
 
 // seedForSQL narrows a seed for SQLite's 64-bit INTEGER, or refuses.
 //
-// The recorded behaviour for an oversized seed is a logged warning
-// and a match recorded nowhere. Refusing here, before any row is written,
-// puts the whole insert on the
-// same side of the fence — a match is one row plus its seats plus its games,
-// and half of one is worse than none.
+// An oversized seed is a logged warning and a match recorded nowhere.
+// Refusing here, before any row is written, puts the whole insert on the same
+// side of the fence — a match is one row plus its seats plus its games, and
+// half of one is worse than none.
 func seedForSQL(seed *big.Int) (any, error) {
 	if seed == nil {
 		return nil, nil
 	}
 	if !seed.IsInt64() {
-		//nolint:staticcheck // capitalised deliberately: the ledger's
-		// long-standing warning text, preserved verbatim so old and new log
-		// lines read as the same failure.
-		return nil, fmt.Errorf("Python int too large to convert to SQLite INTEGER")
+		return nil, fmt.Errorf("seed %s does not fit the ledger's 64-bit integer column", seed)
 	}
 	return seed.Int64(), nil
 }

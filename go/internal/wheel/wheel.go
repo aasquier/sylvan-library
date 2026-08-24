@@ -147,11 +147,13 @@ var faces = map[string]struct {
 
 // Caveat states which system answered (ADR 14 boundary 3) without naming one
 // (commandment 10): what the user needs is the distinction — blind dice,
-// nobody's judgment. The wire still carries `answered_by: "python"` and
-// `seed` as tokens for clients and tests; rendering them is the sin, not
-// sending them. (`answered_by`'s value keeps its historical spelling for
-// exactly that reason: it is a wire token, not a rendered fact, and clients
-// already key on it.)
+// nobody's judgment. The wire still carries `answered_by` and `seed` as
+// tokens for clients and tests; rendering them is the sin, not sending them.
+//
+// `answered_by` is `dice` here against `claude` everywhere Claude answers,
+// and the word is the caveat's own: a token that names the thing that
+// happened outlives a token that names whatever ran it, and a client asking
+// the only question the field exists for reads `!= "claude"` either way.
 const Caveat = "The wheel is blind dice over the card pool — a fate, then a " +
 	"random legal card in this deck's colours that answers to it. " +
 	"A suggestion to argue with, never a recommendation: the " +
@@ -226,7 +228,7 @@ func Spin(ctx context.Context, d *deck.Deck, identity map[string]bool,
 		{Key: "label", Value: chosen.label},
 		{Key: "meaning", Value: meaning},
 		{Key: "seed", Value: seed},
-		{Key: "answered_by", Value: "python"},
+		{Key: "answered_by", Value: "dice"},
 		{Key: "caveat", Value: Caveat},
 	}
 	if faceField != "" {

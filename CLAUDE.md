@@ -6,8 +6,9 @@ fortune-teller reads your cards. One Go binary serves all of it; a React
 frontend renders it; the deployed instance's volume holds the library — a
 checkout carries the engine, never the decks.
 
-Go 1.26 (CGO on — DuckDB) · React/TypeScript · `tools/` holds the one piece
-of Python: the local picture/video pipeline that makes the committed art.
+Go 1.26 (CGO on — DuckDB) · React/TypeScript · `tools/` holds the project's
+Python: the local picture/video pipeline that makes the committed art. (The
+repo's only other `.py` is `.claude/hooks/guard-git.py`, a harness guard.)
 The binary and CLI are named `mtglab`; the repo is `sylvan-library`. That
 mismatch is intentional and not a bug to fix.
 

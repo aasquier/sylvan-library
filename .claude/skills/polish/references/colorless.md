@@ -74,10 +74,17 @@ run reports green, and the bugs are somewhere the file never looks.
 The developer shelf is artifacts in the plainest sense — and most of it is
 currently an absence: the bench suite, the mutation harness and the cache
 register retired with the old backend, and **rebuilding them over the Go
-packages is this part's standing item** until it lands. What survives today
-is `animist verify` in `tools/`. Nothing else in the cycle owns the shelf,
-and a measuring tool that has gone wrong is worse than no tool, because its
-numbers are believed.
+packages is this part's standing item** until it lands. What survives is
+`animist verify` in `tools/`, plus the stock Go toolchain that the other
+colors now measure with (SKILL.md's shelf section lists it). Nothing else in
+the cycle owns the shelf, and a measuring tool that has gone wrong is worse
+than no tool, because its numbers are believed.
+
+**A live question for the rebuild, every run: what would the Go shelf measure
+that the stock tools cannot?** If the honest answer keeps coming back "very
+little beyond a cache register and a benchmark ledger", that is a finding
+about the rebuild's *shape* — say so and re-scope it, rather than carrying a
+plan for a tool the toolchain made redundant.
 
 - **Run each one and read the output as evidence about the tool**, not only
   about the code:
@@ -93,10 +100,11 @@ numbers are believed.
   go unanswered until the shelf returns, and that gap is worth a ledger line
   each run so it cannot silently become permanent.
 
-- **A skipped row is the finding.** `bench` reports unavailable targets by
-  name for exactly this reason: a suite that quietly shrank still prints a
-  table. If a target that used to run now says `skipped`, find out why before
-  reading anything else on the page.
+- **A shrunken run still prints a table.** The retired bench named its
+  unavailable targets for exactly this reason, and the stock tools do not: `go
+  test` prints `no test files` in the same green column as a passing package,
+  and a benchmark filtered out by `-run` reports nothing at all rather than
+  reporting that it ran nothing. Count what ran before reading what it said.
 - **Check the tool against a bug it is supposed to catch.** The instruments
   here were each built from a specific failure, and the honest test is to
   reproduce that failure and watch the needle move. A tool nobody has
@@ -105,10 +113,13 @@ numbers are believed.
   seed and the rate. A rate that moved needs its cause named: new tests, new
   code, or a different draw. Survivors carried forward unread across two runs
   are a finding about the pass, not about the suite.
-- Ask what the shelf is still missing. The standing queued item is `mutmut` or
-  `cosmic-ray` for an exhaustive run over one module, where the in-repo
-  harness does sampling; anything else proposed here is a new dependency and
-  therefore queued with the arithmetic, never adopted in the run.
+- Ask what the shelf is still missing. Three standing items, all queued
+  because each is a dependency or a decision: an off-the-shelf Go mutator for
+  an exhaustive run over one package where the in-repo harness only samples;
+  `benchstat`, which is the difference between a benchmark delta and a
+  benchmark *finding*; and the cache register, whose absence means a cache
+  added today has nothing counting its hits. Anything else proposed here is a
+  new dependency too — queued with the arithmetic, never adopted mid-run.
 
 ## Part four — the leftovers
 
@@ -127,20 +138,50 @@ This is where they get a home.
   `converge` survey is staler than its date says. Write the honest ordering
   for the next bare `/polish` at the bottom of the ledger so the next session
   does not have to re-derive it.
-- **The relic sweep** (Aaron's ask, 2026-08-21, the night the laptop deck
-  copies were retired: "we still have a lot of old artifacts from early dev
-  cycles that don't seem to fit anymore"). Walk the tree for things whose
-  reason has moved out from under them: directories and files from an
-  earlier shape (`~/Downloads` deck markdown is the named example — kept
-  historical, never edited), template files that describe a workflow nobody
-  runs any more, docs sections narrating a phase that ended, CLI commands
-  and flags whose data or purpose has migrated (Green's hosted-first facet
-  owns the *capability* question; this sweep owns the *existence* question),
-  scripts and fixtures that outlived the thing they fixed. For each: name
-  it, say what shape it belonged to, and queue keep/retire for Aaron — a
-  relic is a decision, never a silent deletion. The test is Green's,
-  generalised: a thing earns its place by what the *current* shape needs
-  from it, not by having always been there.
+- **The relic sweep** (Aaron's ask, 2026-08-21, sharpened 2026-08-23: *make
+  the artifact search thorough*). The failure this exists to prevent is not
+  missing a relic — it is **sweeping by memory**, walking the parts of the
+  tree a session already has in context and calling that the tree. A relic
+  lives exactly where nobody looks, so the sweep has to be *enumerative*.
+
+  **Enumerate, then judge. Never the other way round.** Six passes, each one
+  a command whose output is a complete list, and each one finds a different
+  kind of leftover:
+
+  ```bash
+  git ls-files | sed 's#/[^/]*$##' | sort -u        # 1. every tracked directory
+  git ls-files | grep -vE '\.(go|ts|tsx|css|md|json|ya?ml)$'   # 2. odd file types
+  git log --diff-filter=A --name-only --since=... --format=  # 3. what arrived, by era
+  git ls-files -- '*.md' | xargs -n1 head -1        # 4. every doc, by its own title
+  ./mtglab --help  (and each subcommand's)          # 5. every command and flag
+  git ls-files | xargs -I{} sh -c 'grep -rL {} ...' # 6. files nothing references
+  ```
+
+  Pass 1 is the one that pays and the one always skipped: **read the whole
+  directory list out loud against the current architecture** and stop on any
+  directory you cannot immediately say the purpose of. Pass 5 is its
+  equivalent for behaviour — a CLI grows commands and never loses them, and
+  a flag whose data moved to the volume is a relic that still runs.
+
+  The kinds to expect, so none is dismissed as "probably fine": directories
+  from an earlier shape; template and fixture files describing a workflow
+  nobody runs; doc sections narrating a phase that ended; commands and flags
+  whose data or purpose migrated (Green's hosted-first facet owns the
+  *capability* question, this sweep owns the *existence* question); test
+  helpers for deleted subjects; ignore rules matching nothing; config keys
+  and environment variables nothing reads; dependencies nothing imports;
+  and **links pointing at paths that no longer exist** — the standing
+  example being an accepted ADR citing a directory a later sweep deleted,
+  which is unfixable in place because ADRs are immutable and is therefore
+  exactly the kind of thing that must be *found and raised* rather than
+  quietly tidied.
+
+  For each: name it, say what shape it belonged to, and queue keep/retire for
+  Aaron — **a relic is a decision, never a silent deletion.** The test is
+  Green's, generalised: a thing earns its place by what the *current* shape
+  needs from it, not by having always been there. Record in the ledger which
+  passes were actually run, because a sweep that ran two of six and reported
+  "nothing found" is the failure mode this whole entry exists to stop.
 
 ## What this run never does
 

@@ -22,7 +22,7 @@ is opening it on *their* phone, in *their* browser. It has to just work.
   JS/CSS features against 16.4 — `:has()`, container queries,
   `structuredClone`, top-level await in served code. When Vite's target and
   reality disagree, reality is the phone that renders white.
-- **Audit `src/mtglab/web_dist/assets/`, not `web/src`, and run
+- **Audit `web_dist/assets/`, not `web/src`, and run
   the bundle-floor check rather than grepping.** This is the correction
   that run earned the hard way: the floor moved from 15 to 16.4 the day
   Tailwind v4 landed, and no source file changed — v4 emits `@property` and
@@ -85,9 +85,10 @@ trend is read.
 - Response times from outside, cold and warm (Black measures for speed; this
   facet watches for *degradation* — same numbers, different question, so share
   the measurement and record it once). Cold means the caches are cold, not
-  merely that the machine woke up: `mtglab bench caches` is what makes the two
-  distinguishable, and a "cold" figure taken by asking twice is a warm figure
-  with a misleading label.
+  merely that the machine woke up, and the register that could once prove the
+  difference retired with the old backend — so **label a cold figure as cold
+  only when you know what emptied**, and a "cold" number taken by asking twice
+  is a warm number with a misleading name.
 - Fly free-tier/plan posture: what the project is on, what it is near the
   edge of (machine count, volume GB, bandwidth). A limit within one growth
   step is a queued finding with the price of the next tier attached.
@@ -155,12 +156,17 @@ The facet's job is to keep that number a *setting* rather than an
 assumption, so the day it changes is a config edit and a re-measure, not an
 archaeology dig.
 
-- Inventory where the design point lives in code: rate-limit constants, job
-  pool sizes (CPU=1 deliberate and GIL-bound; NET pool width), uvicorn
-  worker count, SQLite's single-writer posture, session/token table growth,
-  invite volume. Anything hard-coded that would need to move at 10× belongs
-  in one documented place — a finding if scattered, a safe fix if
-  centralising it is surgical.
+- Inventory where the design point lives in code: rate-limit constants, the
+  job lanes' widths, SQLite's single-writer posture, session/token table
+  growth, invite volume, and the door's `soft_limit`/`hard_limit` in
+  `fly.toml`. Anything hard-coded that would need to move at 10× belongs in
+  one documented place — a finding if scattered, a safe fix if centralising it
+  is surgical. **One process is the design**, not an accident: the job
+  registry lives in the memory of the process that submitted the job, so a
+  second process would 404 the first's sims. Concurrency inside that process
+  is goroutines and `GOMAXPROCS`, which follows the machine — so the second
+  core (since 2026-08-23) widens the CPU lane for free, and a lane sized by a
+  literal rather than by `runtime.NumCPU` silently does not take it.
 - SQLite is the accepted store (ADR 4) and fine at this scale — do not
   propose Postgres; do check the pragmas serve concurrent reads (WAL mode,
   busy timeout) and that write paths hold transactions briefly.
@@ -174,17 +180,19 @@ archaeology dig.
   correction the 2026-08-19 pass earned. The probe correctly found
   near-perfect serialisation on the library shelf and this facet then wrote
   down the reason: "the shelf's YAML and aggregation costs". Right that it
-  was serial overhead, wrong about *which* — YAML was second at 18ms, and
-  the first was 162ms of failed
-  `import pandas` inside DuckDB's parameter binding. The guess was plausible,
-  specific, and sat in the ledger as a finding for three days. **Run `mtglab
-  bench profile <endpoint>` and paste what it says**; a sentence beginning
-  "presumably" is not a finding.
-- **Probe warm *and* cold, and record them as two numbers.** The shelf went
-  201ms → 16ms warm and is unchanged cold, because the win is a memo. One
-  number per row cannot hold that, and a run reading a single figure next
-  quarter will not know which state it describes. `mtglab bench run --cold`
-  is the cold half.
+  was serial overhead, wrong about *which*: the named cause was second at
+  18ms, and the real first was 162ms spent inside the database driver's own
+  parameter binding — a place no reading of the endpoint's source could have
+  suggested. The guess was plausible, specific, and sat in the ledger as a
+  finding for three days. **Profile it and paste what the profiler says**; a
+  sentence beginning "presumably" is not a finding. Black's facet has the
+  instruments, including the standing warning that a Go CPU profile cannot see
+  inside the pool's cgo calls — so that half is clocked at the query, never
+  guessed at.
+- **Probe warm *and* cold, and record them as two numbers.** The library shelf
+  once went 201ms → 16ms warm while not moving at all cold, because the win
+  was a memo. One number per row cannot hold that, and a run reading a single
+  figure next quarter will not know which state it describes.
 - Growth levers, kept documented rather than pulled: second Fly machine
   (blocked by single-volume design — say so honestly), bigger machine,
   NET/CPU pool widening, per-user quotas on expensive surfaces (Claude
