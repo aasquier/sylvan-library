@@ -3361,9 +3361,12 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
   - **White — earning it.** Both fixes came from the verify-the-anchor habit
     the file added deliberately, not from a list.
   - **Blue — earning it, and its finding was in this skill.** Four places in
-    the pass's own prose told a run to invoke `ruff`/`mypy`/`pytest` bare; all
-    four are `command not found` here, copied from `ci.yml` where they work.
-    That is a checklist failing on its own instructions.
+    the pass's own prose and in CLAUDE.md told a run to invoke the toolbox
+    gates as bare `ruff` / `mypy` / `pytest` / `animist`; all four are
+    `command not found` on this Mac, copied from `ci.yml`, where they work
+    because CI installs them onto `PATH`. That is a checklist failing on its
+    own instructions, and it is the sharpest evidence yet for the guard that
+    2026-08-23's item 5 asks for.
   - **Black — earning it**, and its facet's cgo caveat held under use.
   - **Red — earning it, and item 3 of the 2026-08-23 queue turned out to be
     fact rather than hypothesis.** The `deploy` job's `needs` list had never
@@ -3423,7 +3426,9 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
     class, not a tidy — and it is thin enough that the honest recommendation is
     to leave it.
   - **Pass 5 (every command and flag) — clean, and it corrects this section.**
-    Nine subcommands plus a hidden `probe`; every flag on every one has live
+    Eight subcommands of our own (`cards`, `claude`, `data`, `decks`,
+    `forge-shim`, `sim`, `ui`, `users`), cobra's `help` and `completion`, and a
+    hidden `probe` the image's HEALTHCHECK calls; every flag on every one has live
     data behind it. **`mtglab ui --dev` does not exist and appears nowhere in
     the tree.** This section's 2026-08-21 entry names it twice as a live
     capability ("the dev harness — commandment 16's walks, `--dev` CORS for
