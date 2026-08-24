@@ -12,10 +12,9 @@ library and its five artifacts, the gate, all three simulation tiers
 (goldfish, the Karsten/curve shelf, Forge), the Claude surfaces (seven
 modes behind the stance dial), the tarot table, auth and the Admin page,
 and both ledgers. The frontend is the committed `web_dist/` bundle. Decks
-live on the instance's volume, nowhere else (ADR 30). Six curated decks
-plus one empty draft; statuses are facts about volume files — check with
-`fly ssh console -C "mtglab decks validate <slug>"`, don't inherit them
-from prose.
+live on the instance's volume, nowhere else (ADR 30). The library's contents
+are data rather than documentation — ask it (`mtglab decks list`, then
+`decks validate <slug>`) rather than inheriting a count from prose.
 
 The machine is `shared-cpu-2x`/1GB — two shared cores since 2026-08-23, for
 about $0.70 a month more. It buys throughput rather than speed: a Tier 1 run

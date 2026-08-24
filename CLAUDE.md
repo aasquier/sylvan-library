@@ -1,10 +1,10 @@
 # sylvan-library
 
-Commander toolkit: deck files on disk, Monte Carlo simulation,
-Scryfall-validated decklists, generated primers, and a table where a
-fortune-teller reads your cards. One Go binary serves all of it; a React
-frontend renders it; the deployed instance's volume holds the library — a
-checkout carries the engine, never the decks.
+Commander toolkit: a deck is one YAML file and that file is the truth,
+Monte Carlo simulation, Scryfall-validated decklists, generated primers, and
+a table where a fortune-teller reads your cards. One Go binary serves all of
+it; a React frontend renders it; the deployed instance's volume holds the
+library — a checkout carries the engine, never the decks.
 
 Go 1.26 (CGO on — DuckDB) · React/TypeScript · `tools/` holds the project's
 Python: the local picture/video pipeline that makes the committed art. (The
@@ -303,12 +303,17 @@ is. `docs/adr/` is immutable once accepted: supersede, don't edit.
 
 ## The decks
 
-Six curated decks live on the instance's volume (arahbo cats, atla dinos,
-goreclaw stompy, tivit cEDH, gyome food, trostani tokens) plus one empty
-draft (adrix). Goreclaw fails the gate on a banned card by design — a live
-invalid example, never a test fixture. Statuses, stages and labels are facts
-about volume files: **check with `fly ssh console -C "mtglab decks validate
-<slug>"`, don't inherit them from prose** — including this paragraph.
+**There is no roster here, deliberately.** Decks are the app's data, not the
+project's furniture: Aaron adds them, users add their own, and any list
+written down goes wrong without anything failing. Ask the library instead —
+`fly ssh console -C "mtglab decks list"`, then `mtglab decks validate <slug>`
+for one deck's real status, stage and labels. Every count, name and status in
+any document, this one included, is a claim to re-check.
+
+One standing fact, because it is a rule rather than a roster: **at least one
+curated deck fails the gate on purpose** — a banned card left in place as a
+live invalid example, never a test fixture. A session that "fixes" it has
+removed the only honest demonstration the gate has.
 
 ## Out of scope
 

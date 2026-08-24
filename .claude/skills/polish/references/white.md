@@ -92,9 +92,11 @@ A real fix landed here (the SPA catch-all path traversal, PR #126) and cost
 four commits to get green. The lessons are worth more than the fix:
 
 - **Two jobs, not one: close the hole *and* satisfy the scanner.** The bug is
-  fixed when the vulnerability is gone; the PR merges when CodeQL is also
-  green. These are different, because CodeQL's model may not recognise a
-  perfectly correct guard. Two different containment checks on the resolved
+  fixed when the vulnerability is gone; the work is *done* when CodeQL is
+  also green. Those are different — and neither is the merge gate, because
+  CodeQL is advisory here (Red's facet argues why), so nothing stops a red
+  scan shipping except you. They are different because CodeQL's model may not
+  recognise a perfectly correct guard. Two containment checks on the resolved
   paths *contained* the traversal correctly — the test proved it — and CodeQL
   flagged both anyway, because it does not model either as a barrier on this
   query. Expect the same of `filepath.Clean` plus a prefix check: correct, and
@@ -121,9 +123,30 @@ four commits to get green. The lessons are worth more than the fix:
 
 ## Facet: testing discipline
 
-The 95% floor exists to make regressions loud, but Aaron's bar is the *right*
-tests, not coverage tests — and a suite that stays fast enough that adding
-tests never feels expensive.
+Aaron's bar is the *right* tests, not coverage tests — and a suite that stays
+fast enough that adding tests never feels expensive.
+
+**The 95% floor did not survive the crossing, and saying so is this facet's
+own medicine.** It was a real gate once; today CI runs `go test -race
+-count=1 -cover ./...`, which prints a number and gates on nothing, and no
+threshold lives in `ci.yml`, `.golangci.yml` or any doc. A rule enforced by
+nothing had drifted, and only this file still asserted it. Measured
+2026-08-23: **80.3%** of statements covered by the whole suite, **74.1%**
+counting each package's own tests only. Until Aaron rules (it is in
+`docs/polish/DAYBREAK.md`), treat coverage as a **watched number, not a
+gate**: record both figures every run and treat a fall as a finding.
+
+Two traps in the measuring itself, one of which caught this run:
+
+- **`-coverpkg=./...` changes what every per-package line means.** With it,
+  each package reports its coverage *of the whole module* — so a determinism
+  kernel with excellent tests prints `0.4%` and reads like a hole. Use the
+  plain `-cover` run to rank packages and the `-coverpkg` run only for the
+  module total. Reading one number in the other's frame produces a confident,
+  completely wrong finding.
+- **Read the report for *meaningless* coverage too.** A package at 100%
+  through tests that assert nothing is worse than an honest gap, because it
+  reads as done. This is why the mutation work below outranks the percentage.
 
 - **Check the environment before believing the run.** Compare the local
   package and test counts against CI's — a passing suite that ran *less than
@@ -256,14 +279,21 @@ Then the levers, in the order that pays:
   Go rebuild is the ledger's open item. Until it lands, this facet's sampling
   is the hand protocol on a *throwaway copy* of a package — never the working
   tree — and the survivors the old ledger recorded stay listed there so the
-  rebuilt tool can re-ask them by name on its first run. Adopting an
-  off-the-shelf Go mutator instead is a **queued** proposal with the
-  arithmetic attached, never a silent new dependency.
+  rebuilt tool can re-ask them by name on its first run.
+
+  **The named candidate is `go-gremlins/gremlins`** — a standalone binary with
+  mutation-score thresholds, so it installs on demand exactly as
+  `go-licenses` does and costs the project no `go.mod` entry. (The livelier
+  alternative, `gtramontina/ooze`, runs inside `go test` and therefore *is* a
+  dependency, which is a bigger ask here; `zimmski/go-mutesting`, the classic,
+  has not moved since 2024.) Adoption is queued in `DAYBREAK.md`, not a
+  decision a run takes. When it lands, run it **one package at a time and
+  start with the determinism kernels** — `floats`, `mt19937`, `textutil`,
+  `yamlemit`, `gate` — where correctness risk concentrates and packages are
+  small. Never point it at `internal/api`, which is 63 seconds per test run
+  before a single mutant is generated.
 - After the suite, **`git status data/` proves nothing** — `app.db` is
   gitignored, so a test that writes the developer's real database leaves
   the status clean. Use `ls -la data/` and treat a fresh mtime on
   `data/app.db` as the finding; a test reaching past its scratch directory
   gets fixed, never accommodated.
-- Coverage: read the report for *meaningless* coverage too — a module at 100%
-  through tests that assert nothing is worse than an honest gap, because it
-  reads as done.

@@ -1,6 +1,6 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Go or TypeScript/React best practices (or the animist media toolbox under tools/), testing (including mutation testing and t.Parallel discipline), performance and profiling, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Also covers hosted-first alignment (anything the deployed product needs that exists only as a local CLI or laptop workflow), the relic audit (early-dev leftovers — files, docs, commands — that no longer fit the current shape), and the measuring shelf (benchmarks, profiling, cache hit rates — the Go rebuild is an open item). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' (the artifacts pass over the skill, the ledger and the dev tooling), on 'polish cleanup' (the end phase that lands the stragglers every color queued), on 'polish converge' or 'polish all' (all five colors merged into one report), on 'polish rainbow' (all seven as separate runs, one at a time), on 'run the polish pass', on asking what polish findings are still outstanding or waiting on a ruling, and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
+description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Go or TypeScript/React best practices (or the animist media toolbox under tools/), testing (including mutation testing and t.Parallel discipline), performance and profiling, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), the quality of the controls themselves (dull buttons, missing hover/focus/press states, actions that never disable), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Runs at night by default while Aaron sleeps, leaving anything it cannot settle alone in the daybreak queue (docs/polish/DAYBREAK.md) for the morning; also triggers on 'run the night pass', 'what is in the daybreak queue', and on asking what the overnight run found. Also covers hosted-first alignment (anything the deployed product needs that exists only as a local CLI or laptop workflow), the relic audit (early-dev leftovers — files, docs, commands — that no longer fit the current shape), and the measuring shelf (benchmarks, profiling, cache hit rates — the Go rebuild is an open item). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' (the artifacts pass over the skill, the ledger and the dev tooling), on 'polish cleanup' (the end phase that lands the stragglers every color queued), on 'polish converge' or 'polish all' (all five colors merged into one report), on 'polish rainbow' (all seven as separate runs, one at a time), on 'run the polish pass', on asking what polish findings are still outstanding or waiting on a ruling, and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
 ---
 
 # The Polish Pass
@@ -22,6 +22,79 @@ is free forever and lawful about it, surgical trims over mass restructuring,
 and CI is never a surprise. When a checklist item here conflicts with a
 Commandment or an ADR, the checklist loses — and note the conflict in the
 ledger so the checklist gets fixed.
+
+## Nightbound — this pass runs while Aaron sleeps
+
+**Assume he is asleep.** The polish pass is night work by design: Aaron starts
+it and goes to bed, the orchestrator holds the context, and the next voice he
+hears is a summary over coffee. Innistrad's word for it is the right one — a
+run is *nightbound*, and what it cannot settle alone waits for **daybreak**.
+
+Everything below follows from nobody being awake to ask.
+
+**Never block. Ever.** There is no such thing as stopping to wait for an
+answer — a blocked night run is eight idle hours. When a question appears,
+write it to the daybreak queue in one line and **move to the next item**. A
+run that ends with twelve things done and four questions asked has worked; a
+run that ends with one question and nothing done has slept too.
+
+**Only improvements land.** This is Aaron's bar and it is stricter than the
+daytime one, because there is no one to catch a bad call. Before anything is
+committed, it must be *provably* better, and provably means green:
+
+- The full gauntlet, not a subset. Go's four gates, the web check, the
+  toolbox's when `tools/` moved, and the bundle rebuilt if `web/src` changed.
+- A test that fails without the fix, verified by breaking it once.
+- No new dependency, no schema migration, no new service or spend, no
+  contradiction of an ADR or Commandment.
+- **If it cannot be proven green on this machine, it does not land at night.**
+  The daytime rule already queues anything only CI can verify; at night that
+  rule is absolute, because "push it and watch" needs a watcher.
+
+When in doubt, the answer is always the queue. An improvement deferred to
+morning costs a day; a regression merged at 3am costs the site.
+
+**What may merge, and what may not.** Merging is deploying (ADR 23), so this
+is the one place night work touches the live instance:
+
+- **Anything a user can see does not merge at night.** Commandment 16 is
+  explicit — Aaron walks UI changes in a browser before they land — so a
+  night run takes those to a green PR and stops there, with the branch named
+  in the daybreak queue and a note on where to look.
+- **Everything else may merge when the required checks are green**: backend
+  behaviour with no rendered change, tests, tooling, docs, the skill, the
+  ledger. Watch the deploy to healthy afterwards; a red deploy is a daybreak
+  item and a rollback (HOSTING has the runbook), never an overnight
+  debugging session against the live instance.
+
+**The daybreak queue** is `docs/polish/DAYBREAK.md`, and it exists because the
+ledger is three thousand lines and nobody reads that at seven in the morning.
+It is the one file Aaron opens. Rules that keep it worth opening:
+
+- **One line per item, answerable without reading code**, and every item
+  carries a **recommendation** so the whole file can be answered with "yes to
+  all". A question with no proposed answer is homework, not a question.
+- **Say what it costs to leave.** "Nothing until the next set" and "the volume
+  fills in nine days" are different questions and should not look alike.
+- **It is a queue, not a ledger.** An answered item leaves this file and its
+  outcome goes into the ledger's own section. A file that only grows stops
+  being read, which is how the queue it replaced failed.
+- **Improvements only.** The queue holds things that would make the project
+  better, never chores invented to have something to ask. If a night found
+  nothing worth asking, the honest queue is empty and the summary says so.
+
+**Stop conditions**, where a night run leaves the work rather than pushing
+through: a required check red for a reason it cannot explain; anything
+touching user data, accounts or secrets; a security finding (it goes to
+daybreak *first*, before any fix, because a half-fix advertises the hole); a
+gauntlet that will not go green after one honest attempt. Each is a daybreak
+line and a move to the next item — never a retry loop, and never a workaround
+invented at 4am.
+
+**The morning summary** is what he actually reads: what landed and where,
+what is waiting in a green PR for his eye, the queue's questions, and what
+was deliberately not touched. Numbers with it, since a night run is a run
+like any other and the ledger wants its measurements.
 
 ## The colors, and the two phases that are not colors
 
@@ -158,19 +231,24 @@ Run it in three beats:
    rather than re-litigated. This beat alone regularly finds that a third of
    the queue is not what it says it is.
 
-2. **Upkeep — put the decisions in front of Aaron, in one pass.** This is
-   the phase that is *allowed to be a conversation*, and it is the only one.
-   Group what needs him by the kind of answer wanted — a ruling, a dollar, a
-   dependency, a migration window — and give each item the context to be
-   decided in one line and the consequence of leaving it. **Ask them
-   together.** Six sessions each asking one question is how a queue becomes
-   permanent; one session asking twelve is how it empties. Commandment 1 is
-   the whole basis of this beat: asking is never the wrong move.
+2. **Upkeep — put the decisions in front of Aaron, in one pass.** Group what
+   needs him by the kind of answer wanted — a ruling, a dollar, a dependency,
+   a migration window — each with the context to decide in one line, the
+   consequence of leaving it, and a recommendation. **Ask them together**: six
+   sessions each asking one question is how a queue becomes permanent; one
+   asking twelve is how it empties.
+
+   **Awake, this beat is a conversation — the only one in the pass.** Asleep,
+   it is the daybreak queue instead, same content and same one-line-plus-
+   recommendation discipline, written to `docs/polish/DAYBREAK.md` rather than
+   spoken. Never hold a night run open waiting for an answer; write and move
+   on. Either way commandment 1 is the basis: asking is never the wrong move.
 
 3. **Discard to hand size — land what fits, and say what did not.** Take his
-   answers and implement, under the same non-negotiables every other run
-   obeys: every fix gets a test, the full gauntlet before pushing, surgical
-   over structural. **The cap is real and it is the point** — a cleanup that
+   answers — or, at night, take the items that never needed one — and
+   implement under the same non-negotiables every other run obeys: every fix
+   gets a test, the full gauntlet before pushing, surgical over structural.
+   **The cap is real and it is the point** — a cleanup that
    touches forty files has become the mass restructure the pass forbids. Land
    the highest-value handful, and for everything still in hand write the
    reason it stayed: not "deferred" again, but *what would have to be true*
@@ -224,76 +302,54 @@ last touch was a survey is staler than its date suggests, and the next bare
 
 ## Rainbow — all seven, one at a time
 
-`/polish rainbow` runs the full cycle at **full solo depth** — one subagent
-each, **serially, in WUBRG order, then colorless, then cleanup**: White, Blue,
-Black, Red, Green, Colorless, Cleanup. Rainbow is the opposite of converge:
-every color shines separately and completely, no survey shortcut. It is the
-most thorough option and the most expensive — six real audits plus the phase
-that lands what they queue — so it is Aaron's explicit call and his tokens; do
-not reach for it when converge or a solo run would do.
+`/polish rainbow` is **seven solo runs, chained**: White, Blue, Black, Red,
+Green, Colorless, Cleanup — one subagent each, serially, each an ordinary run
+of the protocol below with its own branch and PR, and the next not starting
+until the previous one has merged. It is the most thorough option and the most
+expensive, so it is Aaron's explicit call; do not reach for it when converge or
+a solo run would do.
 
-**The cleanup step is what makes a rainbow finish rather than merely stop.**
-Six audits with no seventh phase hand Aaron six queues; ending on cleanup
-turns them into decisions and landed work. It is also the beat where he is
-actually needed, so do not run it while he is away — it is a conversation.
+The order is not arbitrary and neither is the serialism:
 
-The shape to hold in your head: **rainbow is six solo runs and a cleanup,
-chained.** Each is
-an ordinary run of the protocol below — main working tree, own branch, own PR —
-and the next does not start until the previous one's PR has merged.
-
-Why serial, and why that order:
-
-- **Serial, because parallel churns.** Five branches each expanding an
-  adjacent section of `docs/polish/LEDGER.md` conflict with one another by
-  construction, and five PRs open at once means five `image` builds queueing
-  for no gain. Merging each color before starting the next cuts every branch
-  from a main that already holds its predecessors' entries, so the conflicts
-  never exist rather than getting resolved. (Parallel was tried once, on
-  2026-08-16; that churn is why this paragraph exists.)
-- **One subagent each, for context rather than collision.** Seven runs' depth
-  does not fit one context window — that is the whole difference between
-  rainbow and converge — so each still gets its own fresh agent.
-- **WUBRG, because Magic says so and the dependencies happen to agree.**
-  Commandment 3 settles the order on its own, but it is also topologically
-  correct: White's licensing law binds Black's static-assets facet, Black's
-  spend numbers feed Green's quota proposal, and Red's external probe is
-  Green's baseline. Every cross-color dependency points forward.
-- **Colorless last, because it audits the other five.** It reads what this
-  rainbow just found, checks each checklist against it, and closes the loop
-  that Blue's docs-and-memory audit cannot: Blue runs second but generates
-  most of its value last, since the colors after it produce the drift it
-  hunts. That used to be a wrinkle the ledger carried into the next cycle.
-  It is now a run.
+- **Serial, because parallel churns.** Concurrent branches all expand adjacent
+  sections of `docs/polish/LEDGER.md` and conflict by construction, and
+  several open PRs queue several `image` builds for no gain. Merging each
+  before starting the next means the conflicts never exist rather than getting
+  resolved.
+- **WUBRG, because Magic says so and the dependencies agree**: White's
+  licensing law binds Black's static-assets facet, Black's spend numbers feed
+  Green's quota proposal, Red's external probe is Green's baseline. Every
+  cross-color dependency points forward.
+- **Colorless sixth, because it audits the other five** — including closing
+  the loop Blue cannot: Blue runs second and generates most of its value last,
+  since the colors after it produce the drift it hunts.
+- **Cleanup seventh, because it lands what the six queued.** Six audits with
+  no closing phase hand Aaron six queues; ending here turns them into
+  decisions and landed work.
 
 Orchestration:
 
-- Run each color **in the main working tree**, not a worktree. Only one color
-  is live at a time so there is nothing to isolate from, and the main tree
-  already has `web/node_modules`, a warm Go build cache and the card pool — a
-  fresh worktree has none of the three and must rebuild all of them before it
-  can run the gauntlet, which was the parallel version's hidden tax.
-- Give each agent exactly one color and its reference file, the ledger, and
-  the same run protocol and non-negotiables below.
-- **Each lands its own branch and PR**, kept independently reviewable — never
-  seven runs' diffs on one branch, which would be a mass-restructure by the back
-  door. Each agent updates **only its own ledger section**; colorless is the
-  one exception, since correcting an entry another color wrote is its job.
-- **Merge before advancing.** Watch the required checks, merge when green, and
-  only then start the next. Remember what merging means here: a green merge deploys
-  itself (ADR 23), so a rainbow is up to seven deploys and seven brief downtimes —
-  one more reason schema migrations stay a queued item.
-- A color with only queued findings and no safe fix opens **no PR**. Carry its
-  ledger text onto the next branch and move straight on; there is nothing to
-  merge and so nothing to wait for.
-- You are the collector: relay each color's report as it lands — the agent's
-  own report never reaches Aaron — resolve cross-color overlap when a later
-  color re-proposes an earlier one's fix, and close with one consolidated
-  summary. Tag each ledger section `YYYY-MM-DD (rainbow)`.
-- A rainbow may outlive a session, and that is fine. The merged PRs and the
-  ledger are the resume point: read the ledger, see which colors already carry
-  this rainbow's tag, and pick up at the next one in WUBRG order — colorless
-  after Green, cleanup after colorless.
+- **Main working tree, not a worktree.** One color is live at a time so there
+  is nothing to isolate from, and main already has `web/node_modules`, a warm
+  Go build cache and the card pool — a fresh worktree rebuilds all three
+  before it can run the gauntlet.
+- Give each agent exactly one color, its reference file, the ledger, and the
+  protocol and non-negotiables below.
+- **Each lands its own branch and PR.** Never seven runs' diffs on one branch,
+  which is a mass restructure by the back door. Each agent updates **only its
+  own ledger section**; colorless may correct another's, which is its job.
+- **Merge before advancing**, checks green. A green merge deploys itself
+  (ADR 23), so a rainbow is up to seven deploys — one more reason schema
+  migrations stay queued. At night, the Nightbound merge rule governs instead.
+- A color with only queued findings and no safe fix opens **no PR**: carry its
+  ledger text onto the next branch and move on.
+- **You are the collector.** A subagent's report never reaches Aaron, so relay
+  each as it lands, resolve overlap when a later color re-proposes an earlier
+  one's fix, and close with one consolidated summary. Tag ledger sections
+  `YYYY-MM-DD (rainbow)`.
+- A rainbow may outlive a session. The merged PRs and the ledger are the
+  resume point: read which colors already carry this rainbow's tag and pick up
+  at the next.
 
 ## The ledger
 
@@ -321,22 +377,20 @@ It is what makes the pass cumulative rather than repetitive.
    it says so, the live instance. **Measure with the tools rather than by
    hand, and never guess a cause.** The shelf above is the instrument set; the
    reference files say which tool answers which question, and the ledger is
-   where the numbers go. Two rules the 2026-08-19 pass paid for: **a large
-   number is a question, not a datum** — anything slow gets profiled and the
-   profile goes in the ledger, not just the millisecond — and **a probe finds
-   *which*, only a profile finds *why***, so a sentence beginning "presumably"
-   is not a finding.
+   where the numbers go. Two rules, each bought with a wrong finding: **a
+   large number is a question, not a datum** — anything slow gets profiled and
+   the profile goes in the ledger, not just the millisecond — and **a probe
+   finds *which*, only a profile finds *why***, so a sentence beginning
+   "presumably" is not a finding.
 
    One standing question besides, whatever the color: **which of this facet's
    absolute claims is enforced by nothing?** "Always", "never", "every", "all"
-   — in CLAUDE.md, in a docstring, in `web/README.md`, in this skill. For each,
-   ask what fails if it stops being true; when the answer is *nothing*, it has
-   already drifted or it will. The pass learned this four times before the
-   2026-08-19 rainbow found five more in one day — an extras list, a `needs`
-   list, a motion guard, a stated rule with no pin, a prose-only lint rule —
-   which is why it now lives here, where every run reads it, rather than only
-   in the colorless reference, where the sixth run does. **The fix is to make
-   the claim machine-checked, never to reword it.**
+   — in CLAUDE.md, in a package doc, in `web/README.md`, in this skill. For
+   each, ask what fails if it stops being true; when the answer is *nothing*,
+   it has already drifted or it will. This is the pass's most productive
+   single question — it has found a dozen, most recently a 95% coverage floor
+   that no gate had enforced since the Go crossing. **The fix is to make the
+   claim machine-checked, never to reword it.**
 3. **Triage every finding** into exactly one of:
    - **Safe fix** — implement it this run. Safe means: behavior-preserving or
      bug-fixing with a test; no new runtime dependency; no schema migration;
@@ -360,54 +414,51 @@ It is what makes the pass cumulative rather than repetitive.
    this project has. The test is not diff size; it is *can I fully prove this
    green before pushing?* If the only proof is CI itself, queue it (or land it
    alone on a branch Aaron can watch), never bundle it into a fix set.
-4. **Fix.** Every bug fix gets a test — and **derive the expectation from the
-   source of truth rather than restating the claim.** A test that repeats the
-   sentence it is checking cannot tell you the sentence is wrong: the deck
-   History tab said earlier edits were "in git" for two ADRs' worth of time
-   beside a green `expect(getByText(/in git, not here/))`, and a licence-notice
-   test drafted its own shelf entry and stayed green against the bug it was
-   written for. The working form reads the truth back: the route test takes the
-   filename *off* the shelves table rather than restating it, and the dial's
-   mode list is held equal to `ModeNames()` as a set, so the next mode added
-   fails there rather than three months later. Then
-   **verify by mutation, not by greenness**: break the thing, watch the test
-   fail, restore it. Match the surrounding code's idiom and comment density,
-   and if a finding grows beyond surgical mid-fix, stop, back it out to a
-   queued item, and say so.
+4. **Fix.** Every bug fix gets a test, and **derive its expectation from the
+   source of truth rather than restating the claim** — a test that repeats the
+   sentence it checks cannot tell you the sentence is wrong, which is how a
+   stale UI caption once sat for months beside a green assertion of itself.
+   The working form reads the truth back: take the filename *off* the table
+   rather than typing it, hold the dial's mode list equal to `ModeNames()` as
+   a set. Then **verify by mutation, not by greenness**: break the thing,
+   watch the test fail, restore it. Match the surrounding code's idiom and
+   comment density; if a finding grows beyond surgical mid-fix, back it out to
+   a queued item and say so.
 5. **Verify.** The full local gauntlet before any push, from `go/` with the
-   Mac's three exports set: `go vet ./...`, `go test -race ./...`,
-   `golangci-lint run ./...`, `gofmt -l .` printing nothing; then
+   Mac's three exports set: `gofmt -l .` printing nothing, `go vet ./...`,
+   `go test -race ./...`, `golangci-lint run ./...`; then
    `npm --prefix web run check`, rebuilding the committed bundle
    (`npm --prefix web run build`) if anything under `web/src` changed; and
    `cd tools && ruff check . && mypy && python -m pytest tests/ -q` when
-   `tools/` moved. Check `data/app.db` was not dirtied by a running app
-   (`ls -la data/`, not `git status`, which is blind to a gitignored
-   file). For UI-visible changes,
-   drive the real surface — a green jsdom test has not seen a layout. Since
-   2026-08-16 that includes authenticated flows on the deployed instance:
-   the `claude` account (a plain user; its edits are confined to its own
-   decks and attributed by name in deck History) can be driven through the
-   Claude-in-Chrome integration once Aaron has signed it in — so "verify on
-   the live instance" no longer stops at the login page. For a
-   **security fix**, three extra beats, learned the hard way: (a) prove the
-   bug with a *mutation-verified* test — revert the guard, watch the test
-   fail, restore it — so the fix is demonstrably closing a real hole, not
-   decorating a safe one; (b) the fix is not done when the test passes, it is
-   done when **code scanning is also green** — CodeQL is a required gate and
-   its model may not recognise a correct guard, so budget for that; (c) once
-   merged and deployed, drive the *live instance* to confirm the hole is
-   actually shut, not just the local tree.
+   `tools/` moved. Confirm `data/app.db` was not dirtied by a running app with
+   `ls -la data/` — `git status` is blind to it, and now doubly so.
+
+   **For anything a user can see, drive the real surface**: a green jsdom test
+   has not seen a layout, and a hover state has no jsdom at all. That includes
+   authenticated flows on the deployed instance — the `claude` account is a
+   plain user whose edits stay in its own decks, drivable through
+   Claude-in-Chrome once Aaron has signed it in.
+
+   **A security fix takes three extra beats**: (a) prove the bug with a
+   *mutation-verified* test, so the fix demonstrably closes a real hole rather
+   than decorating a safe one; (b) it is not done when the test passes but
+   when **code scanning is also green** — CodeQL does not gate merging, but a
+   correct guard its model refuses to recognise is a real cost, so budget for
+   it; (c) after deploy, drive the live instance to confirm the hole is shut
+   there and not only locally.
 6. **Land.** Update the ledger on the branch, stage explicit paths (never
-   `git add -A` — `decks/` is live app data), open a PR, and watch the required
-   checks — **read that list back from the API** rather than from a count
-   remembered in a file, because it has grown twice with no prose noticing:
+   `git add -A` — a hook refuses it, because `decks/` is live app data), open a
+   PR, and watch the required checks — **read that list back from the API**
+   rather than from a count remembered in a file, because it has grown twice
+   with no prose noticing:
    `gh api repos/aasquier/sylvan-library/branches/main/protection --jq
-   .required_status_checks.contexts`. Remember a green merge deploys itself: a
-   few seconds of downtime, and schema migrations apply on boot — which is why
-   step 3 queues them.
-7. **Report.** End with: what was fixed (and where it landed), what is newly
-   queued for Aaron's ruling, the numbers recorded and any trend that moved,
-   and which color the next run should be.
+   .required_status_checks.contexts`. A green merge deploys itself: seconds of
+   downtime, and schema migrations apply on boot, which is why step 3 queues
+   them. **At night the Nightbound merge rule governs** — nothing user-visible
+   merges unwatched.
+7. **Report.** What was fixed and where it landed; what is newly waiting on
+   Aaron (the daybreak queue, if he is asleep); the numbers recorded and any
+   trend that moved; which color the next run should be.
 
 ## What a run never does
 
@@ -427,6 +478,11 @@ These hold even when a checklist item seems to point the other way:
 - **Never let the ledger become a second copy of the code's own records.**
   It holds findings, decisions-in-waiting, and measurements — not changelogs
   (git has those) and not rationale text.
+- **Never land anything at night that cannot be proven green here.** No
+  merging a user-visible change unwatched, no schema migration, no "push it
+  and see what CI says", no debugging the live instance at 4am. The daybreak
+  queue is always available and always the right answer; a night that lands
+  nothing and asks four good questions has done its job.
 
 ## Rigor is not uniform
 

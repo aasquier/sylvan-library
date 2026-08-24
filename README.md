@@ -94,9 +94,10 @@ Setup in full, the command reference and the deck workflow are in
 
 ## Status
 
-In daily use against six curated Commander decks. **The hosted instance is the
-product** — `mtglab ui` runs the same app on a laptop, as a development harness
-and for anyone who would rather keep their decks on their own machine.
+In daily use against a curated library of Commander decks. **The hosted
+instance is the product** — `mtglab ui` runs the same app on a laptop, as a
+development harness and for anyone who would rather keep their decks on their
+own machine.
 
 Built: the gate, the mana solver, both simulator tiers, the artifact generator,
 the web app, accounts with invites and email password resets, deck ownership
@@ -107,9 +108,9 @@ and the deck tier list that would depend on it, free-form deck conversation
 with Claude, card-level spoiler scanning, and anything resembling a checkout.
 Prices are shown; nothing is ever bought.
 
-One deck deliberately fails the gate: Goreclaw runs Primeval Titan, banned in
-Commander. That is the gate working, and picking the replacement is a human's
-call.
+One deck in that library deliberately fails the gate, on a card banned in
+Commander that has been left where it is. That is the gate working, and
+picking the replacement is a human's call.
 
 ### Known limits
 
