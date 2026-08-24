@@ -31,7 +31,7 @@ vi.mock('../lib/api', async () => {
     ...actual,
     api: { decks: vi.fn(), forgeStatus: vi.fn(), simMana: vi.fn(),
            simLands: vi.fn(), simForge: vi.fn(), job: vi.fn(),
-           glossary: vi.fn() },
+           glossary: vi.fn(), validate: vi.fn() },
   }
 })
 
@@ -150,5 +150,80 @@ describe('a match', () => {
     expect(screen.getByText('draw')).toBeTruthy()
     // The wall-clock line speaks Magic, not machinery.
     expect(screen.getByText(/lighting\s+the forge/)).toBeTruthy()
+  })
+})
+
+/**
+ * The two halves of punch list items 5 and 6, and both are about the screen
+ * answering somebody *before* it has anything to report.
+ */
+describe('before a run', () => {
+  /** A shelf whose second deck the gate has already complained about. */
+  const FLAGGED = [
+    DECKS[0]!,
+    { ...DECKS[1]!, errors: 2, warnings: 0 },
+  ] as unknown as DeckTile[]
+
+  it('names the cards a run will leave out, without running anything', async () => {
+    vi.mocked(api.decks).mockResolvedValue(FLAGGED)
+    vi.mocked(api.validate).mockResolvedValue({
+      ok: false,
+      errors: [
+        { code: 'unknown-card', message: 'not found in the local pool', card: 'Sol Rng' },
+        { code: 'unknown-card', message: 'not found in the local pool', card: 'Path to Exil' },
+      ],
+      warnings: [],
+    })
+    mount()
+    // Deck one is clean, so nothing is asked and nothing is said.
+    await waitFor(() => expect(screen.getByText('Real games (Forge)')).toBeTruthy())
+    expect(screen.queryByText(/not in the card pool/)).toBeNull()
+
+    fireEvent.change(screen.getByLabelText(/Deck/i),
+                     { target: { value: 'local/gyome' } })
+    await waitFor(() => expect(screen.getByText(/not in the card pool/)).toBeTruthy())
+    // The names, because "2 errors" is not a thing anybody can act on.
+    expect(screen.getByText(/Sol Rng, Path to Exil/)).toBeTruthy()
+    // And no number for what is left: that belongs to the compiler, and
+    // arrives with the results.
+    expect(screen.queryByText(/97 of 99/)).toBeNull()
+    expect(api.simMana).not.toHaveBeenCalled()
+  })
+
+  it('asks the gate nothing about a deck the shelf says is clean', async () => {
+    mount()
+    await waitFor(() => expect(screen.getByText('Real games (Forge)')).toBeTruthy())
+    expect(api.validate).not.toHaveBeenCalled()
+  })
+
+  it('says the forge is lighting from the click, not from the job', async () => {
+    // A submission that never comes back, which is the whole point: the gap
+    // this covers is the one where a JVM is starting and there is no job to
+    // read a status off yet.
+    vi.mocked(api.simForge).mockReturnValue(new Promise(() => {}))
+    mount()
+    await waitFor(() => expect(screen.getByText('Real games (Forge)')).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/Simulation/i),
+                     { target: { value: 'forge' } })
+
+    const button = screen.getByText('Run simulation') as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+
+    await waitFor(() => expect(screen.getByText('Lighting the forge…')).toBeTruthy())
+    expect((screen.getByText('Lighting the forge…') as HTMLButtonElement).disabled)
+      .toBe(true)
+    // And the other door out of this screen is shut too, so a second press
+    // cannot start a second match behind the first.
+    expect((screen.getByText('New sample').closest('button'))!.disabled).toBe(true)
+  })
+
+  it('does not borrow the forge’s word for a Tier 1 run', async () => {
+    vi.mocked(api.simMana).mockReturnValue(new Promise(() => {}))
+    mount()
+    await waitFor(() => expect(screen.getByText('Real games (Forge)')).toBeTruthy())
+    fireEvent.click(screen.getByText('Run simulation'))
+    await waitFor(() => expect(screen.getByText('Running…')).toBeTruthy())
+    expect(screen.queryByText('Lighting the forge…')).toBeNull()
   })
 })
