@@ -130,6 +130,35 @@ state, never checklists.
      covered the case the documentation does not tell you to run and missed the
      case it does. `/mtglab` added. The `git add -A` hook is why this has not
      already happened, and a hook is not a reason to leave a hole beside it.
+  5. **A data race in the Forge stub, found by `main` going red after the
+     merge — and the fix that opened it is the point of the entry.** PR #280's
+     own checks were green on both architectures; the *push* run of the
+     identical tree failed `go (arm64)` under
+     `TestTwoIdenticalAsksAreOneMatch` with a `WARNING: DATA RACE` at
+     `forgeroute_test.go:56`, and the skipped `deploy` job left `main` and the
+     instance diverged until PR #281 landed. **The race is in test code and
+     predates #280 by about a week.** `stubShim`'s handler appends to `seen`
+     from whichever `net/http` per-connection goroutine is serving, and two of
+     them can be inside it at once.
+     **Which fix opened it is the lesson.** That same test is white.md's
+     standing example of a test that races itself: the stub finished
+     instantly, so a fast enough machine had match one done before ask two
+     arrived and a second job was the *correct* answer. `hold` fixed that by
+     parking the match mid-stream — and a match parked mid-stream is a handler
+     that has not returned, so the next ask's health poll gets its own
+     goroutine and the unguarded append became reachable **exactly when the
+     timing bug stopped being**. A correct fix for a concurrency test can
+     create the concurrency its neighbours were never written for.
+     Fixed with a mutex and a `requests()` accessor that copies under it (a
+     reader running while the worker still talks races the writer just as
+     surely). **Mutation-verified, and the guard turns out to be
+     architecture-independent even though the failure was not**: twenty
+     `-race -count` runs of the real test on this amd64 Mac never reproduced
+     it, so the verification was done directly — a throwaway probe firing 32
+     concurrent requests at the stub is clean with the lock and trips the
+     detector without it, here. **The transferable rule: when `-race -count`
+     will not reproduce a CI race, stop re-running the real test and write the
+     three-line probe that makes the concurrency certain.**
 - **Verified this run — licensing (triple-check):**
   - **`animist verify`: 12 recipes, all held** (`tools/`, with its venv).
     Unchanged in count from 2026-08-19.
