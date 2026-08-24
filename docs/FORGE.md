@@ -123,6 +123,45 @@ and the recorded worker-wire corpus pins the shape from both sides. The
 image holds GPL'd Forge and is pushed only to the app's private registry —
 deployment, never distribution.
 
+### The worker carries a quarter of the distribution
+
+The release is one download for every way Forge can be played — an Adventure
+RPG, quest mode, a mobile build, a particle editor, card names in nine
+languages — and the worker plays exactly one of them: `sim`, from the desktop
+jar, in English. `Dockerfile.forge` deletes the rest after unpacking, which
+takes 465MB down to roughly 110MB.
+
+Measured before it landed (2026-08-24): a copy holding only the kept paths
+played Arahbo vs Goreclaw at seed 12345 to the same Turn 9, the same winner
+and the same 8.1s as the full install, with nothing on the stream but the
+result.
+
+Two things kept that look prunable. `res/skins` and `res/sound` are GUI
+furniture no simulation renders — but AWT initialises anyway (the first fact
+above), and resources are not the place to fight a headless mode Forge will
+not give us. `res/deckgendecks` is 10MB of matrix data nothing here generates
+a deck from, and dropping it still printed `Error reading matrix data` and a
+caught `NullPointerException` at every boot; a rules engine that throws on
+startup is not a place to save ten megabytes.
+
+What the prune buys is registry storage, the push in CI, and the first pull
+onto a new host. It does **not** buy cold-start latency — that is ~8s of JVM
+boot and card-database load, unchanged.
+
+### Staying current with Forge
+
+`.github/workflows/forge-release.yml` checks weekly whether Card-Forge has
+published a release newer than the pinned one, and opens an issue carrying the
+exact `ARG` values when it has. It never opens a pull request, and that is the
+decision rather than an omission: ADR 36 records `forge_version` on every
+match because Forge's AI is the instrument each recorded game was measured
+with. An upgrade changes the judge — ratings computed across an unversioned
+one would silently mix two — so it re-runs the coverage pre-flight and moves
+the ledger forward deliberately.
+
+The goldens under `sim/tier3/testdata/` record the version a match **was**
+played with and never move with an upgrade.
+
 ### Testing deploy skew on purpose
 
 Every release updates the app **before** the worker, by several minutes and

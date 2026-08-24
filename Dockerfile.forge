@@ -39,6 +39,44 @@ RUN apt-get update \
  && tar xjf /tmp/forge.tar.bz2 -C /opt/forge \
  && rm /tmp/forge.tar.bz2
 
+# **Pruned to what a simulation touches**, which is about a quarter of what
+# the release ships. The distribution is one download for every way Forge can
+# be played — an Adventure RPG, quest mode, a mobile build, a particle
+# editor, card names in nine languages — and this machine plays exactly one
+# of them: `sim`, from the desktop jar, in English. 465MB arrives; ~110MB is
+# reachable from a Commander match.
+#
+# **Measured rather than assumed** (2026-08-24), the way the other five facts
+# about Forge were: a copy holding only the kept paths played the recorded
+# Arahbo-vs-Goreclaw game at seed 12345 to the same Turn 9, the same winner
+# and the same 8.1s, with nothing on the stream but the result.
+#
+# What this buys is registry storage, the push in CI, and the first pull onto
+# a new host — **not** cold-start latency, which is ~8s of JVM boot and card
+# database load either way and is untouched by any of this. Worth doing, not
+# worth overselling.
+#
+# Two things kept that look prunable, both deliberate. `res/skins` and
+# `res/sound` are GUI furniture no simulation renders, but `forge.view.Main`
+# initialises AWT before any game starts — the fifth fact in docs/FORGE.md,
+# and the reason this image carries a full JRE and an X server at all. The
+# GUI's own resources are left alone rather than trimmed against a headless
+# mode we do not get to use. `res/deckgendecks` is the pass that had to be
+# redone: 10MB of matrix data nothing here generates a deck from, whose
+# absence still printed `Error reading matrix data` and a caught
+# NullPointerException at every boot. A rules engine that throws on startup is
+# not a place to save ten megabytes.
+#
+# Globbed rather than versioned, so bumping `FORGE_URL` above does not
+# silently stop pruning the jars.
+RUN cd /opt/forge \
+ && rm -rf res/adventure res/quest res/conquest res/music docs \
+ && rm -f res/languages/cardnames-*.txt \
+ && rm -f forge-gui-mobile-dev-*.jar adventure-editor-*.jar \
+          gdx-particle-editor.jar \
+ && rm -f ./*.exe ./*.cmd \
+ && echo "pruned distribution: $(du -sh /opt/forge | cut -f1)"
+
 # `forge.profile.properties` baked at build (ADR 35): Forge reads this file
 # from its own program directory and nowhere else, and it is what points the
 # engine's user data at a directory this image owns rather than at the

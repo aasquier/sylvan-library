@@ -1,0 +1,166 @@
+# Watches Card-Forge/forge for a release newer than the one `Dockerfile.forge`
+# pins, and opens an issue when there is one.
+#
+# **Why an issue and not a pull request**, which is the whole design decision
+# here. Every other pin in this repository is a dependency and Dependabot may
+# bump it on sight. Forge is not a dependency — it is the *instrument*. ADR 36
+# records `forge_version` on every match in the ledger precisely because
+# Forge's AI is what each recorded game was measured with, and ratings
+# computed across an unversioned upgrade would silently mix two judges. An
+# upgrade also re-scans the coverage index (cached per path, mtime and size,
+# so a new distribution invalidates it) and can change which cards Forge
+# implements, which is the one failure `sim/tier3` exists to never serve
+# silently.
+#
+# So this job's whole output is a well-prepared decision. It hands over the
+# exact ARG values and the files that hold them; a person decides when the
+# instrument changes.
+#
+# Weekly, because Forge ships roughly every six to eight weeks (2.0.09 in
+# January through 2.0.14 in August) and a nag that arrives daily is a nag that
+# gets muted.
+name: forge-release
+
+on:
+  schedule:
+    # Tuesday morning, offset from codeql's Monday so a quiet week is one
+    # notification rather than two on the same day.
+    - cron: "23 7 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Compare the pinned distribution against Forge's latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # The pin is read out of the Dockerfile rather than duplicated here.
+          # A watcher carrying its own copy of the current version is a watcher
+          # that goes stale silently the first time somebody upgrades without
+          # telling it.
+          pinned_url=$(sed -n 's/^ARG FORGE_URL="\(.*\)"$/\1/p' Dockerfile.forge)
+          pinned_tag=$(printf '%s' "$pinned_url" \
+            | sed -n 's#.*/download/\([^/]*\)/.*#\1#p')
+          if [ -z "$pinned_tag" ]; then
+            echo "::error::could not read the pinned Forge tag from Dockerfile.forge"
+            exit 1
+          fi
+
+          release=$(gh api repos/Card-Forge/forge/releases/latest)
+          tag=$(jq -r '.tag_name' <<<"$release")
+
+          # `daily-snapshots` is a rolling tag on that repository, and GitHub's
+          # "latest" heuristic excludes it today. Checked rather than trusted:
+          # a heuristic that changes would otherwise file an issue every week
+          # asking us to pin a moving target.
+          case "$tag" in
+            forge-*) ;;
+            *)
+              echo "::warning::latest release is '$tag', not a forge-* tag; nothing to compare"
+              exit 0 ;;
+          esac
+
+          echo "pinned:  $pinned_tag"
+          echo "latest:  $tag"
+          if [ "$tag" = "$pinned_tag" ]; then
+            echo "The worker is current."
+            exit 0
+          fi
+
+          asset=$(jq -c '.assets[]
+            | select(.name|test("^forge-installer-.*\\.tar\\.bz2$"))' <<<"$release" \
+            | head -1)
+          if [ -z "$asset" ]; then
+            echo "::error::$tag publishes no forge-installer tarball; the image fetches that asset"
+            exit 1
+          fi
+          url=$(jq -r '.browser_download_url' <<<"$asset")
+          # GitHub publishes the asset's digest, so the new pin costs an API
+          # call rather than a 300MB download. It is GitHub's word for
+          # GitHub's own file — the same source the current pin came from —
+          # and what it guards is a corrupted or tampered *download*, not the
+          # supply chain behind it.
+          digest=$(jq -r '.digest // ""' <<<"$asset" | sed 's/^sha256://')
+          if [ -z "$digest" ]; then
+            echo "::warning::$tag publishes no digest; asking for it to be computed by hand"
+            digest="<compute: curl -sSL '$url' | sha256sum>"
+          fi
+          notes=$(jq -r '.name // .tag_name' <<<"$release")
+          published=$(jq -r '.published_at' <<<"$release")
+
+          title="Forge $tag is out (worker pins $pinned_tag)"
+
+          # Idempotent by title. The alternative — a label — is a second thing
+          # to create and keep, and the title already carries the one fact that
+          # makes two runs the same run.
+          if gh issue list --state open --search "\"$title\" in:title" \
+               --json title --jq '.[].title' | grep -qxF "$title"; then
+            echo "Already filed: $title"
+            exit 0
+          fi
+
+          # A file rather than an inline heredoc: this whole script is a YAML
+          # block scalar, and a heredoc body written flush-left would end the
+          # block rather than the heredoc.
+          cat > "$RUNNER_TEMP/forge-release.md" <<EOF
+          [$notes](https://github.com/Card-Forge/forge/releases/tag/$tag), published $published.
+          The worker pins \`$pinned_tag\`.
+
+          Opened by \`.github/workflows/forge-release.yml\`. **Nothing here is
+          automatic on purpose** — ADR 36 records \`forge_version\` on every match
+          because Forge's AI is the instrument each recorded game was measured
+          with, so an upgrade changes the judge rather than a dependency.
+
+          ### The new pin
+
+          \`\`\`dockerfile
+          ARG FORGE_URL="$url"
+          ARG FORGE_SHA256="$digest"
+          \`\`\`
+
+          ### What moves
+
+          - \`Dockerfile.forge\` — the two ARGs above, and the version in the
+            comment that introduces them.
+          - \`docs/FORGE.md\` — the install command and the prose naming the
+            pinned distribution.
+
+          ### What does not move
+
+          - \`go/internal/sim/tier3/testdata/\` and the tests reading the old
+            version. Those are frozen goldens recording the version a match
+            **was** played with; updating them rewrites history rather than
+            recording it.
+
+          ### Before merging
+
+          - The \`image\` job builds \`Dockerfile.forge\`, which proves the asset
+            fetches and the digest matches. It does not prove Forge plays.
+          - Re-run the coverage pre-flight against every curated deck: an
+            upgrade changes which cards Forge implements, and a name that stops
+            resolving is the one failure \`sim/tier3\` exists to never serve
+            silently.
+          - The distribution prune in \`Dockerfile.forge\` assumes this release's
+            layout. Confirm the dropped paths still exist to drop.
+          EOF
+
+          gh issue create --title "$title" \
+            --body-file "$RUNNER_TEMP/forge-release.md"
+          echo "Filed: $title"
