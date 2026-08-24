@@ -3285,13 +3285,16 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
   5. **The comment sweep itself — slice `internal/sim/**`, outside the
      fingerprint.** Four files, comment-only: `sim/cache/cache.go`,
      `sim/compile/compile.go`, `sim/curve/curve.go`, `sim/tier3/run.go`.
-     Cut: three `#NNN` PR references, four "until 2026-08-2X" clauses whose
-     old shape was kept and whose date was not, and one "Aaron's ruling of
-     2026-08-21" that is stronger as "Aaron's ruling". Kept: both validation
-     measurements, and every argument. **Slices done, so the sweep finishes
-     over cycles rather than restarting:** `internal/sim/{cache,compile,curve,
-     tier3}` — 2026-08-24. **Not sweepable at all:** the five fingerprinted
-     packages (finding 1).
+     Cut: one `#NNN` PR reference and **seven dates** — six "until/since/on
+     2026-08-2X" clauses whose old shape was kept and whose date was not, plus
+     one "Aaron's ruling of 2026-08-21" that is stronger as "Aaron's ruling".
+     Kept: both validation measurements, and every argument. **Dated comments
+     in `internal/sim` outside tests, ignoring Go's `2006-01-02` layout
+     literals: 11 → 4** — the four being the two validations kept on purpose
+     and two inside the fingerprint that the revert put back. **Slices done, so
+     the sweep finishes over cycles rather than restarting:**
+     `internal/sim/{cache,compile,curve,tier3}` — 2026-08-24. **Not sweepable
+     at all:** the five fingerprinted packages (finding 1).
   6. **The measuring shelf's cgo rule gains its corollary, bought twice in one
      night.** The rule as written — profile the Go half, clock the cgo half —
      held: both Black and Red hit the blind spot and both said so. What it did
@@ -3551,7 +3554,10 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
       dated comments, go/**.go outside _test.go    60   (2026-08-23: 60)
       dated comments, web/src (ts/tsx/css)         87   (2026-08-23 recorded
                                                          101, unreproducible)
-      #NNN / vNNN residue in internal/sim       3 → 0
+      #NNN / vNNN residue in internal/sim       4 → 3   (one removed; the
+                                                        other three are inside
+                                                        the fingerprint and
+                                                        stay -- finding 1)
 
   The skill's own surface: **7 files** (`SKILL.md` plus six references), **42
   distinct path-like backticked tokens, 42 resolving, 0 dead** (17 at the
