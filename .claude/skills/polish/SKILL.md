@@ -207,7 +207,7 @@ go tool pprof -top -nodecount=25 cpu.out                 # -http=: for the graph
 go test -json ./... | grep '"Action":"pass"'             # per-test durations
 go build -gcflags=-m ./internal/<pkg>/ 2>&1 | grep escapes
 go test -race -count=1 -cover ./...                      # what CI runs
-cd tools && animist verify                               # assets vs recipes
+cd tools && .venv/bin/animist verify                     # assets vs recipes
 ```
 
 Four rules, each bought by a real wrong answer:
@@ -222,6 +222,12 @@ Four rules, each bought by a real wrong answer:
   so the database half must be timed *at the query* and never inferred from
   the profile or found by subtraction. This is the retired shelf's hardest
   lesson in its Go form: profile the Go half, clock the cgo half.
+  **The allocation profile is not blind there, and it is the move when the CPU
+  profile comes back featureless** — `-memprofile` read with
+  `-sample_index=alloc_space` sees Go-side allocation regardless of what the C
+  half is doing. Two colors hit the blind spot in one night and the one that
+  switched instruments got the night's finding out of it; the one that only
+  read `-top` got a picture of `runtime.cgocall`.
 - **A cache can be correct, tested, and never once used.** Only a counter
   finds that; no test can. A cache added since the last run with no hit
   count is a finding.
@@ -510,7 +516,8 @@ It is what makes the pass cumulative rather than repetitive.
    `go test -race ./...`, `golangci-lint run ./...`; then
    `npm --prefix web run check`, rebuilding the committed bundle
    (`npm --prefix web run build`) if anything under `web/src` changed; and
-   `cd tools && ruff check . && mypy && python -m pytest tests/ -q` when
+   `cd tools && .venv/bin/ruff check . && .venv/bin/mypy && .venv/bin/python
+   -m pytest tests/ -q` when
    `tools/` moved. Confirm `data/app.db` was not dirtied by a running app with
    `ls -la data/` — `git status` is blind to it, and now doubly so.
 

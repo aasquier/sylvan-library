@@ -32,8 +32,12 @@ them as separate steps on purpose, so a type error reports as a type error.
   for the same reason: the two that once escaped were Tailwind utilities that
   exist only in the built stylesheet.
 - **Routes are lazy.** Every non-landing screen is a `React.lazy` line in
-  `App.tsx`; a new screen wants one, not a top-level import. The entry chunk
-  is ~266 kB and stays that way by this rule.
+  `App.tsx`; a new screen wants one, not a top-level import. Three are
+  deliberately eager — `Library`, `Login`, `Claim`, the screens you arrive on.
+  The entry chunk (`web_dist/assets/app.js`) is **285 kB raw / 91 kB
+  gzipped**, measured 2026-08-24; it was written here as ~266 kB and nothing
+  re-measures it, so treat the figure as a claim to check rather than a
+  budget that is enforced.
 - **A deck is addressed by `DeckRef`** — `{owner, slug}` as an object, never
   two positional strings (transposed strings are a runtime 404 against
   somebody else's library; named fields are a compile error). `deckUrl` in

@@ -52,6 +52,158 @@ the wider docs-rot question, and it is the same shape as daybreak item 5 from
 implementation reuse this test's two helpers rather than write a second pair —
 both halves are built, tested and mutation-verified.
 
+**3. Five code-scanning alerts are permanently red and can never close by
+themselves.** All five are Python findings on files the Go crossing deleted,
+and the Python analysis never runs again — so nothing will ever mark them
+fixed, and the list will read "5 open" forever. The cost is not the findings
+(the code is gone); it is that a permanently-red alert list teaches everyone
+to stop looking at code scanning, which is the one place a real finding would
+appear. The six *Go* alerts are already dismissed, each with a sound argument.
+· *Cost of leaving it:* nothing today, and a genuine alert missed on the day
+there is one. · **Recommendation:** dismiss all five as "no longer relevant"
+— it is your account and your call, which is the only reason this is a
+question rather than a fix. Ledger: Blue, 2026-08-24.
+
+**4. A one-word correction to the artists shelf is built, green, and waiting
+for your eye.** The lore shelf tells a reader that Library of Alexandria is
+"Alpha's own". It is not: its first printing is Arabian Nights, 1993-12-17,
+and Alpha is the 295 cards of 1993-08-05 (read out of the Scryfall bulk, not
+recalled — Mark Poole did paint it, so only the set is wrong). It renders, so
+it stopped at a green PR rather than merging. · *Cost of leaving it:* the
+shelf teaches a newcomer something false about the game's own history, to the
+one audience most likely to notice. · **Recommendation:** merge it. **The walk
+is cheaper than it looks, and here is the honest version:** the diff is one
+word in checked-in prose and touches no render path, so the two-second check
+is `curl -s localhost:8765/api/lore | grep -o "Mark Poole[^\"]*"`. If you want
+it on the page: `.claude/launch.json`'s `mtglab-ui` entry (or `go/mtglab ui
+--port 8765`), then http://127.0.0.1:8765/ — the shelf sits under the Library
+masthead and shows **one fact at a time from a random opening offset**, so
+finding this one means clicking **Another** up to 42 times. Nothing animates
+and there is no cycle time to wait out. Ledger: Blue, 2026-08-24.
+
+**Black —**
+
+**1. PR #284 is green and unmerged, and nothing in it renders.** Three fixes,
+all backend: `/api/health` answers in **2.0ms instead of 4.4ms** (it was
+asking eight database statements to answer a question that needs two — the
+platform's own health check is one of its callers); the card-search page's
+**opening query drops 87.7ms to 53.1ms** and a type filter 71.6ms to 52.9ms,
+because the search was buying a price for every row the top-sixty was about to
+throw away; and the standing claim *"the served app hotlinks nothing it could
+serve itself"* is now machine-checked over the built bundle instead of
+re-verified by hand every quarter. The JSON on the wire is byte-for-byte what
+it was — same cards, same order, same prices — so there is nothing to walk. ·
+*Cost of leaving it:* the wins sit on a branch, and the hotlink guard is not
+protecting anything until it runs in CI. · **Recommendation:** merge it; it
+only stopped because tonight's harness refused `gh pr merge`. Ledger: Black,
+2026-08-24.
+
+**2. The Claude spend ledger lost its command line in the crossing, so the
+deployed instance's bill can only be read by signing in.** The accounting
+itself is fine — every conversation is recorded, and the Admin panel rolls it
+up — but Python's `mtglab claude usage` did not come across, and Claude never
+signs in to anything. The practical result is that the polish pass can only
+ever report the *laptop's* spend, which is nearly idle (≈$1.71 since
+2026-08-16, three conversations in the last five days), while the instance is
+where the money actually goes. · *Cost of leaving it:* every future spend
+number in the ledger is the wrong machine's, and the one place a runaway cost
+would show up is a page nobody opens. Worth noticing now rather than later:
+the Sonnet 5 introductory rate ends **2026-08-31**, and the same traffic costs
+50% more from 1 September (the code already models the change; nothing needs
+editing). · **Recommendation:** yes — restore `mtglab claude usage`, so
+`fly ssh console -C "mtglab claude usage"` answers it from anywhere. It is
+about eighty lines over machinery that already exists; the only real questions
+are what it prints by default (per mode, per model, or both) and whether it
+shows dollars beside the tokens. Say which and it can be built in one sitting.
+Ledger: Black, 2026-08-24.
+
+**3. A price limit on the card search filters the results *after* the search
+has already picked sixty, so a budget shows a fraction of what matches.**
+Measured tonight: asking for sixty cards under $1 returns **23**; asking for
+two hundred returns **74**. The page always asks for sixty, so a newcomer who
+sets a budget sees a short list and reasonably concludes that is all there is.
+Nothing is wrong with the prices themselves — it is the order the two steps
+run in. · *Cost of leaving it:* the one filter a beginner is most likely to
+reach for is the one that quietly lies about how much of the game they can
+afford, which is commandment 2 failing in the exact place it matters. ·
+**Recommendation:** yes — make the price a condition of the search rather than
+a filter over its answer, so "sixty cards under $1" means sixty cards under
+$1. It is a small change and it is a *behaviour* change (different cards
+appear), which is the only reason it is a question rather than a fix. Ledger:
+Black, 2026-08-24.
+
+**4. The card pool's memory is thrown away every time nobody has asked it
+anything for ten seconds, and the lore shelf pays 84× for that.** Measured
+tonight on the full pool: the shelf answers in **0.9ms** while the pool is
+held open and **75.6ms** on the first request after a ten-second gap, because
+the remembered card lookups are filed under the *open* rather than under the
+pool file — and the pool is handed back on a timer so that `mtglab data
+refresh` can always get in, which is a rule worth keeping and must not be
+touched. A reap and a refresh are not the same event, though: only a refresh
+makes the old answers wrong. · *Cost of leaving it:* on a quiet instance
+almost every visitor is the first one, so almost everybody pays the slow
+number and nobody sees the fast one; the front page's own shelf is the worst
+case. · **Recommendation:** yes — let the remembered lookups survive a
+hand-back as long as the pool file has not changed underneath them, which is
+the rule the code already says it follows. It is a change to how long
+something is remembered rather than to what is remembered, which is the only
+reason it waited for daylight. Ledger: Black, 2026-08-24.
+
+**5. Five of the seven `Loading…` labels are flat text with no motion, and one
+of them is the door into the fortune-teller's table.** Blue found them by
+driving the real site (their ledger has the list); this run timed what each
+one is waiting for, because "it feels slow" and "it *is* slow" want different
+answers. **It is not slow.** Every one of the five waits on a single request
+that the server answers in well under a millisecond — so there is nothing to
+speed up, and the whole of it is the page sitting still while it waits. ·
+*Cost of leaving it:* the site's promise is that it is alive and moving, and
+the five places it visibly is not include the way in to the reading — the one
+room that is meant to get the best of everything. · **Recommendation:** yes —
+give them the same treatment the two good ones already have (`App.tsx` uses a
+proper spinner in both of its waits), or a held frame so nothing jumps when
+the answer lands. It renders, so it wants your eye before it merges. Ledger:
+Blue and Black, 2026-08-24.
+
+**Colorless —**
+
+**1. Four of the six questions asked yesterday morning exist only in this
+file.** The pass's own rule is that a waiting item lives in two places — one
+line here, the full record in `LEDGER.md` — and yesterday's run wrote six lines
+and no records. Two of the six made it into the ledger as one-liners in a
+backlog list; the coverage floor, the night-merge rule, the skill-prose guard
+and the pprof mount have nothing anywhere else. That is worse than being
+invisible: this file says an answered item *leaves*, so **answering one of
+those four destroys the only copy of why it was asked**. Tonight's run wrote
+recovered records for all four into the Colorless section, so nothing is
+currently at risk — the question is whether the rule gets a guard. ·
+*Cost of leaving it:* it has happened once in six items and will happen again
+the next time a run is short of night; each time, the price is paid by the
+person answering. · **Recommendation:** yes — a small test asserting every open
+item here names the ledger section holding its record, with the section names
+read out of `LEDGER.md`'s own headings rather than restated, and a failure when
+it finds no items at all so an inert guard cannot pass quietly. It was not
+built tonight because the whole 2026-08-23 block would fail it — none of those
+six names a ledger section and four have none to name — and repairing them
+means editing that block, which this rainbow was told to leave alone.
+Ledger: Colorless, 2026-08-24.
+
+**2. Editing a comment in five particular packages silently throws away the
+deployed instance's whole simulation cache.** `internal/sim`,
+`internal/sim/tier1`, `internal/mana`, `internal/floats` and
+`internal/mt19937` embed their own source, and ADR 18 hashes those bytes into
+the key every stored Tier 1 result is filed under — so reflowing a sentence in
+a doc comment changes the key and the instance recomputes everything it had
+already paid for. Nothing fails and no test speaks. Found by doing it: three
+such edits were made during tonight's comment sweep and reverted, and the
+warning now sits in the code, in the skill, and beside the rule that had said a
+comment-only diff is always free. · *Cost of leaving it:* nothing breaks, ever
+— it is wasted compute on the instance and a trap that reads as safe. ·
+**Recommendation:** rule that prose-only edits in those five packages are not
+made; a comment that is genuinely wrong there gets raised with its cost
+attached and fixed alongside a real change to the same package, so the cache is
+discarded once for a reason rather than twice for tidiness. Ledger: Colorless,
+2026-08-24.
+
 **Green —**
 
 **1. Two guards Green built for itself were deleted by the Go crossing, and for
@@ -149,7 +301,6 @@ will diverge the same way labels did. · **Recommendation:** the copy is a
 wording call and so the house mother's — "35,393 cards on the shelves" reads
 better anyway; the card-art path is the one to answer first because it is
 already the written runbook. Ledger: Green, 2026-08-24, queued 6.
-
 ## Open — 2026-08-23
 
 **1. The 95% coverage floor is gone, and the drop is half unit-change and half

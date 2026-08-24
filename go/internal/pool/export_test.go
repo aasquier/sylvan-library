@@ -26,3 +26,17 @@ func (p *Pool) CacheLen() int {
 	}
 	return p.cards.order.Len()
 }
+
+// Memo is one memo's hits and misses since this pool was opened -- the hit
+// rate that no correctness test can stand in for. Exported to the tests
+// alone: nothing in the app reads a counter, and commandment 10 keeps it
+// that way.
+func (p *Pool) Memo(name string) (hits, misses int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	c := p.memos[name]
+	if c == nil {
+		return 0, 0
+	}
+	return c.hits, c.misses
+}

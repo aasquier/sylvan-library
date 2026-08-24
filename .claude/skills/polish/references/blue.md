@@ -157,17 +157,22 @@ Work the list:
   Measured 2026-08-23: **35 names in code, 15 documented, 20 undocumented** —
   every `MTGLAB_FORGE_*`, both `MTGLAB_LIVE_*`, both `MTGLAB_TEST_*`,
   `MTGLAB_CLAUDE_MODEL`, `MTGLAB_CLAUDE_STANCE_CEILING`, `MTGLAB_TAROT_DIR`
-  and `MTGLAB_WEB_DIST` among them. **The fix is the check, not the
-  paragraph**: a test that fails when a name in the code is missing from
-  `.env.example` (and vice versa) turns a claim into a gate. Precedent for
-  where such a test belongs is any other cross-tree claim the compiler cannot
-  see — the point is that it runs in CI, not that it is written in prose
-  again.
-- **A flag that is parsed and thrown away is help text lying.**
-  `cmd/mtglab/ui.go` defines `--no-open` ("serve without opening a browser")
-  and then discards it with `_ = noOpen`, while every entry in
-  `.claude/launch.json` passes it. Either wire it or delete the flag *and* the
-  promise. For an operator, `--help` is the only documentation there is.
+  and `MTGLAB_WEB_DIST` among them. **CLOSED 2026-08-24 with the check rather
+  than the paragraph**: `go/cmd/mtglab/configrecord_test.go` holds the code's
+  names and `.env.example`'s equal in both directions, and holds the
+  `MTGLAB_TEST_*`/`MTGLAB_LIVE_*` boundary besides — those six are read only
+  by `_test.go` files, so they are not compiled into the binary at all, which
+  is a stronger answer than the test-switch bullet below was expecting. Re-run
+  the two greps anyway when this facet comes round; what to watch now is
+  whether the *extractor* still matches, not whether the list is even.
+- ~~**A flag that is parsed and thrown away is help text lying.**~~ **CLOSED
+  2026-08-24**: `--no-open` is gone from `cmd/mtglab/ui.go` and from the four
+  `.claude/launch.json` entries that passed it, with a comment where it was
+  saying why it will not come back — nothing in the process ever opened a
+  browser, so the help text promised behaviour the command has never had. The
+  same test file now holds `.claude/launch.json` against `newRoot()`, so a
+  flag or subcommand that dies takes the dev-server entries with it at commit
+  time rather than at the moment Aaron is waiting to look at something.
 - **Precedence, stated and tested.** `envOr` is used *inside* two flag
   defaults, so an explicit flag beats the environment which beats the built-in
   default. That is the right order and it is written down nowhere and tested
@@ -182,17 +187,25 @@ Work the list:
   path and wrong for a *relationship*: auth on with no `BaseURL` or
   `EmailFrom` is reset links that go nowhere, discovered by the first person
   who needs one; `SecureCookies` silently defaults from `RequireAuth`; a
-  half-set `MTGLAB_FORGE_*` is a tier that fails on the first match. The
-  fix is small and always the same shape: at boot, validate the relationships
-  and either refuse or log a loud, specific degrade. The point is that a
-  misconfigured deploy announces itself in the first second rather than on the
-  one request that needed it.
-- **Say what it decided, once, at boot.** One structured line — auth on or
-  off, cookie mode, data dir, decks dir, web-dist, tarot dir, schema version,
-  whether a pool is present. That line is how a `fly logs` tail answers "is
-  this thing configured the way I think it is" in two seconds. **Never a
-  secret and never a value that might be one**: a key in a log is a leak
-  forever, and the app's own rule is that it never holds the key at all.
+  half-set `MTGLAB_FORGE_*` is a tier that fails on the first match. **Four of
+  those landed 2026-08-24** as `configComplaints()` in `cmd/mtglab/ui.go`:
+  auth-on against `RESEND_API_KEY`, `MTGLAB_BASE_URL`, `MTGLAB_EMAIL_FROM` and
+  `MTGLAB_ADMIN_EMAIL`. **Warnings, never a refusal** — merging deploys
+  (ADR 23), so a boot that refuses takes the site down for a setting the site
+  does not need to serve an anonymous page, and the argument is written where
+  the function is. Still open: the half-set `MTGLAB_FORGE_*` pair, which needs
+  a predicate `tier3` does not export yet (`Configured()` answers the whole
+  question, not which half is missing).
+- ~~**Say what it decided, once, at boot.**~~ **CLOSED 2026-08-24**:
+  `serve()` logs one `configuration` line — auth, cookie mode, schema, data
+  dir, decks dir, web-dist, tarot, pool present, base URL, which mail sender,
+  whether the Forge worker is configured — immediately after the ladder, so a
+  boot that dies still has its own configuration above the error.
+  `TestTheBootSummaryLeaksNoSecret` is the half worth keeping: it *discovers*
+  the credential-shaped switches off the same walk that holds `.env.example`
+  honest, sets each to a sentinel, and demands none of them come back out. A
+  credential added tomorrow is covered the day it lands. If a run adds a field
+  to that line, the sentinel test is what makes the addition safe.
 - **Where you run it decides what it writes.** `DataDir()` defaults to a
   *relative* `data`, so `mtglab ui` inside a checkout mints `data/app.db` in
   the repo — the trap behind "never `git add -A` after running the app". Any

@@ -1047,12 +1047,326 @@ kill rate is bad enough to want every mutant rather than a sample.
 
 ## Blue — Craft & Knowledge
 
-*Python craft · TypeScript/React craft · Claude-first docs & memory · the
-spirit of Magic*
+*Go craft and the modern-Go sweep · the boot sequence and its configuration ·
+TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
+the spirit of Magic*
 
-- **Last run:** 2026-08-19 (rainbow) — the *spirit of Magic* facet's first
-  outing, so its section below is a baseline rather than a delta. Previous:
-  2026-08-18 (punch-list item 5, Blue + Red in one session).
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
+  2026-08-18.
+- **Read every block below the 2026-08-24 one as history, not as state.**
+  All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
+  mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
+  finished 2026-08-23 and none of those files exist. The *lessons* still bind
+  (a test written against a claim cannot tell you the claim is wrong; a
+  tripwire must flatten a wrapped comment; a probe finds which, only the right
+  column finds why) — but no path, number or test name down there is current.
+  The section's own subtitle said "Python craft" until tonight, which is the
+  drift this facet exists to catch, sitting on its own heading.
+
+### 2026-08-24 (rainbow)
+
+- **Fixed this run:**
+  1. **`.env.example` was twenty names short, and CLAUDE.md's sentence about
+     it was the kind of claim this facet's standing question is for.** Measured
+     before: **32 switch names read by shipping Go, 18 documented, 14
+     undocumented** — every `MTGLAB_FORGE_*`, `MTGLAB_JAVA`, `MTGLAB_FLY_APP`,
+     both Claude dials, both served-file paths. CLAUDE.md said "`.env.example`
+     documents the names"; nothing could tell that it had stopped being true,
+     and an operator meeting an undocumented switch meets it in production.
+     **The fix is the check, not the paragraph**:
+     `go/cmd/mtglab/configrecord_test.go` walks `go/`, extracts every *quoted*
+     `MTGLAB_`/`ANTHROPIC_`/`RESEND_`/`FLY_` literal, and holds it equal to
+     `.env.example`'s entries **in both directions** — an undocumented switch
+     fails, and so does a name kept after its reader was deleted. The fourteen
+     are now written up from the code that reads them (defaults included:
+     `MTGLAB_FORGE_IDLE_SECONDS` 180, `MTGLAB_FORGE_MEMORY_MB` 3072,
+     `MTGLAB_FORGE_SHIM_PORT` 8080), and both directions are empty.
+
+     **The test-switch worry the checklist carried turned out to be already
+     answered, structurally.** `MTGLAB_TEST_POOL`, `MTGLAB_TEST_FLAG`,
+     `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`, `MTGLAB_OLD_SHIM_URL` and
+     `ANTHROPIC_BASE_URL` are read **only** by `_test.go` files, so they are
+     not compiled into the binary at all — a stronger guarantee than a build
+     tag or a boot-time refusal, and it now has a test holding it (plus a
+     third assertion that `.env.example` never documents one, since writing a
+     test switch into the operator's list is how it gets set).
+
+     **The trap this cost, and it is the reason the mutation discipline
+     exists**: the first draft's "documented" regex matched a name at the head
+     of any line, so `# MTGLAB_JAVA beats the JDK unpacked beside…` — a
+     sentence of the *prose* — read as documentation, and deleting the entry
+     left the guard green. Requiring the `=` is what makes it an entry rather
+     than a mention. **Mutation-verified six ways**, all firing: undocument a
+     name (with its prose left in place); document a name nothing reads;
+     document a test switch; read `MTGLAB_TEST_POOL` from `internal/config`;
+     misspell a flag in `.claude/launch.json`; name a subcommand that does not
+     exist there.
+  2. **`--no-open` was help text lying, and it is gone.** `cmd/mtglab/ui.go`
+     parsed it into a variable and threw it away with `_ = noOpen` while
+     promising "serve without opening a browser" — a promise about behaviour
+     the command has never had, since nothing in the process opens anything.
+     Deleted, with the argument left where the flag was, and taken out of the
+     four `.claude/launch.json` entries that passed it. That deletion is what
+     bought the second half of the test above: `.claude/launch.json` is how
+     commandment 16's browser walk starts, cobra *exits* on an unknown flag
+     rather than ignoring it, so a stale entry there costs Aaron the minutes
+     he is waiting to look at something. It is now held against `newRoot()`.
+  3. **The boot sequence says what it decided, once, and complains about the
+     pairs that must agree.** `serve()` logs one `configuration` line — auth,
+     cookie mode, schema, data dir, decks dir, web-dist, tarot, pool
+     present/absent, base URL, which mail sender, whether the Forge worker is
+     configured — placed **after the ladder** (so `schema` is a fact about the
+     file rather than this binary's ambition) and **before anything that can
+     fail** (so a boot that dies has its own configuration above the error).
+     Four relationships then warn: auth on against a missing `RESEND_API_KEY`,
+     a `MTGLAB_BASE_URL` still on the loopback default, a `MTGLAB_EMAIL_FROM`
+     no provider will accept, and an unset `MTGLAB_ADMIN_EMAIL`. Each is a
+     deployment that answers pages and fails one specific request days later.
+
+     **Warnings, never a refusal**, and the argument is written at the
+     function: merging deploys (ADR 23), so a boot that refuses takes the site
+     down for a setting the site does not need to serve an anonymous page.
+     `config.DefaultBaseURL` and `DefaultEmailFrom` are named so the *question*
+     derives from the answer — nothing reads either variable a second time to
+     ask it, which is the one-reader-per-switch rule holding while the surface
+     grows. `TestTheBootSummaryLeaksNoSecret` is the half to keep: it
+     **discovers** the credential-shaped switches off the same walk that holds
+     `.env.example` honest, sets each to a sentinel, and demands none come
+     back out — so a credential added tomorrow is covered the day it lands.
+     Mutation-verified: logging the Resend key instead of the sender's *name*
+     fires it; dropping one complaint fires the complaint test; inverting the
+     cookie state fires the summary test.
+  4. **`internal/config`'s package comment claimed something its own code
+     contradicts.** "And secrets are not here at all -- a value we never hold
+     is a value we cannot log", a hundred lines above `ResendAPIKey`, whose own
+     comment calls itself "the one secret this package names". The absolute was
+     the tidier sentence and the false one. Rewritten as one absence and one
+     *exception*, with the reason (the mail sender puts that value in a header
+     itself) and where the others are read instead. `.env.example` was pointing
+     at `tests/test_config.py` for the pin — a Python-era file — and now points
+     at the package comment that carries the argument.
+  5. **Modern-Go sweep, and most of it is a "no".** Re-measured tonight against
+     the 2026-08-23 inventory: `interface{}` **0**, `ioutil` **0**,
+     `rand.Seed` **0**, `strings.Title` **0** — still clean. Two conversions
+     landed, both `sync.WaitGroup` `Add`/`defer Done` pairs replaced with
+     `wg.Go` (`internal/api`'s `background`, `internal/jobs`' run launcher):
+     one line each, and the Add/Done mismatch class stops existing. Verified
+     with `go test -race -count=2` on both packages.
+
+     **Deliberately not converted, with the reason, so the next run does not
+     re-open it:** the two remaining plain `sort.Slice` calls (both in
+     `internal/jobs/registry.go`, against 15 `sort.SliceStable` elsewhere)
+     each break ties on a unique `seq`, so the comparator is **total** and
+     stability is irrelevant — `slices.SortFunc` would be a pure spelling
+     change in a package that has a golden (`testdata/jobs.json`), which is
+     the wrong trade. And **0 of 19 `sync.Mutex` sites is the read-mostly map
+     `RWMutex` is for**: they are memo caches, lease state, counters, and a
+     check-then-fetch day cache (`api.setsMu`) whose read path *writes*. The
+     honest answer is that this tree is not lock-bound and a conversion wants
+     a profile first, which is Black's.
+  6. **Docs rot, six sites, each verified against the thing it names rather
+     than patched by analogy.** `tools/cardmotion/depth.py` said torch stays
+     out of the container because "the image installs `.[api,claude]`" —
+     extras that no longer exist; the discharge is now structural, read off
+     `Dockerfile` (the builder takes `go/`, the runtime takes the binary,
+     `web_dist`, `assets/tarot` and the entrypoint, and carries no Python at
+     all, so `tools/` never enters the build context). `house-codes.md` still
+     sent the house mother to `mtglab animist`; that family lives in `tools/`.
+     CLAUDE.md's `bash -lc` wrapper is noise — `gh`, `npm`, `node`, `fly`,
+     `uv` all resolve in a plain call (re-verified tonight; the memory file
+     has said so since 2026-08-19 while CLAUDE.md and `MEMORY.md`'s own index
+     went on saying the opposite). And **four places tell you to run the
+     toolbox gates as bare `ruff` / `mypy` / `pytest` / `animist`, which on
+     this Mac fail with `command not found`** — they were copied from
+     `ci.yml`, where `pip install -e './tools[dev]'` puts them on the runner's
+     PATH; corrected in CLAUDE.md and in the skill's three copies to
+     `tools/.venv/bin/…`.
+  7. **`web/README.md`'s entry-chunk figure had rotted.** It reads "~266 kB"
+     as the reason the lazy-route rule matters; measured tonight
+     `web_dist/assets/app.js` is **291,776 bytes — 285 kB raw, 91 kB
+     gzipped**. Corrected, named as unenforced (nothing re-measures it), and
+     the three deliberately-eager routes written down so the "every non-landing
+     screen" claim reads as the true thing it is. *Cross-color: a bundle-size
+     budget is Black's and there is none.*
+- **Also landed, outside the repo (memory audit):**
+  `mtglab-python-environment.md` was rewritten end to end — it described the
+  retired app in every particular (`src/`, `tests/`, the 95% coverage floor,
+  `[dev,api]`, fastapi/uvicorn, `.venv/bin/mtglab`, `tiny_pool.py`,
+  `test_isolation.py`) and would have sent a fresh session at files that do
+  not exist. What replaced it is the toolbox venv, how its gates actually run
+  here, the measured interpreters (`python3` **3.7.3**, `/usr/bin/python3`
+  **3.8.2**, `python3.11` **3.11.15**, `python3.12` **3.12.13**), and what the
+  three other venvs in the tree are (`.venv-depth` is torch's; root `.venv`
+  and `.venv311` are the retired app's, last touched 2026-08-16, read by
+  nothing). Three `MEMORY.md` index lines corrected besides — the `bash -lc`
+  one contradicted its own file, and the Phase 8 headline quotes `#276/v204`
+  as state while the tree is at `#281`/v208.
+- **The spirit of Magic — the shelves, fact-checked against the pool:**
+  **one wrong fact found, and it is queued as a UI change** (below). The
+  measurements are in the *Measured* block; the short version is that the
+  shelves resolve completely — **0 dropped card names across all 32 colour
+  combinations and the 42 lore facts** — so the counter that nobody reads is,
+  today, honestly zero.
+- **Queued for Aaron (daybreak 2026-08-24):**
+  1. **Five CodeQL alerts are permanently red and can never close by
+     themselves** — handed forward by White, re-checked here rather than
+     inherited: all five are Python findings on files the crossing deleted,
+     and the Python analysis never runs again, so nothing will ever mark them
+     fixed. A permanently-red alert list trains everyone to ignore code
+     scanning, which is the actual cost. **Recommendation: dismiss all five as
+     no-longer-relevant.** It is Aaron's account and Aaron's call; the six Go
+     alerts are already dismissed with sound arguments.
+  2. **A one-word correction to the artists shelf, built and waiting on a
+     branch** — see the finding below. It renders, so it stops at a green PR
+     (commandment 16).
+- **The lore shelf says a card was in the wrong set, and it is the exact
+  failure commandment 3 cares about most.** `internal/reference/data/lore.json`,
+  the `mark-poole` entry in the artists volume: *"Mark Poole painted Ancestral
+  Recall, and the game's most famous library after this one: **Alpha's own**
+  Library of Alexandria."* The painter is right and the set is not. Read out of
+  the 2026-08-19 Scryfall bulk rather than recalled (rule 1):
+
+  | card | first printing | released | artist |
+  |---|---|---|---|
+  | Ancestral Recall | `lea` Limited Edition Alpha | 1993-08-05 | Mark Poole |
+  | **Library of Alexandria** | **`arn` Arabian Nights** | **1993-12-17** | Mark Poole |
+
+  Alpha is 295 cards and Library of Alexandria is not one of them. A wrong
+  ruling in the lore teaches a newcomer something false about the game, which
+  is worse than any plain-English button — and this shelf is read by exactly
+  the audience that will catch it. **Fixed on `polish/blue-lore-2026-08-24`
+  and stopped at a green PR**, because the sentence renders.
+- **Deferred:**
+  - **The half-set `MTGLAB_FORGE_*` pair, the one boot complaint that did not
+    land.** `tier3.Configured()` answers the whole question (worker on *and* a
+    token) and cannot say which half is missing, so an operator who sets
+    `MTGLAB_FORGE_WORKER` and forgets `MTGLAB_FLY_API_TOKEN` gets `false` with
+    no reason. The boot line at least *shows* `forge_worker=false` beside the
+    rest now, which is most of the value. Trigger: the next session in
+    `internal/sim/tier3`, which can export the predicate cheaply while it is
+    already in there.
+  - **Three local environment readers, all tiny, none worth a diff yet.**
+    `cmd/mtglab/ui.go`'s `envOr`, `internal/flymetrics`'s identical `envOr`,
+    and `cmd/mtglab/shim.go`'s `envInt`. The duplication is real but two of
+    the three are *deliberate*: flymetrics reads the environment directly on
+    purpose (a credential must not travel through `config`), and the shim is a
+    separate process configured entirely by its environment. The one genuine
+    inconsistency is that `envOr` does not `TrimSpace` where every
+    `config` accessor does, so `MTGLAB_WEB_DIST=" "` is a blank path from one
+    reader and a default from the other. Trigger: a fourth reader, or a bug
+    that traces to the whitespace.
+  - **Nothing reads the dropped-name counter.** Every reference shelf serves
+    `dropped` and no client declares the field, exactly as `pool_stale` did
+    before Green put `SCHEMA_VERSION` on the dashboard. Today the count is 0
+    everywhere, which is why this is deferred rather than queued — there is
+    nothing to surface. Trigger: the first pool refresh after a shelf gains a
+    card name, or any non-zero reading.
+  - **The spirit of Magic — considered and rejected, so it is not
+    re-litigated.** The rendered-string sweep across `web/src` now finds
+    **four** generic strings in the whole app (it found two in 2026-08-19's
+    baseline and both were dealt with): two `Spinner label="Loading…"` in
+    `App.tsx` (the pre-auth shell and the route suspense fallback), the
+    catch-all's "Nothing here. Try the library.", and Admin's "Delete". Admin
+    is maintainer-facing and stays. The other three are real flavour
+    candidates — "Shuffling up…" is Magic's own phrase for a game about to
+    start and a spinner label is not a control, so commandment 2's bound does
+    not bite — but they were **not** taken tonight: this run's user-visible
+    branch carries a factual correction, and mixing a taste change into it
+    doubles what Aaron has to weigh at a glance. Next spirit run starts here.
+
+    **CORRECTION, found on the live walk an hour later, and the method is the
+    finding.** The count above is wrong: there are **seven** rendered
+    `Loading…` strings, not two. The sweep grepped for the *quoted* form
+    (`"Loading…"`) and so saw only the two `Spinner label=` sites; the other
+    five are bare JSX text nodes — `>Loading…<` — in `components/tarot.tsx`,
+    `components/theme.tsx`, `routes/Learn.tsx` (twice) and `routes/NewDeck.tsx`.
+    **A rendered string is not always a quoted string**, and a sweep that only
+    knows one spelling of "rendered" under-reports by a factor of three. This
+    is [[a-completeness-list-must-be-discovered]] in a new costume, and the
+    next spirit run should grep both shapes.
+
+    It matters beyond the count, because **five of the seven are a bare
+    `<p class="text-sm">` with no spinner and no motion at all** — a page that
+    sits there, which is commandment 6 — and one of the five is on the
+    fortune-teller's table, which commandment 15 says is rationed last.
+    Caught by driving `/new` on the instance and watching it render "Loading…"
+    flat and left-aligned for about three seconds before the persona picker
+    arrived. *Cross-color: the missing motion is Red's controls facet as much
+    as this one's; the word itself is Blue's.*
+  - **The live walk, 2026-08-24 (deployed instance, riding the signed-in
+    `claude` seat through Claude-in-Chrome — never signed in by Claude).**
+    `/api/health`: pool true, **35,393 oracle rows, 107,355 printings, 7
+    decks, `pool_stale: false`**. The door holds: `/` 200 while `/api/lore`
+    and `/api/colors` answer **401** unauthenticated, which is the middleware
+    refusing before routing. The library, `/claude`, `/new` and the persona
+    picker all render.
+
+    **The About Claude keeper duty (commandment 18) — the page is in good
+    order and one of its claims did real work.** Both exhibit commanders
+    resolved live out of the pool with their own rules text (Kwain, Itinerant
+    Meddler and Tatyova, Benthic Druid), all four paintings name their painter
+    (Mark Poole, John Avon, Rebecca Guay, Seb McKinnon), and the page's own
+    sentence — "every other picture on this page names its painter" — holds.
+    **And its Library of Alexandria plate credits *Arabian Nights, 1993*.** So
+    the site contradicted itself about one painting across two surfaces, and
+    the surface that was right is the one that also matches the pool. That is
+    worth more than the one-word diff: the correction is not a judgement call.
+
+    **The fortune-teller's table (commandment 15) is still the best room on
+    the site.** The persona picker carries three painted tiles with credits
+    (Volkan Baǵa on the fortune-teller), a sound toggle, an explicit
+    "Pick colours myself" escape hatch, and copy that promises the questions
+    are "about you and never about Magic". The one tile with no painting —
+    "Chat with Claude, no costume" — is deliberately the uncostumed option and
+    correctly the only one carrying no credit. Nothing has slipped past it.
+    The `Loading…` finding above is the single blemish and it is on the way
+    *in* to the room.
+- **Measured (2026-08-24, this Mac, quiet, after the fixes):**
+  - **Go gauntlet, all four gates green.** `gofmt -l .` prints nothing;
+    `go vet ./...` clean; `go test -race ./...` **exit 0, 0 FAIL lines across
+    48 packages** in **1m19s** wall (`user 3m54s`, warm cache);
+    `golangci-lint run ./...` → **`0 issues.`** Slowest packages, from the
+    cold baseline run at the top of the night: `internal/api` **71.7s**,
+    `internal/claude` **57.9s**, `internal/door` **12.2s**,
+    `internal/deckedit` **10.3s**, `internal/deckread` **10.0s**,
+    `cmd/mtglab` **9.2s**. *(The two slow ones are Black's and Red's
+    question, not this facet's.)*
+  - **Frontend:** `npm --prefix web run check` green — **615 tests across 38
+    files in 25.2s**. `web_dist/assets/app.js` **291,776 B raw / 91,138 B
+    gzipped**; `charts.js` 399,398 B / 111,506 B.
+  - **Toolbox:** `ruff` clean, `mypy` clean over **23 source files**,
+    **210 tests passed in 12.35s**, and `animist verify` **held all 12
+    recipes** (exit 0).
+  - **Environment switches:** 33 `os.Getenv`/`os.LookupEnv` reads outside
+    tests in 8 files (unchanged from 2026-08-23), of which 9 are inside
+    `internal/config` and `internal/sim/tier3/worker.go` holds ten on its own.
+    **32 names read by shipping code; 32 documented; both `comm` directions
+    empty.** Six more names are read only by `_test.go` files.
+  - **Layering, grepped not trusted:** no `duckdb` import outside
+    `internal/pool`; `internal/api` imports `internal/door` **nowhere** (only
+    names it in comments); the determinism kernels import nothing above them
+    (`yamlemit` → `deckyaml`, which is itself first-party-import-free).
+    **Every package has a doc comment** — `cmd/mtglab` uses the `// Command
+    mtglab …` form, which a `// Package ` grep reports as a false positive.
+  - **The reference shelves, resolved against the 2026-08-19 pool:** **0
+    dropped** on every one of the **32** colour combinations; the lore shelf
+    is **42 facts across 5 volumes** (history 10, mechanics 10, curiosities 8,
+    artists 7, table 7) resolving **25 card objects, 0 dropped**; the glossary
+    serves **54 terms**. Sampled against the Scryfall bulk rather than recall:
+    Dan Frazier painted all five Alpha Moxes ✓, Christopher Rush painted Black
+    Lotus ✓, Alpha is 295 cards ✓, Innistrad 2011-09-30 ✓, Ravnica: City of
+    Guilds 2005-10-07 ✓, Library of Alexandria **✗ Arabian Nights, not Alpha**.
+  - **Frontend compatibility:** **zero** regex lookbehind under `web/src`;
+    zero `structuredClone` / `findLast` / `toSorted` / `toReversed` /
+    `Object.hasOwn` / `.at(-n)` outside tests; zero `forwardRef`,
+    `React.memo`, `defaultProps`, `propTypes` — React 19 idiom throughout.
+    10 lazy routes against 3 deliberately eager (`Library`, `Login`, `Claim`).
+  - **`data/app.db` mtime unmoved** across the whole run (`Aug 23 22:23`,
+    checked with `ls -la`, which `git status` cannot do): the scratch instance
+    used to read the shelves ran with `MTGLAB_DATA_DIR` pointed at a temp
+    directory holding a symlink to the pool.
+
+### 2026-08-19 and earlier — the Python era
 - **Fixed this run (2026-08-19, rainbow):**
   1. **The one paragraph in CLAUDE.md that states the re-check-completeness
      rule had drifted again, in the other direction.** It says *"a sentence in
@@ -1696,9 +2010,386 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow), plus two
-  un-run entries from the same week — the targeted performance pass and the
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19, 2026-08-16, plus
+  two un-run entries from that week — the targeted performance pass and the
   measuring shelf — both kept below.
+- **Everything below the 2026-08-24 block is about the Python app.** `bench
+  run`, `bench caches`, `cards/db.py`, `modes.py`, the pandas import storm,
+  the cache register: none of those files or commands exist. The *lessons*
+  hold and several are why this run went where it went; **no number, path or
+  command name in them is a current fact.** This run re-baselines the whole
+  facet in Go.
+
+### 2026-08-24 (rainbow)
+
+Night run, PR #284. The night's merge capability was gone by this leg (the
+harness refused `gh pr merge`), so everything below stopped at a green PR
+rather than deploying — the live numbers are v208's, and the fixes are
+unwalked because they never shipped.
+
+- **Fixed this run:**
+  1. **`/api/health` asked eight statements to answer a question that needs
+     two.** `pool.Stale` walks four probes and two `Columns` lookups on every
+     call, and the verdict it computes is a property of the pool **file** —
+     which is opened read-only and re-opened by a refresh, so the answer
+     cannot change under an open. `Columns` was already memoised per open
+     beside it; the staleness verdict was not. It matters because of *who
+     asks*: the platform's own health check is a caller, and the shell asks on
+     every visit. Now memoised per open. **`GET /api/health`: 4.4ms → 2.0ms
+     p50 (15 samples, this Mac, full pool), 8 statements → 2.** The test
+     counts the memo's own hits rather than milliseconds, and two mutations
+     were checked: disabling the read (`&& false`) and dropping the write
+     (`rememberStaleness`) each fail it on the line that should catch them.
+  2. **The card search bought a price for every row the LIMIT was about to
+     throw away.** `(SELECT min(p.price_usd) FROM printings p WHERE
+     p.oracle_id = o.oracle_id)` reads as the tidier query and is the
+     expensive one: DuckDB decorrelates it into an aggregate over all 107,355
+     printings joined against **every** row that survived the WHERE, so the
+     whole wide result — oracle text included — has to be materialised before
+     the top-N can cut it to sixty. Split into a second statement over the
+     kept oracle ids, through a list parameter so one SQL string serves every
+     result size (`GetCards`'s idiom, for its reason). Route medians, this
+     Mac, full pool, 10–12 samples:
+
+     | route | before | after |
+     |---|---:|---:|
+     | `/api/cards/search` (no text — **the card page's own opening query**) | 87.7ms | **53.1ms** |
+     | `/api/cards/search?type_line=creature` | 71.6ms | **52.9ms** |
+     | `/api/cards/search?identity=WU` | 50.7ms | **36.6ms** |
+     | `/api/cards/search?q=goblin` | 41.1ms | 40.4ms |
+     | `/api/cards/search?identity=WU&commanders_only=1` | 39.6ms | 38.1ms |
+
+     **Nothing regressed and the wins are where the user did not type.**
+     `CardSearch` fires the empty query 250ms after mount (`useEffect` +
+     debounce), and NewDeck's guided carousel fires an identity query per
+     combination; a narrow text search is a wash, because the fixed ~9ms of
+     the second statement roughly cancels what the split saves. Measured at
+     the query, on the real pool, since a CPU profile is blind inside cgo:
+
+     ```
+     search: full query (with correlated price subquery)              median    38.68ms
+     search: same query WITHOUT the price subquery                    median    27.48ms
+     search: no-text query (identity only, the picker's default)       median    84.80ms
+     search: no-text, WITHOUT price subquery                          median    38.40ms
+       step2 shape: unnest(?::VARCHAR[]) -- the landed form           median     8.87ms
+       step2 shape: IN (60 literals)                                  median     8.99ms
+       step2 shape: = ANY(list literal)                               median     9.04ms
+       step2 shape: single id lookup (index probe)                    median     0.81ms
+       step2 shape: whole map GROUP BY oracle_id (35k rows out)       median    24.65ms
+       narrow (NewDeck): OLD correlated subquery                      median    27.21ms
+       narrow (NewDeck): NEW main query                               median    16.37ms
+       narrow (NewDeck): NEW step 2 for 3 ids                         median     7.37ms
+     ```
+
+     The test derives its expectation from the printings table rather than
+     restating it, and doctors two extra Sol Ring printings (0.42 and 99.99)
+     into its own temp copy of the fixture — because the recorded fixture has
+     no card with two *different* prices, so `max` in place of `min` passed a
+     first draft of it. Three mutations checked: `max` for `min`, attaching at
+     `oracleIDs[0]`, and returning no prices at all.
+  3. **"The served app hotlinks nothing it could serve itself" was enforced by
+     nothing** — the pass's standing question, answered for this facet. It is
+     re-verified by hand every quarter and it is one `npm install` from being
+     false: a dependency that pulls a webfont from Google, a component library
+     that reaches for a stylesheet, a worker that fetches its own
+     WebAssembly. Each ships silently, works perfectly, and is **invisible to
+     a source grep**, because it only appears in the built bundle. Three
+     guards over `web_dist` now, each about a shape that *fetches* rather than
+     a string that appears (a minified bundle is full of inert absolute URLs
+     and a test that failed on those would be deleted within a month): no
+     code/font CDN host anywhere; no absolute `url()` or `@import` in any
+     stylesheet; and every URL in the shell relative except exactly one
+     `preconnect`, which must be the card-art host. Mutation-verified three
+     ways — a `fonts.gstatic.com` `@font-face`, an `unpkg.com` script tag, and
+     a second preconnect. The jsdelivr allowance is tied to the OCR overrides
+     being *in the bundle*, not in the same chunk: today the tesseract default
+     is in `reader.js` and `lib/reader.ts`'s overrides land in `Import.js`, so
+     a same-file rule would fail on a build detail rather than on a hotlink.
+- **Queued for Aaron (new this run):**
+  1. **The spend instrument lost its CLI in the crossing, and this facet
+     cannot read the number it exists to track.** The accounting itself
+     crossed intact — `claude_usage` is written from `converse` on every way
+     out of a conversation, and `ledger.Summarise` rolls it up by mode or
+     model — but the only *reader* in the Go tree is the Admin panel, a
+     signed-in browser surface. Python had `mtglab claude usage`; `mtglab
+     claude` now offers exactly one subcommand, `check`. The consequence is
+     structural rather than cosmetic: **Claude never signs in** (credentials
+     are Aaron's to type), so a night run can read the laptop's ledger with
+     `sqlite3` and can read the *instance's* only by asking Aaron to open a
+     browser. Every spend figure in this entry is therefore local, and local
+     spend is nearly idle — the deployed instance is where the money is.
+     `fly ssh console -C "mtglab claude usage"` is the shape that fixes it,
+     and it is perhaps eighty lines over machinery that already exists.
+     Queued rather than landed because what it prints is a design call:
+     which axis by default, whether a `--since` window, and whether the price
+     column renders (`prices.Table` is right there, and its figure is a floor
+     — see the carried item below).
+- **Queued for Aaron (carried from 2026-08-16/19, re-checked against the Go
+  tree this run — the code is new, the findings survived it):**
+  1. **Cache-write tokens are still invisible, and still the priciest class.**
+     Unchanged in substance and now re-verified in Go: `converse.go` adds
+     `resp.Usage.InputTokens`, `OutputTokens` and `CacheReadInputTokens`, and
+     `cache_creation_input_tokens` appears **nowhere in the tree** — not in
+     `ledger.Row`, not in `claude_usage` (migration `0007.sql`), not in
+     `prices`. Writes bill at 1.25× input, so every figure this facet quotes
+     is a floor; `prices`'s own package comment says so. Still a schema
+     migration on a forward-only ladder, so still Aaron's window.
+  2. **The theme conversation's second cache breakpoint still cannot be read
+     back on the next turn.** The Go port carries the Python shape exactly:
+     `themeMessages` marks the **closing instruction**, which is stripped and
+     re-appended every turn, so turn N's marked region is not a byte-prefix of
+     turn N+1's request. Its own comment claims the opposite ("everything up
+     to here is settled, and the next turn appends"). The bound from
+     2026-08-19 still holds — 99.2% of this mode's prompt is already served
+     from cache, so the fix is worth at most ~0.8% of its input — which keeps
+     it small rather than urgent. Item 1 remains the instrument that would
+     show it working.
+  3. **The pool refresh's row-at-a-time ingest.** Not re-measured: the loader
+     was rewritten in Go against DuckDB's Appender rather than a Python
+     `executemany`, which is the bulk path the old finding asked for. The
+     *robustness* half — `DELETE FROM printings` before the load, so an
+     interrupted refresh leaves the pool with no printings at all — was not
+     re-derived this run and should be re-checked against `pool/refresh.go`
+     before this item is closed.
+- **Deferred (re-checked):**
+  - **Interview and single-card argue still have neither a cache nor an
+    in-flight dedupe key**, and every other paid surface has one: dossier by
+    `plan.Key` *and* the `dossier_cache` table, the argue sweep by
+    `slug:fingerprint`, scan and research by their own keys, theme
+    deliberately by neither with the argument written down (`api/theme.go`
+    says so at the call site). Trigger unchanged: either single-card endpoint
+    becoming a job, or gaining a caller that is not the deck page.
+  - **Long max-age for the immutable media.** Unchanged and still blocked on
+    the same thing (`assetFileNames: 'assets/[name].[ext]'`), but the stake
+    has grown a lot: `web_dist/assets` is now **7.99MB raw**, and the largest
+    fourteen files are dominated by the motion loops —
+    `claude-library-loop.mp4` 1,338,606 · `.webm` 784,451 ·
+    `bookworm-loop.mp4` 588,763 · `wisps-loop.webm` 454,704 ·
+    `seance-room-loop.mp4` 440,428. They revalidate to 304 rather than
+    re-downloading, so the cost is still one RTT each, and each loop is
+    fetched only where its component mounts. Trigger unchanged: content-hash
+    the *media* names only.
+- **Measurements (2026-08-24, this Mac, quiet, full pool at
+  `data/mtg.duckdb`; live figures against v208):**
+  - **Local routes, warm** (`curl -w '%{time_total}'`, 15 samples, p50 —
+    **and the whole Python-era table below is superseded**; the three
+    reference shelves are between 6× and 9× faster in Go):
+
+| route | 2026-08-19 (Python) | 2026-08-24 (Go, before this run) | after |
+|---|---:|---:|---:|
+| `GET /api/health` | 7.3ms | 4.4ms | **2.0ms** |
+| `GET /api/lore` | 5.9ms | **0.9ms** | 0.9ms |
+| `GET /api/colors` | 6.1ms | **0.7ms** | 0.7ms |
+| `GET /api/glossary` | 4.5ms | **0.7ms** | 0.7ms |
+| `GET /api/tarot/reading` (a fresh seeded deal) | — | **0.7ms** | 0.7ms |
+| `GET /api/themes` | — | **0.6ms** | 0.6ms |
+| `GET /api/claude/personas` | — | **0.7ms** | 0.7ms |
+| `GET /` (the shell) | — | **0.7ms** | 0.7ms |
+| `GET /api/cards/search?q=goblin` | 43.8ms | 41.1ms | 40.4ms |
+| `GET /api/cards/search` (no text) | — | 87.7ms | **53.1ms** |
+
+  - **Held versus reaped: the ten-second lease is the biggest single number
+    in this facet, and it is nowhere in the warm tables above.** `fly.toml`
+    health-checks `GET /api/health` every **30s**; the pool's `IdleLease` is
+    **10s**; so the reaper hands the database back twenty seconds before every
+    check re-opens it, and an idle instance opens a 100MB DuckDB file roughly
+    **2,880 times a day**. Driving one process, this Mac:
+
+    ```
+    first ever /api/health (pool never opened): 43.9ms
+      held /api/health #1: 2.1ms   #2: 2.1ms   #3: 2.1ms   #4: 2.2ms   #5: 2.1ms
+    waiting 16s for the reaper...
+    after the lease expired: 37.7ms
+      held again #1: 1.9ms   #2: 2.0ms   #3: 2.1ms
+    lore cold: 75.6ms
+      lore held #1: 0.8ms   #2: 0.9ms   #3: 0.9ms
+    search cold: 62.5ms
+      search held #1: 40.8ms   #2: 40.1ms
+    ```
+
+    **The lease must not simply be lengthened.** 10s-under-30s is exactly what
+    guarantees a `data refresh` can take DuckDB's write lock, and an app
+    keeper that outlived the health check is the 2026-08-19 failure `pool.go`
+    records in its own comment. Two consequences follow that the warm tables
+    hide. First, **every warm number in this facet is the second request of a
+    visit** — the first pays ~40ms of open. Second, and this is the finding:
+    **`GetCards`'s memo is thrown away by the reaper, and a reap is not a
+    refresh.** `pool.go`'s package comment says caching is keyed on the
+    *stamp* — "a refresh rewrites the file, changes `mtime_ns` and size, and
+    every entry keyed on the old stamp becomes unreachable" — but the memo is
+    keyed on the *open*, and an open ends for two different reasons. The lore
+    shelf asks the same ~120 names forever and pays **75.6ms instead of
+    0.9ms**, an 84× difference, every time the pool has been idle ten seconds.
+    Queued rather than fixed: a cache *lifetime* change on the card pool wants
+    daylight, not 5am.
+  - **⚠️ Time the route you meant, and check the status code.** A first pass
+    of this table carried `/api/tarot/lore` at 0.7ms. There is no such route:
+    it 404s, and the 404 is *fast*, so the row looked like the healthiest
+    number on the board. The API router answers its own JSON 404 rather than
+    falling through to the shell, which is what made it catchable at all —
+    but nothing in a timing script notices, and this is the same shape as
+    2026-08-19's HEAD-instead-of-GET near-miss. The tarot table's real route
+    is `/api/tarot/reading`.
+  - **Do not read the health win as something a visitor can feel.** 2.4ms off
+    a 172ms round trip is invisible from outside, and the live table below
+    will not move. What it buys is *server work per request* on a machine with
+    two shared cores that answers a platform health check on a fixed cadence
+    forever: six DuckDB statements a call, gone. Keep it in proportion,
+    though — see the lease measurement below: on the instance a health check
+    usually finds the pool *reaped*, so it pays ~40ms of DuckDB open and the
+    2.4ms is a slice of about fifty, not of four. A win measured locally and
+    quoted as a user-facing speed-up would be this facet's own worst habit.
+  - **`/api/decks` is unmeasured this run and that is a gap, not a fact.**
+    The laptop's library is empty (ADR 30: the decks live on the instance's
+    volume), so the shelf route answers in 0.7ms with nothing to build. The
+    Python-era 16.5ms warm / 134.2ms cold numbers below are **not**
+    comparable to anything in Go. Re-measuring properly means pulling decks
+    from the instance as scratch, which this run deliberately did not do at
+    4am.
+  - **Live instance, time-to-first-byte** (7 samples, p50, from this Mac to
+    `sjc`). The floor is RTT and everything sits on it — the *whole* spread
+    between the slowest and fastest route is 8ms:
+
+| target | 2026-08-16 | 2026-08-19 | 2026-08-24 |
+|---|---:|---:|---:|
+| `/api/health` | 211ms | 213ms | **171.8ms** |
+| `/` | 240ms | 237ms | **167.8ms** |
+| `/assets/app.js` | 192ms | 222ms | **169.2ms** |
+| `/assets/index.css` | — | — | **173.5ms** |
+| `/api/lore` | — | — | **165.3ms** |
+
+  - **The ETag is gone and the revalidation contract still holds — read this
+    before recording a regression.** Both earlier runs recorded "a strong
+    `etag`". The Go door serves through `http.ServeContent`, which supplies
+    **`Last-Modified` and no ETag**: `last-modified: Mon, 24 Aug 2026
+    09:33:07 GMT` on `/assets/app.js`, which is the container's own mtime and
+    therefore deploy-fresh. Verified live: `If-Modified-Since` → **304, 0
+    bytes, 171ms**; unconditional gzip → 200, 91,301 bytes, 246ms;
+    `If-None-Match` → 200 (there is no ETag to match). So the cost is still
+    one revalidation RTT per navigation rather than a re-download, and —
+    unlike in the Python era — **the claim is machine-checked**:
+    `door_test.go`'s `TestAnAssetRevalidatesWithA304` fails if the validator
+    ever goes. Headers live: `cache-control: no-cache`, `content-encoding:
+    gzip`, `vary: Accept-Encoding`, `x-content-type-options: nosniff`. Still
+    no brotli.
+  - **Bundle** (committed `web_dist`, gzip -9): `charts.js` 399,398 /
+    **111,241** · `app.js` 291,776 / **90,938** · `index.css` 104,218 /
+    **22,818** · four self-hosted `.woff2` faces (`im-fell-english` ×3,
+    `parisienne`). `app.js` and `charts.js` are within a kilobyte of
+    2026-08-19 — no drift; `index.css` has grown 99,824 → 104,218 raw. The
+    motion loops are the weight now (see the deferred item above):
+    **7,992,593 bytes raw across `web_dist/assets`, 5,958,672 of it video.**
+  - **Static assets over hotlinks**: unchanged and now guarded. Exactly one
+    external host is fetched at runtime — `cards.scryfall.io`, kept as a
+    hotlink by White's licensing verdict, warmed by the single `preconnect`.
+    No CDN for code, fonts, CSS or scripts; no `@import`; no absolute `url()`
+    in any stylesheet; every webfont is a `.woff2` this app serves. The other
+    hosts in the bundle are inert or clickable: `github.com`, `react.dev`,
+    `reactrouter.com`, `redux.js.org`, `tailwindcss.com`, `rolldown.rs`,
+    `opencollective.com` and `bit.ly` inside vendored package metadata and
+    minified error text; `console.anthropic.com`, `fly-metrics.net` and
+    `edhrec.com` are links a person clicks. Nothing in category (c).
+  - **Claude spend to date** (the *laptop's* ledger, `data/app.db`, all of it
+    `claude-sonnet-5`): 89 conversations / 100 requests / **20,301 input /
+    130,261 output / 1,821,915 cache reads**, every row `end_turn`. At the
+    introductory rate that is **≈$1.71**; on 2026-09-01 the identical traffic
+    is **≈$2.56**. Per mode:
+
+| mode | conv | req | input | output | cache reads |
+|---|---:|---:|---:|---:|---:|
+| `theme-conversation:fortune-teller` | 74 | 74 | 9,815 | 92,990 | 1,252,433 |
+| `scan` | 6 | 6 | 7,305 | 212 | 0 |
+| `theme-proposal:fortune-teller` | 3 | 11 | 30 | 21,892 | 321,797 |
+| `slot-argument` | 2 | 4 | 2,313 | 5,483 | 17,236 |
+| `commander-dossier` | 1 | 2 | 832 | 9,241 | 230,449 |
+| `theme-conversation:{chef,storyteller,therapist}` | 3 | 3 | 6 | 443 | 0 |
+
+  - **Spend since 2026-08-19 is ≈$0.07** — three conversations, all of them
+    exercising the crossing rather than using the app. The interview and
+    research modes have still never run locally.
+  - **Prompt cache ratio 89.7:1**, down from 105:1, and the drop is `scan`
+    again: 7,305 input tokens and **zero** cache reads, because its 478-token
+    prefix clears no model's minimum. Excluding scan the ratio is **140:1**.
+    `slot-argument`'s own 7.5:1 is the second pull and is correct — a
+    single-card argue is a short conversation whose first request *writes*
+    the 3,298-token prefix and whose second reads it.
+  - **The mode table, counted from `data/modes.json` rather than from
+    prose** — seven modes, and every knob deliberate:
+
+    | mode | max_tokens | effort | own tools | web_search max_uses |
+    |---|---:|---|---|---:|
+    | `commander-dossier` | 16,384 | high | `get_cards` | 4 |
+    | `research` | 16,384 | high | `get_cards` | 4 |
+    | `theme-proposal` | 16,384 | high | `search_cards`, `get_cards` | 3 |
+    | `rationale-interview` | 8,192 | high | 4 pool/deck tools | — |
+    | `slot-argument` | 8,192 | high | 5 pool/deck tools | — |
+    | `theme-conversation` | 8,192 | high | — | 1 |
+    | `scan` | 2,048 | **low** | — | — |
+
+    `MaxToolTurns` 6. `scan`'s `low` is argued as accuracy rather than thrift
+    (ADR 34 forbids a transcriber inferring). No mode declares `thinking`,
+    which on Sonnet 5 is adaptive by default — and `MaxTokens` is a ceiling
+    over thinking and answer together, which is why the searching modes carry
+    16,384.
+  - **`prices.Table` re-verified rate by rate against the `claude-api`
+    skill's current pricing table**: Fable 5 and Mythos 5 $10/$50, Opus 5 /
+    4.8 / 4.7 / 4.6 $5/$25, Sonnet 5 **$2/$10 introductory through
+    2026-08-31** then $3/$15, Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5, cache reads
+    at 0.1×. Every one matches, the window is modelled rather than flattened
+    (`Priced.On`), and `Checked = 2026-08-18` renders beside every figure.
+    **The window closes in seven days** and the code needs no change for it.
+  - **Refusable-before-the-call survived the crossing, on every paid
+    surface.** `scan` refuses an unknown media type, bad base64, an empty
+    capture or an oversized frame before a payload exists (`ErrScanRefused`);
+    research reads the question's shape and refuses in the request rather than
+    minutes later; and `Converse` validates the request and builds the mode's
+    schemas *above* its first `Messages.New`, so a mode cannot error after
+    spending. Nothing new has been added below that line.
+  - **The seven prompts carry no dated-model cruft.** Scanned for the
+    patterns that drift under a newer model — chain-of-thought prodding,
+    "take a deep breath", `<thinking>` tags, JSON-only nagging that structured
+    outputs now guarantee, assistant prefill, role reassurance, length
+    hedges. **Zero hits across all seven.** The system-block breakpoint is
+    still placed correctly (tools render first, so it covers both) and
+    `converse`'s moving marker on the newest tool-result block is still the
+    right second breakpoint for a searching mode.
+  - **Cache hit rates, the Go answer.** The Python register retired with the
+    backend, so the pool's two memos had no hit count at all — the exact
+    "correct, tested, and never once used" shape this facet warns about. They
+    now carry one (`MemoColumns`, `MemoCards`, `MemoStale`), per open, read by
+    the package's own tests and rendered nowhere (commandment 10). Measured
+    through the fixture: the staleness memo answers 4 hits / 1 miss over five
+    `/api/health`-shaped asks, and `columns` 0/2 inside the walk. **The
+    `dossier_cache` and `sim_cache` tables still have no hit count** — they
+    are durable tables whose hit rate is answerable by SQL rather than by a
+    counter, which is a different and adequate instrument; the laptop holds 3
+    dossier rows.
+- **Handed to Red, with the measurement it was missing.** Blue found seven
+  rendered `Loading…` strings and filed the five bare ones as possibly
+  Black's, since they touch perceived performance. **They are not.** Each of
+  the five waits on exactly one endpoint, and every one of those endpoints
+  does **0.6–0.7ms** of work: `tarot.tsx:828` on `/api/claude/personas`,
+  `theme.tsx:844` on `/api/claude` (the stance-and-readiness status),
+  `NewDeck.tsx:378` and `Learn.tsx:572` on `/api/colors`, `Learn.tsx:422` on
+  `/api/glossary` — each timed by driving it, after the tarot near-miss
+  above. So the string is on
+  screen for one round trip — ~170–250ms on the instance — and **there is no
+  server work to remove.** The entire cost is perceived, which makes it
+  commandment 17's ground (and commandment 15's, for the one that gates the
+  fortune-teller's table), not this facet's. All five are also the exact
+  anti-pattern commandment 17 names: `<p style={{ color: … }}>` with no
+  motion, where the two good ones use `<Spinner label="Loading…" />`
+  (`App.tsx:228` and `:367`).
+- **Not touched, deliberately.** Tier 1 and `internal/sim`: no engine change,
+  so the ADR 18 fingerprint did not move and no stored result was orphaned.
+  The determinism kernels were not opened. No Claude call was made — every
+  spend figure here is read from a ledger, not bought.
+
+### 2026-08-19 (rainbow) and the Python era
+
+Everything from here down is about the retired Python app. Kept for its
+reasoning and its trend lines; **no path, command or number in it is current.**
+
 - **Measured out of band (2026-08-20, ADR 35 live — the hosted Forge's cost
   shape, from the first paid matches on the instance):** wake from `stopped`
   is **~5s** (hand-timed against the real machine; `worker.BOOT_SECONDS=90`
@@ -3491,10 +4182,407 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-08-21 (scoped — the relic sweep only; see the dated
-  subsection at the end of this file). Last full run: 2026-08-19 (rainbow) —
-  the first colorless run to have five colors to audit. Previous: 2026-08-19
-  (the run that created this section).
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-21 (scoped — the relic
+  sweep only), 2026-08-19 (rainbow, the first colorless run with five colors to
+  audit), 2026-08-19 (the run that created this section).
+- **Read everything below the 2026-08-24 block as history, not as state.** It
+  is all about the Python app, and its instruments are gone: `mtglab bench`,
+  `mtglab bench caches`, `mtglab bench profile`, `mtglab mutate` and
+  `mtglab animist verify` are named throughout and **not one of them is a
+  command this binary has** — the shelf they describe retired with the Go
+  crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
+  the lessons still hold, and several are why the 2026-08-24 run went where it
+  went; no command, count or path in them is a current fact.
+
+### 2026-08-24 (rainbow)
+
+The sixth leg of a seven-leg rainbow, and the first colorless run since the Go
+crossing. Parts one through five all run; the relic sweep ran all six passes.
+
+- **Fixed this run:**
+  1. **The comment sweep's own licence was wrong, and finding out cost the
+     sweep three of its edits.** Part five's carve-out justified a comment-only
+     diff on the grounds that "the binary and the committed bundle come out
+     byte-identical". **That is false in five packages.** `internal/sim`,
+     `internal/sim/tier1`, `internal/mana`, `internal/floats` and
+     `internal/mt19937` each embed their own source and are hashed into ADR
+     18's engine fingerprint (`internal/sim/cache`'s `engineSources`), so
+     reflowing a doc comment in any of them changes the cache key and **every
+     stored Tier 1 row on the volume stops matching**. Nothing fails, no test
+     speaks — `TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint` asserts the
+     fingerprint *differs* from the recorded Python one, so there is no golden
+     to notice a move — and the instance silently recomputes what it had
+     already paid for. Caught mid-sweep: three edits had already been made in
+     `sim/source.go` and `sim/tier1/{run,tier1}.go` and were reverted. The
+     fix is in three places: `engineSources`' own doc comment now says a
+     comment counts and names the five, `references/colorless.md` part five
+     carries the exclusion, and the carve-out keeps its wrong reason *visible*
+     with the correction beside it rather than edited away, because a fresh
+     session would re-derive it.
+  2. **The relic sweep's pass 6 could not be read, so it could not be run.**
+     As written — `git ls-files | xargs -I{} sh -c 'grep -rL {} ...'` — it
+     reports **180 files**, almost every `.go` and `.tsx` in the tree, because
+     Go and TypeScript reach each other by package and import and never by
+     filename. A pass whose output is 180 lines of noise is a pass nobody
+     reads, which is the same failure the enumerative sweep exists to prevent,
+     one layer up. Rewritten to the file kinds where a basename *is* the
+     linkage (docs, workflows, recipes, schemas, scripts) with a note on how to
+     read the survivors. Scoped, it returns **12 rows, all convention-loaded
+     and all correct**: the twelve `internal/auth/migrations/*.sql`, reached by
+     an embed glob. `.github/dependabot.yml` and `web/tsconfig.json` were the
+     other two rows on the first draft and dropped out of the published
+     command's run for a reason worth writing down — **naming a file in this
+     ledger makes it referenced**, so a relic queued here and then left alone
+     disappears from every later sweep. The rewritten pass was itself run
+     before being published, which is how both of those were caught: the first
+     draft's `--exclude="$f"` matched nothing, because `grep --exclude` takes a
+     basename glob and not a path.
+  3. **The comment baseline was a number nobody could reproduce.** Part five
+     recorded "88 dated comments in Go (60 outside tests) and 101 more under
+     `web/src`" with no command. The Go halves reproduce (89 and 60 today, one
+     added since); **the `web/src` half does not** — 87, 117 and 151 are all
+     obtainable and 101 is not. The four greps that produce the figures are now
+     in the reference beside them, including the one for the residue dates
+     miss: PR numbers and `vNNN` build tags.
+  4. **A fourth kind of date earns its keep, and sweeping is what found it.**
+     Part five listed three (expiry, version floor, pricing cutover,
+     deprecation window). A **validation measurement** is the fourth:
+     `curve.go`'s *"validated against 3,000 Tier 1 games per deck on
+     2026-08-21: mean error -0.06 mana"* is not a diary entry, because the date
+     is how a reader chooses between trusting the formula and re-validating it.
+     Strip it and the sentence claims to be current forever. Both surviving
+     dates in the swept slice are of this kind, which is the argument.
+  5. **The comment sweep itself — slice `internal/sim/**`, outside the
+     fingerprint.** Four files, comment-only: `sim/cache/cache.go`,
+     `sim/compile/compile.go`, `sim/curve/curve.go`, `sim/tier3/run.go`.
+     Cut: one `#NNN` PR reference and **seven dates** — six "until/since/on
+     2026-08-2X" clauses whose old shape was kept and whose date was not, plus
+     one "Aaron's ruling of 2026-08-21" that is stronger as "Aaron's ruling".
+     Kept: both validation measurements, and every argument. **Dated comments
+     in `internal/sim` outside tests, ignoring Go's `2006-01-02` layout
+     literals: 11 → 4** — the four being the two validations kept on purpose
+     and two inside the fingerprint that the revert put back. **Slices done, so
+     the sweep finishes over cycles rather than restarting:**
+     `internal/sim/{cache,compile,curve,tier3}` — 2026-08-24. **Not sweepable
+     at all:** the five fingerprinted packages (finding 1).
+  6. **The measuring shelf's cgo rule gains its corollary, bought twice in one
+     night.** The rule as written — profile the Go half, clock the cgo half —
+     held: both Black and Red hit the blind spot and both said so. What it did
+     not say is what to do next. Red switched to `-sample_index=alloc_space`
+     and got the night's finding out of `internal/api`; the shelf now says the
+     allocation profile is not blind there and is the move when `-top` comes
+     back featureless.
+
+- **Part one — is the ledger telling the truth? The two-places rule is the one
+  that breaks, and it breaks in one direction.** Of the **six** items opened in
+  `DAYBREAK.md` on 2026-08-23, **two** have anything in this file (items 2 and
+  3, both as one-liners in Cleanup's "Not yet run" backlog rather than in a
+  colour's section) and **four have no ledger entry at all** — the coverage
+  floor, the night-merge rule, the skill-prose guard and the pprof mount. No
+  section in this file carries a `2026-08-23` tag; the session that wrote those
+  six lines wrote no record for them.
+
+  **The direction is structural, not accidental.** Writing the queue line is
+  what a run remembers, because it is the thing Aaron opens; writing the record
+  is what a run runs out of night for. And the consequence is worse than
+  invisibility: `DAYBREAK.md` says an answered item *leaves*, so **an item whose
+  only copy is the queue is destroyed by being answered** — the line goes and
+  takes its reasoning with it. Two of the four are Colorless's own subject and
+  their records are recovered below; the other two are noted where they belong.
+
+  **The third hiding place, and Green found it independently tonight**: a
+  finding written into the document it is *about* — `web/README.md` recorded
+  half of the browser-floor gap as a queued item that reached neither this file
+  nor the queue, and for five days the declared Safari 16.4 floor was held by
+  prose alone. Two colours hitting the same plumbing hole in one night is the
+  test for promotion, so the check is now spelled out in
+  `references/colorless.md` part one, including the instruction to *repair* the
+  missing side rather than report it.
+
+- **Spot-checks of what the other colours claimed** (part one, three taken):
+  White's `NOTICE.md` anchors — the four repaired paths resolve and
+  `go/cmd/mtglab/licenserecord_test.go` is on `main` holding them, including
+  the `newRoot()`-derived verb half. White's #281 forge-stub lock is in the
+  tree. Blue's `--no-open` deletion was read rather than assumed, because
+  removing a flag from four `.claude/launch.json` entries looks like a
+  regression from the outside: `cmd/mtglab/ui.go` parsed it into `_ = noOpen`
+  and nothing in the process ever opened a browser, so the flag was help text
+  lying and the deletion is right.
+
+  **A fourth spot-check, taken against the live instance, corrects a "CLOSED"
+  in Green's section.** Green 5a opens *"`SCHEMA_VERSION` is surfaced nowhere.
+  Re-grepped: **not in `/api/health`, not on the admin panel**"* and is marked
+  **CLOSED 2026-08-19 (PR #192)**. Read against the tree and against the
+  deployed instance tonight: the **admin tile crossed** (`GET
+  /api/admin/stats/system` answers `schema.applied` / `schema.expected`, and
+  `Admin.tsx` renders the pair), and **`/api/health` does not carry the number,
+  in Go or in the Python it replaced** — `cf0a640` touched `adminstats.py`,
+  `Admin.tsx` and their tests, and never the health route. So this is not a fix
+  reverted by the crossing; it is **an item closed on half of its own opening
+  sentence**, which reads identically from a distance and is the reason part
+  one asks for spot-checks at all. Nothing is broken by it — the health half
+  survives as the precondition of Red 3, which is still open and still says so
+  — but the word CLOSED is doing more work than the fix did. *Correction filed
+  here rather than in Green's section, whose branch is open tonight; it belongs
+  beside Green 5a once #286 lands.* Live body, for the record:
+  `{"pool":true,"oracle_cards":35393,"printings":107355,"decks":7,
+  "pool_stale":false}` — no `schema_version`, no `app_db`, no `disk_free_mb`.
+
+- **Part two — is the checklist finding things, or reciting them?** Verdicts,
+  measured as what each colour's run tonight actually found against what its
+  file spends its words on:
+  - **White — earning it.** Both fixes came from the verify-the-anchor habit
+    the file added deliberately, not from a list.
+  - **Blue — earning it, and its finding was in this skill.** Four places in
+    the pass's own prose and in CLAUDE.md told a run to invoke the toolbox
+    gates as bare `ruff` / `mypy` / `pytest` / `animist`; all four are
+    `command not found` on this Mac, copied from `ci.yml`, where they work
+    because CI installs them onto `PATH`. That is a checklist failing on its
+    own instructions, and it is the sharpest evidence yet for the guard that
+    2026-08-23's item 5 asks for.
+  - **Black — earning it**, and its facet's cgo caveat held under use.
+  - **Red — earning it, and item 3 of the 2026-08-23 queue turned out to be
+    fact rather than hypothesis.** The `deploy` job's `needs` list had never
+    included `tools`, so every deploy since the crossing shipped without the
+    toolbox gate. **That is a data point about the queue, not about Red**: the
+    item was written as "a job added without `needs` deploys off a partial
+    suite, silently", and the hole was already open when it was written. A
+    queued item is a claim to re-check, exactly like a sentence in a doc.
+  - **Green — earning it, and it found two of its own guards deleted.** The
+    browser-floor and reduced-motion tests went with the interpreter and
+    nothing recorded that they had. A checklist line pointed at a test file is
+    only as good as something noticing the file is gone.
+  - **Colorless — the file that most needed re-reading rather than
+    re-running.** Two of its five parts were wrong in ways only *running* them
+    exposes (pass 6 unreadable, the carve-out's reason false). Both fixed above.
+
+- **Part three — the tooling, run and read as evidence about itself:**
+  - `animist verify` — **12 recipes, 12 `held`, exit 0.** Raw output in the
+    measurements below. The tool is healthy; **what it cannot see is the
+    finding.** `verify` walks recipes, so an asset with no recipe is invisible
+    to it, and three of the eight asset directories have none —
+    `web/src/assets/{claude,fonts,simulator}`. All three are honest (authored
+    or fetched, argued at length in their `PROVENANCE.md`) and two carry the
+    machine-readable marker `<!-- authored: no recipe, no gate. -->`. **Nothing
+    checks that an asset directory is one or the other**, which is a White
+    finding and is filed below.
+  - **The shelf's live question, asked again: what would a Go rebuild measure
+    that the stock toolchain cannot?** The honest answer is still "a cache
+    register and a benchmark ledger", and this run sharpened the first half.
+    Finding 1 is precisely a cache-register question: a comment edit inside a
+    fingerprinted package turns the Tier 1 cache's hit rate to zero on the next
+    deploy, and **nothing anywhere would show it** — not a test, not a log, not
+    `/api/health`. A register would have made that a visible number rather than
+    a paragraph found by accident. The rebuild's shape does not need widening;
+    its cache half needs promoting above its benchmark half.
+  - **The stock instruments answered everything asked of them this cycle**, and
+    the one documented blind spot behaved exactly as documented in two
+    independent hands. That is the shelf earning its thinness.
+
+- **Part four — the relic sweep. All six passes run**, recorded because a sweep
+  that ran two of six and reported "nothing found" is the failure this entry
+  exists to stop.
+  - **Pass 1 (every tracked directory) — clean, and checked the hard way.**
+    Every `go/internal/**` package was read back against its own package doc;
+    all 47 have one and all 47 name a purpose the current architecture needs.
+    `licenses/` holds the two third-party licence texts NOTICE cites.
+  - **Pass 2 (odd file types) — clean.** The non-source tracked files are the
+    tarot deck, the committed media, four fonts, twelve migrations, two schema
+    files, two licence texts, the container files and `docker-entrypoint.sh`.
+  - **Pass 3 (what arrived, by era) — clean.** The oldest untouched tracked
+    files are ADRs 1–10, `LICENSE` and the `web/` tsconfigs, all 2026-08-10 and
+    all immutable or stable by design.
+  - **Pass 4 (every doc by its own title) — one raise, no action.** All 38 ADRs
+    are present; **ADR 29's `#` line is the only one missing its number**, and
+    four titles (ADRs 3, 14, 20, 24) name Python as the served backend, which
+    ADR 38 superseded. ADRs are immutable, so this is the found-and-raised
+    class, not a tidy — and it is thin enough that the honest recommendation is
+    to leave it.
+  - **Pass 5 (every command and flag) — clean, and it corrects this section.**
+    Eight subcommands of our own (`cards`, `claude`, `data`, `decks`,
+    `forge-shim`, `sim`, `ui`, `users`), cobra's `help` and `completion`, and a
+    hidden `probe` the image's HEALTHCHECK calls; every flag on every one has live
+    data behind it. **`mtglab ui --dev` does not exist and appears nowhere in
+    the tree.** This section's 2026-08-21 entry names it twice as a live
+    capability ("the dev harness — commandment 16's walks, `--dev` CORS for
+    Vite", and "what `--dev` is for"). *Correction, recorded beside the
+    original rather than edited into it:* the flag did not cross, and it is not
+    needed — `web/vite.config.ts` proxies `/api` to `127.0.0.1:8765`, so the
+    dev server reaches the real API without any CORS switch. The *ruling* those
+    sentences record is untouched and still holds.
+  - **Pass 6 (files nothing references) — clean once it was made readable**
+    (finding 2). 12 rows, all convention-loaded.
+  - **No keep/retire decision is owed from this sweep**, and that is worth
+    saying plainly: the 2026-08-21 sweep queued six relics, Aaron ruled on all
+    six, and the tree has not re-accumulated. The only file-granularity finding
+    this run is the `--dev` correction above, which is a stale sentence in this
+    ledger rather than a relic in the tree.
+
+- **The convergence nobody planned, and what it means for the two open
+  docs-rot items.** Four documents-versus-tree guards were written into
+  `go/cmd/mtglab` in one night by four different legs: White's
+  `licenserecord_test.go` (paths exist; `mtglab <verb>` read off `newRoot()`),
+  Blue's `configrecord_test.go` (env switches both ways; `.claude/launch.json`
+  against the command tree), Red's `pipeline_test.go` (`ci.yml`'s `needs` set
+  derived from its own job list), Green's `browserfloor_test.go` and
+  `reducedmotion_test.go` (the bundle against the declared floor). **They did
+  not duplicate each other**: Blue, Red and Green all call White's `repoRoot`
+  and `sortedKeys`, which is the shape working. Two things follow.
+  1. **The shared kit is discoverable only by having read the licensing test.**
+     `repoRoot`, `sortedKeys`, `backticked`, `repoPaths` and `mtglabVerb` all
+     live in `licenserecord_test.go`, and a session looking for "how do I
+     assert a doc's path resolves" will not open a file named for the licence
+     record. Not proposed as a move tonight: three of the four files are on
+     unmerged branches and a move would conflict with all of them. **The next
+     cleanup should do it**, once they land.
+  2. **The skills-doc guard 2026-08-23's daybreak item 5 asks for is harder
+     than the licensing one, and the difficulty is now measured rather than
+     guessed.** The skill files write repository paths against **five different
+     implied roots**: the repository itself (`docs/polish/LEDGER.md`,
+     `web/vite.config.ts`), `go/` for packages (`internal/pool`,
+     `cmd/mtglab/ui.go`), `web/src/` for the frontend (`lib/api.ts`,
+     `components/lazycharts.tsx`), the skill's own directory
+     (`references/white.md`), and `go/internal/` for one shorthand in
+     `references/red.md` (`sim/tier1`). Counted across `SKILL.md` and the six
+     reference files: **42 distinct path-like backticked tokens, 17 resolving
+     at the repository root, 25 resolving only under one of the other four, 0
+     resolving nowhere.** So the guard White's helpers make cheap — a plain
+     `Stat(root/p)` — **would fail 25 times on a healthy tree.** **This is not
+     a re-ask**; item 5 and White's item 2 both stand exactly as written. It is
+     the implementation note whichever of them lands will need: resolve a token
+     against a small ordered list of roots and fail only when it resolves under
+     none of them. Audited by hand tonight in place of the guard: **every one
+     of the 42 resolves**, and the one dead command (`mtglab animist` in
+     `.claude/skills/yas-queen/references/house-codes.md`) is already fixed on
+     Blue's PR #282, so it is deliberately not touched here.
+
+- **Recovered records — the four 2026-08-23 daybreak items that had none.**
+  Written here rather than left to be destroyed by their own answers.
+  **Not re-litigated**: each is restated as it stands, and nothing below is a
+  new question.
+  1. *(Colorless's own)* **Does night work merge itself?** The rule in
+     `SKILL.md` was derived from commandments 14 and 16, not from a ruling:
+     anything a user can see stops at a green PR for Aaron's eye, everything
+     else may merge on green. The alternative is "a night run never merges".
+     Tonight made the question moot in one direction and sharper in the other:
+     `gh pr merge` was refused by the harness's permission classifier from
+     Blue's leg onward, so **five of the seven legs ended at a green unmerged
+     PR whatever the rule says**. An answer is still owed, because a capability
+     that comes back should meet a decision rather than a default.
+  2. *(Colorless's own)* **The skill is unenforced prose.** Its standing
+     question — which absolute is enforced by nothing — answers *all of them*
+     for itself. The evidence has doubled since it was written: Blue found four
+     more bare-command errors tonight, and the four-roots measurement above is
+     what the proposed guard has to handle. The recommendation is unchanged.
+  3. *(White's)* **The 95% coverage floor is gone**, 80.3% today, half
+     unit-change and half real, with three Python-era fakes never rebuilt in
+     Go. White's 2026-08-24 measurements block records the trend point the
+     item's recommendation (a) asked for; recommendation (b), the three fakes,
+     has no home in White's section yet. Noted here rather than written into
+     White's, whose block this run did not otherwise touch.
+  4. *(Red's)* **A pprof mount for the hot-spot patrol**, dev-local half and
+     admin-gated live half, the latter carrying the real caveat that a heap
+     profile carries session tokens. **Deliberately not written into Red's
+     section**: Red's branch is open and editing that section would conflict by
+     construction. The next cleanup should file it there.
+
+- **Filed to White, not fixed here** (a colorless run's diff belongs to the
+  skill, the ledger and the tooling): **nothing checks that a committed binary
+  asset is either recipe-covered or declared authored.** `animist verify` holds
+  the 12 recipes; the three recipe-less asset directories are honest and
+  argued, and two of them carry the marker
+  `<!-- authored: no recipe, no gate. -->` in their `PROVENANCE.md` — a
+  machine-readable token nothing reads. The guard White's licensing facet
+  should want: walk every directory holding a committed
+  `.webp/.mp4/.webm/.svg/.woff2` and require it to be covered by a recipe *or*
+  to carry the marker. It derives from the tree rather than restating a list,
+  and it fails when a new asset lands with neither. Today it would pass — and
+  `web/src/assets/fonts` is the one to think about, since it has neither a
+  recipe nor the marker, only prose.
+
+- **Measurements (2026-08-24, rainbow):** raw output, not a summary.
+
+      $ cd tools && .venv/bin/animist verify
+        …/assets/tarot/tarot.recipe.yaml: held
+        …/web/src/assets/ambience/ambience.recipe.yaml: held
+        …/web/src/assets/ambience/embers.recipe.yaml: held
+        …/web/src/assets/ambience/mist.recipe.yaml: held
+        …/web/src/assets/ambience/wisps.recipe.yaml: held
+        …/web/src/assets/learn/bookworm.recipe.yaml: held
+        …/web/src/assets/seance/parchment.recipe.yaml: held
+        …/web/src/assets/wheel/critter.recipe.yaml: held
+        …/web/src/assets/wheel/fates.recipe.yaml: held
+        …/web/src/assets/wheel/lantern.recipe.yaml: held
+        …/web/src/assets/wheel/menagerie.recipe.yaml: held
+        …/web/src/assets/wheel/shades.recipe.yaml: held
+      exit 0   (12 recipes in the tree, 12 rows printed — count before reading)
+
+  Comment residue, with the commands now recorded in the reference beside the
+  numbers so the next run compares rather than re-derives:
+
+      dated comments, go/**.go                     89   (2026-08-23: 88)
+      dated comments, go/**.go outside _test.go    60   (2026-08-23: 60)
+      dated comments, web/src (ts/tsx/css)         87   (2026-08-23 recorded
+                                                         101, unreproducible)
+      #NNN / vNNN residue in internal/sim       4 → 3   (one removed; the
+                                                        other three are inside
+                                                        the fingerprint and
+                                                        stay -- finding 1)
+
+  The skill's own surface: **7 files** (`SKILL.md` plus six references), **42
+  distinct path-like backticked tokens, 42 resolving, 0 dead** (17 at the
+  repository root, 25 under one of four other implied roots); **17 `mtglab
+  <verb>` mentions over 7 distinct verbs**, one dead (`animist`, fixed on PR
+  #282). Relic sweep pass 1: **47 `go/internal` packages, 47 with a package
+  doc, 0 without.** Pass 6 scoped: **12 rows, 0 findings.** Daybreak two-places
+  audit: **6 items opened 2026-08-23, 2 with any ledger entry, 4 with none.**
+  Gauntlet on this branch: `gofmt -l .` silent, `go vet ./...` clean,
+  `go test -race ./...` **0 failures**, `golangci-lint run ./...` **0 issues**,
+  `npm --prefix web run check` **38 files / 615 tests passed in 26.11s**.
+
+  The deployed instance as it stands (**v208**, White's merge; nothing else
+  merged tonight): `GET /` **200 in 182ms**, `GET /api/health` **200**, pool
+  present, `oracle_cards` 35,393, `printings` 107,355, `decks` 7,
+  `pool_stale` false. Recorded because five legs of this rainbow end at green
+  unmerged PRs, so v208 is what the morning is looking at.
+
+- **Queued for Aaron (2026-08-24):** two, both in `DAYBREAK.md` under
+  **Colorless**.
+  1. **Make the two-places rule machine-checked.** Every open item in
+     `DAYBREAK.md` should name the ledger section holding its record, and a
+     test should hold that true — reading the section names *out of*
+     `LEDGER.md`'s own headings rather than restating them, and failing if it
+     finds no items at all, so an inert guard cannot pass silently. Today the
+     whole 2026-08-23 block would fail it — none of those six names a ledger
+     section and four have none to name — which is the argument and also the
+     reason it was not landed tonight: repairing them means editing that block,
+     and the rainbow's own instruction is to leave those items untouched.
+  2. **Rule on comment edits inside the five fingerprinted packages.** Finding
+     1 gives the mechanism; what is owed is the policy. Recommendation: no
+     prose-only edit in `internal/sim`, `internal/sim/tier1`, `internal/mana`,
+     `internal/floats` or `internal/mt19937` — a wrong comment there is raised
+     with its cost attached and fixed alongside a real change to the same
+     package, so the cache is discarded once for a reason rather than twice for
+     tidiness.
+
+- **Deferred (2026-08-24), with the trigger:**
+  - **Move the shared documents-versus-tree helpers out of
+    `licenserecord_test.go`** into a file named for what they are. *Trigger:*
+    Blue's #282, Red's #285 and Green's #286 all merged, so the move stops
+    conflicting with three open branches.
+
+- **Staleness, honestly stated** for the next bare `/polish`: **Cleanup, and it
+  is not close.** All six colours now carry a `2026-08-24 (rainbow)` tag, so
+  nothing is stale by date; Cleanup **has never run at all**, its section still
+  reads "Not yet run", and it now inherits six legs' queues plus everything
+  older. This run's headline finding is that the queue's bookkeeping is broken
+  in one direction, which makes another audit of a queue nobody empties the
+  wrong next move. After Cleanup, **Red** — its 2026-08-23 item turned out to
+  be a live hole rather than a hypothesis, which is a trend line moving the
+  wrong way.
+
+### 2026-08-19 (rainbow) — the Python era
+
 - **Fixed this run (2026-08-19, rainbow):**
   1. **The mutation catalogue held 19 sites no test could ever kill, and they
      were 22% of one whole class.** White handed this over as an observation
