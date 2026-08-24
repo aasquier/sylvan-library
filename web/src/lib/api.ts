@@ -277,9 +277,9 @@ export interface DeckStats {
 }
 
 /** One turn of the Wheel of Fortune — a fate, and (usually) a card in the
- *  deck's colours that answers to it. `answered_by: "python"` is the wire's
- *  token for dice rather than judgment — seeded rolls over the pool, never a
- *  model. Clients key on the token; nothing ever renders it. */
+ *  deck's colours that answers to it. `answered_by: "dice"` is the wire's
+ *  token for chance rather than judgment — seeded rolls over the pool, never
+ *  a model. Clients key on the token; nothing ever renders it. */
 export interface WheelSpin {
   pool_available: boolean
   symbol: 'cup' | 'heart' | 'sword' | 'skull' | null

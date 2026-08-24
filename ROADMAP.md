@@ -12,10 +12,17 @@ library and its five artifacts, the gate, all three simulation tiers
 (goldfish, the Karsten/curve shelf, Forge), the Claude surfaces (seven
 modes behind the stance dial), the tarot table, auth and the Admin page,
 and both ledgers. The frontend is the committed `web_dist/` bundle. Decks
-live on the instance's volume, nowhere else (ADR 30). Six curated decks
-plus one empty draft; statuses are facts about volume files — check with
-`fly ssh console -C "mtglab decks validate <slug>"`, don't inherit them
-from prose.
+live on the instance's volume, nowhere else (ADR 30). The library's contents
+are data rather than documentation — ask it (`mtglab decks list`, then
+`decks validate <slug>`) rather than inheriting a count from prose.
+
+The machine is `shared-cpu-2x`/1GB — two shared cores since 2026-08-23, for
+about $0.70 a month more. It buys throughput rather than speed: a Tier 1 run
+is single-goroutine, so one sweep is no faster, but the CPU job lane is
+`GOMAXPROCS` wide and now runs two sims at once instead of one, and a request
+arriving mid-sim no longer queues behind it. `performance-1x` is the next real
+step, costs five times the whole bill, and is the one that would move a single
+sweep — it wants a measured wall time behind it, never a hunch.
 
 Performance headlines, measured 2026-08-23/24 on the dev Mac and the
 instance: pool refresh ~27 s end to end; Tier 1 (20k games) ~1.9 s a core
@@ -25,30 +32,28 @@ and concurrent across cores; boot to healthy ~4 s.
 
 In order:
 
-1. **A dedicated core for the app machine.** It runs `shared-cpu-1x`
-   today; the binary can use real cores (the jobs lane widens itself from
-   GOMAXPROCS). One `fly.toml` line; re-measure Tier 1 all-cores on the
-   instance after; the price conversation is Aaron's.
-2. **The owed walks** (commandment 16): the Claude sweep and the camera
+1. **The owed walks** (commandment 16): the Claude sweep and the camera
    door in a local browser with Aaron's eyes on them, then the full
    deployed walk-through.
-3. **The Simulator learns, continued**: deck ratings and land-count
+2. **The Simulator learns, continued**: deck ratings and land-count
    regression over the match ledger (ADR 36), then the Tier 2 question —
    adversarial simulation between decks — which starts as a design
    argument, not code.
-4. **Assisted refactor**: swap recommendations that argue from three
+3. **Assisted refactor**: swap recommendations that argue from three
    sources with three different epistemic statuses — the gate
    (reproducible), the simulator (seeded measurement), and Claude's slot
    argument (an opinion, ADR 25). The three problems to solve first are
    recorded in git history with the original design.
-5. **Open deck rulings**: two banned cards still need replacements chosen
+4. **Open deck rulings**: two banned cards still need replacements chosen
    (Goreclaw's is deliberate — the live invalid example stays). Deck facts
    are volume facts; verify before acting.
-6. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
+5. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
    (secret scanning, push protection), uptime watching, the wrong-painter
    credit (needs a pool schema change and a refresh), cache-write tokens
    (schema v11), the phone's touch targets, region-scoped motion (Syr
-   Gwyn's torch flame).
+   Gwyn's torch flame). Two more since the Go crossing: the measuring
+   shelf's rebuild, and the `deploy` job's `needs` list, which is an
+   invariant nothing checks any more.
 
 ## The longer arc
 

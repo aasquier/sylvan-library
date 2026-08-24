@@ -781,7 +781,7 @@ describe('when the surface is not available', () => {
 
   it('offers the door that always works', async () => {
     vi.mocked(api.claudeStatus).mockResolvedValue(
-      { ...CLAUDE_STATUS, installed: false } as never)
+      { ...CLAUDE_STATUS, configured: false } as never)
     open()
     fireEvent.click(await screen.findByRole('button', { name: /help me decide/i }))
 

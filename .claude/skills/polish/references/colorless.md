@@ -1,6 +1,6 @@
 # Colorless — The Artifacts
 
-One facet with four parts, and a single question underneath all of them:
+One facet with five parts, and a single question underneath all of them:
 **is the pass itself still working?**
 
 Colorless is the sixth run and it goes last, after White, Blue, Black, Red and
@@ -11,35 +11,36 @@ tooling, the ledger and this skill are exactly that. They serve every colour
 and no colour owns them, so without a run of their own they are the thing
 nobody ever sweeps.
 
-It is also the cheapest run in the cycle by a distance. Nothing here needs the
-live instance, a card pool or a network — it is reading, arithmetic, and one
-or two tool invocations — so a rainbow that has run long is still worth
-finishing.
+It is also the cheapest run in the cycle. Nothing here needs the live
+instance or a network — parts one through four are reading, arithmetic, and
+one or two tool invocations, and part five's comment sweep adds only local
+edits proved by the local gauntlet — so a rainbow that has run long is still
+worth finishing.
 
-## Part one — did last cycle's findings actually land?
+## Part one — is the ledger telling the truth?
 
 The ledger's whole claim is that the pass is cumulative. This is where that
-claim gets checked, and it is the part most likely to find something, because
-nothing else in the skill ever re-reads an old entry.
+claim gets checked — **not by emptying the queue, which is the cleanup step's
+job.** The division matters, because the two runs look alike from a distance:
+**cleanup asks "can this be landed?"; colorless asks "is this entry honest?"**
+Cleanup acts on the queue. Colorless audits it and leaves it.
 
-- Walk every **queued for Aaron** item, oldest first. For each: has Aaron
-  ruled? Did the ruling get acted on? Is the item still true — or has the code
-  moved under it, so the question no longer means what it meant? A queued
-  finding that has gone stale is worse than an open one, because it is
-  occupying the queue *and* misdescribing the tree. Re-word it, close it, or
-  say plainly that it is still waiting.
-- Walk every **deferred** item and check its **trigger**, which is the field
-  that makes deferral honest. A trigger that has arrived and gone unnoticed is
-  a finding. A deferred item with no trigger recorded at all is a bug in the
-  entry — give it one or promote it.
-- Walk the **fixes** each colour claimed. Spot-check two or three against the
-  tree: is the thing still fixed, and is the guard that holds it still there?
-  This is where a fix quietly reverted by a later merge shows up.
+- Walk every **deferred** item and check its **trigger**, the field that makes
+  deferral honest. A trigger that has arrived and gone unnoticed is a finding.
+  A deferred item with no trigger at all is a bug in the entry — give it one
+  or promote it to the queue.
+- Spot-check the **fixes** each colour claimed: two or three against the tree.
+  Is the thing still fixed, and is the guard that holds it still there? This
+  is where a fix quietly reverted by a later merge shows up, and nothing else
+  in the cycle looks.
+- Check that every waiting item appears in **both** places it must — the
+  ledger for its context, `DAYBREAK.md` for its one line. An entry in one and
+  not the other is the drift that makes a queue untrustworthy: waiting in the
+  ledger alone means nobody sees it, and a daybreak line with no ledger entry
+  means nobody can act on the yes.
 - **Corrections outrank overwrites.** When a later run finds an earlier entry
   wrong, the ledger records the correction beside the original rather than
-  editing it away — the Black section's 2026-08-19 entry is the model, keeping
-  two explicit corrections to its own earlier claims. If a run has silently
-  rewritten history, that is a finding.
+  editing it away. A run that silently rewrote history is a finding.
 
 ## Part two — is the checklist finding things, or reciting them?
 
@@ -74,10 +75,17 @@ run reports green, and the bugs are somewhere the file never looks.
 The developer shelf is artifacts in the plainest sense — and most of it is
 currently an absence: the bench suite, the mutation harness and the cache
 register retired with the old backend, and **rebuilding them over the Go
-packages is this part's standing item** until it lands. What survives today
-is `animist verify` in `tools/`. Nothing else in the cycle owns the shelf,
-and a measuring tool that has gone wrong is worse than no tool, because its
-numbers are believed.
+packages is this part's standing item** until it lands. What survives is
+`animist verify` in `tools/`, plus the stock Go toolchain that the other
+colors now measure with (SKILL.md's shelf section lists it). Nothing else in
+the cycle owns the shelf, and a measuring tool that has gone wrong is worse
+than no tool, because its numbers are believed.
+
+**A live question for the rebuild, every run: what would the Go shelf measure
+that the stock tools cannot?** If the honest answer keeps coming back "very
+little beyond a cache register and a benchmark ledger", that is a finding
+about the rebuild's *shape* — say so and re-scope it, rather than carrying a
+plan for a tool the toolchain made redundant.
 
 - **Run each one and read the output as evidence about the tool**, not only
   about the code:
@@ -93,10 +101,11 @@ numbers are believed.
   go unanswered until the shelf returns, and that gap is worth a ledger line
   each run so it cannot silently become permanent.
 
-- **A skipped row is the finding.** `bench` reports unavailable targets by
-  name for exactly this reason: a suite that quietly shrank still prints a
-  table. If a target that used to run now says `skipped`, find out why before
-  reading anything else on the page.
+- **A shrunken run still prints a table.** The retired bench named its
+  unavailable targets for exactly this reason, and the stock tools do not: `go
+  test` prints `no test files` in the same green column as a passing package,
+  and a benchmark filtered out by `-run` reports nothing at all rather than
+  reporting that it ran nothing. Count what ran before reading what it said.
 - **Check the tool against a bug it is supposed to catch.** The instruments
   here were each built from a specific failure, and the honest test is to
   reproduce that failure and watch the needle move. A tool nobody has
@@ -105,10 +114,13 @@ numbers are believed.
   seed and the rate. A rate that moved needs its cause named: new tests, new
   code, or a different draw. Survivors carried forward unread across two runs
   are a finding about the pass, not about the suite.
-- Ask what the shelf is still missing. The standing queued item is `mutmut` or
-  `cosmic-ray` for an exhaustive run over one module, where the in-repo
-  harness does sampling; anything else proposed here is a new dependency and
-  therefore queued with the arithmetic, never adopted in the run.
+- Ask what the shelf is still missing. Three standing items, all queued
+  because each is a dependency or a decision: an off-the-shelf Go mutator for
+  an exhaustive run over one package where the in-repo harness only samples;
+  `benchstat`, which is the difference between a benchmark delta and a
+  benchmark *finding*; and the cache register, whose absence means a cache
+  added today has nothing counting its hits. Anything else proposed here is a
+  new dependency too — queued with the arithmetic, never adopted mid-run.
 
 ## Part four — the leftovers
 
@@ -127,20 +139,83 @@ This is where they get a home.
   `converge` survey is staler than its date says. Write the honest ordering
   for the next bare `/polish` at the bottom of the ledger so the next session
   does not have to re-derive it.
-- **The relic sweep** (Aaron's ask, 2026-08-21, the night the laptop deck
-  copies were retired: "we still have a lot of old artifacts from early dev
-  cycles that don't seem to fit anymore"). Walk the tree for things whose
-  reason has moved out from under them: directories and files from an
-  earlier shape (`~/Downloads` deck markdown is the named example — kept
-  historical, never edited), template files that describe a workflow nobody
-  runs any more, docs sections narrating a phase that ended, CLI commands
-  and flags whose data or purpose has migrated (Green's hosted-first facet
-  owns the *capability* question; this sweep owns the *existence* question),
-  scripts and fixtures that outlived the thing they fixed. For each: name
-  it, say what shape it belonged to, and queue keep/retire for Aaron — a
-  relic is a decision, never a silent deletion. The test is Green's,
-  generalised: a thing earns its place by what the *current* shape needs
-  from it, not by having always been there.
+- **The relic sweep** (Aaron's ask, 2026-08-21, sharpened 2026-08-23: *make
+  the artifact search thorough*). The failure this exists to prevent is not
+  missing a relic — it is **sweeping by memory**, walking the parts of the
+  tree a session already has in context and calling that the tree. A relic
+  lives exactly where nobody looks, so the sweep has to be *enumerative*.
+
+  **Enumerate, then judge. Never the other way round.** Six passes, each one
+  a command whose output is a complete list, and each one finds a different
+  kind of leftover:
+
+  ```bash
+  git ls-files | sed 's#/[^/]*$##' | sort -u        # 1. every tracked directory
+  git ls-files | grep -vE '\.(go|ts|tsx|css|md|json|ya?ml)$'   # 2. odd file types
+  git log --diff-filter=A --name-only --since=... --format=  # 3. what arrived, by era
+  git ls-files -- '*.md' | xargs -n1 head -1        # 4. every doc, by its own title
+  ./mtglab --help  (and each subcommand's)          # 5. every command and flag
+  git ls-files | xargs -I{} sh -c 'grep -rL {} ...' # 6. files nothing references
+  ```
+
+  Pass 1 is the one that pays and the one always skipped: **read the whole
+  directory list out loud against the current architecture** and stop on any
+  directory you cannot immediately say the purpose of. Pass 5 is its
+  equivalent for behaviour — a CLI grows commands and never loses them, and
+  a flag whose data moved to the volume is a relic that still runs.
+
+  The kinds to expect, so none is dismissed as "probably fine": directories
+  from an earlier shape; template and fixture files describing a workflow
+  nobody runs; doc sections narrating a phase that ended; commands and flags
+  whose data or purpose migrated (Green's hosted-first facet owns the
+  *capability* question, this sweep owns the *existence* question); test
+  helpers for deleted subjects; ignore rules matching nothing; config keys
+  and environment variables nothing reads; dependencies nothing imports;
+  and **links pointing at paths that no longer exist** — the standing
+  example being an accepted ADR citing a directory a later sweep deleted,
+  which is unfixable in place because ADRs are immutable and is therefore
+  exactly the kind of thing that must be *found and raised* rather than
+  quietly tidied.
+
+  For each: name it, say what shape it belonged to, and queue keep/retire for
+  Aaron — **a relic is a decision, never a silent deletion.** The test is
+  Green's, generalised: a thing earns its place by what the *current* shape
+  needs from it, not by having always been there. Record in the ledger which
+  passes were actually run, because a sweep that ran two of six and reported
+  "nothing found" is the failure mode this whole entry exists to stop.
+
+## Part five — the comments are artifacts too
+
+The relic sweep at line granularity, and Aaron's standard for it is one
+sentence: **the only thing that should ever be in a comment is what helps
+Claude develop the code** — the primary-developer frame in SKILL.md. This
+repo deliberately writes comments that carry an argument, and that rule is
+not in question; what creeps in beside the argument is *residue of the
+making* — the date somebody noticed, the punch list it came off, the PR that
+fixed it, the sentence it used to say. Measured 2026-08-23 from a standing
+start: **88 dated comments in Go (60 outside tests) and 101 more under
+`web/src`.**
+
+The line, and it is sharp:
+
+- **Keep** what serves discovery of the code itself: the invariant, the trap,
+  the thing that looks wrong and is not, the reason the obvious alternative
+  was rejected. *"Anchored, because a bare pattern also matches the embedded
+  data directories"* is doing work forever.
+- **Cut** everything that serves history: when it happened, who found it,
+  which run fixed it, what it used to say — unless the old shape is one a
+  reader would otherwise reintroduce, and then one clause is the whole
+  budget.
+- **A date stays only when the date is the fact**: an expiry, a version
+  floor, a pricing cutover, a deprecation window.
+
+The test for every comment: **would a fresh Claude session, reading only the
+code, act differently for having read this sentence?** If no, it goes; if
+yes, it stays whatever its style. Convert rather than delete when a real
+point is buried in narration — the point survives, the diary does not. Sweep
+a bounded slice each run (a package, or one route family) and record in the
+ledger which slices are done, so the sweep finishes over cycles instead of
+restarting every one.
 
 ## What this run never does
 
@@ -148,7 +223,10 @@ This is where they get a home.
   it records it in that colour's section as a finding for that colour's next
   run — this run's diff belongs to the skill, the ledger and the tooling.
   A colourless run that starts fixing product code has stopped being
-  colourless.
+  colourless. **One carve-out, Aaron's: comment-only diffs are this run's to
+  make.** A comment is not product behaviour — the binary and the committed
+  bundle come out byte-identical — so part five's sweep breaks no rule about
+  touching product code, and the gauntlet still runs to prove exactly that.
 - It does not open a PR for the ledger alone. Same rule as every other run:
   a doc change rides the branch that does the work. If the only output is
   ledger text and skill edits, that *is* the work and the PR is legitimate —

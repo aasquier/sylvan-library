@@ -1,11 +1,11 @@
 # Blue — Craft & Knowledge
 
-Four facets: Go best practices (plus the tools/ toolbox's Python),
-TypeScript/React best practices, the Claude-first documentation and memory
-audit, and the spirit of Magic. Blue is
-the color of perfected craft and of knowing things — including knowing
-yourself, which is what the third facet is, and knowing the game whose name
-is on the door, which is the fourth.
+Four facets: Go craft (plus the animist toolbox in `tools/`),
+TypeScript/React craft, the Claude-first documentation and memory audit, and
+the spirit of Magic. Blue is the color of perfected craft and of knowing
+things: knowing the language well enough to write this year's Go rather than
+the Go with the most text behind it, knowing yourself (the third facet), and
+knowing the game whose name is on the door (the fourth).
 
 ## Facet: Go craft
 
@@ -33,12 +33,79 @@ have fallen behind.
 - Platform-tagged files are only type-checked where they build — CI's lint
   is the first reader of a `_linux.go` file, so treat a green local lint as
   a partial answer on this Mac.
-- The tools/ toolbox keeps its own Python gates (`ruff check .`, `mypy`,
-  `pytest`, strict, from `tools/`); ADR 24's no-autoformatter call still
-  binds there, and the revisit trigger is still a second human contributor.
+- **`t.Parallel()` belongs to White's testing facet, but its *cause* is often
+  here**: a test that cannot run in parallel is usually a subject reaching for
+  process-wide state — the environment, the working directory, a package-level
+  variable. When White reports a test left serial, ask whether the design is
+  what is serial.
+- The `tools/` toolbox is the one thing here that is not Go, and it keeps its
+  own gates (`ruff check .`, `mypy`, `pytest`, strict, all from `tools/`). It
+  is the animist and cardmotion media pipelines only — dev-machine tooling
+  that never ships and never serves — so a proposal to grow it is a proposal
+  to grow the one non-Go surface, and belongs in the queue. ADR 24's
+  no-autoformatter call still binds there, and its revisit trigger is still a
+  second human contributor.
 - Performance-adjacent craft belongs to Black; here the question is
   readability, naming, and structure. A function that needs a comment to
   parse is a finding; so is a comment restating its line.
+
+### The modern-Go sweep, and why it is a standing item
+
+**Assume your Go is out of date.** A model's sense of idiomatic Go is
+weighted toward the years with the most text in them, which is the years
+before generics — so the *default* suggestion skews old, and it skews old in
+a way that reads fine and passes review. This facet is where that gets
+corrected on purpose, every run, rather than left to whichever session
+happens to notice.
+
+Two habits, and the first is the one that keeps this alive:
+
+- **Audit the toolchain's release notes, not your memory.** Read the notes
+  for every Go release since the version recorded in the ledger, and write
+  the version you audited *to* in the ledger. New library packages,
+  deprecations, `go vet` checks and language changes each get one question:
+  *does this tree contain the thing it replaces?* This is the same shape as
+  the Anthropic-currency bullet below, for the same reason — the platform
+  moves and prose does not.
+- **Grep for the old spelling, not for the new one.** The tree cannot tell
+  you what it is missing; it can tell you what it still has. A sweep is a
+  list of *outgoing* forms, and this one starts from a real inventory taken
+  2026-08-23: `interface{}` 0, `ioutil` 0, `rand.Seed` 0, `strings.Title` 0
+  — this tree is already clean of the classic tells — against
+  **`sort.Slice` 18**, which is the live one.
+
+The sweep list, roughly by how much the replacement buys:
+
+| Still in the tree | The modern spelling | Note |
+|---|---|---|
+| `sort.Slice` / `sort.SliceStable` | `slices.SortFunc` / `slices.SortStableFunc` | **Not a free swap here** — see the warning below |
+| hand-rolled contains/index loops | `slices.Contains`, `slices.Index`, `maps.Keys` | plainer, and harder to get wrong |
+| `interface{}` | `any` | |
+| a `for` loop counting to n | `for range n` | |
+| a loop variable copied into the body | nothing — per-iteration since 1.22 | delete the copy, keep the comment if it explains *why it used to be there* |
+| `errors.Is` chains built by hand | `errors.Join`, `%w` | |
+| a mutex guarding a read-mostly map | `sync.RWMutex`, or `atomic.Pointer` for swap-whole | **0 `RWMutex` against 15 `sync.Mutex`** — worth one honest look, not a blanket conversion |
+| `var wg sync.WaitGroup` + `wg.Add(1)` + `go func(){defer wg.Done()…}` | `wg.Go(func(){…})` | one line, and it cannot leak an `Add`/`Done` mismatch |
+| a `WaitGroup` plus a shared error variable | `errgroup.Group` | **already available**: `golang.org/x/sync` is an indirect dependency, so this costs no new module — only promoting it to direct |
+| `time.Sleep` in a concurrency test | `testing/synctest` | fake clock; the flake goes away rather than getting a longer sleep |
+
+**Two warnings, both load-bearing here:**
+
+- **A sort swap can move ties, and ties are what the goldens record.** This
+  repo's `testdata/` corpora are frozen, and `sort.Slice` is unstable exactly
+  like `slices.SortFunc`, so an "identical" swap can still reorder equal
+  elements under a different algorithm. Convert one call site, run the
+  package, and if a golden moves the conversion is **wrong** — not the
+  golden. Prefer the `Stable` form anywhere the output is recorded.
+- **Concurrency is not free and this app is not starved for it.** Adding a
+  goroutine to something already fast buys nothing and costs a race surface.
+  The question is never "could this be concurrent" but "what is waiting" —
+  and if the answer is a profile Black has not taken yet, the finding belongs
+  to Black. What belongs *here* is the shape: a goroutine with no way to
+  report its error, a `context` that is accepted and never checked, a
+  goroutine whose lifetime is longer than the request that started it, a
+  channel where a mutex would read plainer. **Every new goroutine gets a
+  race-detected test** — `go test -race -count=2` — or it is not a safe fix.
 
 ## Facet: TypeScript / React craft
 
@@ -112,6 +179,17 @@ files against them.
 - **Doc changes ride the run's branch** — this facet is the one place a
   mostly-doc PR is legitimate, because the corrections are the work. Still
   batch them; still never open a PR for one paragraph.
+- **The comment standard, held at review time.** A comment's only audience is
+  a future Claude session and its only job is discovery of the code itself
+  (the primary-developer frame in SKILL.md): the invariant, the trap, what
+  would break, why the obvious alternative loses. Dates, development process,
+  who found what when — git and the ledger hold history; comments hold
+  discovery. The one date that stays is a date that *is* the fact: an expiry,
+  a version floor, a cutover. This facet holds that bar on every line of code
+  it reviews and every line a fix writes; **the sweep of the existing stock
+  belongs to Colorless** (part five of its reference), where the artifact
+  pass owns relics at every granularity — one owner per job, which is that
+  file's own rule.
 - **Scrub context that has stopped earning its tokens** (Aaron's ask,
   2026-08-16). These files are read by Claude at the top of every session,
   so their length is a per-session cost and their clarity is a correctness
@@ -213,6 +291,26 @@ Where the easy wins live, roughly in order of cost:
   can carry its painter's name; a colour pair can carry its guild. These are
   the cheapest wins of all, because the sentence is already written and
   checked in — it is only not being shown.
+
+Two standing checks before the shortlist, both commandment-owned:
+
+- **The shelves must be true (commandment 3).** `internal/reference`'s prose
+  — colors, glossary, lore, tarot lore — is hand-written, checked in, and
+  read by exactly the audience that will catch an error in it: Magic nerds.
+  Each run, fact-check a sample of entries against the pool and the game's
+  actual history (rule 1 binds — look facts up, never recall them), and read
+  the dropped-name counter: a card name a shelf cites that the pool cannot
+  resolve is being silently dropped *and counted*, and a count nobody reads
+  is a silence. A wrong date, a wrong painter, a wrong ruling in the lore is
+  a worse flavour failure than any plain-English button, because it teaches a
+  newcomer something false about the game.
+- **Visit the fortune-teller's table (commandment 15).** Once per spirit run,
+  open the tarot room on the live instance and ask the commandment's own
+  question: is it still the belle of the ball — the realest art, the richest
+  motion, the most care on the site? Effort rations there *last*, so if this
+  run's enrichment shortlist has one item in it, it goes there; and if the
+  room has slipped behind a newer page anywhere else, that is a finding even
+  though nothing is broken.
 
 Three bounds, all of them hard:
 

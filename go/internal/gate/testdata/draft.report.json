@@ -9,7 +9,7 @@
   {
    "level": "warn",
    "code": "unknown-theme",
-   "message": "theme 'not-a-theme' is not in the vocabulary; the list grows by editing THEMES in decks/model.py",
+   "message": "theme 'not-a-theme' is not in the vocabulary, so no filter will find this deck by it; the deck page's labels editor sets themes from the curated list",
    "card": null
   },
   {
@@ -35,7 +35,7 @@
   {
    "level": "warn",
    "code": "unknown-theme",
-   "message": "theme 'not-a-theme' is not in the vocabulary; the list grows by editing THEMES in decks/model.py",
+   "message": "theme 'not-a-theme' is not in the vocabulary, so no filter will find this deck by it; the deck page's labels editor sets themes from the curated list",
    "card": null
   },
   {

@@ -80,8 +80,8 @@ func deckFieldValue(field string, value any) (any, error) {
 			}
 			if !reference.IsTheme(theme) {
 				return nil, failf("%s is not in the theme vocabulary; the list "+
-					"grows by editing THEMES in decks/model.py, never by typo. "+
-					"Known themes: %s", quotedValue(theme),
+					"is a curated shelf, and a typo would file this deck where "+
+					"no filter looks. Known themes: %s", quotedValue(theme),
 					strings.Join(reference.Themes().Themes, ", "))
 			}
 			if !slices.Contains(themes, theme) {

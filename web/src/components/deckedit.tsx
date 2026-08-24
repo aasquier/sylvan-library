@@ -136,7 +136,7 @@ function InterviewPanel({ deck, card, askNow = false }: {
 
   if (!status) return null
   if (!status.installed || !status.configured) {
-    return <ClaudeUnavailable installed={status.installed} />
+    return <ClaudeUnavailable />
   }
 
   return (
@@ -213,25 +213,23 @@ const STRENGTH_COLOUR: Record<string, string> = {
 }
 
 /**
- * The two unavailable states, kept apart — collapsing them tells somebody
- * their key is missing when they simply have not installed the extra. The
- * first sentence is for anybody; the `code` line is for whoever runs the
- * server, which on a laptop is the same person.
+ * The one unavailable state there is: a server with no key.
+ *
+ * There used to be a second — Claude not present at all — and it was
+ * unreachable, because the client is linked into the binary and the dial's
+ * `installed` is a constant (`TestInstalledIsAConstantBecauseTheSDKIsLinkedIn`
+ * holds it). An arm nobody can reach is copy nobody proofreads, and this one
+ * had gone false: it told the reader to run an installer this server has no
+ * use for. The first sentence is for anybody; the `code` line is for whoever
+ * runs the server, which on a laptop is the same person.
  */
-function ClaudeUnavailable({ installed, className = '' }: {
-  installed: boolean
-  className?: string
-}) {
+function ClaudeUnavailable({ className = '' }: { className?: string }) {
   return (
     <p className={`border-t pt-2 ${className}`}
        style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
-      {installed
-        ? 'Claude is installed here but has no key to call with.'
-        : 'Claude isn’t available on this server.'}
+      Claude is here but has no key to call with.
       <span className="mt-0.5 block text-[10px]">
-        {installed
-          ? <>Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.</>
-          : <><code>pip install -e &quot;.[claude]&quot;</code> adds it.</>}
+        Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.
       </span>
     </p>
   )
@@ -310,7 +308,7 @@ export function SlotArgumentPanel({ deck, card, onClose, writable = false, onSwa
 
   if (!status) return null
   if (!status.installed || !status.configured) {
-    return <ClaudeUnavailable installed={status.installed} className="mt-2" />
+    return <ClaudeUnavailable className="mt-2" />
   }
 
   return (
