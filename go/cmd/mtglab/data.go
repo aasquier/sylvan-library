@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
@@ -17,8 +19,33 @@ func dataCommand() *cobra.Command {
 		Use:   "data",
 		Short: "Fetch and load the card pool",
 	}
-	cmd.AddCommand(dataRefreshCommand(), dataSnapshotCommand())
+	cmd.AddCommand(dataRefreshCommand(), dataSnapshotCommand(), dataBackupCommand())
 	return cmd
+}
+
+// dataBackupCommand is `mtglab data backup`: the runbook's online copy of
+// `app.db`, safe while the app serves. The destination must not exist; the
+// procedure pulls the copy off the box and removes it, because a backup of
+// password hashes should not sit on the volume indefinitely.
+func dataBackupCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "backup <destination>",
+		Short: "Write a consistent copy of app.db, safe while the app runs",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			version, err := auth.Backup(cmd.Context(), config.AppDBPath(), args[0])
+			if err != nil {
+				return err
+			}
+			info, err := os.Stat(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Printf("wrote %s (schema version %d, %s bytes)\n",
+				args[0], version, commas(info.Size()))
+			return nil
+		},
+	}
 }
 
 func dataRefreshCommand() *cobra.Command {
@@ -91,7 +118,7 @@ func dataSnapshotCommand() *cobra.Command {
 	}
 }
 
-// commas renders n with thousands separators, as Python's `{n:,}` does.
+// commas renders n with thousands separators: 34,512.
 func commas(n int64) string {
 	s := fmt.Sprintf("%d", n)
 	if len(s) <= 3 {

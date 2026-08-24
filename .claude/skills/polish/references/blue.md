@@ -1,41 +1,43 @@
 # Blue — Craft & Knowledge
 
-Four facets: Python best practices, TypeScript/React best practices, the
-Claude-first documentation and memory audit, and the spirit of Magic. Blue is
+Four facets: Go best practices (plus the tools/ toolbox's Python),
+TypeScript/React best practices, the Claude-first documentation and memory
+audit, and the spirit of Magic. Blue is
 the color of perfected craft and of knowing things — including knowing
 yourself, which is what the third facet is, and knowing the game whose name
 is on the door, which is the fourth.
 
-## Facet: Python craft
+## Facet: Go craft
 
-The backend's standards are already codified; the audit is whether the tree
-still meets them and whether the standards themselves have fallen behind.
+The backend's standards are the gates plus a handful of repo rules; the
+audit is whether the tree still meets them and whether the rules themselves
+have fallen behind.
 
-- Strict mypy's exception list (`pyproject.toml`) is meant to shrink:
-  **`cli.py` is all that remains** (`cards/db.py` graduated 2026-08-16).
-  Chipping a module off that list is a classic safe fix — measure the error
-  count first and queue it if it is a rewrite rather than annotations. Measure
-  by *removing the override block and re-running*, not by estimating: the
-  recorded count can be years stale, and `cli.py`'s had grown 79 → 109.
-- Ruff's excluded groups were excluded on *measured* cost. Re-measure
-  occasionally — a group whose count has collapsed is now nearly free to
-  adopt. **Measure `src` and `tests` separately**: as of 2026-08-16 ARG, PT and
-  SLF are ~100% test-side (16/604, 0/112, 0/67), so the headline number badly
-  overstates what adopting them would cost `src`. Current totals are in the
-  ledger; update them there so the next run knows.
-- ADR 24 decided **no autoformatter** — do not propose black/ruff-format
-  again; the revisit trigger is a second human contributor.
-- The layering rules are checkable: `api/` never imports `cli.py`; DuckDB
-  stays behind `cards/db.py`; `mana.py` and `sim/` stay stdlib+numpy;
-  optional extras are lazy-imported inside functions (the `claude`,
-  `animist`, dotenv pattern). Grep, don't trust.
-- Idiom sweep, judged surgically: dataclasses/Protocols where dicts have
-  grown fields, `pathlib` throughout (PTH is enforced), timezone-aware
-  datetimes (DTZ), no bare `except` (BLE). New code follows
-  `requires-python >= 3.11` — the floor, not the local 3.12; a 3.12-only
-  construct in `src/` is a bug.
+- The gates are the floor, not the audit: `go vet ./...`,
+  `go test -race ./...`, `golangci-lint run ./...`, `gofmt -l .` printing
+  nothing (all from `go/`, CGO on — the linter cannot typecheck
+  `internal/pool` without it). The audit is what they cannot see.
+- **Package comments carry the argument** — a package whose doc comment
+  merely names its contents is a finding; the standard is the determinism
+  kernels' docs (`internal/mt19937`, `internal/floats`), which say what
+  would break and why the code is shaped as it is.
+- The layering is checkable: `internal/door` owns HTTP concerns and auth
+  sweeps; `internal/api` never reaches around the door; DuckDB stays behind
+  `internal/pool`; the determinism kernels import nothing above them. Grep,
+  don't trust.
+- **The corpora under `testdata/` are frozen goldens** — a diff touching one
+  is a finding in itself, whatever the tests say.
+- Exact-arithmetic discipline: served float sums go through `floats.Fsum`,
+  FMA-sensitive expressions through `floats.Rounded`; a bare `+=` over
+  served floats beside either is a bug (the package doc says why).
+- Platform-tagged files are only type-checked where they build — CI's lint
+  is the first reader of a `_linux.go` file, so treat a green local lint as
+  a partial answer on this Mac.
+- The tools/ toolbox keeps its own Python gates (`ruff check .`, `mypy`,
+  `pytest`, strict, from `tools/`); ADR 24's no-autoformatter call still
+  binds there, and the revisit trigger is still a second human contributor.
 - Performance-adjacent craft belongs to Black; here the question is
-  readability, typing, and structure. A function that needs a comment to
+  readability, naming, and structure. A function that needs a comment to
   parse is a finding; so is a comment restating its line.
 
 ## Facet: TypeScript / React craft
@@ -44,7 +46,7 @@ still meets them and whether the standards themselves have fallen behind.
   `--deny-warnings`, Vitest). The audit is what the gauntlet *cannot* see:
   - **No regex lookbehind anywhere under `web/src`** — it is a SyntaxError at
     parse time below the Safari 16.4 floor, which takes the whole module with
-    it rather than degrading. `tests/test_browser_floor.py` checks the
+    it rather than degrading. The bundle-floor check in CI covers the
     *bundle*, which is the half a grep of `web/src` cannot reach; the grep is
     still worth running on new source, remembering that `(?<name>…)` is a
     named capture group and not the hazard.
@@ -159,14 +161,14 @@ the talking, or has conversational English taken its place?*
 - **"Within reason" is a real boundary, and commandment 2 draws it.** A term
   qualifies only if a newcomer can still act on the sentence — flavour that
   obscures what a control does is a regression wearing a costume. The glossary
-  (`glossary.py`) is what squares the two commandments: a Magic term the UI
+  (`internal/reference`'s served table) is what squares the two commandments: a Magic term the UI
   teaches on hover is beginner-safe in a way a bare one is not, so "use the
   term *and* glossary it" beats both the plain word and the unexplained term.
   A flavour fix that needs a new glossary entry is still a safe fix; the entry
   rides along.
 - **Some words are load-bearing; renaming them is not a safe fix.** Wire
-  tokens, `glossary.py` keys (`SIMULATOR_KEYS` pins them), YAML fields and CLI
-  verbs are API. The pattern is flavouring the *rendered label* over an
+  tokens, the served glossary's keys (the Simulator pins the ones it needs),
+  YAML fields and CLI verbs are API. The pattern is flavouring the *rendered label* over an
   unchanged token — `lib/claudecopy.ts` is exactly that seam — and renaming
   the token underneath is a queued item. Commandment 10 still governs: a
   flavourful sentence that names a seed, model or database has made things
@@ -183,8 +185,8 @@ the surgical cap binds it hardest.
 Where the easy wins live, roughly in order of cost:
 
 - **A bare number or word that has a symbol.** Mana costs, colour identity,
-  card types and rarities all have official marks (`symbols.py`, with
-  `managlyphs.ts` as the offline fallback). Anywhere identity renders as the
+  card types and rarities all have official marks (the app draws its own —
+  `managlyphs.ts` and the SVG set beside it). Anywhere identity renders as the
   letters `WUBRG`, a coloured dot, or the word "green", the pip is the Magic
   way to say it. Sweep for `color_identity`, `mana_cost` and `type_line` in
   `web/src` and look at what each one draws.
@@ -196,8 +198,9 @@ Where the easy wins live, roughly in order of cost:
 - **A card that could speak for itself.** Oracle text and flavour text are
   already in the pool, free, licensed to render, and better written than
   anything a checklist will produce. An empty state, a loading line or a
-  section header can carry a real card's words — `lore.py`, `colors.py` and
-  `tarotlore.py` are the checked-in prose shelves, and rule 1 still binds:
+  section header can carry a real card's words — `internal/reference` holds
+  the checked-in prose shelves (colors, glossary, lore, tarot lore), and
+  rule 1 still binds:
   **card facts come from the pool, never from recall.** A flavour line quoted
   from memory is exactly the error the first non-negotiable exists to stop,
   and it is worse here because it will be *rendered*.

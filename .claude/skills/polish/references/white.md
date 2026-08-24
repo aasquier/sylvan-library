@@ -41,10 +41,10 @@ Work the list:
 - No monetization surface exists, even vestigially: no payment code, no
   donation links, no ad slots, nothing that takes a penny. Check the frontend
   too — a well-meaning "buy me a coffee" is a violation here.
-- Dependency licences: sweep Python (`pip install pip-licenses` is a new dev
-  dep — so do it with a throwaway venv or by reading metadata) and
-  `npm --prefix web ls` trees for licences incompatible with a free public
-  project (AGPL in a dependency is a finding to queue, not necessarily fatal
+- Dependency licences: sweep the Go module graph (`go-licenses report ./...`
+  from `go/`, installed on demand), the tools/ toolbox's Python metadata,
+  and `npm --prefix web ls` trees for licences incompatible with a free
+  public project (AGPL in a dependency is a finding to queue, not necessarily fatal
   — Aaron rules). Record the sweep date in the ledger.
 - Fonts, CSS, and anything served: each has a named free licence. If the
   provenance argument lives nowhere, that is the finding.
@@ -55,7 +55,7 @@ The design intent: isolation is the first thought. Anyone keeping cards
 private on this site must actually have them private — from other users and
 from accidents, not just from attackers.
 
-- Every route is classified in `tests/test_isolation.py`, and the sweep is
+- Every route is classified by the door's own sweep tests (derived from the served route table), and the sweep is
   live: try adding a fake unclassified route locally and confirm the suite
   fails (then remove it). The middleware refuses before routing — verify any
   new prefix landed in the right list.
@@ -64,7 +64,7 @@ from accidents, not just from attackers.
   owner-only (ADR 22, #80). Check any route added since the last run against
   all three.
 - Email addresses: `User.as_dict()` omits the address unless asked; exactly
-  two callers may ask (`mtglab users list`, `api/admin.py`). Grep for new
+  two callers may ask (`mtglab users list`, the admin routes). Grep for new
   serialisation paths, log lines, or tool results that could carry one.
 - Session hygiene: cookie flags (HttpOnly, Secure, SameSite), Argon2id
   parameters against current OWASP guidance, rate limiting on login/reset
@@ -79,8 +79,8 @@ from accidents, not just from attackers.
 - Supply chain and static analysis: read the latest CodeQL and
   dependency-review results rather than assuming green means examined; note
   anything dismissed and why.
-- SQL: everything through parameterized queries in `auth/db.py` and
-  `cards/db.py`; string-built SQL anywhere is a finding.
+- SQL: everything through parameterized queries behind `internal/auth` and
+  `internal/pool`; string-built SQL anywhere is a finding.
 
 ### Fixing a security finding — the hard-won protocol
 
@@ -120,100 +120,46 @@ The 95% floor exists to make regressions loud, but Aaron's bar is the *right*
 tests, not coverage tests — and a suite that stays fast enough that adding
 tests never feels expensive.
 
-- **Check the environment before believing the run.** Compare the local test
-  count against CI's, and `pytest -ra` against CI's pinned skip count — a
-  passing suite that ran *fewer tests than CI* is the failure mode this facet
-  exists for, and it reads exactly like success. It happened: the `dev` extra
-  was missing fastapi, so `pip install -e ".[dev]"` (what CLAUDE.md documents)
-  ran 1444 tests where CI ran 1918, silently skipping the entire HTTP layer
-  including `test_isolation.py`. `tests/test_packaging.py` now pins it, but the
-  general rule stands — a green local suite is evidence only once you know it
-  is the same suite.
-- **Once per cycle, install the documented setup from a clean checkout.** The
-  gap above was found by accident: a run happened to execute in a fresh
-  worktree, and a fresh worktree is a fresh checkout. Nothing reproduces that
-  signal on purpose any more — the serial rainbow runs colors in the main tree,
-  where `.venv` already holds everything ever installed into it, so the
-  documented instructions and the working environment can drift apart
-  indefinitely without anyone standing where a new contributor stands. So stand
-  there deliberately: `git worktree add` to a scratch path, follow CLAUDE.md's
-  Setup block *verbatim* — no extras nobody wrote down — and check the test
-  count, the skip count and `mypy` against CI's. `tests/test_packaging.py` pins
-  the one gap already found; this is what finds the next one, which by
-  definition is not that gap.
-- Measure first: `pytest -q --durations=25`. Record total wall time and the
-  slow tail in the ledger. A test that got slower has a reason; find it.
-- Hunt duplicated setup: fixtures and helpers belong in `tests/tiny_pool.py`,
-  `conftest.py`, and friends — three tests hand-rolling the same scaffolding
-  is a finding. But keep the repo's rule: `tiny_pool` is imported bare-name,
-  and helpers stay import-safe.
-- The skip gate is pinned at 2 (`needs_full_pool`), and `-ra` prints every
-  skip. Any drift in the skip count is a finding even when CI is green.
-- Measure the suite with the tool rather than by feel: `pytest -q
-  --durations=25` for the slow tail, and `mtglab bench run` for anything the
-  suite exercises that a *user* also waits on — a test that got slower and an
-  endpoint that got slower are the same regression seen twice.
-- Parallelism (`pytest-xdist`) is a new dev dependency → **queued, not
-  applied**. What a run *can* do: measure whether the suite is
-  parallel-safe (shared `data/` state, `config.use_paths` discipline) so the
-  queued item carries evidence.
+- **Check the environment before believing the run.** Compare the local
+  test count against CI's — a passing suite that ran *fewer tests than CI*
+  is the failure mode this facet exists for, and it reads exactly like
+  success. It has happened: a missing extra once silently skipped the
+  entire HTTP layer, isolation sweep included. A green local suite is
+  evidence only once you know it is the same suite; on this Mac that also
+  means the three exports (toolchain PATH+GOROOT, the CGO ldflag) are set,
+  because without CGO the linter silently typechecks less.
+- **Once per cycle, follow the documented setup from a clean checkout.**
+  `git worktree add` to a scratch path, follow CLAUDE.md's Setup block
+  *verbatim* — no extras nobody wrote down — and compare the test count
+  with CI's. The documented instructions and the working environment drift
+  apart indefinitely unless someone deliberately stands where a new
+  contributor stands.
+- Measure first: `go test -count=1 ./... 2>&1 | tail` for wall time, and
+  `go test -json` piped through a duration sort for the slow tail. Record
+  both in the ledger. A test that got slower has a reason; find it.
+- Hunt duplicated setup: fixtures and helpers belong in the shared test
+  helpers (`internal/pool/pooltest`, `internal/auth`'s authtest fixtures) —
+  three tests hand-rolling the same scaffolding is a finding.
+- Skips are a budget, not a convenience: every `t.Skip` in the tree is
+  conditional on a real absence (a live instance, a Forge install, a full
+  pool), and a drift in the skip census is a finding even when CI is green.
 - No test sends mail, spends a token, or touches the network — confirm the
-  seams (`EmailSender`, faked `Turn`, faked `subprocess`) still hold for
-  anything added since last run.
+  seams (the mail sender, faked Claude turns, faked subprocesses) still
+  hold for anything added since last run.
 - Verify new guard tests by mutation, not by greenness: a test written to
   hold a boundary gets the boundary broken locally once to prove it fires
   (the conftest-hides-the-deployed-branch lesson).
-- **Mutation sampling, every run of this facet** (Aaron's ask, 2026-08-16;
-  tooled 2026-08-19). The bullet above checks tests you just wrote; this one
-  checks the suite nobody is watching. It is no longer a hand protocol:
-
-  ```bash
-  mtglab mutate list                        # every site, and its defenders
-  mtglab mutate run --sample 12 --seed 0    # a reproducible draw
-  mtglab mutate run --sample 6 --full       # judged by the whole suite
-  mtglab mutate run --only decks/analyze.py:33   # is that survivor still alive?
-  ```
-
-  **Read the catalogue's size off `mutate list`, not off this file** — it was
-  1,231 across 16 modules when the harness landed and 1,260 across 18 by the
-  end of the same week, and a number written here is a number that drifts.
-
-  Every mutation is applied to a **throwaway copy** of the package and pytest
-  is pointed at the copy, so the working tree cannot be reached at all — the
-  hand version edited the real file and restored it, and an interrupted run
-  left a mutation in the tree with `git status` as the only thing between that
-  and a commit.
-
-  Four things to hold on to when reading the output. **Record the seed** —
-  a kill rate nobody can reproduce is a number that can only be quoted, and
-  the ledger wants a figure that trends. **A survivor is a question, not a
-  verdict**: some mutations are semantically equivalent and no test could ever
-  kill them, and telling those apart is reading work the tool does not do.
-  And **note what ran**: by default each mutation is judged by the test files
-  mapped to its module in `mutate/harness.py`, so a survivor of six files is a
-  weaker claim than a survivor of `--full`. A module with no mapping is a
-  finding of its own — add it there, and `tests/test_mutate.py` fails if a
-  mapping names a file that does not exist.
-
-  Fourth, and it is the one this facet kept skipping: **re-run the survivors
-  the last run recorded, by name.** A fresh seeded draw of 25 from 1,260 sites
-  will not revisit them, so a survivor left "worth a look next White run" is
-  worth a look forever — `decks/analyze.py:33` and `decks/companion.py:139`
-  sat that way for two runs and both are still alive. `--only` is that
-  question asked directly, it costs a second a site, and a pattern matching
-  nothing raises rather than reporting a flawless rate over no mutants.
-
-  `mutmut`/`cosmic-ray` stay **queued** as the escalation for an exhaustive
-  run over one module; the harness covers the routine sampling, and the
-  comparison is in the ledger.
+- **Mutation sampling is suspended, not retired as a practice** (Aaron's
+  standing ask, 2026-08-16): the harness died with the old backend and its
+  Go rebuild is the ledger's open item. Until it lands, this facet's
+  sampling is the hand protocol on a *throwaway copy* of a package — never
+  the working tree — and the survivors the old ledger recorded stay listed
+  there so the rebuilt tool can re-ask them by name on its first run.
 - After the suite, **`git status data/` proves nothing** — `app.db` is
-  gitignored, so a test that writes the developer's real database leaves the
-  status clean. That check was in this file for one run and was blind the whole
-  time; it missed a test that was creating `data/app.db` on every run. Use
-  `ls -la data/` instead, and trust `conftest.py`'s `_real_app_db_untouched`,
-  which now fails any test that creates or writes the real file. If that
-  fixture is ever the thing that turns red, the test named in the failure is
-  reaching past its scratch directory — do not "fix" it by relaxing the guard.
+  gitignored, so a test that writes the developer's real database leaves
+  the status clean. Use `ls -la data/` and treat a fresh mtime on
+  `data/app.db` as the finding; a test reaching past its scratch directory
+  gets fixed, never accommodated.
 - Coverage: read the report for *meaningless* coverage too — a module at 100%
   through tests that assert nothing is worse than an honest gap, because it
   reads as done.
