@@ -1,17 +1,17 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Go or TypeScript/React best practices (or the animist media toolbox under tools/), testing (including mutation testing and t.Parallel discipline), performance and profiling, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), the quality of the controls themselves (dull buttons, missing hover/focus/press states, actions that never disable), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Runs at night by default while Aaron sleeps, leaving anything it cannot settle alone in the daybreak queue (docs/polish/DAYBREAK.md) for the morning; also triggers on 'run the night pass', 'what is in the daybreak queue', and on asking what the overnight run found. Also covers hosted-first alignment (anything the deployed product needs that exists only as a local CLI or laptop workflow), the relic audit (early-dev leftovers — files, docs, commands — that no longer fit the current shape), and the measuring shelf (benchmarks, profiling, cache hit rates — the Go rebuild is an open item). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' (the artifacts pass over the skill, the ledger and the dev tooling), on 'polish cleanup' (the end phase that lands the stragglers every color queued), on 'polish converge' or 'polish all' (all five colors merged into one report), on 'polish rainbow' (all seven as separate runs, one at a time), on 'run the polish pass', on asking what polish findings are still outstanding or waiting on a ruling, and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears."
+description: "The recurring, ledger-driven quality pass over the sylvan-library repo and its infrastructure, organised as the five colors of Magic plus colorless and a cleanup step. It runs at night while Aaron sleeps: independent, improvements only, and anything it cannot settle alone goes to the daybreak queue (docs/polish/DAYBREAK.md) for the morning. Covers Go craft and the modern-Go sweep (concurrency, goroutines, errgroup, RWMutex, stale pre-generics idioms); TypeScript/React craft; controls and UI/UX quality (dull buttons, missing hover/focus/press states, actions that never disable, links doing a toggle's job); testing discipline, suite speed, t.Parallel and mutation testing; performance, profiling and benchmarks; security and user isolation; licensing and free-use compliance; Claude API spend; CI/CD and alerting; cloud resources, infrastructure cost and upgrades; browser and mobile compatibility; scalability; hosted-first alignment (anything the product needs that exists only on a laptop); the relic audit of early-dev leftovers; the Claude-facing docs and the code's own comments; and the spirit of Magic, preferring the game's terminology and iconography over plain conversational English. Use whenever Aaron asks for a polish pass, quality pass, sweep or audit; on any color invocation (polish white/blue/black/red/green/colorless/cleanup); on 'polish converge' or 'polish all' (five colors, one merged report), 'polish rainbow' (all seven at full depth, one at a time), 'run the polish pass' or 'run the night pass'; when asked what the overnight run found, what is in the daybreak queue, or which findings are still outstanding or waiting on a ruling; and on any 'are we doing X right?' question about one of those areas, even if the word polish never appears."
 ---
 
 # The Polish Pass
 
 A recurring, ledger-driven quality pass over this codebase and its
 infrastructure. Aaron's quality facets are organised as the five colors of
-Magic, plus colorless and a cleanup step; one invocation runs **one color,
-deeply**. The point is not a skim of everything — it is that over a cycle of
-seven runs every facet gets a real audit, the queue those audits fill gets
-emptied rather than inherited, and the ledger makes the next run smarter than
-the last.
+Magic, plus colorless and a cleanup step. **One color at a time, deeply** —
+named by Aaron, or chained through the night when he is asleep. The point is
+never a skim of everything: over a cycle of seven runs every facet gets a real
+audit, the queue those audits fill gets emptied rather than inherited, and the
+ledger makes the next run smarter than the last.
 
 ## Before anything else
 
@@ -63,9 +63,20 @@ is the one place night work touches the live instance:
   in the daybreak queue and a note on where to look.
 - **Everything else may merge when the required checks are green**: backend
   behaviour with no rendered change, tests, tooling, docs, the skill, the
-  ledger. Watch the deploy to healthy afterwards; a red deploy is a daybreak
-  item and a rollback (HOSTING has the runbook), never an overnight
-  debugging session against the live instance.
+  ledger.
+- **A night merge is not done when the deploy is green.** `/api/health`
+  answers 200 from an instance whose every page is broken — it reports the
+  pool and the process, not the product. Commandment 14 asks for the real
+  surface, and 3am is precisely when nobody else will notice, so **walk it**:
+  sign in on the `claude` seat, open a deck page, the simulator and the tarot
+  table, and read the console for errors. Perhaps four minutes, and it is the
+  difference between a bad merge caught at 3am and one found by a friend at
+  breakfast.
+- **If that walk fails, roll back — do not debug.** HOSTING has the runbook.
+  An unattended rollback restores a known-good instance in minutes; an
+  unattended debugging session is how a small breakage becomes a night of
+  them. Roll back first, write the daybreak line second, and leave the branch
+  for the morning. The same holds for a red deploy that never came up at all.
 
 **The daybreak queue** is `docs/polish/DAYBREAK.md`, and it exists because the
 ledger is three thousand lines and nobody reads that at seven in the morning.
@@ -76,9 +87,11 @@ It is the one file Aaron opens. Rules that keep it worth opening:
   all". A question with no proposed answer is homework, not a question.
 - **Say what it costs to leave.** "Nothing until the next set" and "the volume
   fills in nine days" are different questions and should not look alike.
-- **It is a queue, not a ledger.** An answered item leaves this file and its
-  outcome goes into the ledger's own section. A file that only grows stops
-  being read, which is how the queue it replaced failed.
+- **It is the queue; the ledger is the record.** Each line is a pointer to a
+  fuller entry in the ledger's color section — never a second copy of it, and
+  never the only copy either. When Aaron answers, the line leaves this file
+  and the ruling goes into the ledger. A file that only grows stops being
+  read, which is how the per-color queues it replaces failed.
 - **Improvements only.** The queue holds things that would make the project
   better, never chores invented to have something to ask. If a night found
   nothing worth asking, the honest queue is empty and the summary says so.
@@ -91,10 +104,35 @@ gauntlet that will not go green after one honest attempt. Each is a daybreak
 line and a move to the next item — never a retry loop, and never a workaround
 invented at 4am.
 
+**How much is a night?** More than one color, and that is the point of doing
+this while he sleeps. **A night is a rainbow that stops when the night does:**
+begin at the color "Choosing the color" picks, work onward in WUBRG order —
+colorless after green, cleanup after colorless — and keep going until the work
+runs out or the night does. Each color is still a full solo run with its own
+branch and PR; finishing one is a checkpoint, not a finish line. Two bounds
+that keep it honest:
+
+- **Never start what cannot be finished.** Landing half a fix and sleeping is
+  worse than not starting: the branch is unreviewable and the next session
+  inherits a puzzle. If a color's remaining work is one large item, audit it,
+  queue it, and move to the next color rather than opening it.
+- **Stop early when the queue is the answer.** If three colors in a row
+  produce only queued findings, the night's useful work is done — the rest
+  needs Aaron. Say so in the summary rather than manufacturing safe fixes to
+  look busy. **Improvements only** applies to the night's *volume* as well as
+  its content.
+
+**Where a half-finished night resumes.** The merged PRs and the ledger are the
+resume point, exactly as in a rainbow: read which colors carry tonight's tag,
+and pick up at the next one. Tag ledger entries `YYYY-MM-DD (night)` so the
+morning summary and the next night can both tell what this one covered.
+
 **The morning summary** is what he actually reads: what landed and where,
 what is waiting in a green PR for his eye, the queue's questions, and what
 was deliberately not touched. Numbers with it, since a night run is a run
-like any other and the ledger wants its measurements.
+like any other and the ledger wants its measurements. End with the honest
+sentence about where the night stopped and why — out of work, out of night,
+or out of things that did not need him.
 
 ## The colors, and the two phases that are not colors
 
@@ -124,6 +162,8 @@ Everything below runs from `go/` with this Mac's three exports set (CGO on,
 the 1.26 toolchain on `PATH` *and* `GOROOT`); `animist` runs from `tools/`.
 
 ```bash
+# benchstat is not in the toolchain; install on demand, like go-licenses:
+#   go install golang.org/x/perf/cmd/benchstat@latest
 go test -run '^$' -bench . -benchmem ./internal/<pkg>/   # ns/op AND allocs/op
 go test -run '^$' -bench . -count=10 ./internal/<pkg>/   # then: benchstat a.txt b.txt
 go test -cpuprofile cpu.out -memprofile mem.out -run TestX ./internal/<pkg>/
@@ -396,11 +436,16 @@ It is what makes the pass cumulative rather than repetitive.
      bug-fixing with a test; no new runtime dependency; no schema migration;
      no new service, spend, or infrastructure; no contradiction of an ADR or
      Commandment; surgical rather than structural.
-   - **Queued for Aaron** — record it in the ledger with enough context that a
-     fresh session can act on his yes. Design decisions, anything costing
-     money, new dependencies or services, schema migrations, and anything an
-     ADR already decided (that gets a *superseding ADR proposal*, never an
-     edit — ADRs are immutable).
+   - **Queued for Aaron** — **two places, and they are not duplicates.** The
+     full finding goes in the ledger's own color section, with enough context
+     that a fresh session can act on his yes; **one line goes in
+     `DAYBREAK.md`** — the question, what it costs to leave, the
+     recommendation, and a pointer to the ledger entry. The ledger is the
+     record; daybreak is the queue. Nothing waits in the ledger alone, because
+     nobody reads three thousand lines to find out what is waiting. Queue-class
+     findings: design decisions, anything costing money, new dependencies or
+     services, schema migrations, and anything an ADR already decided (that
+     gets a *superseding ADR proposal*, never an edit — ADRs are immutable).
    - **Deferred** — real but not yet worth doing; record the trigger that
      would make it worth doing.
 

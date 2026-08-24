@@ -16,30 +16,30 @@ live instance, a card pool or a network — it is reading, arithmetic, and one
 or two tool invocations — so a rainbow that has run long is still worth
 finishing.
 
-## Part one — did last cycle's findings actually land?
+## Part one — is the ledger telling the truth?
 
 The ledger's whole claim is that the pass is cumulative. This is where that
-claim gets checked, and it is the part most likely to find something, because
-nothing else in the skill ever re-reads an old entry.
+claim gets checked — **not by emptying the queue, which is the cleanup step's
+job.** The division matters, because the two runs look alike from a distance:
+**cleanup asks "can this be landed?"; colorless asks "is this entry honest?"**
+Cleanup acts on the queue. Colorless audits it and leaves it.
 
-- Walk every **queued for Aaron** item, oldest first. For each: has Aaron
-  ruled? Did the ruling get acted on? Is the item still true — or has the code
-  moved under it, so the question no longer means what it meant? A queued
-  finding that has gone stale is worse than an open one, because it is
-  occupying the queue *and* misdescribing the tree. Re-word it, close it, or
-  say plainly that it is still waiting.
-- Walk every **deferred** item and check its **trigger**, which is the field
-  that makes deferral honest. A trigger that has arrived and gone unnoticed is
-  a finding. A deferred item with no trigger recorded at all is a bug in the
-  entry — give it one or promote it.
-- Walk the **fixes** each colour claimed. Spot-check two or three against the
-  tree: is the thing still fixed, and is the guard that holds it still there?
-  This is where a fix quietly reverted by a later merge shows up.
+- Walk every **deferred** item and check its **trigger**, the field that makes
+  deferral honest. A trigger that has arrived and gone unnoticed is a finding.
+  A deferred item with no trigger at all is a bug in the entry — give it one
+  or promote it to the queue.
+- Spot-check the **fixes** each colour claimed: two or three against the tree.
+  Is the thing still fixed, and is the guard that holds it still there? This
+  is where a fix quietly reverted by a later merge shows up, and nothing else
+  in the cycle looks.
+- Check that every waiting item appears in **both** places it must — the
+  ledger for its context, `DAYBREAK.md` for its one line. An entry in one and
+  not the other is the drift that makes a queue untrustworthy: waiting in the
+  ledger alone means nobody sees it, and a daybreak line with no ledger entry
+  means nobody can act on the yes.
 - **Corrections outrank overwrites.** When a later run finds an earlier entry
   wrong, the ledger records the correction beside the original rather than
-  editing it away — the Black section's 2026-08-19 entry is the model, keeping
-  two explicit corrections to its own earlier claims. If a run has silently
-  rewritten history, that is a finding.
+  editing it away. A run that silently rewrote history is a finding.
 
 ## Part two — is the checklist finding things, or reciting them?
 
