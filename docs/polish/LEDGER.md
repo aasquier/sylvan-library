@@ -1737,13 +1737,13 @@ unwalked because they never shipped.
      result size (`GetCards`'s idiom, for its reason). Route medians, this
      Mac, full pool, 10–12 samples:
 
-| route | before | after |
-|---|---:|---:|
-| `/api/cards/search` (no text — **the card page's own opening query**) | 87.7ms | **53.1ms** |
-| `/api/cards/search?type_line=creature` | 71.6ms | **52.9ms** |
-| `/api/cards/search?identity=WU` | 50.7ms | **36.6ms** |
-| `/api/cards/search?q=goblin` | 41.1ms | 40.4ms |
-| `/api/cards/search?identity=WU&commanders_only=1` | 39.6ms | 38.1ms |
+     | route | before | after |
+     |---|---:|---:|
+     | `/api/cards/search` (no text — **the card page's own opening query**) | 87.7ms | **53.1ms** |
+     | `/api/cards/search?type_line=creature` | 71.6ms | **52.9ms** |
+     | `/api/cards/search?identity=WU` | 50.7ms | **36.6ms** |
+     | `/api/cards/search?q=goblin` | 41.1ms | 40.4ms |
+     | `/api/cards/search?identity=WU&commanders_only=1` | 39.6ms | 38.1ms |
 
      **Nothing regressed and the wins are where the user did not type.**
      `CardSearch` fires the empty query 250ms after mount (`useEffect` +
@@ -1752,20 +1752,20 @@ unwalked because they never shipped.
      the second statement roughly cancels what the split saves. Measured at
      the query, on the real pool, since a CPU profile is blind inside cgo:
 
-```
-search: full query (with correlated price subquery)              median    38.68ms
-search: same query WITHOUT the price subquery                    median    27.48ms
-search: no-text query (identity only, the picker's default)       median    84.80ms
-search: no-text, WITHOUT price subquery                          median    38.40ms
-  step2 shape: unnest(?::VARCHAR[]) -- the landed form           median     8.87ms
-  step2 shape: IN (60 literals)                                  median     8.99ms
-  step2 shape: = ANY(list literal)                               median     9.04ms
-  step2 shape: single id lookup (index probe)                    median     0.81ms
-  step2 shape: whole map GROUP BY oracle_id (35k rows out)       median    24.65ms
-  narrow (NewDeck): OLD correlated subquery                      median    27.21ms
-  narrow (NewDeck): NEW main query                               median    16.37ms
-  narrow (NewDeck): NEW step 2 for 3 ids                         median     7.37ms
-```
+     ```
+     search: full query (with correlated price subquery)              median    38.68ms
+     search: same query WITHOUT the price subquery                    median    27.48ms
+     search: no-text query (identity only, the picker's default)       median    84.80ms
+     search: no-text, WITHOUT price subquery                          median    38.40ms
+       step2 shape: unnest(?::VARCHAR[]) -- the landed form           median     8.87ms
+       step2 shape: IN (60 literals)                                  median     8.99ms
+       step2 shape: = ANY(list literal)                               median     9.04ms
+       step2 shape: single id lookup (index probe)                    median     0.81ms
+       step2 shape: whole map GROUP BY oracle_id (35k rows out)       median    24.65ms
+       narrow (NewDeck): OLD correlated subquery                      median    27.21ms
+       narrow (NewDeck): NEW main query                               median    16.37ms
+       narrow (NewDeck): NEW step 2 for 3 ids                         median     7.37ms
+     ```
 
      The test derives its expectation from the printings table rather than
      restating it, and doctors two extra Sol Ring printings (0.42 and 99.99)
@@ -1956,15 +1956,15 @@ search: no-text, WITHOUT price subquery                          median    38.40
   - **The mode table, counted from `data/modes.json` rather than from
     prose** — seven modes, and every knob deliberate:
 
-| mode | max_tokens | effort | own tools | web_search max_uses |
-|---|---:|---|---|---:|
-| `commander-dossier` | 16,384 | high | `get_cards` | 4 |
-| `research` | 16,384 | high | `get_cards` | 4 |
-| `theme-proposal` | 16,384 | high | `search_cards`, `get_cards` | 3 |
-| `rationale-interview` | 8,192 | high | 4 pool/deck tools | — |
-| `slot-argument` | 8,192 | high | 5 pool/deck tools | — |
-| `theme-conversation` | 8,192 | high | — | 1 |
-| `scan` | 2,048 | **low** | — | — |
+    | mode | max_tokens | effort | own tools | web_search max_uses |
+    |---|---:|---|---|---:|
+    | `commander-dossier` | 16,384 | high | `get_cards` | 4 |
+    | `research` | 16,384 | high | `get_cards` | 4 |
+    | `theme-proposal` | 16,384 | high | `search_cards`, `get_cards` | 3 |
+    | `rationale-interview` | 8,192 | high | 4 pool/deck tools | — |
+    | `slot-argument` | 8,192 | high | 5 pool/deck tools | — |
+    | `theme-conversation` | 8,192 | high | — | 1 |
+    | `scan` | 2,048 | **low** | — | — |
 
     `MaxToolTurns` 6. `scan`'s `low` is argued as accuracy rather than thrift
     (ADR 34 forbids a transcriber inferring). No mode declares `thinking`,
