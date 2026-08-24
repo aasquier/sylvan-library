@@ -44,9 +44,9 @@ func uiCommand() *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&host, "host", "127.0.0.1", "address to listen on")
 	f.StringVar(&port, "port", "8765", "port to listen on")
-	f.StringVar(&webDist, "web-dist", envOr("MTGLAB_WEB_DIST", filepath.Join("src", "mtglab", "web_dist")),
+	f.StringVar(&webDist, "web-dist", envOr("MTGLAB_WEB_DIST", "web_dist"),
 		"the built frontend (MTGLAB_WEB_DIST)")
-	f.StringVar(&tarot, "tarot", envOr("MTGLAB_TAROT_DIR", filepath.Join("src", "mtglab", "assets", "tarot")),
+	f.StringVar(&tarot, "tarot", envOr("MTGLAB_TAROT_DIR", filepath.Join("assets", "tarot")),
 		"the packaged tarot art (MTGLAB_TAROT_DIR)")
 	f.BoolVar(&noOpen, "no-open", false, "serve without opening a browser")
 	_ = noOpen

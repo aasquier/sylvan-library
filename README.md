@@ -6,8 +6,8 @@ A Commander deckbuilding lab where the deck file is the source of truth, every
 card has to justify its slot, and every claim about a deck is traceable to the
 system that made it.
 
-Python 3.11+ · DuckDB · numpy · FastAPI · React. The package and CLI are named
-`mtglab`; the repository is `sylvan-library`.
+Go · DuckDB · React. The binary and CLI are named `mtglab`; the repository is
+`sylvan-library`.
 
 ## The idea
 
@@ -34,7 +34,7 @@ Around it sit three things, each answering a different kind of question:
 
 That last split is the project's central design decision
 ([ADR 14](docs/adr/0014-python-decides-claude-advises.md)): **anything with a
-right answer belongs in deterministic Python; Claude is for opinions and
+right answer belongs in deterministic code; Claude is for opinions and
 research.** Legality, colour identity, mana solving, simulation and pricing are
 reproducible, tested without a network, and never ask a model. Claude gets the
 meta, the history, and whether a spoiled card earns a slot — and may argue
@@ -111,24 +111,20 @@ load in the browser straight from Scryfall's CDN.
 ## Running it
 
 ```bash
-python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
-pip install -e ".[dev,api]"
-mtglab data refresh          # Scryfall bulk -> DuckDB; ~28 minutes, measured
-mtglab ui                    # run it locally, at http://127.0.0.1:8765
+cd go && go build -o ../mtglab ./cmd/mtglab && cd ..
+./mtglab data refresh        # Scryfall bulk -> DuckDB; seconds, not minutes
+./mtglab ui                  # run it locally, at http://127.0.0.1:8765
 ```
 
-macOS ships a Python older than 3.11; [uv](https://docs.astral.sh/uv/) is the
-quickest fix. Five install extras: `api` (the app), `claude` (the Anthropic
-SDK), `animist` (the asset pipeline), `depth` (the depth-model loader —
-deliberately not part of `dev`, being ~800MB of torch for a maintainer-only
-feature) and `dev` (the first three, plus the test tooling). A bare
-`pip install -e .` still gets the gate, the mana solver and Tier 1, which need
-neither an account nor a network.
+Go 1.26+, CGO on (the card pool rides DuckDB). The Claude surfaces want an
+`ANTHROPIC_API_KEY` in the environment; everything else — the gate, the mana
+solver, the simulator — needs neither an account nor a network.
 
 Full setup, the command reference and the deck workflow are in
-**[CONTRIBUTING.md](CONTRIBUTING.md)** — including the Go front door
-(`go/`), which is what the deployed instance runs in front of the Python
-server while the backend is ported ([ADR 38](docs/adr/0038-the-served-backend-is-rewritten-in-go.md)).
+**[CONTRIBUTING.md](CONTRIBUTING.md)**. The one piece of Python left in the
+tree is `tools/` — the local picture and video pipeline that makes the
+site's committed art (`animist`) and the card-art motion (`cardmotion`);
+it never ships and never serves.
 
 ## Status
 

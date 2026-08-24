@@ -1,0 +1,156 @@
+# The media toolbox: the two Python packages that outlived the app.
+#
+# When the served backend finished its move to Go, the asset pipeline
+# (`animist`, ADR 29/31) and the card-art motion derivation (`cardmotion`,
+# ADR 32) stayed Python on purpose -- they are dev-machine tooling built on
+# Pillow, numpy and (for depth) torch, none of which the deployed instance
+# ever runs. This project is that toolbox: installed into its own venv, run
+# from the repository checkout, and never part of the image.
+[project]
+name = "animist"
+version = "0.1.0"
+description = "The sylvan-library media toolbox: the asset pipeline (ADR 29) and card-art motion derivation (ADR 32)"
+requires-python = ">=3.11"
+license = "MIT"
+# What the two packages import, read off their imports rather than guessed:
+# Pillow and numpy are the pixels (ops, motion, encode, the cardmotion
+# effects), imageio-ffmpeg is the video half of the encode table (ADR 31:
+# its wheel bundles a static ffmpeg the encoders shell out to; the licence
+# argument for that binary is the repo's NOTICE.md), pyyaml reads recipes
+# and the deck fields the sync sweep needs, and duckdb reads the card pool
+# (`cardmotion/pool.py`, read-only). The network side is stdlib urllib
+# throughout -- no HTTP client rides here.
+#
+# Pillow `>=11` because nothing older is tested (10.1 is where `py.typed`
+# landed, without which strict mypy reports every Image as Any);
+# `imageio-ffmpeg >=0.6` is the floor whose wheel shape works on this Mac.
+dependencies = [
+    "Pillow>=11",
+    "imageio-ffmpeg>=0.6",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "duckdb>=1.0",
+]
+
+[project.optional-dependencies]
+# The depth model (ADR 32): CPU torch + the Depth-Anything-V2-Small loader,
+# dev-machine tooling for `cardmotion build --effect depth-drift`.
+# Deliberately NOT vendored into `dev` -- these are ~800MB of wheels per
+# environment to exercise a function no test may import (the suite drives
+# the pipeline through a FakeDepthModel; the real model runs only on the
+# maintainer's machine). torch is pinned exact because the fingerprint story
+# assumes same-weights-same-depth, and the pin is the last torch with macOS
+# x86_64 wheels at all -- which is also why `numpy<2` rides here: 2.2.2
+# predates numpy 2 and cannot initialise against it. On this machine that
+# makes the depth extra **its own venv**
+# (`uv venv .venv-depth && uv pip install -e 'tools[depth]'`), resolved to
+# numpy 1.26 throughout, while the main venv stays on current numpy.
+# transformers is capped below 5 because v5 refuses to see a torch this old.
+#
+# Security posture for that exact pin (triaged 2026-08-16, nine Dependabot
+# alerts including one critical -- the torch.load pickle RCE, patched in
+# 2.6.0): dismissed as tolerable risk, and the argument is containment
+# rather than absence. This extra runs on the maintainer's machine only --
+# never a container, never CI, never `dev` -- and the one model it loads is
+# a pinned Hugging Face snapshot shipping safetensors, so torch.load's
+# unpickling path is never exercised. There is no upgrade to take: the pin
+# IS the platform ceiling (see above). New torch alerts inherit this triage
+# until the depth tier leaves this machine; the day it does, this paragraph
+# is the checklist of what must be re-decided.
+depth = ["torch==2.2.2", "transformers>=4.45,<5", "numpy<2"]
+# The test and gate tooling. `types-PyYAML` is here rather than optional
+# because mypy is a gate: without the stubs the run reports import-untyped
+# and nothing else, which reads exactly like "the checker is broken".
+# python-dotenv backs `config._load_dotenv`, which is imported defensively
+# -- a base install works without it, a dev environment behaves like the
+# maintainer's shell.
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.16",
+    "mypy>=1.11",
+    "types-PyYAML>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+animist = "animist.cli:main"
+cardmotion = "cardmotion.cli:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Flat layout, two top-level packages: auto-discovery refuses that shape,
+# so they are named.
+packages = ["animist", "cardmotion"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+# A skipped test is a test nobody is reading the result of, so the suite is
+# not allowed to skip silently. `-ra` prints the reason for every one.
+addopts = "-ra"
+
+[tool.mypy]
+# Strict from the day the toolbox was extracted, which is the only day making
+# it strict is free -- every module here graduated under the app's own strict
+# gate before it moved.
+files = ["animist", "cardmotion"]
+strict = true
+show_error_codes = true
+
+# imageio-ffmpeg ships no py.typed and no stubs exist for it. The surface this
+# package uses is four call sites in animist/{encode,verify}.py, each wrapped
+# in code this repo types itself; silencing the one import beats vendoring a
+# stub file for a module whose API is two generator functions.
+[[tool.mypy.overrides]]
+module = ["imageio_ffmpeg"]
+ignore_missing_imports = true
+
+# torch and transformers back the `depth` extra, which is deliberately not
+# installed in dev (see the extra's comment); the modules that import them do
+# so inside functions behind the DepthModel Protocol seam.
+[[tool.mypy.overrides]]
+module = ["torch", "transformers"]
+ignore_missing_imports = true
+
+[tool.ruff]
+# Pin the rule set explicitly, exactly as the root project does: an
+# unconfigured `ruff check` reports different results depending on which
+# ruff happens to be installed.
+target-version = "py311"   # the floor in requires-python, not the local 3.12
+src = [".", "tests"]
+
+[tool.ruff.lint]
+# The root project's selection, inherited whole: these packages held this
+# line while they lived under src/mtglab, and the extraction is not the
+# moment to loosen it.
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "ISC", "DTZ", "BLE",
+          "C4", "RET", "PTH", "TID", "PIE", "RUF"]
+ignore = [
+    # Ambiguous-unicode. The docstrings here use en and em dashes
+    # deliberately; these rules exist to catch a Cyrillic homoglyph pasted
+    # into an identifier, and they fire on correct typography.
+    "RUF001",
+    "RUF002",
+    # Alphabetical `__all__`. `animist/__init__.py` groups its exports by
+    # source module -- the recipe schema's names, then the gate's -- and
+    # sorting the list scatters that grouping for a machine-checkable
+    # property nobody was going to get wrong. The root project's call,
+    # inherited with the file.
+    "RUF022",
+    # date.today() datestamps the licence gate's confirmations. These are
+    # local documents, not instants needing timezone-aware arithmetic.
+    "DTZ011",
+    # Nested conditionals that read as two decisions stay two statements --
+    # the root project's call (`encode.has_metadata`'s exif check crossed
+    # under it), inherited with the code rather than re-litigated.
+    "SIM102",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The argparse wiring is written as a dense table, one subcommand per line,
+# with `;` joining the parser and its first argument -- the root cli.py's
+# own style, kept through the extraction.
+"animist/cli.py" = ["E702"]

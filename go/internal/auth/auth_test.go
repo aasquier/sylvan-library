@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -289,63 +288,5 @@ func TestStrengthFloorMatchesPython(t *testing.T) {
 	}
 	if _, err := HashPassword("short"); err == nil {
 		t.Fatal("HashPassword stored a weak password")
-	}
-}
-
-// The strongest form of the fixture proof: Python itself writes an app.db with
-// `mtglab.auth` and mints a session, and Go resolves it. Needs a Python with
-// the package installed -- set MTGLAB_PYTHON to one (the repo's `.venv`) --
-// so it runs on the maintainer's machine and is skipped by CI's Go jobs,
-// which have no Python. The same fact is proven there over the wire instead:
-// the `contract` job runs the suite through the front door against an
-// `app.db` the Python harness seeded.
-func TestResolvesASessionPythonMinted(t *testing.T) {
-	python := os.Getenv("MTGLAB_PYTHON")
-	if python == "" {
-		t.Skip("MTGLAB_PYTHON not set")
-	}
-	dir := t.TempDir()
-	script := `
-import sys
-from mtglab import config
-from mtglab.auth import db, users, sessions
-with config.use_paths(data_dir=sys.argv[1]):
-    con = db.connect()
-    alice = users.create(con, "alice", password="correct-horse-battery-staple", is_admin=True)
-    bob = users.create(con, "bob", password="a-different-long-passphrase")
-    print(sessions.create(con, alice.id))
-    print(sessions.create(con, bob.id))
-    con.close()
-`
-	out, err := exec.Command(python, "-c", script, dir).Output()
-	if err != nil {
-		t.Fatalf("python: %v", err)
-	}
-	tokens := strings.Fields(string(out))
-	if len(tokens) != 2 {
-		t.Fatalf("python printed %q", out)
-	}
-	reader, err := Open(filepath.Join(dir, "app.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer reader.Close()
-	ctx := context.Background()
-	alice, err := Resolve(ctx, reader, tokens[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !alice.Authenticated || !alice.IsAdmin || alice.Username != "alice" {
-		t.Fatalf("alice resolved to %+v", alice)
-	}
-	bob, err := Resolve(ctx, reader, tokens[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bob.Authenticated || bob.IsAdmin || bob.Username != "bob" {
-		t.Fatalf("bob resolved to %+v", bob)
-	}
-	if s, _ := Resolve(ctx, reader, "not-minted"); s != Anonymous {
-		t.Fatalf("an unminted token resolved to %+v", s)
 	}
 }

@@ -28,8 +28,8 @@ permissions:
   contents: read
 
 # One analysis per ref, matching `ci.yml`'s group and for the same reason:
-# pushing three fixups to a branch used to queue three full analyses -- two
-# languages each, so six jobs -- and the first two answer a question nobody is
+# pushing three fixups to a branch used to queue three full analyses -- one
+# per language -- and the first two answer a question nobody is
 # asking any more.
 #
 # Cancelled on pull requests only, and here that split is load-bearing rather
@@ -50,15 +50,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `build-mode: none` for Python and TypeScript: both are analysed
-        # from source, no build required — which also keeps this job from
-        # ever needing the pool, Node, or a virtualenv. Go (the front door,
-        # ADR 38) is compiled, so its autobuilder runs; the module is small
-        # and its one CGO dependency is not in the binary the autobuilder
-        # needs to see.
+        # `build-mode: none` for TypeScript: analysed from source, no build
+        # required. Go is compiled, so its autobuilder runs; the module's one
+        # CGO dependency is not in the binary the autobuilder needs to see.
         include:
-          - language: python
-            build-mode: none
           - language: javascript-typescript
             build-mode: none
           - language: go

@@ -21,7 +21,6 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
-	"github.com/aasquier/sylvan-library/go/internal/routes"
 )
 
 // fakeResolver is the two-account arrangement every adversarial test in this
@@ -122,33 +121,68 @@ func detail(t *testing.T, resp *http.Response) string {
 	return s
 }
 
-// ---------------------------------------------------------------- the table
+// ---------------------------------------------------------------- the sweeps
 
-func TestTheCodeMatchesTheSharedTable(t *testing.T) {
-	table, err := routes.Load(routes.DefaultPath())
-	if err != nil {
-		t.Fatal(err)
+// The sweeps' inputs come from the code itself: every pattern the API
+// serves, the public list beside it, and placeholder values for templated
+// segments. The refusals under test all happen before any handler runs, so
+// the values need not resolve to anything real.
+var placeholders = map[string]string{
+	"{slug}": "arahbo-cats", "{owner}": "local", "{name}": "Forest",
+	"{key}": "mulligan", "{job_id}": "deadbeef", "{username}": "alice",
+	"{oracle_id}": "0aae2e33-0000-4000-8000-000000000000",
+	"{effect}":    "depth-drift", "{filename}": "loop.webm", "{code}": "W",
+}
+
+func concrete(t *testing.T, pattern string) string {
+	t.Helper()
+	for placeholder, value := range placeholders {
+		pattern = strings.ReplaceAll(pattern, placeholder, value)
 	}
-	var code []string
+	if strings.ContainsAny(pattern, "{}") {
+		t.Fatalf("pattern %s carries a placeholder this table does not fill", pattern)
+	}
+	return pattern
+}
+
+// servedPaths is every path pattern the API serves, deduplicated across
+// methods, sorted.
+func servedPaths(t *testing.T) []string {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, r := range api.New(api.Config{}).Routes() {
+		seen[r.Pattern] = true
+	}
+	out := make([]string, 0, len(seen))
+	for p := range seen {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Deny by default, derived rather than declared: a new route is protected
+// unless somebody puts it on PublicPaths, and an entry there that nothing
+// serves is a typo with a hole's shape.
+func TestEveryPublicPathIsServed(t *testing.T) {
+	served := map[string]bool{}
+	for _, p := range servedPaths(t) {
+		served[p] = true
+	}
 	for p := range PublicPaths {
-		code = append(code, p)
-	}
-	sort.Strings(code)
-	file := append([]string(nil), table.Public...)
-	sort.Strings(file)
-	if strings.Join(code, ",") != strings.Join(file, ",") {
-		t.Fatalf("door.PublicPaths %v != routes.json public %v; change both or neither", code, file)
-	}
-	if AdminPrefix != table.AdminPrefix {
-		t.Fatalf("door.AdminPrefix %q != routes.json %q", AdminPrefix, table.AdminPrefix)
+		if !served[p] {
+			t.Errorf("PublicPaths names %s, which no route serves", p)
+		}
 	}
 }
 
 func TestEveryProtectedRouteRefusesWithoutASession(t *testing.T) {
-	table, _ := routes.Load(routes.DefaultPath())
 	srv := build(t, true, fakeResolver{})
-	for _, route := range table.Protected() {
-		resp := get(t, srv, "GET", table.Concrete(route), "")
+	for _, route := range servedPaths(t) {
+		if PublicPaths[route] {
+			continue
+		}
+		resp := get(t, srv, "GET", concrete(t, route), "")
 		if resp.StatusCode != 401 {
 			t.Errorf("%s answered %d with no session, want 401", route, resp.StatusCode)
 			continue
@@ -163,21 +197,22 @@ func TestEveryProtectedRouteRefusesWithoutASession(t *testing.T) {
 }
 
 func TestPublicRoutesAreNotRefused(t *testing.T) {
-	table, _ := routes.Load(routes.DefaultPath())
 	srv := build(t, true, fakeResolver{})
-	for _, route := range table.Public {
+	for route := range PublicPaths {
 		resp := get(t, srv, "GET", route, "")
 		if resp.StatusCode == 401 || resp.StatusCode == 403 {
-			t.Errorf("%s is public but the door answered %d", route, resp.StatusCode)
+			t.Errorf("%s is public but the middleware answered %d", route, resp.StatusCode)
 		}
 	}
 }
 
 func TestAdminRoutesRefuseASignedInNonAdmin(t *testing.T) {
-	table, _ := routes.Load(routes.DefaultPath())
 	srv := build(t, true, fakeResolver{})
-	for route := range table.Admin {
-		resp := get(t, srv, "GET", table.Concrete(route), "bob")
+	for _, route := range servedPaths(t) {
+		if route != AdminPrefix && !strings.HasPrefix(route, AdminPrefix+"/") {
+			continue
+		}
+		resp := get(t, srv, "GET", concrete(t, route), "bob")
 		if resp.StatusCode != 403 {
 			t.Errorf("%s answered %d to bob, want 403", route, resp.StatusCode)
 			continue
@@ -191,7 +226,7 @@ func TestAdminRoutesRefuseASignedInNonAdmin(t *testing.T) {
 	if resp := get(t, srv, "GET", "/api/admin/nothing-here", "bob"); resp.StatusCode != 403 {
 		t.Errorf("/api/admin/nothing-here answered %d to bob", resp.StatusCode)
 	}
-	// The control: alice reaches it (and the upstream answers).
+	// The control: alice reaches it.
 	if resp := get(t, srv, "GET", "/api/admin/users", "alice"); resp.StatusCode != 200 {
 		t.Errorf("alice was refused the admin prefix: %d", resp.StatusCode)
 	}
@@ -588,32 +623,6 @@ func TestARouteAnswersTheEmbeddedPayload(t *testing.T) {
 	}
 }
 
-func TestEveryPortedRouteIsInTheSharedTable(t *testing.T) {
-	// A Go-only /api route would be a ghost to `tests/test_isolation.py`,
-	// which requires every classified route to exist in FastAPI's table; so
-	// the door may only answer paths `routes.json` already knows, under the
-	// template it knows them by.
-	table, err := routes.Load(routes.DefaultPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	known := map[string]bool{}
-	for _, p := range table.Every() {
-		known[p] = true
-	}
-	ported := api.New(api.Config{})
-	compiled, err := newRouteTable(ported.Routes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range compiled.Patterns() {
-		_, pattern, _ := strings.Cut(entry, " ")
-		if !known[pattern] {
-			t.Errorf("the door serves %s, which tests/contract/routes.json does not classify", entry)
-		}
-	}
-}
-
 func TestTheRouteTableChoosesTheMostSpecificPattern(t *testing.T) {
 	var hit string
 	named := func(name string) http.HandlerFunc {
@@ -762,7 +771,6 @@ func TestTheDoorCountsWhatItAnswers(t *testing.T) {
 	}
 	d.resolver = fakeResolver{}
 	srv := httptest.NewServer(d.Handler())
-	defer srv.Close()
 
 	get(t, srv, "GET", "/api/glossary", "alice")    // a route, by its pattern
 	get(t, srv, "GET", "/api/health", "")           // public: the template, anonymously
@@ -774,6 +782,12 @@ func TestTheDoorCountsWhatItAnswers(t *testing.T) {
 	get(t, srv, "GET", "/api/nonexistent", "alice") // the catch-all's 404
 	get(t, srv, "GET", "//api/glossary", "alice")   // non-canonical: the same 404
 
+	// Close BEFORE the flush: a count is recorded by the handler goroutine
+	// after the client already has its response, and Close is the barrier
+	// that waits those goroutines out. Flushing first is a born-flaky read
+	// of a buffer someone may still be writing -- arm64's race scheduler
+	// found it on the first try.
+	srv.Close()
 	d.traffic.Flush()
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
 	if err != nil {

@@ -23,7 +23,7 @@ export default defineConfig({
   build: {
     // Built straight into the Python package, so `mtglab ui` serves it and a
     // friend never needs Node to run the app.
-    outDir: '../src/mtglab/web_dist',
+    outDir: '../web_dist',
     emptyOutDir: true,
     rollupOptions: {
       output: {

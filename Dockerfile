@@ -1,7 +1,7 @@
 # sylvan-library, containerised. `docs/HOSTING.md` §4 is the deployment guide;
 # this file is the thing that guide used to only describe.
 #
-# Two stages, and deliberately **no Node stage**. `src/mtglab/web_dist/` is
+# Two stages, and deliberately **no Node stage**. `web_dist/` is
 # committed precisely so the image needs no Node toolchain. CI's `frontend`
 # job proves the committed bundle can be rebuilt from source on every pull
 # request — running the real `npm run build` and failing on any diff — so the
@@ -83,8 +83,8 @@ COPY --from=builder /out/mtglab /usr/local/bin/mtglab
 # copied from the build context — the same files CI's `frontend` job holds
 # current. Asserted here so a moved directory fails the build rather than
 # the first page load.
-COPY src/mtglab/web_dist /app/web_dist
-COPY src/mtglab/assets/tarot /app/tarot
+COPY web_dist /app/web_dist
+COPY assets/tarot /app/tarot
 RUN test -f /app/web_dist/index.html && test -d /app/tarot
 ENV MTGLAB_WEB_DIST=/app/web_dist \
     MTGLAB_TAROT_DIR=/app/tarot

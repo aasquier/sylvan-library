@@ -20,17 +20,24 @@
 
 # -------------------------------------------------------------------- fetch
 
-FROM python:3.12-slim AS fetch
+FROM debian:trixie-slim AS fetch
 
 # The 2.0.14 release, pinned by the SHA-256 GitHub publishes for the asset.
 # Despite the name it *is* the distribution — forge.sh, the desktop jar and
 # res/ (docs/FORGE.md says so, established by unpacking it). Executable code
-# is pinned by digest here for the same reason `ocr.py` pins its WebAssembly.
+# is pinned by digest, and the digest is checked before a single byte is
+# unpacked — the same house rule the OCR shelf's WebAssembly follows.
 ARG FORGE_URL="https://github.com/Card-Forge/forge/releases/download/forge-2.0.14/forge-installer-2.0.14.tar.bz2"
 ARG FORGE_SHA256="e71749376945177d603d52a21a089bc1574330cf34599544b6bae1a04c83da41"
 
-COPY scripts/fetch_forge.py /fetch_forge.py
-RUN python /fetch_forge.py "$FORGE_URL" "$FORGE_SHA256" /opt/forge
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl bzip2 \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL -o /tmp/forge.tar.bz2 "$FORGE_URL" \
+ && echo "$FORGE_SHA256  /tmp/forge.tar.bz2" | sha256sum -c - \
+ && mkdir -p /opt/forge \
+ && tar xjf /tmp/forge.tar.bz2 -C /opt/forge \
+ && rm /tmp/forge.tar.bz2
 
 # `forge.profile.properties` baked at build (ADR 35): Forge reads this file
 # from its own program directory and nowhere else, and it is what points the
