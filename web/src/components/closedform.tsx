@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type {
   CardOddsRow, ColorRequirementRow, DeckCheck, ManaCurve, PolicyResult,
-  ShelfResult,
+  ShelfResult, ValidationReport,
 } from '../lib/api'
 import { Badge, ManaCost, StatTile } from './ui'
 import { HelpTip, Term } from './term'
@@ -393,6 +393,72 @@ export function PolicyReport({ policy }: { policy: PolicyResult }) {
  * Renders nothing at all for a clean deck. A banner that always says
  * something is a banner people stop reading.
  */
+/**
+ * What a run is *about to* leave out, said before anybody pays for it.
+ *
+ * `DeckVerdict` below is the same fact after the fact, and it is the better
+ * of the two: it reports `simulated_size` of `declared_size` because the
+ * compiler counted them, rather than deriving a number the compiler alone
+ * can know. What it cannot do is arrive in time. A Tier 1 run is seconds and
+ * a Forge match is minutes, and in both cases the first thing anybody learns
+ * about the cards that fell out of their deck is a panel underneath figures
+ * they have already read (Aaron, 2026-08-24: "Simulator should not allow
+ * errored decks, or should omit the error cards at the least"). Aaron's
+ * ruling was to omit loudly and never refuse — refusing takes the diagnosis
+ * away exactly when it is wanted, which is `compileChecked`'s whole argument
+ * and commandment 2 with the sign flipped.
+ *
+ * So this is the loud half, and it is **deliberately not numeric**. It names
+ * the cards the pool does not know and says the figures will be about what
+ * is left; it does not say how many are left, because that number belongs to
+ * `compile.Report` and a second derivation of it here is exactly the drift
+ * `theaterRows` and `_row` were built to make impossible one layer down. The
+ * count arrives with the results, from the code that counted it.
+ */
+export function DeckCaution({ report, name }: {
+  report: ValidationReport | undefined
+  name: string
+}) {
+  if (!report || report.ok) return null
+  // The pool not knowing a name is a different kind of trouble from the deck
+  // being illegal: one shrinks what gets simulated, the other does not.
+  const missing = report.errors.filter((e) => e.code === 'unknown-card')
+  const others = report.errors.length - missing.length
+  const tone = missing.length > 0 ? 'var(--status-critical)' : 'var(--status-warning)'
+  return (
+    <div className="rounded-lg p-3 text-xs"
+         style={{
+           background: `color-mix(in srgb, ${tone} 10%, transparent)`,
+           borderLeft: `2px solid ${tone}`,
+         }}>
+      {missing.length > 0 && (
+        <p style={{ color: 'var(--text-secondary)' }}>
+          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {missing.length} card{missing.length === 1 ? '' : 's'} in {name} {missing.length === 1 ? 'is' : 'are'} not
+            in the card pool
+          </span>{' '}
+          — {missing.slice(0, 4).map((e) => e.card).filter(Boolean).join(', ')}
+          {missing.length > 4 && `, and ${missing.length - 4} more`}. A run
+          leaves {missing.length === 1 ? 'it' : 'them'} out and the figures
+          describe what is left; every result says exactly how many cards that
+          was. Check the spelling on the deck page, or refresh the pool.
+        </p>
+      )}
+      {others > 0 && (
+        <p className={missing.length > 0 ? 'mt-1.5' : ''}
+           style={{ color: 'var(--text-secondary)' }}>
+          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {name} does not pass the gate
+          </span>{' '}
+          ({others} {others === 1 ? 'error' : 'errors'} beyond the spelling).
+          It is still simulated: the figures describe the deck exactly as
+          written, which is what you want while you are fixing it.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function DeckVerdict({ check }: { check: DeckCheck | undefined }) {
   if (!check || (check.ok && check.unresolved_count === 0)) return null
 

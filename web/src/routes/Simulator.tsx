@@ -16,6 +16,7 @@ import goldfishWebm from '../assets/simulator/goldfish-loop.webm'
 import {
   api, errorMessage, followJob, type DeckTile, type ForgeResult, type Job,
   type LandResult, type ManaResult, type PolicyResult, type ShelfResult,
+  type ValidationReport,
 } from '../lib/api'
 import { ReplayGlyph } from '../components/glyphs'
 import { percent } from '../lib/mtg'
@@ -29,7 +30,7 @@ import {
 import { DataTable } from '../components/datatable'
 import { MatchTheater } from '../components/theater'
 import {
-  ClosedForm, DeckVerdict, ManaCurvePanel, PolicyReport,
+  ClosedForm, DeckCaution, DeckVerdict, ManaCurvePanel, PolicyReport,
 } from '../components/closedform'
 import { theaterRows } from '../lib/theater'
 import { HelpTip, Term } from '../components/term'
@@ -140,6 +141,26 @@ export default function Simulator() {
   const [targetTurn, setTargetTurn] = useState(4)
   const [targetMana, setTargetMana] = useState(4)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * A chosen deck's own gate report, by address.
+   *
+   * Fetched only for a deck the shelf has *already* said has errors, so the
+   * common case -- every deck valid -- costs nothing. `DeckTile.errors` is a
+   * count and this is what the count is about, which is the difference
+   * between "something is wrong with this deck" and "Sol Rng is not a card".
+   */
+  const [checks, setChecks] = useState<Record<string, ValidationReport>>({})
+  /**
+   * Submitted, and not yet a job (punch list item 6).
+   *
+   * `running` used to be `job.status`, which is only true once the POST has
+   * come back -- and a Forge match's POST is the slowest one here, because a
+   * JVM is starting behind it. So the Forge's own button stayed live and
+   * unchanged for seconds after it was pressed, with nothing on the screen
+   * saying the match had begun: the honest reading of which is that the click
+   * missed. This is the gap between the press and the job.
+   */
+  const [submitting, setSubmitting] = useState(false)
   const cancelRef = useRef<null | (() => void)>(null)
 
   useEffect(() => {
@@ -189,10 +210,44 @@ export default function Simulator() {
   const deckOf = (s: string, o: string) =>
     decks.find((d) => d.slug === s && (!o || d.owner === o)) ?? null
 
+  /** A deck's address, which is owner and slug together (ADR 22). */
+  const address = (s: string, o: string) => `${o}/${s}`
+
+  // Ask the gate about whichever decks are in the seats, and only when the
+  // shelf has already said there is something to ask about. Two seats in
+  // Forge; one everywhere else. Cached by address, because switching back and
+  // forth between two decks should not re-ask the same question, and because
+  // a run does not change the answer.
+  useEffect(() => {
+    const seats = mode === 'forge'
+      ? [[slug, owner], [oppSlug, oppOwner]]
+      : [[slug, owner]]
+    let live = true
+    for (const [s, o] of seats) {
+      if (!s) continue
+      const key = address(s, o ?? '')
+      const tile = deckOf(s, o ?? '')
+      // `errors` is null when the pool was unavailable and the gate never
+      // ran, which is not a pass and must not render as one -- but it is
+      // also not something this screen can diagnose, so it asks nothing.
+      if (!tile || !tile.errors) continue
+      if (checks[key]) continue
+      api.validate({ owner: tile.owner, slug: tile.slug })
+        .then((report) => { if (live) setChecks((c) => ({ ...c, [key]: report })) })
+        .catch(() => undefined)   // a caution nobody can fetch is not an error
+    }
+    return () => { live = false }
+  }, [slug, owner, oppSlug, oppOwner, mode, decks, checks])   // eslint-disable-line react-hooks/exhaustive-deps
+
   async function run(withSeed = seed) {
     if (!slug) return
     cancelRef.current?.()
+    setSubmitting(true)
     setError(null)
+    // The stage is struck before the next match rather than after the last
+    // one, so a second Forge run is "lighting" again instead of inheriting
+    // the finished job that made the first one stop saying so.
+    setJob(null)
     setMana(null)
     setLands(null)
     setForge(null)
@@ -218,6 +273,7 @@ export default function Simulator() {
         setError(errorMessage(e))
       } finally {
         setShelfBusy(false)
+        setSubmitting(false)
       }
       return
     }
@@ -255,6 +311,8 @@ export default function Simulator() {
       else setForge(finished.result as ForgeResult)
     } catch (e) {
       setError(errorMessage(e))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -269,8 +327,11 @@ export default function Simulator() {
     void run(next)
   }
 
-  const running = shelfBusy
+  const running = submitting || shelfBusy
     || job?.status === 'queued' || job?.status === 'running'
+  /** Pressed, and the job has not reported back yet — the seconds a Forge
+   *  match spends starting a JVM, and where "did that click land?" lives. */
+  const lighting = submitting && !job
 
   return (
     <div className="space-y-6">
@@ -387,9 +448,17 @@ export default function Simulator() {
         )}
         <NumberField label="Shuffle" value={seed} onChange={setSeed}
                      min={1} max={999999} help={help('sim.seed')} />
+        {/* Pressed is a state the button has to be able to show, and until
+            now it could not: `running` came from the job, the job comes from
+            the POST, and a Forge POST is a JVM starting. So the slowest
+            action on the screen was the one whose button stayed live and
+            unchanged after it was clicked (punch list item 6). `lighting` is
+            that gap, and Forge gets its own word for it because Forge is
+            where the gap is long enough to read. */}
         <button onClick={() => run()} disabled={running || !slug}
                 className="btn btn-primary btn-accent-1">
-          {running ? 'Running…' : 'Run simulation'}
+          {lighting && mode === 'forge' ? 'Lighting the forge…'
+            : running ? 'Running…' : 'Run simulation'}
         </button>
         <button onClick={resample} disabled={running || !slug}
                 title="Run the same deck against a different shuffle"
@@ -398,6 +467,15 @@ export default function Simulator() {
           New sample
         </button>
       </div>
+
+      {/* What a run will leave out, before it is paid for. Both seats in
+          Forge, where the bill is minutes of real games. */}
+      <DeckCaution report={checks[address(slug, owner)]}
+                   name={deckOf(slug, owner)?.name ?? slug} />
+      {mode === 'forge' && address(oppSlug, oppOwner) !== address(slug, owner) && (
+        <DeckCaution report={checks[address(oppSlug, oppOwner)]}
+                     name={deckOf(oppSlug, oppOwner)?.name ?? oppSlug} />
+      )}
 
       {error && <ErrorNote>Simulation failed: {error}</ErrorNote>}
 
