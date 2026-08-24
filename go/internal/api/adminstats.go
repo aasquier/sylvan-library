@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
@@ -182,6 +183,12 @@ func sizeOf(path string) *int64 {
 	return &total
 }
 
+// countDirs counts deck directories, skipping the two prefixes the file tier
+// itself skips: `_` is scaffolding and `.` is invisible to the glob
+// (`library.FileSource.deckPaths`). Without that rule this panel counted
+// `.trash` as a deck, so an instance reported one more deck than its own
+// deck list did from the moment anybody deleted one -- and the trash
+// directory, whose entries are `slug-stamp`, is counted correctly either way.
 func countDirs(path string) int {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -189,9 +196,10 @@ func countDirs(path string) int {
 	}
 	count := 0
 	for _, e := range entries {
-		if e.IsDir() {
-			count++
+		if !e.IsDir() || strings.HasPrefix(e.Name(), "_") || strings.HasPrefix(e.Name(), ".") {
+			continue
 		}
+		count++
 	}
 	return count
 }

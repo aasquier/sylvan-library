@@ -107,7 +107,21 @@ func BulkDownloadURL(entry map[string]any) (string, error) {
 // already exists; writes to a `.part` and renames only once complete, so an
 // interrupted download is never mistaken for a valid cached copy.
 func DownloadBulk(ctx context.Context, kind, destDir string) (string, error) {
-	index, err := fetchJSON(ctx, BulkIndex)
+	return DownloadBulkFrom(ctx, BulkIndex, kind, destDir)
+}
+
+// DownloadBulkFrom is [DownloadBulk] against a named index, which is how the
+// tests reach the download path at all.
+//
+// The index URL is a parameter rather than a package-level variable a test
+// swaps: the swap would be shared state, `-race` would have something to say
+// about it, and every test that touched it would have to be serial. Passed
+// down, the whole path -- the entry pick, the suffix rules, the dated skip,
+// the `.part` rename -- is exercised by parallel tests against an
+// `httptest.Server`, and no production caller has a second way to spell the
+// real index.
+func DownloadBulkFrom(ctx context.Context, indexURL, kind, destDir string) (string, error) {
+	index, err := fetchJSON(ctx, indexURL)
 	if err != nil {
 		return "", err
 	}

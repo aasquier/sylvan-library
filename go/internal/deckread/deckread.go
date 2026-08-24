@@ -323,14 +323,23 @@ func WithArt(row CardJSON, overrides map[string]ChosenArt) CardJSON {
 func CardArtOverrides(ctx context.Context, c *pool.Conn, d *deck.Deck) (map[string]ChosenArt, error) {
 	chosen := map[string]string{}
 	ids := []string{}
+	// **First choice wins, for the id list and the name map alike.** They
+	// used to disagree: the id list kept the first printing a name chose
+	// while the map kept the last, so a card that appears in two sections
+	// with two different printings -- the 99 and the swap board, which is
+	// exactly what a swap in progress looks like -- had the wrong id queried
+	// and lost its art entirely. The sections are walked 99-first, so the
+	// deck proper's choice is the one that renders.
 	for _, list := range [][]deck.CardEntry{d.Cards, d.SwapBoard, d.Graveyard} {
 		for _, card := range list {
-			if card.Art != "" {
-				if _, dup := chosen[card.Name]; !dup {
-					ids = append(ids, card.Art)
-				}
-				chosen[card.Name] = card.Art
+			if card.Art == "" {
+				continue
 			}
+			if _, dup := chosen[card.Name]; dup {
+				continue
+			}
+			ids = append(ids, card.Art)
+			chosen[card.Name] = card.Art
 		}
 	}
 	out := map[string]ChosenArt{}
