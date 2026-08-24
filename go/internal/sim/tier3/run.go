@@ -217,6 +217,12 @@ type SimRun struct {
 	// ForgeVersion is which Forge played, from the jar's name — or "" when the
 	// run was rebuilt from a wire payload that predates the field.
 	ForgeVersion string
+	// Events is one [EventLog] per game, and is empty unless the run asked to
+	// be narrated. It is **not** on [WireRun]: the recorded worker-wire corpus
+	// pins that struct's bytes, and a finished run is the wrong place for a
+	// thousand beats anyway — they cross on the stream, one line per game, and
+	// a run rebuilt from the wire carries none.
+	Events []EventLog
 }
 
 // Games is the run's completed games.
@@ -261,6 +267,24 @@ type RunOptions struct {
 	// tick per game and the match theater show the row behind the tick. Ticks
 	// are best-effort progress, never results.
 	OnGame func(finished int, game GameResult)
+	// Narrate drops Forge's `-q`, so it prints the whole game log rather than
+	// one line per game, and [OnEvents] hears the beats.
+	//
+	// **Off for anything measured, on for anything watched.** The flag itself
+	// is free — the same seed narrated and quiet played in 8055ms and 8205ms,
+	// inside the noise of one sample — but it turns a nine-turn game from one
+	// line into 477, and a nightly sweep has nobody watching it. `events.go`
+	// carries the measurement.
+	Narrate bool
+	// OnEvents is called once per game with that game's beats, after the
+	// result line closes it.
+	//
+	// Per game rather than per beat, deliberately. Forge plays a game in
+	// about eight seconds and a person cannot watch eight seconds of
+	// Commander; the beats are handed over whole and whoever is showing them
+	// paces them. That also keeps the stream to one extra line per game
+	// instead of a hundred.
+	OnEvents func(log EventLog)
 }
 
 // MemoryDefault is `run_games`'s `memory_mb`.
@@ -346,7 +370,13 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 	}
 	argv = append(argv, names...)
 	argv = append(argv, "-f", "Commander",
-		"-n", strconv.Itoa(opt.Games), "-c", strconv.Itoa(opt.Clock), "-q")
+		"-n", strconv.Itoa(opt.Games), "-c", strconv.Itoa(opt.Clock))
+	// `-q` is Forge's own flag for "the game result, not the entire game
+	// log", read off its `sim -h`. Narrating is its absence rather than a
+	// flag of its own.
+	if !opt.Narrate {
+		argv = append(argv, "-q")
+	}
 	if opt.Seed != nil {
 		argv = append(argv, "-s", opt.Seed.String())
 	}
@@ -407,6 +437,7 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting Forge: %w", err)
 	}
+	var collected []EventLog
 
 	// A blocking read honours no deadline of its own, so the deadline is a
 	// timer that kills the JVM — EOF then ends the read loop, and the flag is
@@ -421,6 +452,14 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 	})
 
 	parser := NewStreamParser()
+	// The second reader of the same pass. One read of the stream feeds both,
+	// so a game's beats and the row that closes it can never come from
+	// different passes and disagree — the property `StreamParser` was folded
+	// into one machine for in the first place.
+	var events *EventParser
+	if opt.Narrate {
+		events = NewEventParser()
+	}
 	var text []string
 	finished := 0
 	reader := bufio.NewReaderSize(stdout, 64*1024)
@@ -428,6 +467,14 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 		line, err := reader.ReadString('\n')
 		if line != "" {
 			text = append(text, strings.TrimRight(line, "\n"))
+			if events != nil {
+				if log := events.Feed(line); log != nil {
+					collected = append(collected, *log)
+					if opt.OnEvents != nil {
+						opt.OnEvents(*log)
+					}
+				}
+			}
 			if game := parser.Feed(line); game != nil {
 				finished++
 				if opt.OnGame != nil {
@@ -459,7 +506,8 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 	}
 
 	return &spawned{
-		SimRun: SimRun{Argv: argv, Output: parser.Output, WallSeconds: elapsed},
-		tail:   text,
+		SimRun: SimRun{Argv: argv, Output: parser.Output, WallSeconds: elapsed,
+			Events: collected},
+		tail: text,
 	}, nil
 }

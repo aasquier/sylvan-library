@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -582,6 +583,7 @@ func simForgeCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 		games, clock int
 		seed         int64
 		checkOnly    bool
+		narrate      bool
 	)
 	cmd := &cobra.Command{
 		Use:   "forge <a> <b> [c] [d]",
@@ -614,8 +616,19 @@ func simForgeCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 			if cmd.Flags().Changed("seed") {
 				seedPtr = big.NewInt(seed)
 			}
+			// Narrating prints each game as it finishes rather than after
+			// the tally, because the tally is the last thing Forge says and
+			// a person who asked to watch should not wait for it.
+			var onEvents func(tier3.EventLog)
+			if narrate {
+				seats := seatsOf(decks)
+				onEvents = func(log tier3.EventLog) {
+					narrateGame(out, log, seats)
+				}
+			}
 			result, err := forge.RunGames(decks, tier3.RunOptions{
 				Games: games, Clock: clock, Seed: seedPtr,
+				Narrate: narrate, OnEvents: onEvents,
 			})
 			if err != nil {
 				return err
@@ -690,7 +703,91 @@ func simForgeCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 	f.Int64Var(&seed, "seed", 0, "seed Forge's shuffles; unset is unseeded")
 	f.BoolVar(&checkOnly, "check-only", false,
 		"card-coverage pre-flight only; needs no JVM")
+	// The flag is free in time and expensive in output: `events.go` measures
+	// the first (8055ms narrated against 8205ms quiet, one sample) and the
+	// second (477 lines for a nine-turn game). So it is asked for and never
+	// assumed -- `--games 10 --narrate` is five thousand lines nobody wants.
+	f.BoolVar(&narrate, "narrate", false,
+		"tell each game as it is played, beat by beat")
 	return cmd
+}
+
+// seatsOf maps a seat to the deck slug sitting in it, which is the order the
+// decks were passed -- the same rule `RunGames` uses to build `Seats`. Built
+// here rather than read off the run because narration happens *during* the
+// run, when there is no run yet.
+func seatsOf(decks []*deck.Deck) map[int]string {
+	seats := map[int]string{}
+	for i, d := range decks {
+		seats[i+1] = d.Slug
+	}
+	return seats
+}
+
+// narrateGame tells one game on the terminal.
+//
+// Deliberately a plain account rather than a table: this is the same event
+// stream the match theater will animate, and the point of putting it on the
+// CLI first is that a person can read exactly what the browser will be
+// handed. A beat nobody can follow here is a beat nothing can animate there.
+func narrateGame(out io.Writer, log tier3.EventLog, seats map[int]string) {
+	who := func(seat int) string {
+		if slug, ok := seats[seat]; ok {
+			return slug
+		}
+		if seat == 0 {
+			return "somebody"
+		}
+		return fmt.Sprintf("seat %d", seat)
+	}
+
+	fmt.Fprintf(out, "\n--- game %d ---\n", log.Game)
+	for _, e := range log.Events {
+		switch e.Kind {
+		case tier3.EventTurn:
+			fmt.Fprintf(out, "\nturn %-3d %s\n", e.Turn, who(e.Seat))
+		case tier3.EventMulligan:
+			fmt.Fprintf(out, "  %s keeps %d\n", who(e.Seat), e.Amount)
+		case tier3.EventLand:
+			fmt.Fprintf(out, "  %s plays %s\n", who(e.Seat), e.Card)
+		case tier3.EventCast:
+			fmt.Fprintf(out, "  %s casts %s\n", who(e.Seat), e.Card)
+		case tier3.EventResolve:
+			fmt.Fprintf(out, "    %s resolves\n", e.Card)
+		case tier3.EventAttack:
+			fmt.Fprintf(out, "  %s attacks %s with %s\n",
+				who(e.Seat), who(e.TargetSeat), e.Card)
+		case tier3.EventBlock:
+			fmt.Fprintf(out, "    %s blocks %s\n", e.Card, e.Target)
+		case tier3.EventUnblocked:
+			fmt.Fprintf(out, "    %s is unblocked\n", e.Card)
+		case tier3.EventDamage:
+			target := e.Target
+			if target == "" {
+				target = who(e.TargetSeat)
+			}
+			fmt.Fprintf(out, "    %s deals %d to %s\n", e.Card, e.Amount, target)
+		case tier3.EventLife:
+			if e.Life != nil {
+				fmt.Fprintf(out, "    %s at %d\n", who(e.Seat), *e.Life)
+			}
+		case tier3.EventDies:
+			fmt.Fprintf(out, "    %s dies\n", e.Card)
+		case tier3.EventOutcome:
+			verb := "loses"
+			if e.Amount == 1 {
+				verb = "WINS"
+			}
+			// No punctuation between them: Forge writes its nine outcome
+			// reasons to follow "<player> has won/lost", so verb and note
+			// are already one sentence.
+			fmt.Fprintf(out, "\n  %s %s %s\n", who(e.Seat), verb, e.Note)
+		}
+	}
+	if log.Truncated {
+		fmt.Fprintf(out, "\n  (this game outran the %d-beat ceiling; "+
+			"the rest is not shown)\n", tier3.EventCap)
+	}
 }
 
 // recordForgeMatch writes the finished match into the ledger, never failing

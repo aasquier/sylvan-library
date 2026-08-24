@@ -171,3 +171,94 @@ func TestARealMatchPlaysAndParses(t *testing.T) {
 }
 
 func bigSeed(n int64) *big.Int { return big.NewInt(n) }
+
+// TestARealMatchNarratesItself is the same path with `-q` withheld.
+//
+// The claim about the world here is that Forge's game log still looks the way
+// `events.go`'s patterns were written from — a claim no corpus can make, since
+// the corpus *is* a recording of that log and would agree with itself after
+// Forge changed every line. If a release renames "didn't block" or moves the
+// instance id, this is what says so.
+func TestARealMatchNarratesItself(t *testing.T) {
+	t.Parallel()
+	forge := liveForge(t)
+	decks := liveDecks(t)
+
+	var told []tier3.EventLog
+	run, err := forge.RunGames(decks, tier3.RunOptions{
+		Games: 2, Clock: 300, Seed: bigSeed(11), Narrate: true,
+		OnEvents: func(log tier3.EventLog) { told = append(told, log) },
+	})
+	if err != nil {
+		t.Fatalf("the narrated match failed: %v", err)
+	}
+
+	// One log per game, in order, and the same logs on the run.
+	if len(told) != 2 {
+		t.Fatalf("heard %d games narrated, want 2", len(told))
+	}
+	if len(run.Events) != 2 {
+		t.Fatalf("the run carries %d narrated games, want 2", len(run.Events))
+	}
+	for i, log := range told {
+		if log.Game != i+1 {
+			t.Errorf("game %d narrated as %d", i+1, log.Game)
+		}
+		if len(log.Events) != len(run.Events[i].Events) {
+			t.Errorf("game %d: the callback heard %d beats, the run kept %d",
+				i+1, len(log.Events), len(run.Events[i].Events))
+		}
+	}
+
+	// The beats a game cannot be played without. A parser whose patterns had
+	// rotted would still return a list — an empty one, or one of nothing but
+	// turns — so this asks for the kinds that prove real lines were read.
+	for i, log := range told {
+		seen := map[tier3.EventKind]int{}
+		for _, e := range log.Events {
+			seen[e.Kind]++
+		}
+		t.Logf("game %d: %d beats %v", log.Game, len(log.Events), seen)
+		for _, kind := range []tier3.EventKind{
+			tier3.EventTurn, tier3.EventLand, tier3.EventCast, tier3.EventOutcome,
+		} {
+			if seen[kind] == 0 {
+				t.Errorf("game %d has no %s beats; the pattern has rotted", i+1, kind)
+			}
+		}
+		// Two players, two verdicts, exactly one of them a win.
+		wins := 0
+		for _, e := range log.Events {
+			if e.Kind == tier3.EventOutcome && e.Amount == 1 {
+				wins++
+			}
+		}
+		if game := run.Games()[i]; !game.Draw && wins != 1 {
+			t.Errorf("game %d was won, but %d beats claim a win", i+1, wins)
+		}
+	}
+}
+
+// TestAQuietMatchNarratesNothing pins the flag to its cost. Narrating is
+// opt-in because it turns one line per game into hundreds; a run that
+// collected them anyway would be paying for output nobody asked for.
+func TestAQuietMatchNarratesNothing(t *testing.T) {
+	t.Parallel()
+	forge := liveForge(t)
+	decks := liveDecks(t)
+
+	called := 0
+	run, err := forge.RunGames(decks, tier3.RunOptions{
+		Games: 1, Clock: 300, Seed: bigSeed(11),
+		OnEvents: func(tier3.EventLog) { called++ },
+	})
+	if err != nil {
+		t.Fatalf("the quiet match failed: %v", err)
+	}
+	if called != 0 {
+		t.Errorf("a quiet run narrated %d games", called)
+	}
+	if len(run.Events) != 0 {
+		t.Errorf("a quiet run kept %d narrated games", len(run.Events))
+	}
+}
