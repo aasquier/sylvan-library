@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,13 +48,40 @@ type stubShim struct {
 	// of it), so the only place to see a row seated live is *during* the
 	// match.
 	hold chan struct{}
+
+	// `seen` is written by `net/http`'s per-connection goroutines, so it needs
+	// the lock -- and the reason it needs it now is the `hold` field above.
+	//
+	// Holding the stream is what made the dedupe test honest (see
+	// [TestTwoIdenticalAsksAreOneMatch]), and it is *also* what made two of
+	// this stub's handlers run at once: with a match parked mid-stream, the
+	// second ask's health poll is served by a second goroutine while the first
+	// is still inside the handler. An unguarded `append` from two of them is a
+	// real race, and the fix for the timing bug is what opened it. CI's arm64
+	// runner found it; twenty `-race -count` runs on the maintainer's amd64
+	// Mac did not, which is the same architecture story that test's own
+	// comment tells.
+	//
+	// Read it with [stubShim.requests], never the field: a reader that runs
+	// while anything is in flight races the writer just as surely.
+	mu   sync.Mutex
 	seen []string
+}
+
+// requests is what the stub has been asked, as of now. A copy, so the caller
+// can range over it while the worker is still talking.
+func (s *stubShim) requests() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.seen...)
 }
 
 func (s *stubShim) serve(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
 		s.seen = append(s.seen, r.Method+" "+r.URL.Path)
+		s.mu.Unlock()
 		switch r.URL.Path {
 		case "/healthz":
 			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
@@ -207,8 +235,8 @@ func TestAHostedMatchRunsAfterTheRequestHasGone(t *testing.T) {
 	// The match really crossed the wire: the stub saw a health poll, the
 	// pre-flight and the match itself.
 	want := []string{"GET /healthz", "POST /coverage", "GET /healthz", "POST /match"}
-	if strings.Join(shim.seen, ",") != strings.Join(want, ",") {
-		t.Errorf("the shim saw %v, want %v", shim.seen, want)
+	if got := shim.requests(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("the shim saw %v, want %v", got, want)
 	}
 }
 
@@ -413,7 +441,7 @@ func TestADeckForgeCannotPlayIsA422ThatNamesTheCards(t *testing.T) {
 		}
 	}
 	// And no match was ever asked for.
-	for _, seen := range shim.seen {
+	for _, seen := range shim.requests() {
 		if seen == "POST /match" {
 			t.Error("a match ran against a deck Forge cannot play")
 		}
@@ -558,8 +586,8 @@ func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
 	}
 	// **No machine was woken to answer it.** The gate is asked on every visit
 	// to the Simulator; one that started a JVM would be a bill.
-	if len(shim.seen) != 0 {
-		t.Errorf("the gate reached the worker: %v", shim.seen)
+	if got := shim.requests(); len(got) != 0 {
+		t.Errorf("the gate reached the worker: %v", got)
 	}
 }
 
