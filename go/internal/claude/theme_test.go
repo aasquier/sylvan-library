@@ -577,10 +577,10 @@ func TestWhatTheTwoChecksRefuse(t *testing.T) {
 				transcript = nil
 			}
 			_, err = CheckAsk(transcript, anySlots(row.Slots), row.Requested,
-				row.Persona, row.Seed, row.Facts, "", nil)
+				row.Persona, row.Seed, row.Facts, "", nil, Endpoint{})
 		} else {
 			_, err = CheckProposal(anyTranscript(corpus.Transcript), anySlots(row.Slots),
-				row.Requested, nil, "", row.Persona, row.Seed, "", nil)
+				row.Requested, nil, "", row.Persona, row.Seed, "", nil, Endpoint{})
 		}
 		if row.Error == "" {
 			if err != nil {
@@ -611,7 +611,7 @@ func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
 	freezeAngle(t, corpus.AngleIndex)
 	for _, row := range corpus.Asks {
 		plan, err := CheckAsk(anyTranscript(row.Transcript), anySlots(row.Slots), row.Requested,
-			row.Persona, row.Seed, row.Facts, "", nil)
+			row.Persona, row.Seed, row.Facts, "", nil, Endpoint{})
 		if err != nil {
 			t.Fatalf("%s: %v", row.Note, err)
 		}
@@ -648,7 +648,7 @@ func TestEveryThemeProposalOutcomeAgreesWithTheCorpus(t *testing.T) {
 		ctx := context.Background()
 		for _, row := range corpus.Proposals {
 			plan, err := CheckProposal(anyTranscript(corpus.Transcript), anySlots(row.Slots),
-				row.Requested, row.Budget, row.Avoid, row.Persona, row.Seed, "", nil)
+				row.Requested, row.Budget, row.Avoid, row.Persona, row.Seed, "", nil, Endpoint{})
 			if err != nil {
 				t.Fatalf("%s: %v", row.Note, err)
 			}

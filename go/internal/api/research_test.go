@@ -26,8 +26,8 @@ const groundedAnswer = `{"answer":"It is still played in stompy lists.",` +
 	`{"id":"s2","title":"t","url":"https://example.com/invented"}]}`
 
 func TestResearchRefusesWhatItCanBeforeAnyJob(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	long := strings.Repeat("x", 2001)
 	for _, row := range []struct {
@@ -58,8 +58,8 @@ func TestResearchRefusesWhatItCanBeforeAnyJob(t *testing.T) {
 }
 
 func TestAtStanceOffResearchIsAJobBornFinishedEvenWithNoKey(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", researchAt,
 		`{"question":"Is Goreclaw still played?","stance":"off"}`)
@@ -78,8 +78,8 @@ func TestAtStanceOffResearchIsAJobBornFinishedEvenWithNoKey(t *testing.T) {
 func TestResearchIsAJobWhoseResultIsTheReport(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("The Real Page")+","+said(groundedAnswer))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", researchAt,
 		`{"question":"  Is Goreclaw still played?  "}`)
@@ -146,8 +146,8 @@ func TestResearchCannotReachADeckThroughAnyTool(t *testing.T) {
 		answer("tool_use", `{"type":"tool_use","id":"tu_1","name":"get_deck","input":{"slug":"kaheera"}}`),
 		answer("end_turn", searchedPage("t")+","+said(groundedAnswer)),
 	}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, payload, _ := callAs(t, rig.api, alice, "POST", researchAt, `{"question":"What does kaheera run?"}`)
 	done, _ := rig.await(t, payload["id"].(string))
@@ -179,8 +179,8 @@ func TestTwoIdenticalQuestionsInFlightAreOneJob(t *testing.T) {
 	// Two runs' worth of replies: alice's one job, and bob's own.
 	reply := answer("end_turn", searchedPage("t")+","+said(groundedAnswer))
 	api := &scriptedClaude{hold: make(chan struct{}), replies: []string{reply, reply}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, first, _ := callAs(t, rig.api, alice, "POST", researchAt, `{"question":"Is Goreclaw still played?"}`)
 	_, second, _ := callAs(t, rig.api, alice, "POST", researchAt, `{"question":"  is GORECLAW still   played? "}`)
@@ -201,9 +201,10 @@ func TestTwoIdenticalQuestionsInFlightAreOneJob(t *testing.T) {
 }
 
 func TestAFailedResearchCallIsAReadableJobError(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{"!401"}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, payload, _ := callAs(t, rig.api, alice, "POST", researchAt, `{"question":"Why?"}`)
 	done, _ := rig.await(t, payload["id"].(string))

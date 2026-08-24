@@ -142,7 +142,7 @@ func dossierOpening(facts wire.OrderedMap) string {
 // the model id -- so editing the instructions misses every stored row, and
 // two tiers never share a commander's dossier. See the package note on why
 // these bytes are exact and recorded.
-func Fingerprint(tier string) (string, error) {
+func Fingerprint(e Endpoint, tier string) (string, error) {
 	mode, err := GetMode(ModeCommanderDossier)
 	if err != nil {
 		return "", err
@@ -151,18 +151,18 @@ func Fingerprint(tier string) (string, error) {
 	digest.Write([]byte(strconv.Itoa(DossierVersion)))
 	digest.Write([]byte(mode.Instructions))
 	digest.Write([]byte(dumpJSON(mode.ResponseSchema, dumpOptions{SortKeys: true})))
-	digest.Write([]byte(ModelFor(tier)))
+	digest.Write([]byte(e.ModelFor(tier)))
 	return hex.EncodeToString(digest.Sum(nil))[:16], nil
 }
 
 // CacheKey is the key for one commander's dossier, or ""
 // when there is no oracle id -- which disables caching for that deck rather
 // than colliding every uncatalogued commander onto one row.
-func CacheKey(oracleID, tier string) (string, error) {
+func CacheKey(e Endpoint, oracleID, tier string) (string, error) {
 	if oracleID == "" {
 		return "", nil
 	}
-	fp, err := Fingerprint(tier)
+	fp, err := Fingerprint(e, tier)
 	if err != nil {
 		return "", err
 	}
@@ -352,8 +352,12 @@ type DossierRequest struct {
 	Refresh bool
 	// Tier is the asking seat's model grant; empty is the house model.
 	Tier string
-	// Limit is the deployment's ceiling; nil reads it from the environment.
+	// Limit is the deployment's ceiling; nil is the built-in default.
 	Limit *Stance
+	// Endpoint is where the call goes, and it is part of the cache key --
+	// the model a dossier was written by is in its fingerprint, so two
+	// endpoints on different models cannot read each other's rows.
+	Endpoint Endpoint
 	// Store is the `dossier_cache` table; nil caches nothing.
 	Store *DossierStore
 }
@@ -369,6 +373,10 @@ type DossierRequest struct {
 // they travel as a result -- a job born finished -- and the client's response
 // shape never forks.
 type DossierPlan struct {
+	// Endpoint is where this call goes. Carried on the plan rather than
+	// looked up, so a background job that outlives its request still knows
+	// which endpoint it was planned against (ADR 39).
+	Endpoint  Endpoint
 	Slug      string
 	Facts     wire.OrderedMap
 	Commander string
@@ -406,11 +414,11 @@ func CheckDossier(ctx context.Context, conn *pool.Conn, slug string, d *deck.Dec
 	if err != nil {
 		return nil, err
 	}
-	key, err := CacheKey(oracleID, req.Tier)
+	key, err := CacheKey(req.Endpoint, oracleID, req.Tier)
 	if err != nil {
 		return nil, err
 	}
-	plan := &DossierPlan{Slug: slug, Facts: facts, Commander: name, OracleID: oracleID,
+	plan := &DossierPlan{Endpoint: req.Endpoint, Slug: slug, Facts: facts, Commander: name, OracleID: oracleID,
 		Key: key, Effective: effective, Tier: req.Tier, Store: req.Store}
 
 	if !req.Refresh {
@@ -457,6 +465,7 @@ func RunDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, run Dos
 		return DossierReport{}, err
 	}
 	turn, err := Converse(ctx, mode, Request{
+		Endpoint: plan.Endpoint,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(dossierOpening(plan.Facts))),
 		},
@@ -583,7 +592,7 @@ type HeadlessDossier struct {
 
 // ReadCachedDossier answers `GET .../dossier`: one of the two shapes above.
 func ReadCachedDossier(ctx context.Context, conn *pool.Conn, slug string, d *deck.Deck,
-	store *DossierStore) (any, error) {
+	store *DossierStore, e Endpoint) (any, error) {
 	facts, err := DossierBrief(ctx, conn, slug, d)
 	var headless *ErrNoCommander
 	if errors.As(err, &headless) {
@@ -598,7 +607,7 @@ func ReadCachedDossier(ctx context.Context, conn *pool.Conn, slug string, d *dec
 	if id, ok := kv(card, "oracle_id").(*string); ok && id != nil {
 		oracleID = *id
 	}
-	key, err := CacheKey(oracleID, "")
+	key, err := CacheKey(e, oracleID, "")
 	if err != nil {
 		return nil, err
 	}

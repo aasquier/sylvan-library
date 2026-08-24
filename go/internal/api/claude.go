@@ -131,7 +131,7 @@ func (a *API) claudeStatus(w http.ResponseWriter, r *http.Request) {
 	if stance != "" {
 		requested = stance
 	}
-	dial, err := claude.Status(requested, asked, surface)
+	dial, err := claude.Status(requested, asked, surface, a.claude)
 	if err != nil {
 		// The one thing that can fail here, and it is the caller's: a preset
 		// name that is not one. The recorded 422.

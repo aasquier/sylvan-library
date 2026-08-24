@@ -29,8 +29,8 @@ func scanBody(fields string) string { return "{" + fields + "}" }
 // Carried into a worker they would arrive as a job in state `error` -- one
 // string for three cases and a status code for none.
 func TestTheScanRouteRefusesWhatItCanBeforeAnyJob(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	good := aCapture("x")
 	for _, row := range []struct {
@@ -74,8 +74,8 @@ func TestTheScanRouteRefusesWhatItCanBeforeAnyJob(t *testing.T) {
 // The capture is checked **before** the stance and before the key, so a
 // photograph nobody could read never reports itself as a missing credential.
 func TestTheCaptureIsRefusedBeforeTheStanceAndTheKey(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	// All three wrong at once: the capture wins.
 	status, payload, raw := callAs(t, rig.api, alice, "POST", scanAt,
@@ -108,8 +108,8 @@ func TestTheCaptureIsRefusedBeforeTheStanceAndTheKey(t *testing.T) {
 // the day that one was ruled and ruled with it. This test is the wart's own,
 // kept and inverted.
 func TestACaptureThatIsNotTextIsA422(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, image := range []string{`[1,2,3]`, `{"a":1}`, `7`, `7.5`, `true`} {
 		status, payload, raw := callAs(t, rig.api, alice, "POST", scanAt,
@@ -149,12 +149,12 @@ func TestACaptureThatIsNotTextIsA422(t *testing.T) {
 // The card is `Black Lotus`, which `tiny_pool` holds -- so this also proves the half
 // that matters most: the transcription is looked up rather than believed.
 func TestAScanTranscribesAndThePoolNamesTheCard(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"title":"  Black Lotus  ","corner":""}`)),
 	}}
-	script.start(t)
+	rig.api.claude = script.start(t)
 
 	status, payload, raw := callAs(t, rig.api, alice, "POST", scanAt,
 		scanBody(fmt.Sprintf(`"image":%q`, aCapture("lotus"))))
@@ -212,12 +212,13 @@ func TestAScanTranscribesAndThePoolNamesTheCard(t *testing.T) {
 // empty sighting hands the identifier an empty list, so no lookup
 // happens at all.
 func TestAnUnreadableCaptureIsANullReading(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"title":"","corner":"   "}`)),
 	}}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 	status, payload, raw := callAs(t, rig.api, alice, "POST", scanAt,
 		scanBody(fmt.Sprintf(`"image":%q`, aCapture("blur"))))
 	if status != 200 {
@@ -240,7 +241,7 @@ func TestAnUnreadableCaptureIsANullReading(t *testing.T) {
 // **The dedupe is the picture.** Two presses on one shot are one paid call;
 // a different photograph is different work.
 func TestTwoPressesOnOnePhotographAreOneJob(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	hold := make(chan struct{})
 	script := &scriptedClaude{
@@ -250,7 +251,8 @@ func TestTwoPressesOnOnePhotographAreOneJob(t *testing.T) {
 		},
 		hold: hold,
 	}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 
 	same := aCapture("one-shot")
 	first := submitScan(t, rig, same)
@@ -272,14 +274,15 @@ func TestTwoPressesOnOnePhotographAreOneJob(t *testing.T) {
 // are one job. `YW==` and `YQ==` decode to the same byte and the digest is
 // over the re-encoding, never what arrived.
 func TestTwoSpellingsOfOnePhotographAreOneJob(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	hold := make(chan struct{})
 	script := &scriptedClaude{
 		replies: []string{answer("end_turn", said(`{"title":"x","corner":""}`))},
 		hold:    hold,
 	}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 	if a, b := submitScan(t, rig, "YW=="), submitScan(t, rig, "YQ=="); a != b {
 		t.Errorf("the same byte under two spellings made two jobs (%s, %s)", a, b)
 	}
@@ -291,12 +294,13 @@ func TestTwoSpellingsOfOnePhotographAreOneJob(t *testing.T) {
 // with a picture on it, and queueing it behind the simulator's single CPU
 // worker would be minutes of stall for nothing.
 func TestAScanWaitsOnTheNetworkLane(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"title":"Black Lotus","corner":""}`)),
 	}}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 	id := submitScan(t, rig, aCapture("lane"))
 	rig.jobs.Wait()
 	found := false
@@ -321,12 +325,14 @@ func TestAScanWaitsOnTheNetworkLane(t *testing.T) {
 // explanation, never a stack trace and never with a mode name prefixed onto
 // it.
 func TestAFailedScanCallIsAFailedJob(t *testing.T) {
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	// 401 and not 500: the SDK retries a 500 five times, and what this
 	// asserts is what a failed call leaves in the job, not the retry policy.
 	script := &scriptedClaude{replies: []string{"!401"}}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 	id := submitScan(t, rig, aCapture("boom"))
 	done, raw := rig.await(t, id)
 	if done["status"] != "error" {

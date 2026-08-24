@@ -88,6 +88,8 @@ func (a *API) rationaleInterview(w http.ResponseWriter, r *http.Request) {
 	err = a.withPool(r.Context(), func(c *pool.Conn) error {
 		var runErr error
 		report, runErr = claude.Interview(r.Context(), c, d, card, claude.InterviewRequest{
+			Endpoint:  a.claude.Endpoint,
+			Limit:     a.claude.Ceiling,
 			Requested: requested,
 			Focus:     focus,
 			// The caller's own source, so a tool the conversation reaches for
@@ -157,7 +159,7 @@ func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool 
 		// already knows how to turn a 401 into "your key may have expired"
 		// rather than a stack trace.
 		a.log.Error("the Claude route failed", "route", where, "error", err)
-		wire.Detail(w, http.StatusBadGateway, claude.Explain(err))
+		wire.Detail(w, http.StatusBadGateway, claude.Explain(err, a.claude.Endpoint.ModelFor("")))
 	}
 	return true
 }

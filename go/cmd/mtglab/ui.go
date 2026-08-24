@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/door"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -182,7 +183,10 @@ func serve(host, port, webDist, tarot string) error {
 		ScryfallDir: cfg.ScryfallDir(),
 		DataDir:     cfg.DataDir,
 		AdminEmail:  cfg.AdminEmail,
-		Logger:      log,
+		// Read once here, like every other setting (ADR 39): the routes are
+		// handed where the calls go rather than looking it up per request.
+		Claude: claude.SettingsFromEnv(),
+		Logger: log,
 	})
 	if err != nil {
 		return err

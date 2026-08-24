@@ -25,7 +25,7 @@ import (
 
 func TestTheDialAnswersWithoutADeck(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := as(t, a, alice, "/api/claude")
 	if status != 200 {
@@ -53,7 +53,7 @@ func TestTheDialAnswersWithoutADeck(t *testing.T) {
 // an ASCII one, a difference every structural check in this file would pass.
 func TestTheDialsKeyOrderIsTheRecordedOne(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	_, _, raw := as(t, a, alice, "/api/claude")
 	var keys []string
@@ -85,7 +85,7 @@ func TestTheDialsKeyOrderIsTheRecordedOne(t *testing.T) {
 // and one about sleeved cardboard costs a trip to the box.
 func TestTheDialReadsTheDecksStatus(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	for slug, want := range map[string]string{
 		"rich":       "consultant",     // status: built
@@ -114,7 +114,7 @@ func TestTheDialReadsTheDecksStatus(t *testing.T) {
 // the natural Go shape resolves the source lazily and answers 200.
 func TestAnUnknownOwnerIsA404EvenWithNoSlug(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	for _, target := range []string{
 		"/api/claude?owner=nobody",
@@ -136,7 +136,7 @@ func TestAnUnknownOwnerIsA404EvenWithNoSlug(t *testing.T) {
 // wrong is contract rather than taste -- and it is the deck's, measured.
 func TestTheDeckIsRefusedBeforeTheStanceIs(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	// Both wrong: the deck wins.
 	status, payload, raw := as(t, a, alice, "/api/claude?stance=garbage&slug=nope")
@@ -165,7 +165,7 @@ func TestTheDeckIsRefusedBeforeTheStanceIs(t *testing.T) {
 // a client that appends rather than replaces, and it is silent.
 func TestTheLastQueryValueWinsOnEveryParameter(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	// slug: the second one is the one that must 404.
 	status, payload, _ := as(t, a, alice, "/api/claude?slug=rich&slug=nope")
@@ -206,7 +206,7 @@ func TestTheLastQueryValueWinsOnEveryParameter(t *testing.T) {
 // about a built deck gets the deck's answer and not the surface's.
 func TestASurfacesDefaultAppliesOnlyWithNoDeck(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	_, payload, _ := as(t, a, alice, "/api/claude?surface=theme")
 	stance, _ := payload["stance"].(map[string]any)
@@ -228,7 +228,7 @@ func TestASurfacesDefaultAppliesOnlyWithNoDeck(t *testing.T) {
 // dial about a stranger's deck.
 func TestTheDialCannotSeeAnotherAccountsPrivateDeck(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	if status, _, raw := as(t, a, alice, "/api/claude?owner=bob&slug=bobs-private"); status != 404 {
 		t.Errorf("bob's private deck answered %d to alice, want 404: %s", status, raw)

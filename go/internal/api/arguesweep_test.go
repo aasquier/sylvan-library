@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"strings"
-	"sync/atomic"
 	"testing"
 )
 
@@ -34,8 +31,8 @@ func sweep(t *testing.T, rig *jobRig, body string) (int, map[string]any, []byte)
 // ---- what is refused, and in what order ---------------------------------
 
 func TestTheSweepRefusesWhatItCanBeforeAnyJob(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, row := range []struct {
 		note, body string
@@ -77,8 +74,8 @@ func TestTheSweepRefusesWhatItCanBeforeAnyJob(t *testing.T) {
 // deck's. Measured on the live wire; the natural Go shape
 // resolves the stance while it has the body open and answers the other way.
 func TestTheSelectionIsRefusedBeforeTheStance(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	status, payload, raw := sweep(t, rig, `{"cards":["Black Lotus"],"stance":"garbage"}`)
 	if status != 422 {
@@ -104,8 +101,8 @@ func TestTheSelectionIsRefusedBeforeTheStance(t *testing.T) {
 // rather than N copies of "no call was made" -- and the six keys in the
 // recorded order.
 func TestASweepAtStanceOffIsAJobBornFinished(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	status, payload, raw := sweep(t, rig,
 		fmt.Sprintf(`{"cards":["%s","%s"],"stance":"off"}`, sweepCards[0], sweepCards[1]))
@@ -142,8 +139,8 @@ func TestASweepAtStanceOffIsAJobBornFinished(t *testing.T) {
 
 // One slot reads "1 slot", not "1 slots".
 func TestTheSweepLabelCountsInEnglish(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	_, payload, _ := sweep(t, rig, fmt.Sprintf(`{"cards":["%s"],"stance":"off"}`, sweepCards[0]))
 	if payload["label"] != "argue: 1 slot of kaheera" {
@@ -169,8 +166,8 @@ func TestTheSweepLabelCountsInEnglish(t *testing.T) {
 // exempt from. Manufacturing a fixture card for it would be arranging the
 // evidence; naming the gap is the honest version.
 func TestTheSelectionIsNormalisedTheRecordedWay(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, row := range []struct {
 		note, cards string
@@ -208,13 +205,13 @@ func TestTheSelectionIsNormalisedTheRecordedWay(t *testing.T) {
 // A whole sweep: one call per card, the reports in selection order, and the
 // progress the bar is drawn from.
 func TestASweepArguesEachSlotInTurn(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
 		answer("end_turn", said(charges("Sol Ring", "It is colourless."))),
 		answer("end_turn", said(charges("Regal Behemoth", "It costs six."))),
 	}}
-	script.start(t)
+	rig.api.claude = script.start(t)
 
 	status, payload, raw := sweep(t, rig,
 		fmt.Sprintf(`{"cards":["%s","%s"]}`, sweepCards[0], sweepCards[1]))
@@ -256,14 +253,15 @@ func TestASweepArguesEachSlotInTurn(t *testing.T) {
 // results are the point of paying for a sweep -- one flaky call must not cost
 // the other answers.
 func TestOneFailedCardDoesNotCostTheSweep(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
 		answer("end_turn", said(charges("Sol Ring", "It is colourless."))),
 		"!401", // the middle card fails
 		answer("end_turn", said(charges("Vorinclex, Voice of Hunger", "It costs eight."))),
 	}}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 
 	status, payload, raw := sweep(t, rig, fmt.Sprintf(`{"cards":["%s","%s","%s"]}`,
 		sweepCards[0], sweepCards[1], sweepCards[2]))
@@ -296,12 +294,14 @@ func TestOneFailedCardDoesNotCostTheSweep(t *testing.T) {
 // `map[string]string` would alphabetise a list whose order is the order things
 // went wrong in.
 func TestTheErrorsKeepSweepOrder(t *testing.T) {
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	// Vorinclex sorts LAST alphabetically and fails FIRST here, so the two
 	// orders disagree and the test can tell them apart.
 	script := &scriptedClaude{replies: []string{"!401", "!401"}}
-	script.start(t)
+	claudeSet := script.start(t)
+	rig.api.claude = claudeSet
 	status, payload, _ := sweep(t, rig,
 		fmt.Sprintf(`{"cards":["%s","%s"]}`, sweepCards[2], sweepCards[0]))
 	if status != 200 {
@@ -331,78 +331,35 @@ func TestTheErrorsKeepSweepOrder(t *testing.T) {
 // Every remaining card would fail the same way, so the rest are marked
 // unattempted rather than burning the selection on a dead key.
 //
-// **The key is cleared from inside the fake API**, not from the test
-// goroutine, and that is the difference between this test and a coin flip:
-// the sweep is sequential, so unsetting the key while the first reply is being
-// written means card two's `Connect()` -- which calls `Require()` afresh every
-// time -- is guaranteed to find nothing. The first version of this test called
-// `t.Setenv` after submitting and passed by luck.
-func TestTheCredentialVanishingStopsTheSweep(t *testing.T) {
-	rig := newJobRig(t)
+// **A sweep with no credential is refused before it starts**, with the 503 the
+// UI already handles, rather than minutes into work that was never going to
+// produce anything.
+//
+// This replaces `TestTheCredentialVanishingStopsTheSweep`, which cleared
+// ANTHROPIC_API_KEY from inside the fake API so that card two's `Connect()` --
+// re-reading the environment every time -- would find nothing. **That scenario
+// no longer exists.** The endpoint is a value captured once at boot (ADR 39),
+// so a credential cannot vanish out from under a running process, and the
+// per-card `ErrUnavailable` break in `argueSweep` is now defence in depth that
+// nothing can trigger. What is still reachable, and still worth holding, is the
+// check before the job is ever submitted.
+func TestASweepWithNoCredentialIsRefusedBeforeItStarts(t *testing.T) {
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 
-	reply := answer("end_turn", said(charges("Sol Ring", "It is colourless.")))
-	var served atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if served.Add(1) > 1 {
-			// Only the first card should ever reach the API. A second request
-			// means the sweep carried on past a dead credential.
-			t.Errorf("request %d reached the API after the key went away", served.Load())
-		}
-		// Gone before this reply is even written, so the next `Connect()`
-		// cannot race it.
-		_ = os.Unsetenv("ANTHROPIC_API_KEY")
-		_ = os.Unsetenv("ANTHROPIC_AUTH_TOKEN")
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(reply))
-	}))
-	defer srv.Close()
-	t.Setenv("ANTHROPIC_BASE_URL", srv.URL)
-	t.Setenv("ANTHROPIC_API_KEY", "test-key-not-a-real-one")
-	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
-	t.Setenv("MTGLAB_CLAUDE_MODEL", "")
-	t.Setenv("MTGLAB_CLAUDE_STANCE_CEILING", "")
-
-	status, payload, raw := sweep(t, rig, fmt.Sprintf(`{"cards":["%s","%s","%s"]}`,
+	status, _, raw := sweep(t, rig, fmt.Sprintf(`{"cards":["%s","%s","%s"]}`,
 		sweepCards[0], sweepCards[1], sweepCards[2]))
-	if status != 200 {
-		t.Fatalf("%d %s", status, raw)
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("%d %s, want 503 before any job is made", status, raw)
 	}
-	done, doneRaw := rig.await(t, payload["id"].(string))
-	// The sweep RECORDS the failure; it does not become one.
-	if done["status"] != "done" {
-		t.Fatalf("the sweep failed rather than recording: %v %s", done["status"], doneRaw)
-	}
-	result, _ := done["result"].(map[string]any)
-	// The first card was argued before the key went away.
-	if reports, _ := result["reports"].([]any); len(reports) != 1 {
-		t.Errorf("%d reports, want the one that got through: %s", len(reports), doneRaw)
-	}
-	errs, _ := result["errors"].(map[string]any)
-	if len(errs) != 2 {
-		t.Fatalf("%d errors, want one per remaining card: %v", len(errs), errs)
-	}
-	// The card it HIT says what went wrong; every card after it says it was
-	// never tried, which is a different sentence on purpose.
-	hit, _ := errs[sweepCards[1]].(string)
-	if hit == "" || strings.Contains(hit, "not attempted") {
-		t.Errorf("the card the failure hit says %q, want the explanation", hit)
-	}
-	rest, _ := errs[sweepCards[2]].(string)
-	if rest != "not attempted: the credential went away" {
-		t.Errorf("the remaining card says %q", rest)
-	}
-	// And `total` is still the whole selection.
-	if result["total"] != float64(3) {
-		t.Errorf("total is %v, want 3", result["total"])
+	if !strings.Contains(string(raw), "ANTHROPIC_API_KEY") {
+		t.Errorf("the refusal does not name what is unset: %s", raw)
 	}
 }
 
-// **The dedupe is the selection**, sorted and casefolded -- so the same slots
-// picked in a different order join one sweep, and a different selection is
-// different work.
 func TestTheSameSelectionInADifferentOrderIsOneSweep(t *testing.T) {
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	hold := make(chan struct{})
 	script := &scriptedClaude{
@@ -415,7 +372,7 @@ func TestTheSameSelectionInADifferentOrderIsOneSweep(t *testing.T) {
 		},
 		hold: hold,
 	}
-	script.start(t)
+	rig.api.claude = script.start(t)
 	both := fmt.Sprintf(`{"cards":["%s","%s"]}`, sweepCards[0], sweepCards[1])
 	reversed := fmt.Sprintf(`{"cards":["%s","%s"]}`, sweepCards[1], sweepCards[0])
 	cased := fmt.Sprintf(`{"cards":["%s","%s"]}`, strings.ToUpper(sweepCards[0]), sweepCards[1])

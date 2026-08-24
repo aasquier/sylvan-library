@@ -420,6 +420,10 @@ func interviewReport(turn *Turn, slug, card string, effective Stance,
 
 // InterviewRequest is what an interview needs beyond the deck and the card.
 type InterviewRequest struct {
+	// Endpoint is where this call goes. Carried on the plan rather than
+	// looked up, so a background job that outlives its request still knows
+	// which endpoint it was planned against (ADR 39).
+	Endpoint Endpoint
 	// Requested is the stance in any form Resolve accepts.
 	Requested any
 	// Focus is the user's own steer, quoted rather than interpolated.
@@ -471,6 +475,7 @@ func Interview(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 	}
 
 	turn, err := Converse(ctx, mode, Request{
+		Endpoint: req.Endpoint,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(opening)),
 		},

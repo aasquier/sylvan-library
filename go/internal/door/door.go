@@ -32,6 +32,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
@@ -88,6 +89,10 @@ type Config struct {
 	// ClientIPHeader is MTGLAB_CLIENT_IP_HEADER, handed to the rate limiter.
 	// Empty trusts only the peer, which is the safe default.
 	ClientIPHeader string
+	// Claude is where this instance's Claude calls go, and its stance ceiling.
+	// The zero value has no credential and refuses every Claude route, which
+	// is what a door built without one should do.
+	Claude claude.Settings
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -189,7 +194,7 @@ func New(cfg Config) (*Door, error) {
 		// environment when a message is actually being sent -- and a test
 		// passes a recorder, which is how no test here sends mail.
 		EmailSender: cfg.EmailSender, Mail: cfg.Mail,
-		ClientIPHeader: cfg.ClientIPHeader})
+		ClientIPHeader: cfg.ClientIPHeader, Claude: cfg.Claude})
 	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err

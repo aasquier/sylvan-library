@@ -80,7 +80,7 @@ func names(body map[string]any) []string {
 // the shelf reporting them, and the files on disk being the renderer's own.
 func TestABuildWritesTheDeliverablesAndAnswersTheShelf(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	before := rig.plant(t, "clean-build")
@@ -167,7 +167,7 @@ func TestABuildWritesTheDeliverablesAndAnswersTheShelf(t *testing.T) {
 // write**, the files sitting on disk under the name that was asked for.
 func TestABuildReportsUnderTheDecksOwnSlug(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// `mono-green-clean`'s file says `slug: mono-green`, and `mono-green` is
@@ -211,7 +211,7 @@ func TestABuildReportsUnderTheDecksOwnSlug(t *testing.T) {
 // ways.
 func TestTheBuildAndTheShelfAgree(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	_, built, raw := rig.do(t, alice, "POST", cleanDeck+"/artifacts", `{}`)
@@ -243,7 +243,7 @@ func TestTheBuildAndTheShelfAgree(t *testing.T) {
 // mirrors `mtglab decks build --force`. A refused build writes nothing.
 func TestTheGateRefusesAndForceOverrides(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	const banned = "/api/decks/alice/mono-green" // the fixture with Primeval Titan
@@ -285,7 +285,7 @@ func TestTheGateRefusesAndForceOverrides(t *testing.T) {
 // rationales and promote it.
 func TestADraftIsRefusedAndForceDoesNotReachIt(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// The `draft` fixture also carries a banned card, which the gate refuses
@@ -322,7 +322,7 @@ func TestADraftIsRefusedAndForceDoesNotReachIt(t *testing.T) {
 // deliverable and must survive.
 func TestARebuildPrunesAStaleSwapList(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	rig.plant(t, "clean-build")
@@ -370,7 +370,7 @@ func TestARebuildPrunesAStaleSwapList(t *testing.T) {
 // edit makes it `current` again.
 func TestTheBaselineFollowsTheDeckAndNotTheClock(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	rig.plant(t, "clean-build")
@@ -405,7 +405,7 @@ func TestTheBaselineFollowsTheDeckAndNotTheClock(t *testing.T) {
 // have every one of them -- and may not rebuild them.
 func TestWhoMayBuildIsDecidedByTheSource(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// `rich` says `shared: false`, so bob's view of the file tier does not
@@ -439,7 +439,7 @@ func TestWhoMayBuildIsDecidedByTheSource(t *testing.T) {
 // at.
 func TestAMalformedBodyIsRefusedBeforeTheDeck(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// A deck that does not exist, so a 404 is what would come next -- and a
@@ -463,7 +463,7 @@ func TestAMalformedBodyIsRefusedBeforeTheDeck(t *testing.T) {
 // both as false.
 func TestForceIsReadWithTheRecordedTruthiness(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	const banned = "/api/decks/alice/mono-green/artifacts"
@@ -486,7 +486,7 @@ func TestForceIsReadWithTheRecordedTruthiness(t *testing.T) {
 // a stale `swaps.md` from a directory prunes it from the table.
 func TestTheSQLTierBuildsToo(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// Built the way a person would, every step a route: create a deck in
@@ -668,7 +668,7 @@ func mustParse(t *testing.T, text, slug string) *deck.Deck {
 // ordered marshalling exists at all.
 func TestTheAnswerKeepsTheRecordedKeyOrder(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	_, _, raw := rig.do(t, alice, "POST", cleanDeck+"/artifacts", `{}`)

@@ -166,21 +166,36 @@ func scratchStore(t *testing.T) *DossierStore {
 	return NewDossierStore(rec.DB(), nil)
 }
 
-// noEnvOverrides is the environment the corpus was written in: no model
-// override and no stance ceiling.
+// noOverrides is the configuration the corpus was written under: no model
+// override and no stance ceiling. The zero values say both.
+//
+// This used to blank MTGLAB_CLAUDE_MODEL and MTGLAB_CLAUDE_STANCE_CEILING on
+// the process, because the key computation read them at call time -- so the
+// frozen keys below were only reproducible on a shell that happened to have
+// neither set.
+var noOverrides = Endpoint{}
+
+// noEnvOverrides blanks the one setting still read from the environment: the
+// stance ceiling, which `Ceiling` consults whenever a caller passes a nil
+// limit.
+//
+// The model override left this helper when [Endpoint] took it over. The
+// ceiling has not, deliberately: making the nil-limit fallback unconditional
+// would mean a deployment whose ceiling somehow failed to be threaded stopped
+// capping stances silently, which is the wrong way for that mistake to fail.
+// A test that calls this is serial, and that is the remaining cost.
 func noEnvOverrides(t *testing.T) {
 	t.Helper()
-	t.Setenv(modelEnv, "")
 	t.Setenv(CeilingEnv, "")
 }
 
 // ------------------------------------------------------------------ the key
 
 func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
-	noEnvOverrides(t)
+	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	for _, row := range corpus.Keys {
-		got, err := CacheKey(row.OracleID, row.Tier)
+		got, err := CacheKey(noOverrides, row.OracleID, row.Tier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -189,9 +204,9 @@ func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
 		}
 	}
 	// The override wins over every tier, so two seats get one key.
-	t.Setenv(modelEnv, "claude-test-1")
+	overridden := noOverrides.WithModel("claude-test-1")
 	for _, row := range corpus.KeysWithModelOverride {
-		got, err := CacheKey(row.OracleID, row.Tier)
+		got, err := CacheKey(overridden, row.OracleID, row.Tier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -224,10 +239,10 @@ func TestTheFingerprintsPartsAreEachTheRecordedOnes(t *testing.T) {
 		t.Errorf("the canonical schema rendering differs:\n got    %s\n corpus %s",
 			got, corpus.Fingerprint.SchemaDumps)
 	}
-	if got := ModelFor(""); got != corpus.Fingerprint.Model {
+	if got := noOverrides.ModelFor(""); got != corpus.Fingerprint.Model {
 		t.Errorf("the default model is %q, corpus %q", got, corpus.Fingerprint.Model)
 	}
-	if got, _ := Fingerprint(""); got != corpus.Fingerprint.Fingerprint {
+	if got, _ := Fingerprint(noOverrides, ""); got != corpus.Fingerprint.Fingerprint {
 		t.Errorf("the fingerprint is %q, corpus %q", got, corpus.Fingerprint.Fingerprint)
 	}
 }
@@ -278,13 +293,13 @@ func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
 	}
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
-		got, err := ReadCachedDossier(ctx, c, "mini", mini, store)
+		got, err := ReadCachedDossier(ctx, c, "mini", mini, store, noOverrides)
 		if err != nil {
 			t.Fatal(err)
 		}
 		assertSameJSONValue(t, "no row yet", got, byNote["no row yet"])
 
-		got, err = ReadCachedDossier(ctx, c, "mini", headless, store)
+		got, err = ReadCachedDossier(ctx, c, "mini", headless, store, noOverrides)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,12 +307,12 @@ func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
 
 		// The stored row is the corpus's own bytes, served raw -- under the
 		// default tier's key, which is the GET's wart.
-		key, _ := CacheKey(corpus.Brief.OracleID, "")
+		key, _ := CacheKey(noOverrides, corpus.Brief.OracleID, "")
 		if key != corpus.Stored.Key {
 			t.Fatalf("the default key is %q, the corpus stored under %q", key, corpus.Stored.Key)
 		}
 		store.Put(ctx, key, corpus.Brief.OracleID, corpus.Brief.Commander, corpus.Stored.Result)
-		got, err = ReadCachedDossier(ctx, c, "mini", mini, store)
+		got, err = ReadCachedDossier(ctx, c, "mini", mini, store, noOverrides)
 		if err != nil {
 			t.Fatal(err)
 		}

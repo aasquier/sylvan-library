@@ -234,7 +234,7 @@ func TestEveryResearchOutcomeMatchesTheGolden(t *testing.T) {
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
 		for _, row := range corpus.Reports {
-			plan, err := CheckResearch(row.Question, row.Requested, "", nil)
+			plan, err := CheckResearch(row.Question, row.Requested, "", nil, Endpoint{})
 			if err != nil {
 				t.Fatalf("%s: check: %v", row.Note, err)
 			}

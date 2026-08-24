@@ -874,7 +874,11 @@ type Combination struct {
 // access-log line, and a finished answer thrown away -- so the call goes in a
 // job and the refusals stay in the request.
 type AskPlan struct {
-	History []TranscriptTurn
+	// Endpoint is where this call goes. Carried on the plan rather than
+	// looked up, so a background job that outlives its request still knows
+	// which endpoint it was planned against (ADR 39).
+	Endpoint Endpoint
+	History  []TranscriptTurn
 	// Carried is the slots the client sent, re-grounded against the transcript
 	// on the way in -- the client is not the authority on what its user said.
 	Carried   []Slot
@@ -920,7 +924,7 @@ func countExchanges(transcript []TranscriptTurn) int {
 // Unlike `CheckProposal` there is no floor to fail: a conversation with
 // nothing in it yet is exactly the case this mode exists for.
 func CheckAsk(transcript, slots, requested, persona, seed, facts any,
-	tier string, limit *Stance) (*AskPlan, error) {
+	tier string, limit *Stance, e Endpoint) (*AskPlan, error) {
 	history, err := CheckTranscript(transcript)
 	if err != nil {
 		return nil, err
@@ -947,7 +951,7 @@ func CheckAsk(transcript, slots, requested, persona, seed, facts any,
 	slotList, _ := slots.([]any)
 	carried, _ := Ground(slotList, history)
 
-	plan := &AskPlan{History: history, Carried: carried, Effective: effective,
+	plan := &AskPlan{Endpoint: e, History: history, Carried: carried, Effective: effective,
 		Persona: who.Key, Seed: dealt, Told: told, Tier: tier}
 	if !effective.AllowsCalls() {
 		answer := askRefusal(plan, who, "The stance is off, so no call was made.")
@@ -1033,6 +1037,7 @@ func RunAsk(ctx context.Context, conn *pool.Conn, plan *AskPlan, run ThemeRun) (
 		return nil, err
 	}
 	turn, err := Converse(ctx, mode, Request{
+		Endpoint: plan.Endpoint,
 		Messages: themeMessages(plan.History,
 			closingFor(plan.Carried, plan.History, plan.Told),
 			frameFor(readingFor(who, plan.Seed), plan.Told)),
@@ -1218,6 +1223,10 @@ func closingFor(grounded []Slot, transcript []TranscriptTurn, told []string) str
 // would arrive as a *job* in state `error`, which turns three distinct
 // answers into one string somebody has to pattern-match.
 type ProposalPlan struct {
+	// Endpoint is where this call goes. Carried on the plan rather than
+	// looked up, so a background job that outlives its request still knows
+	// which endpoint it was planned against (ADR 39).
+	Endpoint  Endpoint
 	History   []TranscriptTurn
 	Grounded  []Slot
 	Dropped   int
@@ -1243,7 +1252,7 @@ func (p *ProposalPlan) NeedsCall() bool { return p.Answer == nil }
 // the UI for the same reason, but a floor that only existed in the client
 // would not be one.
 func CheckProposal(transcript, slots, requested any, budget *float64, avoid string,
-	persona, seed any, tier string, limit *Stance) (*ProposalPlan, error) {
+	persona, seed any, tier string, limit *Stance, e Endpoint) (*ProposalPlan, error) {
 	history, err := CheckTranscript(transcript)
 	if err != nil {
 		return nil, err
@@ -1272,7 +1281,7 @@ func CheckProposal(transcript, slots, requested any, budget *float64, avoid stri
 		return nil, err
 	}
 
-	plan := &ProposalPlan{History: history, Grounded: grounded, Dropped: dropped,
+	plan := &ProposalPlan{Endpoint: e, History: history, Grounded: grounded, Dropped: dropped,
 		Effective: effective, Budget: budget, Avoid: avoid, Persona: who.Key,
 		Seed: dealt, Tier: tier}
 	if !effective.AllowsCalls() {
@@ -1314,6 +1323,7 @@ func RunProposal(ctx context.Context, conn *pool.Conn, plan *ProposalPlan, run T
 		return nil, err
 	}
 	turn, err := Converse(ctx, mode, Request{
+		Endpoint: plan.Endpoint,
 		Messages: themeMessages(plan.History,
 			proposalAsk(plan.Grounded, plan.Budget, plan.Avoid),
 			// `told` is nil, and the nil is load-bearing: the proposal's

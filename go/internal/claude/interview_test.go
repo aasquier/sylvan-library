@@ -347,8 +347,9 @@ func TestACardOnTheSwapBoardCanBeInterviewed(t *testing.T) {
 // At `initiative: off` no call is made and the payload says so. Not an empty
 // list that looks like it had nothing to say.
 func TestAtStanceOffNothingIsAskedAndItSaysSo(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{}}
-	api.start(t)
+	ep := api.start(t)
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		off, err := Preset("off")
@@ -356,7 +357,7 @@ func TestAtStanceOffNothingIsAskedAndItSaysSo(t *testing.T) {
 			t.Fatal(err)
 		}
 		report, err := Interview(context.Background(), c, d, "Sol Ring",
-			InterviewRequest{Requested: "off", Limit: &off})
+			InterviewRequest{Endpoint: ep, Requested: "off", Limit: &off})
 		if err != nil {
 			t.Fatalf("interview: %v", err)
 		}
@@ -382,6 +383,7 @@ func TestAtStanceOffNothingIsAskedAndItSaysSo(t *testing.T) {
 // The whole round trip, with the model's answer scripted: the questions come
 // back, a declarative is dropped and counted, and the payload says who answered.
 func TestAnInterviewReturnsQuestionsAndDropsWhatIsNotOne(t *testing.T) {
+	t.Parallel()
 	answer := `{"questions":[` +
 		`{"question":"What does this beat out at three mana?","angle":"cost","fact":"nine cards at three"},` +
 		`{"question":"Sol Ring is simply the best ramp there is.","angle":"role","fact":"it costs one"},` +
@@ -391,11 +393,11 @@ func TestAnInterviewReturnsQuestionsAndDropsWhatIsNotOne(t *testing.T) {
 		reply{stop: "end_turn", in: 900, out: 120, cached: 2000,
 			content: textBlock(answer)}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		report, err := Interview(context.Background(), c, d, "Sol Ring",
-			InterviewRequest{Requested: "second-opinion"})
+			InterviewRequest{Endpoint: ep, Requested: "second-opinion"})
 		if err != nil {
 			t.Fatalf("interview: %v", err)
 		}
@@ -423,6 +425,7 @@ func TestAnInterviewReturnsQuestionsAndDropsWhatIsNotOne(t *testing.T) {
 // More than MaxQuestions and it stops being an interview and starts being a
 // wall.
 func TestAnInterviewIsCappedAtSixQuestions(t *testing.T) {
+	t.Parallel()
 	var items []string
 	for i := 0; i < 9; i++ {
 		items = append(items, `{"question":"Question number `+string(rune('a'+i))+`?","angle":"role","fact":"f"}`)
@@ -431,11 +434,11 @@ func TestAnInterviewIsCappedAtSixQuestions(t *testing.T) {
 		reply{stop: "end_turn", content: textBlock(
 			`{"questions":[` + strings.Join(items, ",") + `]}`)}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		report, err := Interview(context.Background(), c, d, "Sol Ring",
-			InterviewRequest{Requested: "second-opinion"})
+			InterviewRequest{Endpoint: ep, Requested: "second-opinion"})
 		if err != nil {
 			t.Fatalf("interview: %v", err)
 		}
@@ -449,14 +452,15 @@ func TestAnInterviewIsCappedAtSixQuestions(t *testing.T) {
 // An answer that will not parse is a report saying so, not a crash and not a
 // blank list that reads as "nothing to ask".
 func TestAnUnparseableAnswerIsReportedAsOne(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "max_tokens", content: textBlock(`{"questions":[{"quest`)}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		report, err := Interview(context.Background(), c, d, "Sol Ring",
-			InterviewRequest{Requested: "second-opinion"})
+			InterviewRequest{Endpoint: ep, Requested: "second-opinion"})
 		if err != nil {
 			t.Fatalf("interview: %v", err)
 		}
@@ -471,12 +475,13 @@ func TestAnUnparseableAnswerIsReportedAsOne(t *testing.T) {
 
 // A refusal is a report, not an error.
 func TestARefusedInterviewIsAReport(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{reply{stop: "refusal", content: ""}.json()}}
-	api.start(t)
+	ep := api.start(t)
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		report, err := Interview(context.Background(), c, d, "Sol Ring",
-			InterviewRequest{Requested: "second-opinion"})
+			InterviewRequest{Endpoint: ep, Requested: "second-opinion"})
 		if err != nil {
 			t.Fatalf("interview: %v", err)
 		}
@@ -488,14 +493,15 @@ func TestARefusedInterviewIsAReport(t *testing.T) {
 
 // The user's steer is quoted as theirs rather than folded into the instruction.
 func TestTheUsersFocusIsQuotedAsTheirs(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "end_turn", content: textBlock(`{"questions":[]}`)}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	d := fixtureDeck(t, "mono-green")
 	withPool(t, func(c *pool.Conn) {
 		if _, err := Interview(context.Background(), c, d, "Sol Ring",
-			InterviewRequest{Requested: "second-opinion",
+			InterviewRequest{Endpoint: ep, Requested: "second-opinion",
 				Focus: "  I cannot tell if it is win-more  "}); err != nil {
 			t.Fatalf("interview: %v", err)
 		}

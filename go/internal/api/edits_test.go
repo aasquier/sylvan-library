@@ -13,6 +13,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
+
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 )
 
 // The write routes' own tests. `internal/deckedit` already proves the *bytes*
@@ -29,7 +31,7 @@ type writeRig struct {
 	close    func()
 }
 
-func newWriteRig(t *testing.T) *writeRig {
+func newWriteRig(t *testing.T, set claude.Settings) *writeRig {
 	t.Helper()
 	decks := decksDir(t)
 	dbPath := appDB(t)
@@ -42,7 +44,8 @@ func newWriteRig(t *testing.T) *writeRig {
 		t.Fatal(err)
 	}
 	a := New(Config{
-		Pool: pooltest.Open(t), DecksDir: decks, AdminEmail: "alice@example.com",
+		Claude: set,
+		Pool:   pooltest.Open(t), DecksDir: decks, AdminEmail: "alice@example.com",
 		AppDB: db, AppWriteDB: recorder.DB(), Recorder: recorder,
 		// The same handle the activity log writes through, which is how the
 		// door wires it: two ledgers, two tables, one app.db.
@@ -89,7 +92,7 @@ const cleanDeck = "/api/decks/alice/mono-green-clean"
 
 func TestEveryWriteLeavesADeckAndAnEntry(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	before := rig.text(t)
@@ -137,7 +140,7 @@ func TestEveryWriteLeavesADeckAndAnEntry(t *testing.T) {
 
 func TestTheNineOperationsAllRun(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// A chain: each step needs the one before it, which is also the only way
@@ -204,7 +207,7 @@ func TestTheNineOperationsAllRun(t *testing.T) {
 
 func TestARationaleIsNeverWrittenForYou(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// Rule 4 at the boundary: a swap with no `why` is refused before the
@@ -231,7 +234,7 @@ func TestARationaleIsNeverWrittenForYou(t *testing.T) {
 
 func TestTheCardIsLookedUpBeforeItIsWritten(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// Rule 1 applied to a write: three ways a card can fail the pool, and
@@ -271,7 +274,7 @@ func TestTheCardIsLookedUpBeforeItIsWritten(t *testing.T) {
 // the part of ADR 5 and ADR 22 a write can get wrong in a way a read cannot.
 func TestWhoMayWriteIsDecidedByTheSource(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	// A deck bob cannot see is a 404 -- not a 403, which would confirm it
@@ -314,7 +317,7 @@ func TestWhoMayWriteIsDecidedByTheSource(t *testing.T) {
 // cannot: bob editing his own deck writes a row, not a file.
 func TestTheSQLTierWritesToo(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	status, body, raw := rig.do(t, bob, "PATCH", "/api/decks/bob/bobs-public", `{"field":"status","value":"built"}`)
@@ -377,7 +380,7 @@ func TestAnEditWithoutADatabaseStillEdits(t *testing.T) {
 // be.
 func TestABodyThatNamesNothingIsRefused(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	// A body with no `value` is refused before the editor: `value` is the one
 	// key whose absence cannot be told from a deliberate blank, and clearing a
@@ -412,7 +415,7 @@ func TestABodyThatNamesNothingIsRefused(t *testing.T) {
 // ten cards would report a deck state nobody chose.
 func TestTheBulkSweepIsAllOrNothing(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	before := rig.text(t)
 	for _, body := range []string{

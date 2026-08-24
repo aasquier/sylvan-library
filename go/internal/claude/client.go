@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 
-	"github.com/aasquier/sylvan-library/go/internal/tiers"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -62,62 +60,6 @@ const DefaultMaxTokens = 4096
 // can say so instead of retrying.
 var ErrUnavailable = errors.New("claude is unavailable")
 
-// ModelFor is the model to call: the environment's override, this tier's, or
-// `Model`.
-//
-// Three sources, and the precedence between them is the decision:
-//
-//  1. **MTGLAB_CLAUDE_MODEL wins over everything.** It is the A/B lever ADR 14
-//     left for the open question, and an A/B whose answer depended on which
-//     seat happened to ask would not be one.
-//  2. **The account's tier**, when it has one.
-//  3. **`Model`**, the house answer.
-//
-// An unknown tier lands on the default rather than failing; `tiers.Get` says
-// why. The empty string is how "no tier" arrives -- from a NULL column, or
-// from a caller with no account in hand -- and `tiers.Get` reads it as the
-// default too, so the second and third branches agree by construction. That
-// agreement is asserted by a test rather than trusted, because if `Model` and
-// the default tier's model ever drifted apart, a request with no tier and a
-// request from a default seat would quietly run on different models.
-//
-// Read at call time throughout, so none of the three is captured at import by
-// a process that outlives the request.
-func ModelFor(tier string) string {
-	if override := os.Getenv(modelEnv); override != "" {
-		return override
-	}
-	if tier != "" {
-		return tiers.Resolve(tier)
-	}
-	return Model
-}
-
-// CredentialPresent reports whether the SDK will find something to
-// authenticate with. Deliberately only asks *whether*.
-func CredentialPresent() bool {
-	return os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != ""
-}
-
-// Available reports whether this process can talk to Claude at all. Cheap; no
-// network.
-func Available() bool { return CredentialPresent() }
-
-// Require returns an `ErrUnavailable` with a fixable reason, or nothing.
-//
-// Split out of `Connect` for the caller that needs to know *whether* a call is
-// possible without making one -- a theme proposal is refused with no key from
-// the request rather than four minutes into a job that was never going to
-// work.
-func Require() error {
-	if !CredentialPresent() {
-		return &unavailable{reason: "no ANTHROPIC_API_KEY in the environment " +
-			"-- put one in .env (see .env.example), or `fly secrets set` it " +
-			"when deployed"}
-	}
-	return nil
-}
-
 // unavailable is ErrUnavailable carrying the fixable reason and NOTHING else.
 //
 // A `fmt.Errorf("%w: ...", ErrUnavailable)` would read "claude is unavailable:
@@ -141,18 +83,6 @@ func (e *unavailable) Error() string { return e.reason }
 // reaching anybody.
 func (e *unavailable) Is(target error) bool { return target == ErrUnavailable }
 
-// Connect is an SDK client, or `ErrUnavailable` with a fixable reason.
-//
-// Constructed with no options on purpose: that is the path where the SDK
-// resolves the credential from the environment itself, which is the whole
-// point of never holding the key here.
-func Connect() (anthropic.Client, error) {
-	if err := Require(); err != nil {
-		return anthropic.Client{}, err
-	}
-	return anthropic.NewClient(), nil
-}
-
 // Explain turns an SDK error into something worth reading a month later.
 //
 // The 401 case earns its own branch. The key this project runs on was created
@@ -165,7 +95,7 @@ func Connect() (anthropic.Client, error) {
 // are recorded sentences, and a test holds them to the golden word for word:
 // they are what a person reads at 2am, and a quiet paraphrase
 // would be losing the only part of this function that matters.
-func Explain(err error) string {
+func Explain(err error, model string) string {
 	if err == nil {
 		return ""
 	}
@@ -190,12 +120,12 @@ func Explain(err error) string {
 	case 403:
 		return fmt.Sprintf("the key was refused this request (403) -- most "+
 			"often a model the workspace cannot reach. Asked for %s.",
-			wire.Quote(ModelFor("")))
+			wire.Quote(model))
 	case 429:
 		return "rate limited (429). Retry after the delay in the response headers."
 	case 404:
 		return fmt.Sprintf("no such model or endpoint (404). Asked for %s.",
-			wire.Quote(ModelFor("")))
+			wire.Quote(model))
 	default:
 		return fmt.Sprintf("API error %d: %s", apierr.StatusCode, apierr.Error())
 	}
@@ -240,12 +170,12 @@ const CheckPrompt = "Reply with exactly: pipe open"
 // whether the integration broke or the key simply lapsed.
 //
 // Returns a report rather than printing one.
-func Check(ctx context.Context, prompt string) CheckReport {
+func Check(ctx context.Context, e Endpoint, prompt string) CheckReport {
 	if prompt == "" {
 		prompt = CheckPrompt
 	}
-	report := CheckReport{Model: ModelFor("")}
-	con, err := Connect()
+	report := CheckReport{Model: e.ModelFor("")}
+	con, err := e.Connect()
 	if err != nil {
 		report.Error = err.Error()
 		return report
@@ -264,7 +194,7 @@ func Check(ctx context.Context, prompt string) CheckReport {
 	if err != nil {
 		// Every failure mode of this call is something to report to a person,
 		// and `Explain` is what decides how.
-		report.Error = Explain(err)
+		report.Error = Explain(err, report.Model)
 		return report
 	}
 	var text strings.Builder

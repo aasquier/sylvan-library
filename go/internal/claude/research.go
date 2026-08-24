@@ -210,6 +210,10 @@ func researchReport(turn *Turn, question string, effective Stance, body any,
 // deck. ADR 26's first decision is visible in the type, and
 // `TestTheResearchPlanCannotHoldADeck` holds it there.
 type ResearchPlan struct {
+	// Endpoint is where this call goes. Carried on the plan rather than
+	// looked up, so a background job that outlives its request still knows
+	// which endpoint it was planned against (ADR 39).
+	Endpoint  Endpoint
 	Question  string
 	Key       string
 	Effective Stance
@@ -228,7 +232,7 @@ func (p *ResearchPlan) NeedsCall() bool { return p.Answer == nil }
 // anything. An `ErrQuestionRejected` and a stance rejection
 // come back to the caller, which is what keeps their 422 rather than
 // flattening two answers into one job in state `error` minutes later.
-func CheckResearch(raw any, requested any, tier string, limit *Stance) (*ResearchPlan, error) {
+func CheckResearch(raw any, requested any, tier string, limit *Stance, e Endpoint) (*ResearchPlan, error) {
 	question, err := CheckQuestion(raw)
 	if err != nil {
 		return nil, err
@@ -237,7 +241,7 @@ func CheckResearch(raw any, requested any, tier string, limit *Stance) (*Researc
 	if err != nil {
 		return nil, err
 	}
-	plan := &ResearchPlan{Question: question, Key: QuestionKey(question),
+	plan := &ResearchPlan{Endpoint: e, Question: question, Key: QuestionKey(question),
 		Effective: effective, Tier: tier}
 	if !effective.AllowsCalls() {
 		answer := researchReport(nil, question, effective, nil, false,
@@ -267,6 +271,7 @@ func RunResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, run R
 		return ResearchReport{}, err
 	}
 	turn, err := Converse(ctx, mode, Request{
+		Endpoint: plan.Endpoint,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(researchOpening(plan.Question))),
 		},

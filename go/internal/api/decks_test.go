@@ -14,6 +14,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 	_ "modernc.org/sqlite"
+
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 )
 
 // decksDir writes the gate's fixture decks as a file tier: `<slug>/deck.yaml`
@@ -102,9 +104,10 @@ func appDB(t *testing.T) string {
 	return path
 }
 
-func deckAPI(t *testing.T, withAppDB bool) (*API, func()) {
+func deckAPI(t *testing.T, set claude.Settings, withAppDB bool) (*API, func()) {
 	t.Helper()
-	cfg := Config{Pool: pooltest.Open(t), DecksDir: decksDir(t), AdminEmail: "alice@example.com"}
+	cfg := Config{Claude: set, Pool: pooltest.Open(t), DecksDir: decksDir(t),
+		AdminEmail: "alice@example.com"}
 	var db *sql.DB
 	if withAppDB {
 		var err error
@@ -140,7 +143,7 @@ var (
 
 func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	// Alice is the maintainer: the file tier under her name, writable, and
 	// bob's shared deck after it.
@@ -207,7 +210,7 @@ func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
 		t.Fatal("bob's shelf is incomplete")
 	}
 	// Auth off: one library under `local`, writable, everything showcase.
-	off, doneOff := deckAPI(t, false)
+	off, doneOff := deckAPI(t, noCredential, false)
 	defer doneOff()
 	_, _, raw = as(t, off, auth.Local, "/api/decks")
 	_ = json.Unmarshal(raw, &tiles)
@@ -218,7 +221,7 @@ func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
 
 func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	// Another account's private deck is a 404, never a 403; a shared one
 	// reads; an unknown owner is the same 404 as an unknown deck.
@@ -248,7 +251,7 @@ func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
 			t.Errorf("%s: detail %v", c.path, body["detail"])
 		}
 	}
-	off, doneOff := deckAPI(t, false)
+	off, doneOff := deckAPI(t, noCredential, false)
 	defer doneOff()
 	if status, _, _ := as(t, off, auth.Local, "/api/decks/local/mono-green"); status != 200 {
 		t.Fatalf("local: %d", status)
@@ -260,7 +263,7 @@ func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
 
 func TestTheDeckPayloadIsServiceGetDeck(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, false)
+	a, done := deckAPI(t, noCredential, false)
 	defer done()
 	status, body, raw := as(t, a, auth.Local, "/api/decks/local/mono-green")
 	if status != 200 {
@@ -312,7 +315,7 @@ func TestTheDeckPayloadIsServiceGetDeck(t *testing.T) {
 
 func TestValidateStatsSuggestionsAgreeWithTheFixtures(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, false)
+	a, done := deckAPI(t, noCredential, false)
 	defer done()
 	dir := filepath.Join("..", "gate", "testdata")
 	entries, _ := os.ReadDir(dir)
@@ -393,7 +396,7 @@ func canonicalJSON(t *testing.T, raw []byte) string {
 
 func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, true)
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	// The commander's panel: counted, not recalled.
 	status, body, raw := as(t, a, alice, "/api/decks/alice/mono-green/commander")
@@ -488,7 +491,7 @@ func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
 
 func TestChallengeProgressScoresTheLibrary(t *testing.T) {
 	t.Parallel()
-	a, done := deckAPI(t, false)
+	a, done := deckAPI(t, noCredential, false)
 	defer done()
 	_, body, raw := as(t, a, auth.Local, "/api/colors/progress")
 	if body["pool"] != true || body["total"] != float64(32) || body["filled"].(float64) < 1 {
