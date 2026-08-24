@@ -15,16 +15,25 @@ is opening it on *their* phone, in *their* browser, with *their* body. It has
 to just work — and "shut out" in the commandment includes shut out by a
 screen reader or a keyboard.
 
-- **The floor is Safari 16.4, declared by Aaron on 2026-08-19** and pinned as
-  the bundle-floor check in CI, whose comment has the argument:
-  two independent routes reach the same number — Tailwind v4's `@property` and
+- **The floor is Safari 16.4, declared by Aaron on 2026-08-19** and pinned by
+  `go/cmd/mtglab/browserfloor_test.go`, whose comment has the argument: two
+  independent routes reach the same number — Tailwind v4's `@property` and
   `color-mix(in lab, …)`, and the camera door's SIMD wasm core. Do not
-  re-derive it; three runs already did. Note the consequence for this machine:
-  **Safari 15.6 on macOS 12 is now below the floor**, so the dev browser is no
-  longer a witness for it and the Playwright/WebKit 17.4 rig is. Check newer
-  JS/CSS features against 16.4 — `:has()`, container queries,
+  re-derive it; three runs already did. **That test is the second copy of this
+  guard**: the first was Python and the Go crossing deleted it, so between #272
+  and 2026-08-24 the floor was declared and enforced by nothing — which is why
+  a run's first move here is to check the guard still exists before trusting
+  it. Check newer JS/CSS features against 16.4 — `:has()`, container queries,
   `structuredClone`, top-level await in served code. When Vite's target and
   reality disagree, reality is the phone that renders white.
+- **There is no WebKit witness on this machine, and the sentence that said
+  there was is a live daybreak question (Green, 2026-08-24, queued 5).**
+  **Safari 15.6 on macOS 12 is below the floor**, so the dev browser stopped
+  being a witness — and the Playwright/WebKit 17.4 rig this file used to name
+  as its replacement is not in the tree and never was. Until Aaron rules
+  (stand it up, or strike the claim), treat the floor as *statically* checked
+  by the test above and witnessed only on his phone, and do not record a
+  WebKit result you did not actually obtain.
 - **Audit `web_dist/assets/`, not `web/src`, and run
   the bundle-floor check rather than grepping.** This is the correction
   that run earned the hard way: the floor moved from 15 to 16.4 the day
@@ -70,8 +79,8 @@ screen reader or a keyboard.
 - Responsive sweep of anything new since last run at phone, tablet, laptop
   widths — and both themes. A screenshot at each width is the evidence;
   "the classes look right" is not.
-- **Motion accessibility: run the reduced-motion checks in the web suite, and audit the
-  bundle if you audit by hand at all.** Commandment 6 wants a living page
+- **Motion accessibility: run `go/cmd/mtglab/reducedmotion_test.go`, and audit
+  the bundle if you audit by hand at all.** Commandment 6 wants a living page
   *and* `prefers-reduced-motion` is a promise to users who get motion-sick —
   reduced, not necessarily removed. This is the bullet above's lesson a second
   time, and the 2026-08-16 run learned it the expensive way *in this facet*:
@@ -83,17 +92,17 @@ screen reader or a keyboard.
   every animating rule against the guards, and carries `COVERED_BY` for the
   two mechanisms a stylesheet cannot show — a base class on the same element,
   and an ancestor the guard `display: none`s. Both directions are
-  self-checking, so it cannot rot into a list of excuses.
+  self-checking, so it cannot rot into a list of excuses. It is a Go test now
+  and reads `web_dist/assets/index.css`; the Python original died with the
+  interpreter, and the guard's absence went unnoticed for five days.
 - Cross-browser: Chrome, Firefox, Safari on desktop; Safari and Chrome on
   mobile. The practical method is feature-floor discipline plus real-engine
-  checks, and since 2026-08-16 both phone engines are testable from this
-  laptop: Blink via the Browser pane's mobile preset, and real WebKit via
-  the Playwright rig — `playwright@1.45.3` pinned (the last macOS 12
-  builds; **WebKit 17.4**, which is also the newest this hardware will
-  ever run), launched with iPhone device descriptors. ENGINEERING §4 has
-  the rig's story. iOS-Safari-only behavior — the URL-bar viewport dance,
-  rubber-banding, autoplay policy, `viewport-fit=cover` — still needs
-  Aaron's physical phone; flag those, test everything else yourself.
+  checks — **and be honest about which engines this laptop actually has.**
+  Blink is available through the browser tooling, when it will resize; real
+  WebKit is not, per the bullet at the top of this facet. iOS-Safari-only
+  behavior — the URL-bar viewport dance, rubber-banding, autoplay policy,
+  `viewport-fit=cover` — still needs Aaron's physical phone; flag those, and
+  say plainly which of the rest you did and did not manage to drive.
 
 ## Facet: cloud resource watch
 

@@ -2765,11 +2765,290 @@ runs against a cache nobody emptied.
 
 ## Green — Growth & Resilience
 
-*Browser & mobile compatibility · cloud resource watch · scalability*
+*Browser, mobile & accessibility · cloud resource watch · scalability &
+user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow), which was
-  the first Green run — so this is the first Green run with a baseline to move
-  against, and everything below is read as a trend where one exists.
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
+  2026-08-16 (rainbow).
+
+### 2026-08-24 (rainbow) — PR #286
+
+**Read the 2026-08-19 and 2026-08-16 blocks below as archaeology, not as a
+trend line.** Every number in them was measured against the Python tree, which
+no longer exists; where this run has a comparable figure it says so explicitly
+and says what makes it comparable. The two ledgered *guards* from those runs
+turned out not to have survived at all, which is this run's first finding.
+
+- **Fixed — the two guards Green built for itself were both deleted by the Go
+  crossing, and nothing said so.** `tests/test_browser_floor.py` and
+  `tests/test_reduced_motion.py` went with the interpreter in #272. Between
+  then and tonight the declared Safari 16.4 floor and the reduced-motion
+  promise were held by **nothing at all** — `web/README.md` had already
+  noticed half of it ("declared here and enforced **nowhere**") and filed it as
+  a queued item that was never in this ledger. Rebuilt as
+  `go/cmd/mtglab/browserfloor_test.go` and
+  `go/cmd/mtglab/reducedmotion_test.go`, ported argument-for-argument from the
+  originals (recovered out of `90158d6^`) rather than re-derived, with three
+  Go-specific changes: RE2 has no lookbehind, so `(?<![-\w])animation` is
+  written `(^|[^-\w])animation`; the camera door's second route now reads the
+  core's name off `reference.Runtime().OCR.Assets` where Python read
+  `ocr.ASSETS`; and both files gained an **anti-vacuity fatal**, because every
+  assertion in them is a `strings.Contains` that an empty haystack passes and
+  a moved bundle would read as a clean sweep. `web/README.md` and
+  `docs/ENGINEERING.md` §4 now point at the tests instead of restating them —
+  §4's "No regex lookbehind under `web/src`" was the *source* grep the floor
+  test exists to correct, and it had outlived that correction by five days.
+  **Seven mutations, all killed:** floor lowered to 16.2 (names both setters),
+  a floor-setter that is not in the bundle, a lookbehind marker that really is
+  in the bundle, `reader.ts` and the OCR shelf pointed at different cores, a
+  guard's mention of `.forest-ambience` removed from the committed sheet
+  (fails two tests, names all three covered classes), a misspelled cover, a
+  fabricated cover entry — plus the parser broken to zero matches, which fires
+  the fatal instead of passing.
+- **Fixed — the app had no live region anywhere, and now the wait and the
+  refusal both speak.** Counted over `web/src`: **zero** `aria-live`, **zero**
+  `role="status"`, **zero** `role="alert"`, **zero** `aria-busy`, across some
+  thirty surfaces where an answer arrives after an await — every sim, every
+  Claude mode, the tarot deal, the Wheel, card search, the camera, the
+  artifacts build. Re-confirmed on the deployed instance rather than inferred:
+  v208's home page and `/new` each report `0` live regions to a DOM query.
+  Commandment 2's "shut out" includes shut out by a screen reader, and this is
+  the shape of it — a sighted person watches a ring turn and watches the answer
+  replace it; a reader user gets silence and then silence. The fix is two
+  attributes in `web/src/components/ui.tsx`, because `Spinner` (20 call sites)
+  and `ErrorNote` (23) are the whole app's waiting and the whole app's refusal:
+  `role="status"` on the spinner, `role="alert"` on the note, and
+  `aria-hidden` on the turning ring so the region reads the label and not a
+  nameless element. `web/src/components/ui.test.tsx` holds it, found **by
+  role** rather than by class; three mutations, all killed (each dropped
+  attribute fails its own test, and dropping `role="status"` fails two).
+  **What it deliberately does not do:** the region lives on the spinner, so it
+  announces the *wait* and not the *answer* — announcing arrivals means one
+  region mounted across both states at each surface, which is a per-surface
+  design call and is queued (item 2) rather than smuggled in here.
+- **Checklist corrections applied to `references/green.md`, and one
+  deliberately not applied.** Three of its pointers named files that the
+  crossing had deleted or that never existed: the bundle-floor check "in CI",
+  "the reduced-motion checks in the web suite", and — the one that matters —
+  the Playwright/WebKit rig with "ENGINEERING §4 has the rig's story". The
+  first two now name the Go tests that make them true again, which is the
+  pass's own rule (a claim is fixed by being machine-checked, not by being
+  reworded). **The rig sentence is not rewritten away**: whether to stand it up
+  or strike it is Aaron's call, so the bullet now says the witness does not
+  exist, points at daybreak, and forbids recording a WebKit result nobody
+  obtained. A checklist that quietly deletes its own broken promise has lost
+  the finding.
+- **Queued for Aaron (2026-08-24):**
+  1. **The light theme's muted text fails WCAG AA, and it is the whole nav.**
+     `--text-muted` is `#898781` — and it is *the same value in both palettes*
+     (`web/src/index.css:15` light, `:68`/`:94` dark). Against dark's `#0d0d0d`
+     that is ~5.4:1 and fine; against light's `#f9f9f7` it is **3.41:1**
+     where AA wants 4.5. Measured with a real contrast computation over the
+     deployed instance's own rendered text, both themes, three routes: dark
+     **0** failing colours on `/new`, **1** on `/learn`; light **21** distinct
+     failing elements on `/new` and **4** distinct failing colours on `/learn`.
+     What fails is not decoration — it is every masthead nav link (Library,
+     Start a deck, Import, Card search, Simulator, Laboratory, Learn, About
+     Claude), the card count, the signed-in username, the unselected mode
+     chips, the art attribution line and the pentagram's legend. `--text-muted`
+     is used **268 times** across `web/src`'s components and 17 more in
+     `index.css`. *Cost of leaving it:* the newcomer on a light-themed phone
+     reads the way to the Learn room in the faintest text on the page.
+     **Recommendation:** give the light palette its own `--text-muted` and
+     leave dark's alone. `#747370` is the smallest darkening of the same hue
+     that clears the bar — computed, not eyeballed: it lands at **4.51:1**
+     against `#f9f9f7`. It renders, so it wants an eye and probably the house
+     mother's. Second, separate, smaller: `/learn`'s "Build Selesnya" call to
+     action is white on its guild colour at **3.64:1 in dark** and 4.42 in
+     light — one button, and a different decision (the colour is the guild's).
+  2. **Announcing the answer, not just the wait.** The PR gives every waiting
+     surface a polite region and every refusal an assertive one, which is the
+     half that generalises. The other half does not: a region that lives on the
+     spinner unmounts with the spinner, so the *arrival* is still silent. Doing
+     it properly means one live region mounted across both states at each
+     surface — about thirty of them, each with a real choice about what the
+     announcement says ("Sixty cards" vs "Search finished"). *Cost of leaving
+     it:* a reader user knows a wait started and never hears it end.
+     **Recommendation:** yes, but as its own pass with the copy written
+     deliberately, starting with the four that matter most — the tarot deal,
+     the Wheel stopping, a sim finishing, and card search's result count.
+  3. **Nothing prunes the Scryfall bulk files, and the volume doubled in five
+     days.** 2026-08-19: 115 MB of 2.9 GB (5%). Tonight: **234 MB (9%), 2.5 GB
+     free** — and the whole of the growth is `/data/scryfall`, which went
+     **24 MB → 121 MB**. It holds three files (`default_cards-2026-08-19`
+     77.5 MB, `oracle_cards-2026-08-13` and `-2026-08-19` at 24.5 MB each);
+     `pool.download` names each file by Scryfall's own `updated_at` date and
+     **never removes an older one** (`go/internal/pool/refresh.go`, the
+     `target`/`part`/`Rename` block). So a full refresh costs ~102 MB of volume
+     forever, which is **~25 more refreshes of headroom**. The laptop shows the
+     same shape (four files, two dates). `fly.toml`'s `[[mounts]]` comment
+     still sizes the volume for "the ~98MB of Scryfall downloads", a fixed
+     number for a directory with no ceiling. *Cost of leaving it:* nothing this
+     month; a full volume in a year of ordinary maintenance, and the failure
+     mode is a refresh that half-writes. **Recommendation:** after a successful
+     load, keep the newest file of each kind and delete the rest — the
+     newest is worth keeping because `download` short-circuits on an existing
+     target, so a re-run stays free. Not taken tonight because it deletes files
+     on the live volume and a night run does not do that unwatched.
+  4. **Three purge functions exist, are tested, and nothing in production calls
+     any of them.** `auth.PurgeExpiredSessions`
+     (`go/internal/auth/sessionwrites.go:164`), `auth.PurgeExpiredTokens`
+     (`tokens.go:324`, with `KeepUsedTokensFor = 30 days` beside it) and
+     `auth.PurgeStaleLimits` (`ratelimit.go:187`) have no caller outside
+     `accounts_test.go`, and the serving process has **no scheduled sweep at
+     all** — the only `time.NewTicker` in the whole tree is the pool keeper's
+     reaper. So sessions, spent invite and reset tokens, and rate-limit windows
+     accumulate in `app.db` with nothing to remove them. Rate-limit rows in
+     particular grow with *traffic*, not with accounts, so the design point
+     does not bound them. `app.db` is 348 KB today, so this is a shape rather
+     than a crisis. *Cost of leaving it:* an unbounded table on the volume, and
+     three functions a reader reasonably assumes are running. **Recommendation:**
+     wire one sweep — on boot and then daily — calling all three, and log the
+     counts. Queued rather than taken because it deletes rows from `app.db`,
+     which is a stop condition for a night run by name.
+  5. **The WebKit witness this checklist tells every Green run to use does not
+     exist.** `references/green.md` says real WebKit is testable here "via the
+     Playwright rig — `playwright@1.45.3` pinned … ENGINEERING §4 has the rig's
+     story". There is no `playwright` dependency in `web/package.json`, none in
+     the tree, and `git log -S` finds the string in exactly one place ever: the
+     skill reference itself (#145). ENGINEERING §4 had no rig story either.
+     This matters more than an ordinary stale line, because the same checklist
+     records that **Safari 15.6 on this Mac is now *below* the declared floor**
+     — so the laptop's own browser stopped being a witness and the replacement
+     was never real. Nothing on this hardware can currently render the site in
+     the oldest engine it claims to support. *Cost of leaving it:* the floor is
+     now guarded against *arriving* features (the new test) and witnessed by
+     nothing; a rendering bug that only WebKit 16–17 shows would reach a friend
+     first. **Recommendation:** either stand the rig up for real and write it
+     into ENGINEERING §4 (a devDependency and one script, and it is macOS 12's
+     last usable build so it is pin-or-nothing), or strike the claim from the
+     checklist and say plainly that the floor is checked statically and
+     witnessed on Aaron's phone. Do not leave it claimed.
+  6. **Hosted-first: one line of copy and two capabilities.** (a) Four
+     user-facing strings say **"the local pool"** on an instance that is not
+     the reader's machine — `Library.tsx:204`, `:234`, `:488` and
+     `Import.tsx:109`, plus the gate's own `unknown-card` message
+     (`gate/validate.go:232`). Seen rendering on v208 tonight: *"7 decks ·
+     35,393 cards in the local pool"*. (b) **`cardmotion sync` is the next
+     "labels"** — `docs/HOSTING.md` §on card-art documents the only path as
+     build on the dev machine then `fly ssh sftp put -r`, and the tool globs
+     `*/deck.yaml` out of a decks directory the checkout is not supposed to
+     have; the deployed side only serves (`api/shelves.go`), with no build
+     route. (c) **The ADR 36 match ledger is write-only on the instance** —
+     `forge.go` records into it, `ledger.Recent()` has no caller in
+     `internal/api` and no route, and the only reader is `mtglab sim matches`
+     on a terminal. *Cost of leaving it:* (a) is a small lie told to every
+     visitor; (b) is the exact divergence this facet was created for, one
+     capability later; (c) is data the app writes to the volume and cannot
+     show. **Recommendation:** (a) drop the word — "35,393 cards on the
+     shelves" and "Names resolve against the library's own cards" — a copy call
+     and so the house mother's; (b) and (c) are real work, and (b) is the one
+     to answer first because it is already the documented runbook.
+- **Retired this run — the shelf's serialization, deferred since 2026-08-16, is
+  no longer the shape it was deferred as.** That item's whole content was that
+  `/api/decks` serialised: ten concurrent requests cost **9.3× one request** in
+  Python. Measured tonight against the Go tree with the real seven-deck library
+  pulled off the volume: **10 concurrent cost 3.8× one request, 30 cost
+  10.3×.** The curve is no longer the flat line the deferral described, so the
+  trigger it carried ("past ~150 concurrent, or past ~40 decks") is arithmetic
+  about a program that does not exist. Re-deferring it honestly would mean
+  re-deriving the trigger from tonight's curve, and there is nothing to fix at
+  this scale — so it is closed rather than carried, and the numbers below are
+  the new baseline any successor starts from.
+- **Measurements (2026-08-24, rainbow):**
+  - **The first `/api/decks` numbers the Go tree has had, because the laptop's
+    library is empty and Black could not get one.** Seven decks pulled from the
+    volume with `fly ssh sftp get` into a scratch directory **outside the
+    working tree** (`MTGLAB_DECKS_DIR` pointed at it, so `decks/` in the
+    checkout stayed empty), and deleted afterwards. Local `mtglab ui`, one
+    process, machine load 5.36/8 — noisy, so these are conservative.
+    Serial medians of 7, warm:
+    `/api/health` **4.3 ms** · `/api/decks` **19.6 ms** ·
+    `/api/decks/local/arahbo-cats` **6.7 ms** · `/api/colors` **0.6 ms** ·
+    `/api/glossary` **0.5 ms** · `/api/lore` **0.7 ms** ·
+    `/api/cards/search?q=goblin` **40.8 ms** · `/` **0.7 ms**.
+  - **Concurrency, and the shape is the finding.** `/api/decks`: n=1 wall
+    **18.8 ms**; n=10 wall **71.5 ms**, median 64.4, worst 68.8; n=30 wall
+    **193.0 ms**, median 150.0, worst 180.3. Deck detail: n=10 **27.7 ms**,
+    n=30 **65.3 ms**. Card search n=10 **171.5 ms** against a 40.8 ms serial.
+    **Zero errors at every level** — no 500s, no timeouts, no lock failures.
+    Ten concurrent readers cost 3.8× one reader where Python cost 9.3×, so the
+    library shelf is genuinely parallel now rather than merely faster.
+  - **Cold and warm as two numbers**, cold meaning the first request after a
+    13 s idle — long enough that the pool's 10 s lease has been reaped, which
+    is what actually empties the memo. `/api/health` **48.9 / 4.2 ms** ·
+    `/api/decks` **120.0 / 18.9** · deck detail **86.9 / 6.6** · `/api/lore`
+    **78.0 / 0.9** · card search **67.6 / 40.3**. The lore shelf's 82.6× is
+    Black's queued item 4 seen from this facet; card search's 1.7× is the one
+    target that is genuinely database-bound rather than memo-bound.
+  - **Volume: 234 MB of 2.9 GB (9%), 2.5 GB free** — up from 115 MB (5%) on
+    2026-08-19. `/data/scryfall` **121 MB** (was 24), `mtg.duckdb` **96 MB**,
+    `/data/cache` 16 MB, `/data/decks` 512 KB, `app.db` 348 KB + 956 KB of WAL.
+    The growth is entirely queued item 3.
+  - **Machine: `shared-cpu-2x`, 2 vCPUs, 1 GB, `iad`** — Red's correction to
+    this ledger's `1x` confirmed at the source. Health check 1/1 passing. Event
+    log holds one entry, the v208 deploy at 09:34Z: **no OOM, no restarts, no
+    unplanned events.** A second machine exists, `forge-worker`
+    (`performance-2x`/4 GB), **stopped** — it is not in a Fly Launch process
+    group, so `fly deploy` never touches it and it costs nothing while idle.
+  - **Snapshots: five, 5-day retention, newest 21 h, 798 MiB stored.** Newer
+    than the newest schema migration, which is the question the checklist asks.
+    Unchanged from Red's reading; recorded once, not twice.
+  - **Pool: not stale, and `pool_stale` cannot tell you whether it is.**
+    `/api/health` on v208 reports `pool_stale: false` with bulk files dated
+    2026-08-19 (five days). Reading `pool.Stale` rather than trusting its name:
+    it asks whether the pool predates the *columns* the app reads — printed
+    stats on `oracle_cards`, painter on `printings` — and answers `false` for a
+    pool of any age whose schema is current. **Rules staleness is measured by
+    nothing**; the only date is inside a filename. Not filed as a finding
+    because the checklist already says to read the dates, and it is the same
+    ground as queued item 3 — but the next run should not read `false` as "the
+    pool is fresh".
+  - **Contrast, deployed, both themes, computed rather than eyeballed** — see
+    queued item 1 for the numbers and the fix.
+  - **Touch targets, unchanged and re-measured on v208**: **21 of 29** visible
+    focusable elements are under 44 px in at least one dimension on the library
+    page — nav links 32 px tall, the settings control 28 px, "In the Learn
+    room →" **16 px**. That is Green's queued item 3 from 2026-08-19 (21 of 23
+    on `/import` at 375 px) still true one tree later, so it is recorded rather
+    than re-filed. **The phone-width half of this run is owed**: the browser
+    available tonight refused every resize (`innerWidth` stayed 1440 through
+    two attempts), so every figure above is desktop-width, and the responsive
+    sweep at 375/768/1024 did not happen. Related to queued item 5 — the
+    engines this facet is supposed to have are not there.
+  - **Page structure, v208:** `lang="en"` present, exactly one `h1` per route,
+    headings in order, **no skip link anywhere** (`a[href^="#"]` finds none), so
+    a keyboard user tabs the eight-link masthead before reaching content on
+    every navigation. Reader tiles on `/new` are real `<button>`s with
+    accessible names, 400×424 — the fortune-teller's own room passes the
+    keyboard path, which is the one place this run checked hardest
+    (commandment 15).
+  - **Icon-only buttons and images, swept:** 131 buttons outside tests, 6 with
+    no text child, and **all 6 carry a name** (`aria-label`, or the button's
+    lone `<img alt>`); 9 carry `aria-label` in total. 53 `<img>`, **none
+    missing `alt`**; 8 dynamic alts are all card or painting names; 36 are
+    deliberately empty on decorative art. Nothing to file — this is the half of
+    the facet that is already right, recorded so a future run knows it was
+    looked at.
+  - **The design point, verified in the Go tree** (100 accounts / 10
+    concurrent): the CPU lane is **derived, not literal** —
+    `jobs.Registry` takes `GOMAXPROCS(0)` floored at 1, so the second core
+    since 2026-08-23 widened the lane for free, which is exactly what
+    `references/green.md` warns a literal would have missed. `netWorkers = 2`,
+    `forgeWorkers = 1`, `MaxJobs = 200`. Rate limits are one `var` block
+    (`auth/ratelimit.go`): 10/15min per account, 30/15min per address,
+    3/hr reset per mailbox, 10/hr reset per address, 20/15min claim per
+    address; no invite volume cap exists. SQLite: `journal_mode(WAL)` set on
+    the creating DSN and persisted in the file, `busy_timeout(5000)` on every
+    open path but one test helper, `foreign_keys(1)` on all three write paths,
+    one writer connection each, four readers. `synchronous` is set nowhere —
+    the driver default stands. `fly.toml` `soft_limit=20`/`hard_limit=40`.
+    **Adaptability verdict: 500/50 is a config edit and a re-measure** — the
+    shelf answers 30 concurrent in 193 ms and the CPU lane follows the machine.
+  - **Held-awake trigger: not arrived.** `fly.toml`'s block is held "until
+    primary development is done", and primary development is what tonight is.
+    The block to uncomment is named in the file, directly beneath the one to
+    delete; its own comment prices the machine at ≈$0.22/day.
 - **Fixed this run (2026-08-19, rainbow): two animations reach the browser
   that no reduced-motion guard could ever have arrested, and the reason they
   were missed is that the previous run checked the wrong file.** That run

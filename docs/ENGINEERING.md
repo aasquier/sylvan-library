@@ -77,10 +77,17 @@ flake.
 ## 4. Frontend
 
 React + TypeScript under `web/`, bundle committed at `web_dist/` (CI proves
-it rebuilds byte-identically). `noUncheckedIndexedAccess` is on. No regex
-lookbehind under `web/src` — the supported-browser floor includes WebKit
-without it. The check gate is `npm --prefix web run check`; run
-`npm --prefix web run build` whenever `web/src` changes.
+it rebuilds byte-identically). `noUncheckedIndexedAccess` is on. The check
+gate is `npm --prefix web run check`; run `npm --prefix web run build`
+whenever `web/src` changes.
+
+**The browser floor is Safari 16.4, and two Go tests hold it against the
+committed bundle** — `go/cmd/mtglab/browserfloor_test.go` (features above the
+floor, regex lookbehind, and the two independent things that set the number)
+and `go/cmd/mtglab/reducedmotion_test.go` (every animating rule reachable by a
+`prefers-reduced-motion` guard). Both read `web_dist/assets`, never `web/src`,
+because every feature that has ever moved this floor arrived through a
+dependency rather than through a file we wrote.
 
 ## 5. CI/CD
 

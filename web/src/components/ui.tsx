@@ -380,21 +380,51 @@ export function Badge({
   )
 }
 
+/**
+ * The wait, said out loud.
+ *
+ * `role="status"` is an implicit `aria-live="polite"` region, and it is on the
+ * shared spinner rather than on twenty call sites because that is where it
+ * covers every surface at once: a turning ring is a picture of waiting, and a
+ * picture of waiting is nothing at all to somebody who cannot see it. With a
+ * `label` a screen reader now says "Reading the colour guide…" when the wait
+ * starts; without one there is nothing to announce and nothing is, which is
+ * correct rather than a gap.
+ *
+ * **What this does not do, deliberately.** The region lives on the spinner, so
+ * it goes when the spinner goes — the wait is announced, the *answer* is not.
+ * Announcing arrivals means keeping one region mounted across both states at
+ * each surface, which is a per-surface change and a design call; it is queued
+ * rather than smuggled in here. Half the promise kept out loud beats all of it
+ * kept in silence.
+ */
 export function Spinner({ label }: { label?: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+    <div role="status" className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
       <span
         className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
         style={{ borderTopColor: 'transparent' }}
+        aria-hidden="true"
       />
       {label}
     </div>
   )
 }
 
+/**
+ * Something went wrong, said out loud.
+ *
+ * `role="alert"` is an assertive live region, and assertive is right here in a
+ * way it would be wrong almost anywhere else: a failure is the one message that
+ * must not wait its turn behind whatever is being read, because the person is
+ * otherwise still waiting for an answer that is never coming. Every refusal in
+ * the app comes through this one component, so the role belongs on it and not
+ * on twenty-three copies of it.
+ */
 export function ErrorNote({ children }: { children: React.ReactNode }) {
   return (
     <div
+      role="alert"
       className="rounded-lg px-4 py-3 text-sm"
       style={{
         background: 'color-mix(in srgb, var(--status-critical) 10%, transparent)',
