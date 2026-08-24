@@ -1273,6 +1273,54 @@ the spirit of Magic*
     not bite — but they were **not** taken tonight: this run's user-visible
     branch carries a factual correction, and mixing a taste change into it
     doubles what Aaron has to weigh at a glance. Next spirit run starts here.
+
+    **CORRECTION, found on the live walk an hour later, and the method is the
+    finding.** The count above is wrong: there are **seven** rendered
+    `Loading…` strings, not two. The sweep grepped for the *quoted* form
+    (`"Loading…"`) and so saw only the two `Spinner label=` sites; the other
+    five are bare JSX text nodes — `>Loading…<` — in `components/tarot.tsx`,
+    `components/theme.tsx`, `routes/Learn.tsx` (twice) and `routes/NewDeck.tsx`.
+    **A rendered string is not always a quoted string**, and a sweep that only
+    knows one spelling of "rendered" under-reports by a factor of three. This
+    is [[a-completeness-list-must-be-discovered]] in a new costume, and the
+    next spirit run should grep both shapes.
+
+    It matters beyond the count, because **five of the seven are a bare
+    `<p class="text-sm">` with no spinner and no motion at all** — a page that
+    sits there, which is commandment 6 — and one of the five is on the
+    fortune-teller's table, which commandment 15 says is rationed last.
+    Caught by driving `/new` on the instance and watching it render "Loading…"
+    flat and left-aligned for about three seconds before the persona picker
+    arrived. *Cross-color: the missing motion is Red's controls facet as much
+    as this one's; the word itself is Blue's.*
+  - **The live walk, 2026-08-24 (deployed instance, riding the signed-in
+    `claude` seat through Claude-in-Chrome — never signed in by Claude).**
+    `/api/health`: pool true, **35,393 oracle rows, 107,355 printings, 7
+    decks, `pool_stale: false`**. The door holds: `/` 200 while `/api/lore`
+    and `/api/colors` answer **401** unauthenticated, which is the middleware
+    refusing before routing. The library, `/claude`, `/new` and the persona
+    picker all render.
+
+    **The About Claude keeper duty (commandment 18) — the page is in good
+    order and one of its claims did real work.** Both exhibit commanders
+    resolved live out of the pool with their own rules text (Kwain, Itinerant
+    Meddler and Tatyova, Benthic Druid), all four paintings name their painter
+    (Mark Poole, John Avon, Rebecca Guay, Seb McKinnon), and the page's own
+    sentence — "every other picture on this page names its painter" — holds.
+    **And its Library of Alexandria plate credits *Arabian Nights, 1993*.** So
+    the site contradicted itself about one painting across two surfaces, and
+    the surface that was right is the one that also matches the pool. That is
+    worth more than the one-word diff: the correction is not a judgement call.
+
+    **The fortune-teller's table (commandment 15) is still the best room on
+    the site.** The persona picker carries three painted tiles with credits
+    (Volkan Baǵa on the fortune-teller), a sound toggle, an explicit
+    "Pick colours myself" escape hatch, and copy that promises the questions
+    are "about you and never about Magic". The one tile with no painting —
+    "Chat with Claude, no costume" — is deliberately the uncostumed option and
+    correctly the only one carrying no credit. Nothing has slipped past it.
+    The `Loading…` finding above is the single blemish and it is on the way
+    *in* to the room.
 - **Measured (2026-08-24, this Mac, quiet, after the fixes):**
   - **Go gauntlet, all four gates green.** `gofmt -l .` prints nothing;
     `go vet ./...` clean; `go test -race ./...` **exit 0, 0 FAIL lines across
