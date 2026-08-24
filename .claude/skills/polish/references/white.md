@@ -262,6 +262,17 @@ Then the levers, in the order that pays:
 - Hunt duplicated setup: fixtures and helpers belong in the shared test
   helpers (`internal/pool/pooltest`, `internal/auth`'s authtest fixtures) —
   three tests hand-rolling the same scaffolding is a finding.
+- **The determinism replay, once per cycle, against the live instance.**
+  Determinism is contract (CLAUDE.md): a seed is a promise — the tarot deal a
+  browser reloads, the Wheel's spin, every Tier 1 run. The goldens hold it
+  locally; this replays it where users live. Keep one recorded seed per
+  surface in the ledger with its full response, and each cycle ask the
+  deployed instance the same seed and byte-compare: the same tarot seed must
+  deal the same spread, the same wheel seed the same fate. One nuance for
+  Tier 1: its cache key includes the engine fingerprint, so after an engine
+  change a recompute under the same seed is *correct* — check the fingerprint
+  before calling a Tier 1 difference drift. Tarot and Wheel have no such out;
+  drift there is a broken promise and outranks everything else in this facet.
 - Skips are a budget, not a convenience: every `t.Skip` in the tree is
   conditional on a real absence (a live instance, a Forge install, a full
   pool), and a drift in the skip census is a finding even when CI is green.

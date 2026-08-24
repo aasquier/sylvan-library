@@ -36,6 +36,16 @@ repo rule, and the pricing/caching facts there beat memory.
   call. Do not silently change models; if a mode's task profile clearly fits
   a cheaper or better-priced model, queue the proposal with measured
   token counts and the pricing math.
+- **Spend and craft are one reading.** While the mode table is open for its
+  numbers, ask the quality questions too, because nothing else in the cycle
+  reads these prompts: does each mode's prompt still fit the model it runs on
+  (prompts written for an older model drift under a newer one — hedges the
+  model no longer needs, workarounds for weaknesses it no longer has), do the
+  personas still land, and has the roster moved — a newer model at the same
+  price, a price change under the same model? Load the `claude-api` skill and
+  check the current tables rather than memory. A roster change is queued for
+  Aaron (his call by standing rule); a prompt no longer earning its tokens is
+  a finding here, with a measured before/after when it lands.
 - Web search costs per call: dossier and research budgets (`max_uses`) should
   be deliberate numbers, not defaults.
 - Failure spend: a mode that errors after its Anthropic call has spent the

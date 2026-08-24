@@ -1,13 +1,11 @@
 # Blue — Craft & Knowledge
 
-Five facets: Go craft (plus the animist toolbox in `tools/`),
-TypeScript/React craft, **controls** — commandment 17 made checkable — the
-Claude-first documentation and memory audit, and the spirit of Magic. Blue is
-the color of perfected craft and of knowing things: knowing the language well
-enough to write this year's Go rather than the Go with the most text behind
-it, knowing what the hand expects when it reaches for a control, knowing
-yourself (the fourth facet), and knowing the game whose name is on the door
-(the fifth).
+Four facets: Go craft (plus the animist toolbox in `tools/`),
+TypeScript/React craft, the Claude-first documentation and memory audit, and
+the spirit of Magic. Blue is the color of perfected craft and of knowing
+things: knowing the language well enough to write this year's Go rather than
+the Go with the most text behind it, knowing yourself (the third facet), and
+knowing the game whose name is on the door (the fourth).
 
 ## Facet: Go craft
 
@@ -143,59 +141,6 @@ The sweep list, roughly by how much the replacement buys:
   seams is a finding.
 - If anything under `web/src` changed, the committed bundle must be rebuilt —
   and after any rebase, rebuilt again.
-
-## Facet: controls — commandment 17, made checkable
-
-Commandment 17 says every control answers the hand that reaches for it. It is
-the commandment most often satisfied *in the abstract* and missed on the
-actual element, because a control can look finished while doing none of it.
-Aaron's standing complaint, 2026-08-23: dull buttons, buttons that keep
-accepting clicks after the first one, and links doing a toggle's job.
-
-**Walk the surfaces in a real browser and press things.** jsdom cannot see a
-hover state, a focus ring, or a second click landing. Then work the list —
-each item is a grep or a press, not a judgment call:
-
-- **Does it reply to hover, focus *and* press?** Three separate states, and
-  focus is the one that gets skipped: keyboard users get no hover, so a
-  control with `:hover` styling and no `:focus-visible` is invisible to them.
-  A control that changes on hover alone is two-thirds done.
-- **Is it in the shared control vocabulary?** `web/src/index.css` holds the
-  `.btn` family for actions and `.chip-toggle` / `.strip-tab` and their
-  siblings for controls that are *places* rather than actions. Measured
-  2026-08-23: **131 button tags outside tests, 21 of them wearing no class
-  from that vocabulary.** Not all 21 are bugs — the tarot reader tiles, the
-  art picker and the wheel are deliberately bespoke and carry their own named
-  classes — so the test is not "does it have a `.btn`" but **"is there one
-  named place where this control's three states are defined?"** A control
-  styled only by inline `style={{…}}` fails that by construction, because
-  **a `:hover` can never reach an inline style** — which is how the last
-  hundred dull buttons happened, and there are 648 inline style props under
-  `web/src` for the sweep to work through.
-- **Does a click that starts work stop accepting clicks?** Measured
-  2026-08-23: **19 buttons start async work on click and 6 of them never
-  disable** — including `save()` and the deck page's return-a-card control,
-  which are *writes*, so the failure mode is a double edit rather than a
-  double read. The pattern is a busy flag driving `disabled` **and** a visible
-  pending state (the shared `Spinner`, or the button's own label changing).
-  Disabling with no visible change reads as broken; a spinner with no
-  `disabled` still double-submits. Both halves or neither.
-- **Is it the right element for the job?** A link navigates; a button acts; a
-  thing with an on and an off state is a toggle and should say so with
-  `aria-pressed` or `role="switch"`, not be a link that happens to change
-  colour. Aaron named this one specifically. An `<a>` with an `onClick` and no
-  `href` is the tell.
-- **Is the disabled reason legible?** A control disabled with no explanation
-  is a dead end, and commandment 2 makes that a real cost — a newcomer
-  assumes they broke it. A `title`, a helper line, or a tooltip saying *what
-  would enable this* is part of the control.
-- **Does it survive the keyboard and the phone?** Tab to it, press Enter and
-  Space; then check it at a touch size (Green owns the 44px floor, this facet
-  owns whether the hit target is the visible thing).
-
-Record which surfaces were walked and which controls were fixed, and — the
-part that keeps this from restarting every cycle — **which were examined and
-deliberately left bespoke, with the reason.**
 
 ## Facet: Claude-first docs & memory audit
 
@@ -365,6 +310,26 @@ Where the easy wins live, roughly in order of cost:
   can carry its painter's name; a colour pair can carry its guild. These are
   the cheapest wins of all, because the sentence is already written and
   checked in — it is only not being shown.
+
+Two standing checks before the shortlist, both commandment-owned:
+
+- **The shelves must be true (commandment 3).** `internal/reference`'s prose
+  — colors, glossary, lore, tarot lore — is hand-written, checked in, and
+  read by exactly the audience that will catch an error in it: Magic nerds.
+  Each run, fact-check a sample of entries against the pool and the game's
+  actual history (rule 1 binds — look facts up, never recall them), and read
+  the dropped-name counter: a card name a shelf cites that the pool cannot
+  resolve is being silently dropped *and counted*, and a count nobody reads
+  is a silence. A wrong date, a wrong painter, a wrong ruling in the lore is
+  a worse flavour failure than any plain-English button, because it teaches a
+  newcomer something false about the game.
+- **Visit the fortune-teller's table (commandment 15).** Once per spirit run,
+  open the tarot room on the live instance and ask the commandment's own
+  question: is it still the belle of the ball — the realest art, the richest
+  motion, the most care on the site? Effort rations there *last*, so if this
+  run's enrichment shortlist has one item in it, it goes there; and if the
+  room has slipped behind a newer page anywhere else, that is a finding even
+  though nothing is broken.
 
 Three bounds, all of them hard:
 

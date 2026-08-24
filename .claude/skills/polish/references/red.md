@@ -1,8 +1,11 @@
 # Red — Speed & Alarum
 
-Two facets: the CI/CD pipeline, and alerting & self-healing. Red is speed and
-the fire alarm — the pipeline that answers fast, and the bell that rings
-before Aaron's friends notice the site is down.
+Three facets: the CI/CD pipeline, alerting & self-healing, and the controls —
+commandment 17 made checkable. Red is speed, the fire alarm, and the answered
+impulse: the pipeline that answers fast, the bell that rings before Aaron's
+friends notice the site is down, and the button that replies the instant a
+hand reaches for it. A control belongs to Red for the same reason lightning
+does — its whole virtue is the speed of its reply.
 
 ## Facet: CI/CD
 
@@ -108,11 +111,78 @@ approved.
   - **Admin-page surfacing** — Green's facet owns resource *numbers*; the
     alerting tie-in is thresholds: the admin page showing a number is
     Aaron checking; a threshold firing a push is nobody needing to.
+- **The expiry calendar.** A probe watches the site; nothing watches a date
+  unless a run does, and a lapse is the outage no monitor explains. Enumerate
+  everything that expires and record the nearest three in the ledger: the
+  domain registration for sylvan-libraries.com (the site going dark with DNS
+  intact-looking), TLS (Fly renews it — verify the date, never assume the
+  renewal), the Anthropic key's rotation cycle (it is short-lived by policy;
+  a 401 on every Claude surface is what expiry looks like), and the Fly
+  payment method. Anything inside sixty days is a daybreak line with the
+  renewal step attached.
 - Self-healing posture: Fly restart policy on the machine, what happens on
   OOM, and the known hard edge — **schema migrations apply on boot,
   forward-only, unwatched**. Any proposal that increases automatic restarts
   must reckon with that edge, and say so when queued.
 - Failure-tolerance review: single machine, single volume is the accepted
   design (held awake deliberately). Don't re-litigate it; do keep the
-  recovery runbook honest — snapshots current, restore path documented in
-  HOSTING.md and actually tried at least once since it last changed.
+  recovery runbook honest — snapshots current, and **the restore drill dated
+  in the ledger**: the last time the documented restore path was actually
+  walked end to end, against a scratch target, and what it produced. A drill
+  older than the newest schema migration is due, because the ladder is
+  forward-only and a restore crosses it. The volume is the library's one
+  standing copy (ADR 30); an untested backup of the only copy is a hope
+  wearing a procedure's name.
+
+## Facet: controls — commandment 17, made checkable
+
+Commandment 17 says every control answers the hand that reaches for it. It is
+the commandment most often satisfied *in the abstract* and missed on the
+actual element, because a control can look finished while doing none of it.
+Aaron's standing complaint, 2026-08-23: dull buttons, buttons that keep
+accepting clicks after the first one, and links doing a toggle's job.
+
+**Walk the surfaces in a real browser and press things.** jsdom cannot see a
+hover state, a focus ring, or a second click landing. Then work the list —
+each item is a grep or a press, not a judgment call:
+
+- **Does it reply to hover, focus *and* press?** Three separate states, and
+  focus is the one that gets skipped: keyboard users get no hover, so a
+  control with `:hover` styling and no `:focus-visible` is invisible to them.
+  A control that changes on hover alone is two-thirds done.
+- **Is it in the shared control vocabulary?** `web/src/index.css` holds the
+  `.btn` family for actions and `.chip-toggle` / `.strip-tab` and their
+  siblings for controls that are *places* rather than actions. Measured
+  2026-08-23: **131 button tags outside tests, 21 of them wearing no class
+  from that vocabulary.** Not all 21 are bugs — the tarot reader tiles, the
+  art picker and the wheel are deliberately bespoke and carry their own named
+  classes — so the test is not "does it have a `.btn`" but **"is there one
+  named place where this control's three states are defined?"** A control
+  styled only by inline `style={{…}}` fails that by construction, because
+  **a `:hover` can never reach an inline style** — which is how the last
+  hundred dull buttons happened, and there are 648 inline style props under
+  `web/src` for the sweep to work through.
+- **Does a click that starts work stop accepting clicks?** Measured
+  2026-08-23: **19 buttons start async work on click and 6 of them never
+  disable** — including `save()` and the deck page's return-a-card control,
+  which are *writes*, so the failure mode is a double edit rather than a
+  double read. The pattern is a busy flag driving `disabled` **and** a visible
+  pending state (the shared `Spinner`, or the button's own label changing).
+  Disabling with no visible change reads as broken; a spinner with no
+  `disabled` still double-submits. Both halves or neither.
+- **Is it the right element for the job?** A link navigates; a button acts; a
+  thing with an on and an off state is a toggle and should say so with
+  `aria-pressed` or `role="switch"`, not be a link that happens to change
+  colour. Aaron named this one specifically. An `<a>` with an `onClick` and no
+  `href` is the tell.
+- **Is the disabled reason legible?** A control disabled with no explanation
+  is a dead end, and commandment 2 makes that a real cost — a newcomer
+  assumes they broke it. A `title`, a helper line, or a tooltip saying *what
+  would enable this* is part of the control.
+- **Does it survive the keyboard and the phone?** Tab to it, press Enter and
+  Space; then check it at a touch size (Green owns the 44px floor, this facet
+  owns whether the hit target is the visible thing).
+
+Record which surfaces were walked and which controls were fixed, and — the
+part that keeps this from restarting every cycle — **which were examined and
+deliberately left bespoke, with the reason.**

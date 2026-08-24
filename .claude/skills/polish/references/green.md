@@ -1,16 +1,19 @@
 # Green — Growth & Resilience
 
-Four facets: browser and mobile compatibility, the cloud resource watch,
-scalability, and hosted-first alignment. Green is the color that adapts to
-every terrain and grows without breaking — the site working on a phone in
-someone's kitchen, the volume never silently filling, the architecture
-bending instead of snapping when ten users become a hundred, and nothing the
-product needs still chained to the laptop it grew up on.
+Four facets: browser, mobile and accessibility compatibility, the cloud
+resource watch, scalability, and hosted-first alignment. Green is the color
+that adapts to every terrain and every player — the site working on a phone
+in someone's kitchen and under someone's screen reader, the volume never
+silently filling, the architecture bending instead of snapping when ten users
+become a hundred, and nothing the product needs still chained to the laptop
+it grew up on.
 
-## Facet: browser & mobile compatibility
+## Facet: browser, mobile & accessibility
 
 Commandment 2 makes this concrete: the newcomer someone shares the site with
-is opening it on *their* phone, in *their* browser. It has to just work.
+is opening it on *their* phone, in *their* browser, with *their* body. It has
+to just work — and "shut out" in the commandment includes shut out by a
+screen reader or a keyboard.
 
 - **The floor is Safari 16.4, declared by Aaron on 2026-08-19** and pinned as
   the bundle-floor check in CI, whose comment has the argument:
@@ -41,6 +44,29 @@ is opening it on *their* phone, in *their* browser. It has to just work.
 - Touch targets: interactive elements at ≥44px effective size on the deck
   page's dense controls. Measure in a real mobile viewport
   (`resize_window` mobile preset drives a true touch profile), not jsdom.
+- **Accessibility is compatibility with the player, not the device**, and it
+  is swept with the same walk and the same tools as the pixels around it:
+  - **Keyboard-only** through the changed surfaces: every interactive element
+    reachable by Tab, focus visible on each (Red's controls facet owns the
+    focus *style*; this owns the *path*), Enter and Space acting, no trap a
+    modal or menu cannot be escaped from.
+  - **Names for the nameless**: icon-only buttons carry `aria-label`s, card
+    images carry the card's name as alt text — the pool already knows it, so
+    a bare `<img>` of a card is a one-line fix — and decorative art is marked
+    decorative rather than read aloud as a filename.
+  - **Contrast in both themes**, measured with a real checker rather than by
+    eye: the felt and brass run dark, and the muted text tokens are where AA
+    quietly fails. Check text and control states, not just body copy.
+  - **Async results announce themselves**: a sim finishing, a validation
+    report arriving, the Wheel stopping — a live region or an equivalent, so
+    the answer does not simply *appear* to someone who cannot see it appear.
+- **The newcomer's walk, once per cycle (commandment 2).** Open the site cold
+  — fresh profile, phone width, no memory of it — and spend five minutes as
+  somebody's partner who has never played Magic. Can they tell what this
+  place is? Does the first screen invite or gate? Is any word on it one they
+  cannot learn by hovering? Does the path to the fortune-teller's table
+  require knowing anything? File every stumble; this walk outranks the pixel
+  checks around it, because it is the commandment the pixel checks serve.
 - Responsive sweep of anything new since last run at phone, tablet, laptop
   widths — and both themes. A screenshot at each width is the evidence;
   "the classes look right" is not.
@@ -89,6 +115,18 @@ trend is read.
   difference retired with the old backend — so **label a cold figure as cold
   only when you know what emptied**, and a "cold" number taken by asking twice
   is a warm number with a misleading name.
+- **Pool staleness is rules staleness.** Bans and new sets reach this site
+  only through a refresh, so a stale pool quietly serves yesterday's
+  legality. Read `/api/health` — it reports `pool_stale` and the bulk-file
+  dates — and flag a pool more than about two weeks old, always flagging
+  across a banned-list announcement or a set release. The refresh is one
+  command in HOSTING; the finding is that nobody ran it.
+- **The held-awake trigger, checked every run.** The single biggest lever on
+  the bill is already written down: `fly.toml` holds the machine awake "until
+  primary development is done", and its own comment says restoring
+  scale-to-zero then is worth more than every micro-optimisation combined.
+  Each run, ask whether the trigger has arrived; when it has, that revert is
+  a daybreak line with the block to uncomment named.
 - Fly free-tier/plan posture: what the project is on, what it is near the
   edge of (machine count, volume GB, bandwidth). A limit within one growth
   step is a queued finding with the price of the next tier attached.
