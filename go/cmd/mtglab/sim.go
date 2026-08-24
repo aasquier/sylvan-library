@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -50,19 +51,19 @@ import (
 // Failures of the caller's own making (a zero games count, a one-deck Forge
 // match) come back as plain errors, printed by the root as
 // `mtglab: <message>` -- the recorded sentence, never a stack.
-func simCommand() *cobra.Command {
+func simCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sim",
 		Short: "The simulator: goldfish runs, the closed form, keep rules, Forge",
 	}
 	cmd.AddCommand(
-		simManaCommand(),
-		simLandsCommand(),
-		simShelfCommand(),
-		simMulliganCommand(),
-		simCacheCommand(),
-		simForgeCommand(),
-		simMatchesCommand(),
+		simManaCommand(cfg),
+		simLandsCommand(cfg),
+		simShelfCommand(cfg),
+		simMulliganCommand(cfg),
+		simCacheCommand(cfg),
+		simForgeCommand(cfg, forge),
+		simMatchesCommand(cfg),
 	)
 	return cmd
 }
@@ -71,8 +72,8 @@ func simCommand() *cobra.Command {
 
 // loadSimDeck reads one slug's deck.yaml off the file tier, or refuses with
 // the recorded sentence.
-func loadSimDeck(slug string) (*deck.Deck, error) {
-	path := filepath.Join(settings().DecksDir, slug, "deck.yaml")
+func loadSimDeck(cfg config.Config, slug string) (*deck.Deck, error) {
+	path := filepath.Join(cfg.DecksDir, slug, "deck.yaml")
 	text, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -91,7 +92,7 @@ func loadSimDeck(slug string) (*deck.Deck, error) {
 // commander, the 99, the swap board, and the companion. The graveyard is
 // not queried -- nothing here simulates it, and the narrower lookup is part
 // of the recorded behaviour.
-func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, error) {
+func deckPool(ctx context.Context, cfg config.Config, d *deck.Deck) (map[string]*pool.CardRecord, error) {
 	names := append([]string{}, d.Commander...)
 	for _, c := range d.Cards {
 		names = append(names, c.Name)
@@ -102,7 +103,7 @@ func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, e
 	if d.Companion != nil {
 		names = append(names, *d.Companion)
 	}
-	p := pool.New(settings().DBPath(), nil)
+	p := pool.New(cfg.DBPath(), nil)
 	defer p.Close()
 	var cards map[string]*pool.CardRecord
 	err := p.Use(ctx, func(c *pool.Conn) error {
@@ -119,12 +120,12 @@ func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, e
 // simCards loads and compiles, or fails with the compiler's own words. The
 // only error `compile.Deck` returns is PoolRequired, whose Error() is the
 // recorded exit sentence word for word.
-func simCards(ctx context.Context, slug string) (*deck.Deck, []*sim.Card, *sim.Card, error) {
-	d, err := loadSimDeck(slug)
+func simCards(ctx context.Context, cfg config.Config, slug string) (*deck.Deck, []*sim.Card, *sim.Card, error) {
+	d, err := loadSimDeck(cfg, slug)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	cards, err := deckPool(ctx, d)
+	cards, err := deckPool(ctx, cfg, d)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -137,7 +138,7 @@ func simCards(ctx context.Context, slug string) (*deck.Deck, []*sim.Card, *sim.C
 
 // ------------------------------------------------------------------- mana
 
-func simManaCommand() *cobra.Command {
+func simManaCommand(cfg config.Config) *cobra.Command {
 	var (
 		games, turns, minLands, maxLands, minPieces int
 		seed                                        int64
@@ -147,10 +148,11 @@ func simManaCommand() *cobra.Command {
 		Short: "Tier 1 -- baseline mana consistency, goldfished",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			if games < 1 {
 				return errors.New("a run needs at least one game")
 			}
-			_, library, commander, err := simCards(context.Background(), args[0])
+			_, library, commander, err := simCards(context.Background(), cfg, args[0])
 			if err != nil {
 				return err
 			}
@@ -161,7 +163,7 @@ func simManaCommand() *cobra.Command {
 				s := seed
 				opts.Seed = &s
 			}
-			fmt.Println(summaryReport(tier1.Run(library, commander, opts)))
+			fmt.Fprintln(out, summaryReport(tier1.Run(library, commander, opts)))
 			return nil
 		},
 	}
@@ -211,7 +213,7 @@ func summaryReport(s tier1.SimSummary) string {
 
 // ------------------------------------------------------------------ lands
 
-func simLandsCommand() *cobra.Command {
+func simLandsCommand(cfg config.Config) *cobra.Command {
 	var (
 		games int
 		seed  int64
@@ -221,6 +223,7 @@ func simLandsCommand() *cobra.Command {
 		Short: "Sweep the land count; read where deployment plateaus",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			low, err := strconv.Atoi(args[1])
 			if err != nil {
 				return fmt.Errorf("argument low: invalid int value: '%s'", args[1])
@@ -232,7 +235,7 @@ func simLandsCommand() *cobra.Command {
 			if games < 1 {
 				return errors.New("a run needs at least one game")
 			}
-			_, library, commander, err := simCards(context.Background(), args[0])
+			_, library, commander, err := simCards(context.Background(), cfg, args[0])
 			if err != nil {
 				return err
 			}
@@ -248,7 +251,7 @@ func simLandsCommand() *cobra.Command {
 				return errors.New("deck has no lands to sweep")
 			}
 
-			fmt.Println(" lands  P(cmdr T5)  spells thru T8  wasted thru T8  mull%")
+			fmt.Fprintln(out, " lands  P(cmdr T5)  spells thru T8  wasted thru T8  mull%")
 			for n := low; n <= high; n++ {
 				// Resize by cycling the existing land pool, preserving its
 				// colour mix.
@@ -261,14 +264,14 @@ func simLandsCommand() *cobra.Command {
 				s := seed
 				summary := tier1.Run(lib, commander,
 					tier1.Options{Games: games, Turns: 10, Seed: &s})
-				fmt.Printf(" %s     %s          %s           %s          %s\n",
+				fmt.Fprintf(out, " %s     %s          %s           %s          %s\n",
 					padLeft(strconv.Itoa(n), 5),
 					padLeft(percent(summary.CommanderByTurn[5], 1), 6),
 					padLeft(fixedDecimal(summary.SpellsThrough(8), 2), 5),
 					padLeft(fixedDecimal(summary.WastedThrough(8), 2), 5),
 					padLeft(percent(summary.MulliganRate, 1), 4))
 			}
-			fmt.Println("\nPick the land count where 'spells thru T8' plateaus -- past that " +
+			fmt.Fprintln(out, "\nPick the land count where 'spells thru T8' plateaus -- past that "+
 				"you are buying commander speed with flood.")
 			return nil
 		},
@@ -281,7 +284,7 @@ func simLandsCommand() *cobra.Command {
 
 // ------------------------------------------------------------------ shelf
 
-func simShelfCommand() *cobra.Command {
+func simShelfCommand(cfg config.Config) *cobra.Command {
 	var (
 		target    float64
 		onTheDraw bool
@@ -292,7 +295,8 @@ func simShelfCommand() *cobra.Command {
 		Short: "Tier 1.5 -- the closed form: coloured source requirements, a land count and per-card lag",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, library, commander, err := simCards(context.Background(), args[0])
+			out := cmd.OutOrStdout()
+			d, library, commander, err := simCards(context.Background(), cfg, args[0])
 			if err != nil {
 				return err
 			}
@@ -302,15 +306,15 @@ func simShelfCommand() *cobra.Command {
 			if !shelf.OnThePlay {
 				seat = "on the draw"
 			}
-			fmt.Println(d.Name)
-			fmt.Printf("%d cards, %d lands, judged at %s consistency, %s.\n\n",
+			fmt.Fprintln(out, d.Name)
+			fmt.Fprintf(out, "%d cards, %d lands, judged at %s consistency, %s.\n\n",
 				shelf.DeckSize, shelf.Lands, percent(shelf.Target, 0), seat)
 
-			fmt.Println("COLOURED SOURCES -- what your own cards demand")
-			fmt.Println("  A rung per pip count, because a deck short on triple-pip cards is")
-			fmt.Print("  not a deck short on colour.\n\n")
+			fmt.Fprintln(out, "COLOURED SOURCES -- what your own cards demand")
+			fmt.Fprintln(out, "  A rung per pip count, because a deck short on triple-pip cards is")
+			fmt.Fprint(out, "  not a deck short on colour.\n\n")
 			for _, req := range shelf.Colors {
-				fmt.Printf("  %s: you have %d sources (%d lands, %d other)\n",
+				fmt.Fprintf(out, "  %s: you have %d sources (%d lands, %d other)\n",
 					req.Color, req.Have, req.HaveLands, req.Have-req.HaveLands)
 				for _, tier := range req.Tiers {
 					verdict := "ok"
@@ -321,29 +325,29 @@ func simShelfCommand() *cobra.Command {
 					if len(tier.Cards) > 1 {
 						more = fmt.Sprintf(" (+%d more)", len(tier.Cards)-1)
 					}
-					fmt.Printf("      %d pip on T%d: wants %s  -- %s you make it %s of the time  [%s%s]\n",
+					fmt.Fprintf(out, "      %d pip on T%d: wants %s  -- %s you make it %s of the time  [%s%s]\n",
 						tier.Pips, tier.Turn, padLeft(strconv.Itoa(tier.Need), 2),
 						padRight(verdict, 8), percent(tier.OddsNow, 0),
 						tier.Cards[0], more)
 				}
-				fmt.Println()
+				fmt.Fprintln(out)
 			}
 
 			est := shelf.LandEstimate
-			fmt.Println("LAND COUNT -- a regression, not a simulation")
-			fmt.Printf("  You run %d. The fit says %d (%+d), from an average mana value of %s and %d cheap accelerants.\n",
+			fmt.Fprintln(out, "LAND COUNT -- a regression, not a simulation")
+			fmt.Fprintf(out, "  You run %d. The fit says %d (%+d), from an average mana value of %s and %d cheap accelerants.\n",
 				est.LandsNow, est.Recommended, est.Delta(),
 				floats.Repr(est.AverageManaValue), est.CheapAccelerants)
 			for _, caveat := range est.Caveats {
-				fmt.Printf("    - %s\n", caveat)
+				fmt.Fprintf(out, "    - %s\n", caveat)
 			}
-			fmt.Println("  Read `mtglab sim lands` beside this: it simulates *this* deck and prices flood,")
-			fmt.Print("  which the fit cannot.\n\n")
+			fmt.Fprintln(out, "  Read `mtglab sim lands` beside this: it simulates *this* deck and prices flood,")
+			fmt.Fprint(out, "  which the fit cannot.\n\n")
 
-			fmt.Println("LATEST CARDS -- cost against when the mana is actually there")
-			fmt.Println("  'lag' is turns between what a card costs and when you can rely on")
-			fmt.Println("  casting it. This assumes the card is in your hand; it is a question")
-			fmt.Print("  about the mana base, not about drawing.\n\n")
+			fmt.Fprintln(out, "LATEST CARDS -- cost against when the mana is actually there")
+			fmt.Fprintln(out, "  'lag' is turns between what a card costs and when you can rely on")
+			fmt.Fprintln(out, "  casting it. This assumes the card is in your hand; it is a question")
+			fmt.Fprint(out, "  about the mana base, not about drawing.\n\n")
 			var inHorizon []karsten.CardOdds
 			for _, o := range shelf.Odds {
 				if o.MV <= karsten.Horizon {
@@ -351,7 +355,7 @@ func simShelfCommand() *cobra.Command {
 				}
 			}
 			shown := headOf(inHorizon, top)
-			fmt.Printf("  %s %s %s %s %s\n", padRight("card", 38),
+			fmt.Fprintf(out, "  %s %s %s %s %s\n", padRight("card", 38),
 				padLeft("cost", 4), padLeft("on curve", 9),
 				padLeft("reliable", 9), padLeft("lag", 6))
 			for _, odds := range shown {
@@ -367,20 +371,20 @@ func simShelfCommand() *cobra.Command {
 				if v := odds.Lag(); v != nil {
 					lag = "+" + strconv.Itoa(*v)
 				}
-				fmt.Printf("  %s %s %s %s %s\n",
+				fmt.Fprintf(out, "  %s %s %s %s %s\n",
 					padRight(headRunes(odds.Name, 38), 38),
 					padLeft(strconv.Itoa(odds.MV), 4), padLeft(curve, 9),
 					padLeft(reliable, 9), padLeft(lag, 6))
 			}
 			if len(shelf.Approximated) > 0 {
-				fmt.Printf("\n  %d card(s) demand two or more colours, where this method\n",
+				fmt.Fprintf(out, "\n  %d card(s) demand two or more colours, where this method\n",
 					len(shelf.Approximated))
 				tail := ""
 				if len(shelf.Approximated) > 4 {
 					tail = ", ..."
 				}
-				fmt.Println("  approximates and reads slightly low: " +
-					strings.Join(headOf(shelf.Approximated, 4), ", ") + tail)
+				fmt.Fprintln(out, "  approximates and reads slightly low: "+
+					strings.Join(headOf(shelf.Approximated, 4), ", ")+tail)
 			}
 			return nil
 		},
@@ -405,22 +409,23 @@ func cardValues(library []*sim.Card) []sim.Card {
 
 // --------------------------------------------------------------- mulligan
 
-func simMulliganCommand() *cobra.Command {
+func simMulliganCommand(cfg config.Config) *cobra.Command {
 	var games, turns, seed, top int
 	cmd := &cobra.Command{
 		Use:   "mulligan <slug>",
 		Short: "search keep rules and report the best policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			if games < 1 {
 				return errors.New("a run needs at least one game")
 			}
-			d, library, commander, err := simCards(context.Background(), args[0])
+			d, library, commander, err := simCards(context.Background(), cfg, args[0])
 			if err != nil {
 				return err
 			}
 			grid := mulligan.Candidates()
-			fmt.Printf("%s: %d keep rules x %s games (seed %d) ...\n\n",
+			fmt.Fprintf(out, "%s: %d keep rules x %s games (seed %d) ...\n\n",
 				d.Name, len(grid), groupThousands(games), seed)
 			sweep, err := mulligan.Search(library, commander,
 				mulligan.Options{Games: games, Turns: turns, Seed: seed})
@@ -428,7 +433,7 @@ func simMulliganCommand() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("  %s %s %s  rule\n", padLeft("spells T8", 9),
+			fmt.Fprintf(out, "  %s %s %s  rule\n", padLeft("spells T8", 9),
 				padLeft("mull%", 7), padLeft("cmdr", 5))
 			for _, row := range headOf(sweep.Rows, top) {
 				marks := " "
@@ -444,41 +449,41 @@ func simMulliganCommand() *cobra.Command {
 				if row.MedianCommanderTurn != nil {
 					cmdr = "T" + gFormat(row.MedianCommanderTurn.Value())
 				}
-				fmt.Printf("%s%s %s %s  %s\n", marks,
+				fmt.Fprintf(out, "%s%s %s %s  %s\n", marks,
 					padLeft(fixedDecimal(row.SpellsThroughT8, 2), 9),
 					padLeft(percent(row.MulliganRate, 1), 7),
 					padLeft(cmdr, 5), row.Describe)
 			}
-			fmt.Print("\n  * best   = the default this simulator uses when you choose nothing\n\n")
+			fmt.Fprint(out, "\n  * best   = the default this simulator uses when you choose nothing\n\n")
 
 			if sweep.IsFlat() {
-				fmt.Printf("NO CHANGE WORTH MAKING. The best rule beats your default by %s spells\n",
+				fmt.Fprintf(out, "NO CHANGE WORTH MAKING. The best rule beats your default by %s spells\n",
 					signed(sweep.Gain()))
-				fmt.Printf("through turn 8, under the %s threshold this calls noise. The grid\n",
+				fmt.Fprintf(out, "through turn 8, under the %s threshold this calls noise. The grid\n",
 					floats.Repr(mulligan.Flat))
-				fmt.Printf("spans %s spells overall, but most of that range is rules nobody\n",
+				fmt.Fprintf(out, "spans %s spells overall, but most of that range is rules nobody\n",
 					fixedDecimal(sweep.Spread, 2))
-				fmt.Println("would play -- flatness is measured against your default, not against the grid.")
+				fmt.Fprintln(out, "would play -- flatness is measured against your default, not against the grid.")
 				gentle := sweep.Gentlest()
 				if gentle.MulliganRate < sweep.Baseline.MulliganRate-0.05 {
-					fmt.Printf("\nStill worth knowing: '%s' deploys the same (%s)\n",
+					fmt.Fprintf(out, "\nStill worth knowing: '%s' deploys the same (%s)\n",
 						gentle.Describe, fixedDecimal(gentle.SpellsThroughT8, 2))
-					fmt.Printf("while mulliganing %s of hands instead of %s. Same result, fewer hands thrown away.\n",
+					fmt.Fprintf(out, "while mulliganing %s of hands instead of %s. Same result, fewer hands thrown away.\n",
 						percent(gentle.MulliganRate, 0),
 						percent(sweep.Baseline.MulliganRate, 0))
 				}
 			} else {
-				fmt.Printf("BEST: %s\n", sweep.Best.Describe)
-				fmt.Printf("  %s spells through turn 8, %s against your default's %s,\n",
+				fmt.Fprintf(out, "BEST: %s\n", sweep.Best.Describe)
+				fmt.Fprintf(out, "  %s spells through turn 8, %s against your default's %s,\n",
 					fixedDecimal(sweep.Best.SpellsThroughT8, 2), signed(sweep.Gain()),
 					fixedDecimal(sweep.Baseline.SpellsThroughT8, 2))
-				fmt.Printf("  mulliganing %s of hands against %s.\n",
+				fmt.Fprintf(out, "  mulliganing %s of hands against %s.\n",
 					percent(sweep.Best.MulliganRate, 0),
 					percent(sweep.Baseline.MulliganRate, 0))
 			}
-			fmt.Println()
-			fmt.Println("Judged on spells deployed through turn 8: mulligan rate alone recommends keeping")
-			fmt.Println("everything, and hand quality alone recommends mulliganing forever.")
+			fmt.Fprintln(out)
+			fmt.Fprintln(out, "Judged on spells deployed through turn 8: mulligan rate alone recommends keeping")
+			fmt.Fprintln(out, "everything, and hand quality alone recommends mulliganing forever.")
 			return nil
 		},
 	}
@@ -500,29 +505,30 @@ func sameRule(a, b mulligan.Row) bool {
 
 // ------------------------------------------------------------------ cache
 
-func simCacheCommand() *cobra.Command {
+func simCacheCommand(cfg config.Config) *cobra.Command {
 	var clear bool
 	cmd := &cobra.Command{
 		Use:   "cache",
 		Short: "what Tier 1 results are memoised",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			ctx := context.Background()
-			store := openSimStore()
+			store := openSimStore(cfg)
 			defer func() { _ = store.Close() }()
 			if clear {
-				fmt.Printf("cleared %d cached result(s) from %s\n",
-					store.Clear(ctx), settings().AppDBPath())
+				fmt.Fprintf(out, "cleared %d cached result(s) from %s\n",
+					store.Clear(ctx), cfg.AppDBPath())
 				return nil
 			}
 			info := store.Stats(ctx)
-			fmt.Printf("store:   %s\n", settings().AppDBPath())
+			fmt.Fprintf(out, "store:   %s\n", cfg.AppDBPath())
 			enabled := "no -- results are not cached"
 			if info.Enabled {
 				enabled = "yes"
 			}
-			fmt.Printf("enabled: %s\n", enabled)
-			fmt.Printf("rows:    %d (%s kB)\n", info.Rows,
+			fmt.Fprintf(out, "enabled: %s\n", enabled)
+			fmt.Fprintf(out, "rows:    %d (%s kB)\n", info.Rows,
 				fixedDecimal(float64(info.Bytes)/1024, 1))
 			kinds := make([]string, 0, len(info.ByKind))
 			for kind := range info.ByKind {
@@ -530,10 +536,10 @@ func simCacheCommand() *cobra.Command {
 			}
 			sort.Strings(kinds)
 			for _, kind := range kinds {
-				fmt.Printf("  %s %d\n", padRight(kind, 18), info.ByKind[kind])
+				fmt.Fprintf(out, "  %s %d\n", padRight(kind, 18), info.ByKind[kind])
 			}
 			if info.Oldest != nil {
-				fmt.Printf("computed between %s and %s UTC\n",
+				fmt.Fprintf(out, "computed between %s and %s UTC\n",
 					headRunes(*info.Oldest, 19), headRunes(*info.Newest, 19))
 			}
 			return nil
@@ -552,8 +558,8 @@ func simCacheCommand() *cobra.Command {
 // file is read as an empty one, never minted. An existing file has the
 // schema ladder run first, so a stale schema is a state this command never
 // sees.
-func openSimStore() *simcache.Store {
-	path := settings().AppDBPath()
+func openSimStore(cfg config.Config) *simcache.Store {
+	path := cfg.AppDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
@@ -571,7 +577,7 @@ func openSimStore() *simcache.Store {
 
 // ------------------------------------------------------------------ forge
 
-func simForgeCommand() *cobra.Command {
+func simForgeCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 	var (
 		games, clock int
 		seed         int64
@@ -582,9 +588,10 @@ func simForgeCommand() *cobra.Command {
 		Short: "Tier 3 -- Forge plays real games",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
 			decks := make([]*deck.Deck, 0, len(args))
 			for _, slug := range args {
-				d, err := loadSimDeck(slug)
+				d, err := loadSimDeck(cfg, slug)
 				if err != nil {
 					return err
 				}
@@ -594,12 +601,12 @@ func simForgeCommand() *cobra.Command {
 				// The coverage pre-flight on its own: reads a zip, needs no
 				// JVM, and is the only half of this command that works
 				// without the distribution installed.
-				reports, err := tier3.CheckCoverage(decks, "")
+				reports, err := forge.CheckCoverage(decks)
 				if err != nil {
 					return err
 				}
 				for i := range reports {
-					fmt.Println(reports[i].Summary())
+					fmt.Fprintln(out, reports[i].Summary())
 				}
 				return nil
 			}
@@ -607,7 +614,7 @@ func simForgeCommand() *cobra.Command {
 			if cmd.Flags().Changed("seed") {
 				seedPtr = big.NewInt(seed)
 			}
-			result, err := tier3.RunGames(decks, tier3.RunOptions{
+			result, err := forge.RunGames(decks, tier3.RunOptions{
 				Games: games, Clock: clock, Seed: seedPtr,
 			})
 			if err != nil {
@@ -618,7 +625,7 @@ func simForgeCommand() *cobra.Command {
 			// the two places a match finishes. Never fails the run; an
 			// overnight round-robin must not die on a ledger hiccup with the
 			// JVM's work already done.
-			recordForgeMatch(result, decks, seedPtr, clock, games)
+			recordForgeMatch(cfg, result, decks, seedPtr, clock, games)
 
 			wins := map[string]int{}
 			for _, game := range result.Games() {
@@ -637,7 +644,7 @@ func simForgeCommand() *cobra.Command {
 			for _, g := range result.Games() {
 				played = append(played, float64(g.Milliseconds)/1000)
 			}
-			fmt.Printf("%d games in %ss (%ss of it JVM + card database)\n",
+			fmt.Fprintf(out, "%d games in %ss (%ss of it JVM + card database)\n",
 				len(result.Games()), fixedDecimal(result.WallSeconds, 1),
 				fixedDecimal(result.StartupSeconds(), 1))
 			// `Fsum` for the rule rather than for this number: these are
@@ -648,15 +655,15 @@ func simForgeCommand() *cobra.Command {
 			for _, v := range played[1:] {
 				minS, maxS = min(minS, v), max(maxS, v)
 			}
-			fmt.Printf("per game: %ss min / %ss mean / %ss max\n",
+			fmt.Fprintf(out, "per game: %ss min / %ss mean / %ss max\n",
 				fixedDecimal(minS, 1),
 				fixedDecimal(floats.Fsum(played)/float64(len(played)), 1),
 				fixedDecimal(maxS, 1))
 			for _, slug := range args {
-				fmt.Printf("  %s %d\n", padRight(slug, 22), wins[slug])
+				fmt.Fprintf(out, "  %s %d\n", padRight(slug, 22), wins[slug])
 			}
 			if wins["draw"] > 0 {
-				fmt.Printf("  %s %d\n", padRight("draw", 22), wins["draw"])
+				fmt.Fprintf(out, "  %s %d\n", padRight("draw", 22), wins["draw"])
 			}
 			clocked := 0
 			for _, g := range result.Games() {
@@ -667,10 +674,10 @@ func simForgeCommand() *cobra.Command {
 			if clocked > 0 {
 				// Never folded into the draw count: a clock-out is the
 				// measurement giving up, not the game ending.
-				fmt.Printf("  (%d hit the %ds clock and were called draws)\n",
+				fmt.Fprintf(out, "  (%d hit the %ds clock and were called draws)\n",
 					clocked, clock)
 			}
-			fmt.Println("\nForge's AI is best at aggro and midrange, poor at control and bad " +
+			fmt.Fprintln(out, "\nForge's AI is best at aggro and midrange, poor at control and bad "+
 				"at most combo.\nRead these per archetype, not as one ranking.")
 			return nil
 		},
@@ -691,9 +698,9 @@ func simForgeCommand() *cobra.Command {
 // `sim cache` it MAY mint app.db: recording is a write, the ladder applies
 // on the way in, and a match silently unrecorded on a fresh machine would
 // be a regression.
-func recordForgeMatch(result *tier3.SimRun, decks []*deck.Deck, seed *big.Int,
+func recordForgeMatch(cfg config.Config, result *tier3.SimRun, decks []*deck.Deck, seed *big.Int,
 	clock, games int) {
-	path := settings().AppDBPath()
+	path := cfg.AppDBPath()
 	if err := auth.Migrate(path); err != nil {
 		fmt.Fprintf(os.Stderr, "match ledger record failed (%v)\n", err)
 		return
@@ -716,16 +723,17 @@ func recordForgeMatch(result *tier3.SimRun, decks []*deck.Deck, seed *big.Int,
 
 // ---------------------------------------------------------------- matches
 
-func simMatchesCommand() *cobra.Command {
+func simMatchesCommand(cfg config.Config) *cobra.Command {
 	var limit int
 	cmd := &cobra.Command{
 		Use:   "matches",
 		Short: "the match ledger -- every Forge match recorded",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := settings().AppDBPath()
+			out := cmd.OutOrStdout()
+			path := cfg.AppDBPath()
 			if _, err := os.Stat(path); err != nil {
-				fmt.Println("no matches recorded yet -- `mtglab sim forge` records as it plays")
+				fmt.Fprintln(out, "no matches recorded yet -- `mtglab sim forge` records as it plays")
 				return nil
 			}
 			if err := auth.Migrate(path); err != nil {
@@ -741,10 +749,10 @@ func simMatchesCommand() *cobra.Command {
 				return err
 			}
 			if len(matches) == 0 {
-				fmt.Println("no matches recorded yet -- `mtglab sim forge` records as it plays")
+				fmt.Fprintln(out, "no matches recorded yet -- `mtglab sim forge` records as it plays")
 				return nil
 			}
-			fmt.Printf("ledger: %s\n", path)
+			fmt.Fprintf(out, "ledger: %s\n", path)
 			for _, m := range matches {
 				when := strings.ReplaceAll(headRunes(m.CreatedAt, 19), "T", " ")
 				where := "local"
@@ -759,7 +767,7 @@ func simMatchesCommand() *cobra.Command {
 				if m.Seed != nil {
 					seeded = fmt.Sprintf("seed %d", *m.Seed)
 				}
-				fmt.Printf("\n#%d  %s UTC  (%s%s, %s)\n", m.ID, when, where,
+				fmt.Fprintf(out, "\n#%d  %s UTC  (%s%s, %s)\n", m.ID, when, where,
 					version, seeded)
 				for _, seat := range m.Seats {
 					labels := seat.Archetype
@@ -773,7 +781,7 @@ func simMatchesCommand() *cobra.Command {
 					if seat.Wins == 1 {
 						plural = ""
 					}
-					fmt.Printf("  %s %s win%s  (%s)\n", padRight(seat.Slug, 22),
+					fmt.Fprintf(out, "  %s %s win%s  (%s)\n", padRight(seat.Slug, 22),
 						padLeft(strconv.Itoa(seat.Wins), 2), plural, labels)
 				}
 				extras := []string{}
@@ -793,7 +801,7 @@ func simMatchesCommand() *cobra.Command {
 				if len(extras) > 0 {
 					tail = "  (" + strings.Join(extras, ", ") + ")"
 				}
-				fmt.Printf("  %d of %d games%s\n", m.Played, m.GamesRequested, tail)
+				fmt.Fprintf(out, "  %d of %d games%s\n", m.Played, m.GamesRequested, tail)
 			}
 			return nil
 		},

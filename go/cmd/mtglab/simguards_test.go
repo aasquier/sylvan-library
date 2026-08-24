@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/config"
+
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
@@ -23,8 +25,9 @@ import (
 // A run of no games is arithmetic about nothing, and every command that takes
 // `--games` says so rather than dividing by zero somewhere further in.
 func TestEverySimCommandRefusesARunOfNoGames(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 
 	for _, tc := range []struct {
 		name string
@@ -36,7 +39,7 @@ func TestEverySimCommandRefusesARunOfNoGames(t *testing.T) {
 		{"mulligan", []string{"mulligan", "mono-green", "--games", "0"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out, err := runSim(t, tc.args...)
+			out, err := d.run(t, append([]string{"sim"}, tc.args...)...)
 			if err == nil {
 				t.Fatalf("a run of no games was attempted:\n%s", out)
 			}
@@ -50,15 +53,16 @@ func TestEverySimCommandRefusesARunOfNoGames(t *testing.T) {
 // A land range that will not parse names which of the two bounds was wrong,
 // because "invalid int value" without a name sends somebody to check both.
 func TestTheLandRangeNamesWhichBoundWouldNotParse(t *testing.T) {
-	simHome(t, true)
-	writeSimDeck(t, "mono-green", monoGreenText(t))
+	t.Parallel()
+	d := simHome(t, true)
+	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 
 	for _, tc := range []struct{ name, low, high, wants string }{
 		{"the low bound", "thirty", "40", "argument low"},
 		{"the high bound", "30", "forty", "argument high"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := runSim(t, "lands", "mono-green", tc.low, tc.high)
+			_, err := d.run(t, "sim", "lands", "mono-green", tc.low, tc.high)
 			if err == nil {
 				t.Fatal("an unparseable bound was swept")
 			}
@@ -78,7 +82,8 @@ func TestTheLandRangeNamesWhichBoundWouldNotParse(t *testing.T) {
 // already spent, so a ledger that cannot be written is a warning rather than
 // a lost result.
 func TestTheMatchLedgerRecordsAFinishedMatchAndThenRendersIt(t *testing.T) {
-	simHome(t, false)
+	t.Parallel()
+	d := simHome(t, false)
 
 	// A finished match, built by hand rather than played -- what is under
 	// test is the recording and the rendering, not Forge.
@@ -99,11 +104,11 @@ func TestTheMatchLedgerRecordsAFinishedMatchAndThenRendersIt(t *testing.T) {
 		{Slug: "trostani", Name: "Trostani"},
 	}
 
-	recordForgeMatch(run, decks, big.NewInt(7), 300, 2)
+	recordForgeMatch(d.Config, run, decks, big.NewInt(7), 300, 2)
 
 	// The ledger now renders it, which is the only way to see that the write
 	// landed -- and the render is what a maintainer actually reads.
-	out, err := runSim(t, "matches")
+	out, err := d.run(t, "sim", "matches")
 	if err != nil {
 		t.Fatalf("matches: %v", err)
 	}
@@ -122,9 +127,12 @@ func TestTheMatchLedgerRecordsAFinishedMatchAndThenRendersIt(t *testing.T) {
 // A ledger write that cannot happen is a warning, never a failure -- the
 // match is already paid for by the time there is anything to record.
 func TestAFailedLedgerWriteDoesNotTakeTheMatchWithIt(t *testing.T) {
+	t.Parallel()
 	// A data directory that is not there: the ladder cannot run.
-	t.Setenv("MTGLAB_DATA_DIR", "/nonexistent/never-mounted")
-	t.Setenv("MTGLAB_DECKS_DIR", "/nonexistent/never-mounted/decks")
+	unmounted := config.Config{
+		DataDir:  "/nonexistent/never-mounted",
+		DecksDir: "/nonexistent/never-mounted/decks",
+	}
 
 	run := &tier3.SimRun{
 		Output:      tier3.SimOutput{Games: []tier3.GameResult{{Index: 0, Milliseconds: 1000}}},
@@ -132,7 +140,7 @@ func TestAFailedLedgerWriteDoesNotTakeTheMatchWithIt(t *testing.T) {
 		Seats:       map[int]string{1: "gyome"},
 	}
 	// The whole contract: it returns rather than panicking or exiting.
-	recordForgeMatch(run, []*deck.Deck{{Slug: "gyome", Name: "Gyome"}},
+	recordForgeMatch(unmounted, run, []*deck.Deck{{Slug: "gyome", Name: "Gyome"}},
 		big.NewInt(1), 300, 1)
 }
 
@@ -140,16 +148,17 @@ func TestAFailedLedgerWriteDoesNotTakeTheMatchWithIt(t *testing.T) {
 // are no matches rather than having a database made for it. (`sim cache` has
 // the same rule; the recording write above is the deliberate exception.)
 func TestReadingTheLedgerOnAFreshMachineMintsNothing(t *testing.T) {
-	dir := simHome(t, false)
+	t.Parallel()
+	d := simHome(t, false)
 
-	out, err := runSim(t, "matches")
+	out, err := d.run(t, "sim", "matches")
 	if err != nil {
 		t.Fatalf("matches on a fresh machine: %v", err)
 	}
 	if strings.TrimSpace(out) == "" {
 		t.Error("an empty ledger printed nothing at all")
 	}
-	if fileExists(dir + "/app.db") {
+	if fileExists(d.AppDBPath()) {
 		t.Error("reading the ledger created app.db -- a read must not acquire a database")
 	}
 }

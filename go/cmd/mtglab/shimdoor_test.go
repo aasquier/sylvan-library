@@ -27,12 +27,19 @@ import (
 // and a watchdog that read silence as idleness would kill matches at the
 // three-minute mark and look exactly like a Forge crash.
 //
-// Serial, because every path reads the environment.
+// All parallel since ADR 40: the door is handed the machine it serves as a
+// [tier3.Settings], so a test that wants a locked door and a test that wants
+// an open one can run at the same time.
 
-// newShim is a server over a fresh door.
-func newShim(t *testing.T) *httptest.Server {
+// newShim is a server over a fresh door with no lock on it.
+func newShim(t *testing.T) *httptest.Server { return newShimFor(t, tier3.Settings{}) }
+
+// newShimFor is the same door serving a described machine.
+func newShimFor(t *testing.T, forge tier3.Settings) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(&shim{state: newShimState(), log: log.New(io.Discard, "", 0)})
+	srv := httptest.NewServer(&shim{
+		state: newShimState(), log: log.New(io.Discard, "", 0), forge: forge,
+	})
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -58,8 +65,8 @@ func post(t *testing.T, srv *httptest.Server, path, token, body string) *http.Re
 // token compared with `==` leaks its prefix to anybody who can time the
 // private network.
 func TestTheShimRefusesEveryRouteWithoutItsToken(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "s3cret")
-	srv := newShim(t)
+	t.Parallel()
+	srv := newShimFor(t, tier3.Settings{ShimToken: "s3cret"})
 
 	for _, tc := range []struct{ name, token string }{
 		{"no token at all", ""},
@@ -103,7 +110,7 @@ func TestTheShimRefusesEveryRouteWithoutItsToken(t *testing.T) {
 // An unset token is a laptop running the shim by hand, and it lets everything
 // through rather than locking the operator out of their own process.
 func TestAnUnsetTokenLetsALaptopIn(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
+	t.Parallel()
 	srv := newShim(t)
 
 	resp, err := srv.Client().Get(srv.URL + "/healthz")
@@ -128,7 +135,7 @@ func TestAnUnsetTokenLetsALaptopIn(t *testing.T) {
 // Everything that is not one of the three routes is a 404 that names what was
 // asked for, rather than a bare status the app has to guess about.
 func TestTheShimHasExactlyThreeRoutes(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
+	t.Parallel()
 	srv := newShim(t)
 
 	for _, tc := range []struct{ method, path string }{
@@ -163,7 +170,7 @@ func TestTheShimHasExactlyThreeRoutes(t *testing.T) {
 // A body the shim cannot read is a 400 that says so, rather than a panic or a
 // match played with default arguments nobody asked for.
 func TestAnUnreadableBodyIsRefusedRatherThanGuessedAt(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
+	t.Parallel()
 	srv := newShim(t)
 
 	for _, tc := range []struct{ name, body string }{
@@ -197,11 +204,12 @@ func TestAnUnreadableBodyIsRefusedRatherThanGuessedAt(t *testing.T) {
 
 // A worker with no Forge answers 503 rather than 500, because the app turns
 // exactly that into "Forge is not available here" instead of a red job.
+// **Serial**: it clears the package-level coverage index, which every other
+// test reading a cardsfolder shares.
 func TestAWorkerWithNoForgeAnswers503(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
-	t.Setenv("MTGLAB_FORGE_HOME", t.TempDir()) // present, and empty
 	tier3.ClearIndex()
-	srv := newShim(t)
+	// A Forge home that is present, and empty.
+	srv := newShimFor(t, tier3.Settings{Home: t.TempDir()})
 
 	resp := post(t, srv, "/coverage", "", `{"decks":[]}`)
 	if resp.StatusCode != http.StatusServiceUnavailable {
@@ -352,38 +360,28 @@ type errSentinel struct{}
 
 func (errSentinel) Error() string { return "something else went wrong" }
 
-// The JVM heap ceiling and the idle window are read from the environment and
-// fall back rather than becoming zero -- a zero heap would fail every match
-// and a zero idle window means "never stop", which is what a laptop wants.
-func TestTheShimsEnvironmentIntegersFallBackRatherThanBecomingZero(t *testing.T) {
-	t.Setenv("MTGLAB_TEST_SHIM_INT", "")
-	if got := envInt("MTGLAB_TEST_SHIM_INT", 3072); got != 3072 {
-		t.Errorf("an unset value gave %d", got)
-	}
-	t.Setenv("MTGLAB_TEST_SHIM_INT", "not-a-number")
-	if got := envInt("MTGLAB_TEST_SHIM_INT", 3072); got != 3072 {
-		t.Errorf("an unparseable value gave %d -- a zero heap fails every match", got)
-	}
-	t.Setenv("MTGLAB_TEST_SHIM_INT", "2048")
-	if got := envInt("MTGLAB_TEST_SHIM_INT", 3072); got != 2048 {
-		t.Errorf("an explicit value gave %d", got)
-	}
-	// Zero IS a legitimate explicit value: for the idle window it means
-	// "never stop".
-	t.Setenv("MTGLAB_TEST_SHIM_INT", "0")
-	if got := envInt("MTGLAB_TEST_SHIM_INT", 180); got != 0 {
-		t.Errorf("an explicit zero gave %d -- 0 means never stop", got)
-	}
-	// And the defaults themselves: the heap sits below the client's own
-	// default on purpose, because the heap is not the only resident of a
-	// 4GB machine.
-	if memoryDefault >= tier3.MemoryDefault {
+// The JVM heap ceiling and the idle window fall back rather than becoming
+// zero -- a zero heap would fail every match, and a zero idle window means
+// "never stop", which is what a laptop wants. The reading itself moved to
+// [tier3.LoadSettings] with ADR 40 and is tested there; what is asked here is
+// the thing this package still owns, which is whether the numbers are sane.
+func TestTheShimsDefaultsAreSane(t *testing.T) {
+	t.Parallel()
+	// The heap sits below the client's own default on purpose, because the
+	// heap is not the only resident of a 4GB machine.
+	if tier3.DefaultMemoryMB >= tier3.MemoryDefault {
 		t.Errorf("the shim's heap ceiling (%d) is not below tier3's (%d) -- "+
 			"metaspace, the card database and this process live beside it",
-			memoryDefault, tier3.MemoryDefault)
+			tier3.DefaultMemoryMB, tier3.MemoryDefault)
 	}
-	if idleDefault <= 0 {
-		t.Errorf("the default idle window is %d", idleDefault)
+	if tier3.DefaultIdleSeconds <= 0 {
+		t.Errorf("the default idle window is %d", tier3.DefaultIdleSeconds)
+	}
+	// Zero IS a legitimate explicit value for the idle window: it means
+	// "never stop", and a shim asked for it must not fall back to three
+	// minutes and exit under a laptop.
+	if got := (tier3.Settings{IdleSeconds: 0}).IdleSeconds; got != 0 {
+		t.Errorf("an explicit zero became %d", got)
 	}
 }
 
@@ -391,7 +389,7 @@ func TestTheShimsEnvironmentIntegersFallBackRatherThanBecomingZero(t *testing.T)
 // them with a decoder and a body of unknown length over a private network is
 // how a read hangs.
 func TestEveryShimAnswerIsCountedJSON(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
+	t.Parallel()
 	srv := newShim(t)
 
 	for _, tc := range []struct{ method, path, body string }{

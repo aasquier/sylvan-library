@@ -1,86 +1,30 @@
 package main
 
-// The `mtglab decks` family, driven exactly as main wires it -- a root with
-// the same silences, `decks <cmd>` in argv -- against a scratch library:
-// MTGLAB_DECKS_DIR and MTGLAB_DATA_DIR into temp dirs, the 21-card pool
-// copied to `<data>/mtg.duckdb` when a test wants card-level checks,
-// `app.db` seeded through `authtest.Schema` when one wants history.
+// The `mtglab decks` family, driven exactly as main wires it -- the same root
+// with the same silences, `decks <cmd>` in argv -- against a scratch library:
+// a [deployment] with its own directories, the 21-card pool copied in when a
+// test wants card-level checks, `app.db` seeded through `authtest.Schema`
+// when one wants history.
 //
-// The commands print with bare fmt.Printf, so stdout is captured with a
-// pipe rather than through cobra's own writer -- which keeps the command
-// code plain. Expected strings are written as literals, not rebuilt with
-// the same format verbs, so a wrong verb fails here instead of agreeing
+// Every command writes through Cobra's own writer (ADR 40), so a test reads a
+// buffer rather than swapping [os.Stdout] for a pipe, and describes its
+// library with a value rather than exporting one -- which is what lets all of
+// these run at once. Expected strings are written as literals, not rebuilt
+// with the same format verbs, so a wrong verb fails here instead of agreeing
 // with itself.
 
 import (
-	"bytes"
 	"database/sql"
-	"io"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	_ "modernc.org/sqlite" // registers "sqlite" for the seeded app.db
 
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
-	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
-
-// runDecks executes `mtglab decks <args...>` and returns what it printed to
-// stdout and the error the root would render as `mtglab: <err>`.
-func runDecks(t *testing.T, args ...string) (string, error) {
-	t.Helper()
-	root := &cobra.Command{Use: "mtglab", SilenceUsage: true, SilenceErrors: true}
-	root.AddCommand(decksCommand())
-	root.SetArgs(append([]string{"decks"}, args...))
-	root.SetOut(io.Discard)
-	root.SetErr(io.Discard)
-
-	old := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Stdout = w
-	captured := make(chan string)
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		captured <- buf.String()
-	}()
-	execErr := root.Execute()
-	os.Stdout = old
-	_ = w.Close()
-	out := <-captured
-	_ = r.Close()
-	return out, execErr
-}
-
-// trapExit swaps osExit for a recorder, so `validate` on a failing deck is a
-// recorded code rather than a dead test process.
-func trapExit(t *testing.T) *[]int {
-	t.Helper()
-	codes := &[]int{}
-	old := osExit
-	osExit = func(code int) { *codes = append(*codes, code) }
-	t.Cleanup(func() { osExit = old })
-	return codes
-}
-
-// scratch points the config env at fresh directories and returns them.
-func scratch(t *testing.T) (decksDir, dataDir string) {
-	t.Helper()
-	decksDir = filepath.Join(t.TempDir(), "decks")
-	dataDir = t.TempDir()
-	if err := os.MkdirAll(decksDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("MTGLAB_DECKS_DIR", decksDir)
-	t.Setenv("MTGLAB_DATA_DIR", dataDir)
-	return decksDir, dataDir
-}
 
 func writeDeck(t *testing.T, decksDir, slug, text string) {
 	t.Helper()
@@ -89,19 +33,6 @@ func writeDeck(t *testing.T, decksDir, slug, text string) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "deck.yaml"), []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// installPool copies the 21-card fixture pool to `<data>/mtg.duckdb`, which
-// is where `config.DBPath()` will look.
-func installPool(t *testing.T, dataDir string) {
-	t.Helper()
-	raw, err := os.ReadFile(pooltest.Build(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "mtg.duckdb"), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -179,9 +110,12 @@ cards:
 `
 
 func TestDecksListRefusesWithoutADecksDirectory(t *testing.T) {
-	decksDir, _ := scratch(t)
-	t.Setenv("MTGLAB_DECKS_DIR", filepath.Join(decksDir, "missing"))
-	out, err := runDecks(t, "list")
+	t.Parallel()
+	d := scratchDeployment(t)
+	// A library that is not there: the directory the config names does not
+	// exist, which is a fresh checkout before anything has made one.
+	d.DecksDir = filepath.Join(d.DecksDir, "missing")
+	out, err := d.run(t, "decks", "list")
 	if err == nil || err.Error() != "no decks/ directory" {
 		t.Fatalf("want the bare `no decks/ directory` refusal, got %v", err)
 	}
@@ -191,18 +125,19 @@ func TestDecksListRefusesWithoutADecksDirectory(t *testing.T) {
 }
 
 func TestDecksListPrintsTheTable(t *testing.T) {
-	decksDir, _ := scratch(t)
-	writeDeck(t, decksDir, "evergreen", evergreen)
-	writeDeck(t, decksDir, "sprouts", sprouts)
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
+	writeDeck(t, d.DecksDir, "sprouts", sprouts)
 	// A hand-started file with nothing in it: commander renders as `?`.
-	writeDeck(t, decksDir, "nameless", "cards: []\n")
+	writeDeck(t, d.DecksDir, "nameless", "cards: []\n")
 	// Scaffolding and empty directories are not decks.
-	writeDeck(t, decksDir, "_template", "name: T\n")
-	if err := os.MkdirAll(filepath.Join(decksDir, "hollow"), 0o755); err != nil {
+	writeDeck(t, d.DecksDir, "_template", "name: T\n")
+	if err := os.MkdirAll(filepath.Join(d.DecksDir, "hollow"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := runDecks(t, "list")
+	out, err := d.run(t, "decks", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,30 +151,35 @@ func TestDecksListPrintsTheTable(t *testing.T) {
 }
 
 func TestDecksListIsSilentOverAnEmptyLibrary(t *testing.T) {
-	scratch(t)
-	out, err := runDecks(t, "list")
+	t.Parallel()
+	d := scratchDeployment(t)
+	out, err := d.run(t, "decks", "list")
 	if err != nil || out != "" {
 		t.Fatalf("an empty library lists nothing and exits clean; got out=%q err=%v", out, err)
 	}
 }
 
 func TestDecksValidateRefusesAMissingDeck(t *testing.T) {
-	decksDir, _ := scratch(t)
-	_, err := runDecks(t, "validate", "nope")
-	want := "no deck at " + filepath.Join(decksDir, "nope", "deck.yaml")
+	t.Parallel()
+	d := scratchDeployment(t)
+	_, err := d.run(t, "decks", "validate", "nope")
+	want := "no deck at " + filepath.Join(d.DecksDir, "nope", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("want %q, got %v", want, err)
 	}
 }
 
 func TestDecksValidateDegradesWithoutThePool(t *testing.T) {
-	decksDir, _ := scratch(t)
-	writeDeck(t, decksDir, "seedling", seedling)
-	codes := trapExit(t)
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "seedling", seedling)
 
-	out, err := runDecks(t, "validate", "seedling")
-	if err != nil {
-		t.Fatal(err)
+	// A failing gate is a nonzero exit with nothing extra printed: the
+	// sentinel [errFailedGate], which `main` turns into a status and no
+	// sentence. It used to be `osExit(1)` and a nil error.
+	out, err := d.run(t, "decks", "validate", "seedling")
+	if !errors.Is(err, errFailedGate) {
+		t.Fatalf("a failing gate returned %v, want errFailedGate", err)
 	}
 	want := "ERROR deck-size: deck has 1 cards in the 99, expected 99\n" +
 		"WARN  unverified: no card pool supplied; identity, legality and text were NOT checked\n" +
@@ -247,18 +187,15 @@ func TestDecksValidateDegradesWithoutThePool(t *testing.T) {
 	if out != want {
 		t.Fatalf("the report diverged:\nwant:\n%q\ngot:\n%q", want, out)
 	}
-	if len(*codes) != 1 || (*codes)[0] != 1 {
-		t.Fatalf("a failing deck exits 1, exactly once; got %v", *codes)
-	}
 }
 
 func TestDecksValidatePassesAgainstThePool(t *testing.T) {
-	decksDir, dataDir := scratch(t)
-	installPool(t, dataDir)
-	writeDeck(t, decksDir, "evergreen", evergreen)
-	codes := trapExit(t)
+	t.Parallel()
+	d := scratchDeployment(t)
+	d = d.withPool(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
 
-	out, err := runDecks(t, "validate", "evergreen")
+	out, err := d.run(t, "decks", "validate", "evergreen")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,16 +203,14 @@ func TestDecksValidatePassesAgainstThePool(t *testing.T) {
 	if out != want {
 		t.Fatalf("a clean deck reads differently:\nwant:\n%q\ngot:\n%q", want, out)
 	}
-	if len(*codes) != 0 {
-		t.Fatalf("a passing deck must not exit nonzero; recorded %v", *codes)
-	}
 }
 
 func TestDecksBuildWritesPrunesAndThenDiffs(t *testing.T) {
-	decksDir, dataDir := scratch(t)
-	installPool(t, dataDir)
-	writeDeck(t, decksDir, "evergreen", evergreen)
-	outdir := filepath.Join(decksDir, "evergreen", "artifacts")
+	t.Parallel()
+	d := scratchDeployment(t)
+	d = d.withPool(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
+	outdir := filepath.Join(d.DecksDir, "evergreen", "artifacts")
 
 	// A stale swap list from a build that no longer exists: the first build
 	// has no baseline, writes no swaps.md, and must prune this one.
@@ -286,7 +221,7 @@ func TestDecksBuildWritesPrunesAndThenDiffs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runDecks(t, "build", "evergreen")
+	out, err := d.run(t, "decks", "build", "evergreen")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,9 +246,9 @@ func TestDecksBuildWritesPrunesAndThenDiffs(t *testing.T) {
 	// moxfield.txt and the snapshot, in Store's order.
 	edited := strings.Replace(evergreen, "qty: 99", "qty: 98", 1) +
 		"  - name: Sol Ring\n    category: ramp\n    why: Every deck wants the acceleration.\n"
-	writeDeck(t, decksDir, "evergreen", edited)
+	writeDeck(t, d.DecksDir, "evergreen", edited)
 
-	out, err = runDecks(t, "build", "evergreen")
+	out, err = d.run(t, "decks", "build", "evergreen")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,10 +272,11 @@ func TestDecksBuildWritesPrunesAndThenDiffs(t *testing.T) {
 }
 
 func TestDecksBuildHonoursAnExplicitBaseline(t *testing.T) {
-	decksDir, dataDir := scratch(t)
-	installPool(t, dataDir)
-	writeDeck(t, decksDir, "evergreen", evergreen)
-	outdir := filepath.Join(decksDir, "evergreen", "artifacts")
+	t.Parallel()
+	d := scratchDeployment(t)
+	d = d.withPool(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
+	outdir := filepath.Join(d.DecksDir, "evergreen", "artifacts")
 
 	// The baseline lives wherever the operator says; only its parent
 	// directory's name stands in for a slug, as `Deck.load` has it.
@@ -354,7 +290,7 @@ func TestDecksBuildHonoursAnExplicitBaseline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runDecks(t, "build", "evergreen", "--against", baseline)
+	out, err := d.run(t, "decks", "build", "evergreen", "--against", baseline)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,11 +308,12 @@ func TestDecksBuildHonoursAnExplicitBaseline(t *testing.T) {
 }
 
 func TestDecksBuildRefusesGateErrorsUnlessForced(t *testing.T) {
-	decksDir, _ := scratch(t)
-	writeDeck(t, decksDir, "seedling", seedling)
-	outdir := filepath.Join(decksDir, "seedling", "artifacts")
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "seedling", seedling)
+	outdir := filepath.Join(d.DecksDir, "seedling", "artifacts")
 
-	out, err := runDecks(t, "build", "seedling")
+	out, err := d.run(t, "decks", "build", "seedling")
 	wantErr := "refusing to generate with 1 error(s). Fix them, or pass --force if you know better."
 	if err == nil || err.Error() != wantErr {
 		t.Fatalf("want %q, got %v", wantErr, err)
@@ -393,7 +330,7 @@ func TestDecksBuildRefusesGateErrorsUnlessForced(t *testing.T) {
 	// --force overrides the gate (and only the gate). The report renders as
 	// the warnings branch does -- `print(rep.render(), "\n")`, trailing space
 	// and blank line included -- then the files are written.
-	out, err = runDecks(t, "build", "seedling", "--force")
+	out, err = d.run(t, "decks", "build", "seedling", "--force")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,25 +347,26 @@ func TestDecksBuildRefusesGateErrorsUnlessForced(t *testing.T) {
 }
 
 func TestDecksBuildRefusesADraftAndForceDoesNotReachIt(t *testing.T) {
-	decksDir, _ := scratch(t)
-	writeDeck(t, decksDir, "sproutwall", sproutwall)
-	writeDeck(t, decksDir, "sprouts", sprouts)
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "sproutwall", sproutwall)
+	writeDeck(t, d.DecksDir, "sprouts", sprouts)
 
 	// A draft that passes every gate ERROR still refuses at the renderer, in
 	// the renderer's own words.
-	_, err := runDecks(t, "build", "sproutwall")
+	_, err := d.run(t, "decks", "build", "sproutwall")
 	wantErr := "refusing to generate: sproutwall is a draft, and the artifacts are the " +
 		"shareable surface. 1 card(s) still need a `why`: Forest"
 	if err == nil || err.Error() != wantErr {
 		t.Fatalf("want %q, got %v", wantErr, err)
 	}
-	if _, err := os.Stat(filepath.Join(decksDir, "sproutwall", "artifacts")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(d.DecksDir, "sproutwall", "artifacts")); !os.IsNotExist(err) {
 		t.Fatal("a refused draft build must write nothing")
 	}
 
 	// --force overrides gate errors and must NOT override the draft refusal:
 	// the way out of a draft is to write the rationales, not to pass a flag.
-	_, err = runDecks(t, "build", "sprouts", "--force")
+	_, err = d.run(t, "decks", "build", "sprouts", "--force")
 	wantErr = "refusing to generate: sprouts is a draft, and the artifacts are the " +
 		"shareable surface. 1 card(s) still need a `why`: Llanowar Reborn"
 	if err == nil || err.Error() != wantErr {
@@ -437,10 +375,11 @@ func TestDecksBuildRefusesADraftAndForceDoesNotReachIt(t *testing.T) {
 }
 
 func TestDecksLogAnswersEmptyWithoutCreatingAppDB(t *testing.T) {
-	decksDir, dataDir := scratch(t)
-	writeDeck(t, decksDir, "evergreen", evergreen)
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
 
-	out, err := runDecks(t, "log", "evergreen")
+	out, err := d.run(t, "decks", "log", "evergreen")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,23 +390,24 @@ func TestDecksLogAnswersEmptyWithoutCreatingAppDB(t *testing.T) {
 	}
 	// A reader must never create app.db on the way past -- the ladder
 	// belongs to the serving command.
-	if _, err := os.Stat(filepath.Join(dataDir, "app.db")); !os.IsNotExist(err) {
+	if _, err := os.Stat(d.AppDBPath()); !os.IsNotExist(err) {
 		t.Fatal("`decks log` acquired an app.db it had no business creating")
 	}
 
 	// And a slug that is not a deck says so, rather than printing an empty
 	// history -- the same fact wearing a misleading face.
-	_, err = runDecks(t, "log", "nope")
-	want = "no deck at " + filepath.Join(decksDir, "nope", "deck.yaml")
+	_, err = d.run(t, "decks", "log", "nope")
+	want = "no deck at " + filepath.Join(d.DecksDir, "nope", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("want %q, got %v", want, err)
 	}
 }
 
 func TestDecksLogPrintsTheHistoryNewestFirst(t *testing.T) {
-	decksDir, dataDir := scratch(t)
-	writeDeck(t, decksDir, "evergreen", evergreen)
-	seedAppDB(t, dataDir,
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
+	seedAppDB(t, d.DataDir,
 		`INSERT INTO deck_log (created_at, owner_id, slug, actor, action, summary)
 		   VALUES ('2026-08-21T12:00:00+00:00', NULL, 'evergreen', NULL, 'add', 'added Sol Ring as ramp')`,
 		`INSERT INTO deck_log (created_at, owner_id, slug, actor, action, summary)
@@ -482,7 +422,7 @@ func TestDecksLogPrintsTheHistoryNewestFirst(t *testing.T) {
 		   VALUES ('2026-08-22T10:00:00+00:00', NULL, 'other', NULL, 'add', 'added Swamp as land')`,
 	)
 
-	out, err := runDecks(t, "log", "evergreen")
+	out, err := d.run(t, "decks", "log", "evergreen")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,9 +439,10 @@ func TestDecksLogPrintsTheHistoryNewestFirst(t *testing.T) {
 }
 
 func TestDecksLogSaysWhenTheLimitCappedIt(t *testing.T) {
-	decksDir, dataDir := scratch(t)
-	writeDeck(t, decksDir, "evergreen", evergreen)
-	seedAppDB(t, dataDir,
+	t.Parallel()
+	d := scratchDeployment(t)
+	writeDeck(t, d.DecksDir, "evergreen", evergreen)
+	seedAppDB(t, d.DataDir,
 		`INSERT INTO deck_log (created_at, owner_id, slug, actor, action, summary)
 		   VALUES ('2026-08-21T12:00:00+00:00', NULL, 'evergreen', NULL, 'add', 'added Sol Ring as ramp')`,
 		`INSERT INTO deck_log (created_at, owner_id, slug, actor, action, summary)
@@ -510,7 +451,7 @@ func TestDecksLogSaysWhenTheLimitCappedIt(t *testing.T) {
 		   VALUES ('2026-08-21T14:00:00+00:00', NULL, 'evergreen', NULL, 'swap', 'swapped Forest out for Sol Ring')`,
 	)
 
-	out, err := runDecks(t, "log", "evergreen", "--limit", "2")
+	out, err := d.run(t, "decks", "log", "evergreen", "--limit", "2")
 	if err != nil {
 		t.Fatal(err)
 	}

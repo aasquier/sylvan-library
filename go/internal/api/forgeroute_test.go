@@ -159,13 +159,19 @@ func forgeAPI(t *testing.T, shim *stubShim) (*API, *jobs.Registry, string) {
 
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	reg := jobs.New(jobs.Config{Logger: quiet})
-	worker := &tier3.Worker{Boot: 5 * time.Second, Sleep: func(time.Duration) {}}
+	// The machine this API is on: a hosted worker pointed at the stub shim,
+	// or nothing at all. A value rather than MTGLAB_FORGE_WORKER_URL on the
+	// process (ADR 40), which is why two of these can run at once -- and why
+	// the stub each one built is the stub its own API talks to.
+	var forge tier3.Settings
 	if shim != nil {
-		t.Setenv("MTGLAB_FORGE_WORKER_URL", shim.serve(t).URL)
+		forge.WorkerURL = shim.serve(t).URL
 	}
+	worker := &tier3.Worker{Settings: forge, Boot: 5 * time.Second,
+		Sleep: func(time.Duration) {}}
 	a := New(Config{Logger: quiet, Pool: pooltest.Open(t), DecksDir: decksDir(t),
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: writeDB,
-		Jobs: reg, ForgeWorker: worker,
+		Jobs: reg, ForgeWorker: worker, Forge: forge,
 		MatchLedger: matchledger.FromDB(writeDB, quiet)})
 	return a, reg, dbPath
 }
@@ -514,11 +520,13 @@ func TestAPreTheaterShimStillTicks(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", srv.URL)
 
 	var ticks []int
 	seatedRows := 0
-	worker := &tier3.Worker{Boot: 5 * time.Second, Sleep: func(time.Duration) {}}
+	worker := &tier3.Worker{
+		Settings: tier3.Settings{WorkerURL: srv.URL},
+		Boot:     5 * time.Second, Sleep: func(time.Duration) {},
+	}
 	run, err := worker.RunMatch(t.Context(), nil, 2, 300, nil,
 		func(finished int, game *tier3.GameResult) {
 			ticks = append(ticks, finished)

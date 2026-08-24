@@ -83,15 +83,15 @@ const (
 // booting either. `why` is maintainer-facing prose (it names paths and version
 // floors); the client renders its own words, which is commandment 10 doing its
 // usual work.
-func forgeStatus() (bool, *string) {
-	if tier3.Configured() {
+func (a *API) forgeStatus() (bool, *string) {
+	if a.forge.Configured() {
 		return true, nil
 	}
-	if _, err := tier3.DesktopJar(""); err != nil {
+	if _, err := a.forge.DesktopJar(); err != nil {
 		why := err.Error()
 		return false, &why
 	}
-	if _, err := tier3.JavaBinary(); err != nil {
+	if _, err := a.forge.JavaBinary(); err != nil {
 		why := err.Error()
 		return false, &why
 	}
@@ -101,7 +101,7 @@ func forgeStatus() (bool, *string) {
 // forgeGate is `GET /api/forge` — the gate the Simulator asks before it offers
 // real games.
 func (a *API) forgeGate(w http.ResponseWriter, r *http.Request) {
-	available, why := forgeStatus()
+	available, why := a.forgeStatus()
 	wire.JSON(w, http.StatusOK, wire.OrderedMap{
 		{Key: "available", Value: available},
 		{Key: "why", Value: why},
@@ -357,7 +357,7 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 	// The gate before the decks -- the recorded order: an instance
 	// with no Forge answers 503 without ever asking the library who these
 	// people are.
-	if available, why := forgeStatus(); !available {
+	if available, why := a.forgeStatus(); !available {
 		detail := ""
 		if why != nil {
 			detail = *why
@@ -390,7 +390,7 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 	// or on the worker machine (which this wakes — the one request-thread cost
 	// the hosted shape adds, bounded by the worker's boot budget so a machine
 	// that will not come up is a 503 rather than a hang).
-	hosted := tier3.Configured()
+	hosted := a.forge.Configured()
 	if err := a.preflight(r.Context(), hosted, decks); err != nil {
 		switch {
 		case errors.Is(err, tier3.ErrCoverageFailed):
@@ -423,7 +423,7 @@ func (a *API) preflight(ctx context.Context, hosted bool, decks []*deck.Deck) er
 		_, err := a.forgeWorker().CheckCoverage(ctx, decks)
 		return err
 	}
-	_, err := tier3.CheckCoverage(decks, "")
+	_, err := a.forge.CheckCoverage(decks)
 	return err
 }
 
@@ -433,7 +433,7 @@ func (a *API) forgeWorker() *tier3.Worker {
 	if a.forgeClient != nil {
 		return a.forgeClient
 	}
-	return &tier3.Worker{}
+	return &tier3.Worker{Settings: a.forge}
 }
 
 // planForge is `forgeruns.plan_forge`: one heads-up match, planned. Refusals
@@ -517,7 +517,7 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			if hosted {
 				run, runErr = worker.RunMatch(ctx, decks, games, ForgeClock, seed, tick)
 			} else {
-				run, runErr = tier3.RunGames(decks, tier3.RunOptions{
+				run, runErr = a.forge.RunGames(decks, tier3.RunOptions{
 					Games: games, Clock: ForgeClock, Seed: seed,
 					OnGame: func(finished int, game tier3.GameResult) {
 						tick(finished, &game)

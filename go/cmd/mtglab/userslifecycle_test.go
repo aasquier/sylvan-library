@@ -20,10 +20,10 @@ import (
 
 // seedAccount makes a claimed account, which is the state most of these
 // commands act on.
-func seedAccount(t *testing.T, name string, extra ...string) {
+func seedAccount(t *testing.T, d deployment, name string, extra ...string) {
 	t.Helper()
-	args := append([]string{"add", name}, extra...)
-	if _, err := runUsers(t, "hunter2hunter2\nhunter2hunter2\n", args...); err != nil {
+	args := append([]string{"users", "add", name}, extra...)
+	if _, err := d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", args...); err != nil {
 		t.Fatalf("seeding %s: %v", name, err)
 	}
 }
@@ -32,11 +32,12 @@ func seedAccount(t *testing.T, name string, extra ...string) {
 // session count is reported because "it is off" and "and everyone signed out"
 // are different facts and the operator needs both.
 func TestDisableAndEnableRoundTripAndReportTheSessions(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
-	seedAccount(t, "player")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
+	seedAccount(t, d, "player")
 
-	out, err := runUsers(t, "", "disable", "player")
+	out, err := d.run(t, "users", "disable", "player")
 	if err != nil {
 		t.Fatalf("disable: %v", err)
 	}
@@ -45,7 +46,7 @@ func TestDisableAndEnableRoundTripAndReportTheSessions(t *testing.T) {
 	}
 
 	// The list shows the state, which is how an operator confirms it.
-	out, err = runUsers(t, "", "list")
+	out, err = d.run(t, "users", "list")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -53,7 +54,7 @@ func TestDisableAndEnableRoundTripAndReportTheSessions(t *testing.T) {
 		t.Errorf("the list does not show the disabled account:\n%s", out)
 	}
 
-	out, err = runUsers(t, "", "enable", "player")
+	out, err = d.run(t, "users", "enable", "player")
 	if err != nil {
 		t.Fatalf("enable: %v", err)
 	}
@@ -65,10 +66,11 @@ func TestDisableAndEnableRoundTripAndReportTheSessions(t *testing.T) {
 // Disabling the last admin is a lockout, and the CLI has to say so in words
 // rather than passing the constraint up raw.
 func TestDisablingTheLastAdminIsRefusedInWords(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
-	out, err := runUsers(t, "", "disable", "keeper")
+	out, err := d.run(t, "users", "disable", "keeper")
 	if err == nil {
 		t.Fatalf("the last admin was disabled anyway:\n%s", out)
 	}
@@ -81,8 +83,8 @@ func TestDisablingTheLastAdminIsRefusedInWords(t *testing.T) {
 
 	// A second admin makes it safe, which is the point of the guard rather
 	// than a blanket refusal.
-	seedAccount(t, "second", "--admin")
-	if _, err := runUsers(t, "", "disable", "keeper"); err != nil {
+	seedAccount(t, d, "second", "--admin")
+	if _, err := d.run(t, "users", "disable", "keeper"); err != nil {
 		t.Errorf("disabling one of two admins was refused: %v", err)
 	}
 }
@@ -91,11 +93,12 @@ func TestDisablingTheLastAdminIsRefusedInWords(t *testing.T) {
 // what it looked for -- because the operator's next move is to check the
 // spelling.
 func TestEveryAccountCommandRefusesAnAccountThatIsNotThere(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
 	for _, verb := range []string{"disable", "enable", "promote", "demote", "passwd"} {
-		out, err := runUsers(t, "hunter2hunter2\nhunter2hunter2\n", verb, "ghost")
+		out, err := d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users", verb, "ghost")
 		if err == nil {
 			t.Errorf("%s invented an account:\n%s", verb, out)
 			continue
@@ -112,11 +115,12 @@ func TestEveryAccountCommandRefusesAnAccountThatIsNotThere(t *testing.T) {
 // Promote and demote report how many admins can actually sign in afterwards,
 // which is the number that decides whether the instance is administrable.
 func TestPromoteAndDemoteReportHowManyAdminsCanSignIn(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
-	seedAccount(t, "player")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
+	seedAccount(t, d, "player")
 
-	out, err := runUsers(t, "", "promote", "player")
+	out, err := d.run(t, "users", "promote", "player")
 	if err != nil {
 		t.Fatalf("promote: %v", err)
 	}
@@ -127,7 +131,7 @@ func TestPromoteAndDemoteReportHowManyAdminsCanSignIn(t *testing.T) {
 		t.Errorf("promote did not count the admins:\n%s", out)
 	}
 
-	out, err = runUsers(t, "", "demote", "player")
+	out, err = d.run(t, "users", "demote", "player")
 	if err != nil {
 		t.Fatalf("demote: %v", err)
 	}
@@ -143,11 +147,12 @@ func TestPromoteAndDemoteReportHowManyAdminsCanSignIn(t *testing.T) {
 // than an error or a silent success -- an operator running the same line
 // twice should learn nothing changed.
 func TestPromotingAnAdminAgainSaysItIsAlreadyOne(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
-	seedAccount(t, "player")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
+	seedAccount(t, d, "player")
 
-	out, err := runUsers(t, "", "promote", "keeper")
+	out, err := d.run(t, "users", "promote", "keeper")
 	if err != nil {
 		t.Fatalf("promoting an admin again: %v", err)
 	}
@@ -155,7 +160,7 @@ func TestPromotingAnAdminAgainSaysItIsAlreadyOne(t *testing.T) {
 		t.Errorf("said:\n%s", out)
 	}
 
-	out, err = runUsers(t, "", "demote", "player")
+	out, err = d.run(t, "users", "demote", "player")
 	if err != nil {
 		t.Fatalf("demoting a non-admin: %v", err)
 	}
@@ -168,13 +173,14 @@ func TestPromotingAnAdminAgainSaysItIsAlreadyOne(t *testing.T) {
 // has nobody who can administer it: an admin with no password cannot sign in
 // to use it, and the CLI has to say so unprompted.
 func TestPromotingAnUnclaimedAccountWarnsItCannotSignIn(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
-	if _, err := runUsers(t, "", "add", "waiting", "--no-password"); err != nil {
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
+	if _, err := d.run(t, "users", "add", "waiting", "--no-password"); err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := runUsers(t, "", "promote", "waiting")
+	out, err := d.run(t, "users", "promote", "waiting")
 	if err != nil {
 		t.Fatalf("promote: %v", err)
 	}
@@ -189,10 +195,11 @@ func TestPromotingAnUnclaimedAccountWarnsItCannotSignIn(t *testing.T) {
 // Demoting the last admin is the other door to a lockout, and it is refused
 // in words for the same reason.
 func TestDemotingTheLastAdminIsRefusedInWords(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
-	_, err := runUsers(t, "", "demote", "keeper")
+	_, err := d.run(t, "users", "demote", "keeper")
 	if err == nil {
 		t.Fatal("the last admin was demoted")
 	}
@@ -205,10 +212,11 @@ func TestDemotingTheLastAdminIsRefusedInWords(t *testing.T) {
 // "your password is set" and "and you are signed out on your phone" are
 // different facts.
 func TestPasswdSetsAPasswordAndSaysWhatItEnded(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
-	out, err := runUsers(t, "newpassword123\nnewpassword123\n", "passwd", "keeper")
+	out, err := d.runWithInput(t, "newpassword123\nnewpassword123\n", "users", "passwd", "keeper")
 	if err != nil {
 		t.Fatalf("passwd: %v", err)
 	}
@@ -221,10 +229,11 @@ func TestPasswdSetsAPasswordAndSaysWhatItEnded(t *testing.T) {
 // silently taking the first -- the failure mode where somebody sets a
 // password they cannot reproduce.
 func TestPasswdRefusesMismatchedEntries(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
-	_, err := runUsers(t, "onepassword123\notherpassword123\n", "passwd", "keeper")
+	_, err := d.runWithInput(t, "onepassword123\notherpassword123\n", "users", "passwd", "keeper")
 	if err == nil {
 		t.Fatal("two different entries were accepted")
 	}
@@ -237,18 +246,19 @@ func TestPasswdRefusesMismatchedEntries(t *testing.T) {
 // refused before any account is made -- otherwise the instance accumulates
 // accounts nobody was ever told about.
 func TestAnInviteRefusesAnAddressItCannotSendTo(t *testing.T) {
-	scratchDataDir(t)
-	seedAccount(t, "keeper", "--admin")
+	t.Parallel()
+	d := scratchDeployment(t)
+	seedAccount(t, d, "keeper", "--admin")
 
 	for _, address := range []string{"not-an-address", "@example.com", "  "} {
-		_, err := runUsers(t, "", "invite", address)
+		_, err := d.run(t, "users", "invite", address)
 		if err == nil {
 			t.Errorf("%q was accepted as an address", address)
 		}
 	}
 
 	// Nothing was created while it was refusing.
-	out, err := runUsers(t, "", "list")
+	out, err := d.run(t, "users", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,15 +271,16 @@ func TestAnInviteRefusesAnAddressItCannotSendTo(t *testing.T) {
 // re-invited, because an invite would be a second way in for an account that
 // already has one.
 func TestInvitingAClaimedAddressPointsAtTheResetLinkInstead(t *testing.T) {
-	scratchDataDir(t)
-	t.Setenv("MTGLAB_MAIL_FROM", "noreply@example.com")
-	t.Setenv("MTGLAB_RESEND_API_KEY", "test-key")
-	if _, err := runUsers(t, "hunter2hunter2\nhunter2hunter2\n",
+	t.Parallel()
+	d := scratchDeployment(t)
+	d.EmailFrom = "noreply@example.com"
+	d.ResendAPIKey = "test-key"
+	if _, err := d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n", "users",
 		"add", "keeper", "--admin", "--email", "keeper@example.com"); err != nil {
 		t.Skipf("this build's add takes no --email: %v", err)
 	}
 
-	_, err := runUsers(t, "", "invite", "keeper@example.com")
+	_, err := d.run(t, "users", "invite", "keeper@example.com")
 	if err == nil {
 		t.Skip("this build re-invites a claimed address")
 	}

@@ -36,6 +36,19 @@ linters:
         - (*os.File).Close
         - (*database/sql.DB).Close
         - (*database/sql.Rows).Close
+        # A command printing its own report to the writer cobra handed it.
+        # The same judgement as the closers above: a CLI whose stdout has
+        # gone away cannot report that fact anywhere, and the alternative
+        # spelling -- `_, _ =` in front of a hundred and fourteen lines of
+        # `sim shelf` -- makes the tables harder to read for no reader's
+        # benefit. Deliberately narrow: **nothing serves an HTTP response
+        # through `fmt`**. Every `fmt.Fprint*` outside `cmd/` writes to a
+        # `strings.Builder` or a `bytes.Buffer`, which cannot fail, and the
+        # door's own writes go through `internal/wire`, whose errors are
+        # checked and stay checked.
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
     gosec:
       excludes:
         # G204: the supervised command is the operator's own argv.

@@ -10,8 +10,6 @@ import (
 	"io"
 	"math/big"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +61,11 @@ const BootBudget = 90 * time.Second
 // Worker is the client. A value rather than package functions so a test can
 // give it its own HTTP client and clock.
 type Worker struct {
+	// Settings is the resolved Forge and Fly environment: which app holds the
+	// machine, the tokens, and where the shim answers. The zero value is a
+	// worker nothing is configured for, which every method refuses in the
+	// same words an unset variable used to produce.
+	Settings Settings
 	// HTTP is the client every call goes through. Nil means a default with no
 	// timeout of its own — every call below carries its own context deadline.
 	HTTP *http.Client
@@ -94,55 +97,19 @@ func (w *Worker) sleep(d time.Duration) {
 	time.Sleep(d)
 }
 
-// Configured reports whether the hosted worker is the way to run Forge here —
-// a fact about the environment.
-//
-// The gate calls this and answers `available: true` without any network: the
-// same contract `/api/claude` set, where configuration is a fact of the
-// environment and reachability is discovered when work is actually asked for.
-func Configured() bool {
-	if os.Getenv("MTGLAB_FORGE_WORKER_URL") != "" {
-		return true
-	}
-	return strings.TrimSpace(os.Getenv("MTGLAB_FORGE_WORKER")) != "" &&
-		os.Getenv("MTGLAB_FLY_API_TOKEN") != ""
-}
-
-func appName() (string, error) {
-	// FLY_APP_NAME is injected by Fly into every machine; the override exists
-	// for tests and for talking to the instance from a laptop.
-	name := os.Getenv("MTGLAB_FLY_APP")
-	if name == "" {
-		name = os.Getenv("FLY_APP_NAME")
-	}
-	if name == "" {
+func (w *Worker) appName() (string, error) {
+	if w.Settings.FlyApp == "" {
 		return "", NotInstalled("forge worker: no Fly app name in the " +
 			"environment (FLY_APP_NAME or MTGLAB_FLY_APP)")
 	}
-	return name, nil
-}
-
-func machineName() string {
-	if name := os.Getenv("MTGLAB_FORGE_MACHINE"); name != "" {
-		return name
-	}
-	return "forge-worker"
-}
-
-func shimPort() int {
-	if raw := os.Getenv("MTGLAB_FORGE_SHIM_PORT"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil {
-			return n
-		}
-	}
-	return 8080
+	return w.Settings.FlyApp, nil
 }
 
 // api is one Machines API call. Returns [ErrForgeNotInstalled] with the API's
 // own words on failure, because every caller here turns that into a 503.
 func (w *Worker) api(ctx context.Context, method, path string,
 	payload any, timeout time.Duration) (json.RawMessage, error) {
-	token := os.Getenv("MTGLAB_FLY_API_TOKEN")
+	token := w.Settings.FlyAPIToken
 	if token == "" {
 		return nil, NotInstalled("forge worker: MTGLAB_FLY_API_TOKEN is not set")
 	}
@@ -189,7 +156,7 @@ type machine struct {
 }
 
 func (w *Worker) findMachine(ctx context.Context) (machine, string, error) {
-	app, err := appName()
+	app, err := w.appName()
 	if err != nil {
 		return machine{}, "", err
 	}
@@ -205,26 +172,26 @@ func (w *Worker) findMachine(ctx context.Context) (machine, string, error) {
 		}
 	}
 	for _, m := range machines {
-		if m.Name == machineName() {
+		if m.Name == w.Settings.Machine {
 			return m, app, nil
 		}
 	}
 	return machine{}, "", NotInstalled("forge worker: no machine named %q in "+
 		"app %q — the deploy workflow creates it; has one run since the "+
-		"worker landed?", machineName(), app)
+		"worker landed?", w.Settings.Machine, app)
 }
 
-func shimHeaders(req *http.Request) {
+func (w *Worker) shimHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
-	if token := os.Getenv("MTGLAB_FORGE_SHIM_TOKEN"); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	if w.Settings.ShimToken != "" {
+		req.Header.Set("Authorization", "Bearer "+w.Settings.ShimToken)
 	}
 }
 
 // BaseURL is where the shim answers, waking the machine if it is asleep.
 func (w *Worker) BaseURL(ctx context.Context) (string, error) {
-	if direct := os.Getenv("MTGLAB_FORGE_WORKER_URL"); direct != "" {
-		return strings.TrimRight(direct, "/"), nil
+	if w.Settings.WorkerURL != "" {
+		return w.Settings.WorkerURL, nil
 	}
 
 	m, app, err := w.findMachine(ctx)
@@ -243,7 +210,7 @@ func (w *Worker) BaseURL(ctx context.Context) (string, error) {
 			return "", err
 		}
 	}
-	return fmt.Sprintf("http://%s.vm.%s.internal:%d", m.ID, app, shimPort()), nil
+	return fmt.Sprintf("http://%s.vm.%s.internal:%d", m.ID, app, w.Settings.ShimPort), nil
 }
 
 // Ready is a base URL whose shim has answered.
@@ -275,7 +242,7 @@ func (w *Worker) healthy(ctx context.Context, base string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	shimHeaders(req)
+	w.shimHeaders(req)
 	resp, err := w.client().Do(req)
 	if err != nil {
 		return false, err
@@ -352,7 +319,7 @@ func (w *Worker) post(ctx context.Context, base, path string, payload any,
 	if err != nil {
 		return err
 	}
-	shimHeaders(req)
+	w.shimHeaders(req)
 	resp, err := w.client().Do(req)
 	if err != nil {
 		return fmt.Errorf("forge worker: %s failed: %w", path, err)
@@ -429,7 +396,7 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck, games, clock 
 	if err != nil {
 		return nil, err
 	}
-	shimHeaders(req)
+	w.shimHeaders(req)
 
 	client := *w.client()
 	client.Timeout = 0

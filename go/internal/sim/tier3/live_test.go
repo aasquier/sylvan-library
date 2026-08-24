@@ -29,14 +29,21 @@ import (
 // Two games, not ten: this is a smoke test for the machinery, and the numbers
 // it produces are nobody's evidence about a deck.
 
-func liveForge(t *testing.T) {
+// liveForge is this machine's real Forge, or a skip.
+//
+// The one place in the tree that still *wants* [tier3.LoadSettings] in a test:
+// these tests are claims about the world, so the installation they run against
+// has to be the one the operator actually has.
+func liveForge(t *testing.T) tier3.Settings {
 	t.Helper()
 	if os.Getenv("MTGLAB_LIVE_FORGE") != "1" {
 		t.Skip("set MTGLAB_LIVE_FORGE=1 to run a real Forge match")
 	}
-	if _, err := tier3.DesktopJar(""); err != nil {
+	forge := tier3.LoadSettings()
+	if _, err := forge.DesktopJar(); err != nil {
 		t.Skipf("no Forge distribution: %v", err)
 	}
+	return forge
 }
 
 func liveDecks(t *testing.T) []*deck.Deck {
@@ -59,12 +66,14 @@ func liveDecks(t *testing.T) []*deck.Deck {
 // TestTheRealIndexIsReadFromTheRealZip checks the pre-flight against Forge's
 // own card scripts — the data the engine itself loads at startup, which is
 // what makes agreeing with it agreeing with Forge.
+// **Serial**: it clears the package-level index and then asserts on its hit
+// counters, which any other test reading the index concurrently would move.
 func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
 	t.Parallel()
-	liveForge(t)
+	forge := liveForge(t)
 	tier3.ClearIndex()
 	started := time.Now()
-	index, err := tier3.ImplementedNames("")
+	index, err := forge.ImplementedNames()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +95,7 @@ func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
 	// And it is cached on (path, mtime, size): a second ask must not re-read
 	// 33,587 files.
 	hits, misses := tier3.IndexStats()
-	if _, err := tier3.ImplementedNames(""); err != nil {
+	if _, err := forge.ImplementedNames(); err != nil {
 		t.Fatal(err)
 	}
 	hits2, misses2 := tier3.IndexStats()
@@ -103,14 +112,14 @@ func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
 // old, AWT would not initialise. Each of those has happened at least once.
 func TestARealMatchPlaysAndParses(t *testing.T) {
 	t.Parallel()
-	liveForge(t)
+	forge := liveForge(t)
 	decks := liveDecks(t)
 
 	var ticks []int
 	var seated []tier3.GameResult
 	seed := int64(7)
 	started := time.Now()
-	run, err := tier3.RunGames(decks, tier3.RunOptions{
+	run, err := forge.RunGames(decks, tier3.RunOptions{
 		Games: 2, Clock: 300, Seed: bigSeed(seed),
 		OnGame: func(finished int, game tier3.GameResult) {
 			ticks = append(ticks, finished)

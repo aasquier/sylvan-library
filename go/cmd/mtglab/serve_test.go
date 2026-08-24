@@ -8,13 +8,15 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/signal"
-	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
+	"github.com/aasquier/sylvan-library/go/internal/claude"
+	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // The boot itself, and the health probe the container asks it with.
@@ -32,6 +34,16 @@ import (
 // installs its own `signal.Notify` first**, so the runtime can never take
 // SIGTERM's default action and kill the test binary if `serve` returns before
 // its own handler is up.
+
+// atoi is a port number as an int, failing the test rather than the boot.
+func atoi(t *testing.T, port string) int {
+	t.Helper()
+	n, err := strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
 
 // freePort takes an ephemeral port and gives it straight back, so the caller
 // can name it. A race in principle; in practice the kernel does not hand the
@@ -55,8 +67,11 @@ func freePort(t *testing.T) string {
 // The whole boot: ladder, door, listener, a real request over TCP, and a
 // clean stop on SIGTERM.
 func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
-	dir := scratchDataDir(t)
-	t.Setenv("MTGLAB_DECKS_DIR", filepath.Join(dir, "decks"))
+	// **Serial**, and the audit cannot see why: it passes alone, but it sends
+	// SIGTERM to the whole process. A second `serve` running beside it would
+	// take the same signal and stop too, so the failure would land on the
+	// other test and read as a flake there.
+	d := scratchDeployment(t)
 
 	// Ours first: the runtime's default for SIGTERM is to exit, and this
 	// keeps the test binary alive whatever `serve` does with its own.
@@ -66,7 +81,7 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 
 	port := freePort(t)
 	done := make(chan error, 1)
-	go func() { done <- serve("127.0.0.1", port, t.TempDir(), t.TempDir()) }()
+	go func() { done <- serve(d.Config, tier3.Settings{}, "127.0.0.1", port, t.TempDir(), t.TempDir()) }()
 
 	// The ladder ran on the way up, which is the first thing the boot owes.
 	base := "http://127.0.0.1:" + port
@@ -88,7 +103,7 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("/api/health answered %d: %s", resp.StatusCode, body)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "app.db")); err != nil {
+	if _, err := os.Stat(d.AppDBPath()); err != nil {
 		t.Errorf("the boot did not run the schema ladder: %v", err)
 	}
 
@@ -124,7 +139,7 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 // A port already in use is a refusal that names the address, because the
 // operator's next move is to find what is holding it.
 func TestABusyPortIsRefusedByName(t *testing.T) {
-	scratchDataDir(t)
+	t.Parallel()
 
 	held, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -136,7 +151,8 @@ func TestABusyPortIsRefusedByName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = serve("127.0.0.1", port, t.TempDir(), t.TempDir())
+	err = serve(scratchDeployment(t).Config, tier3.Settings{},
+		"127.0.0.1", port, t.TempDir(), t.TempDir())
 	if err == nil {
 		t.Fatal("the server bound a port somebody else was holding")
 	}
@@ -148,12 +164,13 @@ func TestABusyPortIsRefusedByName(t *testing.T) {
 // A ladder that cannot be applied is a **refusal to serve**, not a warning: a
 // request answered over a half-migrated file is worse than no answer at all.
 func TestAnUnrunnableLadderRefusesToServe(t *testing.T) {
+	t.Parallel()
 	// A data directory that is not there and cannot be made.
-	t.Setenv("MTGLAB_DATA_DIR", "/nonexistent/never-mounted")
-	t.Setenv("MTGLAB_DECKS_DIR", "/nonexistent/never-mounted/decks")
-	t.Setenv("MTGLAB_ADMIN_EMAIL", "")
-
-	err := serve("127.0.0.1", freePort(t), t.TempDir(), t.TempDir())
+	unmounted := config.Config{
+		DataDir:  "/nonexistent/never-mounted",
+		DecksDir: "/nonexistent/never-mounted/decks",
+	}
+	err := serve(unmounted, tier3.Settings{}, "127.0.0.1", freePort(t), t.TempDir(), t.TempDir())
 	if err == nil {
 		t.Fatal("a boot with no writable volume served anyway")
 	}
@@ -244,20 +261,23 @@ func runProbe(t *testing.T, url string) error {
 // The Forge shim's own listener, driven the same way: it comes up, answers
 // its health route, and is not holding a JVM to do it.
 func TestTheShimListensAndAnswersItsHealthRoute(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_SHIM_TOKEN", "")
-	t.Setenv("MTGLAB_FORGE_SHIM_HOST", "127.0.0.1")
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", freePort(t))
-	// **Zero means never**, which is what a laptop running the shim by hand
-	// wants -- and what keeps this test from having its process exited out
-	// from under it by the idle watchdog.
-	t.Setenv("MTGLAB_FORGE_IDLE_SECONDS", "0")
-	t.Setenv("MTGLAB_FORGE_HOME", t.TempDir())
+	t.Parallel()
+	port := freePort(t)
+	forge := tier3.Settings{
+		ShimHost: "127.0.0.1",
+		ShimPort: atoi(t, port),
+		Home:     t.TempDir(),
+		// **Zero means never**, which is what a laptop running the shim by
+		// hand wants -- and what keeps this test from having its process
+		// exited out from under it by the idle watchdog.
+		IdleSeconds: 0,
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- serveShim(ctx) }()
+	go func() { done <- serveShim(ctx, forge) }()
 
-	base := "http://127.0.0.1:" + os.Getenv("MTGLAB_FORGE_SHIM_PORT")
+	base := "http://127.0.0.1:" + port
 	client := &http.Client{Timeout: 2 * time.Second}
 	var resp *http.Response
 	var err error
@@ -287,6 +307,7 @@ func TestTheShimListensAndAnswersItsHealthRoute(t *testing.T) {
 
 // A shim that cannot bind says so rather than exiting silently.
 func TestAShimThatCannotBindSaysSo(t *testing.T) {
+	t.Parallel()
 	held, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -297,12 +318,9 @@ func TestAShimThatCannotBindSaysSo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("MTGLAB_FORGE_SHIM_HOST", "127.0.0.1")
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", port)
-	t.Setenv("MTGLAB_FORGE_IDLE_SECONDS", "0")
-	t.Setenv("MTGLAB_FORGE_HOME", t.TempDir())
-
-	if err := serveShim(context.Background()); err == nil {
+	if err := serveShim(context.Background(), tier3.Settings{
+		ShimHost: "127.0.0.1", ShimPort: atoi(t, port), Home: t.TempDir(),
+	}); err == nil {
 		t.Error("the shim bound a port somebody else was holding")
 	} else if !strings.Contains(err.Error(), "forge shim") {
 		t.Errorf("the refusal said %q", err)
@@ -314,7 +332,10 @@ func TestAShimThatCannotBindSaysSo(t *testing.T) {
 // anything failing.
 func TestEveryFamilyIsWiredIntoTheRootCommand(t *testing.T) {
 	t.Parallel()
-	root := rootCommand()
+	// The real tree, not a copy of it: a second `AddCommand` list beside
+	// [newRoot] is a list that can drift, which is the thing this test exists
+	// to catch.
+	root := newRoot(config.Config{}, tier3.Settings{}, claude.Endpoint{})
 	got := map[string]bool{}
 	for _, c := range root.Commands() {
 		got[c.Name()] = true
@@ -327,13 +348,4 @@ func TestEveryFamilyIsWiredIntoTheRootCommand(t *testing.T) {
 			t.Errorf("`mtglab %s` is not wired into the root command", want)
 		}
 	}
-}
-
-// rootCommand builds the tree the way main does, so the wiring test above
-// asks about the real one.
-func rootCommand() *cobra.Command {
-	root := &cobra.Command{Use: "mtglab"}
-	root.AddCommand(uiCommand(), dataCommand(), usersCommand(), decksCommand(),
-		simCommand(), cardsCommand(), claudeCommand(), shimCommand(), probeCommand())
-	return root
 }

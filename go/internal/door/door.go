@@ -39,6 +39,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 	matchledger "github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/traffic"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
@@ -93,6 +94,11 @@ type Config struct {
 	// The zero value has no credential and refuses every Claude route, which
 	// is what a door built without one should do.
 	Claude claude.Settings
+	// Forge is where Forge lives on this machine and how the hosted worker is
+	// reached (ADR 40). The zero value names no distribution and no Fly app,
+	// so `/api/forge` answers `available: false` with the reason -- which is
+	// what a door built without one should do.
+	Forge tier3.Settings
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -194,7 +200,8 @@ func New(cfg Config) (*Door, error) {
 		// environment when a message is actually being sent -- and a test
 		// passes a recorder, which is how no test here sends mail.
 		EmailSender: cfg.EmailSender, Mail: cfg.Mail,
-		ClientIPHeader: cfg.ClientIPHeader, Claude: cfg.Claude})
+		ClientIPHeader: cfg.ClientIPHeader, Claude: cfg.Claude,
+		Forge: cfg.Forge})
 	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err

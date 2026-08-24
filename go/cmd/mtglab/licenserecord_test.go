@@ -7,6 +7,10 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/claude"
+	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // The licensing record holds this project's right to exist, and every claim in
@@ -175,7 +179,7 @@ var mtglabVerb = regexp.MustCompile(`\bmtglab\s+([a-z][a-z-]*)`)
 func TestTheLicensingRecordNamesNoCommandTheBinaryLacks(t *testing.T) {
 	t.Parallel()
 	have := map[string]bool{}
-	for _, c := range newRoot().Commands() {
+	for _, c := range newRoot(config.Config{}, tier3.Settings{}, claude.Endpoint{}).Commands() {
 		have[c.Name()] = true
 		for _, alias := range c.Aliases {
 			have[alias] = true

@@ -92,12 +92,8 @@ func (e *untrustworthy) Error() string        { return e.msg }
 func (e *untrustworthy) Is(target error) bool { return target == ErrResultsUntrustworthy }
 
 // CardsfolderPath is `coverage.cardsfolder_path`.
-func CardsfolderPath(forgeHome string) (string, error) {
-	home := forgeHome
-	if home == "" {
-		home = ForgeHome()
-	}
-	path := filepath.Join(home, cardsfolder)
+func (s Settings) CardsfolderPath() (string, error) {
+	path := filepath.Join(s.Home, cardsfolder)
 	if _, err := os.Stat(path); err != nil {
 		return "", NotInstalled("no Forge card data at %s -- set "+
 			"MTGLAB_FORGE_HOME to an unpacked Forge distribution", path)
@@ -142,8 +138,8 @@ func ClearIndex() {
 
 // ImplementedNames is every card name Forge implements, read from its own card
 // scripts.
-func ImplementedNames(forgeHome string) (map[string]bool, error) {
-	path, err := CardsfolderPath(forgeHome)
+func (s Settings) ImplementedNames() (map[string]bool, error) {
+	path, err := s.CardsfolderPath()
 	if err != nil {
 		return nil, err
 	}
@@ -343,8 +339,8 @@ func RaiseUnlessCovered(reports []CoverageReport) error {
 // Separated from [RunGames] so a caller can pre-flight without a JVM — it
 // reads a zip and needs no Java at all, which makes it the cheap check to run
 // first and the one an API can run on a request thread.
-func CheckCoverage(decks []*deck.Deck, forgeHome string) ([]CoverageReport, error) {
-	index, err := ImplementedNames(forgeHome)
+func (s Settings) CheckCoverage(decks []*deck.Deck) ([]CoverageReport, error) {
+	index, err := s.ImplementedNames()
 	if err != nil {
 		return nil, err
 	}

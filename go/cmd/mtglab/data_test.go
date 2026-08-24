@@ -1,14 +1,13 @@
 package main
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
+	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
 // The `data` family: the runbook's three commands over the volume.
@@ -29,45 +28,22 @@ import (
 // `refresh` is the one that is not here: it downloads from Scryfall, and the
 // download itself is tested against a stub in `internal/pool` rather than by
 // reaching the network from a test.
-
-// runData executes one `mtglab data ...` invocation and returns its output.
-func runData(t *testing.T, args ...string) (string, error) {
-	t.Helper()
-	cmd := dataCommand()
-	cmd.SetArgs(args)
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-	cmd.SilenceUsage, cmd.SilenceErrors = true, true
-
-	old := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Stdout = w
-	read := make(chan string, 1)
-	go func() {
-		b, _ := io.ReadAll(r)
-		read <- string(b)
-	}()
-	runErr := cmd.Execute()
-	os.Stdout = old
-	_ = w.Close()
-	out := <-read
-	_ = r.Close()
-	return out, runErr
-}
+//
+// All parallel since ADR 40: the volume each of these runs against is a
+// [deployment] value rather than MTGLAB_DATA_DIR on the process.
 
 // The backup writes a real database and says what it wrote.
 func TestABackupWritesAConsistentCopyAndSaysWhatItWrote(t *testing.T) {
-	dir := scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 	// A database with something in it, so the copy is of a real file.
-	if _, err := runUsers(t, "hunter2hunter2\nhunter2hunter2\n", "add", "keeper", "--admin"); err != nil {
+	if _, err := d.runWithInput(t, "hunter2hunter2\nhunter2hunter2\n",
+		"users", "add", "keeper", "--admin"); err != nil {
 		t.Fatal(err)
 	}
 
 	dest := filepath.Join(t.TempDir(), "app.db.backup")
-	out, err := runData(t, "backup", dest)
+	out, err := d.run(t, "data", "backup", dest)
 	if err != nil {
 		t.Fatalf("backup: %v", err)
 	}
@@ -99,7 +75,7 @@ func TestABackupWritesAConsistentCopyAndSaysWhatItWrote(t *testing.T) {
 	}
 
 	// The original is untouched and still serving.
-	if _, err := os.Stat(filepath.Join(dir, "app.db")); err != nil {
+	if _, err := os.Stat(d.AppDBPath()); err != nil {
 		t.Errorf("the original went missing: %v", err)
 	}
 }
@@ -107,13 +83,14 @@ func TestABackupWritesAConsistentCopyAndSaysWhatItWrote(t *testing.T) {
 // **The destination must not exist.** A backup that clobbered the previous
 // one is not a backup, and the procedure runs it more than once.
 func TestABackupRefusesToOverwriteTheLastOne(t *testing.T) {
-	scratchDataDir(t)
-	if _, err := runUsers(t, "", "list"); err != nil {
+	t.Parallel()
+	d := scratchDeployment(t)
+	if _, err := d.run(t, "users", "list"); err != nil {
 		t.Fatal(err)
 	}
 
 	dest := filepath.Join(t.TempDir(), "app.db.backup")
-	if _, err := runData(t, "backup", dest); err != nil {
+	if _, err := d.run(t, "data", "backup", dest); err != nil {
 		t.Fatalf("the first backup: %v", err)
 	}
 	before, err := os.ReadFile(dest)
@@ -121,7 +98,7 @@ func TestABackupRefusesToOverwriteTheLastOne(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := runData(t, "backup", dest); err == nil {
+	if _, err := d.run(t, "data", "backup", dest); err == nil {
 		t.Fatal("the second backup overwrote the first")
 	}
 	after, err := os.ReadFile(dest)
@@ -136,14 +113,15 @@ func TestABackupRefusesToOverwriteTheLastOne(t *testing.T) {
 // A backup of a database that is not there is a refusal rather than an empty
 // file -- an empty backup restored is an instance with no accounts.
 func TestABackupOfNothingIsRefusedRatherThanEmpty(t *testing.T) {
-	dir := scratchDataDir(t)
+	t.Parallel()
+	d := scratchDeployment(t)
 	// No `app.db`: nothing has run the ladder here.
-	if _, err := os.Stat(filepath.Join(dir, "app.db")); err == nil {
+	if _, err := os.Stat(d.AppDBPath()); err == nil {
 		t.Skip("this scratch directory already has an app.db")
 	}
 
 	dest := filepath.Join(t.TempDir(), "app.db.backup")
-	if _, err := runData(t, "backup", dest); err == nil {
+	if _, err := d.run(t, "data", "backup", dest); err == nil {
 		if info, statErr := os.Stat(dest); statErr == nil && info.Size() == 0 {
 			t.Fatal("an empty backup was written -- restoring it is an instance " +
 				"with no accounts")
@@ -155,22 +133,10 @@ func TestABackupOfNothingIsRefusedRatherThanEmpty(t *testing.T) {
 // silently wrote nothing leaves a gap in the series nobody notices until
 // somebody asks about the month that has one.
 func TestASnapshotAppendsTodaysPricesAndCountsThem(t *testing.T) {
-	dataDir := t.TempDir()
-	t.Setenv("MTGLAB_DATA_DIR", dataDir)
-	t.Setenv("MTGLAB_DECKS_DIR", filepath.Join(dataDir, "decks"))
-	t.Setenv("MTGLAB_ADMIN_EMAIL", "")
-	t.Setenv("MTGLAB_ADMIN_USERNAME", "")
+	t.Parallel()
+	d := scratchDeployment(t).withPool(t)
 
-	// The 21-card pool where `config.DBPath()` will look for it.
-	raw, err := os.ReadFile(pooltest.Build(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "mtg.duckdb"), raw, 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runData(t, "snapshot")
+	out, err := d.run(t, "data", "snapshot")
 	if err != nil {
 		t.Fatalf("snapshot: %v", err)
 	}
@@ -183,7 +149,7 @@ func TestASnapshotAppendsTodaysPricesAndCountsThem(t *testing.T) {
 
 	// Twice on one day is idempotent rather than doubled: the series is
 	// keyed by day, and a second run must not put two rows on it.
-	second, err := runData(t, "snapshot")
+	second, err := d.run(t, "data", "snapshot")
 	if err != nil {
 		t.Fatalf("the second snapshot: %v", err)
 	}
@@ -207,12 +173,10 @@ func TestASnapshotAppendsTodaysPricesAndCountsThem(t *testing.T) {
 // Whether that should refuse instead is a decision rather than a bug fix, so
 // this test records what happens today and fails the day it changes.
 func TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero(t *testing.T) {
-	dataDir := t.TempDir()
-	t.Setenv("MTGLAB_DATA_DIR", dataDir)
-	t.Setenv("MTGLAB_DECKS_DIR", filepath.Join(dataDir, "decks"))
-	t.Setenv("MTGLAB_ADMIN_EMAIL", "")
+	t.Parallel()
+	d := scratchDeployment(t)
 
-	out, err := runData(t, "snapshot")
+	out, err := d.run(t, "data", "snapshot")
 	if err != nil {
 		t.Fatalf("a fresh machine failed the snapshot: %v", err)
 	}
@@ -221,7 +185,7 @@ func TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero(t *testing.T) {
 	}
 	// It minted the pool on the way through, which is the half worth
 	// knowing: nothing about the output says the volume was empty.
-	if _, statErr := os.Stat(filepath.Join(dataDir, "mtg.duckdb")); statErr != nil {
+	if _, statErr := os.Stat(d.DBPath()); statErr != nil {
 		t.Errorf("the snapshot did not create the pool it reported on: %v", statErr)
 	}
 }
@@ -231,7 +195,7 @@ func TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero(t *testing.T) {
 func TestTheDataFamilyIsWired(t *testing.T) {
 	t.Parallel()
 	got := map[string]bool{}
-	for _, c := range dataCommand().Commands() {
+	for _, c := range dataCommand(config.Config{}).Commands() {
 		got[c.Name()] = true
 	}
 	for _, want := range []string{"refresh", "snapshot", "backup"} {
