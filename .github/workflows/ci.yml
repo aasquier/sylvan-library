@@ -152,6 +152,28 @@ jobs:
   #
   # Adding these was the plan's two steps -- written here, and required on
   # `main`. ENGINEERING section 5 keeps the list and the read-back command.
+  # The media toolbox -- the one piece of Python left, and it never serves:
+  # tools/ makes the site's committed art (animist) and the card-art motion
+  # (cardmotion) on a dev machine. Its own gates, plus `animist verify` by
+  # way of the suite: every committed asset held to its recipe.
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/pyproject.toml
+      - run: pip install -e './tools[dev]'
+      - name: The toolbox gates
+        working-directory: tools
+        run: |
+          ruff check .
+          mypy
+          python -m pytest tests/ -q
+
   go:
     name: go (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}

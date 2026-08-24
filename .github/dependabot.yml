@@ -13,7 +13,7 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: pip
-    directory: /
+    directory: /tools
     schedule:
       interval: weekly
     groups:
@@ -21,7 +21,7 @@ updates:
         patterns: ["*"]
     ignore:
       # `torch` is pinned exact on purpose and must not be bumped here.
-      # pyproject.toml's `depth` extra argues it: 2.2.2 is the last torch
+      # tools/pyproject.toml's `depth` extra argues it: 2.2.2 is the last torch
       # with macOS x86_64 wheels at all, which is this machine's ceiling
       # (the Mac is at its OS ceiling and stays there), and the `numpy<2`
       # beside it rides along because 2.2.2 predates numpy 2. A bump here
