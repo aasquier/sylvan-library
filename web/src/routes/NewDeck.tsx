@@ -53,7 +53,7 @@ import {
   type ThemeCommander,
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
-import { CardHover, ColorRing, ManaText, PageMasthead } from '../components/ui'
+import { CardHover, ColorRing, ManaText, PageMasthead, Spinner } from '../components/ui'
 
 /** The doors page wears the card about choosing which way to go. Shadows over
  *  Innistrad's printing; artist and URL read off the pool together, so the
@@ -375,7 +375,7 @@ export default function NewDeck() {
     )
   }
   if (!taxonomy) {
-    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+    return <Spinner label="Reading the colour guide…" />
   }
 
   const tierInfo = taxonomy.tiers.find((t) => t.key === tier) ?? null
