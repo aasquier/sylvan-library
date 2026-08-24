@@ -567,7 +567,19 @@ func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
 // so a second identical click must join the live job rather than queue a
 // second JVM behind the first.
 func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
-	shim := &stubShim{stream: true, games: []tier3.WireGame{won(1, 100, 1, 3)}}
+	// **The stub has to hold the stream, and that is the whole test.** The
+	// dedupe under test is an *in-flight* join: a second ask joins the first
+	// only while the first is still running. Without `hold` this stub finishes
+	// the moment it starts, so on a quick enough machine match one is already
+	// done when ask two arrives -- and a second job is then the correct
+	// answer, which reads as a broken dedupe. It is a test that races itself,
+	// and it stayed green here for as long as this laptop stayed slower than
+	// CI's arm64 runner. Holding the stream makes the window a fact rather
+	// than a hope; the failing form is reproducible by sleeping between the
+	// two asks.
+	hold := make(chan struct{})
+	shim := &stubShim{stream: true, games: []tier3.WireGame{won(1, 100, 1, 3)},
+		hold: hold}
 	a, reg, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)
 
@@ -577,6 +589,9 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 	if first["id"] != second["id"] {
 		t.Errorf("two identical asks made two matches: %v and %v", first["id"], second["id"])
 	}
+	// Closed rather than sent to once: every later game in this test reads
+	// from it too, and a closed channel releases all of them.
+	close(hold)
 	reg.Wait()
 
 	// And a *different* match is its own job, queued honestly behind it.

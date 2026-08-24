@@ -14,20 +14,42 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ## Open — 2026-08-23
 
-**1. The 95% coverage floor is enforced by nothing, and coverage is not 95%.**
-CI runs `go test -race -count=1 -cover ./...`, which *prints* a number and
-gates on nothing; no threshold exists in `ci.yml`, `.golangci.yml` or any doc.
-Only the polish skill still asserts the floor. Measured 2026-08-23, and it
-takes two numbers because Go reports two different things: **80.3%** of
-statements covered by the whole suite (`-coverpkg=./...`, the number
-comparable to a floor) and **74.1%** counting only each package's own tests
-(plain `-cover`, the default). · *Cost of leaving it:* the pass keeps citing a
-floor that does not exist, which is the exact drift it was written to hunt. ·
-**Recommendation:** keep it a *watched* measurement rather than a gate —
-record both numbers every White run and treat a fall as a finding — and delete
-the "floor" language. A hard threshold set today would either fail CI
-immediately or sit so low it certifies nothing. Say the word and it becomes a
-gate instead.
+**1. The 95% coverage floor is gone, and the drop is half unit-change and half
+real.** CI's `-cover` prints a number and gates on nothing; no threshold
+exists in `ci.yml`, `.golangci.yml` or any doc, and only the polish skill
+still asserted it. Measured 2026-08-23: **80.3%** of statements across the
+whole suite (`-coverpkg=./...`, the figure comparable to the old floor).
+
+The old gate covered `src/mtglab` at 95.749% on **11,573 Python statements**.
+The same product in Go is **16,050 statements** — 39% more for identical
+behaviour, because Go writes its error paths as code where Python's exceptions
+propagate invisibly. Classifying all 3,158 uncovered statements by reading
+their source: **33% are error handling** (`if err != nil` and its returns),
+lines that largely did not exist to be counted before. Excluding error paths
+from the denominator puts it at **86.0%**.
+
+The other **54% (1,714 statements) is ordinary logic, and that part is a real
+regression** — and it is not diffuse. `pyproject.toml`'s own coverage note
+records what bought the last five points in Python on 2026-08-14: the CLI's
+Claude renderers, the theme modes faked at `Turn`, **Forge's run path faked at
+`subprocess`**, **the Scryfall ingest against fake bulk files**, and the SQL
+deck tier. Those are precisely today's gaps — `sim/tier3` sits at **25.6%**
+(`run.go` 169 uncovered, `worker.go` 110), `pool/refresh.go` 111,
+`cmd/mtglab/users.go` 126, plus the admin/sim/shelf route families.
+**The fakes were not rebuilt in Go.** The migration's safety net was
+byte-identical output diffing across a case matrix — stronger than coverage
+for proving the port, but it leaves no unit tests behind for the paths it
+exercised. · *Cost of leaving it:* Forge's run path and the pool refresh are
+both live code with no test holding them.
+
+· **Recommendation, two parts:** (a) make coverage a *watched* number, not a
+gate — record it every White run, treat a fall as a finding — since a
+threshold set today either fails CI at once or certifies nothing; and (b)
+queue the three fakes for rebuild in Go, in this order: the shim/subprocess
+fake for `tier3` (biggest single gap, and the only one covering code that
+talks to a worker machine), the bulk-file fake for `pool/refresh`, then the
+CLI's pool-backed commands. That is the honest path back, and it is worth
+more than any number.
 
 **2. Adopt `gremlins` for mutation testing?** The in-repo harness died with
 the old backend. Of the live options, `go-gremlins/gremlins` is the strongest

@@ -268,6 +268,17 @@ Then the levers, in the order that pays:
 - No test sends mail, spends a token, or touches the network — confirm the
   seams (the mail sender, faked Claude turns, faked subprocesses) still
   hold for anything added since last run.
+- **A test that asserts something about work *in flight* must hold the work in
+  flight.** Otherwise it races itself and its greenness is a fact about the
+  machine, not the code. The standing example: the Forge in-flight dedupe test
+  posted two identical asks and expected one job — with a stub that finished
+  instantly, so on a quick enough machine the first job was already done and a
+  second job was the *correct* answer. It passed on this laptop and went red
+  on CI's arm64 runner. The fix is a gate the test controls (this stub already
+  had one), never a sleep. **Diagnose this class by making the race certain**
+  — sleep between the two actions and watch it fail every time — then fix it
+  and confirm the fix survives that same sleep. Suspect every test whose
+  subject is a cache, a dedupe, a job, a lock or a stream.
 - Verify new guard tests by mutation, not by greenness: a test written to
   hold a boundary gets the boundary broken locally once to prove it fires.
   The standing example is a whole class of code that is maintainer-dependent
