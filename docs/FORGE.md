@@ -147,6 +147,16 @@ Four things about the format, each found by reading real output:
   attackers produce three `Damage:` lines and one `Life:` line for the total,
   so damage sums per combat rather than matching blow for blow. The first
   version of the test asserted per blow and failed against a real game.
+* **Only three of the nine outcome sentences say "because".** They are in
+  `res/languages/en-US.properties`, and requiring the word dropped six of them
+  — including `has lost trying to draw cards from empty library` and `has lost
+  due to accumulation of 21 damage from generals`, which is the loss condition
+  this format is named for. One of them, `has lost because an opponent has won
+  by spell '%s'`, holds **both** verbs, so it is the one pattern here matched
+  non-greedily: a greedy read calls that line a win for the player who just
+  lost. The reason is kept whole, because Forge writes these to follow
+  "&lt;player&gt; has won/lost" and so `<player> <verb> <note>` is already a
+  sentence.
 
 **What the log does not say**, which bounds what can ever be built on it:
 there are no counters (none, not even the quest counters a trigger's own text

@@ -33,7 +33,7 @@ func oneNarratedGame() tier3.EventLog {
 		{Kind: tier3.EventBlock, Turn: 6, Seat: 1, Card: "Pride Sovereign",
 			Target: "Goreclaw, Terror of Qal Sisma"},
 		{Kind: tier3.EventOutcome, Turn: 6, Seat: 2, Amount: 0,
-			Note: "life total reached 0"},
+			Note: "because life total reached 0"},
 	}}
 }
 
@@ -62,7 +62,7 @@ func TestTheNarratorTellsEveryBeatItIsGiven(t *testing.T) {
 		"arahbo-cats at 38",
 		"Sakura-Tribe Elder dies",
 		"Pride Sovereign blocks Goreclaw, Terror of Qal Sisma",
-		"goreclaw-stompy loses -- life total reached 0",
+		"goreclaw-stompy loses because life total reached 0",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("the account never says %q. It said:\n%s", want, got)
@@ -74,12 +74,35 @@ func TestTheNarratorNamesAWinnerAsAWinner(t *testing.T) {
 	t.Parallel()
 
 	log := tier3.EventLog{Game: 3, Events: []tier3.GameEvent{
-		{Kind: tier3.EventOutcome, Seat: 1, Amount: 1, Note: "all opponents have lost"},
+		{Kind: tier3.EventOutcome, Seat: 1, Amount: 1, Note: "because all opponents have lost"},
 	}}
 	var buf bytes.Buffer
 	narrateGame(&buf, log, map[int]string{1: "arahbo-cats"})
-	if got := buf.String(); !strings.Contains(got, "arahbo-cats WINS") {
+	if got := buf.String(); !strings.Contains(got, "arahbo-cats WINS because all opponents have lost") {
 		t.Errorf("a win read as %q", got)
+	}
+}
+
+func TestTheNarratorReadsForgesReasonAsASentence(t *testing.T) {
+	t.Parallel()
+
+	// Forge writes its nine outcome reasons to follow "<player> has
+	// won/lost", so the narrator puts nothing between the verb and the note.
+	// Three of the nine say "because" and six do not; both have to read.
+	for _, tc := range []struct{ note, want string }{
+		{"because life total reached 0", "a loses because life total reached 0"},
+		{"trying to draw cards from empty library",
+			"a loses trying to draw cards from empty library"},
+		{"due to accumulation of 21 damage from generals",
+			"a loses due to accumulation of 21 damage from generals"},
+	} {
+		var buf bytes.Buffer
+		narrateGame(&buf, tier3.EventLog{Game: 1, Events: []tier3.GameEvent{
+			{Kind: tier3.EventOutcome, Seat: 1, Amount: 0, Note: tc.note},
+		}}, map[int]string{1: "a"})
+		if got := buf.String(); !strings.Contains(got, tc.want) {
+			t.Errorf("%q rendered as %q, want it to contain %q", tc.note, got, tc.want)
+		}
 	}
 }
 

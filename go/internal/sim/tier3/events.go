@@ -112,8 +112,10 @@ type GameEvent struct {
 	// Life is the life total *after* a life change. A pointer because zero
 	// life is a real and rather important total.
 	Life *int `json:"life,omitempty"`
-	// Note is an outcome's reason, in Forge's own words ("life total reached
-	// 0"). Never shown as an explanation of anything else.
+	// Note is an outcome's reason in Forge's own words, kept whole and
+	// designed to follow the verb: "because life total reached 0", "trying to
+	// draw cards from empty library", "due to accumulation of 21 damage from
+	// generals". Render it as `<player> <verb> <note>` and it is a sentence.
 	Note string `json:"note,omitempty"`
 }
 
@@ -170,7 +172,40 @@ var (
 	// `Zone Change: Sakura-Tribe Elder (188) was put into Graveyard from Battlefield.`
 	eventDiesRe = regexp.MustCompile(`^Zone Change: (.+) \(\d+\) was put into Graveyard from Battlefield\.$`)
 	// `Game Outcome: Ai(2)-<label> has lost because life total reached 0`
-	eventOutcomeRe = regexp.MustCompile(`^Game Outcome: Ai\((\d+)\)-.* has (won|lost) because (.+)$`)
+	//
+	// **The only pattern here that is not greedy, and the only one whose
+	// reason keeps its first word.** Both come from the same place: Forge's
+	// nine outcome sentences, read out of `res/languages/en-US.properties`
+	// rather than guessed from the two a test happened to produce.
+	//
+	//	has won because all opponents have lost
+	//	has won due to effect of '%s'
+	//	has lost because life total reached 0
+	//	has lost because of obtaining 10 poison counters
+	//	has lost because an opponent has won by spell '%s'
+	//	has lost trying to draw cards from empty library
+	//	has lost due to effect of spell '%s'
+	//	has lost due to accumulation of 21 damage from generals
+	//	has lost for unknown reason (this is a bug)
+	//
+	// Only three of them say "because", so requiring the word dropped six —
+	// including decking and **21 damage from generals**, which is the loss
+	// condition this format is named for. It was found by playing two fixture
+	// decks and watching one of them mill itself while the parser recorded a
+	// winner and no loser.
+	//
+	// Non-greedy because `has lost because an opponent has won by spell` holds
+	// *both* verbs, and the last one is the wrong one: a greedy `.*` reads
+	// that line as a win. Non-greedy takes the first, which is the player's
+	// own verdict. The trade is a deck literally named "... has won ...",
+	// which is nobody's deck; the alternative misreads a sentence Forge
+	// really ships.
+	//
+	// The reason is kept whole — "because life total reached 0", "trying to
+	// draw cards from empty library" — because Forge writes these to follow
+	// "<player> has won/lost", so the sentence reads correctly wherever it is
+	// shown and nothing has to re-grammar it.
+	eventOutcomeRe = regexp.MustCompile(`^Game Outcome: Ai\((\d+)\)-.*? has (won|lost) (.+)$`)
 )
 
 // EventParser turns Forge's narration into beats, one line at a time.

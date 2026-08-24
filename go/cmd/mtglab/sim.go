@@ -778,7 +778,10 @@ func narrateGame(out io.Writer, log tier3.EventLog, seats map[int]string) {
 			if e.Amount == 1 {
 				verb = "WINS"
 			}
-			fmt.Fprintf(out, "\n  %s %s -- %s\n", who(e.Seat), verb, e.Note)
+			// No punctuation between them: Forge writes its nine outcome
+			// reasons to follow "<player> has won/lost", so verb and note
+			// are already one sentence.
+			fmt.Fprintf(out, "\n  %s %s %s\n", who(e.Seat), verb, e.Note)
 		}
 	}
 	if log.Truncated {

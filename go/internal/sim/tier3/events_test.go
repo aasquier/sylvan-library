@@ -72,14 +72,14 @@ func TestTheEventParserReadsTheBeatsItClaims(t *testing.T) {
 		{"a creature dying",
 			"Zone Change: Sakura-Tribe Elder (188) was put into Graveyard from Battlefield.",
 			GameEvent{Kind: EventDies, Card: "Sakura-Tribe Elder"}},
-		{"a win, with Forge's own reason",
+		{"a win, with Forge's own reason kept whole",
 			"Game Outcome: " + p1 + " has won because all opponents have lost",
 			GameEvent{Kind: EventOutcome, Seat: 1, Amount: 1,
-				Note: "all opponents have lost"}},
-		{"a loss",
+				Note: "because all opponents have lost"}},
+		{"a loss on life",
 			"Game Outcome: " + p2 + " has lost because life total reached 0",
 			GameEvent{Kind: EventOutcome, Seat: 2, Amount: 0,
-				Note: "life total reached 0"}},
+				Note: "because life total reached 0"}},
 
 		// The wrinkles, each found in real output and each the reason its
 		// pattern is shaped the way it is.
@@ -89,6 +89,39 @@ func TestTheEventParserReadsTheBeatsItClaims(t *testing.T) {
 		{"an unblocked attacker with no prefix, which is every one after the first",
 			p2 + " didn't block Kaheera, the Orphanguard (100).",
 			GameEvent{Kind: EventUnblocked, Seat: 2, Card: "Kaheera, the Orphanguard"}},
+
+		// The other six outcome sentences, from
+		// `res/languages/en-US.properties` rather than from whichever two a
+		// test happened to produce. Only three of the nine say "because", so
+		// a pattern that required the word dropped these -- including the two
+		// this format is most known for.
+		{"decking, which says no because at all",
+			"Game Outcome: " + p1 + " has lost trying to draw cards from empty library",
+			GameEvent{Kind: EventOutcome, Seat: 1, Amount: 0,
+				Note: "trying to draw cards from empty library"}},
+		{"commander damage, the loss this format is named for",
+			"Game Outcome: " + p2 + " has lost due to accumulation of 21 damage from generals",
+			GameEvent{Kind: EventOutcome, Seat: 2, Amount: 0,
+				Note: "due to accumulation of 21 damage from generals"}},
+		{"poison",
+			"Game Outcome: " + p1 + " has lost because of obtaining 10 poison counters",
+			GameEvent{Kind: EventOutcome, Seat: 1, Amount: 0,
+				Note: "because of obtaining 10 poison counters"}},
+		{"an alternate win condition",
+			"Game Outcome: " + p2 + " has won due to effect of 'Thassa's Oracle'",
+			GameEvent{Kind: EventOutcome, Seat: 2, Amount: 1,
+				Note: "due to effect of 'Thassa's Oracle'"}},
+		{"losing to somebody else's alternate win, which names BOTH verbs",
+			// The trap: this sentence holds " has lost" and " has won", and
+			// the last one is the wrong one. A greedy pattern reads it as a
+			// win for the player who just lost.
+			"Game Outcome: " + p1 + " has lost because an opponent has won by spell 'Approach of the Second Sun'",
+			GameEvent{Kind: EventOutcome, Seat: 1, Amount: 0,
+				Note: "because an opponent has won by spell 'Approach of the Second Sun'"}},
+		{"Forge admitting it does not know",
+			"Game Outcome: " + p2 + " has lost for unknown reason (this is a bug)",
+			GameEvent{Kind: EventOutcome, Seat: 2, Amount: 0,
+				Note: "for unknown reason (this is a bug)"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
