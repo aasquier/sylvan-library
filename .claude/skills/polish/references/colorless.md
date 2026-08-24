@@ -92,7 +92,7 @@ plan for a tool the toolchain made redundant.
   about the code:
 
   ```bash
-  cd tools && animist verify       # committed assets vs their recipes
+  cd tools && .venv/bin/animist verify   # committed assets vs their recipes
   ```
 
   For the retired instruments the question is the rebuild item itself: is it
