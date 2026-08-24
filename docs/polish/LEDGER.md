@@ -2300,11 +2300,82 @@ runs against a cache nobody emptied.
 
 ## Red — Speed & Alarum
 
-*CI/CD · alerting & self-healing*
+*CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-18 (punch-list item 5,
-  with Blue), and 2026-08-16 (rainbow), which was the first Red run and the
-  baseline the numbers below are a trend against.
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
+  2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
+  first Red run and the baseline the numbers below are a trend against.
+  **Everything below the 2026-08-24 block is Python-era and reads as such** —
+  `test (3.11)`, `test (3.12)`, `contract`, `src/mtglab`, `tests/test_packaging.py`.
+  The Go crossing (#272) replaced the pipeline's whole middle; the 2026-08-19
+  numbers are a different product's numbers and are kept as history, not as a
+  baseline anything should be compared against.
+- **Fixed this run (2026-08-24, rainbow): the `tools` job gated nothing at
+  all, and the guard that would have said so had died with the Python
+  suite.** `deploy`'s `needs` is the whole safety argument for ADR 23 and the
+  *only* guard on the manual button — branch protection governs merging and
+  has nothing to say about a `workflow_dispatch` on `main`. Read both lists in
+  `ci.yml` as `references/red.md` instructs and the invariant was already
+  broken: the file has seven jobs besides `deploy` and `needs` named six.
+  `tools` arrived in #272 and nothing wired it in, so **every deploy since the
+  interpreter departed has shipped without the toolbox gate ever having had to
+  be green** — and that gate is not cosmetic: `tools/tests/test_animist_recipes_repo.py`
+  holds every committed asset to the same glob `animist verify` asks, which is
+  a commandment 9 fact about provenance, not a lint. The same job was also
+  never added to the required contexts, so a red `tools` blocked neither the
+  merge nor the deploy; that half is a repository setting and is queued
+  (item 9). This is daybreak item 3 of 2026-08-23 with its hypothetical
+  removed — it was filed as *"a job added without `needs` now deploys off a
+  partial suite, silently"*, and that had already happened.
+  `TestTheDeployJobWaitsForEveryOtherJobInTheFile` in
+  `go/cmd/mtglab/pipeline_test.go` is the guard rebuilt, and it **derives**:
+  the expected set is `ci.yml`'s own `jobs:` keys minus `deploy`, parsed with
+  `goccy/go-yaml` (already a direct dependency), never a list typed into the
+  test — a typed list passes on the one day that matters. It checks both
+  directions, because naming a job that does *not* exist fails the whole
+  workflow on `main`, after the merge. **Mutation-verified the honest way
+  round: it was written before the fix and was born red**, naming `tools`,
+  and the same run of it went green when the line was added. Anti-vacuity on
+  both sides — a parse yielding fewer than two jobs, or no `deploy` key, is a
+  `t.Fatal` rather than a pass.
+- **Fixed this run (2026-08-24, rainbow): five surfaces answered a wait by
+  standing perfectly still, and one of them was the fortune-teller's door.**
+  `tarot.tsx` (waiting on the readers), `theme.tsx` (the interview),
+  `NewDeck.tsx` and `Learn.tsx` twice (the colour guide, the glossary) each
+  returned `<p style={{…}}>Loading…</p>` from a null-guard — a static text
+  node, in a component tree where `Spinner` has been the shared answer in
+  fourteen other files including `App.tsx`'s own Suspense fallback.
+  **The measurement is what makes this a fix rather than a preference**:
+  Black clocked all four endpoints at **0.6–0.7ms of server work**, so there
+  is nothing to make faster and the entire wait a person experiences is the
+  round trip plus the page choosing not to move through it. Commandment 6 for
+  four of them; commandment 15 for the tarot one, which is the first screen of
+  the most expensive door in the app and was the dullest of the five. Labels
+  taken from each site's own error copy rather than invented — NewDeck and
+  Learn already say "Could not load the colour guide" — so the two states
+  speak about the same thing. **Guarded by
+  `web/src/loadingstates.test.ts`**, which reads every component's source
+  through `import.meta.glob(…, { query: '?raw' })` (not `node:fs`:
+  `tsconfig.app.json` pins `types` to `vite/client`, so `node:fs` does not
+  typecheck in this tree) and fails on any JSX *text node* announcing a wait.
+  The pattern is deliberately narrow — a `>`, the word, the next `<`, and
+  nothing between them that only code or a comment would hold — which is what
+  makes `<Spinner label="Loading…" />` unmatchable by construction and a
+  comment saying "renders as loading" invisible. It can miss; it cannot
+  invent. **Mutation-verified**: restoring one of the five made it fail
+  naming `./routes/Learn.tsx: >Loading…<`, and it carries its own
+  anti-vacuity test (the glob resolved to >40 components, the pattern still
+  matches a control string, and does not match the cure).
+- **Queue closed since 2026-08-19, verified from the API rather than assumed
+  — items 4 and 8 below are both done.** `sha_pinning_required` is now
+  **`true`** (was false), and secret scanning **and** push protection are both
+  **`enabled`** — the endpoint that answered `404 Secret scanning is disabled
+  on this repository` on 2026-08-19 now answers `[]`, which is zero alerts on
+  an enabled scanner and not the same thing at all. `allowed_actions` is still
+  `"all"` and `secret_scanning_non_provider_patterns` is still `disabled`;
+  neither is urgent and both are free, so they fold into item 9 rather than
+  becoming their own line. Queued item 7 (the arm64 QEMU leg) is also closed:
+  `image-arm64` exists, runs on `ubuntu-24.04-arm`, and is a required context.
 - **Fixed this run (2026-08-19, rainbow): the deploy job's `needs` list is
   the whole safety argument and nothing checked it.** `deploy` cannot start
   until the four jobs above it are green, which is what makes it
@@ -2447,7 +2518,7 @@ runs against a cache nobody emptied.
      the body and keep the status 200**, and let the external monitor decide
      what is worth waking somebody for. Roughly: `app_db` (does it open),
      `disk_free_mb`, `schema_version`.
-  4. **`sha_pinning_required` is available and off.** GitHub now offers
+  4. **CLOSED 2026-08-24 — done.** ~~`sha_pinning_required` is available and off.~~ GitHub now offers
      enforced SHA pinning for Actions free on public repos; the repo already
      pins all eleven references by hand and Dependabot keeps them current, so
      turning it on makes an existing convention structural instead of
@@ -2474,8 +2545,9 @@ runs against a cache nobody emptied.
      step in the `deploy` job that snapshots before `flyctl deploy` — but that
      needs a `FLY_API_TOKEN` scope check and a decision about failing the
      deploy when the snapshot fails, so it is Aaron's call, not a safe fix.
-  7. **The `image` job spends 60% of itself emulating an architecture nothing
-     deploys to — three options, and Aaron picks.** Profiled this run (run
+  7. **CLOSED 2026-08-24 — option (b) was taken.** `image-arm64` runs natively
+     on `ubuntu-24.04-arm` and is a required context. ~~The `image` job spends
+     60% of itself emulating an architecture nothing deploys to.~~ Profiled this run (run
      `32312916793`, `image` 302s): setup 23s, amd64 build 63s, the eight
      container assertions 8s, Trivy 16s, and the multi-arch build **182s** —
      which is arm64 and nothing else, because every amd64 layer is already
@@ -2501,8 +2573,8 @@ runs against a cache nobody emptied.
      rather than trusting. Either (a) or (b) is the first thing in six runs
      that would actually move the wall clock, because it is the only lever
      that acts on the job that is the critical path half the time.
-  8. **Secret scanning and push protection are off, and both are free on a
-     public repository.** Confirmed rather than assumed: the API answers
+  8. **CLOSED 2026-08-24 — both are on.** ~~Secret scanning and push protection
+     are off, and both are free on a public repository.~~ Confirmed rather than assumed: the API answers
      `404 Secret scanning is disabled on this repository`. What the repo has
      instead is `no-secrets-or-card-data`'s `git grep` for `sk-ant-…`, and
      that guard is **post-hoc by construction** — it runs after the push, on a
@@ -2516,7 +2588,85 @@ runs against a cache nobody emptied.
      with nobody in the loop. Repository settings, so Aaron's to flip
      alongside #4. The CI grep stays either way: it also enforces the
      card-data half of rule 5, and a repo-specific belt costs six seconds.
+  9. **`tools` is not a required context, so a red toolbox still does not
+     block a merge.** This run wired it into `deploy`'s `needs`, which stops
+     it deploying off a partial suite; the other half of "adding a job is two
+     steps" (ENGINEERING §5) is a repository setting and therefore Aaron's.
+     Read back 2026-08-24, the eight required contexts are `frontend`,
+     `image`, `no-secrets-or-card-data`, `dependency-review`, `image-arm64`,
+     `go (amd64)`, `go (arm64)`, `go-lint` — no `tools`. What it gates is not
+     a lint: the toolbox suite holds every committed asset to its recipe,
+     which is the provenance half of commandment 9. **Recommendation:** add
+     it — `gh api -X POST …/protection/required_status_checks/contexts -f
+     'contexts[]=tools'` — and, while in there, `allowed_actions` is still
+     `"all"` (the widest setting, and every reference is now SHA-pinned by
+     policy anyway) and `secret_scanning_non_provider_patterns` is still
+     `disabled` though free on a public repo. Three flips, all free.
+ 10. **Five CodeQL alerts stand open against Python that no longer exists,
+     and nothing will ever close them.** All five point into `src/mtglab/**`
+     — four `py/polynomial-redos` in `decks/decklist.py` created 2026-08-15
+     and one `py/stack-trace-exposure` in `api/app.py` created 2026-08-20.
+     `codeql.yml`'s matrix is `javascript-typescript` and `go`; **Python is
+     not analysed any more**, so these alerts can never be re-evaluated and
+     can never auto-close. This is Red's rather than White's because it is an
+     alerting fact: `codeql.yml`'s own header argues that a scanner which
+     cries wolf is a scanner that gets disabled in anger, and a Security tab
+     permanently showing five un-actionable alerts is that failure arriving
+     by a different road — the next real Go or TypeScript alert lands in a
+     list nobody has been able to empty for a fortnight. **Recommendation:**
+     dismiss all five with reason `won't fix` and a comment naming #272, so
+     the tab's count means something again. It is Aaron's because dismissing
+     a security alert is a security-tab action and because the pass sends
+     security findings to daybreak before any hand touches them.
+ 11. **The restore drill's trigger has fired.** The deferred item below says
+     a Fly volume-snapshot restore has never been performed, with the trigger
+     "any change to the volume's shape or size, or the first time a real
+     restore is needed". `references/red.md` sets a second and stronger one:
+     **a drill older than the newest schema migration is due**, because the
+     ladder is forward-only and a restore crosses it. The ladder was rebuilt
+     entirely in the Go crossing — `go/internal/auth/migrations/` is now
+     twelve scripts with `SchemaVersion` bumped per rung — so a restore today
+     would cross a ladder no drill has ever met. Snapshots are healthy (five,
+     newest 21h, 5-day retention) and `docs/HOSTING.md` §5 is honest that the
+     path "has never been exercised here". **Recommendation:** walk it once,
+     deliberately, against a scratch volume forked from the newest snapshot
+     and a throwaway machine — never against `mtglab_data` — and write the
+     result into HOSTING §5 with the date. It costs a few cents of volume for
+     an hour and it is the only way the phrase "safety net" earns itself; ADR
+     30 makes that volume the library's one standing copy.
+ 12. **Seven controls start async work and never stop accepting clicks, and
+     two of them are writes.** Re-measured 2026-08-24 (was 19/6 on
+     2026-08-23; the two named offenders are the same ones): 131 `<button>`
+     tags outside tests, **21** whose `onClick` starts async work, **7** with
+     no `disabled` in the tag — `App.tsx` `signOut()`, `dossier.tsx`'s
+     disclosure `load()`, `artifacts.tsx` `copy()`, `ui.tsx`'s armed
+     card-action, `Research.tsx` `ask(example)`, and in `DeckDetail.tsx`
+     **`save()` and `returnCard()`**. The last two are the ones that matter:
+     they write, so a double click is a double edit and ADR 28 records both.
+     Deliberately **not** attempted this run — the pattern is a busy flag
+     driving `disabled` *and* a visible pending state (both halves or
+     neither: disabling with no visible change reads as broken, a spinner
+     with no `disabled` still double-submits), and doing that properly inside
+     `DeckDetail`'s state is more than a night has left after the rest of
+     this. **Recommendation:** take the two writes first as their own small
+     branch, then the five reads; the shared `Spinner` is already the pending
+     half and the `.btn` family already styles `:disabled`.
 - **Deferred:**
+  - **A guard for commandment 17 itself, of the shape this run built for
+    loading states.** Measured 2026-08-24: of 131 `<button>` tags outside
+    tests, **zero** carry no `className` at all and only **three** carry no
+    class defined anywhere in `index.css` (`stance.tsx`, `term.tsx`,
+    `NewDeck.tsx`) — so the 2026-08-23 reading of "21 wearing no class from
+    that vocabulary" was counting membership of the `.btn`/`.chip-toggle`
+    family, not the presence of a named place, and by `references/red.md`'s
+    own test ("is there one named place where this control's three states are
+    defined?") the tree is in much better shape than that number reads.
+    The checkable form of the commandment is therefore not "does it wear a
+    `.btn`" but **"does at least one class this button wears define `:hover`,
+    `:focus-visible` and a pressed state?"** — buildable, and it needs a
+    Tailwind-utility allowlist to avoid drowning in `px-3`. Trigger: the
+    inline-style sweep (643 `style={{` props under `web/src`, was 648) coming
+    up on a Green or Colorless run, or the first new bespoke control class.
   - **Speeding up the `image` job in place — still deferred, and half of the
     2026-08-16 reasoning behind it is now disproven.** The trigger this item
     named ("the test job gets materially faster") **has not arrived and moved
@@ -2556,6 +2706,146 @@ runs against a cache nobody emptied.
     fails; the Fly cert covers the apex only). Harmless until a friend types
     it. Trigger: anyone reports the site not loading and turns out to have
     typed `www.`.
+- **Measurements (2026-08-24, rainbow):**
+  - **CI per-job medians, n=22** — every successful `ci.yml` run back to
+    2026-08-23, computed from `started_at`/`completed_at` per job. **This is a
+    new baseline, not a trend**: the Python jobs it would be compared against
+    no longer exist.
+    `go (amd64)` **197s** (175–209) · `image` **136.5s** (47–262) ·
+    `go (arm64)` **118s** (109–128) · `image-arm64` **89s** (13–145) ·
+    `frontend` **48.5s** (39–57) · `tools` **35s** (28–47) ·
+    `go-lint` **31s** (27–37) · `no-secrets-or-card-data` **6s** (4–8) ·
+    `deploy` **175s** (142–210, n=4). Full-run wall clock on a pull request
+    **193–214s**; on a push with the deploy, **375s**. Against 2026-08-19's
+    median of 329s for a *worse* suite, the crossing bought roughly 40% of
+    the pull-request clock.
+  - **The critical path is no longer a tie, and it is one step.**
+    `go (amd64)` is the longest job in 20 of 22 runs. Its steps, from run
+    `32720646458`, beside the same steps on `go (arm64)` — identical work,
+    identical file:
+    `setup-go` 7s/9s · `go mod verify` 2s/2s · `go vet` **12s/4s** ·
+    `go build` 4s/2s · **`Tests, race-detected` 171s/89s** · tidy 4s/0s.
+    So the pipeline's clock is one step on one runner, and its sibling runs
+    the same step in 52% of the time. Compile-bound work shows the same 3x
+    (`vet` 12 vs 4), which points at the runner rather than at anything in
+    the tests — `ubuntu-24.04-arm` is simply faster per core than
+    `ubuntu-latest` here. **Recorded, not acted on:** there is no lever in
+    `ci.yml` for it, amd64 is what deploys, and the honest levers are inside
+    the suite. See the patrol below for where that time sits.
+  - **Cache health: hit, read from run `32720646458`'s log rather than
+    assumed.** `setup-go` restored
+    `setup-go-Linux-x64-ubuntu24-go-1.26.6-e0a5eafd...`, ~215 MB, "Cache
+    restored successfully". Go toolchain found in the hosted tool cache.
+    Note the key is `go.sum` alone, so the saved build cache holds the
+    dependencies' objects and never the project's own — which is the bulk of
+    the win and is worth knowing before anyone reads a 171s test step as a
+    cache miss.
+  - **Concurrency verified by observation.** Six `ci.yml` runs on
+    `polish/black-2026-08-24` were **cancelled** as designed between 11:01Z
+    and 11:07Z as fixups landed, and the seventh completed. The group works.
+  - **Actions hygiene: 27 `uses:` references across 12 distinct actions,
+    every one a 40-char SHA with a version comment** (was 18/11 on
+    2026-08-19; the growth is the Go jobs and the deploy's Forge steps). No
+    `pull_request_target`. Workflow-level `permissions: contents: read` on all
+    three files, `security-events: write` scoped to CodeQL's job alone.
+    Default workflow permissions `read`, `can_approve_pull_request_reviews`
+    false. **`sha_pinning_required` now true**; `allowed_actions` still
+    `"all"`.
+  - **Hot-spot patrol, first Go-era run.** Profiled at the package seam
+    (`-cpuprofile`/`-memprofile` over each suite, `go tool pprof -top`),
+    because the serving process still has no pprof mount — daybreak item 6 of
+    2026-08-23. **Test-shaped load is not request-shaped load**; what follows
+    ranks where the *suite* spends itself, which is also what the CI critical
+    path is made of.
+    - **Package ranking, `go test -race -count=1 -json ./...`, 46 packages
+      with tests, 473.4 package-seconds, 1m37s wall on 8 cores:**
+      `internal/api` **87.63s** · `internal/claude` **74.82s** ·
+      `internal/auth` 17.72s · `internal/sim/mulligan` 17.49s ·
+      `internal/pool` 15.09s · `internal/sim/curve` 13.48s ·
+      `internal/claude/ledger` 10.75s · `internal/mt19937` 10.68s ·
+      `internal/sim/tier1` 10.00s · `cmd/mtglab` 9.90s. Two packages are 34%
+      of the suite.
+    - **CPU, `internal/api` (38.05s duration, 35.86s sampled):**
+      `runtime.cgocall` **24.84s flat, 69.27%** · `syscall.rawsyscalln` 4.23s
+      (11.80%) · `runtime.pthread_cond_signal` 2.64s (7.36%) · `<unknown>`
+      2.04s · `argon2.blamkaSSE4` 0.45s (1.25%). Cumulative:
+      `database/sql.(*DB).ExecContext` **17.31s (48.27%)**,
+      `database/sql.(*DB).Close` **4.81s (13.41%)**. This is the shelf's
+      standing blind spot behaving exactly as documented — the profile is
+      nearly featureless because the work is DuckDB behind cgo — and the
+      shape it *does* show is fixture cost: opening, seeding and closing an
+      in-process pool per test. `gate` and `deckread` read the same way
+      (cgocall 88% and 80% of their samples). `library` samples only 30ms in
+      total and `sim/tier1` 340ms; neither is a hot spot at all.
+    - **Allocation, `internal/api` — the one finding a CPU profile could not
+      see.** `-sample_index=alloc_space`, 1,981 MB total:
+      `golang.org/x/crypto/argon2.initBlocks` **1,805 MB flat, 91.10%**,
+      reached through `api.(*accountRig).call` (498 MB cumulative, 25.13%).
+      Second place is `duckdb.(*Stmt).bind` at 24 MB. **There is no
+      test-parameter profile for the hasher**: `auth/passwords.go` sets
+      `MemoryCostKiB = 19_456` and the rig hashes at it, so ~95 production
+      Argon2id hashes run inside the suite that is the CI critical path.
+      CPU cost is genuinely small (1.9% cumulative) — this is GC pressure,
+      not arithmetic. **Red found where; whether and how is Black's**, and
+      the caveat that makes it Black's rather than a quick win is that
+      `MemoryCostKiB` is load-bearing for `NeedsRehash`, so a test profile
+      must not silently become the thing the rehash check compares against.
+  - **Controls, walked in source and counted.** 131 `<button>` tags outside
+    tests · **0** with no `className` at all · **3** carrying no class defined
+    in `index.css` · **21** whose `onClick` starts async work · **7** of those
+    with no `disabled` (queued item 12) · **643** `style={{` props under
+    `web/src` (was 648). Five static loading placeholders found and fixed;
+    the remaining two `Loading...` strings in the tree are `App.tsx`'s, and
+    both already go through `Spinner`.
+  - **Live probe (2026-08-24 ~11:20Z, v208, three samples each).**
+    `GET /` **200** 178–282ms (1,897 bytes) · `GET /api/health` **200**
+    167–257ms · `GET /api/decks` **401** 164–173ms · `GET /api/colors` and
+    `/api/glossary` **401** 163–235ms. TLS handshake 67–81ms, connect ~30ms
+    warm. HTTP/2, ALPN h2. **`HEAD /` and `HEAD /api/health` still 405** —
+    queued item 2 unchanged, and it is still the thing that would make a
+    default-configured monitor cry wolf on day one.
+    Health body: pool true, **35,393 oracle cards, 107,355 printings**,
+    7 decks, `pool_stale` false, bulk files now include
+    `default_cards-2026-08-19.jsonl.gz` and `oracle_cards-2026-08-19.jsonl.gz`
+    beside the old `-2026-08-13`. Still **no `app_db`, no `disk_free_mb`, no
+    `schema_version`** — queued item 3 unchanged.
+  - **Instance:** machine `84e19ef25041e8`, **version 208** (was 120 on
+    2026-08-19), `iad`, **`shared-cpu-2x`/1 GB** (the ledger's
+    `shared-cpu-1x` was stale — `fly.toml` records the change on 2026-08-23),
+    started, 1/1 checks passing. A second machine now exists and is meant to:
+    `forge-worker`, `performance-2x`/4096 MB, **stopped**, image
+    `forge-worker-890a5be...` — ADR 35's worker, woken by the deploy job and
+    put back to sleep, which is what the run log shows it doing.
+  - **Volume `mtglab_data`:** 3 GB, encrypted, attached, `iad`. **5
+    snapshots**, one per day, newest 21 hours old, 5-day retention, **798 MiB
+    stored** (was 447). Fly's schedule only; still nothing tied to a deploy
+    (queued item 6).
+  - **The expiry calendar, nearest first.** **Sonnet 5's introductory
+    pricing window ends 2026-08-31 — seven days**, after which the same
+    traffic costs 50% more; `prices.Table` already models both sides in code,
+    so nothing to build, but it is a date nothing else watches. **The
+    Anthropic key expires around 2026-09-10 — eighteen days**; it is
+    short-lived by policy and a 401 on every Claude surface is what expiry
+    looks like, not a broken integration. Then **TLS 2026-11-11** (Let's
+    Encrypt, `CN=sylvan-libraries.com`, issued 2026-08-13, 79 days,
+    Fly-managed, apex-only SAN — `www.` still unresolvable, deferred item
+    unchanged). Comfortably outside: **`FLY_API_TOKEN` 2027-08-14**, exactly
+    as `ci.yml`'s failure-path message prints, and the **domain registration
+    2027-08-13T02:28:05Z** (Porkbun, ACTIVE, transfer- and delete-locked).
+    The Fly payment method is behind Aaron's login and was not driven.
+  - **Alerting posture — one delta, and it is the good kind.** Fly HTTP check
+    GET `/api/health`, 30s/5s/10s grace, passing, **does not restart on
+    failure** · machine restart policy fires only on process exit · Dockerfile
+    `HEALTHCHECK` present but inert on Fly Machines · GitHub deploy-job
+    failure email · **external uptime monitoring: none · phone alerting:
+    none** (queued item 1, unchanged and still the biggest gap). The delta:
+    **secret scanning and push protection are now on**, which is the one piece
+    of genuine self-healing this project has — Anthropic is a GitHub
+    secret-scanning partner, so a key that leaks from this public repo is
+    forwarded and revoked with nobody in the loop.
+  - **Scanner backlog:** **5** open CodeQL alerts, all Python, all against
+    deleted files (queued item 10) · **9** open Dependabot alerts, unchanged
+    cluster · secret scanning enabled with **0** alerts.
 - **Measurements (2026-08-19, rainbow):**
   - **CI per-job medians, n=20** — every successful `ci.yml` run of the day,
     13:41Z to 23:21Z, which is #179–#187 and their pushes. Against 2026-08-18

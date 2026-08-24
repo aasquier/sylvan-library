@@ -36,7 +36,7 @@ import {
 } from '../lib/api'
 import { COLOR_VAR } from '../lib/mtg'
 import {
-  CardHover, ColorRing, ErrorNote, ManaCost, ManaText, PageMasthead,
+  CardHover, ColorRing, ErrorNote, ManaCost, ManaText, PageMasthead, Spinner,
 } from '../components/ui'
 
 /** The card the whole project is named after, so the reference page wears it.
@@ -419,7 +419,7 @@ function WordsTab() {
   }, [])
 
   if (!glossary) {
-    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+    return <Spinner label="Reading the glossary…" />
   }
 
   const needle = query.trim().toLowerCase()
@@ -569,7 +569,7 @@ export default function Learn() {
       {tab === 'words' ? <WordsTab /> : taxonomy ? (
         <ColorsTab taxonomy={taxonomy} selected={selected} onSelect={select} />
       ) : !error && (
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+        <Spinner label="Reading the colour guide…" />
       )}
 
       <ReadingRoom />

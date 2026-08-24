@@ -55,7 +55,7 @@ import roomMp4Url from '../assets/seance/seance-room-loop.mp4'
 import roomStillUrl from '../assets/seance/seance-room-still.webp'
 import roomWebmUrl from '../assets/seance/seance-room-loop.webm'
 import { ThemeInterview } from './theme'
-import { CardArt } from './ui'
+import { CardArt, Spinner } from './ui'
 import { VideoBackdrop } from './videofx'
 
 /** The table survives a reload, for the reason the transcript does: a reading
@@ -825,7 +825,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     )
   }
   if (!roster) {
-    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+    return <Spinner label="Gathering the readers…" />
   }
 
   const chosen = roster.personas.find((p) => p.key === table.persona) ?? null

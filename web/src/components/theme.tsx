@@ -46,7 +46,7 @@ import { COLOR_VAR } from '../lib/mtg'
 import { PERSONA_ACCENT, PERSONA_ART } from '../lib/personart'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { SceneBackdrop } from './forest'
-import { ArmedButton, CardHover, ColorRing } from './ui'
+import { ArmedButton, CardHover, ColorRing, Spinner } from './ui'
 import { ReplayGlyph } from './glyphs'
 import { StanceReadout } from './stance'
 
@@ -841,7 +841,7 @@ export function ThemeInterview({
   }
 
   if (!status) {
-    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+    return <Spinner label="Opening the interview…" />
   }
   // One way this door stays shut: no key. The second arm this branch used to
   // carry — Claude absent from the server — cannot happen, because the client

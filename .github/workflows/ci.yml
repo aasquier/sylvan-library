@@ -535,8 +535,14 @@ jobs:
   # check above is green, so it is *structurally* unable to deploy something
   # that failed one -- rather than relying on branch protection, which governs
   # merging and has nothing to say about a workflow_dispatch run.
+  # `needs` names every other job in this file, and
+  # `TestTheDeployJobWaitsForEveryOtherJobInTheFile` (go/cmd/mtglab) derives
+  # that set from the `jobs:` keys above rather than restating it. The guard is
+  # here because the invariant has already broken once without one: `tools`
+  # arrived with the Go crossing and was never wired in, so every deploy for a
+  # day shipped without the toolbox gate ever having had to be green.
   deploy:
-    needs: [frontend, no-secrets-or-card-data, go, go-lint, image, image-arm64]
+    needs: [frontend, no-secrets-or-card-data, tools, go, go-lint, image, image-arm64]
     # Two conditions, and the ref one is deliberately outside the event check.
     #
     # Never from a pull request: a fork's PR must not be able to reach the
