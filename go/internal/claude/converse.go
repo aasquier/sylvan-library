@@ -81,9 +81,13 @@ func (e *exhausted) Is(target error) bool { return target == ErrModeExhausted }
 // put the mode's name in front of every one of those sentences -- a prefix
 // the recorded shape never carries, on the first Claude surfaces the door
 // answered.
-type apiFailure struct{ err error }
+type apiFailure struct {
+	err error
+	// model is what was asked for, which two of Explain's branches name.
+	model string
+}
 
-func (e *apiFailure) Error() string { return Explain(e.err) }
+func (e *apiFailure) Error() string { return Explain(e.err, e.model) }
 func (e *apiFailure) Unwrap() error { return e.err }
 
 // MaxToolTurns is enough for a lookup, a search and a reconsider. A mode that
@@ -158,6 +162,11 @@ func (t Turn) Parsed(into any) error {
 type Request struct {
 	Messages []anthropic.MessageParam
 	Stance   Stance
+	// Endpoint is where this conversation's calls go. The zero value is an
+	// instance with no credential, which refuses -- so a caller that forgets
+	// to set it gets a clean refusal rather than a live call it did not mean
+	// to make.
+	Endpoint Endpoint
 	// Deps is what the mode's own tools may reach -- a deck source and a pool,
 	// either of which may be absent.
 	Deps tools.Deps
@@ -199,11 +208,11 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 	if err := req.Stance.Validate(); err != nil {
 		return Turn{}, fmt.Errorf("%s: %w", mode.Name, err)
 	}
-	con, err := Connect()
+	con, err := req.Endpoint.Connect()
 	if err != nil {
 		return Turn{}, err
 	}
-	answering := ModelFor(req.Tier)
+	answering := req.Endpoint.ModelFor(req.Tier)
 	schemas, err := mode.Schemas()
 	if err != nil {
 		return Turn{}, err
@@ -304,7 +313,7 @@ func Converse(ctx context.Context, mode Mode, req Request) (Turn, error) {
 			// Nothing is recorded to the ledger on an API failure,
 			// deliberately: the roll-up counts conversations, and a request
 			// the API refused is not one.
-			return Turn{}, &apiFailure{err: err}
+			return Turn{}, &apiFailure{err: err, model: answering}
 		}
 		requests++
 		tokensIn += resp.Usage.InputTokens

@@ -56,8 +56,8 @@ const themeProposalAnswer = `{"combinations":[` +
 // exactly the right thing too early that they sent something wrong is the
 // commandment-2 failure in a status code.
 func TestTheThemeRoutesRefuseWhatTheyCanBeforeAnyJob(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, row := range []struct {
 		at     string
@@ -108,8 +108,8 @@ func TestTheThemeRoutesRefuseWhatTheyCanBeforeAnyJob(t *testing.T) {
 // helps: "keep talking" is actionable and "there is no key" is not the
 // caller's problem to solve.
 func TestTheFloorIsRefusedBeforeTheMissingKey(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", themeProposalAt,
 		`{"transcript":`+readyTranscript+`}`)
@@ -135,8 +135,8 @@ func TestTheFloorIsRefusedBeforeTheMissingKey(t *testing.T) {
 // refusal says, so everything the budget grammar accepted before is still
 // accepted, which is what the second half of this table checks.
 func TestEveryUnreadableBudgetRefusesInOneSentence(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	body := func(budget string) string {
 		return `{"transcript":` + readyTranscript + `,"slots":` + readySlots +
@@ -187,8 +187,8 @@ func TestEveryUnreadableBudgetRefusesInOneSentence(t *testing.T) {
 // Two ways a turn reaches nobody, both jobs born finished -- so the common
 // cheap case costs exactly one request and never a poll.
 func TestATurnThatReachesNobodyIsAJobBornFinished(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, row := range []struct {
 		note, body, reason string
@@ -222,8 +222,8 @@ func TestATurnThatReachesNobodyIsAJobBornFinished(t *testing.T) {
 // A stance of `off` on the proposal, and its label -- the singular is
 // `” if n == 1 else 's'`, which puts "1 thing" against "3 things".
 func TestTheProposalLabelCountsThingsKnown(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	_, payload, raw := callAs(t, rig.api, alice, "POST", themeProposalAt,
 		`{"stance":"off","slots":`+readySlots+`,"transcript":`+readyTranscript+`}`)
@@ -240,8 +240,8 @@ func TestTheProposalLabelCountsThingsKnown(t *testing.T) {
 // call was made.
 func TestTheThemeTurnIsAJobWhoseResultIsTheReport(t *testing.T) {
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(themeTurnAnswer))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", themeAt,
 		`{"transcript":`+readyTranscript+`}`)
@@ -288,7 +288,8 @@ func TestTheThemeProposalIsAJobWhoseResultIsTheProposal(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("The Real Page")+","+said(themeProposalAnswer))}}
 	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", themeProposalAt,
 		`{"transcript":`+readyTranscript+`,"slots":`+readySlots+`,"budget":50}`)
@@ -345,8 +346,8 @@ func TestTheThemeProposalIsAJobWhoseResultIsTheProposal(t *testing.T) {
 func TestTheBudgetReachesTheModelInTheRecordedFormat(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(themeProposalAnswer))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, payload, _ := callAs(t, rig.api, alice, "POST", themeProposalAt,
 		`{"transcript":`+readyTranscript+`,"slots":`+readySlots+
@@ -372,10 +373,10 @@ func TestTheBudgetReachesTheModelInTheRecordedFormat(t *testing.T) {
 // collapsing them would hand one of them the other's question.
 func TestTwoIdenticalThemeTurnsAreTwoJobs(t *testing.T) {
 	reply := answer("end_turn", said(themeTurnAnswer))
-	api := &scriptedClaude{hold: make(chan struct{}), replies: []string{reply, reply}}
-	api.start(t)
-	rig := newJobRig(t)
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
+	api := &scriptedClaude{hold: make(chan struct{}), replies: []string{reply, reply}}
+	rig.api.claude = api.start(t)
 	body := `{"transcript":` + readyTranscript + `}`
 	_, first, _ := callAs(t, rig.api, alice, "POST", themeAt, body)
 	_, second, _ := callAs(t, rig.api, alice, "POST", themeAt, body)
@@ -403,8 +404,8 @@ func TestNeitherThemeModeIsOfferedADeckTool(t *testing.T) {
 			searchedPage("t") + "," + said(themeProposalAnswer), "get_cards,search_cards,web_search"},
 	} {
 		api := &scriptedClaude{replies: []string{answer("end_turn", row.reply)}}
-		api.start(t)
-		rig := newJobRig(t)
+		claudeSet := api.start(t)
+		rig := newJobRig(t, claudeSet)
 		_, payload, _ := callAs(t, rig.api, alice, "POST", row.at, row.body)
 		done, _ := rig.await(t, payload["id"].(string))
 		if done["status"] != "done" {
@@ -433,9 +434,10 @@ func TestNeitherThemeModeIsOfferedADeckTool(t *testing.T) {
 // A failed call is a job in state `error`, in the words `explain` gives it --
 // not a 502, because by then the response has been sent.
 func TestAFailedThemeCallIsAReadableJobError(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{"!401"}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, payload, _ := callAs(t, rig.api, alice, "POST", themeAt,
 		`{"transcript":`+readyTranscript+`}`)
@@ -475,8 +477,8 @@ func exhaustedTranscript() string {
 // only one is "1 thing". Nothing above reached either edge, so a mutation
 // that spelled it `n == 0` survived a whole suite.
 func TestTheLabelsCountThingsTheRecordedWay(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, row := range []struct{ slots, want string }{
 		{`[]`, "theme: a question, from 0 things known"},
@@ -514,8 +516,8 @@ func TestTheLabelsCountThingsTheRecordedWay(t *testing.T) {
 func TestTheThemeJobOutlivesTheRequestThatMadeIt(t *testing.T) {
 	api := &scriptedClaude{hold: make(chan struct{}),
 		replies: []string{answer("end_turn", said(themeTurnAnswer))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rig.api.claudeTheme(w, r.WithContext(auth.WithScope(r.Context(), alice)))

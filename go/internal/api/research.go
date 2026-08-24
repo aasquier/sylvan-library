@@ -79,7 +79,7 @@ func (a *API) claudeResearch(w http.ResponseWriter, r *http.Request) {
 		requested = body["stance"]
 	}
 	plan, err := claude.CheckResearch(body["question"], requested,
-		auth.ScopeFrom(r.Context()).ModelTier, nil)
+		auth.ScopeFrom(r.Context()).ModelTier, a.claude.Ceiling, a.claude.Endpoint)
 	if err != nil {
 		// `except (QuestionRejected, ValueError)`: a question that is not one,
 		// or a stance that will not read. Both are the caller's to fix.
@@ -99,7 +99,7 @@ func (a *API) claudeResearch(w http.ResponseWriter, r *http.Request) {
 		a.submit(w, r, jobs.Plan{Kind: ResearchKind, Label: label, Result: *plan.Answer, Lane: jobs.NET})
 		return
 	}
-	if err := claude.Require(); err != nil {
+	if err := a.claude.Endpoint.Require(); err != nil {
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
@@ -123,7 +123,7 @@ func (a *API) claudeResearch(w http.ResponseWriter, r *http.Request) {
 				return runErr
 			})
 			if err != nil {
-				return nil, claudeJobError(err)
+				return nil, claudeJobError(err, a.claude.Endpoint.ModelFor(""))
 			}
 			return report, nil
 		},

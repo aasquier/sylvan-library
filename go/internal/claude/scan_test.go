@@ -248,6 +248,7 @@ func TestTheSightingReadsBackAsRecorded(t *testing.T) {
 
 // The mode's own stance: `consultant`, and emphatically not `off`.
 func TestTheScanStanceMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	for _, row := range c.Stances {
 		ceiling := ""
@@ -255,7 +256,6 @@ func TestTheScanStanceMatchesTheCorpus(t *testing.T) {
 			ceiling = *row.Ceiling
 		}
 		t.Run(row.Note, func(t *testing.T) {
-			withDialEnv(t, ceiling)
 			var requested any
 			if len(row.Requested) > 0 && string(row.Requested) != "null" {
 				// **UseNumber, because production does.** The refusals tell
@@ -271,7 +271,7 @@ func TestTheScanStanceMatchesTheCorpus(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			got, err := ScanStanceFor(requested, nil)
+			got, err := ScanStanceFor(requested, dialSettings(t, ceiling).Ceiling)
 			if row.Error != "" {
 				if err == nil {
 					t.Fatalf("resolved where the corpus refuses with %q", row.Error)

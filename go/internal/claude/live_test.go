@@ -54,20 +54,26 @@ import (
 // The four other cases assert structure rather than judgement and do not vary.
 //
 // It is skipped everywhere else, CI included.
-func liveOrSkip(t *testing.T) {
+// Returns the real endpoint, which is the one thing in this package that
+// genuinely wants the process environment: these tests exist to prove the
+// actual wire, so reading the actual credential is the point rather than a
+// leak (ADR 39).
+func liveOrSkip(t *testing.T) Endpoint {
 	t.Helper()
 	if os.Getenv("MTGLAB_LIVE_CLAUDE") != "1" {
 		t.Skip("live: set MTGLAB_LIVE_CLAUDE=1 (and a key) to spend tokens proving the wire")
 	}
-	if !Available() {
+	e := EndpointFromEnv()
+	if !e.Present() {
 		t.Skip("live: no ANTHROPIC_API_KEY in the environment")
 	}
+	return e
 }
 
 func TestLiveTheSmallestCallProvesTheKey(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
-	report := Check(context.Background(), "")
+	live := liveOrSkip(t)
+	report := Check(context.Background(), live, "")
 	if !report.OK {
 		t.Fatalf("the pipe is not open: %s", report.Error)
 	}
@@ -188,7 +194,7 @@ func TestLiveAToolRoundTripAndACacheRead(t *testing.T) {
 // not a test failure.
 func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
+	live := liveOrSkip(t)
 	d := fixtureDeck(t, "kaheera")
 	stance, err := Preset("second-opinion")
 	if err != nil {
@@ -198,6 +204,7 @@ func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
 	withPool(t, func(c *pool.Conn) {
 		var runErr error
 		report, runErr = Interview(context.Background(), c, d, "Sol Ring", InterviewRequest{
+			Endpoint:  live,
 			Requested: stance,
 			Deps:      tools.Deps{Pool: c},
 			Limit:     &Collaborator,
@@ -251,7 +258,7 @@ func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
 // failure), and nothing anywhere in the payload argues FOR the card.
 func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
+	live := liveOrSkip(t)
 	d := fixtureDeck(t, "kaheera")
 	stance, err := Preset("second-opinion")
 	if err != nil {
@@ -261,6 +268,7 @@ func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
 	withPool(t, func(c *pool.Conn) {
 		var runErr error
 		report, runErr = Argue(context.Background(), c, d, "Sol Ring", ArgueRequest{
+			Endpoint:  live,
 			Requested: stance,
 			Deps:      tools.Deps{Pool: c},
 			Limit:     &Collaborator,
@@ -359,14 +367,15 @@ func withRealPool(t *testing.T, fn func(c *pool.Conn)) {
 // dossier was stored, because that is the row the deck page will serve.
 func TestLiveTheDossierCitesPagesItActuallyRead(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
+	live := liveOrSkip(t)
 	d := fixtureDeck(t, "kaheera")
 	store := scratchStore(t)
 	var report DossierReport
 	withRealPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
 		plan, err := CheckDossier(ctx, c, "kaheera", d, DossierRequest{
-			Requested: "second-opinion", Store: store, Limit: &Collaborator})
+			Requested: "second-opinion", Store: store, Limit: &Collaborator,
+			Endpoint: live})
 		if err != nil {
 			t.Fatalf("the plan failed: %v", err)
 		}
@@ -431,10 +440,10 @@ func TestLiveTheDossierCitesPagesItActuallyRead(t *testing.T) {
 // answered from pages the search returned, with every finding resting on one.
 func TestLiveResearchAnswersFromPagesItRead(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
+	live := liveOrSkip(t)
 	plan, err := CheckResearch(
 		"Why is Primeval Titan banned in Commander, and when was it banned?",
-		nil, "", &Collaborator)
+		nil, "", &Collaborator, live)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,14 +531,14 @@ func liveSlots(t *testing.T) []Slot {
 // observed against a real model's output.
 func TestLiveTheThemeTurnAsksAboutThePerson(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
+	live := liveOrSkip(t)
 	slots := liveSlots(t)
 	raw := make([]any, 0, len(slots))
 	for _, s := range slots {
 		raw = append(raw, map[string]any{"kind": s.Kind, "value": s.Value, "quote": s.Quote})
 	}
 	plan, err := CheckAsk(transcriptAsAny(liveTranscript), raw, "second-opinion",
-		nil, nil, nil, "", &Collaborator)
+		nil, nil, nil, "", &Collaborator, live)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,14 +599,14 @@ func TestLiveTheThemeTurnAsksAboutThePerson(t *testing.T) {
 // opt-in.
 func TestLiveTheThemeProposalNamesRealCommanders(t *testing.T) {
 	t.Parallel()
-	liveOrSkip(t)
+	live := liveOrSkip(t)
 	slots := liveSlots(t)
 	raw := make([]any, 0, len(slots))
 	for _, s := range slots {
 		raw = append(raw, map[string]any{"kind": s.Kind, "value": s.Value, "quote": s.Quote})
 	}
 	plan, err := CheckProposal(transcriptAsAny(liveTranscript), raw, "second-opinion",
-		nil, "", nil, nil, "", &Collaborator)
+		nil, "", nil, nil, "", &Collaborator, live)
 	if err != nil {
 		t.Fatal(err)
 	}

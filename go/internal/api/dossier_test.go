@@ -17,6 +17,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
+
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 )
 
 // The dossier's two routes. `internal/claude` holds the mode to a corpus; what
@@ -41,7 +43,7 @@ type jobRig struct {
 	close func()
 }
 
-func newJobRig(t *testing.T) *jobRig {
+func newJobRig(t *testing.T, set claude.Settings) *jobRig {
 	t.Helper()
 	decks := decksDir(t)
 	// A deck with no commander, for the 422 that must come before any job.
@@ -66,6 +68,7 @@ func newJobRig(t *testing.T) *jobRig {
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	reg := jobs.New(jobs.Config{Logger: quiet})
 	a := New(Config{
+		Claude: set,
 		Logger: quiet, Pool: pooltest.Open(t), DecksDir: decks, AdminEmail: "alice@example.com",
 		AppDB: db, AppWriteDB: recorder.DB(), Recorder: recorder,
 		ClaudeLedger: ledger.RecorderFrom(recorder.DB(), nil), Jobs: reg,
@@ -120,8 +123,8 @@ const wholeDossier = `{"who":{"prose":"A bear of Qal Sisma.","source_ids":["s1"]
 // ---- the free half ------------------------------------------------------
 
 func TestTheCachedDossierIsFreeAndShapedAsRecorded(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "GET", dossierAt, "")
 	if status != 200 {
@@ -161,8 +164,8 @@ func TestTheCachedDossierIsFreeAndShapedAsRecorded(t *testing.T) {
 // ---- what is refused, and before any job --------------------------------
 
 func TestADossierRefusesWhatItCanBeforeAnyJob(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	for _, row := range []struct {
 		path, body string
@@ -195,8 +198,8 @@ func TestADossierRefusesWhatItCanBeforeAnyJob(t *testing.T) {
 // A stance of off needs no key: it is decided before the key is asked for,
 // and it costs nothing, so it is answered now as a job that took no time.
 func TestAtStanceOffTheDossierIsAJobBornFinishedEvenWithNoKey(t *testing.T) {
-	noCredential(t)
-	rig := newJobRig(t)
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", dossierAt, `{"stance":"off"}`)
 	if status != 200 {
@@ -222,8 +225,8 @@ func TestAtStanceOffTheDossierIsAJobBornFinishedEvenWithNoKey(t *testing.T) {
 func TestWritingADossierIsAJobWhoseResultIsTheReport(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("The Real Page")+","+said(wholeDossier))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 
 	status, payload, raw := callAs(t, rig.api, alice, "POST", dossierAt, `{}`)
@@ -324,8 +327,8 @@ func TestWritingADossierIsAJobWhoseResultIsTheReport(t *testing.T) {
 func TestTwoAsksInFlightAreOneDossierJob(t *testing.T) {
 	api := &scriptedClaude{hold: make(chan struct{}), replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(wholeDossier))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 
 	_, first, raw := callAs(t, rig.api, alice, "POST", dossierAt, `{}`)
@@ -346,9 +349,10 @@ func TestTwoAsksInFlightAreOneDossierJob(t *testing.T) {
 // in the job's error field is the whole of what a person gets to debug from
 // -- and it is `Explain`'s sentence, bare, as the record has it.
 func TestAFailedDossierCallIsAReadableJobError(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{"!401"}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	status, payload, raw := callAs(t, rig.api, alice, "POST", dossierAt, `{}`)
 	if status != 200 {
@@ -370,14 +374,15 @@ func TestAFailedDossierCallIsAReadableJobError(t *testing.T) {
 // The turn ceiling is the recorded exhaustion sentence, full stop included
 // and nothing in front of it.
 func TestAnExhaustedDossierRecordsTheRecordedSentence(t *testing.T) {
+	t.Parallel()
 	replies := make([]string, 8)
 	for i := range replies {
 		replies[i] = answer("tool_use", fmt.Sprintf(
 			`{"type":"tool_use","id":"tu_%d","name":"get_cards","input":{"names":["Sol Ring"]}}`, i))
 	}
 	api := &scriptedClaude{replies: replies}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, payload, _ := callAs(t, rig.api, alice, "POST", dossierAt, `{}`)
 	done, _ := rig.await(t, payload["id"].(string))
@@ -393,8 +398,8 @@ func TestAnExhaustedDossierRecordsTheRecordedSentence(t *testing.T) {
 func TestTheDossierRecordsUnderItsOwnMode(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(wholeDossier))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	_, payload, _ := callAs(t, rig.api, alice, "POST", dossierAt, `{}`)
 	_, _ = rig.await(t, payload["id"].(string))
@@ -424,8 +429,8 @@ func TestTheDossierRecordsUnderItsOwnMode(t *testing.T) {
 func TestTheDossierJobStoresAfterTheRequestHasGone(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(wholeDossier))}}
-	api.start(t)
-	rig := newJobRig(t)
+	claudeSet := api.start(t)
+	rig := newJobRig(t, claudeSet)
 	defer rig.close()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// No mux in front of the handler here, so the path values the door

@@ -31,7 +31,7 @@ func claudeCheckCommand() *cobra.Command {
 		Short: "One real call, so \"is the pipe open\" is a command rather than a guess",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			report := claude.Check(cmd.Context(), "")
+			report := claude.Check(cmd.Context(), claude.EndpointFromEnv(), "")
 			fmt.Printf("  model     %s\n", report.Model)
 			if !report.OK {
 				fmt.Println("  status    unavailable")

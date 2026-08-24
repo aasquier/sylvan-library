@@ -62,14 +62,14 @@ var dialSurfaces = map[string]bool{"theme": true, "research": true, "scan": true
 // surface meant editing two places, and the day `scan` arrived neither was
 // edited. A literal here would be a third copy of an answer three other
 // files already give.
-func surfaceStanceFor(surface string, requested any) (Stance, error) {
+func surfaceStanceFor(surface string, requested any, limit *Stance) (Stance, error) {
 	switch surface {
 	case "research":
-		return ResearchStanceFor(requested, nil)
+		return ResearchStanceFor(requested, limit)
 	case "scan":
-		return ScanStanceFor(requested, nil)
+		return ScanStanceFor(requested, limit)
 	default:
-		return ThemeStanceFor(requested, nil)
+		return ThemeStanceFor(requested, limit)
 	}
 }
 
@@ -84,9 +84,9 @@ func surfaceStanceFor(surface string, requested any) (Stance, error) {
 // Note the asymmetry with `DefaultFor`, which answers `Consultant` for a nil
 // deck: that is the right answer to "what does a deck default to" and the
 // wrong one here, so this checks for the deck first.
-func DialDefault(deck DeckStatused, surface string) Stance {
+func DialDefault(deck DeckStatused, surface string, limit *Stance) Stance {
 	if deck == nil && dialSurfaces[surface] {
-		s, err := surfaceStanceFor(surface, nil)
+		s, err := surfaceStanceFor(surface, nil, limit)
 		if err != nil {
 			// Unreachable with a nil request -- neither surface parses
 			// anything on that path -- and `Off` rather than a panic if it
@@ -222,18 +222,22 @@ func nonNil(in []string) []string {
 //
 // Returns an error only for a stance that will not read, which is the caller's
 // 422. Nothing else here can fail.
-func Status(requested any, deck DeckStatused, surface string) (Dial, error) {
+func Status(requested any, deck DeckStatused, surface string, set Settings) (Dial, error) {
 	var effective Stance
 	var err error
+	// Both of these take the deployment's ceiling rather than looking one up:
+	// passing nil here would let each fall back to the package default, and
+	// the dial would then report a stance more permissive than the deployment
+	// actually honours -- which is the wrong direction for that mistake.
 	if deck == nil && dialSurfaces[surface] {
-		effective, err = surfaceStanceFor(surface, requested)
+		effective, err = surfaceStanceFor(surface, requested, set.Ceiling)
 	} else {
-		effective, err = Resolve(requested, deck, nil)
+		effective, err = Resolve(requested, deck, set.Ceiling)
 	}
 	if err != nil {
 		return Dial{}, err
 	}
-	limit := Ceiling()
+	limit := set.ceiling()
 	presets := make([]DialPreset, 0, len(PresetNames))
 	for _, name := range PresetNames {
 		preset, presetErr := Preset(name)
@@ -255,17 +259,17 @@ func Status(requested any, deck DeckStatused, surface string) (Dial, error) {
 		// the client reads it, and true is the truth everywhere this door
 		// runs.
 		Installed:  true,
-		Configured: CredentialPresent(),
+		Configured: set.Endpoint.Present(),
 		// `ModelFor` with **no tier**: the house answer, not this seat's.
 		// The dial does not pass the caller's tier even though every mode
 		// route does, so an account on a non-default tier is told the house
 		// model here. Recorded; the field is on the wire and nothing renders
 		// it.
-		Model:   ModelFor(""),
+		Model:   set.Endpoint.ModelFor(""),
 		Stance:  Describe(effective),
 		Ceiling: Describe(limit),
 		// The same question the effective stance just answered with no pin.
-		Default: Describe(DialDefault(deck, surface)),
+		Default: Describe(DialDefault(deck, surface, set.Ceiling)),
 		Presets: presets,
 		Never:   DialNever,
 		Modes:   DialModes(),

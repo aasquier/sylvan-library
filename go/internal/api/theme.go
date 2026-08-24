@@ -83,7 +83,7 @@ func (a *API) claudeTheme(w http.ResponseWriter, r *http.Request) {
 		// The facts already shown, client-held like the transcript, so "never
 		// give the same fact twice" is enforceable rather than aspirational.
 		body["facts"],
-		auth.ScopeFrom(r.Context()).ModelTier, nil)
+		auth.ScopeFrom(r.Context()).ModelTier, a.claude.Ceiling, a.claude.Endpoint)
 	if a.refuseTheme(w, "theme ask", err) {
 		return
 	}
@@ -99,7 +99,7 @@ func (a *API) claudeTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	// Raised here rather than inside a job that was never going to work, which
 	// preserves the 503 the UI already handles.
-	if err := claude.Require(); err != nil {
+	if err := a.claude.Endpoint.Require(); err != nil {
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
@@ -135,7 +135,7 @@ func (a *API) claudeThemeProposal(w http.ResponseWriter, r *http.Request) {
 	plan, err := claude.CheckProposal(body["transcript"], body["slots"],
 		orNil(body["stance"]), budget, strOr(body, "avoid"),
 		orNil(body["persona"]), body["seed"],
-		auth.ScopeFrom(r.Context()).ModelTier, nil)
+		auth.ScopeFrom(r.Context()).ModelTier, a.claude.Ceiling, a.claude.Endpoint)
 	if a.refuseTheme(w, "theme proposal", err) {
 		return
 	}
@@ -146,7 +146,7 @@ func (a *API) claudeThemeProposal(w http.ResponseWriter, r *http.Request) {
 			Result: *plan.Answer, Lane: jobs.NET})
 		return
 	}
-	if err := claude.Require(); err != nil {
+	if err := a.claude.Endpoint.Require(); err != nil {
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
@@ -185,7 +185,7 @@ func (a *API) submitTheme(w http.ResponseWriter, r *http.Request, kind, label st
 				return runErr
 			})
 			if err != nil {
-				return nil, claudeJobError(err)
+				return nil, claudeJobError(err, a.claude.Endpoint.ModelFor(""))
 			}
 			return report, nil
 		},

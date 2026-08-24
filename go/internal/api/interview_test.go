@@ -47,7 +47,12 @@ type scriptedClaude struct {
 	mu sync.Mutex
 }
 
-func (s *scriptedClaude) start(t *testing.T) {
+// start stands the stub up and returns the [claude.Settings] pointing at it.
+//
+// **Returned rather than installed**: this used to publish the URL through
+// ANTHROPIC_BASE_URL, one slot for the whole process, so two stubs could never
+// coexist and every test using one was serial (ADR 39).
+func (s *scriptedClaude) start(t *testing.T) claude.Settings {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -78,11 +83,7 @@ func (s *scriptedClaude) start(t *testing.T) {
 		_, _ = w.Write([]byte(reply))
 	}))
 	t.Cleanup(srv.Close)
-	t.Setenv("ANTHROPIC_BASE_URL", srv.URL)
-	t.Setenv("ANTHROPIC_API_KEY", "test-key-not-a-real-one")
-	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
-	t.Setenv("MTGLAB_CLAUDE_MODEL", "")
-	t.Setenv("MTGLAB_CLAUDE_STANCE_CEILING", "")
+	return claude.Settings{Endpoint: claude.EndpointAt(srv.URL, "test-key-not-a-real-one")}
 }
 
 // answer is one scripted Message response.
@@ -96,26 +97,26 @@ func answer(stop, content string) string {
 
 func said(s string) string { return fmt.Sprintf(`{"type":"text","text":%q}`, s) }
 
-// noCredential is an instance nobody has given a key to, which is CI. Set
-// explicitly
-// because this machine's shell may well have one.
-func noCredential(t *testing.T) {
-	t.Helper()
-	t.Setenv("ANTHROPIC_API_KEY", "")
-	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
-	t.Setenv("MTGLAB_CLAUDE_STANCE_CEILING", "")
-}
+// noCredential is an instance nobody has given a key to, which is CI.
+//
+// A value now. This used to blank the two ANTHROPIC variables on the process
+// "because this machine's shell may well have one" -- a test defending against
+// the developer who ran it. The zero [claude.Settings] cannot be reached by any
+// shell, so there is nothing left to defend against, and the tests that use it
+// run in parallel (ADR 39).
+var noCredential = claude.Settings{}
 
 // deckAPIWithLog is deckAPI with somewhere to read the logs from, which one
 // test needs because the thing it asserts is what the operator sees rather
 // than what the caller gets.
-func deckAPIWithLog(t *testing.T, into *bytes.Buffer) (*API, func()) {
+func deckAPIWithLog(t *testing.T, set claude.Settings, into *bytes.Buffer) (*API, func()) {
 	t.Helper()
 	db, err := auth.Open(appDB(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	a := New(Config{
+		Claude:   set,
 		Logger:   slog.New(slog.NewTextHandler(into, &slog.HandlerOptions{Level: slog.LevelDebug})),
 		Pool:     pooltest.Open(t),
 		DecksDir: decksDir(t), AdminEmail: "alice@example.com", AppDB: db,
@@ -128,8 +129,8 @@ const kaheera = "/api/decks/alice/kaheera/interview"
 // ---- what is refused, and in what order ---------------------------------
 
 func TestTheInterviewNeedsACard(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	for _, body := range []string{`{}`, `{"card":""}`, `{"card":"   "}`} {
 		status, payload, raw := callAs(t, a, alice, "POST", kaheera, body)
@@ -148,8 +149,8 @@ func TestTheInterviewNeedsACard(t *testing.T) {
 // answer is still a 422, with a different sentence, and the sentence is the
 // contract.
 func TestANullCardIsTheFourLetterStringNone(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera, `{"card":null}`)
 	if status != 422 {
@@ -163,8 +164,8 @@ func TestANullCardIsTheFourLetterStringNone(t *testing.T) {
 }
 
 func TestTheInterviewRefusesACardTheDeckDoesNotRun(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera, `{"card":"Black Lotus"}`)
 	if status != 422 {
@@ -193,8 +194,8 @@ func TestTheInterviewRefusesACardTheDeckDoesNotRun(t *testing.T) {
 // What was always asserted as correct is the sentence: the parser's own words,
 // so a person reads "'emperor' is not a stance preset" either way.
 func TestAMalformedStanceIsThe422TheRulingMade(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera,
 		`{"card":"Sol Ring","stance":"emperor"}`)
@@ -215,8 +216,8 @@ func TestAMalformedStanceIsThe422TheRulingMade(t *testing.T) {
 // The deck is resolved through `Library` like every other per-deck route, so a
 // deck bob cannot see is a 404 and never a 403 (ADR 5).
 func TestTheInterviewIs404ForADeckTheCallerCannotSee(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, _, raw := callAs(t, a, bob, "POST", "/api/decks/bob/kaheera/interview",
 		`{"card":"Sol Ring"}`)
@@ -228,8 +229,8 @@ func TestTheInterviewIs404ForADeckTheCallerCannotSee(t *testing.T) {
 // The body is read before the deck -- the recorded order: the body is
 // validated before the owner is resolved.
 func TestAMissingCardIsAnsweredBeforeAMissingDeck(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST",
 		"/api/decks/alice/no-such-deck/interview", `{}`)
@@ -252,8 +253,8 @@ func TestAMissingCardIsAnsweredBeforeAMissingDeck(t *testing.T) {
 // A `strings.Contains(detail, "ANTHROPIC_API_KEY")` check passed both
 // spellings, which is exactly how it survived until a wire diff found it.
 func TestWithNoKeyTheInterviewIs503(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera, `{"card":"Sol Ring"}`)
 	if status != 503 {
@@ -272,8 +273,8 @@ func TestWithNoKeyTheInterviewIs503(t *testing.T) {
 // reason, on an instance with no key at all. Not an empty question list that
 // looks like the model had nothing to say.
 func TestAtStanceOffNoCallIsMadeAndTheReportSaysSo(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera,
 		`{"card":"Sol Ring","stance":"off"}`)
@@ -297,8 +298,8 @@ func TestTheReportReachesTheWireInTheRecordedOrder(t *testing.T) {
 		`{"questions":[{"question":"What does it accelerate into?","angle":"curve","fact":"ramp holds 1 slot"},`+
 			`{"question":"Would a Signet do?","angle":"alternatives","fact":"colour identity is G"},`+
 			`{"not a question":true,"question":"It is simply good.","angle":"a","fact":"b"}]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	status, payload, raw := callAs(t, a, alice, "POST", kaheera, `{"card":"Sol Ring"}`)
@@ -353,8 +354,8 @@ func TestTheReportReachesTheWireInTheRecordedOrder(t *testing.T) {
 func TestTheModelIsHandedTheDecksOwnFacts(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"questions":[]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	if status, _, raw := callAs(t, a, alice, "POST", kaheera, `{"card":"Sol Ring","focus":"is it too slow"}`); status != 200 {
@@ -406,8 +407,8 @@ func TestTheToolsSeeTheCallersOwnLibrary(t *testing.T) {
 		answer("tool_use", `{"type":"tool_use","id":"tu_1","name":"get_deck","input":{"slug":"kaheera"}}`),
 		answer("end_turn", said(`{"questions":[]}`)),
 	}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	// bob reading alice's shared deck: the tool must answer over alice's
@@ -437,8 +438,8 @@ func TestTheToolsSeeTheCallersOwnLibrary(t *testing.T) {
 // falsy value as "none was asked for", so the deck's own default answers. A
 // route that passed it through would refuse an empty form field as a typo.
 func TestAFalsyStanceFallsBackToTheDecksDefault(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	for _, body := range []string{
 		`{"card":"Sol Ring","stance":""}`,
@@ -459,8 +460,8 @@ func TestAFalsyStanceFallsBackToTheDecksDefault(t *testing.T) {
 // nothing had ever driven through a route: `readBody` decodes to
 // `map[string]any`, a different arm of `StanceFromObj` entirely.
 func TestAStanceMayArriveAsAnObjectOfAxes(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	// Valid axes: resolved, then no key -- 503, not 422.
 	status, _, raw := callAs(t, a, alice, "POST", kaheera,
@@ -487,8 +488,8 @@ func TestAStanceMayArriveAsAnObjectOfAxes(t *testing.T) {
 func TestATieredSeatIsAskedOfItsOwnModel(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"questions":[]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	seated := alice
@@ -516,9 +517,9 @@ func TestATieredSeatIsAskedOfItsOwnModel(t *testing.T) {
 // mutation run said out loud. Now the branch answers 422 as well, and this
 // test still says what it is for.
 func TestAClientsTypoIsNotLoggedAsAFailure(t *testing.T) {
-	noCredential(t)
+	t.Parallel()
 	var logged bytes.Buffer
-	a, done := deckAPIWithLog(t, &logged)
+	a, done := deckAPIWithLog(t, noCredential, &logged)
 	defer done()
 
 	if status, _, raw := callAs(t, a, alice, "POST", kaheera,
@@ -535,8 +536,8 @@ func TestAClientsTypoIsNotLoggedAsAFailure(t *testing.T) {
 	// Several, because the SDK retries a 5xx before giving up; the script
 	// running out is itself a test failure, so this cannot pass by accident.
 	api := &scriptedClaude{replies: []string{"!500", "!500", "!500", "!500", "!500"}}
-	api.start(t)
-	b, doneB := deckAPIWithLog(t, &logged)
+	claudeSet := api.start(t)
+	b, doneB := deckAPIWithLog(t, claudeSet, &logged)
 	defer doneB()
 	if status, _, raw := callAs(t, b, alice, "POST", kaheera, `{"card":"Sol Ring"}`); status != 502 {
 		t.Fatalf("%d %s", status, raw)
@@ -553,9 +554,9 @@ func TestAClientsTypoIsNotLoggedAsAFailure(t *testing.T) {
 func TestTheInterviewRecordsWhatItSpent(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"questions":[]}`))}}
-	api.start(t)
+	claudeSet := api.start(t)
 
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, claudeSet)
 	if status, _, raw := callAs(t, rig.api, alice, "POST",
 		"/api/decks/alice/kaheera/interview", `{"card":"Sol Ring"}`); status != 200 {
 		t.Fatalf("%d %s", status, raw)
@@ -573,8 +574,8 @@ func TestTheInterviewRecordsWhatItSpent(t *testing.T) {
 }
 
 func TestAConversationThatNeverHappenedIsNotRecorded(t *testing.T) {
-	noCredential(t)
-	rig := newWriteRig(t)
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
 	if status, _, raw := callAs(t, rig.api, alice, "POST",
 		"/api/decks/alice/kaheera/interview", `{"card":"Sol Ring","stance":"off"}`); status != 200 {
 		t.Fatalf("%d %s", status, raw)

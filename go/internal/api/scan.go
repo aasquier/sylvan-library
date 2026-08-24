@@ -119,7 +119,7 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
-	stance, err := claude.ScanStanceFor(requested, nil)
+	stance, err := claude.ScanStanceFor(requested, a.claude.Ceiling)
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -134,7 +134,7 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 	// Raised here rather than a minute into a job that was never going to
 	// work. `Require` and not `Connect`, for the reason themeruns gives: this
 	// only needs to know *whether* a call is possible.
-	if err := claude.Require(); err != nil {
+	if err := a.claude.Endpoint.Require(); err != nil {
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
@@ -151,6 +151,7 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 				return nil, err
 			}
 			turn, err := claude.Converse(ctx, mode, claude.Request{
+				Endpoint: a.claude.Endpoint,
 				Messages: []anthropic.MessageParam{ask},
 				Stance:   stance,
 				// **No deps at all, and the nil is the contract.** This mode
@@ -163,7 +164,7 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 				OnTurn: func(done, max int) { rep.Report(done, max) },
 			})
 			if err != nil {
-				return nil, claudeJobError(err)
+				return nil, claudeJobError(err, a.claude.Endpoint.ModelFor(""))
 			}
 			seen := claude.ScanSighting(turn)
 			out := scanResult{Transcribed: seen, Refused: turn.Refused, Model: turn.Model}

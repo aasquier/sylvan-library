@@ -66,7 +66,7 @@ func (a *API) claudeDossierCached(w http.ResponseWriter, r *http.Request) {
 	var payload any
 	err = a.withPool(r.Context(), func(c *pool.Conn) error {
 		var readErr error
-		payload, readErr = claude.ReadCachedDossier(r.Context(), c, slug, d, a.dossierStore())
+		payload, readErr = claude.ReadCachedDossier(r.Context(), c, slug, d, a.dossierStore(), a.claude.Endpoint)
 		return readErr
 	})
 	if a.refuse(w, "dossier", err) {
@@ -102,6 +102,8 @@ func (a *API) claudeDossier(w http.ResponseWriter, r *http.Request) {
 		Refresh:   truthy(body["refresh"]),
 		Tier:      auth.ScopeFrom(r.Context()).ModelTier,
 		Store:     a.dossierStore(),
+		Limit:     a.claude.Ceiling,
+		Endpoint:  a.claude.Endpoint,
 	}
 	var plan *claude.DossierPlan
 	err = a.withPool(r.Context(), func(c *pool.Conn) error {
@@ -122,7 +124,7 @@ func (a *API) claudeDossier(w http.ResponseWriter, r *http.Request) {
 	}
 	// Raised here rather than four minutes into a job that was never going to
 	// work, which preserves the 503 the UI already handles.
-	if err := claude.Require(); err != nil {
+	if err := a.claude.Endpoint.Require(); err != nil {
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
@@ -155,7 +157,7 @@ func (a *API) claudeDossier(w http.ResponseWriter, r *http.Request) {
 				return runErr
 			})
 			if err != nil {
-				return nil, claudeJobError(err)
+				return nil, claudeJobError(err, a.claude.Endpoint.ModelFor(""))
 			}
 			return report, nil
 		},
@@ -205,9 +207,9 @@ func (a *API) leasePool(ctx context.Context, fn func(c *pool.Conn) error) error 
 // between the check and the worker, and `claude.Explain` for everything else
 // -- the function that turns a 401 into "your key may have expired" rather
 // than a stack trace in a job's error field.
-func claudeJobError(err error) error {
+func claudeJobError(err error, model string) error {
 	if errors.Is(err, claude.ErrModeExhausted) || errors.Is(err, claude.ErrUnavailable) {
 		return err
 	}
-	return errors.New(claude.Explain(err))
+	return errors.New(claude.Explain(err, model))
 }

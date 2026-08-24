@@ -76,6 +76,8 @@ func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
 	err = a.withPool(r.Context(), func(c *pool.Conn) error {
 		var runErr error
 		report, runErr = claude.Argue(r.Context(), c, d, card, claude.ArgueRequest{
+			Endpoint:  a.claude.Endpoint,
+			Limit:     a.claude.Ceiling,
 			Requested: requested,
 			Focus:     focus,
 			Deps:      tools.Deps{Source: src, Pool: c},
@@ -239,7 +241,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
-	effective, err := claude.Resolve(requested, claude.DeckWithStatus(d.Status), nil)
+	effective, err := claude.Resolve(requested, claude.DeckWithStatus(d.Status), a.claude.Ceiling)
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -259,7 +261,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	}
 	// Raised here rather than minutes into a sweep that was never going to
 	// work, which preserves the 503 the UI already handles.
-	if err := claude.Require(); err != nil {
+	if err := a.claude.Endpoint.Require(); err != nil {
 		wire.Detail(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
@@ -277,6 +279,8 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 
 	tier := auth.ScopeFrom(r.Context()).ModelTier
 	ledgerOf := a.claudeLedger
+	endpoint := a.claude.Endpoint
+	ceiling := a.claude.Ceiling
 	a.submit(w, r, jobs.Plan{
 		Kind: ArgueSweepKind, Label: label, Lane: jobs.NET, Key: key,
 		Run: func(rep jobs.Progress) (any, error) {
@@ -292,6 +296,11 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 				runErr := a.withPool(ctx, func(c *pool.Conn) error {
 					var argueErr error
 					report, argueErr = claude.Argue(ctx, c, d, name, claude.ArgueRequest{
+						// Captured at plan time with everything else the job
+						// carries: a sweep outlives the request that knew who
+						// was asking.
+						Endpoint:  endpoint,
+						Limit:     ceiling,
 						Requested: requested,
 						Deps:      tools.Deps{Source: src, Pool: c},
 						Tier:      tier,
@@ -300,10 +309,16 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 					return argueErr
 				})
 				if errors.Is(runErr, claude.ErrUnavailable) {
-					// The key vanished mid-sweep. Every remaining card fails
-					// the same way, so say so once each and stop spending time
-					// on it.
-					errs = append(errs, wire.KV{Key: name, Value: claude.Explain(runErr)})
+					// Defence in depth, and no longer reachable: the endpoint
+					// is a value captured before this job was made (ADR 39), so
+					// the credential it holds cannot go away underneath the
+					// loop. It used to be able to -- `Connect` re-read the
+					// environment on every card -- and the branch is kept
+					// because a sweep that somehow lost its endpoint should
+					// still stop rather than make the same doomed call once per
+					// slot. The reachable check is the `Require` above, before
+					// the job is submitted at all.
+					errs = append(errs, wire.KV{Key: name, Value: claude.Explain(runErr, endpoint.ModelFor(""))})
 					for _, rest := range ordered[i+1:] {
 						errs = append(errs, wire.KV{Key: rest,
 							Value: "not attempted: the credential went away"})
@@ -313,7 +328,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 				}
 				if runErr != nil {
 					// One bad call must not cost the rest of the sweep.
-					errs = append(errs, wire.KV{Key: name, Value: claude.Explain(runErr)})
+					errs = append(errs, wire.KV{Key: name, Value: claude.Explain(runErr, endpoint.ModelFor(""))})
 				} else {
 					reports = append(reports, report)
 				}

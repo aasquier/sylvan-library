@@ -46,7 +46,13 @@ type scriptedAPI struct {
 	served   int
 }
 
-func (s *scriptedAPI) start(t *testing.T) {
+// start stands the stub up and returns the [Endpoint] pointing at it.
+//
+// **Returning it rather than installing it is the whole point.** This used to
+// publish the URL through ANTHROPIC_BASE_URL, which is one slot for the whole
+// process -- so two stubs could not coexist and every test that used one was
+// serial (ADR 39). Each caller now gets its own.
+func (s *scriptedAPI) start(t *testing.T) Endpoint {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -74,9 +80,7 @@ func (s *scriptedAPI) start(t *testing.T) {
 		_, _ = w.Write([]byte(reply))
 	}))
 	t.Cleanup(srv.Close)
-	t.Setenv("ANTHROPIC_BASE_URL", srv.URL)
-	t.Setenv("ANTHROPIC_API_KEY", "test-key-not-a-real-one")
-	t.Setenv(modelEnv, "")
+	return EndpointAt(srv.URL, "test-key-not-a-real-one")
 }
 
 // reply builds one Message response body.
@@ -185,15 +189,16 @@ func scratchLedger(t *testing.T) (*ledger.Recorder, string) {
 // project's own worst failure mode wearing a different hat -- the Forge run
 // that plays on with 96 cards and reports a plausible winner.
 func TestAPausedTurnIsResumedAndNeverReturned(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "pause_turn", container: "cont_1",
 			content: textBlock("Here is the complete answer.") + "," + searchOK("https://a")}.json(),
 		reply{stop: "end_turn",
 			content: textBlock("The actual answer.")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 
-	turn, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)})
+	turn, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)})
 	if err != nil {
 		t.Fatalf("converse: %v", err)
 	}
@@ -227,15 +232,16 @@ func TestAPausedTurnIsResumedAndNeverReturned(t *testing.T) {
 // request carrying the first turn's blocks is refused unless the container
 // rides along. It must NOT ride along before one exists.
 func TestTheContainerRidesAlongOnceAServerToolHasRun(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "tool_use", container: "cont_7",
 			content: searchOK("https://a") + "," + toolUse("tu_2", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 
-	if _, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+	if _, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 	if len(api.requests) != 3 {
@@ -255,13 +261,14 @@ func TestTheContainerRidesAlongOnceAServerToolHasRun(t *testing.T) {
 
 // A container, once issued, keeps riding even on a turn that reports none.
 func TestTheContainerIsKeptWhenATurnReportsNone(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", container: "cont_7", content: toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "tool_use", content: toolUse("tu_2", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
-	if _, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+	ep := api.start(t)
+	if _, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 	for i := 1; i < 3; i++ {
@@ -307,14 +314,15 @@ func countMarkers(t *testing.T, req map[string]any) (system int, onResults []str
 // -- and the earlier breakpoints keep working as read points once the marker
 // itself has gone.
 func TestTheConversationCacheMarkerMovesRatherThanAccumulating(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "tool_use", content: toolUse("tu_2", "list_decks", "{}")}.json(),
 		reply{stop: "tool_use", content: toolUse("tu_3", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
-	if _, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+	ep := api.start(t)
+	if _, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 
@@ -420,12 +428,13 @@ func TestTheToolsBlockIsByteStable(t *testing.T) {
 // same request -- which is what this asserts, rather than the comment claiming
 // it.
 func TestTheSystemBreakpointIsPresentOnEveryRequest(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
-	if _, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+	ep := api.start(t)
+	if _, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 	for i, req := range api.requests {
@@ -444,14 +453,15 @@ func TestTheSystemBreakpointIsPresentOnEveryRequest(t *testing.T) {
 // unedited -- a turn that stripped them would be replaying a different
 // conversation than the one the model had.
 func TestThinkingBlocksAreReplayedUnedited(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use",
 			content: thinkingBlock() + "," + toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	if _, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 	msgs, _ := api.requests[1]["messages"].([]any)
@@ -479,11 +489,12 @@ func TestThinkingBlocksAreReplayedUnedited(t *testing.T) {
 // empty page list, and they want different answers. On success the content is
 // a list; on failure it is a single error object.
 func TestAFailedSearchIsNotAnEmptyOne(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "end_turn", content: searchErr("max_uses_exceeded") + "," + textBlock("hm")}.json(),
 	}}
-	api.start(t)
-	turn, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)})
+	ep := api.start(t)
+	turn, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)})
 	if err != nil {
 		t.Fatalf("converse: %v", err)
 	}
@@ -497,13 +508,14 @@ func TestAFailedSearchIsNotAnEmptyOne(t *testing.T) {
 }
 
 func TestSearchPagesAreDeduplicatedOnURL(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: searchOK("https://a", "https://b") + "," +
 			toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: searchOK("https://b", "https://c") + "," + textBlock("done")}.json(),
 	}}
-	api.start(t)
-	turn, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)})
+	ep := api.start(t)
+	turn, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)})
 	if err != nil {
 		t.Fatalf("converse: %v", err)
 	}
@@ -522,13 +534,14 @@ func TestSearchPagesAreDeduplicatedOnURL(t *testing.T) {
 // A refusal can carry an empty content list. Reading content first is how this
 // becomes a panic instead of a message somebody can act on.
 func TestARefusalWithNoContentIsAnAnswerAndNotAPanic(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "refusal", content: "", in: 11, out: 3}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	led, ledPath := scratchLedger(t)
 	turn, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t), Ledger: led})
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t), Ledger: led})
 	if err != nil {
 		t.Fatalf("converse: %v", err)
 	}
@@ -547,13 +560,14 @@ func TestARefusalWithNoContentIsAnAnswerAndNotAPanic(t *testing.T) {
 // model's move is to ask differently. A refused write in particular should read
 // as "that door does not exist" rather than ending the conversation.
 func TestARefusedToolIsATurnAndNotTheEnd(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: toolUse("tu_1", "set_card_field",
 			`{"slug":"gyome","card":"Bake into a Pie","field":"why","value":"because"}`)}.json(),
 		reply{stop: "end_turn", content: textBlock("understood")}.json(),
 	}}
-	api.start(t)
-	turn, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)})
+	ep := api.start(t)
+	turn, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)})
 	if err != nil {
 		t.Fatalf("a refused tool ended the conversation: %v", err)
 	}
@@ -578,13 +592,14 @@ func TestARefusedToolIsATurnAndNotTheEnd(t *testing.T) {
 // that failed -- which is all the refusal owes it, since the recovery is to
 // call list_decks and ask again.
 func TestAMissingDeckIsRecoverableAndNamesTheSlug(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: toolUse("tu_1", "get_deck", `{"slug":"no-such-deck"}`)}.json(),
 		reply{stop: "end_turn", content: textBlock("ok")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	if _, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t), Deps: tools.Deps{Source: emptySource{}}}); err != nil {
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t), Deps: tools.Deps{Source: emptySource{}}}); err != nil {
 		t.Fatalf("a missing deck ended the conversation: %v", err)
 	}
 	if body := api.raw[1]; !strings.Contains(body, "DeckNotFound: no-such-deck") {
@@ -598,17 +613,18 @@ func TestAMissingDeckIsRecoverableAndNamesTheSlug(t *testing.T) {
 // A mode that has not finished by the ceiling is looping rather than working.
 // Handing back the last turn's text is the failure this refuses to commit.
 func TestTheTurnCeilingIsAnErrorAndNotAnAnswer(t *testing.T) {
+	t.Parallel()
 	replies := make([]string, 6)
 	for i := range replies {
 		replies[i] = reply{stop: "tool_use", in: 10, out: 2,
 			content: toolUse(fmt.Sprintf("tu_%d", i), "list_decks", "{}")}.json()
 	}
 	api := &scriptedAPI{replies: replies}
-	api.start(t)
+	ep := api.start(t)
 	led, ledPath := scratchLedger(t)
 
 	_, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t), Ledger: led})
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t), Ledger: led})
 	if !errors.Is(err, ErrModeExhausted) {
 		t.Fatalf("want ErrModeExhausted, got %v", err)
 	}
@@ -632,13 +648,14 @@ func TestTheTurnCeilingIsAnErrorAndNotAnAnswer(t *testing.T) {
 // ------------------------------------------------------------------- the ledger
 
 func TestCacheReadsAreCountedBesideInputTokensAndNotInside(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", in: 100, out: 10, cached: 0,
 			content: toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", in: 7, out: 20, cached: 2000, content: textBlock("done")}.json(),
 	}}
-	api.start(t)
-	turn, err := Converse(context.Background(), testMode(t, nil), Request{Messages: ask(t), Stance: testStance(t)})
+	ep := api.start(t)
+	turn, err := Converse(context.Background(), testMode(t, nil), Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)})
 	if err != nil {
 		t.Fatalf("converse: %v", err)
 	}
@@ -651,25 +668,26 @@ func TestCacheReadsAreCountedBesideInputTokensAndNotInside(t *testing.T) {
 // An API failure records nothing: the roll-up counts conversations, and a
 // request the API refused is not one.
 func TestAnAPIFailureRecordsNothing(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{"!401"}}
-	api.start(t)
+	ep := api.start(t)
 	led, ledPath := scratchLedger(t)
 	_, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t), Ledger: led})
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t), Ledger: led})
 	if err == nil {
 		t.Fatal("a 401 was not reported")
 	}
 	// And it is reported in the words somebody reads at 2am -- as the whole
 	// of `err.Error()`, not merely inside it. The recorded failure text is
 	// the explanation and nothing else; a route's 502 and a
-	// job's error both render Explain(err) and would hide a prefix here, so
+	// job's error both render Explain(err, Model) and would hide a prefix here, so
 	// this is the one place a stray "mode: " on the error itself is visible
 	// -- a mutation run found the assertion missing.
 	if !strings.Contains(err.Error(), "It may have expired") {
 		t.Errorf("a 401 should say the key may have expired: %v", err)
 	}
-	if err.Error() != Explain(err) {
-		t.Errorf("the error reads %q; it must be exactly its explanation %q", err.Error(), Explain(err))
+	if err.Error() != Explain(err, Model) {
+		t.Errorf("the error reads %q; it must be exactly its explanation %q", err.Error(), Explain(err, Model))
 	}
 	if rows := ledgerRows(t, ledPath); len(rows) != 0 {
 		t.Errorf("an API failure was recorded as a conversation: %+v", rows)
@@ -677,13 +695,14 @@ func TestAnAPIFailureRecordsNothing(t *testing.T) {
 }
 
 func TestTheServedByModelIsRecordedAndNotTheAskedForOne(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "end_turn", model: "claude-sonnet-5-served", content: textBlock("hi")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	led, ledPath := scratchLedger(t)
 	if _, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t), Ledger: led}); err != nil {
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t), Ledger: led}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 	rows := ledgerRows(t, ledPath)
@@ -697,13 +716,15 @@ func TestTheServedByModelIsRecordedAndNotTheAskedForOne(t *testing.T) {
 // OnTurn is a ceiling and not an estimate: a loop that finishes on turn two of
 // six jumps straight to done.
 func TestOnTurnFiresAsEachTurnBeginsAndIsACeiling(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "tool_use", content: toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	var seen [][2]int
 	if _, err := Converse(context.Background(), testMode(t, nil), Request{
+		Endpoint: ep,
 		Messages: ask(t),
 		Stance:   testStance(t),
 		OnTurn:   func(done, max int) { seen = append(seen, [2]int{done, max}) },
@@ -720,12 +741,13 @@ func TestOnTurnFiresAsEachTurnBeginsAndIsACeiling(t *testing.T) {
 // simply missing -- a real change to what the model is told, visible nowhere,
 // because a Go map lookup answers "" for an unknown scope.
 func TestAZeroValueStanceIsRefusedRatherThanRenderingAnEmptyScope(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "end_turn", content: textBlock("hi")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	_, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t)}) // no Stance
+		Request{Endpoint: ep, Messages: ask(t)}) // no Stance
 	if err == nil {
 		t.Fatal("a zero-value stance was accepted -- the mode went out with no " +
 			"scope paragraph at all")
@@ -775,12 +797,13 @@ func TestATurnKeepsTheRecordedFieldNames(t *testing.T) {
 // and a mode whose search list was lost must not look the same to a caller
 // checking citations against it.
 func TestATurnsEmptyEvidenceIsAnEmptyListAndNotNull(t *testing.T) {
+	t.Parallel()
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "end_turn", content: textBlock("no searching here")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	turn, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t)})
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -845,6 +868,7 @@ func ledgerRows(t *testing.T, path string) []ledger.Row {
 // with a 400 -- on the second turn of every dossier, after the search was
 // paid for. Found by the live case, 2026-08-23, and by nothing else.
 func TestTheAssistantTurnIsResentAsItArrived(t *testing.T) {
+	t.Parallel()
 	encrypted := `{"type":"code_execution_tool_result","tool_use_id":"srv_9",` +
 		`"content":{"type":"encrypted_code_execution_result","encrypted_stdout":"c2VjcmV0",` +
 		`"content":[],"return_code":0,"stderr":""}}`
@@ -854,9 +878,9 @@ func TestTheAssistantTurnIsResentAsItArrived(t *testing.T) {
 				toolUse("tu_1", "list_decks", "{}")}.json(),
 		reply{stop: "end_turn", content: textBlock("done")}.json(),
 	}}
-	api.start(t)
+	ep := api.start(t)
 	if _, err := Converse(context.Background(), testMode(t, nil),
-		Request{Messages: ask(t), Stance: testStance(t)}); err != nil {
+		Request{Endpoint: ep, Messages: ask(t), Stance: testStance(t)}); err != nil {
 		t.Fatalf("converse: %v", err)
 	}
 	if len(api.requests) != 2 {

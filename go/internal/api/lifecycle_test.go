@@ -27,7 +27,7 @@ func (r *writeRig) read(t *testing.T, slug string) (string, bool) {
 
 func TestCreateWritesADraftAndNothingElse(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks",
@@ -85,7 +85,7 @@ func TestCreateRefusesBeforeWritingAnything(t *testing.T) {
 			"cannot be your commander"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			rig := newWriteRig(t)
+			rig := newWriteRig(t, noCredential)
 			defer rig.close()
 			status, body, raw := rig.do(t, alice, "POST", "/api/decks", c.body)
 			if status != 422 {
@@ -110,7 +110,7 @@ func TestCreateRefusesBeforeWritingAnything(t *testing.T) {
 // one of the editor's sentences.
 func TestCreateRefusesABracketThatIsNotANumber(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks",
 		`{"slug":"bad-bracket","commander":["Goreclaw, Terror of Qal Sisma"],"bracket":"four"}`)
@@ -128,7 +128,7 @@ const paste = "1 Sol Ring\n1 Cultivator Colossus\n30 Forest\n"
 
 func TestImportWritesADraftWithEveryRationaleOwed(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
@@ -161,7 +161,7 @@ func TestImportWritesADraftWithEveryRationaleOwed(t *testing.T) {
 // makes it a preview rather than a description of one.
 func TestADryRunWritesNothing(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
@@ -183,7 +183,7 @@ func TestADryRunWritesNothing(t *testing.T) {
 
 func TestImportRefusesAListWithNothingInIt(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
 		`{"slug":"empty-paste","commander":["Goreclaw, Terror of Qal Sisma"],"text":"# just a comment"}`)
@@ -197,7 +197,7 @@ func TestImportRefusesAListWithNothingInIt(t *testing.T) {
 
 func TestImportPassesTheImportersOwnRefusalThrough(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
 		`{"slug":"headless","text":"`+strings.ReplaceAll(paste, "\n", "\\n")+`"}`)
@@ -216,7 +216,7 @@ func TestImportPassesTheImportersOwnRefusalThrough(t *testing.T) {
 
 func TestDeleteMovesTheDeckAndSaysWhere(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
 	status, body, raw := rig.do(t, alice, "DELETE",
@@ -250,7 +250,7 @@ func TestDeleteNeedsAConfirmationSomebodyHadToType(t *testing.T) {
 		"another slug":   "?confirm=kaheera",
 	} {
 		t.Run(name, func(t *testing.T) {
-			rig := newWriteRig(t)
+			rig := newWriteRig(t, noCredential)
 			defer rig.close()
 			status, body, raw := rig.do(t, alice, "DELETE",
 				"/api/decks/alice/mono-green-clean"+query, "")
@@ -271,7 +271,7 @@ func TestDeleteNeedsAConfirmationSomebodyHadToType(t *testing.T) {
 		"the slug, in capers": "?confirm=Mono-Green-Clean",
 	} {
 		t.Run(name, func(t *testing.T) {
-			rig := newWriteRig(t)
+			rig := newWriteRig(t, noCredential)
 			defer rig.close()
 			status, _, raw := rig.do(t, alice, "DELETE",
 				"/api/decks/alice/mono-green-clean"+query, "")
@@ -286,7 +286,7 @@ func TestDeleteNeedsAConfirmationSomebodyHadToType(t *testing.T) {
 
 func TestSharingIsASurgicalEditAndAnswersWithTheDeck(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	before := rig.text(t)
 
@@ -316,7 +316,7 @@ func TestSharingIsASurgicalEditAndAnswersWithTheDeck(t *testing.T) {
 
 func TestSharingNeedsTheFlag(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "PUT",
 		"/api/decks/alice/mono-green-clean/shared", `{}`)
@@ -340,7 +340,7 @@ func TestTheSharingFlagIsReadWithTheRecordedTruthiness(t *testing.T) {
 		`{"shared":null}`: false,
 	} {
 		t.Run(body, func(t *testing.T) {
-			rig := newWriteRig(t)
+			rig := newWriteRig(t, noCredential)
 			defer rig.close()
 			status, answer, raw := rig.do(t, alice, "PUT",
 				"/api/decks/alice/mono-green-clean/shared", body)
@@ -361,7 +361,7 @@ func TestTheSharingFlagIsReadWithTheRecordedTruthiness(t *testing.T) {
 // governs all of them.
 func TestAnotherAccountsPrivateDeckIsA404ToEveryLifecycleVerb(t *testing.T) {
 	t.Parallel()
-	rig := newWriteRig(t)
+	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 	for _, c := range []struct{ method, target, body string }{
 		{"DELETE", "/api/decks/bob/bobs-private?confirm=bobs-private", ""},

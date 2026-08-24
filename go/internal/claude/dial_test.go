@@ -3,7 +3,6 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"reflect"
 	"slices"
 	"testing"
@@ -29,36 +28,35 @@ type dialRow struct {
 	Error      string          `json:"error"`
 }
 
-// withDialEnv pins the three environment facts the dial reads at call time, to
-// the same values `dial_cases` rendered under. Without this the corpus would
-// be a record of whichever shell rendered it: a key in the environment makes
-// `configured` true, and `MTGLAB_CLAUDE_MODEL` makes `model` anything at all.
-func withDialEnv(t *testing.T, ceiling string) {
+// dialSettings are the settings `dial_cases` was rendered under: no
+// credential, no model override, and the named ceiling.
+//
+// This used to be `withDialEnv`, which blanked three variables and unset them
+// on the process, because the dial read all of them at call time -- so the
+// corpus would otherwise have been a record of whichever shell ran it, a key
+// in the environment making `configured` true and MTGLAB_CLAUDE_MODEL making
+// `model` anything at all. The zero [Endpoint] says all of that as a value,
+// and says it to one test rather than to the whole binary.
+func dialSettings(t *testing.T, ceiling string) Settings {
 	t.Helper()
-	for _, name := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "MTGLAB_CLAUDE_MODEL"} {
-		t.Setenv(name, "")
-		if err := os.Unsetenv(name); err != nil {
-			t.Fatalf("unset %s: %v", name, err)
-		}
-	}
 	if ceiling == "" {
-		t.Setenv(CeilingEnv, "")
-		if err := os.Unsetenv(CeilingEnv); err != nil {
-			t.Fatalf("unset %s: %v", CeilingEnv, err)
-		}
-		return
+		return Settings{}
 	}
-	t.Setenv(CeilingEnv, ceiling)
+	s, err := Preset(ceiling)
+	if err != nil {
+		t.Fatalf("ceiling %q: %v", ceiling, err)
+	}
+	return Settings{Ceiling: &s}
 }
 
 func TestTheDialAgreesWithTheRecordedPayload(t *testing.T) {
+	t.Parallel()
 	corpus := loadStanceCorpus(t)
 	if len(corpus.Dial) == 0 {
 		t.Fatal("stance.json carries no dial cases; the frozen golden always does")
 	}
 	for _, row := range corpus.Dial {
 		t.Run(row.Note, func(t *testing.T) {
-			withDialEnv(t, deref(row.Ceiling))
 
 			// The route reads a falsy stance as none; the corpus records
 			// what reached the dial, which is already that.
@@ -79,7 +77,7 @@ func TestTheDialAgreesWithTheRecordedPayload(t *testing.T) {
 				deck = DeckWithStatus(*row.DeckStatus)
 			}
 
-			got, err := Status(requested, deck, deref(row.Surface))
+			got, err := Status(requested, deck, deref(row.Surface), dialSettings(t, deref(row.Ceiling)))
 			if row.Error != "" {
 				if err == nil {
 					t.Fatalf("answered where the corpus refuses with %q", row.Error)
@@ -148,7 +146,7 @@ func TestTheDialListsEveryMode(t *testing.T) {
 // that DO have owners are checked beside the one that does not, so this reads
 // as a table rather than as four separate claims.
 func TestEveryDecklessSurfaceResolvesToItsOwnDefault(t *testing.T) {
-	withDialEnv(t, "")
+	t.Parallel()
 	for surface, want := range map[string]string{
 		"theme":    "second-opinion",
 		"research": "second-opinion",
@@ -158,7 +156,7 @@ func TestEveryDecklessSurfaceResolvesToItsOwnDefault(t *testing.T) {
 		"":         "off",
 		"nonsense": "off",
 	} {
-		dial, err := Status(nil, nil, surface)
+		dial, err := Status(nil, nil, surface, Settings{})
 		if err != nil {
 			t.Fatalf("surface %q: %v", surface, err)
 		}
@@ -184,8 +182,8 @@ func TestEveryDecklessSurfaceResolvesToItsOwnDefault(t *testing.T) {
 // linked into this binary, so the answer cannot be false -- and the field
 // stays on the wire because the client reads it.
 func TestInstalledIsAConstantBecauseTheSDKIsLinkedIn(t *testing.T) {
-	withDialEnv(t, "")
-	dial, err := Status(nil, nil, "")
+	t.Parallel()
+	dial, err := Status(nil, nil, "", Settings{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,8 +195,9 @@ func TestInstalledIsAConstantBecauseTheSDKIsLinkedIn(t *testing.T) {
 	if dial.Configured {
 		t.Error("configured is true with no credential in the environment")
 	}
-	t.Setenv("ANTHROPIC_API_KEY", "sk-test")
-	dial, err = Status(nil, nil, "")
+	// And a configured instance says so -- a value now, not a variable
+	// installed on the process every other test shares.
+	dial, err = Status(nil, nil, "", Settings{Endpoint: EndpointAt("http://example.test", "sk-test")})
 	if err != nil {
 		t.Fatal(err)
 	}

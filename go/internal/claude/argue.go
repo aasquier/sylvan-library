@@ -299,6 +299,10 @@ type ArgueUsage struct {
 
 // ArgueRequest is what a slot argument needs beyond the deck and the card.
 type ArgueRequest struct {
+	// Endpoint is where this call goes. Carried on the plan rather than
+	// looked up, so a background job that outlives its request still knows
+	// which endpoint it was planned against (ADR 39).
+	Endpoint  Endpoint
 	Requested any
 	Focus     string
 	Deps      tools.Deps
@@ -390,6 +394,7 @@ func Argue(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 	}
 
 	turn, err := Converse(ctx, mode, Request{
+		Endpoint: req.Endpoint,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(opening)),
 		},

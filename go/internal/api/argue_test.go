@@ -18,8 +18,8 @@ import (
 const argueAt = "/api/decks/alice/kaheera/argue"
 
 func TestTheArgumentIsTheInterviewsTwinOnRefusals(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	for _, row := range []struct {
 		body   string
@@ -47,8 +47,8 @@ func TestTheArgumentIsTheInterviewsTwinOnRefusals(t *testing.T) {
 }
 
 func TestTheArgumentIs404ForADeckTheCallerCannotSee(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	if status, _, raw := callAs(t, a, bob, "POST", "/api/decks/bob/kaheera/argue",
 		`{"card":"Sol Ring"}`); status != 404 {
@@ -61,8 +61,8 @@ func TestTheArgumentIs404ForADeckTheCallerCannotSee(t *testing.T) {
 // five-key shape only exists once the alternatives have actually been
 // resolved.
 func TestAtStanceOffTheDroppedBlockHasTheRecordedFourKeys(t *testing.T) {
-	noCredential(t)
-	a, done := deckAPI(t, true)
+	t.Parallel()
+	a, done := deckAPI(t, noCredential, true)
 	defer done()
 	status, payload, raw := callAs(t, a, alice, "POST", argueAt,
 		`{"card":"Sol Ring","stance":"off"}`)
@@ -93,8 +93,8 @@ func TestTheArgumentReachesTheWireWithItsAlternativesJudged(t *testing.T) {
 			`{"claim":"It is simply bad."},`+
 			`{"claim":"Too slow for the curve.","ground":"speed","fact":"average mana value is 3.9.","strength":"vibes"}],`+
 			`"alternatives":["Craterhoof Behemoth","Ajani, Nacatl Pariah","Primeval Titan","Not A Real Card"]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	status, payload, raw := callAs(t, a, alice, "POST", argueAt, `{"card":"Sol Ring"}`)
@@ -173,8 +173,8 @@ func TestTheCaseIsCappedAtFiveCharges(t *testing.T) {
 	}
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(
 		`{"charges":[`+strings.Join(items, ",")+`],"alternatives":[]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	status, payload, raw := callAs(t, a, alice, "POST", argueAt, `{"card":"Sol Ring"}`)
@@ -198,8 +198,8 @@ func TestTheCaseIsCappedAtFiveCharges(t *testing.T) {
 func TestTheCommanderIsNotOfferedAsAnAlternative(t *testing.T) {
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(
 		`{"charges":[],"alternatives":["Goreclaw, Terror of Qal Sisma"]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	status, payload, raw := callAs(t, a, alice, "POST", argueAt, `{"card":"Sol Ring"}`)
@@ -225,8 +225,8 @@ func TestTheArgumentsToolsSeeTheCallersOwnLibrary(t *testing.T) {
 		answer("tool_use", `{"type":"tool_use","id":"tu_1","name":"deck_stats","input":{"slug":"kaheera"}}`),
 		answer("end_turn", said(`{"charges":[],"alternatives":[]}`)),
 	}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	if status, _, raw := callAs(t, a, alice, "POST", argueAt, `{"card":"Sol Ring"}`); status != 200 {
@@ -251,8 +251,8 @@ func TestTheArgumentsToolsSeeTheCallersOwnLibrary(t *testing.T) {
 func TestTheArgumentAsksTheSeatsOwnModel(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"charges":[],"alternatives":[]}`))}}
-	api.start(t)
-	a, done := deckAPI(t, true)
+	claudeSet := api.start(t)
+	a, done := deckAPI(t, claudeSet, true)
 	defer done()
 
 	seated := alice
@@ -268,8 +268,8 @@ func TestTheArgumentAsksTheSeatsOwnModel(t *testing.T) {
 func TestTheArgumentRecordsUnderItsOwnMode(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"charges":[],"alternatives":[]}`))}}
-	api.start(t)
-	rig := newWriteRig(t)
+	claudeSet := api.start(t)
+	rig := newWriteRig(t, claudeSet)
 	if status, _, raw := callAs(t, rig.api, alice, "POST",
 		"/api/decks/alice/kaheera/argue", `{"card":"Sol Ring"}`); status != 200 {
 		t.Fatalf("%d %s", status, raw)

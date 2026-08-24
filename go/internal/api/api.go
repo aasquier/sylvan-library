@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/flymetrics"
@@ -126,6 +127,11 @@ type Config struct {
 	// sets to the real client IP, or empty to trust only the peer. Empty is
 	// the safe default and the one every test wants.
 	ClientIPHeader string
+	// Claude is where this instance's Claude calls go and how far a stance may
+	// be turned up. The zero value has no credential, so every Claude route
+	// refuses -- which is the state CI runs in, and the state a test that says
+	// nothing about Claude should get rather than the developer's own key.
+	Claude claude.Settings
 }
 
 // API holds the routes' dependencies.
@@ -148,6 +154,7 @@ type API struct {
 	// read at the moment of sending.
 	mail           auth.MailSettings
 	clientIPHeader string
+	claude         claude.Settings
 	jobs           *jobs.Registry
 	simCache       *cache.Store
 	matchLedgerOf  *matchledger.Recorder
@@ -195,7 +202,8 @@ func New(cfg Config) *API {
 		jobs: cfg.Jobs, simCache: cfg.SimCache,
 		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
 		forgeClient: cfg.ForgeWorker,
-		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader}
+		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader,
+		claude: cfg.Claude}
 }
 
 // background runs fn after the response has gone, which is, for the one
