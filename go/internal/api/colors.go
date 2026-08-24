@@ -72,7 +72,7 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !found {
-		wire.Detail(w, http.StatusNotFound, "no colour combination "+wire.PyRepr(key))
+		wire.Detail(w, http.StatusNotFound, "no colour combination "+wire.Quote(key))
 		return
 	}
 	type base struct {

@@ -176,7 +176,7 @@ func TestTheLogParserAgreesWithPython(t *testing.T) {
 func TestTheStatelessPredicateAgreesWithPython(t *testing.T) {
 	corpus := loadForgeCorpus(t)
 	for _, c := range corpus.Logs {
-		lines := splitLikePython(c.Text)
+		lines := splitLikeTheCorpus(c.Text)
 		if len(lines) != len(c.IsGameResult) {
 			t.Errorf("%s: split into %d lines, Python got %d",
 				c.Note, len(lines), len(c.IsGameResult))

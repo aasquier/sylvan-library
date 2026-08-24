@@ -1,4 +1,4 @@
-package pyfloat
+package floats
 
 import "embed"
 
@@ -7,7 +7,7 @@ import "embed"
 // the only reader.
 //
 // Fingerprinted where Python's counterpart is not, and for the same reason
-// `internal/pyrand` is: in Python this arithmetic is CPython's -- `math.fsum`
+// `internal/mt19937` is: in Python this arithmetic is CPython's -- `math.fsum`
 // and `round` are the interpreter's own and cannot change under a running
 // process -- so `sim/cache.py` has nothing to hash. Here it is **ours**, and a
 // one-character change to Shewchuk's summation or to the ties-to-even rounding
@@ -25,5 +25,5 @@ import "embed"
 // author. A file ARRIVING is the edit the per-package test *can* see, which is
 // the half of the pair that works.
 //
-//go:embed pyfloat.go repr.go source.go
+//go:embed floats.go repr.go source.go
 var SourceFS embed.FS

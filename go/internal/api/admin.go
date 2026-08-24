@@ -9,6 +9,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/claude"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
@@ -137,7 +138,7 @@ func (a *API) findAccount(w http.ResponseWriter, r *http.Request, db *sql.DB) (*
 		return nil, false
 	}
 	if user == nil {
-		wire.Detail(w, http.StatusNotFound, "no account "+wire.PyRepr(username))
+		wire.Detail(w, http.StatusNotFound, "no account "+wire.Quote(username))
 		return nil, false
 	}
 	return user, true
@@ -413,7 +414,7 @@ func (a *API) updateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if fetched == nil {
-		wire.Detail(w, http.StatusNotFound, "no account "+wire.PyRepr(user.Username))
+		wire.Detail(w, http.StatusNotFound, "no account "+wire.Quote(user.Username))
 		return
 	}
 	answer, err := accountBody(r.Context(), db, fetched)
@@ -554,11 +555,11 @@ func (a *API) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	// empty string, anything else renders as Python's str().
 	typed := ""
 	if pyTruthy(body["confirm"]) {
-		typed = claude.PyStrip(wire.PyStr(body["confirm"]))
+		typed = textutil.Strip(wire.Plain(body["confirm"]))
 	}
-	if claude.PyCasefold(typed) != claude.PyCasefold(user.Username) {
+	if claude.Casefold(typed) != claude.Casefold(user.Username) {
 		wire.Detail(w, http.StatusUnprocessableEntity,
-			"type "+wire.PyRepr(user.Username)+" in confirm to delete it")
+			"type "+wire.Quote(user.Username)+" in confirm to delete it")
 		return
 	}
 	caller := auth.ScopeFrom(r.Context())

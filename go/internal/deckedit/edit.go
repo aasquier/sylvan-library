@@ -25,7 +25,7 @@
 // The failure this package must not have is silently corrupting the one file
 // the whole project is built on, so it is checked rather than argued -- and
 // the port carries a second check the original did not need: the lines it
-// writes come from `internal/pyyaml`, which reproduces PyYAML's emitter byte
+// writes come from `internal/yamlemit`, which reproduces PyYAML's emitter byte
 // for byte against a corpus Python generated. Same edit, same bytes, either
 // runtime.
 package deckedit
@@ -37,7 +37,7 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
-	"github.com/aasquier/sylvan-library/go/internal/pyyaml"
+	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
 // Failed is `EditFailed`: the edit could not be made safely, so nothing was
@@ -328,7 +328,7 @@ func countMismatch(key string, items, spans int) error {
 
 // render is `_render` at the deck files' own width.
 func render(key string, value any, indent int) ([]string, error) {
-	return pyyaml.Render(key, value, indent, pyyaml.RenderWidth, false)
+	return yamlemit.Render(key, value, indent, yamlemit.RenderWidth, false)
 }
 
 // cardLines writes a whole card entry, in the key order the deck files use.

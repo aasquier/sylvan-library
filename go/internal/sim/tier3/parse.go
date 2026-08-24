@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aasquier/sylvan-library/go/internal/pytext"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // Forge's `sim -q` output is line-oriented text, and not a stable API. The
@@ -108,7 +108,7 @@ func (o *SimOutput) Trustworthy() bool {
 // one [StreamParser] now, so this survives as the cheap question a caller with
 // no state wants answered.
 func IsGameResult(line string) bool {
-	s := pytext.Strip(line)
+	s := textutil.Strip(line)
 	return wonRe.MatchString(s) || drawRe.MatchString(s)
 }
 
@@ -139,7 +139,7 @@ func NewStreamParser() *StreamParser { return &StreamParser{} }
 // same stream, so this matches lines it recognises and ignores the rest rather
 // than trying to model the whole log.
 func (p *StreamParser) Feed(raw string) *GameResult {
-	line := pytext.Strip(raw)
+	line := textutil.Strip(raw)
 
 	if strings.Contains(line, slowMatch) {
 		p.pendingTimeout = true
@@ -207,9 +207,9 @@ func (p *StreamParser) finish(game GameResult) *GameResult {
 }
 
 // Parse reads a whole `sim` run: a [StreamParser] fed every line at once.
-func Parse(text string) SimOutput {
+func Parse(log string) SimOutput {
 	p := NewStreamParser()
-	for _, raw := range pytext.SplitLines(text) {
+	for _, raw := range textutil.SplitLines(log) {
 		p.Feed(raw)
 	}
 	return p.Output

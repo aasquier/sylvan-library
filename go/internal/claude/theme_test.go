@@ -300,12 +300,12 @@ func TestGroundFoldsTheWayPythonFolds(t *testing.T) {
 			"reachable difference between casefold and ToLower is untested")
 	}
 	// And directly, so the reason is legible without the corpus.
-	if pyCasefold("Straße") != pyCasefold("STRASSE") {
+	if casefold("Straße") != casefold("STRASSE") {
 		t.Error("casefold does not make Straße and STRASSE equal")
 	}
 	// Spelled out rather than compared inline: the point is what `ToLower`
 	// does to these two strings, which is the function a tidier `EqualFold`
-	// would replace and the reason `pyCasefold` exists.
+	// would replace and the reason `casefold` exists.
 	lowered, shouted := strings.ToLower("Straße"), strings.ToLower("STRASSE")
 	if lowered == shouted {
 		t.Error("ToLower now agrees with casefold here, so this test is moot")
@@ -436,7 +436,7 @@ func TestTheSeedGrammarIsPythonsIntNotPydantics(t *testing.T) {
 	corpus := loadThemeCorpus(t)
 	sawFullwidth := false
 	for _, row := range corpus.Seeds {
-		got, err := pyInt(row.Raw)
+		got, err := intValue(row.Raw)
 		if row.Error != "" {
 			if err == nil {
 				t.Errorf("%s: read %s where Python refused", row.Note, got)
@@ -466,16 +466,16 @@ func TestTheBudgetFormatAgreesWithPython(t *testing.T) {
 		var got string
 		switch row.Note {
 		case "inf":
-			got = pyFormatG(inf(1))
+			got = formatG(inf(1))
 		case "-inf":
-			got = pyFormatG(inf(-1))
+			got = formatG(inf(-1))
 		case "nan":
-			got = pyFormatG(nan())
+			got = formatG(nan())
 		default:
 			if row.Value == nil {
 				t.Fatalf("a budget row with no value and no note: %+v", row)
 			}
-			got = pyFormatG(*row.Value)
+			got = formatG(*row.Value)
 		}
 		if got != row.Formatted {
 			t.Errorf("%v: formatted %q, Python says %q", row.Value, got, row.Formatted)
@@ -736,17 +736,17 @@ func TestNeitherThemePlanCanHoldADeck(t *testing.T) {
 	}
 }
 
-// The ASCII fast path in `pyCasefold` is an optimisation, never a second
+// The ASCII fast path in `casefold` is an optimisation, never a second
 // definition. All 128 through both, plus the whole table.
 func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
 	for r := rune(0); r < 0x80; r++ {
 		s := string(r)
-		fast, ok := pyCasefoldASCII(s)
+		fast, ok := casefoldASCII(s)
 		if !ok {
 			t.Fatalf("U+%04X is not ASCII to the fast path", r)
 		}
 		want := s
-		if folded, in := pyFolds[r]; in {
+		if folded, in := folds[r]; in {
 			want = folded
 		}
 		if fast != want {
@@ -754,7 +754,7 @@ func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
 		}
 	}
 	// And the table is a table of real folds: nothing maps to itself.
-	for r, folded := range pyFolds {
+	for r, folded := range folds {
 		if folded == string(r) {
 			t.Errorf("U+%04X is in the table and folds to itself", r)
 		}
@@ -771,7 +771,7 @@ func TestEveryUnicodeDigitReadsAsItsValue(t *testing.T) {
 			continue
 		}
 		seen++
-		value, ok := pyDigitValue(r)
+		value, ok := digitValue(r)
 		if !ok {
 			t.Fatalf("U+%04X is category Nd and has no value", r)
 			continue
@@ -939,7 +939,7 @@ func pyFloatRepr(f float64) string {
 
 // The `d < 10` guard, driven against a table that does not know every digit.
 //
-// Through `pyDigitValue` this is unreachable: `unicode.IsDigit` rejects
+// Through `digitValue` this is unreachable: `unicode.IsDigit` rejects
 // anything outside a known run before the guard is consulted, so a mutation
 // dropping it survives a sweep of all 680 digits. The case it exists for is a
 // Unicode version moving under one runtime and not the other -- Go calling a
@@ -972,7 +972,7 @@ func TestADigitBeyondTheKnownRunsIsRefusedRatherThanGuessed(t *testing.T) {
 	// would look identical to a correct one.
 	last := digitZeros[len(digitZeros)-1]
 	for i := rune(0); i < 10; i++ {
-		if value, ok := pyDigitValue(last + i); !ok || value != int(i) {
+		if value, ok := digitValue(last + i); !ok || value != int(i) {
 			t.Errorf("U+%04X reads as %d/%v", last+i, value, ok)
 		}
 	}

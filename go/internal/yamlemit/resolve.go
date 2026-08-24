@@ -1,4 +1,4 @@
-package pyyaml
+package yamlemit
 
 import "regexp"
 

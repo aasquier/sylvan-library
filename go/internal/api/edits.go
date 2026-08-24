@@ -266,12 +266,12 @@ func decodeOffset(err error) int {
 // spells it `or ""`; everything else goes through Python's own `str()`, which
 // is **not** `fmt.Sprint` for a container. `str(["x"])` is `"['x']"` where
 // `fmt.Sprint` gives `"[x]"`, and that lands in a 404's `detail` verbatim.
-// Found by diffing the pair; see [wire.PyStr].
+// Found by diffing the pair; see [wire.Plain].
 func str(body map[string]any, key string) string {
 	if v, ok := body[key]; !ok || v == nil {
 		return ""
 	}
-	return wire.PyStr(body[key])
+	return wire.Plain(body[key])
 }
 
 // ---- the nine routes -------------------------------------------------------
@@ -299,19 +299,19 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 	}
 	entry := findCard(d, out)
 	if entry == nil {
-		a.refuseWrite(w, "swap", rejectf("%s is not in this deck", wire.PyRepr(out)))
+		a.refuseWrite(w, "swap", rejectf("%s is not in this deck", wire.Quote(out)))
 		return
 	}
 	wanted := strings.ToLower(strings.TrimSpace(into))
 	for _, c := range append(append([]deck.CardEntry{}, d.Cards...), d.SwapBoard...) {
 		if strings.ToLower(c.Name) == wanted {
-			a.refuseWrite(w, "swap", rejectf("%s is already in this deck", wire.PyRepr(into)))
+			a.refuseWrite(w, "swap", rejectf("%s is already in this deck", wire.Quote(into)))
 			return
 		}
 	}
 	for _, c := range d.Commander {
 		if strings.ToLower(c) == wanted {
-			a.refuseWrite(w, "swap", rejectf("%s is the commander", wire.PyRepr(into)))
+			a.refuseWrite(w, "swap", rejectf("%s is the commander", wire.Quote(into)))
 			return
 		}
 	}
@@ -351,7 +351,7 @@ func (a *API) addCard(w http.ResponseWriter, r *http.Request) {
 	}
 	if into != "cards" && into != "swap_board" {
 		a.refuseWrite(w, "add", rejectf("cards go into %s, not %s",
-			strings.Join(deckedit.CardLists, " or "), wire.PyRepr(into)))
+			strings.Join(deckedit.CardLists, " or "), wire.Quote(into)))
 		return
 	}
 	qty, err := bodyQty(body)
@@ -399,7 +399,7 @@ func (a *API) removeCard(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	entry := findCard(d, name)
 	if entry == nil {
-		a.refuseWrite(w, "remove", rejectf("%s is not in this deck", wire.PyRepr(name)))
+		a.refuseWrite(w, "remove", rejectf("%s is not in this deck", wire.Quote(name)))
 		return
 	}
 	inThe99 := false
@@ -467,12 +467,12 @@ func (a *API) entombCards(w http.ResponseWriter, r *http.Request) {
 		match, found := in99[strings.ToLower(name)]
 		if !found {
 			a.refuseWrite(w, "entomb", rejectf("%s is not in the 99, so nothing was entombed",
-				wire.PyRepr(name)))
+				wire.Quote(name)))
 			return
 		}
 		for _, already := range resolved {
 			if already == match {
-				a.refuseWrite(w, "entomb", rejectf("%s is listed twice", wire.PyRepr(match)))
+				a.refuseWrite(w, "entomb", rejectf("%s is listed twice", wire.Quote(match)))
 				return
 			}
 		}
@@ -551,7 +551,7 @@ func (a *API) patchCard(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	entry := findCard(d, name)
 	if entry == nil {
-		a.refuseWrite(w, "patch-card", rejectf("%s is not in this deck", wire.PyRepr(name)))
+		a.refuseWrite(w, "patch-card", rejectf("%s is not in this deck", wire.Quote(name)))
 		return
 	}
 	if field == "category" {
@@ -679,7 +679,7 @@ func checkCategory(category string) (string, error) {
 	category = strings.ToLower(strings.TrimSpace(category))
 	if !reference.IsCategory(category) {
 		return "", rejectf("%s is not a category; choose one of %s",
-			wire.PyRepr(category), strings.Join(reference.Deck().Categories, ", "))
+			wire.Quote(category), strings.Join(reference.Deck().Categories, ", "))
 	}
 	return category, nil
 }
@@ -699,7 +699,7 @@ func (a *API) playableCard(ctx context.Context, d *deck.Deck, name, noPool strin
 		}
 		rec = found[name]
 		if rec == nil {
-			return rejectf("%s is not a card the pool knows", wire.PyRepr(name))
+			return rejectf("%s is not a card the pool knows", wire.Quote(name))
 		}
 		if !rec.LegalCommander {
 			return rejectf("%s is not legal in Commander", rec.Name)
@@ -834,7 +834,7 @@ func bodyQty(body map[string]any) (int, error) {
 	case float64:
 		return 0, fmt.Errorf("invalid literal for int() with base 10: %v", v)
 	case string:
-		return 0, fmt.Errorf("invalid literal for int() with base 10: %s", wire.PyRepr(v))
+		return 0, fmt.Errorf("invalid literal for int() with base 10: %s", wire.Quote(v))
 	default:
 		return 0, fmt.Errorf("int() argument must be a string or a number")
 	}

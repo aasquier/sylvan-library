@@ -103,7 +103,7 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 	if !slugPattern.MatchString(slug) {
 		a.refuseWrite(w, "create", rejectf(
 			"%s is not a usable slug -- lowercase letters, digits and single "+
-				"hyphens, e.g. 'arahbo-cats'", wire.PyRepr(slug)))
+				"hyphens, e.g. 'arahbo-cats'", wire.Quote(slug)))
 		return
 	}
 	slugs, err := src.Slugs(r.Context())
@@ -112,7 +112,7 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 	}
 	if slices.Contains(slugs, slug) {
 		a.refuseWrite(w, "create", rejectf(
-			"a deck called %s already exists; pick another slug", wire.PyRepr(slug)))
+			"a deck called %s already exists; pick another slug", wire.Quote(slug)))
 		return
 	}
 	if len(commander) == 0 {
@@ -126,7 +126,7 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 	}
 	if !slices.Contains(reference.Deck().DeckStatuses, status) {
 		a.refuseWrite(w, "create", rejectf("status %s is not one of %s",
-			wire.PyRepr(status), strings.Join(reference.Deck().DeckStatuses, ", ")))
+			wire.Quote(status), strings.Join(reference.Deck().DeckStatuses, ", ")))
 		return
 	}
 
@@ -213,7 +213,7 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 			// one uncaught and answers 500; refusing it in the same words as
 			// the check is the honest answer and costs nothing.
 			a.refuseWrite(w, "create", rejectf(
-				"a deck called %s already exists; pick another slug", wire.PyRepr(slug)))
+				"a deck called %s already exists; pick another slug", wire.Quote(slug)))
 			return
 		}
 		a.refuseWrite(w, "create", err)
@@ -280,7 +280,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 	if !slugPattern.MatchString(slug) {
 		a.refuseWrite(w, "import", rejectf(
 			"%s is not a usable slug -- lowercase letters, digits and single "+
-				"hyphens, e.g. 'arahbo-cats'", wire.PyRepr(slug)))
+				"hyphens, e.g. 'arahbo-cats'", wire.Quote(slug)))
 		return
 	}
 	slugs, err := src.Slugs(r.Context())
@@ -289,12 +289,12 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 	}
 	if slices.Contains(slugs, slug) {
 		a.refuseWrite(w, "import", rejectf(
-			"a deck called %s already exists; pick another slug", wire.PyRepr(slug)))
+			"a deck called %s already exists; pick another slug", wire.Quote(slug)))
 		return
 	}
 	if !slices.Contains(reference.Deck().DeckStatuses, status) {
 		a.refuseWrite(w, "import", rejectf("status %s is not one of %s",
-			wire.PyRepr(status), strings.Join(reference.Deck().DeckStatuses, ", ")))
+			wire.Quote(status), strings.Join(reference.Deck().DeckStatuses, ", ")))
 		return
 	}
 
@@ -325,7 +325,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 			if err := writer.Create(r.Context(), slug, built.YAML); err != nil {
 				var exists library.ErrExists
 				if errors.As(err, &exists) {
-					return rejectf("a deck called %s already exists", wire.PyRepr(slug))
+					return rejectf("a deck called %s already exists", wire.Quote(slug))
 				}
 				return err
 			}
@@ -411,8 +411,8 @@ func (a *API) deleteDeck(w http.ResponseWriter, r *http.Request) {
 			"to delete %s, confirm by typing %s or the slug itself. Got %s. "+
 				"This is deliberately not a yes/no: it is the one operation here "+
 				"that can lose work nothing else recorded.",
-			wire.PyRepr(slug), wire.PyRepr(deleteWord),
-			wire.PyRepr(r.URL.Query().Get("confirm"))))
+			wire.Quote(slug), wire.Quote(deleteWord),
+			wire.Quote(r.URL.Query().Get("confirm"))))
 		return
 	}
 
@@ -499,7 +499,7 @@ func bodyBracket(body map[string]any) (*int, error) {
 		}
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			return nil, fmt.Errorf("invalid literal for int() with base 10: %s", wire.PyRepr(v))
+			return nil, fmt.Errorf("invalid literal for int() with base 10: %s", wire.Quote(v))
 		}
 		return &n, nil
 	case json.Number:
@@ -507,7 +507,7 @@ func bodyBracket(body map[string]any) (*int, error) {
 		// number arriving as a float has to do here too.
 		f, err := v.Float64()
 		if err != nil {
-			return nil, fmt.Errorf("invalid literal for int(): %s", wire.PyRepr(v.String()))
+			return nil, fmt.Errorf("invalid literal for int(): %s", wire.Quote(v.String()))
 		}
 		n := int(f)
 		return &n, nil

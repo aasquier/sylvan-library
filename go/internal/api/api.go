@@ -255,7 +255,7 @@ func (a *API) Routes() []Route {
 		// The Claude surface's two free corners (Phase 6, the pure half):
 		// a checked-in roster of voices, and a seeded deal. Neither needs a
 		// key, a pool or a network, so both answer on a base install --
-		// and the deal is internal/pyrand's first served caller, where a
+		// and the deal is internal/mt19937's first served caller, where a
 		// seed minted before the cutover must still deal its own spread.
 		{Method: http.MethodGet, Pattern: "/api/claude/personas", Handler: a.personaRoster},
 		// The dial itself, which crosses LAST of the free corners rather than

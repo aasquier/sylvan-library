@@ -18,7 +18,7 @@ import (
 // Decoded with `UseNumber`, as every route body is, so `1.0` is still `1.0`
 // and a huge integer still has all its digits.
 
-type pystrCase struct {
+type plainCase struct {
 	Note     string `json:"note"`
 	Document string `json:"document"`
 	Str      string `json:"str"`
@@ -32,13 +32,13 @@ type pystrCase struct {
 	GoSortsTo string `json:"go_sorts_to"`
 }
 
-func loadPyStr(t *testing.T) []pystrCase {
+func loadPlain(t *testing.T) []plainCase {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "pystr.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []pystrCase
+	var cases []plainCase
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
 	}
@@ -48,8 +48,8 @@ func loadPyStr(t *testing.T) []pystrCase {
 	return cases
 }
 
-func TestPyStrAndPyReprAgreeWithCPython(t *testing.T) {
-	for _, c := range loadPyStr(t) {
+func TestPlainAndQuoteMatchTheRecordedCorpus(t *testing.T) {
+	for _, c := range loadPlain(t) {
 		t.Run(c.Note, func(t *testing.T) {
 			decoder := json.NewDecoder(bytes.NewReader([]byte(c.Document)))
 			decoder.UseNumber()
@@ -68,11 +68,11 @@ func TestPyStrAndPyReprAgreeWithCPython(t *testing.T) {
 					t.Fatal("the corpus row no longer separates the two orders")
 				}
 			}
-			if got := wire.PyStr(value); got != want {
-				t.Errorf("PyStr(%s) = %q, want %q", c.Document, got, want)
+			if got := wire.Plain(value); got != want {
+				t.Errorf("Plain(%s) = %q, want %q", c.Document, got, want)
 			}
-			if got := wire.PyReprValue(value); got != wantRepr {
-				t.Errorf("PyReprValue(%s) = %q, want %q", c.Document, got, wantRepr)
+			if got := wire.Literal(value); got != wantRepr {
+				t.Errorf("Literal(%s) = %q, want %q", c.Document, got, wantRepr)
 			}
 		})
 	}
@@ -82,12 +82,12 @@ func TestPyStrAndPyReprAgreeWithCPython(t *testing.T) {
 // field that is a list reaches a 404's `detail`, which the deck page renders
 // verbatim, and `fmt.Sprint` writes a different sentence from `str`.
 func TestAListSlugRendersAsPythonRendersIt(t *testing.T) {
-	if got := wire.PyStr([]any{"x"}); got != "['x']" {
+	if got := wire.Plain([]any{"x"}); got != "['x']" {
 		t.Errorf("a list slug rendered %q, want %q", got, "['x']")
 	}
 	// And the difference is real rather than theoretical: this is exactly
 	// what the shared helper used to produce.
-	if got := wire.PyStr([]any{"x"}); got == "[x]" {
+	if got := wire.Plain([]any{"x"}); got == "[x]" {
 		t.Error("the helper is still using Go's own rendering")
 	}
 }

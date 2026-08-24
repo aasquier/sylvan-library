@@ -28,7 +28,7 @@
 //
 // Everything here counts columns in **code points**, as Python does. A `why`
 // with an em dash in it wraps where Python wraps it, not one byte earlier.
-package pyyaml
+package yamlemit
 
 import (
 	"fmt"

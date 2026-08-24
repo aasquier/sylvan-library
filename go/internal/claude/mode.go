@@ -93,7 +93,7 @@ func NewMode(m Mode) (Mode, error) {
 			"mode %s declares it may write %v. No mode may write anything "+
 				"(ADR 15) -- and this package cannot reach a write path in any "+
 				"case. Changing that needs a new ADR superseding 15, not a "+
-				"value here", wire.PyRepr(m.Name), m.MayWrite)
+				"value here", wire.Quote(m.Name), m.MayWrite)
 	}
 	if m.MaxTokens == 0 {
 		m.MaxTokens = DefaultModeMaxTokens
@@ -181,7 +181,7 @@ func toolParam(schema map[string]any) (anthropic.ToolUnionParam, error) {
 	inputSchema, ok := schema["input_schema"].(map[string]any)
 	if !ok {
 		return anthropic.ToolUnionParam{}, fmt.Errorf(
-			"tool %s has no input_schema object", wire.PyRepr(name))
+			"tool %s has no input_schema object", wire.Quote(name))
 	}
 	properties, _ := inputSchema["properties"].(map[string]any)
 	required, _ := inputSchema["required"].([]string)

@@ -136,7 +136,7 @@ func uniqueUsername(ctx context.Context, db *sql.DB, wanted string) (string, err
 			return candidate, nil
 		}
 	}
-	return "", failf("%w: no free username near %s", ErrUserExists, wire.PyRepr(wanted))
+	return "", failf("%w: no free username near %s", ErrUserExists, wire.Quote(wanted))
 }
 
 // EnsureMaintainer makes the configured address an enabled admin. A no-op when
@@ -165,7 +165,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 		// already in the deployment config, so it is the one address ADR 16's
 		// no-logging rule is not protecting from the maintainer.
 		slog.Default().Error(fmt.Sprintf("MTGLAB_ADMIN_EMAIL=%s is not an email "+
-			"address; no maintainer account was reconciled", wire.PyRepr(address)))
+			"address; no maintainer account was reconciled", wire.Quote(address)))
 		return nil //nolint:nilerr // a malformed preference is logged and skipped, never fatal — bootstrap.py's own behavior
 	}
 	if normalised == "" { // unreachable: the `if address == ""` above
@@ -185,7 +185,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 		if name != wanted {
 			slog.Default().Warn(fmt.Sprintf("the handle %s is taken, so the "+
 				"maintainer account is %s -- rename the other account if that "+
-				"is wrong", wire.PyRepr(wanted), wire.PyRepr(name)))
+				"is wrong", wire.Quote(wanted), wire.Quote(name)))
 		}
 		created, err := Create(ctx, db, name, normalised, true)
 		if err != nil {
@@ -194,7 +194,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 		slog.Default().Warn(fmt.Sprintf("created maintainer account %s from "+
 			"MTGLAB_ADMIN_EMAIL -- it has no password yet; use the reset link "+
 			"on the sign-in page or `mtglab users invite`",
-			wire.PyRepr(created.Username)))
+			wire.Quote(created.Username)))
 		return nil
 	}
 
@@ -205,7 +205,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 		slog.Default().Warn(fmt.Sprintf("promoted %s to admin from "+
-			"MTGLAB_ADMIN_EMAIL", wire.PyRepr(account.Username)))
+			"MTGLAB_ADMIN_EMAIL", wire.Quote(account.Username)))
 	}
 	if account.Disabled {
 		// Re-enabling is the break-glass half, and it is deliberate: whoever
@@ -216,7 +216,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 		slog.Default().Warn(fmt.Sprintf("re-enabled %s from MTGLAB_ADMIN_EMAIL",
-			wire.PyRepr(account.Username)))
+			wire.Quote(account.Username)))
 	}
 	return nil
 }

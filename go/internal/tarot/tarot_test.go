@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyrand"
+	"github.com/aasquier/sylvan-library/go/internal/mt19937"
 )
 
 type dealCorpus struct {
@@ -225,7 +225,7 @@ func TestAnUnseededDealIsStillReproducibleFromItsOwnSeed(t *testing.T) {
 // TestTheRunningTotalIsAnFsumAndNotASum tests the one thing the deals above
 // structurally cannot.
 //
-// Swapping pyfloat.Fsum for `total += w` changes no spread in this corpus, and
+// Swapping floats.Fsum for `total += w` changes no spread in this corpus, and
 // no corpus of any size would change: tarot.py measured 200,000 seeds dealing
 // identically, because mark would have to land inside a 2.8e-14 window out of
 // 90.2 to notice — about 3e-16 per draw. Searching for a separating seed is not
@@ -249,10 +249,10 @@ func TestTheRunningTotalIsAnFsumAndNotASum(t *testing.T) {
 		t.Fatal("the corpus records no pool totals; the fsum claim is untested")
 	}
 	// Driven through weightedSample itself, not through a hand-rolled
-	// pyfloat.Fsum call. That distinction is the whole test: recomputing the
+	// floats.Fsum call. That distinction is the whole test: recomputing the
 	// sum here passes against a weightedSample that adds in a loop, which was
 	// confirmed by mutation before this was rewritten.
-	_, totals := weightedSample(pyrand.New(0), len(Spread))
+	_, totals := weightedSample(mt19937.New(0), len(Spread))
 	if len(totals) != len(c.PoolTotals) {
 		t.Fatalf("the sampler used %d totals, the corpus records %d",
 			len(totals), len(c.PoolTotals))

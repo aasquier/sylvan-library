@@ -77,7 +77,7 @@ func TestUnprocessableIsFastAPIsValidationList(t *testing.T) {
 	}
 }
 
-func TestPyReprWritesWhatPythonWrites(t *testing.T) {
+func TestQuoteWritesWhatPythonWrites(t *testing.T) {
 	for in, want := range map[string]string{
 		"nope":     `'nope'`,
 		"no'pe":    `"no'pe"`,
@@ -90,8 +90,8 @@ func TestPyReprWritesWhatPythonWrites(t *testing.T) {
 		"":         `''`,
 		"Æon — é":  `'Æon — é'`,
 	} {
-		if got := PyRepr(in); got != want {
-			t.Errorf("PyRepr(%q) = %s, want %s", in, got, want)
+		if got := Quote(in); got != want {
+			t.Errorf("Quote(%q) = %s, want %s", in, got, want)
 		}
 	}
 }

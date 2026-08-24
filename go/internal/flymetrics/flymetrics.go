@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -185,7 +185,7 @@ func (p *Panel) Fetch() wire.OrderedMap {
 	settleEdge(byName)
 	for i := range values {
 		if v := byName[values[i].Key]; v != nil {
-			values[i].Value = pyfloat.Float(*v)
+			values[i].Value = floats.Float(*v)
 		}
 	}
 	answer := wire.OrderedMap{

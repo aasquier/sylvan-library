@@ -45,9 +45,9 @@ import (
 //go:embed data/casefold.json
 var casefoldFile []byte
 
-// pyFolds is every code point whose fold is not itself. Multi-character
+// folds is every code point whose fold is not itself. Multi-character
 // folds are why the value is a string.
-var pyFolds map[rune]string
+var folds map[rune]string
 
 func init() {
 	var payload struct {
@@ -59,33 +59,33 @@ func init() {
 	if err := json.Unmarshal(casefoldFile, &payload); err != nil {
 		panic(fmt.Sprintf("claude: casefold.json will not parse: %v", err))
 	}
-	pyFolds = make(map[rune]string, len(payload.Folds))
+	folds = make(map[rune]string, len(payload.Folds))
 	for _, f := range payload.Folds {
-		pyFolds[f.CP] = f.Fold
+		folds[f.CP] = f.Fold
 	}
 }
 
-// pyCasefold is `str.casefold()`.
+// casefold is `str.casefold()`.
 //
 // ASCII is answered without touching the table, which is what the whole of
 // a transcript is in the ordinary case: `A`-`Z` shift by 32 and every other
 // byte below 0x80 folds to itself. Both facts are in the table too, so the
 // fast path is an optimisation and never a second definition -- a test
 // walks all 128 through both.
-// PyCasefold is `str.casefold()`, exported for `internal/api`: the argue
+// Casefold is `str.casefold()`, exported for `internal/api`: the argue
 // sweep folds a NAME SOMEBODY TYPED against the deck's own spelling, which is
 // two different strings and therefore the one place in this family where
 // `casefold` and `lower` can genuinely disagree.
-func PyCasefold(s string) string { return pyCasefold(s) }
+func Casefold(s string) string { return casefold(s) }
 
-func pyCasefold(s string) string {
-	if ascii, done := pyCasefoldASCII(s); done {
+func casefold(s string) string {
+	if ascii, done := casefoldASCII(s); done {
 		return ascii
 	}
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if folded, ok := pyFolds[r]; ok {
+		if folded, ok := folds[r]; ok {
 			b.WriteString(folded)
 			continue
 		}
@@ -94,10 +94,10 @@ func pyCasefold(s string) string {
 	return b.String()
 }
 
-// pyCasefoldASCII folds a string that is entirely ASCII, and reports whether
+// casefoldASCII folds a string that is entirely ASCII, and reports whether
 // it was one. Separate so the test that proves the fast path agrees with the
 // table can drive it directly.
-func pyCasefoldASCII(s string) (string, bool) {
+func casefoldASCII(s string) (string, bool) {
 	upper := false
 	for i := 0; i < len(s); i++ {
 		c := s[i]

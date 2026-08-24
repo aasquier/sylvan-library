@@ -39,7 +39,7 @@ func claudeCheckCommand() *cobra.Command {
 				return errUnavailable
 			}
 			fmt.Printf("  served by %s\n", report.ServedBy)
-			fmt.Printf("  reply     %s\n", wire.PyRepr(report.Text))
+			fmt.Printf("  reply     %s\n", wire.Quote(report.Text))
 			fmt.Printf("  tokens    %d in / %d out\n",
 				report.InputTokens, report.OutputTokens)
 

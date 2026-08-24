@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 )
 
 // Python's `repr`, for the three dataclasses the determinism gate hashes.
@@ -154,13 +154,13 @@ func reprOptNumber(v *Number) string {
 	}
 }
 
-// ReprFloat is CPython's `repr(float)`, now `pyfloat.Repr`.
+// ReprFloat is CPython's `repr(float)`, now `floats.Repr`.
 //
 // It left this package when the Forge result needed the same renderer: a
 // payload's float fields must read `4.0` where Python writes `4.0`, and a
 // second copy of the exponent boundaries is how two halves of a reproduction
 // drift. The corpus that pins those boundaries did not move.
-func ReprFloat(v float64) string { return pyfloat.Repr(v) }
+func ReprFloat(v float64) string { return floats.Repr(v) }
 
 // ReprString is CPython's `repr(str)`.
 //

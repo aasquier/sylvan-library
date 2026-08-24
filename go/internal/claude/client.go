@@ -194,12 +194,12 @@ func Explain(err error) string {
 	case 403:
 		return fmt.Sprintf("the key was refused this request (403) -- most "+
 			"often a model the workspace cannot reach. Asked for %s.",
-			wire.PyRepr(ModelFor("")))
+			wire.Quote(ModelFor("")))
 	case 429:
 		return "rate limited (429). Retry after the delay in the response headers."
 	case 404:
 		return fmt.Sprintf("no such model or endpoint (404). Asked for %s.",
-			wire.PyRepr(ModelFor("")))
+			wire.Quote(ModelFor("")))
 	default:
 		return fmt.Sprintf("API error %d: %s", apierr.StatusCode, apierr.Error())
 	}

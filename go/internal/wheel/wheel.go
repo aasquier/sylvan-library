@@ -9,7 +9,7 @@
 // (rule 4); a card the deck already runs is excluded before the draw, and so
 // is anything banned or outside the commander's identity.
 //
-// The randomness is `internal/pyrand`, because a seed is a promise: a spin
+// The randomness is `internal/mt19937`, because a seed is a promise: a spin
 // somebody replayed on the Python side deals the same fate, the same face
 // and the same card here — `randrange` over the symbols, then over a fate's
 // faces, then over the candidate count, all off one generator. Held to
@@ -25,8 +25,8 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/mt19937"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyrand"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -173,7 +173,7 @@ func Spin(ctx context.Context, d *deck.Deck, identity map[string]bool,
 		}
 		seed = fresh
 	}
-	rng := pyrand.NewFromBig(seed)
+	rng := mt19937.NewFromBig(seed)
 	symbol := Symbols[rng.RandRange(int64(len(Symbols)))]
 	chosen := fates[symbol]
 

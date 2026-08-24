@@ -9,6 +9,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -58,9 +59,9 @@ const researchLabelChars = 60
 // -- `question[:60]` is a `str` slice -- and the cut end is right-stripped
 // before the ellipsis so it never reads "research: why does ...".
 func researchLabel(question string) string {
-	short := claude.PyHead(question, researchLabelChars)
-	if claude.PyLen(question) > researchLabelChars {
-		short = claude.PyRStrip(short) + "..."
+	short := textutil.Head(question, researchLabelChars)
+	if textutil.Len(question) > researchLabelChars {
+		short = textutil.RStrip(short) + "..."
 	}
 	return "research: " + short
 }

@@ -39,8 +39,8 @@ func (a *API) deckWheel(w http.ResponseWriter, r *http.Request) {
 	}
 	var seed *big.Int
 	if raw, present := body["seed"]; present && raw != nil {
-		if seed, err = claude.PyInt(raw); err != nil {
-			pythonUncaught(w, a.log, "wheel", err)
+		if seed, err = claude.IntValue(raw); err != nil {
+			uncaught500(w, a.log, "wheel", err)
 			return
 		}
 	}
@@ -78,11 +78,11 @@ func (a *API) deckWheel(w http.ResponseWriter, r *http.Request) {
 		append(wire.OrderedMap{{Key: "pool_available", Value: true}}, spun...))
 }
 
-// pythonUncaught answers the way Starlette's ServerErrorMiddleware answers an
-// exception no handler caught: `text/plain; charset=utf-8`, the three words,
-// nothing about the cause. The cause goes to the log instead, which is also
-// Python's split — the traceback lands server-side, never on the wire.
-func pythonUncaught(w http.ResponseWriter, log interface {
+// uncaught500 answers an error no handler owns: `text/plain; charset=utf-8`,
+// the three words, nothing about the cause. The cause goes to the log
+// instead — the detail lands server-side, never on the wire — and the shape
+// is recorded, so it stays plain text rather than growing a JSON body.
+func uncaught500(w http.ResponseWriter, log interface {
 	Error(string, ...any)
 }, where string, err error) {
 	log.Error("the "+where+" route raised", "error", err)

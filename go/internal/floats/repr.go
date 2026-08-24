@@ -1,4 +1,4 @@
-package pyfloat
+package floats
 
 import (
 	"fmt"
@@ -52,7 +52,7 @@ func Repr(v float64) string {
 	digits := strings.Replace(s[:epos], ".", "", 1)
 	exp, err := strconv.Atoi(s[epos+1:])
 	if err != nil {
-		panic("pyfloat: unreadable float exponent in " + s)
+		panic("floats: unreadable float exponent in " + s)
 	}
 	decpt := exp + 1
 

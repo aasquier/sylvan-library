@@ -15,7 +15,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -71,7 +71,7 @@ const perMillion = 1_000_000
 
 // Cost is `prices.cost`: what one conversation came to, or false for a model
 // with no rate — a conversation that cost nothing and one nobody can price
-// are different facts. Every product is fenced with `pyfloat.Rounded`,
+// are different facts. Every product is fenced with `floats.Rounded`,
 // because `a*b + c` is the shape arm64 fuses into one FMADDD and CPython
 // rounds twice.
 func Cost(model string, inputTokens, outputTokens, cacheReadTokens int64,
@@ -81,10 +81,10 @@ func Cost(model string, inputTokens, outputTokens, cacheReadTokens int64,
 		return 0, false
 	}
 	rate := priced.On(when)
-	total := pyfloat.Rounded(float64(inputTokens) * rate.Input)
-	total = pyfloat.Rounded(total + pyfloat.Rounded(float64(outputTokens)*rate.Output))
-	cache := pyfloat.Rounded(pyfloat.Rounded(float64(cacheReadTokens)*rate.Input) * CacheReadFraction)
-	total = pyfloat.Rounded(total + cache)
+	total := floats.Rounded(float64(inputTokens) * rate.Input)
+	total = floats.Rounded(total + floats.Rounded(float64(outputTokens)*rate.Output))
+	cache := floats.Rounded(floats.Rounded(float64(cacheReadTokens)*rate.Input) * CacheReadFraction)
+	total = floats.Rounded(total + cache)
 	return total / perMillion, true
 }
 
@@ -132,7 +132,7 @@ func Over(rows []Row, when string) Estimate {
 			}
 			continue
 		}
-		out.USD = pyfloat.Rounded(out.USD + amount)
+		out.USD = floats.Rounded(out.USD + amount)
 	}
 	sort.Strings(out.UnpricedModels)
 	return out
@@ -147,7 +147,7 @@ func (e Estimate) AsDict() wire.OrderedMap {
 		models = []string{}
 	}
 	return wire.OrderedMap{
-		{Key: "usd", Value: pyfloat.Float(pyfloat.RoundTo(e.USD, 4))},
+		{Key: "usd", Value: floats.Float(floats.RoundTo(e.USD, 4))},
 		{Key: "unpriced", Value: e.Unpriced},
 		{Key: "unpriced_models", Value: models},
 		{Key: "complete", Value: e.Unpriced == 0},

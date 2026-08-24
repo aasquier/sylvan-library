@@ -16,8 +16,8 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // PrimaryTypes are the card types, most specific first: a "Legendary
@@ -188,19 +188,19 @@ func thousands(n int) string {
 //
 // **The multiply.** `a*b + c*d` is exactly what arm64 fuses into an `FMADDD`,
 // rounding once where CPython rounds twice, on the architecture the image
-// ships. `pyfloat.Rounded` is the explicit conversion the Go spec blesses for
+// ships. `floats.Rounded` is the explicit conversion the Go spec blesses for
 // this; putting each product into a `[]float64` for `Fsum` needs it for the
 // same reason `curve` does. `total` needs it too -- `similarity + 0.10*p` is
 // the same fusable shape with the sum already collapsed.
 func Score(target, candidate *pool.CardRecord, why string) Candidate {
 	targetTokens := Tokens(target.OracleText, why)
-	similarity := pyfloat.Fsum([]float64{
-		pyfloat.Rounded(0.30 * typeScore(target, candidate)),
-		pyfloat.Rounded(0.20 * curveScore(target, candidate)),
-		pyfloat.Rounded(0.15 * keywordScore(target, candidate)),
-		pyfloat.Rounded(0.35 * textScore(targetTokens, candidate)),
+	similarity := floats.Fsum([]float64{
+		floats.Rounded(0.30 * typeScore(target, candidate)),
+		floats.Rounded(0.20 * curveScore(target, candidate)),
+		floats.Rounded(0.15 * keywordScore(target, candidate)),
+		floats.Rounded(0.35 * textScore(targetTokens, candidate)),
 	})
-	total := similarity + pyfloat.Rounded(0.10*popularity(candidate))
+	total := similarity + floats.Rounded(0.10*popularity(candidate))
 
 	reasons := []string{}
 	if typeScore(target, candidate) == 1 {

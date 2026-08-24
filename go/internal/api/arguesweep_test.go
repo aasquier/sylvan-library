@@ -160,7 +160,7 @@ func TestTheSweepLabelCountsInEnglish(t *testing.T) {
 //
 // **One half of this is unobservable here, and is recorded rather than
 // arranged.** Python matches with `casefold()` and the port uses
-// `PyCasefold`, but no card in any fixture deck holds a character where
+// `Casefold`, but no card in any fixture deck holds a character where
 // `casefold` and `lower` disagree -- it takes an `ß`, an `ſ` or a `ς`, and
 // Magic's English names have none. So a `ToLower` mutation survives this
 // test. It is still wrong: this is the one comparison in the family where the

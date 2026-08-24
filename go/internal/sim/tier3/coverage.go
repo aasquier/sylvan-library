@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
-	"github.com/aasquier/sylvan-library/go/internal/pytext"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // `sim/tier3/coverage.py`: the card-coverage pre-flight — does Forge
@@ -203,9 +203,9 @@ func readNames(path string) (map[string]bool, error) {
 			// card script should cost that card, not the whole pre-flight.
 			// Go's []byte -> string is already lossless-to-invalid, and every
 			// `Name:` line the index needs is ASCII or valid UTF-8.
-			for _, line := range pytext.SplitLines(string(body)) {
+			for _, line := range textutil.SplitLines(string(body)) {
 				if strings.HasPrefix(line, "Name:") {
-					names[pytext.Strip(line[5:])] = true
+					names[textutil.Strip(line[5:])] = true
 				}
 			}
 			return nil
@@ -232,7 +232,7 @@ func Resolve(name string, index map[string]bool) string {
 	}
 	if strings.Contains(name, " // ") {
 		for _, face := range strings.Split(name, " // ") {
-			face = pytext.Strip(face)
+			face = textutil.Strip(face)
 			if index[face] {
 				return face
 			}

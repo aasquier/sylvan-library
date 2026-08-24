@@ -1,4 +1,4 @@
-package pytext_test
+package textutil_test
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/aasquier/sylvan-library/go/internal/pytext"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // CPython's whitespace and line-boundary tables, held to a real interpreter.
@@ -24,7 +24,7 @@ import (
 // property, after the theme lane found two tables that failed together for two
 // entirely different reasons.
 
-type pytextCorpus struct {
+type textCorpus struct {
 	SpaceRanges [][2]int `json:"space_ranges"`
 	BreakRanges [][2]int `json:"break_ranges"`
 	Strips      []struct {
@@ -48,10 +48,10 @@ type pytextCorpus struct {
 	} `json:"heads"`
 }
 
-func load(t *testing.T) pytextCorpus {
+func load(t *testing.T) textCorpus {
 	t.Helper()
-	var corpus pytextCorpus
-	raw, err := os.ReadFile(filepath.Join("testdata", "pytext.json"))
+	var corpus textCorpus
+	raw, err := os.ReadFile(filepath.Join("testdata", "corpus.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestIsSpaceIsStrIsSpaceForEveryCodePoint(t *testing.T) {
 			continue
 		}
 		want := inRanges(corpus.SpaceRanges, r)
-		if got := pytext.IsSpace(r); got != want {
+		if got := textutil.IsSpace(r); got != want {
 			if wrong < 10 {
 				t.Errorf("IsSpace(U+%04X) = %v, CPython says %v", r, got, want)
 			}
@@ -112,7 +112,7 @@ func TestGoAndPythonReallyDisagreeAboutWhitespace(t *testing.T) {
 		if !isCharacter(r) {
 			continue
 		}
-		if pytext.IsSpace(r) != unicode.IsSpace(r) {
+		if textutil.IsSpace(r) != unicode.IsSpace(r) {
 			differ = append(differ, r)
 		}
 	}
@@ -133,7 +133,7 @@ func TestSplitLinesAgreesWithPython(t *testing.T) {
 	corpus := load(t)
 	for _, c := range corpus.Splits {
 		t.Run(c.Note, func(t *testing.T) {
-			got := pytext.SplitLines(c.Text)
+			got := textutil.SplitLines(c.Text)
 			if len(got) != len(c.Lines) {
 				t.Fatalf("split %q into %q, want %q", c.Text, got, c.Lines)
 			}
@@ -157,7 +157,7 @@ func TestEveryLineBoundaryIsOneCPythonKnows(t *testing.T) {
 			continue
 		}
 		want := inRanges(corpus.BreakRanges, r)
-		got := len(pytext.SplitLines("a"+string(r)+"b")) == 2
+		got := len(textutil.SplitLines("a"+string(r)+"b")) == 2
 		if got != want {
 			t.Fatalf("U+%04X splits = %v, CPython says %v", r, got, want)
 		}
@@ -168,17 +168,17 @@ func TestEveryLineBoundaryIsOneCPythonKnows(t *testing.T) {
 // own, because it is the single fact most likely to be got wrong by somebody
 // deriving one table from the other.
 func TestUnitSeparatorIsWhitespaceButNotABoundary(t *testing.T) {
-	if !pytext.IsSpace(0x1f) {
+	if !textutil.IsSpace(0x1f) {
 		t.Error("U+001F must be whitespace to str.strip()")
 	}
-	if got := pytext.SplitLines("a\x1fb"); len(got) != 1 {
+	if got := textutil.SplitLines("a\x1fb"); len(got) != 1 {
 		t.Errorf("U+001F split a line into %q; it is not a boundary", got)
 	}
 	for _, r := range []rune{0x1c, 0x1d, 0x1e} {
-		if !pytext.IsSpace(r) {
+		if !textutil.IsSpace(r) {
 			t.Errorf("U+%04X must be whitespace", r)
 		}
-		if got := pytext.SplitLines("a" + string(r) + "b"); len(got) != 2 {
+		if got := textutil.SplitLines("a" + string(r) + "b"); len(got) != 2 {
 			t.Errorf("U+%04X must be a line boundary; got %q", r, got)
 		}
 	}
@@ -189,13 +189,13 @@ func TestStripAndFriendsAgreeWithPython(t *testing.T) {
 	corpus := load(t)
 	for _, c := range corpus.Strips {
 		t.Run(c.Note, func(t *testing.T) {
-			if got := pytext.Strip(c.Text); got != c.Stripped {
+			if got := textutil.Strip(c.Text); got != c.Stripped {
 				t.Errorf("Strip(%q) = %q, want %q", c.Text, got, c.Stripped)
 			}
-			if got := pytext.RStrip(c.Text); got != c.RStripped {
+			if got := textutil.RStrip(c.Text); got != c.RStripped {
 				t.Errorf("RStrip(%q) = %q, want %q", c.Text, got, c.RStripped)
 			}
-			if got := pytext.SplitJoin(c.Text); got != c.SplitJoin {
+			if got := textutil.SplitJoin(c.Text); got != c.SplitJoin {
 				t.Errorf("SplitJoin(%q) = %q, want %q", c.Text, got, c.SplitJoin)
 			}
 		})
@@ -209,10 +209,10 @@ func TestLenAndHeadCountCodePoints(t *testing.T) {
 	corpus := load(t)
 	for _, c := range corpus.Heads {
 		t.Run(c.Note, func(t *testing.T) {
-			if got := pytext.Len(c.Text); got != c.Len {
+			if got := textutil.Len(c.Text); got != c.Len {
 				t.Errorf("Len(%q) = %d, want %d", c.Text, got, c.Len)
 			}
-			if got := pytext.Head(c.Text, c.N); got != c.Head {
+			if got := textutil.Head(c.Text, c.N); got != c.Head {
 				t.Errorf("Head(%q, %d) = %q, want %q", c.Text, c.N, got, c.Head)
 			}
 		})
@@ -225,21 +225,21 @@ func TestLenAndHeadCountCodePoints(t *testing.T) {
 // zero, and a fixed six-digit layout does not.
 func TestIsoformatElidesTheFractionAtAZeroMicrosecond(t *testing.T) {
 	whole := time.Date(2026, 8, 23, 1, 23, 45, 0, time.UTC)
-	if got := pytext.Isoformat(whole); got != "2026-08-23T01:23:45+00:00" {
+	if got := textutil.Isoformat(whole); got != "2026-08-23T01:23:45+00:00" {
 		t.Errorf("Isoformat at a zero microsecond = %q", got)
 	}
 	fraction := time.Date(2026, 8, 23, 1, 23, 45, 678901000, time.UTC)
-	if got := pytext.Isoformat(fraction); got != "2026-08-23T01:23:45.678901+00:00" {
+	if got := textutil.Isoformat(fraction); got != "2026-08-23T01:23:45.678901+00:00" {
 		t.Errorf("Isoformat with microseconds = %q", got)
 	}
 	// Nanoseconds are truncated, not rounded — `datetime` has no finer unit.
 	sub := time.Date(2026, 8, 23, 1, 23, 45, 678901999, time.UTC)
-	if got := pytext.Isoformat(sub); got != "2026-08-23T01:23:45.678901+00:00" {
+	if got := textutil.Isoformat(sub); got != "2026-08-23T01:23:45.678901+00:00" {
 		t.Errorf("Isoformat truncating nanoseconds = %q", got)
 	}
 	// And the offset is `+00:00`, never `Z`: it is a sort key as TEXT in more
 	// than one table here.
-	if got := pytext.Isoformat(whole); got[len(got)-6:] != "+00:00" {
+	if got := textutil.Isoformat(whole); got[len(got)-6:] != "+00:00" {
 		t.Errorf("Isoformat ended %q, want +00:00", got[len(got)-6:])
 	}
 }

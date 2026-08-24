@@ -12,32 +12,31 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// Python's `int()` over a JSON-decoded value, for the theme interview's
-// reading seed.
+// The lenient number grammars: [IntValue] and [FloatValue] over a
+// JSON-decoded value, for the theme interview's reading seed and the
+// proposal's budget.
 //
-// **This is not the tarot route's seed parser and must not become it.**
-// `/api/tarot/reading` takes its seed from a query string through FastAPI's
-// `seed: int | None`, which is *Pydantic's* integer grammar -- measured
-// against the running app in the tarot lane, and it refuses the fullwidth
-// `７` that Python's own `int()` reads as seven. `theme._reading_for` spells
-// it `int(seed)`. Two different functions on two different doors, and the
-// difference is observable: a client that puts `"１０"` in a JSON body gets
-// reading ten from Python.
+// **[IntValue] is not the tarot route's seed parser and must not become
+// it.** `/api/tarot/reading` takes its seed from a query string through a
+// strict decimal grammar that refuses the fullwidth `７` this one reads as
+// seven. Two different grammars on two different doors, deliberately, and
+// the difference is observable: a client that puts `"１０"` in a JSON body
+// gets reading ten.
 //
-// What `int()` accepts, and what each does here:
+// What the grammar accepts:
 //
-//   - an int -- itself, unbounded, so a `*big.Int`;
+//   - an integer -- itself, unbounded, so a `*big.Int`;
 //   - a float -- **truncated toward zero**, so 5.9 is five, and NaN or an
-//     infinity raises (`ValueError` / `OverflowError`, both caught by the
-//     same handler in Python and both a refusal here);
-//   - a bool -- one or zero, because `bool` is an `int` in Python;
+//     infinity is a refusal;
+//   - a bool -- one or zero;
 //   - a string -- optional surrounding whitespace, an optional sign, and
 //     digits with single underscores between them, where a "digit" is **any
 //     Unicode decimal digit** and not only ASCII;
-//   - anything else -- a `TypeError`, which is the same refusal.
+//   - anything else -- the same refusal.
 
 //go:embed data/digits.json
 var digitsFile []byte
@@ -62,9 +61,9 @@ func init() {
 	digitZeros = payload.Zeros
 }
 
-// pyDigitValue is the decimal value of one Unicode digit, and whether it is
+// digitValue is the decimal value of one Unicode digit, and whether it is
 // one at all.
-func pyDigitValue(r rune) (int, bool) {
+func digitValue(r rune) (int, bool) {
 	if r >= '0' && r <= '9' {
 		return int(r - '0'), true
 	}
@@ -78,12 +77,13 @@ func pyDigitValue(r rune) (int, bool) {
 //
 // **Split out so its guard can be reached at all.** Every code point Go calls
 // a digit today sits inside a run this table knows, so `d < 10` never fires
-// through `pyDigitValue` and a mutation dropping it survives every sweep of
+// through `digitValue` and a mutation dropping it survives every sweep of
 // Unicode there is -- which is what "equivalent over the reachable input"
 // looks like rather than a gap in the sweep. The case the guard is for cannot
 // be reached from outside: **a rune Go's `unicode` tables call a digit and
-// this table, swept from CPython, has never heard of**, which is a Unicode
-// version moving under one runtime and not the other. Then the distance from
+// this recorded table has never heard of**, which is a Unicode version
+// moving under the toolchain while the recorded grammar stands still.
+// Then the distance from
 // the last known run start is arbitrary, and answering it would be a
 // confident wrong digit where refusing is a refusal to guess. Handing the
 // table in is how a test says that out loud.
@@ -101,27 +101,27 @@ func digitValueIn(zeros []rune, r rune) (int, bool) {
 // asciiDigits rewrites a Unicode digit's value as its ASCII spelling. An
 // index rather than `byte('0' + value)`, so the range that makes the
 // conversion safe is the string's own length rather than a claim about
-// `pyDigitValue` made somewhere else.
+// `digitValue` made somewhere else.
 const asciiDigits = "0123456789"
 
-// errNotAnInt stands for every way `int()` refuses, since Python catches
-// `TypeError` and `ValueError` in one handler and says the same sentence for
-// both.
+// errNotAnInt stands for every way the grammar refuses — a wrong type and a
+// malformed value say the same sentence, so one error covers both.
 var errNotAnInt = fmt.Errorf("not an integer")
 
-// PyInt is `int(v)` over a JSON-decoded value, exported beside [PyFloat] and
-// for the same reason it is: a second family needs Python's own integer
-// grammar. The theme proposal's budget was the first; `POST /api/sim/forge`'s
-// games count and seed are the second, and `strconv.Atoi` is not this — `1_0`
-// is ten, a float truncates, a bool is 0 or 1, and a fullwidth digit reads.
+// IntValue reads an integer from a JSON-decoded value, exported beside
+// [FloatValue] and for the same reason it is: a second family needs the
+// same lenient grammar. The theme interview's reading seed was the first;
+// `POST /api/sim/forge`'s games count and seed are the second, and
+// `strconv.Atoi` is not this — `1_0` is ten, a float truncates, a bool is
+// 0 or 1, and a fullwidth digit reads.
 //
-// A `*big.Int` because Python's integers are unbounded and a Forge seed is
-// echoed back to the caller: narrowing here would answer a different number
-// than the one somebody asked with.
-func PyInt(v any) (*big.Int, error) { return pyInt(v) }
+// A `*big.Int` because the grammar is unbounded and a Forge seed is echoed
+// back to the caller: narrowing here would answer a different number than
+// the one somebody asked with.
+func IntValue(v any) (*big.Int, error) { return intValue(v) }
 
-// pyInt is `int(v)` over a JSON-decoded value.
-func pyInt(v any) (*big.Int, error) {
+// intValue reads an integer from a JSON-decoded value.
+func intValue(v any) (*big.Int, error) {
 	switch value := v.(type) {
 	case bool:
 		if value {
@@ -129,7 +129,7 @@ func pyInt(v any) (*big.Int, error) {
 		}
 		return big.NewInt(0), nil
 	case string:
-		return pyIntFromString(value)
+		return intFromString(value)
 	case json.Number:
 		// The body is decoded with UseNumber, so an integer literal is still
 		// exact here -- `int(10000000000000000001)` must not lose its last
@@ -141,9 +141,9 @@ func pyInt(v any) (*big.Int, error) {
 		if err != nil {
 			return nil, errNotAnInt
 		}
-		return pyIntFromFloat(f)
+		return intFromFloat(f)
 	case float64:
-		return pyIntFromFloat(value)
+		return intFromFloat(value)
 	case int:
 		return big.NewInt(int64(value)), nil
 	case int64:
@@ -155,9 +155,9 @@ func pyInt(v any) (*big.Int, error) {
 	}
 }
 
-// pyIntFromFloat is `int(f)`: truncation toward zero, and a refusal for a
+// intFromFloat is `int(f)`: truncation toward zero, and a refusal for a
 // value that has no integer at all.
-func pyIntFromFloat(f float64) (*big.Int, error) {
+func intFromFloat(f float64) (*big.Int, error) {
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return nil, errNotAnInt
 	}
@@ -165,14 +165,14 @@ func pyIntFromFloat(f float64) (*big.Int, error) {
 	return n, nil
 }
 
-// pyIntFromString is `int(s)` for a `str`: Python's integer literal grammar.
+// intFromString reads the string form of the integer grammar.
 //
 // Underscores are separators and only between digits -- not leading, not
 // trailing, not doubled, not next to the sign -- which is the same rule the
 // tarot route's scanner applies to a query value. Everything else about the
 // two differs.
-func pyIntFromString(s string) (*big.Int, error) {
-	body := strings.TrimFunc(s, pyIsSpace)
+func intFromString(s string) (*big.Int, error) {
+	body := strings.TrimFunc(s, textutil.IsSpace)
 	if body == "" {
 		return nil, errNotAnInt
 	}
@@ -194,15 +194,15 @@ func pyIntFromString(s string) (*big.Int, error) {
 			if i == 0 || i == len(runes)-1 {
 				return nil, errNotAnInt
 			}
-			if _, ok := pyDigitValue(runes[i-1]); !ok {
+			if _, ok := digitValue(runes[i-1]); !ok {
 				return nil, errNotAnInt
 			}
-			if _, ok := pyDigitValue(runes[i+1]); !ok {
+			if _, ok := digitValue(runes[i+1]); !ok {
 				return nil, errNotAnInt
 			}
 			continue
 		}
-		value, ok := pyDigitValue(r)
+		value, ok := digitValue(r)
 		if !ok {
 			return nil, errNotAnInt
 		}
@@ -218,20 +218,19 @@ func pyIntFromString(s string) (*big.Int, error) {
 	return out, nil
 }
 
-// pyFormatG is `f"{v:g}"`: the format the proposal's budget sentence uses.
+// formatG is the `g` rendering the proposal's budget sentence uses.
 //
-// Go's `'g'` with an explicit precision of 6 **is** Python's default `g` --
-// same significant-digit count, same trailing-zero removal, same switch to
-// exponent form outside `[-4, precision)`, same two-digit exponent. The
-// precision has to be spelled out: Go's default for `'g'` is -1, which is the
-// shortest round-tripping form, and `f"{1234567.0:g}"` is `1.23457e+06` where
-// that would give `1.234567e+06`.
+// Go's `'g'` with an explicit precision of 6 is the recorded rendering --
+// six significant digits, trailing zeros removed, a switch to exponent form
+// outside `[-4, 6)`, a two-digit exponent. The precision has to be spelled
+// out: Go's default for `'g'` is -1, the shortest round-tripping form, which
+// would write `1.234567e+06` where the recorded form is `1.23457e+06`.
 //
-// The three special values are Python's spelling and not Go's, which is the
-// whole reason this is a function rather than a call. A budget arrives as
-// `float(payload["budget"])`, and `float("inf")` is a thing a client can
-// send.
-func pyFormatG(v float64) string {
+// The three special values are spelled `nan`, `inf` and `-inf` — the served
+// spelling, not Go's `NaN`/`+Inf` — which is the whole reason this is a
+// function rather than a call. A budget goes through [FloatValue], and
+// `"inf"` is a thing a client can send.
+func formatG(v float64) string {
 	switch {
 	case math.IsNaN(v):
 		return "nan"
@@ -243,21 +242,22 @@ func pyFormatG(v float64) string {
 	return strconv.FormatFloat(v, 'g', 6, 64)
 }
 
-// ErrFloatType is `float()`'s `TypeError`: the argument is not a string or a
-// number. Its own error because the theme proposal's route catches
-// `ValueError` and **not** this one, so the two reach the client as different
-// statuses.
+// ErrFloatType is the refusal for a value that is not a string or a number.
+// Its own error, distinct from a malformed string's, because the theme
+// proposal's route answers the two with different statuses. The message is a
+// recorded wire shape — it reaches the client as a 422's `detail` — so its
+// words stay exactly as recorded.
 var ErrFloatType = fmt.Errorf("float() argument must be a string or a real number")
 
-// PyFloat is `float(v)` over a JSON-decoded value.
+// FloatValue reads a float from a JSON-decoded value.
 //
-// Not `strconv.ParseFloat`, and the differences all reach a user. Python's
+// Not `strconv.ParseFloat`, and the differences all reach a user. The
 // grammar takes underscores between digits (`1_0` is ten), any Unicode
 // decimal digit (`５` is five), and the bare words `inf`, `infinity` and
 // `nan` in any case with an optional sign -- while refusing the hex float
-// and the `p` exponent that Go accepts. The refusal message is Python's own,
-// because it is what reaches the client as a 422's `detail`.
-func PyFloat(v any) (float64, error) {
+// and the `p` exponent that `strconv` accepts. The refusal message is a
+// recorded shape, because it is what reaches the client as a 422's `detail`.
+func FloatValue(v any) (float64, error) {
 	switch value := v.(type) {
 	case bool:
 		if value {
@@ -267,23 +267,23 @@ func PyFloat(v any) (float64, error) {
 	case float64:
 		return value, nil
 	case json.Number:
-		return pyFloatFromString(value.String())
+		return floatFromString(value.String())
 	case string:
-		return pyFloatFromString(value)
+		return floatFromString(value)
 	case int:
 		return float64(value), nil
 	case int64:
 		return float64(value), nil
 	default:
-		return 0, fmt.Errorf("%w, not '%s'", ErrFloatType, pyTypeName(v))
+		return 0, fmt.Errorf("%w, not '%s'", ErrFloatType, typeName(v))
 	}
 }
 
-func pyFloatFromString(raw string) (float64, error) {
+func floatFromString(raw string) (float64, error) {
 	refuse := func() (float64, error) {
-		return 0, fmt.Errorf("could not convert string to float: %s", wire.PyRepr(raw))
+		return 0, fmt.Errorf("could not convert string to float: %s", wire.Quote(raw))
 	}
-	body := strings.TrimFunc(raw, pyIsSpace)
+	body := strings.TrimFunc(raw, textutil.IsSpace)
 	if body == "" {
 		return refuse()
 	}
@@ -295,11 +295,11 @@ func pyFloatFromString(raw string) (float64, error) {
 		sign = -1
 		body = body[1:]
 	}
-	switch pyCasefold(body) {
+	switch casefold(body) {
 	case "inf", "infinity":
 		return sign * math.Inf(1), nil
 	case "nan":
-		// Python's `float("-nan")` is a NaN too; the sign is carried and never
+		// `-nan` reads as a NaN too; the sign is carried and never
 		// observed, so it is dropped here rather than pretended about.
 		return math.NaN(), nil
 	}
@@ -315,15 +315,15 @@ func pyFloatFromString(raw string) (float64, error) {
 			if i == 0 || i == len(runes)-1 {
 				return refuse()
 			}
-			if _, ok := pyDigitValue(runes[i-1]); !ok {
+			if _, ok := digitValue(runes[i-1]); !ok {
 				return refuse()
 			}
-			if _, ok := pyDigitValue(runes[i+1]); !ok {
+			if _, ok := digitValue(runes[i+1]); !ok {
 				return refuse()
 			}
 			continue
 		}
-		if value, ok := pyDigitValue(r); ok {
+		if value, ok := digitValue(r); ok {
 			ascii.WriteByte(asciiDigits[value])
 			continue
 		}
@@ -333,16 +333,16 @@ func pyFloatFromString(raw string) (float64, error) {
 		ascii.WriteByte(byte(r))
 	}
 	text := ascii.String()
-	// Go accepts spellings Python does not, and every one of them would be a
-	// silent widening of what this endpoint takes.
+	// `strconv` accepts spellings this grammar does not, and every one of
+	// them would be a silent widening of what this endpoint takes.
 	if strings.ContainsAny(text, "xXpP") || strings.Contains(text, "0x") {
 		return refuse()
 	}
 	out, err := strconv.ParseFloat(text, 64)
 	if err != nil {
 		if errors.Is(err, strconv.ErrRange) {
-			// `float("1e400")` is `inf` in Python, not an error: the literal
-			// overflows and Python says so by answering an infinity.
+			// `1e400` is `inf`, not an error: the literal overflows and the
+			// grammar says so by answering an infinity.
 			return sign * out, nil
 		}
 		return refuse()

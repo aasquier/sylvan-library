@@ -320,7 +320,7 @@ func (a *API) commanderPrintings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if entry == nil {
-			wire.Detail(w, http.StatusUnprocessableEntity, wire.PyRepr(vals[len(vals)-1])+" is not in this deck")
+			wire.Detail(w, http.StatusUnprocessableEntity, wire.Quote(vals[len(vals)-1])+" is not in this deck")
 			return
 		}
 		name, selected = entry.Name, entry.Art

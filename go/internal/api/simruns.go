@@ -11,11 +11,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/compile"
@@ -345,23 +345,23 @@ func manaResultFrom(slug string, d *deck.Deck, summary tier1.SimSummary, p manaP
 	for t := 0; t < p.turns; t++ {
 		byTurn = append(byTurn, byTurnRow{
 			Turn:          t + 1,
-			Lands:         pyfloat.RoundTo(summary.AvgLandsByTurn[t], 2),
-			Mana:          pyfloat.RoundTo(summary.AvgManaByTurn[t], 2),
-			Unused:        pyfloat.RoundTo(summary.AvgUnusedByTurn[t], 2),
-			Spells:        pyfloat.RoundTo(summary.AvgSpellsByTurn[t], 2),
+			Lands:         floats.RoundTo(summary.AvgLandsByTurn[t], 2),
+			Mana:          floats.RoundTo(summary.AvgManaByTurn[t], 2),
+			Unused:        floats.RoundTo(summary.AvgUnusedByTurn[t], 2),
+			Spells:        floats.RoundTo(summary.AvgSpellsByTurn[t], 2),
 			CommanderDown: summary.CommanderByTurn[t+1],
 			// P(no land to play this turn) -- the drop that could not be made,
 			// never the one held back.
-			MissedDrop: pyfloat.RoundTo(summary.MissedDropByTurn[t], 4),
+			MissedDrop: floats.RoundTo(summary.MissedDropByTurn[t], 4),
 		})
 	}
 	timings := make([]cardTimingRow, 0, len(summary.CardTimings))
 	for _, ct := range summary.CardTimings {
 		timings = append(timings, cardTimingRow{
 			Name: ct.Name, MV: ct.MV,
-			CastRate:   pyfloat.RoundTo(ct.CastRate, 4),
+			CastRate:   floats.RoundTo(ct.CastRate, 4),
 			MedianTurn: ct.MedianTurn,
-			ByT8:       pyfloat.RoundTo(ct.ByT8, 4),
+			ByT8:       floats.RoundTo(ct.ByT8, 4),
 		})
 	}
 	return manaResult{
@@ -374,7 +374,7 @@ func manaResultFrom(slug string, d *deck.Deck, summary tier1.SimSummary, p manaP
 		ColorScrewRate:      summary.ColorScrewRate,
 		ByTurn:              byTurn,
 		MedianFirstSpell:    summary.MedianFirstSpellTurn,
-		StalledTurns:        pyfloat.RoundTo(summary.AvgStalledTurns, 2),
+		StalledTurns:        floats.RoundTo(summary.AvgStalledTurns, 2),
 		CardTimings:         timings,
 		Caveat:              Tier1Caveat,
 	}
@@ -528,8 +528,8 @@ func landRowFrom(count int, summary tier1.SimSummary) landRow {
 	return landRow{
 		Lands:           count,
 		CommanderByT5:   summary.CommanderByTurn[5],
-		SpellsThroughT8: pyfloat.RoundTo(summary.SpellsThrough(8), 2),
-		WastedThroughT8: pyfloat.RoundTo(summary.WastedThrough(8), 2),
+		SpellsThroughT8: floats.RoundTo(summary.SpellsThrough(8), 2),
+		WastedThroughT8: floats.RoundTo(summary.WastedThrough(8), 2),
 		MulliganRate:    summary.MulliganRate,
 	}
 }
@@ -554,7 +554,7 @@ func landSummaryFrom(slug string, d *deck.Deck, rows []landRow, games, seed int)
 	spread := hi - lo
 	return landSummary{
 		Slug: slug, DeckName: d.Name, Games: games, Seed: seed, Rows: rows,
-		DeploymentSpread: pyfloat.RoundTo(spread, 2),
+		DeploymentSpread: floats.RoundTo(spread, 2),
 		ArgmaxLands:      best.Lands,
 		Flat:             spread < 0.25,
 		Caveat:           LandSweepCaveat,

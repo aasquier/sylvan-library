@@ -1,4 +1,4 @@
-package pyrand
+package mt19937
 
 import (
 	"math"

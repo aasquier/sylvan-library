@@ -19,6 +19,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 	"github.com/aasquier/sylvan-library/go/internal/tarot"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -154,7 +155,7 @@ func ReadBudget(raw any) (*float64, error) {
 	if !pyTruthyValue(raw) {
 		return nil, nil
 	}
-	value, err := PyFloat(raw)
+	value, err := FloatValue(raw)
 	if err != nil {
 		return nil, ErrBudgetRejected
 	}
@@ -207,7 +208,7 @@ func Prose(text any) string {
 		themeLog.Warn("prose() removed control characters from model text",
 			"removed", removed, "codepoints", strings.Join(names, ", "))
 	}
-	return pySplitJoin(cleaned)
+	return textutil.SplitJoin(cleaned)
 }
 
 // normalise is lowercased and whitespace-collapsed, punctuation left alone.
@@ -216,10 +217,10 @@ func Prose(text any) string {
 // "cats" match "cats?" but would also start matching things that are not
 // quotes, and the value of this check is that it is hard to pass by accident.
 //
-// `pyCasefold` and not `strings.ToLower` -- see `pycasefold.go`. This is the
+// `casefold` and not `strings.ToLower` -- see `pycasefold.go`. This is the
 // one call in the package where the two can disagree about strings a person
 // actually typed.
-func normalise(text string) string { return pyCasefold(pySplitJoin(text)) }
+func normalise(text string) string { return casefold(textutil.SplitJoin(text)) }
 
 // TranscriptTurn is one client-held turn: plain text with a role, and nothing
 // structural.
@@ -270,12 +271,12 @@ func Ground(slots []any, transcript []TranscriptTurn) ([]Slot, int) {
 			dropped++
 			continue
 		}
-		kind := pyStrip(pyStrOr(item["kind"]))
+		kind := textutil.Strip(pyStrOr(item["kind"]))
 		quote := Prose(item["quote"])
 		value := Prose(item["value"])
 		needle := normalise(quote)
 		if !slotKind(kind) || value == "" ||
-			PyLen(needle) < MinQuoteChars || !strings.Contains(haystack, needle) {
+			textutil.Len(needle) < MinQuoteChars || !strings.Contains(haystack, needle) {
 			dropped++
 			continue
 		}
@@ -444,13 +445,13 @@ func CheckTold(raw any) ([]string, error) {
 		if !ok {
 			return nil, rejectTranscript("fact %d is not a string", i)
 		}
-		text = pyStrip(text)
+		text = textutil.Strip(text)
 		if text == "" {
 			continue
 		}
-		if PyLen(text) > MaxFactChars {
+		if textutil.Len(text) > MaxFactChars {
 			return nil, rejectTranscript(
-				"fact %d is %d characters; the cap is %d", i, PyLen(text), MaxFactChars)
+				"fact %d is %d characters; the cap is %d", i, textutil.Len(text), MaxFactChars)
 		}
 		out = append(out, text)
 	}
@@ -493,7 +494,7 @@ func KeepFact(raw any, searched []Page) *Fact {
 	if text == "" || source == "" {
 		return nil
 	}
-	folded := pyCasefold(source)
+	folded := casefold(source)
 	if strings.HasPrefix(folded, TarotSource) {
 		entry := reference.TarotFactByID(source[len(TarotSource):])
 		if entry == nil {
@@ -550,19 +551,19 @@ func CheckTranscript(raw any) ([]TranscriptTurn, error) {
 		if !ok {
 			return nil, rejectTranscript("turn %d is not an object", i)
 		}
-		role := pyStrip(pyStrOr(turn["role"]))
-		text := pyStrip(pyStrOr(turn["text"]))
+		role := textutil.Strip(pyStrOr(turn["role"]))
+		text := textutil.Strip(pyStrOr(turn["text"]))
 		if role != "user" && role != "assistant" {
 			return nil, rejectTranscript(
 				"turn %d has role %s; only 'user' and 'assistant' cross this "+
-					"boundary", i, wire.PyRepr(role))
+					"boundary", i, wire.Quote(role))
 		}
 		if text == "" {
 			return nil, rejectTranscript("turn %d is empty", i)
 		}
-		if PyLen(text) > MaxTurnChars {
+		if textutil.Len(text) > MaxTurnChars {
 			return nil, rejectTranscript("turn %d is %d characters; the cap is %d",
-				i, PyLen(text), MaxTurnChars)
+				i, textutil.Len(text), MaxTurnChars)
 		}
 		// Alternation is deliberately **not** required: the Messages API
 		// accepts consecutive same-role turns and combines them. Requiring it
@@ -975,7 +976,7 @@ func seedFor(who Persona, seed any) (*big.Int, error) {
 	if !who.Deals || seed == nil {
 		return nil, nil
 	}
-	n, err := pyInt(seed)
+	n, err := intValue(seed)
 	if err != nil {
 		// `int(seed)` raises `TypeError` for a list and `ValueError` for a
 		// string that is not a number; Python catches both and says the same
@@ -1424,7 +1425,7 @@ func proposalAsk(grounded []Slot, budget *float64, avoid string) string {
 		"That is the conversation. Here is what was heard, and every one of " +
 			"these is quoted from something they actually typed:",
 		"",
-		pyDumps(rows, pyDumpOptions{Indent: 2}),
+		dumpJSON(rows, dumpOptions{Indent: 2}),
 		"",
 	}
 	// `if budget:` -- a zero budget is no budget, which is Python's truthiness
@@ -1433,11 +1434,11 @@ func proposalAsk(grounded []Slot, budget *float64, avoid string) string {
 		lines = append(lines, fmt.Sprintf(
 			"They have about $%s for the whole deck, so pass price_max to "+
 				"search_cards and prefer commanders that do not need an "+
-				"expensive shell.", pyFormatG(*budget)))
+				"expensive shell.", formatG(*budget)))
 	}
-	if pyStrip(avoid) != "" {
+	if textutil.Strip(avoid) != "" {
 		lines = append(lines, "Colours or things to steer away from, in their "+
-			"words: "+pyStrip(avoid))
+			"words: "+textutil.Strip(avoid))
 	}
 	lines = append(lines,
 		"Propose two colour combinations and three commanders for each. The "+
@@ -1468,7 +1469,7 @@ func resolveCombinations(ctx context.Context, conn *pool.Conn, raw any,
 		if !ok {
 			continue
 		}
-		combo, ok := valid[strings.ToUpper(pyStrip(pyStrOr(row["key"])))]
+		combo, ok := valid[strings.ToUpper(textutil.Strip(pyStrOr(row["key"])))]
 		if !ok {
 			lost++
 			continue
@@ -1541,7 +1542,7 @@ func resolveCommanders(ctx context.Context, conn *pool.Conn, raw any,
 	names := make([]string, 0, len(rows))
 	wanted := []string{}
 	for _, row := range rows {
-		name := pyStrip(pyStrOr(row["card"]))
+		name := textutil.Strip(pyStrOr(row["card"]))
 		names = append(names, name)
 		if name != "" {
 			wanted = append(wanted, name)
@@ -1557,7 +1558,7 @@ func resolveCommanders(ctx context.Context, conn *pool.Conn, raw any,
 	}
 	found := map[string]deckread.NamedCard{}
 	for _, record := range looked.Cards {
-		found[pyCasefold(record.Name)] = record
+		found[casefold(record.Name)] = record
 	}
 	identity := map[string]bool{}
 	for _, c := range combo.Colors {
@@ -1567,7 +1568,7 @@ func resolveCommanders(ctx context.Context, conn *pool.Conn, raw any,
 	out := []Commander{}
 	dropped := 0
 	for i, row := range rows {
-		record, ok := found[pyCasefold(names[i])]
+		record, ok := found[casefold(names[i])]
 		if !ok || !sameIdentity(record.ColorIdentity, identity) {
 			dropped++
 			continue

@@ -1,4 +1,4 @@
-package pyrand
+package mt19937
 
 import "math/bits"
 
@@ -38,7 +38,7 @@ import "math/bits"
 // stops being true. A hang is a worse answer than a panic.
 func (r *Random) RandBelow(n int64) int64 {
 	if n <= 0 {
-		panic("pyrand: RandBelow needs a positive bound")
+		panic("mt19937: RandBelow needs a positive bound")
 	}
 	// Compared in the unsigned domain, which is the one `getrandbits` answers
 	// in; the two conversions are exact because n is positive and every value
@@ -60,7 +60,7 @@ func (r *Random) RandBelow(n int64) int64 {
 // `_randbelow`, with no arithmetic in between.
 func (r *Random) RandRange(stop int64) int64 {
 	if stop <= 0 {
-		panic("pyrand: RandRange needs a positive stop")
+		panic("mt19937: RandRange needs a positive stop")
 	}
 	return r.RandBelow(stop)
 }
@@ -82,7 +82,7 @@ func (r *Random) RandRangeStep(start, stop, step int64) int64 {
 		if width > 0 {
 			return start + r.RandBelow(width)
 		}
-		panic("pyrand: empty range in RandRangeStep")
+		panic("mt19937: empty range in RandRangeStep")
 	}
 
 	var count int64
@@ -92,10 +92,10 @@ func (r *Random) RandRangeStep(start, stop, step int64) int64 {
 	case step < 0:
 		count = floorDiv(width+step+1, step)
 	default:
-		panic("pyrand: zero step in RandRangeStep")
+		panic("mt19937: zero step in RandRangeStep")
 	}
 	if count <= 0 {
-		panic("pyrand: empty range in RandRangeStep")
+		panic("mt19937: empty range in RandRangeStep")
 	}
 	return start + step*r.RandBelow(count)
 }
@@ -149,7 +149,7 @@ func ShuffleSlice[T any](r *Random, x []T) {
 // It panics on an empty sequence, where CPython raises IndexError.
 func (r *Random) ChoiceIndex(length int) int {
 	if length <= 0 {
-		panic("pyrand: ChoiceIndex on an empty sequence")
+		panic("mt19937: ChoiceIndex on an empty sequence")
 	}
 	return int(r.RandBelow(int64(length)))
 }

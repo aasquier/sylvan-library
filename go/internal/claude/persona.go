@@ -98,7 +98,7 @@ type UnknownPersonaError struct{ Requested any }
 func (e *UnknownPersonaError) Error() string {
 	quoted := make([]string, len(PersonaKeys))
 	for i, k := range PersonaKeys {
-		quoted[i] = wire.PyRepr(k)
+		quoted[i] = wire.Quote(k)
 	}
 	return fmt.Sprintf("no persona %s; there is %s",
 		pyReprAny(e.Requested), strings.Join(quoted, ", "))

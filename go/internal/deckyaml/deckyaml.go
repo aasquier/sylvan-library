@@ -47,7 +47,7 @@ type Pair struct {
 
 // Map is a YAML mapping in the order the document wrote it.
 //
-// The same shape as `pyyaml.Map` next door and deliberately not the same
+// The same shape as `yamlemit.Map` next door and deliberately not the same
 // type: that one is a payload somebody is about to *emit*, built key by key
 // by a dumper, and this one is what a file said. They meet in
 // `deck.Dump`, which converts.

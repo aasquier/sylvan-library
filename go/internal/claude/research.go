@@ -12,6 +12,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // Research: the questions the pool cannot answer, with the pages that can.
@@ -79,12 +80,12 @@ func (e *ErrQuestionRejected) Error() string { return e.Msg }
 // exactly the judgement-call guard this project keeps refusing, and the
 // structural version is that the mode has no deck to reach.
 func CheckQuestion(raw any) (string, error) {
-	question := pyStrip(pyStrOr(raw))
+	question := textutil.Strip(pyStrOr(raw))
 	if question == "" {
 		return "", &ErrQuestionRejected{Msg: "Ask something. The research surface " +
 			"takes a question about Magic in plain words."}
 	}
-	if n := PyLen(question); n > MaxQuestion {
+	if n := textutil.Len(question); n > MaxQuestion {
 		return "", &ErrQuestionRejected{Msg: fmt.Sprintf(
 			"That question is %d characters, and the ceiling is %d. Anything "+
 				"longer is usually a pasted decklist, and this surface cannot see "+
@@ -111,7 +112,7 @@ func CheckQuestion(raw any) (string, error) {
 // for a property nobody can observe; `TestTheQuestionKeyLowercasesWhere\
 // PythonCasefolds` names the gap so it is known rather than found.
 func QuestionKey(question string) string {
-	normalised := strings.ToLower(pySplitJoin(question))
+	normalised := strings.ToLower(textutil.SplitJoin(question))
 	sum := sha256.Sum256([]byte(normalised))
 	return "research:" + hex.EncodeToString(sum[:])[:16]
 }

@@ -1,4 +1,4 @@
-package pyyaml
+package yamlemit
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ func Render(key string, value any, indent int, width int, fold bool) ([]string, 
 	if fold {
 		text, ok := value.(string)
 		if !ok {
-			return nil, fmt.Errorf("pyyaml: only a string folds, not %T", value)
+			return nil, fmt.Errorf("yamlemit: only a string folds, not %T", value)
 		}
 		payload = folded(text)
 	}
@@ -171,7 +171,7 @@ func scalarOf(value any) (scalar, error) {
 		}
 		return scalar{text: "false", implicit: true}, nil
 	default:
-		return scalar{}, fmt.Errorf("pyyaml: cannot render %T", value)
+		return scalar{}, fmt.Errorf("yamlemit: cannot render %T", value)
 	}
 }
 

@@ -98,10 +98,10 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 	// `str(payload.get("media_type") or "image/jpeg")`: `str` and not a cast,
 	// so an int media type becomes "7" and refuses by name rather than by
 	// type. Measured -- a list becomes "['a']" and repr-quotes with double
-	// quotes in the refusal, which is `wire.PyRepr`'s job.
+	// quotes in the refusal, which is `wire.Quote`'s job.
 	mediaType := "image/jpeg"
 	if pyTruthy(body["media_type"]) {
-		mediaType = claude.PyStr(body["media_type"])
+		mediaType = claude.Plain(body["media_type"])
 	}
 
 	// Built here, before anything is queued: this is what validates the

@@ -45,14 +45,14 @@ const (
 	// of multiplications per term, then `Fsum` over up to a hundred terms.
 	// Exact anyway, because the multiplication order is Python's (the pip
 	// buckets keep first-appearance order, which is what makes float
-	// multiplication's non-associativity harmless) and `pyfloat.Fsum` is CPython's
+	// multiplication's non-associativity harmless) and `floats.Fsum` is CPython's
 	// own summation. Wanted because `CardOdds.ReliableTurn` compares this
 	// against 0.90, and one ulp there moves a card's `Lateness`, which is the
 	// shelf's sort key.
 	epsilonCastableOdds = 0.0
 
 	// regressionLands: a fitted line over an exact integer mean. Its float
-	// output is `average_mana_value`, rounded to two places by `pyfloat.RoundTo`;
+	// output is `average_mana_value`, rounded to two places by `floats.RoundTo`;
 	// its integer output is a land count rounded ties-to-even. Exact because
 	// the three constants are the same doubles and the evaluation order is the
 	// same, with the fused multiply-add guarded at both product sites.

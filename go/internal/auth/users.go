@@ -109,7 +109,7 @@ func NormaliseUsername(username string) (string, error) {
 	if !UsernamePattern.MatchString(candidate) {
 		return "", failf("%w: %s is not a usable username -- 2 to 32 characters, "+
 			"letters, digits, dot, dash or underscore, starting with a letter "+
-			"or digit", ErrInvalidUsername, wire.PyRepr(username))
+			"or digit", ErrInvalidUsername, wire.Quote(username))
 	}
 	return candidate, nil
 }
@@ -133,7 +133,7 @@ func NormaliseEmail(email string) (string, error) {
 			clipped = clipped[:MaxEmail]
 		}
 		return "", failf("%w: %s does not look like an email address",
-			ErrInvalidEmail, wire.PyRepr(clipped))
+			ErrInvalidEmail, wire.Quote(clipped))
 	}
 	return candidate, nil
 }

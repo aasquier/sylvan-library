@@ -61,7 +61,7 @@ type ErrCardNotInDeck struct{ Card, Slug string }
 func (e *ErrCardNotInDeck) Error() string {
 	return fmt.Sprintf("%s is not in %s. The interview argues about a card "+
 		"already in a deck; adding one is a different operation.",
-		wire.PyRepr(e.Card), e.Slug)
+		wire.Quote(e.Card), e.Slug)
 }
 
 // MaxSiblings caps the sibling rationales, which are the most useful thing in

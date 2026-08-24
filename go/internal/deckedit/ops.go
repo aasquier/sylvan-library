@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyyaml"
+	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
 // The nine operations. Each takes the file's text and hands back the text it
@@ -699,7 +699,7 @@ func SetNote(text, key, value string) (string, error) {
 		for anchor > 0 && strings.TrimSpace(lines[anchor-1]) == "" {
 			anchor--
 		}
-		body, err := pyyaml.Render(key, value, 2, pyyaml.ProseWidth, true)
+		body, err := yamlemit.Render(key, value, 2, yamlemit.ProseWidth, true)
 		if err != nil {
 			return "", err
 		}
@@ -727,7 +727,7 @@ func SetNote(text, key, value string) (string, error) {
 			}
 			break
 		}
-		rendered, err := pyyaml.Render(key, value, indent, pyyaml.ProseWidth, true)
+		rendered, err := yamlemit.Render(key, value, indent, yamlemit.ProseWidth, true)
 		if err != nil {
 			return "", err
 		}

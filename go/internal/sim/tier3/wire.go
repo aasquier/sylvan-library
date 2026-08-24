@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -168,7 +168,7 @@ type WireRun struct {
 	// so nothing observable turns on it today — which is exactly when a
 	// difference like this is cheap to get right.
 	Seats map[int]string
-	// WallSeconds renders through `pyfloat.Float` in MarshalJSON below:
+	// WallSeconds renders through `floats.Float` in MarshalJSON below:
 	// Python writes `1.0` for a whole-second match and `encoding/json`
 	// writes `1`, on a wire a Python shim and a Go app can be on
 	// opposite ends of.
@@ -198,7 +198,7 @@ func (w WireRun) MarshalJSON() ([]byte, error) {
 	return wire.MarshalOrdered([]wire.KV{
 		{Key: "games", Value: games},
 		{Key: "seats", Value: seats},
-		{Key: "wall_seconds", Value: pyfloat.Float(w.WallSeconds)},
+		{Key: "wall_seconds", Value: floats.Float(w.WallSeconds)},
 		{Key: "forge_version", Value: w.ForgeVersion},
 	})
 }

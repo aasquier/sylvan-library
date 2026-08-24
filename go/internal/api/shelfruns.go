@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/library"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/curve"
@@ -176,7 +176,7 @@ func colorsPayload(cs []karsten.ColorRequirement) []colorPayload {
 			tiers = append(tiers, pipTierPayload{
 				Pips: t.Pips, Turn: t.Turn, Need: t.Need, Have: t.Have,
 				Met: t.Met(), Shortfall: t.Shortfall(),
-				OddsNow:   pyfloat.RoundTo(t.OddsNow, 4),
+				OddsNow:   floats.RoundTo(t.OddsNow, 4),
 				Cards:     append([]string{}, cards...),
 				CardCount: len(t.Cards),
 			})
@@ -194,11 +194,11 @@ func shelfPayloadFrom(slug string, d *deck.Deck, s karsten.Shelf) shelfPayload {
 	for _, o := range s.Odds {
 		byTurn := make([]float64, 0, len(o.ByTurn))
 		for _, x := range o.ByTurn {
-			byTurn = append(byTurn, pyfloat.RoundTo(x, 4))
+			byTurn = append(byTurn, floats.RoundTo(x, 4))
 		}
 		var onCurve *float64
 		if v := o.OnCurve(); v != nil {
-			r := pyfloat.RoundTo(*v, 4)
+			r := floats.RoundTo(*v, 4)
 			onCurve = &r
 		}
 		cards = append(cards, oddsPayload{
@@ -232,11 +232,11 @@ func curvePayloadFrom(mc curve.ManaCurve) curvePayload {
 	for _, t := range mc.Turns {
 		turns = append(turns, turnPayload{
 			Turn:         t.Turn,
-			FromLands:    pyfloat.RoundTo(t.FromLands, 2),
-			FromRamp:     pyfloat.RoundTo(t.FromRamp, 2),
-			ExpectedMana: pyfloat.RoundTo(t.ExpectedMana(), 2),
-			LandDropOdds: pyfloat.RoundTo(t.LandDropOdds, 4),
-			Odds:         pyfloat.RoundTo(t.Odds, 4),
+			FromLands:    floats.RoundTo(t.FromLands, 2),
+			FromRamp:     floats.RoundTo(t.FromRamp, 2),
+			ExpectedMana: floats.RoundTo(t.ExpectedMana(), 2),
+			LandDropOdds: floats.RoundTo(t.LandDropOdds, 4),
+			Odds:         floats.RoundTo(t.Odds, 4),
 		})
 	}
 	a := mc.Advice

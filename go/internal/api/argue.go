@@ -15,6 +15,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -174,7 +175,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 		// `[c.strip() for c in cards if c and c.strip()]` -- the falsy test
 		// runs on the RAW value and the strip on the kept ones, so a card that
 		// is only whitespace is dropped rather than kept as "".
-		if trimmed := claude.PyStrip(name); trimmed != "" {
+		if trimmed := textutil.Strip(name); trimmed != "" {
 			asked = append(asked, trimmed)
 		}
 	}
@@ -201,11 +202,11 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	// against the deck's.
 	inDeck := make(map[string]string, len(d.Cards))
 	for _, entry := range d.Cards {
-		inDeck[claude.PyCasefold(entry.Name)] = entry.Name
+		inDeck[claude.Casefold(entry.Name)] = entry.Name
 	}
 	missing := []string{}
 	for _, name := range asked {
-		if _, held := inDeck[claude.PyCasefold(name)]; !held {
+		if _, held := inDeck[claude.Casefold(name)]; !held {
 			missing = append(missing, name)
 		}
 	}
@@ -222,8 +223,8 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	seen := map[string]bool{}
 	ordered := make([]string, 0, len(asked))
 	for _, name := range asked {
-		proper := inDeck[claude.PyCasefold(name)]
-		folded := claude.PyCasefold(proper)
+		proper := inDeck[claude.Casefold(name)]
+		folded := claude.Casefold(proper)
 		if seen[folded] {
 			continue
 		}
@@ -268,7 +269,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	// slots picked in a different order are still the same sweep.
 	folded := make([]string, 0, len(ordered))
 	for _, name := range ordered {
-		folded = append(folded, claude.PyCasefold(name))
+		folded = append(folded, claude.Casefold(name))
 	}
 	sort.Strings(folded)
 	sum := sha256.Sum256([]byte(strings.Join(folded, "\x00")))

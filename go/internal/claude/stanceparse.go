@@ -32,7 +32,7 @@ func StanceFromObj(obj any) (Stance, error) {
 	case json.RawMessage:
 		return stanceFromRaw(v)
 	}
-	return Stance{}, fmt.Errorf("cannot read a stance from %s", pyTypeName(obj))
+	return Stance{}, fmt.Errorf("cannot read a stance from %s", typeName(obj))
 }
 
 func stanceFromMap(m map[string]any) (Stance, error) {
@@ -49,7 +49,7 @@ func stanceFromMap(m map[string]any) (Stance, error) {
 		// and this string reaches a 422 body.
 		quoted := make([]string, len(unknown))
 		for i, u := range unknown {
-			quoted[i] = wire.PyRepr(u)
+			quoted[i] = wire.Quote(u)
 		}
 		return Stance{}, fmt.Errorf("[%s] are not stance axes; expected %s",
 			strings.Join(quoted, ", "), strings.Join(Axes, ", "))
@@ -92,19 +92,19 @@ func stanceFromRaw(raw json.RawMessage) (Stance, error) {
 	dec.UseNumber()
 	var decoded any
 	if err := dec.Decode(&decoded); err != nil {
-		return Stance{}, fmt.Errorf("cannot read a stance from %s", pyTypeName(raw))
+		return Stance{}, fmt.Errorf("cannot read a stance from %s", typeName(raw))
 	}
 	return StanceFromObj(decoded)
 }
 
-// pyTypeName spells a decoded JSON value the way Python's type(obj).__name__
+// typeName spells a decoded JSON value the way Python's type(obj).__name__
 // does, because the refusal text reaches a 422 body and the corpus holds it.
 //
 // json.Number carries its own literal, so int and float are told apart the way
 // Python's json module tells them apart: by whether the source text had a
 // decimal point or an exponent, never by whether the value happens to be
 // integral. `7.0` is a float in both languages.
-func pyTypeName(obj any) string {
+func typeName(obj any) string {
 	switch v := obj.(type) {
 	case nil:
 		return "NoneType"
@@ -142,7 +142,7 @@ func pyReprAny(v any) string {
 		}
 		return "False"
 	case string:
-		return wire.PyRepr(x)
+		return wire.Quote(x)
 	case json.Number:
 		return x.String()
 	}

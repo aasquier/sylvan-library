@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // Research, held to Python by `testdata/research.json`.
@@ -113,14 +114,14 @@ func TestCheckQuestionAgreesWithPython(t *testing.T) {
 
 // Whitespace as Python counts it: the four information separators are
 // whitespace to `str.strip()` and not to `strings.TrimSpace`, so a question
-// that is only `\x1c\x1d` is empty to both runtimes only because pyIsSpace
+// that is only `\x1c\x1d` is empty to both runtimes only because text.IsSpace
 // says so. The corpus holds that case; this names the mechanism.
 func TestTheInformationSeparatorsAreWhitespaceAsPythonCounts(t *testing.T) {
 	if strings.TrimSpace("\x1c\x1d") == "" {
 		t.Skip("Go's TrimSpace now strips the information separators; the helper is redundant")
 	}
-	if pyStrip("\x1c\x1dq\x1e") != "q" {
-		t.Errorf("pyStrip did not strip the information separators: %q", pyStrip("\x1c\x1dq\x1e"))
+	if textutil.Strip("\x1c\x1dq\x1e") != "q" {
+		t.Errorf("pyStrip did not strip the information separators: %q", textutil.Strip("\x1c\x1dq\x1e"))
 	}
 	if _, err := CheckQuestion("\x1c\x1d"); err == nil {
 		t.Error("a question of information separators was accepted; Python refuses it as empty")

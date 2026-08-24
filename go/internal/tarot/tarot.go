@@ -16,7 +16,7 @@
 //
 // # A seed is a promise
 //
-// This is `internal/pyrand`'s first real caller, and the reason it was built
+// This is `internal/mt19937`'s first real caller, and the reason it was built
 // bit-exact rather than merely well-distributed. A reading outlives the request
 // that produced it: the client carries one integer, and a reload must deal the
 // same three cards or it is a different reading of the same person. Across the
@@ -34,8 +34,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
-	"github.com/aasquier/sylvan-library/go/internal/pyrand"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
+	"github.com/aasquier/sylvan-library/go/internal/mt19937"
 )
 
 //go:embed data/deck.json
@@ -196,11 +196,11 @@ type Reading struct {
 // It returns the running totals it used alongside the cards, and Deal
 // discards them. That second value exists for one reason: the fsum this
 // function depends on is invisible in the cards. A test that recomputes
-// pyfloat.Fsum by hand proves pyfloat works and says nothing about whether
+// floats.Fsum by hand proves pyfloat works and says nothing about whether
 // THIS loop calls it — the mutation survives, which was measured rather than
 // guessed. Handing the totals back is the smallest change that lets a test
 // drive the real path instead of a re-implementation of it.
-func weightedSample(rng *pyrand.Random, k int) ([]Card, []float64) {
+func weightedSample(rng *mt19937.Random, k int) ([]Card, []float64) {
 	pool := make([]Card, len(FullDeck))
 	copy(pool, FullDeck)
 	out := make([]Card, 0, k)
@@ -210,7 +210,7 @@ func weightedSample(rng *pyrand.Random, k int) ([]Card, []float64) {
 		for i, c := range pool {
 			weights[i] = c.Weight
 		}
-		total := pyfloat.Fsum(weights)
+		total := floats.Fsum(weights)
 		totals = append(totals, total)
 		mark := rng.Float64() * total
 		acc := 0.0
@@ -249,7 +249,7 @@ func Deal(seed *big.Int) Reading {
 	if used == nil {
 		used = big.NewInt(mintSeed())
 	}
-	rng := pyrand.NewFromBig(used)
+	rng := mt19937.NewFromBig(used)
 	drawn, _ := weightedSample(rng, len(Spread))
 	cards := make([]Drawn, len(drawn))
 	for i, card := range drawn {
@@ -354,7 +354,7 @@ func joinAnd(names []string) string { return strings.Join(names, " and ") }
 // because every other line in this package is: pyrand exists so that a seed
 // SOMEBODY ALREADY HOLDS deals the same three cards on either runtime, and
 // nobody holds a seed that has not been minted yet. What must match is the
-// deal FROM a seed, which pyrand.New guarantees; which unheld integer gets
+// deal FROM a seed, which mt19937.New guarantees; which unheld integer gets
 // chosen is not observable by anyone.
 //
 // crypto/rand rather than math/rand so that two processes starting in the same

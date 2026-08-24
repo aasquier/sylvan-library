@@ -1,4 +1,4 @@
-package pyyaml
+package yamlemit
 
 // The whole-document dump: `yaml.dump(payload, Dumper=_Dumper,
 // sort_keys=False, allow_unicode=True, width=100, default_flow_style=False)`,

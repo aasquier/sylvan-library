@@ -96,7 +96,7 @@ func (a *API) artMotionStatus(w http.ResponseWriter, r *http.Request) {
 	oracleID, effectKey := r.PathValue("oracle_id"), r.PathValue("effect")
 	effect, ok := reference.Runtime().Cardmotion.Effects[effectKey]
 	if !ok {
-		wire.Detail(w, http.StatusNotFound, "no effect "+wire.PyRepr(effectKey))
+		wire.Detail(w, http.StatusNotFound, "no effect "+wire.Quote(effectKey))
 		return
 	}
 	var art *string

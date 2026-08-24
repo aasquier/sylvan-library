@@ -43,7 +43,7 @@ func (a *API) personaRoster(w http.ResponseWriter, _ *http.Request) {
 // A seed may be supplied to re-deal an existing reading, which is what a reload
 // does. That is the promise the whole port rests on here: a seed minted by the
 // Python door before the cutover must deal the same three cards from this one,
-// which is what internal/pyrand is for.
+// which is what internal/mt19937 is for.
 func (a *API) tarotReading(w http.ResponseWriter, r *http.Request) {
 	// Last value wins, as Starlette's query mapping does — `?seed=7&seed=9`
 	// is nine. Go's Query().Get() returns the FIRST, which is the kind of

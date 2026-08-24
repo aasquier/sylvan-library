@@ -23,8 +23,8 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/prices"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 
@@ -44,7 +44,7 @@ func (a *API) statsSystem(w http.ResponseWriter, r *http.Request) {
 	loads := loadAverages()
 	loadOut := make([]any, 0, len(loads))
 	for _, l := range loads {
-		loadOut = append(loadOut, pyfloat.Float(l))
+		loadOut = append(loadOut, floats.Float(l))
 	}
 	total, used, free := diskUsage(a.dataDir)
 	wire.JSON(w, http.StatusOK, wire.OrderedMap{

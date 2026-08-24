@@ -9,7 +9,7 @@
 // # What makes this port checkable
 //
 // Tier 1 consumes randomness through exactly one call -- `rng.shuffle(deck)`
-// in SimulateGame -- and `internal/pyrand` is CPython's `random.Random` bit
+// in SimulateGame -- and `internal/mt19937` is CPython's `random.Random` bit
 // for bit, held to a corpus that includes all 99,274 draws of the reference
 // run below. So the dice were a solved problem before this package was
 // written: a divergence here is an engine divergence, and the fixture in
@@ -59,7 +59,7 @@ import (
 	"sort"
 
 	"github.com/aasquier/sylvan-library/go/internal/mana"
-	"github.com/aasquier/sylvan-library/go/internal/pyrand"
+	"github.com/aasquier/sylvan-library/go/internal/mt19937"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
@@ -402,7 +402,7 @@ func pickLand(hand []*sim.Card, pool []sim.Source, castables []*sim.Card) *sim.C
 type GameOptions struct {
 	Turns     int
 	KeepRule  *KeepRule
-	RNG       *pyrand.Random
+	RNG       *mt19937.Random
 	OnThePlay bool
 }
 
@@ -410,7 +410,7 @@ type GameOptions struct {
 func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) GameResult {
 	rng := opts.RNG
 	if rng == nil {
-		rng = pyrand.New(unseededSeed())
+		rng = mt19937.New(unseededSeed())
 	}
 	keepRule := DefaultKeepRule()
 	if opts.KeepRule != nil {
@@ -422,7 +422,7 @@ func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) Ga
 	mulligans := 0
 	var hand []*sim.Card
 	for {
-		pyrand.ShuffleSlice(rng, deck)
+		mt19937.ShuffleSlice(rng, deck)
 		hand = deck[:min(7, len(deck))]
 		if keepRule.Keeps(hand) || mulligans >= keepRule.MaxMulligans {
 			break

@@ -28,7 +28,7 @@ import (
 const (
 	// expectedLandsInPlay: a running total of `capped * Exactly(...)`, summed
 	// in ascending k exactly as Python's generator yields it. Exact, and the
-	// one place `pyfloat.Rounded` is doing visible work -- without it arm64 fuses
+	// one place `floats.Rounded` is doing visible work -- without it arm64 fuses
 	// the multiply into the add and answers one ulp differently.
 	epsilonExpectedLands = 0.0
 

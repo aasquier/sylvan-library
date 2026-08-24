@@ -38,7 +38,7 @@
 // every Go site that mirrored one was moved to `Fsum`; a naive accumulation
 // loop over floats in this module is now a bug wherever it appears beside a
 // Python `fsum`.
-package pyfloat
+package floats
 
 import (
 	"math"
@@ -197,7 +197,7 @@ func sign(n *big.Int) int {
 
 // Rounded is the guard against a fused multiply-add, and it is the reason
 // every `total += a * b` in these two packages is written `total +=
-// pyfloat.Rounded(a * b)`.
+// floats.Rounded(a * b)`.
 //
 // The Go specification permits an implementation to "combine multiple
 // floating-point operations into a single fused operation, possibly across

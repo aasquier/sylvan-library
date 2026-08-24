@@ -11,8 +11,8 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
@@ -127,7 +127,7 @@ func forgeGames(body map[string]any) (int, error) {
 	if !ok {
 		raw = ForgeGamesDefault
 	}
-	n, err := claude.PyInt(raw)
+	n, err := claude.IntValue(raw)
 	if err != nil {
 		return 0, err
 	}
@@ -155,7 +155,7 @@ func forgeSeed(body map[string]any) (*big.Int, error) {
 	if s, isString := raw.(string); isString && s == "" {
 		return big.NewInt(DefaultSeed), nil
 	}
-	return claude.PyInt(raw)
+	return claude.IntValue(raw)
 }
 
 // forgeRow is one game as the client renders it, whichever moment it arrives
@@ -169,20 +169,20 @@ func forgeSeed(body map[string]any) (*big.Int, error) {
 type forgeRow struct {
 	Game   int     `json:"game"`
 	Winner *string `json:"winner"`
-	// Seconds is a `pyfloat.Float` and not a `float64`, which is the one
+	// Seconds is a `floats.Float` and not a `float64`, which is the one
 	// thing about this struct that has to be decided rather than typed:
 	// `round(4000/1000, 1)` is `4.0`, Python writes `4.0`, and
 	// `encoding/json` writes `4`. Same number to a client, different bytes
 	// in DevTools and in anything that ever hashes this payload.
-	Seconds  pyfloat.Float `json:"seconds"`
-	Turns    *int          `json:"turns"`
-	Draw     bool          `json:"draw"`
-	TimedOut bool          `json:"timed_out"`
+	Seconds  floats.Float `json:"seconds"`
+	Turns    *int         `json:"turns"`
+	Draw     bool         `json:"draw"`
+	TimedOut bool         `json:"timed_out"`
 }
 
 func newForgeRow(g tier3.GameResult, slug *string) forgeRow {
 	row := forgeRow{Game: g.Index,
-		Seconds:  pyfloat.Float(pyfloat.RoundTo(float64(g.Milliseconds)/1000, 1)),
+		Seconds:  floats.Float(floats.RoundTo(float64(g.Milliseconds)/1000, 1)),
 		Turns:    g.Turns,
 		Draw:     g.Draw && !g.TimedOut,
 		TimedOut: g.TimedOut}
@@ -203,19 +203,19 @@ type forgeSeat struct {
 // forgeResult is the payload a match becomes. Medians and tails, never a mean
 // alone.
 type forgeResult struct {
-	Decks          []forgeSeat    `json:"decks"`
-	Games          int            `json:"games"`
-	Played         int            `json:"played"`
-	Draws          int            `json:"draws"`
-	TimedOut       int            `json:"timed_out"`
-	MedianSeconds  *pyfloat.Float `json:"median_seconds"`
-	MaxSeconds     *pyfloat.Float `json:"max_seconds"`
-	StartupSeconds pyfloat.Float  `json:"startup_seconds"`
-	WallSeconds    pyfloat.Float  `json:"wall_seconds"`
-	Clock          int            `json:"clock"`
-	Seed           *big.Int       `json:"seed"`
-	Rows           []forgeRow     `json:"rows"`
-	Caveat         string         `json:"caveat"`
+	Decks          []forgeSeat   `json:"decks"`
+	Games          int           `json:"games"`
+	Played         int           `json:"played"`
+	Draws          int           `json:"draws"`
+	TimedOut       int           `json:"timed_out"`
+	MedianSeconds  *floats.Float `json:"median_seconds"`
+	MaxSeconds     *floats.Float `json:"max_seconds"`
+	StartupSeconds floats.Float  `json:"startup_seconds"`
+	WallSeconds    floats.Float  `json:"wall_seconds"`
+	Clock          int           `json:"clock"`
+	Seed           *big.Int      `json:"seed"`
+	Rows           []forgeRow    `json:"rows"`
+	Caveat         string        `json:"caveat"`
 }
 
 // forgePartial is what the job's `partial` carries while the match plays.
@@ -270,8 +270,8 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		Decks:          make([]forgeSeat, 0, len(decks)),
 		Games:          games,
 		Played:         len(rows),
-		StartupSeconds: pyfloat.Float(pyfloat.RoundTo(run.StartupSeconds(), 1)),
-		WallSeconds:    pyfloat.Float(pyfloat.RoundTo(run.WallSeconds, 1)),
+		StartupSeconds: floats.Float(floats.RoundTo(run.StartupSeconds(), 1)),
+		WallSeconds:    floats.Float(floats.RoundTo(run.WallSeconds, 1)),
 		Clock:          ForgeClock,
 		Seed:           seed,
 		Rows:           rows,
@@ -290,9 +290,9 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		}
 	}
 	if len(seconds) > 0 {
-		median := pyfloat.Float(pyfloat.RoundTo(pyMedian(seconds), 1))
+		median := floats.Float(floats.RoundTo(pyMedian(seconds), 1))
 		out.MedianSeconds = &median
-		max := pyfloat.Float(seconds[len(seconds)-1])
+		max := floats.Float(seconds[len(seconds)-1])
 		out.MaxSeconds = &max
 	}
 	if out.Rows == nil {
@@ -414,7 +414,7 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		// catching a ValueError there, so Starlette answers its plain-text
 		// three words -- not a JSON detail, which is what this wrote until
 		// Phase 8's wheel port measured the real bytes. See [forgeGames].
-		pythonUncaught(w, a.log, "forge", err)
+		uncaught500(w, a.log, "forge", err)
 		return
 	}
 	a.submit(w, r, plan)

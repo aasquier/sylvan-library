@@ -73,7 +73,7 @@ var levelMeanings = map[[2]string]string{
 func index(axis, level string) (int, error) {
 	ordered, ok := levels[axis]
 	if !ok {
-		return 0, fmt.Errorf("%s is not one of %s", wire.PyRepr(axis), strings.Join(Axes, ", "))
+		return 0, fmt.Errorf("%s is not one of %s", wire.Quote(axis), strings.Join(Axes, ", "))
 	}
 	for i, candidate := range ordered {
 		if candidate == level {
@@ -81,7 +81,7 @@ func index(axis, level string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("%s is not a %s level; expected one of %s",
-		wire.PyRepr(level), axis, strings.Join(ordered, ", "))
+		wire.Quote(level), axis, strings.Join(ordered, ", "))
 }
 
 // Stance is one setting of the three axes.
@@ -218,7 +218,7 @@ func Preset(name string) (Stance, error) {
 	}
 	sort.Strings(known)
 	return Stance{}, fmt.Errorf("%s is not a stance preset; expected one of %s",
-		wire.PyRepr(name), strings.Join(known, ", "))
+		wire.Quote(name), strings.Join(known, ", "))
 }
 
 // DeckStatused is what DefaultFor needs of a deck, which is one string. The

@@ -49,8 +49,8 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
-	"github.com/aasquier/sylvan-library/go/internal/pytext"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
 // DefaultLimit is how many matches a reader gets when it does not say. The
@@ -266,7 +266,7 @@ func boolToInt(b bool) int {
 // now is `datetime.now(UTC).isoformat()`, and a variable so a test can freeze
 // it. Through `pytext` rather than a local format string, so the fraction is
 // elided at a zero microsecond exactly as Python elides it.
-var now = func() string { return pytext.Isoformat(time.Now()) }
+var now = func() string { return textutil.Isoformat(time.Now()) }
 
 // Seat is one deck's row in a recorded match, with the labels it wore when it
 // played.

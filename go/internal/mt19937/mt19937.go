@@ -70,7 +70,7 @@
 //
 // Nothing here is safe for concurrent use, exactly as `random.Random` is not.
 // A run owns its generator.
-package pyrand
+package mt19937
 
 import (
 	"encoding/binary"
@@ -312,6 +312,6 @@ func (r *Random) GetRandBits(k uint) uint64 {
 		}
 		return lo | hi<<32
 	default:
-		panic("pyrand: GetRandBits asked for more than 64 bits")
+		panic("mt19937: GetRandBits asked for more than 64 bits")
 	}
 }

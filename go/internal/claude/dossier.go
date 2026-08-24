@@ -128,7 +128,7 @@ func dossierOpening(facts wire.OrderedMap) string {
 			"query rather than a recollection, and it is the authority on what " +
 			"the card does.",
 		"",
-		pyDumps(body, pyDumpOptions{Indent: 2}),
+		dumpJSON(body, dumpOptions{Indent: 2}),
 		"",
 		fmt.Sprintf("Write the dossier for %s. Search the web for the character's "+
 			"story, the archetype, the competitors, the rivals and the standing; "+
@@ -151,7 +151,7 @@ func Fingerprint(tier string) (string, error) {
 	digest := sha256.New()
 	digest.Write([]byte(strconv.Itoa(DossierVersion)))
 	digest.Write([]byte(mode.Instructions))
-	digest.Write([]byte(pyDumps(mode.ResponseSchema, pyDumpOptions{SortKeys: true})))
+	digest.Write([]byte(dumpJSON(mode.ResponseSchema, dumpOptions{SortKeys: true})))
 	digest.Write([]byte(ModelFor(tier)))
 	return hex.EncodeToString(digest.Sum(nil))[:16], nil
 }

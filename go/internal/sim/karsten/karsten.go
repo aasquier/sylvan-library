@@ -61,7 +61,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
@@ -581,12 +581,12 @@ func CastableOdds(card sim.Card, library []sim.Card, turn int, onThePlay bool) f
 				break
 			}
 		}
-		terms = append(terms, pyfloat.Rounded(weight*odds))
+		terms = append(terms, floats.Rounded(weight*odds))
 	}
 	// fsum rather than a running total: a hundred small products of
 	// probabilities is exactly the shape that accumulates float error, and
 	// `ReliableTurn` compares this against 0.90.
-	if v := pyfloat.Fsum(terms); v < 1.0 {
+	if v := floats.Fsum(terms); v < 1.0 {
 		return v
 	}
 	return 1.0
@@ -675,18 +675,18 @@ func RegressionLands(library []sim.Card) LandEstimate {
 	}
 	average := float64(totalMV) / float64(len(spells))
 
-	fitted := fitIntercept + pyfloat.Rounded(fitPerManaValue*average) - pyfloat.Rounded(fitPerCheapAccelrant*float64(accelerants))
+	fitted := fitIntercept + floats.Rounded(fitPerManaValue*average) - floats.Rounded(fitPerCheapAccelrant*float64(accelerants))
 	// No guard on this one: a multiply feeding a *divide* has no fused form.
 	scaled := fitted * float64(deckSize) / fitDeckSize
 
-	recommended := pyfloat.Round(scaled)
+	recommended := floats.Round(scaled)
 	if recommended < 0 {
 		recommended = 0
 	}
 	return LandEstimate{
 		LandsNow:         landsNow,
 		Recommended:      recommended,
-		AverageManaValue: pyfloat.RoundTo(average, 2),
+		AverageManaValue: floats.RoundTo(average, 2),
 		CheapAccelerants: accelerants,
 		DeckSize:         deckSize,
 		Caveats: []string{

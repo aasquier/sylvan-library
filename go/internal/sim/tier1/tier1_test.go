@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyrand"
+	"github.com/aasquier/sylvan-library/go/internal/mt19937"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
@@ -164,7 +164,7 @@ func referenceOutputs(t *testing.T, c *corpus) []string {
 	library, commander := deck(t, c, "golgari-34")
 
 	single := SimulateGame(library, commander,
-		GameOptions{Turns: c.Reference.Turns, RNG: pyrand.New(seed)})
+		GameOptions{Turns: c.Reference.Turns, RNG: mt19937.New(seed)})
 	summary := Run(library, commander, Options{
 		Games: c.Reference.Games, Turns: c.Reference.Turns, Seed: &seed})
 
@@ -203,7 +203,7 @@ func TestTheReferenceRunReproducesThePinnedDigest(t *testing.T) {
 	got := digestOf(referenceOutputs(t, load(t)))
 	if got != ReferenceDigest {
 		t.Fatalf("REFERENCE_DIGEST is %s; this engine computes %s.\n"+
-			"The dice are not the suspect -- internal/pyrand replays the "+
+			"The dice are not the suspect -- internal/mt19937 replays the "+
 			"reference run's whole draw stream. Read the per-line failures "+
 			"from TestTheReferenceOutputsAreCPythonsOwnText, which say which "+
 			"game and which field moved.", ReferenceDigest, got)
@@ -279,7 +279,7 @@ func TestEveryGameIsCPythonsGame(t *testing.T) {
 			got := SimulateGame(library, commander, GameOptions{
 				Turns:     tc.Turns,
 				KeepRule:  &rule,
-				RNG:       pyrand.New(seedOf(t, tc.Seed)),
+				RNG:       mt19937.New(seedOf(t, tc.Seed)),
 				OnThePlay: tc.OnThePlay,
 			})
 			if got.Repr() != tc.Repr {

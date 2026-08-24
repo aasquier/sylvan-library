@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/suggest"
 )
 
@@ -103,14 +103,14 @@ func TestTheScoreCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
 		products := make([]float64, len(c.Parts))
 		naive := 0.0
 		for i := range c.Parts {
-			products[i] = pyfloat.Rounded(c.Weights[i] * c.Parts[i])
+			products[i] = floats.Rounded(c.Weights[i] * c.Parts[i])
 			naive += products[i]
 		}
-		exact := pyfloat.Fsum(products)
+		exact := floats.Fsum(products)
 		if math.Float64bits(naive) != math.Float64bits(exact) {
 			differs++
-			nudge := pyfloat.Rounded(0.10 * c.Popularity)
-			if pyfloat.RoundTo(naive+nudge, 4) != pyfloat.RoundTo(exact+nudge, 4) {
+			nudge := floats.Rounded(0.10 * c.Popularity)
+			if floats.RoundTo(naive+nudge, 4) != floats.RoundTo(exact+nudge, 4) {
 				rounded++
 			}
 		}

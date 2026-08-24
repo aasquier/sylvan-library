@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/mana"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
@@ -412,7 +412,7 @@ func atLeastOne(deckSize, copies, seen int) float64 {
 // OpeningHand is `analyze.opening_hand`: draw odds for the opening seven and
 // the seen-it-by-turn table, on the draw (`7 + t` cards by the end of turn t).
 //
-// `keepable` goes through `pyfloat.Fsum` and not a `+=` loop, matching the
+// `keepable` goes through `floats.Fsum` and not a `+=` loop, matching the
 // `math.fsum` Python spells it with. The loop was the obvious transcription of
 // Python's old `sum(...)` and it was wrong in a way that only fires on one of
 // the two interpreters: `sum()` over floats is compensated from CPython 3.12
@@ -441,7 +441,7 @@ func OpeningHand(d *deck.Deck) Opening {
 			keep = append(keep, chance)
 		}
 	}
-	keepable := pyfloat.Fsum(keep)
+	keepable := floats.Fsum(keep)
 	counts, order := d.CategoryCounts()
 	sort.SliceStable(order, func(i, j int) bool { return counts[order[i]] > counts[order[j]] })
 	categories := []CategoryOdds{}

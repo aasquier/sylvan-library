@@ -19,12 +19,12 @@
 //     U+2029. A Forge log line carrying one splits in two under Python and
 //     stays whole under Go, which turns one game result into none.
 //
-// `internal/claude/pytext.go` was where these first landed, for the two
+// `internal/claude/text.go` was where these first landed, for the two
 // searching modes; they moved here when `sim/tier3` needed the same set and
 // the alternative was a second copy of the whitespace table. The rule the
 // repo already learned from `pyfloat`: an arithmetic reproduction belongs in
 // its own package the moment a second family needs it.
-package pytext
+package textutil
 
 import (
 	"strings"

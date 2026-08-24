@@ -75,7 +75,7 @@ func (a *API) upcomingSets(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	if err := dec.Decode(&payload); err != nil {
-		pythonUncaught(w, a.log, "sets", err)
+		uncaught500(w, a.log, "sets", err)
 		return
 	}
 

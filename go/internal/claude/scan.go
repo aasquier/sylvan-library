@@ -10,6 +10,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -123,7 +124,7 @@ func scanPayload(image any, mediaType string) (string, error) {
 		}
 		sort.Strings(names)
 		return "", refuseScan("%s is not an image this reads. Expected one of: %s.",
-			wire.PyRepr(mediaType), strings.Join(names, ", "))
+			wire.Quote(mediaType), strings.Join(names, ", "))
 	}
 	var raw []byte
 	switch value := image.(type) {
@@ -297,10 +298,10 @@ func ScanSighting(turn Turn) ScanRead {
 	// code points are whitespace, and a transcription can carry anything the
 	// model typed. The corpus holds U+00A0 and U+2028 for exactly that.
 	if value, ok := read["title"].(string); ok {
-		out.Title = pyStrip(value)
+		out.Title = textutil.Strip(value)
 	}
 	if value, ok := read["corner"].(string); ok {
-		out.Corner = pyStrip(value)
+		out.Corner = textutil.Strip(value)
 	}
 	return out
 }

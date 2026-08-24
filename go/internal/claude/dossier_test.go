@@ -23,7 +23,7 @@ import (
 // because a dossier Python wrote is served by Go under it after the cutover
 // -- a wrong fingerprint costs a four-minute paid search per commander and
 // looks like a cache that simply missed. **The brief's opening message**, as
-// bytes, which is the whole of `DossierBrief` and `pyDumps` checked at once
+// bytes, which is the whole of `DossierBrief` and `dumpJSON` checked at once
 // against the tiny pool. **The free GET's three shapes**, two of them
 // different key sets. And **every outcome of a run**, each report compared as
 // marshalled bytes -- key order included, because the report is the wire and
@@ -218,7 +218,7 @@ func TestTheFingerprintsPartsAreEachPythons(t *testing.T) {
 		t.Errorf("the instructions hash %s, python %s -- modes.json has drifted from INSTRUCTIONS",
 			got, corpus.Fingerprint.InstructionsSHA256)
 	}
-	if got := pyDumps(mode.ResponseSchema, pyDumpOptions{SortKeys: true}); got != corpus.Fingerprint.SchemaDumps {
+	if got := dumpJSON(mode.ResponseSchema, dumpOptions{SortKeys: true}); got != corpus.Fingerprint.SchemaDumps {
 		t.Errorf("json.dumps(schema, sort_keys=True) differs:\n go     %s\n python %s",
 			got, corpus.Fingerprint.SchemaDumps)
 	}

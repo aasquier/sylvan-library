@@ -46,7 +46,7 @@ package mulligan
 import (
 	"errors"
 
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 )
@@ -126,7 +126,7 @@ type Sweep struct {
 
 // Gain is spells the best rule deploys over the default. The whole verdict.
 func (s *Sweep) Gain() float64 {
-	return pyfloat.RoundTo(s.Best.SpellsThroughT8-s.Baseline.SpellsThroughT8, 2)
+	return floats.RoundTo(s.Best.SpellsThroughT8-s.Baseline.SpellsThroughT8, 2)
 }
 
 // IsFlat is `PolicySweep.flat`: is the winner meaningfully better than the
@@ -241,12 +241,12 @@ func row(rule tier1.KeepRule, library []*sim.Card, commander *sim.Card,
 		MinLands:            rule.MinLands,
 		MaxLands:            rule.MaxLands,
 		MinPieces:           rule.MinManaPieces,
-		SpellsThroughT8:     pyfloat.RoundTo(summary.SpellsThrough(Through), 2),
-		MulliganRate:        pyfloat.RoundTo(summary.MulliganRate, 4),
-		AvgMulligans:        pyfloat.RoundTo(summary.AvgMulligans, 3),
+		SpellsThroughT8:     floats.RoundTo(summary.SpellsThrough(Through), 2),
+		MulliganRate:        floats.RoundTo(summary.MulliganRate, 4),
+		AvgMulligans:        floats.RoundTo(summary.AvgMulligans, 3),
 		MedianCommanderTurn: summary.MedianCommanderTurn,
-		ColorScrewRate:      pyfloat.RoundTo(summary.ColorScrewRate, 3),
-		StalledTurns:        pyfloat.RoundTo(summary.AvgStalledTurns, 3),
+		ColorScrewRate:      floats.RoundTo(summary.ColorScrewRate, 3),
+		StalledTurns:        floats.RoundTo(summary.AvgStalledTurns, 3),
 		Describe:            rule.Describe(),
 	}
 }
@@ -328,7 +328,7 @@ func Search(library []*sim.Card, commander *sim.Card, opts Options) (*Sweep, err
 		Rows:     rows,
 		Best:     best,
 		Baseline: baseline,
-		Spread:   pyfloat.RoundTo(hi-lo, 2),
+		Spread:   floats.RoundTo(hi-lo, 2),
 	}, nil
 }
 

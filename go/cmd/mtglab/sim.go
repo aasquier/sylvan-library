@@ -17,8 +17,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	simcache "github.com/aasquier/sylvan-library/go/internal/sim/cache"
 	"github.com/aasquier/sylvan-library/go/internal/sim/compile"
@@ -336,7 +336,7 @@ func simShelfCommand() *cobra.Command {
 			fmt.Println("LAND COUNT -- a regression, not a simulation")
 			fmt.Printf("  You run %d. The fit says %d (%+d), from an average mana value of %s and %d cheap accelerants.\n",
 				est.LandsNow, est.Recommended, est.Delta(),
-				pyfloat.Repr(est.AverageManaValue), est.CheapAccelerants)
+				floats.Repr(est.AverageManaValue), est.CheapAccelerants)
 			for _, caveat := range est.Caveats {
 				fmt.Printf("    - %s\n", caveat)
 			}
@@ -458,7 +458,7 @@ func simMulliganCommand() *cobra.Command {
 				fmt.Printf("NO CHANGE WORTH MAKING. The best rule beats your default by %s spells\n",
 					pySigned(sweep.Gain()))
 				fmt.Printf("through turn 8, under the %s threshold this calls noise. The grid\n",
-					pyfloat.Repr(mulligan.Flat))
+					floats.Repr(mulligan.Flat))
 				fmt.Printf("spans %s spells overall, but most of that range is rules nobody\n",
 					pyFixed(sweep.Spread, 2))
 				fmt.Println("would play -- flatness is measured against your default, not against the grid.")
@@ -653,7 +653,7 @@ func simForgeCommand() *cobra.Command {
 			}
 			fmt.Printf("per game: %ss min / %ss mean / %ss max\n",
 				pyFixed(minS, 1),
-				pyFixed(pyfloat.Fsum(played)/float64(len(played)), 1),
+				pyFixed(floats.Fsum(played)/float64(len(played)), 1),
 				pyFixed(maxS, 1))
 			for _, slug := range args {
 				fmt.Printf("  %s %d\n", padRight(slug, 22), wins[slug])
@@ -905,7 +905,7 @@ func numberOrNone(n *tier1.Number) string {
 		return "None"
 	}
 	if n.IsFloat {
-		return pyfloat.Repr(n.Float)
+		return floats.Repr(n.Float)
 	}
 	return strconv.Itoa(n.Int)
 }
@@ -916,5 +916,5 @@ func floatOrNone(v *float64) string {
 	if v == nil {
 		return "None"
 	}
-	return pyfloat.Repr(*v)
+	return floats.Repr(*v)
 }

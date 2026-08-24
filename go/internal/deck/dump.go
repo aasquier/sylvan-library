@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
-	"github.com/aasquier/sylvan-library/go/internal/pyyaml"
+	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
 // DumpWidth is `Deck.dump`'s `width=100`. `edit.py`'s `_render` uses 96 for
@@ -42,7 +42,7 @@ func (d *Deck) Dump() (string, error) {
 			"which a whole-file dump cannot write", d.Slug)
 	}
 
-	payload := pyyaml.Map{
+	payload := yamlemit.Map{
 		{Key: "slug", Value: d.Slug},
 		{Key: "name", Value: d.Name},
 		{Key: "status", Value: d.Status},
@@ -54,19 +54,19 @@ func (d *Deck) Dump() (string, error) {
 	// `shared: true` would rewrite all six curated files to assert the
 	// default they already had.
 	if !d.Shared {
-		payload = append(payload, pyyaml.Pair{Key: "shared", Value: false})
+		payload = append(payload, yamlemit.Pair{Key: "shared", Value: false})
 	}
 	if d.Pilot != "" {
-		payload = append(payload, pyyaml.Pair{Key: "pilot", Value: d.Pilot})
+		payload = append(payload, yamlemit.Pair{Key: "pilot", Value: d.Pilot})
 	}
 	if d.CommanderArt != "" {
-		payload = append(payload, pyyaml.Pair{Key: "commander_art", Value: d.CommanderArt})
+		payload = append(payload, yamlemit.Pair{Key: "commander_art", Value: d.CommanderArt})
 	}
 	if d.Companion != nil && *d.Companion != "" {
-		payload = append(payload, pyyaml.Pair{Key: "companion", Value: *d.Companion})
+		payload = append(payload, yamlemit.Pair{Key: "companion", Value: *d.Companion})
 	}
 	if d.Bracket != nil {
-		payload = append(payload, pyyaml.Pair{Key: "bracket", Value: *d.Bracket})
+		payload = append(payload, yamlemit.Pair{Key: "bracket", Value: *d.Bracket})
 	}
 	// The pre-ADR-37 declared class, written back only while it is
 	// load-bearing: once the themes name a class word the key is shadowed and
@@ -74,43 +74,43 @@ func (d *Deck) Dump() (string, error) {
 	// class the boards know -- a round trip must not eat a line `validate` is
 	// still warning about.
 	if d.LegacyArchetype != "" && !d.HasClassWord() {
-		payload = append(payload, pyyaml.Pair{Key: "archetype", Value: d.LegacyArchetype})
+		payload = append(payload, yamlemit.Pair{Key: "archetype", Value: d.LegacyArchetype})
 	}
 	if len(d.Themes) > 0 {
-		payload = append(payload, pyyaml.Pair{Key: "themes", Value: stringList(d.Themes)})
+		payload = append(payload, yamlemit.Pair{Key: "themes", Value: stringList(d.Themes)})
 	}
 	if text, _ := d.Strategy.(string); text != "" {
-		payload = append(payload, pyyaml.Pair{Key: "strategy", Value: text})
+		payload = append(payload, yamlemit.Pair{Key: "strategy", Value: text})
 	}
 	if len(d.Notes) > 0 {
 		notes, err := yamlNode(d.Notes)
 		if err != nil {
 			return "", fmt.Errorf("deck %q: notes: %w", d.Slug, err)
 		}
-		payload = append(payload, pyyaml.Pair{Key: "notes", Value: notes})
+		payload = append(payload, yamlemit.Pair{Key: "notes", Value: notes})
 	}
 	// The draft rule reaches the 99 and nothing else. `swap_board` and
 	// `graveyard` are outside the deck -- the board is a list of cards under
 	// consideration and the graveyard keeps the words a card already had -- so
 	// neither gets the blank `why:` a draft writes as its own to-do list.
-	payload = append(payload, pyyaml.Pair{Key: "cards", Value: cardList(d.Cards, d.Stage == "draft")})
+	payload = append(payload, yamlemit.Pair{Key: "cards", Value: cardList(d.Cards, d.Stage == "draft")})
 	if len(d.SwapBoard) > 0 {
-		payload = append(payload, pyyaml.Pair{
+		payload = append(payload, yamlemit.Pair{
 			Key: "swap_board", Value: cardList(d.SwapBoard, false)})
 	}
 	// Written only when occupied, like the swap board: an empty graveyard is
 	// the normal state and six curated decks should not each grow a
 	// `graveyard: []` line asserting it.
 	if len(d.Graveyard) > 0 {
-		payload = append(payload, pyyaml.Pair{
+		payload = append(payload, yamlemit.Pair{
 			Key: "graveyard", Value: cardList(d.Graveyard, false)})
 	}
-	return pyyaml.Dump(payload, DumpWidth)
+	return yamlemit.Dump(payload, DumpWidth)
 }
 
 // cardList is `[c.to_obj() for c in cards]`, with the draft rule applied.
-func cardList(cards []CardEntry, draft bool) pyyaml.List {
-	out := make(pyyaml.List, 0, len(cards))
+func cardList(cards []CardEntry, draft bool) yamlemit.List {
+	out := make(yamlemit.List, 0, len(cards))
 	for _, c := range cards {
 		out = append(out, cardObject(c, draft))
 	}
@@ -129,34 +129,34 @@ func cardList(cards []CardEntry, draft bool) pyyaml.List {
 // is one, and Python's `setdefault` on a key the mapping has not got appends.
 // A draft card with a quantity therefore reads `qty` before `why: ”`, which
 // is the sort of thing only a corpus catches.
-func cardObject(c CardEntry, draft bool) pyyaml.Map {
-	obj := pyyaml.Map{{Key: "name", Value: c.Name}, {Key: "category", Value: c.Category}}
+func cardObject(c CardEntry, draft bool) yamlemit.Map {
+	obj := yamlemit.Map{{Key: "name", Value: c.Name}, {Key: "category", Value: c.Category}}
 	if c.Why != "" {
-		obj = append(obj, pyyaml.Pair{Key: "why", Value: c.Why})
+		obj = append(obj, yamlemit.Pair{Key: "why", Value: c.Why})
 	}
 	if c.Qty != 1 {
-		obj = append(obj, pyyaml.Pair{Key: "qty", Value: c.Qty})
+		obj = append(obj, yamlemit.Pair{Key: "qty", Value: c.Qty})
 	}
 	if c.ScryfallID != nil && *c.ScryfallID != "" {
-		obj = append(obj, pyyaml.Pair{Key: "scryfall_id", Value: *c.ScryfallID})
+		obj = append(obj, yamlemit.Pair{Key: "scryfall_id", Value: *c.ScryfallID})
 	}
 	if c.ManaCost != nil && *c.ManaCost != "" {
-		obj = append(obj, pyyaml.Pair{Key: "mana_cost", Value: *c.ManaCost})
+		obj = append(obj, yamlemit.Pair{Key: "mana_cost", Value: *c.ManaCost})
 	}
 	if len(c.Tags) > 0 {
-		obj = append(obj, pyyaml.Pair{Key: "tags", Value: stringList(c.Tags)})
+		obj = append(obj, yamlemit.Pair{Key: "tags", Value: stringList(c.Tags)})
 	}
 	if c.Art != "" {
-		obj = append(obj, pyyaml.Pair{Key: "art", Value: c.Art})
+		obj = append(obj, yamlemit.Pair{Key: "art", Value: c.Art})
 	}
 	if draft && c.Why == "" {
-		obj = append(obj, pyyaml.Pair{Key: "why", Value: ""})
+		obj = append(obj, yamlemit.Pair{Key: "why", Value: ""})
 	}
 	return obj
 }
 
 // yamlNode carries a parsed value across into the emitter's node model: an
-// ordered mapping becomes a `pyyaml.Map`, a sequence a `pyyaml.List`, and a
+// ordered mapping becomes a `yamlemit.Map`, a sequence a `yamlemit.List`, and a
 // scalar is left for `scalarOf` to judge.
 //
 // The two are separate types on purpose -- one is what a file said, the other
@@ -173,17 +173,17 @@ func cardObject(c CardEntry, draft bool) pyyaml.Map {
 func yamlNode(v any) (any, error) {
 	switch t := v.(type) {
 	case deckyaml.Map:
-		out := make(pyyaml.Map, 0, len(t))
+		out := make(yamlemit.Map, 0, len(t))
 		for _, p := range t {
 			value, err := yamlNode(p.Value)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", p.Key, err)
 			}
-			out = append(out, pyyaml.Pair{Key: p.Key, Value: value})
+			out = append(out, yamlemit.Pair{Key: p.Key, Value: value})
 		}
 		return out, nil
 	case []any:
-		out := make(pyyaml.List, 0, len(t))
+		out := make(yamlemit.List, 0, len(t))
 		for i, item := range t {
 			value, err := yamlNode(item)
 			if err != nil {
@@ -199,8 +199,8 @@ func yamlNode(v any) (any, error) {
 	}
 }
 
-func stringList(items []string) pyyaml.List {
-	out := make(pyyaml.List, 0, len(items))
+func stringList(items []string) yamlemit.List {
+	out := make(yamlemit.List, 0, len(items))
 	for _, item := range items {
 		out = append(out, item)
 	}

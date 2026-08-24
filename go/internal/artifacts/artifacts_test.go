@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 )
 
 // The artifacts oracle: `render_all` over every fixture deck, beside the exact
@@ -297,7 +297,7 @@ func TestTheShoppingListSeparatesFsumFromARunningTotal(t *testing.T) {
 			amounts = append(amounts, c.Prices[n])
 			naive += c.Prices[n]
 		}
-		exact := pyfloat.Fsum(amounts)
+		exact := floats.Fsum(amounts)
 		priced++
 		if fmt.Sprintf("%.2f", naive) == fmt.Sprintf("%.2f", exact) {
 			continue

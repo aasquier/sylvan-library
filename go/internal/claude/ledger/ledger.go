@@ -213,7 +213,7 @@ func now() string {
 }
 
 // pyQuote is repr() for the one refusal this package builds. Not
-// wire.PyRepr: importing the HTTP envelope package into the ledger would put
+// wire.Quote: importing the HTTP envelope package into the ledger would put
 // a route's vocabulary underneath the accounting, and this needs one quote
 // character, not an escaping table.
 func pyQuote(s string) string { return "'" + s + "'" }
