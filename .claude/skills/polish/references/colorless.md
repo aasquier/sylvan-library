@@ -37,7 +37,15 @@ Cleanup acts on the queue. Colorless audits it and leaves it.
   ledger for its context, `DAYBREAK.md` for its one line. An entry in one and
   not the other is the drift that makes a queue untrustworthy: waiting in the
   ledger alone means nobody sees it, and a daybreak line with no ledger entry
-  means nobody can act on the yes.
+  means nobody can act on the yes. **This is the rule that actually breaks**,
+  and it breaks in the daybreak-only direction, because writing the queue line
+  is what a run remembers and writing the record is what it runs out of night
+  for. Measured 2026-08-24: four of the six items opened the previous day
+  existed only as daybreak lines. **Repair the missing side rather than
+  reporting it** — a queue item whose only copy is the queue is destroyed by
+  being answered, since the line leaves and takes the reasoning with it. Look
+  for the third hiding place too: a finding written into the document it is
+  about (a README, a package comment) and never entered anywhere.
 - **Corrections outrank overwrites.** When a later run finds an earlier entry
   wrong, the ledger records the correction beside the original rather than
   editing it away. A run that silently rewrote history is a finding.
@@ -156,7 +164,10 @@ This is where they get a home.
   git log --diff-filter=A --name-only --since=... --format=  # 3. what arrived, by era
   git ls-files -- '*.md' | xargs -n1 head -1        # 4. every doc, by its own title
   ./mtglab --help  (and each subcommand's)          # 5. every command and flag
-  git ls-files | xargs -I{} sh -c 'grep -rL {} ...' # 6. files nothing references
+  # 6. non-source files nothing else in the tree names -- see the note below
+  git ls-files | grep -E '\.(md|ya?ml|toml|sh|sql|txt)$' | while read -r f; do
+    grep -rqlF --exclude-dir={.git,node_modules,web_dist} "$(basename "$f")" \
+      --exclude="$f" . || echo "$f"; done
   ```
 
   Pass 1 is the one that pays and the one always skipped: **read the whole
@@ -164,6 +175,16 @@ This is where they get a home.
   directory you cannot immediately say the purpose of. Pass 5 is its
   equivalent for behaviour — a CLI grows commands and never loses them, and
   a flag whose data moved to the volume is a relic that still runs.
+
+  **Pass 6 only works over non-source files, and the version that did not say
+  so was useless.** Go and TypeScript reach each other by package and import,
+  never by filename, so a basename sweep over the whole tree reports ~180
+  source files as unreferenced — a list nobody reads, which is the same
+  failure as not running the pass. Source reachability is the compiler's
+  question and `deadcode`/`knip`'s, not this sweep's; what this sweep can see
+  is a doc, a workflow, a recipe or a schema that nothing names. Read its
+  output expecting *convention-loaded* survivors — `dependabot.yml`, an
+  embedded migration glob, a `tsconfig` — and stop on anything that is not one.
 
   The kinds to expect, so none is dismissed as "probably fine": directories
   from an earlier shape; template and fixture files describing a workflow
@@ -193,9 +214,25 @@ Claude develop the code** — the primary-developer frame in SKILL.md. This
 repo deliberately writes comments that carry an argument, and that rule is
 not in question; what creeps in beside the argument is *residue of the
 making* — the date somebody noticed, the punch list it came off, the PR that
-fixed it, the sentence it used to say. Measured 2026-08-23 from a standing
-start: **88 dated comments in Go (60 outside tests) and 101 more under
-`web/src`.**
+fixed it, the sentence it used to say.
+
+**The baseline, with the commands that produce it**, because a number nobody
+can reproduce is not a baseline — the first measurement here was recorded bare
+and its `web/src` half could not be reproduced by any obvious variant on the
+next run (87, 117 and 151 were all available; the recorded figure was 101):
+
+```bash
+grep -rnE '^\s*//.*20[0-9]{2}-[0-9]{2}-[0-9]{2}' go --include=*.go | wc -l
+grep -rnE '^\s*//.*20[0-9]{2}-[0-9]{2}-[0-9]{2}' go --include=*.go \
+  | grep -vc _test.go
+grep -rnE '(^|\s)(//|\*|/\*).*20[0-9]{2}-[0-9]{2}-[0-9]{2}' web/src \
+  --include=*.ts --include=*.tsx --include=*.css | wc -l
+grep -rnE '#[0-9]{2,3}|\bv[0-9]{3}\b' go --include=*.go   # the other residue
+```
+
+**2026-08-24: 89 dated in Go, 60 outside tests, 87 under `web/src`.** Dates are
+only the visible half — PR numbers, `vNNN` build tags and punch-list references
+are the same residue and the last grep is how they are found.
 
 The line, and it is sharp:
 
@@ -208,7 +245,12 @@ The line, and it is sharp:
   reader would otherwise reintroduce, and then one clause is the whole
   budget.
 - **A date stays only when the date is the fact**: an expiry, a version
-  floor, a pricing cutover, a deprecation window.
+  floor, a pricing cutover, a deprecation window — **and a validation
+  measurement**, which is the fourth kind and was found by sweeping. *"Validated
+  against 3,000 Tier 1 games per deck on 2026-08-21: mean error -0.06 mana"* is
+  not a diary entry, because its date is how a reader decides between trusting
+  the formula and re-validating it. Strip the date and the sentence quietly
+  claims to be current forever.
 
 The test for every comment: **would a fresh Claude session, reading only the
 code, act differently for having read this sentence?** If no, it goes; if
@@ -218,6 +260,17 @@ a bounded slice each run (a package, or one route family) and record in the
 ledger which slices are done, so the sweep finishes over cycles instead of
 restarting every one.
 
+**Five packages are not sweepable, and the reason is ADR 18.**
+`internal/sim`, `internal/sim/tier1`, `internal/mana`, `internal/floats` and
+`internal/mt19937` each embed their own source (`SourceFS`) and are hashed
+into the Tier 1 cache's engine fingerprint — `internal/sim/cache`'s
+`engineSources` is the list, and its own doc comment now says this. **A
+reflowed comment in any of them changes the key and discards every stored row
+on the volume.** Nothing fails, no test speaks, and the instance silently
+recomputes what it had already paid for. Choose a slice outside them; if a
+comment in one is genuinely wrong, that is a finding to raise with the cost
+attached, not a tidy to fold into a sweep.
+
 ## What this run never does
 
 - **It does not re-audit the five colours.** If it finds a real bug in code,
@@ -225,9 +278,13 @@ restarting every one.
   run — this run's diff belongs to the skill, the ledger and the tooling.
   A colourless run that starts fixing product code has stopped being
   colourless. **One carve-out, Aaron's: comment-only diffs are this run's to
-  make.** A comment is not product behaviour — the binary and the committed
-  bundle come out byte-identical — so part five's sweep breaks no rule about
-  touching product code, and the gauntlet still runs to prove exactly that.
+  make.** A comment is not product behaviour, so part five's sweep breaks no
+  rule about touching product code, and the gauntlet still runs to prove
+  exactly that. **The carve-out used to justify itself with "the binary and the
+  committed bundle come out byte-identical", and that is false in five
+  packages** — see part five's fingerprint note. The correction is worth
+  keeping visible rather than editing away, because the wrong reason is the
+  kind a fresh session would re-derive.
 - It does not open a PR for the ledger alone. Same rule as every other run:
   a doc change rides the branch that does the work. If the only output is
   ledger text and skill edits, that *is* the work and the PR is legitimate —

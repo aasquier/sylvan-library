@@ -3212,10 +3212,360 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-08-21 (scoped — the relic sweep only; see the dated
-  subsection at the end of this file). Last full run: 2026-08-19 (rainbow) —
-  the first colorless run to have five colors to audit. Previous: 2026-08-19
-  (the run that created this section).
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-21 (scoped — the relic
+  sweep only), 2026-08-19 (rainbow, the first colorless run with five colors to
+  audit), 2026-08-19 (the run that created this section).
+- **Read everything below the 2026-08-24 block as history, not as state.** It
+  is all about the Python app, and its instruments are gone: `mtglab bench`,
+  `mtglab bench caches`, `mtglab bench profile`, `mtglab mutate` and
+  `mtglab animist verify` are named throughout and **not one of them is a
+  command this binary has** — the shelf they describe retired with the Go
+  crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
+  the lessons still hold, and several are why the 2026-08-24 run went where it
+  went; no command, count or path in them is a current fact.
+
+### 2026-08-24 (rainbow)
+
+The sixth leg of a seven-leg rainbow, and the first colorless run since the Go
+crossing. Parts one through five all run; the relic sweep ran all six passes.
+
+- **Fixed this run:**
+  1. **The comment sweep's own licence was wrong, and finding out cost the
+     sweep three of its edits.** Part five's carve-out justified a comment-only
+     diff on the grounds that "the binary and the committed bundle come out
+     byte-identical". **That is false in five packages.** `internal/sim`,
+     `internal/sim/tier1`, `internal/mana`, `internal/floats` and
+     `internal/mt19937` each embed their own source and are hashed into ADR
+     18's engine fingerprint (`internal/sim/cache`'s `engineSources`), so
+     reflowing a doc comment in any of them changes the cache key and **every
+     stored Tier 1 row on the volume stops matching**. Nothing fails, no test
+     speaks — `TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint` asserts the
+     fingerprint *differs* from the recorded Python one, so there is no golden
+     to notice a move — and the instance silently recomputes what it had
+     already paid for. Caught mid-sweep: three edits had already been made in
+     `sim/source.go` and `sim/tier1/{run,tier1}.go` and were reverted. The
+     fix is in three places: `engineSources`' own doc comment now says a
+     comment counts and names the five, `references/colorless.md` part five
+     carries the exclusion, and the carve-out keeps its wrong reason *visible*
+     with the correction beside it rather than edited away, because a fresh
+     session would re-derive it.
+  2. **The relic sweep's pass 6 could not be read, so it could not be run.**
+     As written — `git ls-files | xargs -I{} sh -c 'grep -rL {} ...'` — it
+     reports **180 files**, almost every `.go` and `.tsx` in the tree, because
+     Go and TypeScript reach each other by package and import and never by
+     filename. A pass whose output is 180 lines of noise is a pass nobody
+     reads, which is the same failure the enumerative sweep exists to prevent,
+     one layer up. Rewritten to the file kinds where a basename *is* the
+     linkage (docs, workflows, recipes, schemas, scripts) with a note on how to
+     read the survivors. Scoped, it returns **14 rows, all convention-loaded
+     and all correct**: `.github/dependabot.yml`, the twelve
+     `internal/auth/migrations/*.sql` (an embed glob), and `web/tsconfig.json`.
+  3. **The comment baseline was a number nobody could reproduce.** Part five
+     recorded "88 dated comments in Go (60 outside tests) and 101 more under
+     `web/src`" with no command. The Go halves reproduce (89 and 60 today, one
+     added since); **the `web/src` half does not** — 87, 117 and 151 are all
+     obtainable and 101 is not. The four greps that produce the figures are now
+     in the reference beside them, including the one for the residue dates
+     miss: PR numbers and `vNNN` build tags.
+  4. **A fourth kind of date earns its keep, and sweeping is what found it.**
+     Part five listed three (expiry, version floor, pricing cutover,
+     deprecation window). A **validation measurement** is the fourth:
+     `curve.go`'s *"validated against 3,000 Tier 1 games per deck on
+     2026-08-21: mean error -0.06 mana"* is not a diary entry, because the date
+     is how a reader chooses between trusting the formula and re-validating it.
+     Strip it and the sentence claims to be current forever. Both surviving
+     dates in the swept slice are of this kind, which is the argument.
+  5. **The comment sweep itself — slice `internal/sim/**`, outside the
+     fingerprint.** Four files, comment-only: `sim/cache/cache.go`,
+     `sim/compile/compile.go`, `sim/curve/curve.go`, `sim/tier3/run.go`.
+     Cut: three `#NNN` PR references, four "until 2026-08-2X" clauses whose
+     old shape was kept and whose date was not, and one "Aaron's ruling of
+     2026-08-21" that is stronger as "Aaron's ruling". Kept: both validation
+     measurements, and every argument. **Slices done, so the sweep finishes
+     over cycles rather than restarting:** `internal/sim/{cache,compile,curve,
+     tier3}` — 2026-08-24. **Not sweepable at all:** the five fingerprinted
+     packages (finding 1).
+  6. **The measuring shelf's cgo rule gains its corollary, bought twice in one
+     night.** The rule as written — profile the Go half, clock the cgo half —
+     held: both Black and Red hit the blind spot and both said so. What it did
+     not say is what to do next. Red switched to `-sample_index=alloc_space`
+     and got the night's finding out of `internal/api`; the shelf now says the
+     allocation profile is not blind there and is the move when `-top` comes
+     back featureless.
+
+- **Part one — is the ledger telling the truth? The two-places rule is the one
+  that breaks, and it breaks in one direction.** Of the **six** items opened in
+  `DAYBREAK.md` on 2026-08-23, **two** have anything in this file (items 2 and
+  3, both as one-liners in Cleanup's "Not yet run" backlog rather than in a
+  colour's section) and **four have no ledger entry at all** — the coverage
+  floor, the night-merge rule, the skill-prose guard and the pprof mount. No
+  section in this file carries a `2026-08-23` tag; the session that wrote those
+  six lines wrote no record for them.
+
+  **The direction is structural, not accidental.** Writing the queue line is
+  what a run remembers, because it is the thing Aaron opens; writing the record
+  is what a run runs out of night for. And the consequence is worse than
+  invisibility: `DAYBREAK.md` says an answered item *leaves*, so **an item whose
+  only copy is the queue is destroyed by being answered** — the line goes and
+  takes its reasoning with it. Two of the four are Colorless's own subject and
+  their records are recovered below; the other two are noted where they belong.
+
+  **The third hiding place, and Green found it independently tonight**: a
+  finding written into the document it is *about* — `web/README.md` recorded
+  half of the browser-floor gap as a queued item that reached neither this file
+  nor the queue, and for five days the declared Safari 16.4 floor was held by
+  prose alone. Two colours hitting the same plumbing hole in one night is the
+  test for promotion, so the check is now spelled out in
+  `references/colorless.md` part one, including the instruction to *repair* the
+  missing side rather than report it.
+
+- **Spot-checks of what the other colours claimed** (part one, three taken):
+  White's `NOTICE.md` anchors — the four repaired paths resolve and
+  `go/cmd/mtglab/licenserecord_test.go` is on `main` holding them, including
+  the `newRoot()`-derived verb half. White's #281 forge-stub lock is in the
+  tree. Blue's `--no-open` deletion was read rather than assumed, because
+  removing a flag from four `.claude/launch.json` entries looks like a
+  regression from the outside: `cmd/mtglab/ui.go` parsed it into `_ = noOpen`
+  and nothing in the process ever opened a browser, so the flag was help text
+  lying and the deletion is right.
+
+- **Part two — is the checklist finding things, or reciting them?** Verdicts,
+  measured as what each colour's run tonight actually found against what its
+  file spends its words on:
+  - **White — earning it.** Both fixes came from the verify-the-anchor habit
+    the file added deliberately, not from a list.
+  - **Blue — earning it, and its finding was in this skill.** Four places in
+    the pass's own prose told a run to invoke `ruff`/`mypy`/`pytest` bare; all
+    four are `command not found` here, copied from `ci.yml` where they work.
+    That is a checklist failing on its own instructions.
+  - **Black — earning it**, and its facet's cgo caveat held under use.
+  - **Red — earning it, and item 3 of the 2026-08-23 queue turned out to be
+    fact rather than hypothesis.** The `deploy` job's `needs` list had never
+    included `tools`, so every deploy since the crossing shipped without the
+    toolbox gate. **That is a data point about the queue, not about Red**: the
+    item was written as "a job added without `needs` deploys off a partial
+    suite, silently", and the hole was already open when it was written. A
+    queued item is a claim to re-check, exactly like a sentence in a doc.
+  - **Green — earning it, and it found two of its own guards deleted.** The
+    browser-floor and reduced-motion tests went with the interpreter and
+    nothing recorded that they had. A checklist line pointed at a test file is
+    only as good as something noticing the file is gone.
+  - **Colorless — the file that most needed re-reading rather than
+    re-running.** Two of its five parts were wrong in ways only *running* them
+    exposes (pass 6 unreadable, the carve-out's reason false). Both fixed above.
+
+- **Part three — the tooling, run and read as evidence about itself:**
+  - `animist verify` — **12 recipes, 12 `held`, exit 0.** Raw output in the
+    measurements below. The tool is healthy; **what it cannot see is the
+    finding.** `verify` walks recipes, so an asset with no recipe is invisible
+    to it, and three of the eight asset directories have none —
+    `web/src/assets/{claude,fonts,simulator}`. All three are honest (authored
+    or fetched, argued at length in their `PROVENANCE.md`) and two carry the
+    machine-readable marker `<!-- authored: no recipe, no gate. -->`. **Nothing
+    checks that an asset directory is one or the other**, which is a White
+    finding and is filed below.
+  - **The shelf's live question, asked again: what would a Go rebuild measure
+    that the stock toolchain cannot?** The honest answer is still "a cache
+    register and a benchmark ledger", and this run sharpened the first half.
+    Finding 1 is precisely a cache-register question: a comment edit inside a
+    fingerprinted package turns the Tier 1 cache's hit rate to zero on the next
+    deploy, and **nothing anywhere would show it** — not a test, not a log, not
+    `/api/health`. A register would have made that a visible number rather than
+    a paragraph found by accident. The rebuild's shape does not need widening;
+    its cache half needs promoting above its benchmark half.
+  - **The stock instruments answered everything asked of them this cycle**, and
+    the one documented blind spot behaved exactly as documented in two
+    independent hands. That is the shelf earning its thinness.
+
+- **Part four — the relic sweep. All six passes run**, recorded because a sweep
+  that ran two of six and reported "nothing found" is the failure this entry
+  exists to stop.
+  - **Pass 1 (every tracked directory) — clean, and checked the hard way.**
+    Every `go/internal/**` package was read back against its own package doc;
+    all 47 have one and all 47 name a purpose the current architecture needs.
+    `licenses/` holds the two third-party licence texts NOTICE cites.
+  - **Pass 2 (odd file types) — clean.** The non-source tracked files are the
+    tarot deck, the committed media, four fonts, twelve migrations, two schema
+    files, two licence texts, the container files and `docker-entrypoint.sh`.
+  - **Pass 3 (what arrived, by era) — clean.** The oldest untouched tracked
+    files are ADRs 1–10, `LICENSE` and the `web/` tsconfigs, all 2026-08-10 and
+    all immutable or stable by design.
+  - **Pass 4 (every doc by its own title) — one raise, no action.** All 38 ADRs
+    are present; **ADR 29's `#` line is the only one missing its number**, and
+    four titles (ADRs 3, 14, 20, 24) name Python as the served backend, which
+    ADR 38 superseded. ADRs are immutable, so this is the found-and-raised
+    class, not a tidy — and it is thin enough that the honest recommendation is
+    to leave it.
+  - **Pass 5 (every command and flag) — clean, and it corrects this section.**
+    Nine subcommands plus a hidden `probe`; every flag on every one has live
+    data behind it. **`mtglab ui --dev` does not exist and appears nowhere in
+    the tree.** This section's 2026-08-21 entry names it twice as a live
+    capability ("the dev harness — commandment 16's walks, `--dev` CORS for
+    Vite", and "what `--dev` is for"). *Correction, recorded beside the
+    original rather than edited into it:* the flag did not cross, and it is not
+    needed — `web/vite.config.ts` proxies `/api` to `127.0.0.1:8765`, so the
+    dev server reaches the real API without any CORS switch. The *ruling* those
+    sentences record is untouched and still holds.
+  - **Pass 6 (files nothing references) — clean once it was made readable**
+    (finding 2). 14 rows, all convention-loaded.
+  - **No keep/retire decision is owed from this sweep**, and that is worth
+    saying plainly: the 2026-08-21 sweep queued six relics, Aaron ruled on all
+    six, and the tree has not re-accumulated. The only file-granularity finding
+    this run is the `--dev` correction above, which is a stale sentence in this
+    ledger rather than a relic in the tree.
+
+- **The convergence nobody planned, and what it means for the two open
+  docs-rot items.** Four documents-versus-tree guards were written into
+  `go/cmd/mtglab` in one night by four different legs: White's
+  `licenserecord_test.go` (paths exist; `mtglab <verb>` read off `newRoot()`),
+  Blue's `configrecord_test.go` (env switches both ways; `.claude/launch.json`
+  against the command tree), Red's `pipeline_test.go` (`ci.yml`'s `needs` set
+  derived from its own job list), Green's `browserfloor_test.go` and
+  `reducedmotion_test.go` (the bundle against the declared floor). **They did
+  not duplicate each other**: Blue, Red and Green all call White's `repoRoot`
+  and `sortedKeys`, which is the shape working. Two things follow.
+  1. **The shared kit is discoverable only by having read the licensing test.**
+     `repoRoot`, `sortedKeys`, `backticked`, `repoPaths` and `mtglabVerb` all
+     live in `licenserecord_test.go`, and a session looking for "how do I
+     assert a doc's path resolves" will not open a file named for the licence
+     record. Not proposed as a move tonight: three of the four files are on
+     unmerged branches and a move would conflict with all of them. **The next
+     cleanup should do it**, once they land.
+  2. **The skills-doc guard 2026-08-23's daybreak item 5 asks for is harder
+     than the licensing one, and the difficulty is now measured rather than
+     guessed.** The skill files write repository paths against **four different
+     implied roots** — `go/` for packages (`internal/pool`, `cmd/mtglab/ui.go`),
+     `web/src/` for the frontend (`lib/api.ts`, `components/lazycharts.tsx`),
+     the skill's own directory for `references/*.md`, and a shorthand in
+     `references/red.md` (`sim/tier1` for `go/internal/sim/tier1`). Of 24
+     path-like backticked tokens across `SKILL.md` and the six reference files,
+     **20 resolve under none of the roots a naive `Stat(root/p)` would try, and
+     all 24 resolve under one of the four** — so the guard White's helpers make
+     cheap would fail 20 times on a healthy tree. **This is not a re-ask**;
+     item 5 and White's item 2 both stand exactly as written. It is the
+     implementation note whichever of them lands will need: resolve a token
+     against a small ordered list of roots and fail only when it resolves under
+     none. Audited by hand tonight in place of the guard: **all 24 paths
+     resolve**, and the one dead command (`mtglab animist` in
+     `.claude/skills/yas-queen/references/house-codes.md`) is already fixed on
+     Blue's PR #282, so it is deliberately not touched here.
+
+- **Recovered records — the four 2026-08-23 daybreak items that had none.**
+  Written here rather than left to be destroyed by their own answers.
+  **Not re-litigated**: each is restated as it stands, and nothing below is a
+  new question.
+  1. *(Colorless's own)* **Does night work merge itself?** The rule in
+     `SKILL.md` was derived from commandments 14 and 16, not from a ruling:
+     anything a user can see stops at a green PR for Aaron's eye, everything
+     else may merge on green. The alternative is "a night run never merges".
+     Tonight made the question moot in one direction and sharper in the other:
+     `gh pr merge` was refused by the harness's permission classifier from
+     Blue's leg onward, so **five of the seven legs ended at a green unmerged
+     PR whatever the rule says**. An answer is still owed, because a capability
+     that comes back should meet a decision rather than a default.
+  2. *(Colorless's own)* **The skill is unenforced prose.** Its standing
+     question — which absolute is enforced by nothing — answers *all of them*
+     for itself. The evidence has doubled since it was written: Blue found four
+     more bare-command errors tonight, and the four-roots measurement above is
+     what the proposed guard has to handle. The recommendation is unchanged.
+  3. *(White's)* **The 95% coverage floor is gone**, 80.3% today, half
+     unit-change and half real, with three Python-era fakes never rebuilt in
+     Go. White's 2026-08-24 measurements block records the trend point the
+     item's recommendation (a) asked for; recommendation (b), the three fakes,
+     has no home in White's section yet. Noted here rather than written into
+     White's, whose block this run did not otherwise touch.
+  4. *(Red's)* **A pprof mount for the hot-spot patrol**, dev-local half and
+     admin-gated live half, the latter carrying the real caveat that a heap
+     profile carries session tokens. **Deliberately not written into Red's
+     section**: Red's branch is open and editing that section would conflict by
+     construction. The next cleanup should file it there.
+
+- **Filed to White, not fixed here** (a colorless run's diff belongs to the
+  skill, the ledger and the tooling): **nothing checks that a committed binary
+  asset is either recipe-covered or declared authored.** `animist verify` holds
+  the 12 recipes; the three recipe-less asset directories are honest and
+  argued, and two of them carry the marker
+  `<!-- authored: no recipe, no gate. -->` in their `PROVENANCE.md` — a
+  machine-readable token nothing reads. The guard White's licensing facet
+  should want: walk every directory holding a committed
+  `.webp/.mp4/.webm/.svg/.woff2` and require it to be covered by a recipe *or*
+  to carry the marker. It derives from the tree rather than restating a list,
+  and it fails when a new asset lands with neither. Today it would pass — and
+  `web/src/assets/fonts` is the one to think about, since it has neither a
+  recipe nor the marker, only prose.
+
+- **Measurements (2026-08-24, rainbow):** raw output, not a summary.
+
+      $ cd tools && .venv/bin/animist verify
+        …/assets/tarot/tarot.recipe.yaml: held
+        …/web/src/assets/ambience/ambience.recipe.yaml: held
+        …/web/src/assets/ambience/embers.recipe.yaml: held
+        …/web/src/assets/ambience/mist.recipe.yaml: held
+        …/web/src/assets/ambience/wisps.recipe.yaml: held
+        …/web/src/assets/learn/bookworm.recipe.yaml: held
+        …/web/src/assets/seance/parchment.recipe.yaml: held
+        …/web/src/assets/wheel/critter.recipe.yaml: held
+        …/web/src/assets/wheel/fates.recipe.yaml: held
+        …/web/src/assets/wheel/lantern.recipe.yaml: held
+        …/web/src/assets/wheel/menagerie.recipe.yaml: held
+        …/web/src/assets/wheel/shades.recipe.yaml: held
+      exit 0   (12 recipes in the tree, 12 rows printed — count before reading)
+
+  Comment residue, with the commands now recorded in the reference beside the
+  numbers so the next run compares rather than re-derives:
+
+      dated comments, go/**.go                     89   (2026-08-23: 88)
+      dated comments, go/**.go outside _test.go    60   (2026-08-23: 60)
+      dated comments, web/src (ts/tsx/css)         87   (2026-08-23 recorded
+                                                         101, unreproducible)
+      #NNN / vNNN residue in internal/sim       3 → 0
+
+  The skill's own surface: **7 files** (`SKILL.md` plus six references), **24
+  path-like backticked tokens, 24 resolving, 0 dead**; **7 distinct
+  `mtglab <verb>` mentions**, one dead (`animist`, fixed on PR #282). Relic
+  sweep pass 6 scoped: **14 rows, 0 findings.** Daybreak two-places audit:
+  **6 items opened 2026-08-23, 2 with any ledger entry, 4 with none.**
+  Gauntlet on this branch: `gofmt -l .` silent, `go vet ./...` clean,
+  `go test -race ./...` **0 failures**, `golangci-lint run ./...` **0 issues**,
+  `npm --prefix web run check` **38 files / 615 tests passed in 26.11s**.
+
+- **Queued for Aaron (2026-08-24):** two, both in `DAYBREAK.md` under
+  **Colorless**.
+  1. **Make the two-places rule machine-checked.** Every open item in
+     `DAYBREAK.md` should name the ledger section holding its record, and a
+     test should hold that true — reading the section names *out of*
+     `LEDGER.md`'s own headings rather than restating them, and failing if it
+     finds no items at all, so an inert guard cannot pass silently. Today four
+     of the eight open items would fail it, which is the argument and also the
+     reason it was not landed tonight: repairing them means editing the
+     2026-08-23 block, and the rainbow's own instruction is to leave those
+     items untouched.
+  2. **Rule on comment edits inside the five fingerprinted packages.** Finding
+     1 gives the mechanism; what is owed is the policy. Recommendation: no
+     prose-only edit in `internal/sim`, `internal/sim/tier1`, `internal/mana`,
+     `internal/floats` or `internal/mt19937` — a wrong comment there is raised
+     with its cost attached and fixed alongside a real change to the same
+     package, so the cache is discarded once for a reason rather than twice for
+     tidiness.
+
+- **Deferred (2026-08-24), with the trigger:**
+  - **Move the shared documents-versus-tree helpers out of
+    `licenserecord_test.go`** into a file named for what they are. *Trigger:*
+    Blue's #282, Red's #284 and Green's #286 all merged, so the move stops
+    conflicting with three open branches.
+
+- **Staleness, honestly stated** for the next bare `/polish`: **Cleanup, and it
+  is not close.** All six colours now carry a `2026-08-24 (rainbow)` tag, so
+  nothing is stale by date; Cleanup **has never run at all**, its section still
+  reads "Not yet run", and it now inherits six legs' queues plus everything
+  older. This run's headline finding is that the queue's bookkeeping is broken
+  in one direction, which makes another audit of a queue nobody empties the
+  wrong next move. After Cleanup, **Red** — its 2026-08-23 item turned out to
+  be a live hole rather than a hypothesis, which is a trend line moving the
+  wrong way.
+
+### 2026-08-19 (rainbow) — the Python era
+
 - **Fixed this run (2026-08-19, rainbow):**
   1. **The mutation catalogue held 19 sites no test could ever kill, and they
      were 22% of one whole class.** White handed this over as an observation
