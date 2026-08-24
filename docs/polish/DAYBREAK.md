@@ -12,6 +12,46 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ---
 
+## Open — 2026-08-24
+
+**1. ADR 5's isolation sweep did not cross to Go, and it is the one test that
+ADR itself calls the highest-value test in the whole auth story.** Its decision
+text reads: *"For every user-scoped endpoint, a test logs in as user B,
+requests user A's resource and asserts 404, not 403 … **parametrised over the
+route table, so an endpoint added without scoping fails the suite.**"* Python
+had it — 57 routes classified, each filed with its argument. The Go tree has no
+equivalent: the door's sweeps derive public-vs-protected and the admin prefix
+from the route table (both genuinely machine-checked), but *whose data a route
+serves* is checked only by a scattering of hand-written per-route 404 tests
+with no completeness guard over the 23 `/api/decks/{owner}/…` patterns. The
+structural half ADR 5 also asked for **is** in place — one accessor,
+`api.sourceFor` → `library.SourceFor`, and every deck handler read this run
+goes through it — so this is a missing guard rather than a known hole, and no
+leak was found by spot-check. · *Cost of leaving it:* the next deck route
+written without the accessor ships silently; nothing in the suite notices, and
+the thing it would leak is another person's decklist. · **Recommendation:**
+rebuild it, and in ADR 5's own parametrised form rather than as more one-off
+tests — iterate the served route table, and for every pattern carrying
+`{owner}` drive it as a signed-in stranger against a private deck and assert
+404. Deliberately **not** attempted tonight: mis-filing one route as shared
+would certify a hole as shut, which is worse than the gap, and that judgement
+wants daylight. Ledger: White, 2026-08-24.
+
+**2. `NOTICE.md`'s dead anchors are fixed, but nothing stops the next four.**
+This run repaired three dead repo paths and a dead command name in the
+licensing record — anchors the Go crossing killed (see White's ledger entry) —
+and added `go/cmd/mtglab/licenserecord_test.go` to hold them: every
+repository path `NOTICE.md` and the `PROVENANCE.md` files name must exist, and
+every `mtglab <verb>` they tell a reader to run must be a real subcommand,
+read off the binary's own command tree. It does **not** cover the rest of the
+tree's prose, where the same rot is visible — `docs/`, `web/README.md`, package
+comments, `.claude/skills/yas-queen/references/house-codes.md`. · *Cost of
+leaving it:* nothing legal; the licensing record itself is now held. This is
+the wider docs-rot question, and it is the same shape as daybreak item 5 from
+2026-08-23. · **Recommendation:** if you say yes to that item, have its
+implementation reuse this test's two helpers rather than write a second pair —
+both halves are built, tested and mutation-verified.
+
 ## Open — 2026-08-23
 
 **1. The 95% coverage floor is gone, and the drop is half unit-change and half

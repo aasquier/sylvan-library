@@ -19,7 +19,418 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-08-19 (rainbow). Previous: 2026-08-16 (rainbow).
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19, 2026-08-16.
+- **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
+  state.** Every one of them is about the Python app: `src/mtglab`, pytest,
+  `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
+  finished on 2026-08-23 and none of those files exist. The findings and the
+  *lessons* still hold — several are why this run went where it went — but no
+  number, path or test name below is a current fact. Where a guard from that
+  era did **not** cross, this run says so by name.
+
+### 2026-08-24 (rainbow)
+
+- **Fixed this run:**
+  1. **The licensing record's verification anchors died in the crossing, and
+     nothing noticed.** `NOTICE.md` is not decoration: it is where the Fan
+     Content, Scryfall, GPL-for-Forge and GPL-for-ffmpeg arguments are made,
+     and every one of them is *anchored* — it names the file a reader can open
+     to check the claim. Four anchors resolved to nothing. **The arguments were
+     all still sound; what had gone was anyone's ability to re-verify them**,
+     which for a document whose entire value is re-verifiability is nearly the
+     same failure. Each was re-checked against the primary source before being
+     rewritten, never patched by analogy:
+     - Scryfall, "the ingest makes one request per bulk file per day" →
+       `cards/db.py`. Now `go/internal/pool/refresh.go`, and the sentence is
+       corrected as well as re-pointed: the code asks the bulk index once and
+       parks each download as `<kind>-<date>`, *skipping one already on disk*.
+     - Forge/GPL, "starts `forge.jar` as a separate process and reads its
+       stdout; nothing links to it" → `sim/tier3/run.py`. Now
+       `go/internal/sim/tier3/run.go`, confirmed to use `os/exec` and a
+       `bufio` read of stdout — so the FSF's separate-programs boundary is
+       still the right one.
+     - ffmpeg/GPL, "never in the container image" → argued from "the `animist`
+       extra is not installed by the image's `.[api,claude]`". Those extras do
+       not exist. Read the `Dockerfile` instead: it copies `go`, `web_dist`,
+       `assets/tarot` and the entrypoint, **and nothing else** — `tools/`, the
+       only thing in this repository that has ever held imageio-ffmpeg, never
+       enters the build context, and the runtime stage carries no Python at
+       all. The discharge is now structural rather than a fact about a
+       packaging extra.
+     - Tesseract, "pins every file by SHA-256 against the manifest in
+       `internal/reference`" → now the actual file,
+       `go/internal/reference/data/shelves.json`.
+
+     **And the command nobody can run.** Twenty-two lines across nine
+     documents told a reader to reproduce a committed asset with
+     `mtglab animist build <recipe>`. That family moved to `tools/` when the
+     Python app retired; the binary has no `animist` subcommand and the CLI's
+     own docstring says so. Every PROVENANCE file opens by promising *"every
+     transformation applied is written down, so the derivation is
+     reproducible from the source"* — a promise a dead verb quietly voids.
+     Corrected to `animist build <recipe>` throughout (ADRs left alone: they
+     are immutable and they record what was true). The séance file's pointer
+     to the licence gate, `animist/sources.py`, is now
+     `tools/animist/sources.py`.
+
+     **The fix is the guard, not the edit.** `go/cmd/mtglab/licenserecord_test.go`
+     holds both halves from now on: every repository path `NOTICE.md` and the
+     `PROVENANCE.md` files name must resolve in the tree, and every
+     `mtglab <verb>` they name must be a real subcommand — read off
+     `newRoot()`'s own command list rather than restated beside it, which is
+     why `main()` gained a `newRoot()` (behaviour-preserving; `main` now calls
+     it). The document set is **discovered by walking**, never listed, so a new
+     asset directory joins the check by existing.
+     **Mutation-verified against real history rather than a synthetic break:**
+     run against `origin/main`'s own text, the path half names exactly
+     `cards/db.py`, `sim/tier3/run.py` and `animist/sources.py` and nothing
+     else — no false positives across 23 extracted paths — and the command
+     half fires on a restored `mtglab animist`. Two deliberate conservatisms
+     are written into the test: only backticked tokens *containing a slash*
+     count (a bare `LICENSE.txt` in `NOTICE.md` is Forge's, not ours), and only
+     those ending in an extension this repository writes. Both can miss a
+     stale anchor; neither can invent one.
+  2. **`TestEveryDoorResponseCarriesTheSecurityHeaders` was named "Every" and
+     drove eight hand-picked paths.** It now derives its API half from
+     `servedPaths(t)` — the served route table — keeping only the paths no
+     route table names (the SPA shell, both static tiers, the door's own
+     liveness answer) as literals. **This one is load-bearing rather than
+     tidy**: three dismissed high-severity `go/reflected-xss` alerts (17, 32,
+     33 — see the CodeQL audit below) rest on the single sentence *"every body
+     written through the door is `application/json` with `nosniff` applied at
+     `WriteHeader`"*, and a sample of eight cannot hold a sentence whose whole
+     content is *every*. **Mutation-verified both ways, which is the part
+     worth keeping**: `securityHeaders` was made to skip `/api/tarot/reading`
+     — a route the old list did not name — and the derived sweep fails on all
+     four headers while **the old eight-path shape, re-created with the mutant
+     still in place, passes clean**. The widening is not cosmetic; it is the
+     difference between catching that and not.
+  3. **`internal/floats/repr.go` — the canonical rendering — was 0.0% covered
+     by its own package**, and `Float.UnmarshalJSON` was 0.0% across the whole
+     module: no test anywhere called it. `repr.go`'s own doc says its
+     boundaries are "held by the frozen corpus rather than trusted from this
+     comment", and `testdata/corpus.json` carries `fsum`, `round` and
+     `round_to` and **no `repr` section at all**. That corpus is frozen, so the
+     missing section is not a run's to write. `repr_test.go` pins the two
+     properties `repr.go` states about *itself* instead, each derived rather
+     than restated — a rendering that parses back to the same bits is the
+     definition of "the shortest decimal that round-trips", and a `Float` that
+     survives a marshal/unmarshal is the reason the type exists — over a
+     sample spread across both renderings and both sides of every documented
+     switch, plus a deterministic exponent sweep. Package coverage
+     **62.1% → 93.7%**. Three mutants, all killed: `Repr` reduced to six
+     significant digits, the decoder's `TrimSpace` removed, and `MarshalJSON`
+     bypassing `Repr` (which prints `1` for `1.0` — the exact bug the declared
+     type exists to prevent).
+  4. **The documented build lands an 89MB binary in an unignored place.**
+     `.gitignore` covered `go/mtglab` — the no-`-o` accident — with a comment
+     saying "a local build should use `-o` too". CLAUDE.md's Setup block *does*
+     use `-o`: `go build -o ../mtglab ./cmd/mtglab`, which drops the same 89MB
+     Mach-O at the repository root, where nothing ignored it. So the safety net
+     covered the case the documentation does not tell you to run and missed the
+     case it does. `/mtglab` added. The `git add -A` hook is why this has not
+     already happened, and a hook is not a reason to leave a hole beside it.
+- **Verified this run — licensing (triple-check):**
+  - **`animist verify`: 12 recipes, all held** (`tools/`, with its venv).
+    Unchanged in count from 2026-08-19.
+  - **Committed-media sweep: 156 tracked media files, up from 150.** 119
+    source-side + 37 build copies under `web_dist/`. The new directory since
+    the last White run is `web/src/assets/simulator/` (3 files: the goldfish
+    loop, its mp4 and its poster). Read its `PROVENANCE.md` in full: authored
+    by Aaron on his own machine with Seedance, no upstream file, redistribution
+    unrestricted, and — the part that actually decides it — a written per-clip
+    judgement that the frame contains no marks of anyone's, Wizards' included,
+    with the card backs called out explicitly. Correct, and correctly outside
+    the gate for the reason the séance file argues at length.
+  - Cross-checking every source-side media file against its directory's recipe
+    or PROVENANCE left one genuinely unnamed: **`web/src/assets/seance/parchment-deckle.svg`**,
+    which is in no recipe and in no PROVENANCE entry. **Not a finding**, and
+    recorded so the next run does not spend the hour: it is procedurally
+    generated by this project (`numpy default_rng(1909)`, parameters in its own
+    header comment, "regenerate from the parameters above rather than editing
+    points by hand"), so there is no third party and no licence question. The
+    provenance argument lives *in the file*; the séance PROVENANCE simply does
+    not index it.
+  - **No hand-placed third-party binary. No Wizards image under
+    `git ls-files`.** Wizards art is runtime-only: `PERSONA_ART`'s six Scryfall
+    hotlinks each carry a `credit`, and `PageMasthead`'s `credit` prop is
+    **required by the type**, so a masthead without one does not compile — the
+    strongest form this check has ever had. All nine call sites read: seven
+    name card, artist and printing; the two authored-video mastheads (About
+    Claude, Simulator) say the room is ours, which is the honest credit.
+  - **The licence gate still has no override**, checked in the code rather than
+    the docs: `tools/animist/sources.py` raises `LicenceRefused` against
+    `ALLOWED_COMMONS` / `ALLOWED_OPENVERSE` / `ALLOWED_MET`, and
+    `tools/animist/cli.py` has no `--force`, no `--skip`, no bypass argument.
+  - **No monetization surface**, swept across `web/src`, `go/` and `tools/`
+    for donation/sponsor/patreon/kofi/paypal/stripe/subscription/paywall/ad
+    wording. Every hit is either Anthropic API *pricing* (admin-only spend
+    accounting — Aaron paying, never a user paying) or React's
+    `subscribe`/`useSyncExternalStore`. `NOTICE.md`'s "no paid tiers, no
+    sponsorship, no donations, no advertising" holds.
+  - **Scryfall/ADR 6:** no bulk data tracked; the CI filename scan still
+    matches `.duckdb`/`.jsonl.gz`/`.json.gz` anywhere, the content scan still
+    covers `web_dist/`, and the `image` job still refuses a pool *inside the
+    container*. Attribution present.
+  - **The Tesseract obligation survived the crossing intact**, which was worth
+    checking by name because it is the one thing this project actually
+    redistributes. The fourth shelf row — `worker.min.js.LICENSE.txt`, the file
+    `worker.min.js`'s own first line points at — is still in the pinned asset
+    table (`go/internal/reference/data/shelves.json`, digest
+    `45f54171…`, 466 bytes) and still served at
+    `/api/ocr/worker.min.js.LICENSE.txt`. **It is pinned by no test**, which
+    is a smaller version of finding 1 and is named in the deferred list below.
+- **Verified this run — security & isolation:**
+  - **The one real gap is ADR 5's isolation sweep, and it is queued** (below,
+    and daybreak item 1).
+  - **CodeQL: six Go alerts exist, all six are dismissed, and the ledger had
+    never recorded them.** The open-alert list is five Python alerts on
+    `src/mtglab/…` — files that no longer exist — which will sit open forever
+    because the analysis that would close them never runs again (the analyses
+    on `main` are `/language:go` and `/language:javascript-typescript` only).
+    So "5 open, all stale" is the standing state, and reading the open list is
+    *not* reading the security results. The six dismissed Go alerts, each
+    re-checked against the code rather than inherited:
+    - **17, 32, 33 `go/reflected-xss`** (`door.go:415`, `gzip.go:88` and `:97`)
+      — dismissed false-positive: bodies are JSON with `nosniff`. **Premise now
+      machine-checked** by fix 2 above; it was a sample before.
+    - **27, 28 `go/path-injection`** (`library/source.go:161`, `:200`) —
+      dismissed false-positive on `FileSource.path`'s slug validation, pinned
+      by `TestTheFileTierCannotBeWalkedOutOfItsRoot`. Test confirmed present.
+    - **26 `go/cookie-secure-not-set`** (`accounts.go:233`) — dismissed
+      won't-fix: `Secure` follows `MTGLAB_SECURE_COOKIES`. The dismissal's
+      premise ("which the deployment sets") is *looser than the truth* and the
+      truth is better: `config.SecureCookies()` **defaults to `RequireAuth()`**,
+      so the deployed instance gets `Secure` whether or not anyone sets the
+      variable, and `TestSecureCookiesFollowRequireAuthUnlessToldOtherwise`
+      pins exactly that. Nothing to do.
+  - **Email:** `AsDict(true)` has exactly **one** non-test caller,
+    `go/internal/api/admin.go:124` (plus `mtglab users list` reading
+    `user.Email` directly to the maintainer's own terminal). No third. Two log
+    lines in `auth/bootstrap.go` mention `MTGLAB_ADMIN_EMAIL`; only one prints
+    an address, and it is the malformed-configuration path, whose own comment
+    argues the case correctly — it is the maintainer's own address, already in
+    the deployment config, and ADR 16's rule protects users' addresses *from*
+    the maintainer. The other three print `Username`.
+  - **Session hygiene, all holding:** cookies `HttpOnly` + `SameSite=Lax` +
+    config-gated `Secure`; Argon2id at the OWASP minimum (`m=19456` KiB,
+    `t=2`, `p=1`) with a `NeedsRehash`-style staleness check beside it and a
+    dummy-hash timing-parity path; 429 with `Retry-After` on login and reset;
+    `POST /api/auth/reset` answers **202 always**, and its comment argues why
+    the 429 is not an exception (every request is counted, hit or miss).
+    Tokens hashed at rest (`HashToken`) and single-use (`used_at IS NULL`).
+    **No query-string token anywhere under `web/src`.**
+  - **SQL, swept for string building:** four sites concatenate or interpolate,
+    all four clean and each checked rather than assumed.
+    `library/source.go`'s `where()` builds from string literals and binds
+    `owner_id`; `pool/refresh.go:77` interpolates the module-level
+    `addedColumns` table; `pooltest.go:90` is a test helper. The one on a
+    request path is **`api/colors.go:126`**, whose comment claims "both values
+    are the table's own and neither is caller input" — traced and true: the
+    caller's `{key}` is used only to *look up* `combo` in the reference table
+    and 404s when it misses, so `combo.Colors` and `combo.Size` are
+    table-owned by the time they reach the string.
+  - `.env` gitignored (with `!.env.example` after `.env.*`, in the right
+    order); `fly.toml` carries no secret and says so at the top.
+- **Queued for Aaron (2026-08-24):**
+  1. **ADR 5's isolation sweep did not cross to Go.** Daybreak item 1. ADR 5's
+     decision text is explicit — *"For every user-scoped endpoint, a test logs
+     in as user B, requests user A's resource and asserts 404, not 403 …
+     parametrised over the route table, so an endpoint added without scoping
+     fails the suite"* — and its consequences section calls it "the
+     highest-value test in the whole auth story". Python had it: 57 routes
+     classified, each filed with its argument. **The Go tree has no
+     equivalent.** What it *does* have, and what should not be confused with
+     it: the door's two sweeps derive public-vs-protected and the admin prefix
+     from `api.New(api.Config{}).Routes()`, so deny-by-default is genuinely
+     machine-checked and a new route is protected by construction. What is
+     unchecked is *whose data a route serves*. The 404 law is held by a
+     scattering of hand-written per-route tests —
+     `TestAnotherAccountsPrivateDeckIsA404ToEveryLifecycleVerb` covers two
+     verbs; `argue`, `interview`, `wheel` and `claudedial` have one each —
+     against **23 `/api/decks/{owner}/…` patterns**, with no completeness
+     guard over the set. The structural half ADR 5 also asked for *is* in
+     place: one accessor, `api.sourceFor` → `library.SourceFor`, and every
+     deck handler read this run goes through it. So this is a missing guard,
+     not a known hole, and no leak was found by spot-check.
+     **Deliberately not attempted at night, and the reason is this facet's own
+     rule**: filing one route as shared when it is owned would certify a hole
+     as shut, which is strictly worse than the gap. The shape to build is
+     ADR 5's own — iterate the served route table, and for every pattern
+     carrying `{owner}` drive it as a signed-in stranger against a private
+     deck and assert 404 — and the door's existing `concrete()` placeholder
+     filler is most of the scaffolding.
+  2. **The wider docs-rot guard.** Daybreak item 2 — the licensing record is
+     now held; `docs/`, `web/README.md`, package comments and
+     `.claude/skills/yas-queen/references/house-codes.md` (which still says
+     `mtglab animist`) are not. Overlaps 2026-08-23's daybreak item 5; the
+     recommendation is that whichever lands reuses this run's two helpers.
+- **Deferred (2026-08-24), each with its trigger:**
+  - **The `worker.min.js.LICENSE.txt` shelf row is pinned by no test.** The
+    Python run that added it wrote a mutation-verified test that took the name
+    *off* the shelf (`name, = [n for n in ocr.ASSETS if n.endswith(...)]`)
+    rather than restating it; the Go port kept the row and dropped the test.
+    The row is an Apache-2.0 §4 obligation on the only code this project
+    redistributes, so it is worth a guard of the same shape — derive the name
+    from the asset table, assert `/api/ocr/<it>` answers. *Trigger:* any bump
+    of the Tesseract pins, or the next White run, whichever is first.
+  - **`repr.go`'s boundaries still have no corpus.** Fix 3 pinned the two
+    properties; the *rendering table* the doc comment states (`1e16` →
+    `1e+16`, `1e15` fixed, `0.0001` fixed, `0.00001` → `1e-05`, `100.0` never
+    `100`) is still held only transitively. A `repr` section in
+    `testdata/corpus.json` would be the right home and **the corpus is frozen**
+    — CLAUDE.md forbids regenerating it — so this needs Aaron's ruling on
+    whether *adding* a section counts as regenerating. *Trigger:* that ruling,
+    or a Repr change.
+  - **`mtglab` has no `--version` and the licence record has no build stamp.**
+    Not a compliance gap today (the repo is the distribution), but the moment
+    an image or a binary is published anywhere, NOTICE's own Forge section says
+    the exact version must be pinned and the source shipped. *Trigger:*
+    publishing the image or a binary.
+- **Measurements (2026-08-24, rainbow):** raw output, not a summary.
+  - **Coverage, both figures, and both are flat against 2026-08-23** — the
+    first trend point rather than a one-off number (daybreak item 1 of
+    2026-08-23 proposed recording it every White run; this is that recording,
+    and it does not re-litigate the open question):
+
+    ```
+    go test -count=1 -coverpkg=./... ./...   →  total: (statements)  80.3%
+    go test -count=1 -coverprofile=own.out ./...  →  total: (statements)  74.1%
+    ```
+
+    80.3% and 74.1%, both to the tenth, identical to the 2026-08-23 figures.
+    No fall. The unweighted mean across the 46 packages is 81.1%, which is a
+    *different* number from either and is recorded only so the next run does
+    not compute it and think coverage rose.
+    Lowest packages by their own tests: `deckread` 20.4%, `sim/tier3` 25.6%,
+    `library` 28.1%, `claude/tools` 45.1%, `cmd/mtglab` 61.6%, `floats` 62.1%
+    (**93.7% after fix 3**), `pool` 64.0%, `config` 64.3%, `wire` 67.7%,
+    `deckyaml` 70.8%, `api` 71.6%, `auth` 76.6%.
+    **One trap paid for in this run and worth the next one's time:** `floats`
+    reading 62.1% looked like an untested determinism kernel and was not —
+    module-wide, `Repr` is 96.4% and `MarshalJSON` 100%, reached through
+    `wire` and the simulator. Only `UnmarshalJSON` was truly 0% anywhere.
+    Reading a plain `-cover` number as "untested" is the same class of wrong
+    answer as reading a `-coverpkg` number as a package's own.
+  - **Suite wall clock: 57.8s** (`go test -count=1 ./...`, warm build cache,
+    nothing else running), against **1m13s** on 2026-08-23. `-race`:
+    **1m37.9s**. 2409 test results including subtests, 15 skipped.
+
+    ```
+    real 0m57.847s   user 2m46.171s   sys 0m33.080s
+    ```
+
+    Per-package tail, from `go test -count=1 -json`:
+
+    | package | elapsed |
+    |---|---|
+    | `internal/api` | **49.47s** |
+    | `internal/claude` | 25.93s |
+    | `internal/pool` | 8.09s |
+    | `internal/library` | 8.02s |
+    | `cmd/mtglab` | 7.67s |
+    | `internal/auth` | 7.40s |
+    | `internal/gate` | 7.12s |
+
+    `internal/api` is **86% of the wall clock** — the same share as
+    2026-08-23, so the shape has not moved even though the total did. Sum of
+    package times 264.7s against 57.8s wall: the package-level parallelism is
+    working and within-package serialisation is the whole remaining cost.
+  - **`t.Parallel()` census: 833 test functions across 116 files, 2 calls** —
+    and both calls are in the file this run added. The standing start of zero
+    (831/115/0 on 2026-08-23) is otherwise unchanged. 86 `t.Setenv` calls mark
+    tests the compiler will not let run in parallel; the tail is one package
+    (`internal/api`), which is where the whole lever is.
+  - **Skip census: 15 skips, every one conditional on a real absence** —
+    9 live-Claude (`MTGLAB_LIVE_CLAUDE` + a key), 4 Forge (`MTGLAB_LIVE_FORGE`
+    / no distribution / no old shim URL), 1 pool (`MTGLAB_TEST_POOL` unset,
+    which is why it skips here even though this machine has a pool), and
+    `sim/curve`'s data-conditional one. Two more `t.Skip` call sites read as
+    unconditional on a first grep and are not — `claude/interview_test.go:160`
+    guards against the messy fixture ceasing to fail the gate, and
+    `claude/research_test.go:121` against Go's `TrimSpace` changing; both run
+    today. No drift.
+  - **Mutation sampling, first `gremlins` baselines** — one package at a time,
+    determinism kernels first, run in a throwaway `git worktree` at
+    `origin/main` so the working tree was never reachable:
+
+    | package | killed | lived | not covered | efficacy |
+    |---|---|---|---|---|
+    | `internal/mt19937` | 121 | 9 | 9 | **93.08%** |
+    | `internal/textutil` | 9 | 1 | 2 | **90.00%** |
+    | `internal/yamlemit` | 176 | 47 | 36 | **78.92%** |
+    | `internal/floats` | 34 | 15 | 45 | **69.39%** |
+
+    No thresholds set: a `--threshold-efficacy` invented ahead of a baseline
+    either fails at once or certifies nothing, and these are the baselines.
+    **A gremlins trap, found the hard way and worth more than the numbers:**
+    re-running `floats` gave `Killed: 0, Lived: 0, Timed out: 54` and an
+    efficacy of 0.00%, then `Killed: 1, Timed out: 53` with
+    `--timeout-coefficient 10`. gremlins derives its per-mutant timeout from a
+    baseline test run, and for a package whose tests take a fifth of a second
+    that budget collapses and every mutant reports TIMED OUT — a completely
+    fabricated score that looks like a catastrophic result. The first run of a
+    fast package is the one to trust; **an efficacy near zero with a large
+    timed-out count is a fact about the harness, not the suite.**
+    The one number stable across all three `floats` runs is the one that does
+    not require running a mutant: **45 NOT COVERED, every one in `repr.go`** —
+    which is what fix 3 came from.
+  - **The determinism replay, live** (commandment-level: a seed is a promise).
+    Ridden on the signed-in `claude` seat through Claude-in-Chrome; Claude
+    never signed in. Baseline recorded here for the next cycle to byte-compare
+    against:
+
+    - **Tarot, `GET /api/tarot/reading?seed=1909`** — the deployed instance and
+      a build of this tree are **byte-identical**, sha256
+      `e406f504c05f962cb6c2ccabb7d9d18fead04235997917639ac93c90135a3928`,
+      741 bytes. Three cards: Three of Wands *reversed* at `taste`/"The Root",
+      Ten of Swords at `temperament`/"The Turning", The Devil at
+      `posture`/"The Table". The local half was served from a scratch
+      `MTGLAB_DATA_DIR`, and the same seed asked twice locally hashes the same.
+    - **Wheel, `POST /api/decks/gyome/arahbo-cats/wheel {"seed":1909}`** —
+      two calls to the deployed instance, responses identical, 973 bytes;
+      `symbol: sword`, `sword_face: edge`, `answered_by: "dice"`. Live-vs-live
+      only: there are no decks on this laptop (ADR 30), so a local half is not
+      available and the wheel's cross-check is the instance's own repeatability.
+      Commandment 10's plain-word distinction (`answered_by: "dice"`) is
+      present on the wire.
+  - **Dependency licences, swept 2026-08-24 from the packages themselves.**
+    **Go: 32 third-party modules — 19 MIT, 10 BSD-3-Clause, 2 Apache-2.0, and
+    one that needed the triple-check.** `go-licenses report` calls
+    `modernc.org/mathutil` **Unknown**; read its `LICENSE` and it is a
+    textbook **BSD-3-Clause** (retain notice / reproduce notice / no
+    endorsement) with every source file headed "BSD-style license". Not a
+    finding — a classifier miss, recorded so the next run does not repeat the
+    hour. The other 49 "Unknown" rows are this project's own `internal/`
+    packages: the Go module root is `go/` and `LICENSE` is at the repository
+    root, so any tool resolving a licence from the module root reports this
+    module unlicensed. No obligation attaches (nothing here is published as a
+    module) but it is worth knowing before anyone reads an SBOM.
+    **npm: 239 entries, 164 with resolvable metadata — 127 MIT, 15 ISC, 10
+    Apache-2.0, 3 BSD-3-Clause, 3 BSD-2-Clause, 2 MPL-2.0, 2 MIT-0, 1
+    BlueOak-1.0.0, 1 "MIT AND ISC".** The 75 without a licence field are all
+    empty objects — other platforms' optional binaries (`lightningcss-*`,
+    `@oxlint/binding-*`, `@tailwindcss/oxide-*`) and unresolved optional
+    peers, none of them installed. **Zero AGPL/GPL/SSPL/UNLICENSED on either
+    side.**
+  - **`data/app.db` untouched by any of it**, checked by content and not by
+    `git status` (which is blind — the file is gitignored): sha256
+    `dfeee2a5…` and 229,376 bytes before the first suite run and after the
+    last, mtime never moved. The scratch `mtglab ui` used for the determinism
+    replay was pointed at a temporary `MTGLAB_DATA_DIR`.
+  - **Live instance, public posture:** `/api/health` 200 with `pool: true`,
+    35,393 oracle cards, 107,355 printings, 7 decks, `pool_stale: false`.
+    `/api/tarot/reading` and the wheel both **401 without a session**, which is
+    the middleware refusing before routing.
+  - **The library, read rather than remembered** (CLAUDE.md's standing fact
+    about a deliberately invalid deck): 7 decks, all owned by `gyome`, all
+    shared, all `writable: false` to the `claude` seat — ADR 22's read-only
+    sharing, confirmed on the wire. One **curated** deck carries an error, so
+    the honest live demonstration of the gate is intact; a second, a draft,
+    carries one too.
+
+### 2026-08-19 and earlier — the Python era
+
 - **Fixed this run (2026-08-19, rainbow):**
   1. **The project distributes other people's code and type, and none of the
      notices travelled with it.** The camera door (#179/#180, three days old)

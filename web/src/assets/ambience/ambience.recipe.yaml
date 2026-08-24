@@ -1,7 +1,7 @@
 # The ivy set's recipe (ADR 29) -- the reconstruction of 2026-08-15's
 # scripted-Pillow pipeline, whose script was described in PROVENANCE.md but
-# never committed. The committed assets are the record; `mtglab animist
-# verify` holds them to the `expect` blocks below and never regenerates them.
+# never committed. The committed assets are the record; `animist verify`
+# holds them to the `expect` blocks below and never regenerates them.
 #
 # Two parameters did not survive from that session and are honestly absent
 # rather than plausibly invented: the initial crop box ("the cascading

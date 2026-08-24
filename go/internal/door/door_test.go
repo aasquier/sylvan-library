@@ -486,6 +486,21 @@ func TestNoFrontendMeansNoShell(t *testing.T) {
 
 // -------------------------------------------------------------- the headers
 
+// "Every" is derived, not sampled -- and the distinction is load-bearing
+// rather than tidy. Three dismissed high-severity `go/reflected-xss` alerts
+// (door.go's 404 echo and the gzip layer's two writes) rest on one sentence:
+// every body this door writes is JSON or a disk asset, and `nosniff` reaches
+// all of them. A hand-written list of eight paths cannot hold that sentence,
+// because the route it does not name is exactly the one that breaks it. So
+// the API half comes from `servedPaths` -- the served route table -- and the
+// literals below are only the paths no route table names: the SPA shell, the
+// two static tiers and the door's own liveness answer.
+//
+// Anonymous, deliberately: a protected route is refused before its handler
+// runs and a public one answers for real, so the sweep costs nothing and
+// still crosses the middleware seam where the headers are stamped. The one
+// signed-in case is the admin prefix, whose 403 is written by a different
+// arm of the same middleware.
 func TestEveryDoorResponseCarriesTheSecurityHeaders(t *testing.T) {
 	srv := build(t, true, fakeResolver{})
 	want := map[string]string{
@@ -493,11 +508,17 @@ func TestEveryDoorResponseCarriesTheSecurityHeaders(t *testing.T) {
 		"Referrer-Policy":    "same-origin",
 		"Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
 	}
-	for _, c := range []struct{ method, path, token string }{
-		{"GET", "/api/decks", ""}, {"GET", "/api/admin/users", "bob"}, {"GET", "/", ""},
+	cases := []struct{ method, path, token string }{
+		{"GET", "/", ""}, {"POST", "/", ""},
 		{"GET", "/tarot/00-fool.webp", ""}, {"GET", "/assets/nope.js", ""},
-		{"GET", DoorHealthPath, ""}, {"GET", "/api/health", ""}, {"POST", "/", ""},
-	} {
+		{"GET", DoorHealthPath, ""},
+		{"GET", "/api/admin/users", "bob"},
+	}
+	for _, route := range servedPaths(t) {
+		cases = append(cases, struct{ method, path, token string }{
+			"GET", concrete(t, route), ""})
+	}
+	for _, c := range cases {
 		resp := get(t, srv, c.method, c.path, c.token)
 		for name, value := range want {
 			// Values, not Get: a response carrying the header twice would

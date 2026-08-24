@@ -34,7 +34,7 @@ pipeline still has no `authored` source kind
   judgement; the studio-pressure situation around video models was moving
   when this was checked, so re-check rather than inherit this paragraph.
 - **Transformations** (ffmpeg 7.1 via imageio-ffmpeg, and **not** through
-  `mtglab animist`):
+  `animist`):
   - The delivered clip is 1280x720, 10.04s, 241 frames at 24fps, video only
     (no audio track was delivered).
   - Made seamless by **ping-pong** rather than the séance room's

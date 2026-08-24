@@ -1,7 +1,7 @@
 # The tarot deck's recipe (ADR 29) -- the reconstruction of the 2026-08-13
 # fetch, whose script PROVENANCE.md describes ("the fetch script skips
 # anything without that prefix") but which was never committed. The committed
-# cards are the record; `mtglab animist verify` holds them to `expect` and
+# cards are the record; `animist verify` holds them to `expect` and
 # never re-fetches. If they ever ARE re-fetched, PROVENANCE.md's trap section
 # applies: check the RWS1909 prefix AND the visual tells, because the 1971
 # US Games recolouring is still in copyright.
@@ -36,6 +36,6 @@ outputs:
     # half-matches is worse than one that fails. 400px sits at the measured
     # knee of the size curve (PROVENANCE.md: 560px cost 11.0 MB, 340px saved
     # only 1.5 MB more while softening linework); re-derive it with
-    # `mtglab animist measure`. Heights vary per scan, so only width is
+    # `animist measure`. Heights vary per scan, so only width is
     # contractual.
     expect: {count: 78, width: 400, total_budget_kb: 4700, metadata: none}

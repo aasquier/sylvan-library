@@ -10,7 +10,7 @@ The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transfor
 - **Source**: "Folio from a Qur'an Manuscript", <https://www.metmuseum.org/art/collection/search/448369>, found via the Met Open Access API, searching `parchment` after Wikimedia's best vellum plates all turned out to be CC BY -- an attribution obligation a decoration must not carry (the gate refuses it, and the gate is right)
 .
 - **Licence**: CC0. Confirmed through met at fetch time (2026-08-17).
-- **Transformations** (Pillow, scripted -- `mtglab animist build parchment.recipe.yaml`):
+- **Transformations** (Pillow, scripted -- `animist build parchment.recipe.yaml`):
   - `crop`: frac_box=[0.0, 0.7132, 0.2204, 0.9327].
   - `levels`: out_black='#b1945f'.
   - Encoded WEBP, quality 84.
@@ -25,7 +25,7 @@ Why committed rather than hotlinked: The folio is CC0 through the museum's own i
 - **Licence**: Aaron's, outright. Checked 2026-08-18: the platform behind Seedance (Volcengine Ark) asserts no intellectual-property ownership over generated output, grants commercial use, and requires no attribution to the model, the platform or ByteDance. **Redistribution is unrestricted, and that -- not the non-commercial question -- is what this repo's gate actually asks**, since committing an asset to a public repository *is* redistribution; it is why `ALLOWED_LICENCES` refuses even CC-BY. These terms clear that bar, and by a wider margin than this project needs, since it charges nothing, ever (commandment 9).
 
   **The residual risk is not the licence, and it is worth stating.** A generative model's exposure attaches to the *output*, not to the tool: whether a given clip contains somebody else's protected material. Seedance was under active studio pressure on exactly that when this file was written (an MPA cease-and-desist to ByteDance, a Disney legal threat, safeguards pledged in response), so this is a per-clip judgement rather than a settled question. **The judgement for this clip**: candles, glass, votive holders, devotional statuary and green baize -- no characters, no marks, nothing recognisably anyone's. A future clip is its own judgement, and the situation was moving when this was checked, so re-check rather than inherit this paragraph.
-- **Transformations** (ffmpeg, and **not** through `mtglab animist` — see below):
+- **Transformations** (ffmpeg, and **not** through `animist` — see below):
   - The delivered clip is 1280x720, 8.04s, 193 frames at 24fps, with an audio track.
   - Made seamless: the last 12 frames are cross-dissolved into the first 12 (`blend=all_expr='A*(1-N/12)+B*(N/12)'`), and the result is the 181 frames that survive. First-versus-last mean absolute difference was 4.23/255 before, so the dissolve is short on purpose -- a long one ghosts the moving flames.
   - Audio dropped outright. The table has its own sounds and a backdrop that makes noise is a backdrop nobody can mute.
@@ -41,7 +41,7 @@ Why committed rather than hotlinked: The folio is CC0 through the museum's own i
 ## Why these three sat outside the animist
 
 ADR 29's rule is that no binary is hand-placed, and these three were. The gate
-(`animist/sources.py`) confirms a licence *per file, through a provider's API*,
+(`tools/animist/sources.py`) confirms a licence *per file, through a provider's API*,
 and it knows four kinds of source: Wikimedia, Openverse, the Met, and
 `procedural` -- pixels this pipeline generated itself from a seed. A file the
 maintainer authored on his own laptop is none of those. There is nobody to ask,
