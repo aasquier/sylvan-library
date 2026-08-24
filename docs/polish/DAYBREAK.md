@@ -84,6 +84,23 @@ may merge when the required checks are green. · *Cost of leaving it:* nothing
 — it is already the conservative reading. · **Recommendation:** confirm it, or
 tighten it to "a night run never merges" if a 3am deploy is unwelcome at all.
 
+**6. The polish skill is entirely unenforced prose, which is the one thing it
+tells every run to hunt.** Its own standing question is "which absolute claim
+is enforced by nothing?" — and the answer, for the skill itself, is *all of
+them*. Today's refresh fixed by hand: a command that does not exist
+(`mtglab animist verify` — animist is a `tools/` script), a path that moved
+(`src/mtglab/web_dist`), a required-checks list wrong for months, a test cited
+as the model of good practice that no longer exists, and a claim that CodeQL
+gates merging. Every one is mechanically checkable. · *Cost of leaving it:*
+the skill rots at exactly the rate the tree moves, and only a colorless run
+notices, once a cycle. · **Recommendation:** a small Go test that reads
+`.claude/skills/**/*.md`, extracts the repo paths and `mtglab`/`animist`
+subcommands they name, and asserts each resolves — paths against the tree,
+subcommands against the CLI's own command table. Perhaps sixty lines, it
+derives its expectation from the source of truth rather than restating it (the
+pass's own rule), and it would have caught four of the five above at commit
+time. A colorless run's natural first job.
+
 ---
 
 ## Answered
