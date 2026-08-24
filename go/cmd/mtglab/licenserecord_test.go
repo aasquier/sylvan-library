@@ -25,11 +25,19 @@ import (
 // command family that moved to `tools/` and left its name behind. All four
 // were mechanically checkable and none was mechanically checked.
 //
-// Two deliberate conservatisms, because a guard that cries wolf gets deleted:
-// only backticked tokens that *contain a slash* are treated as repository
-// paths (a bare `LICENSE.txt` in this file is Forge's, not ours), and only
-// those ending in an extension this repository actually writes. Both can miss
-// a stale anchor; neither can invent one.
+// Three deliberate conservatisms, because a guard that cries wolf gets
+// deleted: only backticked tokens that *contain a slash* are treated as
+// repository paths (a bare `LICENSE.txt` in this file is Forge's, not ours);
+// only those ending in an extension this repository actually writes; and
+// **files only, never directories**. All three can miss a stale anchor; none
+// of them can invent one.
+//
+// The directory rule was bought by CI on the first push, which is the right
+// way round: a laptop passed and both architectures failed on `NOTICE.md`'s
+// `data/` — the very sentence that says the card pool is gitignored and so is
+// *not* in the tree. A directory named in this record is as likely to be one
+// the repository deliberately does not carry as one it does, and the anchors
+// that rot are files anyway: all four this test was written for are files.
 
 // licensingRecord is `NOTICE.md` plus every `PROVENANCE.md` in the tree --
 // discovered by walking, never listed, so a new asset directory joins the
@@ -126,8 +134,7 @@ func repoPaths(body string) []string {
 			continue
 		}
 		if strings.HasSuffix(token, "/") {
-			out = append(out, token)
-			continue
+			continue // a directory: see the note above about `data/`
 		}
 		if repoExtensions[filepath.Ext(token)] {
 			out = append(out, token)
