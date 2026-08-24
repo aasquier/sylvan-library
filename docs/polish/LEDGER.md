@@ -1867,12 +1867,21 @@ unwalked because they never shipped.
 | `GET /api/lore` | 5.9ms | **0.9ms** | 0.9ms |
 | `GET /api/colors` | 6.1ms | **0.7ms** | 0.7ms |
 | `GET /api/glossary` | 4.5ms | **0.7ms** | 0.7ms |
-| `GET /api/tarot/lore` | — | **0.7ms** | 0.7ms |
+| `GET /api/tarot/reading` (a fresh seeded deal) | — | **0.7ms** | 0.7ms |
+| `GET /api/themes` | — | **0.6ms** | 0.6ms |
 | `GET /api/claude/personas` | — | **0.7ms** | 0.7ms |
 | `GET /` (the shell) | — | **0.7ms** | 0.7ms |
 | `GET /api/cards/search?q=goblin` | 43.8ms | 41.1ms | 40.4ms |
 | `GET /api/cards/search` (no text) | — | 87.7ms | **53.1ms** |
 
+  - **⚠️ Time the route you meant, and check the status code.** A first pass
+    of this table carried `/api/tarot/lore` at 0.7ms. There is no such route:
+    it 404s, and the 404 is *fast*, so the row looked like the healthiest
+    number on the board. The API router answers its own JSON 404 rather than
+    falling through to the shell, which is what made it catchable at all —
+    but nothing in a timing script notices, and this is the same shape as
+    2026-08-19's HEAD-instead-of-GET near-miss. The tarot table's real route
+    is `/api/tarot/reading`.
   - **Do not read the health win as something a visitor can feel.** 2.4ms off
     a 172ms round trip is invisible from outside, and the live table below
     will not move. What it buys is *server work per request* on a machine with
