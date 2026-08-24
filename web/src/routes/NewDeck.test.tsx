@@ -6,7 +6,7 @@
  * pinning here is not the markup but the four claims the ADR makes:
  *
  * * The proposal is a **proposal**. Picking a commander fills in the create
- *   form; it does not make a deck. Nothing under `src/mtglab/claude/` can
+ *   form; it does not make a deck. Nothing under `go/internal/claude/` can
  *   reach a write path and the UI has to tell the same story.
  * * A reading and a claim are **labelled differently**, all the way to the
  *   page. One of them can be wrong.

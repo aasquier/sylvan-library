@@ -126,7 +126,7 @@ four commits to get green. The lessons are worth more than the fix:
 Aaron's bar is the *right* tests, not coverage tests — and a suite that stays
 fast enough that adding tests never feels expensive.
 
-**The 95% floor did not survive the crossing, and saying so is this facet's
+**The 95% floor is a claim no gate enforces, and saying so is this facet's
 own medicine.** It was a real gate once; today CI runs `go test -race
 -count=1 -cover ./...`, which prints a number and gates on nothing, and no
 threshold lives in `ci.yml`, `.golangci.yml` or any doc. A rule enforced by
@@ -296,24 +296,38 @@ Then the levers, in the order that pays:
   — it takes a different path for an admin than for anyone else — and whose
   admin path the default fixtures never take, so it is untested and *looks*
   tested.
-- **Mutation sampling is suspended, not retired as a practice** (Aaron's
-  standing ask, 2026-08-16): the harness died with the old backend and its
-  Go rebuild is the ledger's open item. Until it lands, this facet's sampling
-  is the hand protocol on a *throwaway copy* of a package — never the working
-  tree — and the survivors the old ledger recorded stay listed there so the
-  rebuilt tool can re-ask them by name on its first run.
+- **Mutation sampling is a live practice again, and `gremlins` is the tool**
+  (Aaron's standing ask since 2026-08-16, ruled 2026-08-23). It is a
+  standalone binary with mutation-score thresholds, so it installs on demand
+  exactly as `go-licenses` does and costs the project no `go.mod` entry:
 
-  **The named candidate is `go-gremlins/gremlins`** — a standalone binary with
-  mutation-score thresholds, so it installs on demand exactly as
-  `go-licenses` does and costs the project no `go.mod` entry. (The livelier
-  alternative, `gtramontina/ooze`, runs inside `go test` and therefore *is* a
-  dependency, which is a bigger ask here; `zimmski/go-mutesting`, the classic,
-  has not moved since 2024.) Adoption is queued in `DAYBREAK.md`, not a
-  decision a run takes. When it lands, run it **one package at a time and
-  start with the determinism kernels** — `floats`, `mt19937`, `textutil`,
-  `yamlemit`, `gate` — where correctness risk concentrates and packages are
-  small. Never point it at `internal/api`, which is 63 seconds per test run
-  before a single mutant is generated.
+  ```bash
+  go install github.com/go-gremlins/gremlins/cmd/gremlins@latest
+  gremlins unleash ./internal/floats/          # `run` and `r` are aliases
+  ```
+
+  Read the report by status: **KILLED** is a test doing its job, **LIVED** is
+  the finding (a mutant the suite never noticed), **NOT COVERED** is a line no
+  test reaches at all, and **NOT VIABLE** means the mutation did not build and
+  says nothing about the tests. `--threshold-efficacy` fails the run below a
+  KILLED/(KILLED+LIVED) ratio, which is the flag to reach for once a package
+  has a number worth holding — **not before**, because a threshold invented
+  ahead of a baseline either fails at once or certifies nothing.
+
+  How to run it here, learned from the packages rather than from the docs:
+  **one package at a time, starting with the determinism kernels** —
+  `floats`, `mt19937`, `textutil`, `yamlemit`, `gate` — where correctness risk
+  concentrates and packages are small. **Never point it at `internal/api`**,
+  which is 63 seconds per test run before a single mutant is generated. Record
+  the score per package in the ledger the first time each is run; a mutation
+  score with nothing to compare against is a number, not a finding.
+
+  Two things it does not replace. **A survivor is a question, not a task** —
+  a LIVED mutant in a branch the product never takes is noise, and saying so
+  in the ledger is the right answer. And the **hand protocol still stands** for
+  anything gremlins cannot reach (the frontend, `tools/`, a single guard test
+  you just wrote): break the thing on a *throwaway copy* of the package —
+  never the working tree — watch the test fail, restore it.
 - After the suite, **`git status data/` proves nothing** — `app.db` is
   gitignored, so a test that writes the developer's real database leaves
   the status clean. Use `ls -la data/` and treat a fresh mtime on

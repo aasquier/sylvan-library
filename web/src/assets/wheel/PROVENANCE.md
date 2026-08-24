@@ -1,6 +1,6 @@
 # wheel assets -- provenance
 
-The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): nothing ships in this directory whose licence was not checked per file, and every transformation applied is written down so the derivation is reproducible from the source.
+The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): nothing ships in this directory whose licence was not checked per file, and every transformation applied is written down so the derivation is reproducible from the source.
 
 <!-- animist:begin critter -->
 ## wheel-beetle.webp

@@ -70,7 +70,7 @@ jobs:
           # under minified noise; the same code is analysed in `web/src`.
           config: |
             paths-ignore:
-              - src/mtglab/web_dist
+              - web_dist
       - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd  # v4
         with:
           category: "/language:${{ matrix.language }}"

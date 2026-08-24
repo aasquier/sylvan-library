@@ -51,40 +51,28 @@ talks to a worker machine), the bulk-file fake for `pool/refresh`, then the
 CLI's pool-backed commands. That is the honest path back, and it is worth
 more than any number.
 
-**2. Adopt `gremlins` for mutation testing?** The in-repo harness died with
-the old backend. Of the live options, `go-gremlins/gremlins` is the strongest
-fit (391 stars, active, standalone binary, mutation-score thresholds);
-`gtramontina/ooze` is more recently active but is a `go.mod` dependency that
-runs inside `go test`. · *Cost of leaving it:* mutation sampling stays a hand
-protocol, and the survivors the old ledger recorded stay unasked. ·
-**Recommendation:** gremlins, installed on demand exactly as `go-licenses`
-already is — no `go.mod` entry, no dependency surface. Run it one package at a
-time on the determinism kernels first (`floats`, `mt19937`, `textutil`,
-`yamlemit`, `gate`), never on `internal/api`, which is 63s per test run before
-a single mutant.
-
-**3. ADR 38 cites `docs/go-migration/`, twice, and the directory is gone.**
+**2. ADR 38 cites `docs/go-migration/`, twice, and the directory is gone.**
 The zero-trace sweep deleted it; the ADR links it in its header and its
 context. ADRs are immutable. · *Cost of leaving it:* an accepted record points
 at nothing, and every future reader of ADR 38 hits it. · **Recommendation:** a
 short superseding note recording that the directory was deliberately removed
 and where its content went — cheaper than restoring it, and honest about why.
 
-**4. The `deploy` job's `needs` list is checked by nothing.** The test that
+**3. The `deploy` job's `needs` list is checked by nothing.** The test that
 derived the expected job set from `ci.yml`'s own job list died with the old
 suite. A job added without `needs` now deploys off a partial suite, silently.
 · *Cost of leaving it:* one forgotten line ships an unverified deploy. ·
 **Recommendation:** rebuild it in Go as a test that parses `ci.yml` and
 derives the set — it was a real guard and it is a small one.
 
-**5. Does night work merge itself?** The skill's current rule, written
+**4. Does night work merge itself?** The skill's current rule, written
 2026-08-23 and derived from commandments 14 and 16 rather than from a ruling:
 anything a user can see stops at a green PR for Aaron's eye; everything else
 may merge when the required checks are green. · *Cost of leaving it:* nothing
 — it is already the conservative reading. · **Recommendation:** confirm it, or
 tighten it to "a night run never merges" if a 3am deploy is unwelcome at all.
 
-**6. The polish skill is entirely unenforced prose, which is the one thing it
+**5. The polish skill is entirely unenforced prose, which is the one thing it
 tells every run to hunt.** Its own standing question is "which absolute claim
 is enforced by nothing?" — and the answer, for the skill itself, is *all of
 them*. Today's refresh fixed by hand: a command that does not exist
@@ -101,7 +89,7 @@ derives its expectation from the source of truth rather than restating it (the
 pass's own rule), and it would have caught four of the five above at commit
 time. A colorless run's natural first job.
 
-**7. A pprof mount, so the hot-spot patrol can profile the serving process
+**6. A pprof mount, so the hot-spot patrol can profile the serving process
 itself.** Red's new patrol profiles at the package seam because the door has
 no profiling endpoint at all — the tree contains no pprof anywhere. Two
 halves, separable: (a) **dev-local**, mounting `net/http/pprof` only when
@@ -122,5 +110,11 @@ spot the local mount cannot explain.
 
 ## Answered
 
-*(Nothing yet. Answered items move here in one line with the ruling and the
-date, then out entirely once the ledger carries them.)*
+- **Mutation testing: adopt `gremlins`** — yes, 2026-08-23. Installed on
+  demand (`go install github.com/go-gremlins/gremlins/cmd/gremlins@latest`),
+  no `go.mod` entry, one package at a time, determinism kernels first, never
+  `internal/api`. The protocol now lives in the skill (White's testing facet);
+  `docs/ENGINEERING.md` names it as the project's mutation tool.
+
+*(Answered items move here in one line with the ruling and the date, then out
+entirely once the ledger carries them.)*

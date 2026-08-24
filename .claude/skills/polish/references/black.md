@@ -94,8 +94,8 @@ from it is a *where*, never a mandate — the discipline below decides whether
 any line of that ranking is worth its diff, and everything it hands over goes
 through the same benchstat-and-caveats gauntlet as a finding born here.
 
-The purpose-built `bench` command retired with the old backend and its Go
-rebuild is an open ledger item, so this facet runs on the stock toolchain.
+There is no purpose-built `bench` command — building one is an open ledger
+item — so this facet runs on the stock toolchain.
 That is a trade up, not down: Go ships a sampling profiler, an allocation
 profiler, a blocking profiler and a race detector, and none of them need a
 harness. Everything below is from `go/` with the three exports set.

@@ -38,7 +38,7 @@ a "docs only" pull request.
 
 Stage explicit paths instead:
 
-    git add src/mtglab/foo.py tests/test_foo.py"""
+    git add go/internal/api/api.go go/internal/api/api_test.go"""
 
 STASH_REASON = """Refused: `git stash` corrupts the index on this repository.
 

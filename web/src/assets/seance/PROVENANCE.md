@@ -1,6 +1,6 @@
 # seance assets -- provenance
 
-The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`): every transformation applied is written down, so the derivation is reproducible from the source.
+The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transformation applied is written down, so the derivation is reproducible from the source.
 
 **The stronger half of that rule now has an exception, stated rather than implied.** This file used to open by claiming nothing ships here whose licence was not checked *per file, through a provider's API*. Three files do, as of 2026-08-17 -- the room, its still, and the card back, all authored by Aaron -- and the last section says exactly why and what is owed. The claim was rewritten instead of being left to rot, because a completeness sentence that has quietly stopped being true is worse than no sentence at all.
 

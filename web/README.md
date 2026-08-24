@@ -8,7 +8,7 @@ session; the argument for each rule lives where the rule is enforced, and
 ## What serves what
 
 The app you see at `mtglab ui` is the **committed bundle** in
-`src/mtglab/web_dist/` — a change under `web/src` is invisible until
+`web_dist/` — a change under `web/src` is invisible until
 `npm --prefix web run build`, and CI fails if the committed bundle drifts from
 source. For live iteration use the `web-dev` entry in `.claude/launch.json`
 (Vite with HMR, proxying `/api` — and *only* `/api`, which is why package-data
@@ -19,14 +19,15 @@ them as separate steps on purpose, so a type error reports as a type error.
 
 ## Conventions that are load-bearing
 
-- **The browser floor is Safari 16.4** (declared 2026-08-19), and it is a
-  declared value rather than a remembered one: `FLOOR` in
-  `tests/test_browser_floor.py`, checked against the *committed bundle* rather
-  than against `web/src`, because every feature that ever moved it arrived
-  through a dependency. Two independent things hold it — Tailwind v4's
-  `@property` and `color-mix(in lab, …)`, and the camera door's SIMD wasm core
-  — so lowering it means answering both. That file's docstring is the whole
-  argument; do not re-derive it here.
+- **The browser floor is Safari 16.4** (declared 2026-08-19) — and today it is
+  declared here and enforced **nowhere**: no `browserslist`, no build target,
+  no CI check. Two independent things hold it — Tailwind v4's `@property` and
+  `color-mix(in lab, …)`, and the camera door's SIMD wasm core — so lowering
+  it means answering both. Re-gating it is a queued item, and the shape the
+  gate has to take is the lesson worth keeping: every feature that ever moved
+  this floor arrived through a **dependency**, not through `web/src`, so the
+  check has to read the *committed bundle*. Until it exists, a dependency bump
+  is the diff to read carefully.
 - **Routes are lazy.** Every non-landing screen is a `React.lazy` line in
   `App.tsx`; a new screen wants one, not a top-level import. The entry chunk
   is ~266 kB and stays that way by this rule.
@@ -53,10 +54,15 @@ them as separate steps on purpose, so a type error reports as a type error.
   is two colours no single glyph states. A drawn pip carries `role="img"` and
   the colour's name, because a drawing contributes nothing to the
   accessibility tree on its own.
-- **Glossary keys are pinned from Python.** `Term`/`HelpTip` names must exist
-  in `glossary.py`; `SIMULATOR_KEYS` in `tests/test_glossary.py` fails when a
-  control on the simulator has no entry, because TypeScript cannot check a
-  string against a Python table.
+- **Glossary keys are pinned to the served table.** A `Term` or `HelpTip` name
+  must exist in `go/internal/reference/data/glossary.json`, which the app
+  fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip
+  and nothing else — deliberately). The consequence is that a typo'd key fails
+  **silently**: TypeScript cannot check a string against a JSON table, and a
+  component test cannot either, because the glossary is mocked away there. The
+  check that failed when a simulator control had no entry is gone; rebuilding
+  it over the Go table is a queued item, so until then a new `Term` gets its
+  key confirmed against that file by hand.
 - **Page nameplates are `PageMasthead`** (`components/ui.tsx`): the painting
   whole at its own ratio beside the title, never a cropped band behind it —
   `art_crop` is 1.37:1 and a full-bleed band keeps less than half of it, a

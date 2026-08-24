@@ -72,14 +72,15 @@ run reports green, and the bugs are somewhere the file never looks.
 
 ## Part three — the tooling
 
-The developer shelf is artifacts in the plainest sense — and most of it is
-currently an absence: the bench suite, the mutation harness and the cache
-register retired with the old backend, and **rebuilding them over the Go
-packages is this part's standing item** until it lands. What survives is
-`animist verify` in `tools/`, plus the stock Go toolchain that the other
-colors now measure with (SKILL.md's shelf section lists it). Nothing else in
-the cycle owns the shelf, and a measuring tool that has gone wrong is worse
-than no tool, because its numbers are believed.
+The developer shelf is artifacts in the plainest sense — and much of it is
+currently an absence: there is no bench suite and no cache register, and
+**building them over the Go packages is this part's standing item** until it
+lands. Mutation sampling has left that list — `gremlins` is the tool now, and
+White's testing facet owns it. What else survives is `animist verify` in
+`tools/`, plus the stock Go toolchain the other colors measure with (the
+shelf section in `SKILL.md` lists it). Nothing else in the cycle owns the
+shelf, and a measuring tool that has gone wrong is worse than no tool,
+because its numbers are believed.
 
 **A live question for the rebuild, every run: what would the Go shelf measure
 that the stock tools cannot?** If the honest answer keeps coming back "very
