@@ -669,7 +669,7 @@
    "half": "ask",
    "note": "an unknown persona",
    "persona": "not-a-voice",
-   "error": "no persona 'not-a-voice'; there is 'plain', 'fortune-teller', 'therapist', 'scientist', 'chef', 'storyteller', 'barkeep'",
+   "error": "no persona 'not-a-voice'; there is 'plain', 'fortune-teller', 'therapist', 'scientist', 'chef', 'storyteller', 'barkeep', 'witch'",
    "error_kind": "rejected"
   },
   {"half":"ask","note":"an unusable seed","persona":"fortune-teller","seed":"soon","error":"not a usable reading seed: 'soon'","error_kind":"rejected"},
@@ -730,7 +730,7 @@
     {"kind":"posture","value":"makes deals","quote":"I make deals"}
    ],
    "persona": "not-a-voice",
-   "error": "no persona 'not-a-voice'; there is 'plain', 'fortune-teller', 'therapist', 'scientist', 'chef', 'storyteller', 'barkeep'",
+   "error": "no persona 'not-a-voice'; there is 'plain', 'fortune-teller', 'therapist', 'scientist', 'chef', 'storyteller', 'barkeep', 'witch'",
    "error_kind": "rejected"
   },
   {

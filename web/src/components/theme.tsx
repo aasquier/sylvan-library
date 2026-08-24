@@ -212,6 +212,41 @@ function RoomSign({ persona }: { persona: string }) {
                     fill="#f0e4c2" opacity="0.9" />
           </svg>
         )
+      case 'witch':
+        // A three-legged cauldron with something pale-green working in it.
+        // The chef two cases above also has a pot, so this one had to be
+        // unmistakably the other kind, and the legs are what do it: a lidded
+        // pan sits on a stove, a cauldron stands in a fire on its own feet.
+        //
+        // Fire was drawn first and thrown out twice. Under the belly at
+        // 64x48 the tongues read as orange legs; moved to the sides they
+        // read as leaves. The bubbles already say the thing is hot, and a
+        // sign this small can carry one idea.
+        //
+        // The brew keeps a colour of its own, the barkeep's foam rule — but
+        // paler than the room's accent rather than a different hue, because
+        // in this one room the accent IS green, and two greens of the same
+        // weight merge into a green pot of green.
+        return (
+          <svg viewBox="0 0 64 48" className="h-12 w-16">
+            {/* Two feet splayed and the third behind, which is what a
+                three-legged pot looks like from the front. */}
+            <path d="M21 36 L 17 45 M32 39 L 32 44 M43 36 L 47 45"
+                  stroke="currentColor" strokeWidth="3" strokeLinecap="round"
+                  opacity="0.85" />
+            <path d="M15 21 C 15 33 22 39 32 39 C 42 39 49 33 49 21 Z"
+                  fill="currentColor" opacity="0.85" />
+            <path d="M11 21 H 53" stroke="currentColor" strokeWidth="3.4"
+                  strokeLinecap="round" />
+            <ellipse cx="32" cy="19.4" rx="15" ry="3.2" fill="#c8ef86" />
+            <circle className="lab-bubble" cx="26" cy="15" r="2.4"
+                    fill="#c8ef86" opacity="0.85" />
+            <circle className="lab-bubble lab-bubble-2" cx="37" cy="12" r="1.9"
+                    fill="#c8ef86" opacity="0.7" />
+            <circle className="lab-steam" cx="31" cy="7" r="2.7"
+                    fill="#c8ef86" opacity="0.4" />
+          </svg>
+        )
       case 'fortune-teller':
         // Three cards, already fanned. The table below deals the real ones.
         return (

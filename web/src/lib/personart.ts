@@ -16,6 +16,13 @@
  *   to the deck he leads in this library.
  * - storyteller — *Birgi, God of Storytelling*, Eric Deschamps, Kaldheim.
  * - barkeep — *Edgewall Innkeeper*, Matt Stewart, Throne of Eldraine.
+ * - witch — *Agatha of the Vile Cauldron*, Jason A. Engle, Wilds of
+ *   Eldraine: a witch mid-brew, one hand over a cauldron going green, in a
+ *   hut hung with jars and cages. Aaron asked for "a witch brewing a secret
+ *   concoction in her pot" and named Agatha; the painting is that sentence.
+ *   Her artifact — *Agatha's Soul Cauldron*, the same artist and set — is the
+ *   more famous card, but it is a painting of a pot with nobody at it, and a
+ *   persona tile is a face.
  *
  * This lives in `lib/` because two components need it — the persona tiles
  * (`components/tarot.tsx`) and the interview's rooms (`components/theme.tsx`)
@@ -52,6 +59,10 @@ export const PERSONA_ART: Record<string, { art: string; credit: string }> = {
     art: 'https://cards.scryfall.io/art_crop/front/7/c/7c5d0560-f9e6-4c70-8cce-cae61e4e74bc.jpg',
     credit: 'Matt Stewart',
   },
+  witch: {
+    art: 'https://cards.scryfall.io/art_crop/front/d/6/d6c48f07-63b7-4a60-8da6-ce77405abf1e.jpg',
+    credit: 'Jason A. Engle',
+  },
 }
 
 export const PERSONA_ACCENT: Record<string, string> = {
@@ -62,4 +73,8 @@ export const PERSONA_ACCENT: Record<string, string> = {
   chef: '#c98a3a',
   storyteller: '#d97a5a',
   barkeep: '#c9a227',
+  // Sampled off the brew itself rather than chosen: the greens in the lower
+  // third of the painting average #90af72, which is that colour under a dim
+  // hut. Lifted to the saturation and value the rest of this table lives at.
+  witch: '#7eb846',
 }
