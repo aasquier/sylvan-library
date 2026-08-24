@@ -263,7 +263,9 @@ func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRe
 	}
 	key := strings.Join(names, "\x00")
 	if cache := c.cache(); cache != nil {
-		if hit, ok := cache.get(key); ok {
+		hit, ok := cache.get(key)
+		c.pool.note(MemoCards, ok)
+		if ok {
 			return hit, nil
 		}
 	}

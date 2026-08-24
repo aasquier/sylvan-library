@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -254,4 +255,95 @@ func canonical(t *testing.T, raw []byte) string {
 		t.Fatalf("canonicalising: %v", err)
 	}
 	return string(out)
+}
+
+// The cheapest price is asked for in its own statement, after the LIMIT — see
+// the argument beside the search query. What the split must not change is the
+// answer, and there are four shapes it could get wrong: the minimum across
+// several *priced* printings, an unpriced printing sitting beside a priced
+// one, a card whose printings are all unpriced, and a card with no printings
+// at all.
+//
+// The fixture carries three of those; the fourth is doctored in, because the
+// fixture has no card with two different prices and a `max` in place of the
+// `min` would otherwise pass. Doctoring the test's own temp copy is what
+// `stale_test.go` already does, and it is not a fixture edit: the recorded
+// corpus on disk is untouched.
+func TestSearchPricesEachCardAtItsCheapestPrintingOrNotAtAll(t *testing.T) {
+	ctx := context.Background()
+	path := pooltest.Build(t)
+	db, err := pooltest.Writer(path)
+	if err != nil {
+		t.Fatalf("opening the fixture to doctor it: %v", err)
+	}
+	// Two more Sol Ring printings: one cheaper than the recorded 2.51, one
+	// dearer. Only the cheapest may reach a search result.
+	if _, err := db.Exec(`INSERT INTO printings (id, oracle_id, name, price_usd)
+             SELECT 'black-cheap', oracle_id, name, 0.42 FROM oracle_cards WHERE name = 'Sol Ring'
+             UNION ALL
+             SELECT 'black-dear', oracle_id, name, 99.99 FROM oracle_cards WHERE name = 'Sol Ring'`); err != nil {
+		t.Fatalf("doctoring the printings: %v", err)
+	}
+	_ = db.Close()
+
+	p := pool.New(path, nil)
+	t.Cleanup(p.Close)
+	if err := p.Use(ctx, func(c *pool.Conn) error {
+		found, err := SearchCards(ctx, c, SearchQuery{Limit: 200})
+		if err != nil {
+			return err
+		}
+		prices := map[string]*float64{}
+		for _, card := range found {
+			prices[card.Name] = card.PriceUSD
+		}
+		// Four printings now: 0.42, 2.51, 99.99 and one unpriced.
+		if got := prices["Sol Ring"]; got == nil || *got != 0.42 {
+			t.Fatalf("Sol Ring priced at %s, want 0.42 -- the cheapest of four",
+				showPrice(got))
+		}
+		// Two printings, neither priced.
+		if got, ok := prices["Goreclaw, Terror of Qal Sisma"]; !ok || got != nil {
+			t.Fatalf("Goreclaw priced at %s, want no price at all", showPrice(got))
+		}
+		// No printings at all — a card the pool knows and nobody sells.
+		if got, ok := prices["Swords to Plowshares"]; !ok || got != nil {
+			t.Fatalf("Swords to Plowshares priced at %s, want no price at all",
+				showPrice(got))
+		}
+		// Every other card's price is the one the printings table holds,
+		// computed here rather than typed: a test that restates the number it
+		// checks cannot tell you the number is wrong. This is also what
+		// catches a price landing on the wrong row.
+		for name, got := range prices {
+			var want *float64
+			row := c.DB().QueryRowContext(ctx,
+				`SELECT min(p.price_usd) FROM printings p JOIN oracle_cards o
+                   ON o.oracle_id = p.oracle_id WHERE o.name = ?`, name)
+			var v any
+			if err := row.Scan(&v); err != nil {
+				return err
+			}
+			want = AsFloatPtr(v)
+			switch {
+			case want == nil && got == nil:
+			case want == nil || got == nil, *want != *got:
+				t.Fatalf("%s priced at %s, the printings say %s",
+					name, showPrice(got), showPrice(want))
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("searching: %v", err)
+	}
+}
+
+// showPrice renders a nullable price for a failure message. Without it a
+// `%v` on a *float64 prints the address, which is the one number nobody
+// wants at the moment a test breaks.
+func showPrice(p *float64) string {
+	if p == nil {
+		return "no price"
+	}
+	return strconv.FormatFloat(*p, 'f', -1, 64)
 }
