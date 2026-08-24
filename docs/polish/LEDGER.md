@@ -3598,7 +3598,7 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
 - **Deferred (2026-08-24), with the trigger:**
   - **Move the shared documents-versus-tree helpers out of
     `licenserecord_test.go`** into a file named for what they are. *Trigger:*
-    Blue's #282, Red's #284 and Green's #286 all merged, so the move stops
+    Blue's #282, Red's #285 and Green's #286 all merged, so the move stops
     conflicting with three open branches.
 
 - **Staleness, honestly stated** for the next bare `/polish`: **Cleanup, and it
