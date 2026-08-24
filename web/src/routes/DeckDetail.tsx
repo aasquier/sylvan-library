@@ -1173,6 +1173,39 @@ export default function DeckDetail() {
             </p>
           )}
 
+          {/* Why the controls are not here.
+              The header already carries "Shared by <owner> — you can read
+              this deck, not change it", and it was not enough: Aaron went
+              looking for the edit controls on somebody else's deck and read
+              their absence as a regression (2026-08-24). One muted line four
+              screens up cannot answer a question somebody only forms down
+              here, where the buttons used to be. So the answer is where the
+              question is. ADR 22 is working exactly as designed; what was
+              missing was it saying so twice. */}
+          {!deck.writable && (
+            <div className="rounded-lg px-4 py-3 text-sm"
+                 style={{
+                   background: 'var(--gridline)',
+                   color: 'var(--text-secondary)',
+                 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                This is {deck.owner}’s deck, and you are reading it.
+              </strong>{' '}
+              Adding a card, entombing one, writing a <code>why</code> and
+              asking Claude about a slot all live on your own decks — so none
+              of them are here.
+              {deck.stage !== 'draft' && (
+                <>
+                  {' '}The <button type="button" onClick={() => setTab('artifacts')}
+                          className="btn btn-ghost btn-xs"
+                          style={{ color: 'var(--series-1)' }}>
+                    Artifacts
+                  </button> tab has the decklist, if you want to build your own.
+                </>
+              )}
+            </div>
+          )}
+
           {deck.writable && (
             <div className="flex flex-wrap items-center gap-3">
               <AddCardForm deck={deckRef} stage={deck.stage} onDone={() => void refresh()} />
@@ -1407,6 +1440,74 @@ export default function DeckDetail() {
               )}
             </section>
           ))}
+
+          {/* The swap board: the cards being considered, which the deck file
+              has always held and this page has never shown.
+
+              `swap_board` is the model's name for the maybeboard — Commander
+              has no sideboard, so a list of cards you are weighing is exactly
+              what it is. `decklist.Parse` files a pasted `Sideboard`,
+              `Maybeboard` or `Considering` section here, our own moxfield.txt
+              artifact writes the commander and companion into `SIDEBOARD:`,
+              and the edit panel can move a card here — so decks have been
+              arriving with a bench for as long as importing has existed, and
+              the only place to look at it was the YAML (Aaron, 2026-08-24:
+              "do we have the notion of a sidepanel in our decks yet?").
+
+              Between the 99 and the graveyard, because that is where it sits
+              in the deck's own life: not in, not dead, still in the argument.
+              Read-only here on purpose — moving a card between the two lists
+              is a surgical edit and belongs to the edit panel that already
+              does it (ADR 12), not to a second door onto the same operation.
+              Shown to readers, like the graveyard: a bench is deck state. */}
+          {deck.swap_board.length > 0 && (
+            <section className="space-y-2 border-t pt-4"
+                     style={{ borderColor: 'var(--hairline)' }}>
+              <h3 className="flex items-baseline gap-2 text-sm font-semibold">
+                <span aria-hidden>⇄</span> Swap board
+                <span className="tabular text-xs font-normal"
+                      style={{ color: 'var(--text-muted)' }}>
+                  {deck.swap_board.length}
+                </span>
+              </h3>
+              <p className="max-w-2xl text-xs" style={{ color: 'var(--text-muted)' }}>
+                Cards under consideration, outside the {deck.total_cards}. They
+                are not simulated, not validated against the 99, and carry no
+                obligation — a maybeboard by its proper name. Nothing here
+                counts towards a draft’s outstanding rationales.
+              </p>
+              <ul className="space-y-1">
+                {deck.swap_board.map((card) => (
+                  <li key={card.name} className="card-surface rounded-lg p-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <CardHover card={card}>
+                        <CardArt src={card.art_crop} alt={card.name}
+                                 ratio="aspect-[626/457]"
+                                 className="w-16 shrink-0 cursor-help" />
+                      </CardHover>
+                      <div className="min-w-0 flex-1 basis-52">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <CardHover card={card}>
+                            <span className="cursor-help text-sm font-medium">
+                              {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
+                              {card.name}
+                            </span>
+                          </CardHover>
+                          <ManaCost cost={card.mana_cost} />
+                        </div>
+                        {card.why && (
+                          <p className="mt-0.5 text-xs leading-relaxed"
+                             style={{ color: 'var(--text-secondary)' }}>
+                            <ManaText>{card.why}</ManaText>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* The graveyard (ADR 27). Rendered for readers too — an entombed
               card is deck state, not a private undo buffer — but the two ways
