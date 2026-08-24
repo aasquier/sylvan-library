@@ -1,8 +1,8 @@
 # Blue — Craft & Knowledge
 
-Four facets: Go craft (plus the animist toolbox in `tools/`),
-TypeScript/React craft, the Claude-first documentation and memory audit, and
-the spirit of Magic. Blue is the color of perfected craft and of knowing
+Five facets: Go craft (plus the animist toolbox in `tools/`), the boot
+sequence and its configuration, TypeScript/React craft, the Claude-first
+documentation and memory audit, and the spirit of Magic. Blue is the color of perfected craft and of knowing
 things: knowing the language well enough to write this year's Go rather than
 the Go with the most text behind it, knowing yourself (the third facet), and
 knowing the game whose name is on the door (the fourth).
@@ -106,6 +106,131 @@ The sweep list, roughly by how much the replacement buys:
   goroutine whose lifetime is longer than the request that started it, a
   channel where a mutex would read plainer. **Every new goroutine gets a
   race-detected test** — `go test -race -count=2` — or it is not a safe fix.
+
+## Facet: the boot sequence and its configuration
+
+The door's start is the one code path every user depends on and nobody
+audits, because it works on the laptop. It is also where the app's switches
+live, and a switch has a way of acquiring a second reader, a third default and
+no documentation at all.
+
+**Read `internal/config`'s package comment before proposing anything here.**
+Two decisions are already settled and are not this facet's business to
+re-litigate: config is **read at call time and never bound at start**, so a
+test can point the process at a scratch directory and a container at its
+volume without a restart ceremony; and there is **no `.env` reader and no
+secret in the package at all** — "a value we never hold is a value we cannot
+log". Cobra is likewise settled, throughout, by Aaron's explicit requirement
+(ADR 38 decision 5). So the audit is never "bind it all to a config library".
+It is whether those decisions are held *consistently*, and whether the things
+read-at-call-time cannot catch are caught somewhere else.
+
+Work the list:
+
+- **One reader per switch.** `internal/config` is the named place. Measure how
+  much of the app agrees, and re-measure rather than trusting this sentence:
+
+  ```bash
+  grep -rn "os.Getenv\|os.LookupEnv" go/ --include='*.go' | grep -v "_test.go" \
+    | cut -d: -f1 | sort | uniq -c | sort -rn
+  ```
+
+  Measured 2026-08-23: **33 reads outside tests in 8 files — 9 of them inside
+  `internal/config` and 24 outside it**, with `internal/sim/tier3/worker.go`
+  holding ten on its own, plus a **second local reader**, `envOr`, in
+  `cmd/mtglab/ui.go`. Not every outside read is a bug (a worker process that
+  is configured entirely by its environment is a reasonable shape), but every
+  one is a question: **does this switch have exactly one place that decides
+  its default?** Two readers mean two defaults, and the second one is
+  discovered in production.
+- **Documented, or it does not exist.** CLAUDE.md says `.env.example`
+  documents the names. That is an absolute claim; check it rather than
+  inheriting it:
+
+  ```bash
+  grep -oE '^#? *(MTGLAB|ANTHROPIC|RESEND)_[A-Z0-9_]+' .env.example | sed 's/^#* *//' | sort -u > /tmp/documented
+  grep -rhoE '"(MTGLAB|ANTHROPIC|RESEND)_[A-Z0-9_]+"' go/ --include='*.go' | tr -d '"' | sort -u > /tmp/incode
+  comm -13 /tmp/documented /tmp/incode   # read by code, documented nowhere
+  comm -23 /tmp/documented /tmp/incode   # documented, read by nothing
+  ```
+
+  Measured 2026-08-23: **35 names in code, 15 documented, 20 undocumented** —
+  every `MTGLAB_FORGE_*`, both `MTGLAB_LIVE_*`, both `MTGLAB_TEST_*`,
+  `MTGLAB_CLAUDE_MODEL`, `MTGLAB_CLAUDE_STANCE_CEILING`, `MTGLAB_TAROT_DIR`
+  and `MTGLAB_WEB_DIST` among them. **The fix is the check, not the
+  paragraph**: a test that fails when a name in the code is missing from
+  `.env.example` (and vice versa) turns a claim into a gate. Precedent for
+  where such a test belongs is any other cross-tree claim the compiler cannot
+  see — the point is that it runs in CI, not that it is written in prose
+  again.
+- **A flag that is parsed and thrown away is help text lying.**
+  `cmd/mtglab/ui.go` defines `--no-open` ("serve without opening a browser")
+  and then discards it with `_ = noOpen`, while every entry in
+  `.claude/launch.json` passes it. Either wire it or delete the flag *and* the
+  promise. For an operator, `--help` is the only documentation there is.
+- **Precedence, stated and tested.** `envOr` is used *inside* two flag
+  defaults, so an explicit flag beats the environment which beats the built-in
+  default. That is the right order and it is written down nowhere and tested
+  nowhere. And only two switches got flags at all: when a switch deserves one,
+  say which side wins, and pin it with a test that sets both.
+- **A test switch must not be reachable in production.** `MTGLAB_TEST_POOL`,
+  `MTGLAB_TEST_FLAG`, `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`. For each,
+  ask what happens if it is set on the instance. If the answer is anything but
+  "nothing", it wants a build tag, a boot-time refusal, or a name that cannot
+  be set by accident — not a comment asking nicely.
+- **Fail fast on the pairs that must agree.** Read-at-call-time is right for a
+  path and wrong for a *relationship*: auth on with no `BaseURL` or
+  `EmailFrom` is reset links that go nowhere, discovered by the first person
+  who needs one; `SecureCookies` silently defaults from `RequireAuth`; a
+  half-set `MTGLAB_FORGE_*` is a tier that fails on the first match. The
+  fix is small and always the same shape: at boot, validate the relationships
+  and either refuse or log a loud, specific degrade. The point is that a
+  misconfigured deploy announces itself in the first second rather than on the
+  one request that needed it.
+- **Say what it decided, once, at boot.** One structured line — auth on or
+  off, cookie mode, data dir, decks dir, web-dist, tarot dir, schema version,
+  whether a pool is present. That line is how a `fly logs` tail answers "is
+  this thing configured the way I think it is" in two seconds. **Never a
+  secret and never a value that might be one**: a key in a log is a leak
+  forever, and the app's own rule is that it never holds the key at all.
+- **Where you run it decides what it writes.** `DataDir()` defaults to a
+  *relative* `data`, so `mtglab ui` inside a checkout mints `data/app.db` in
+  the repo — the trap behind "never `git add -A` after running the app". Any
+  new default path answers the same question: what does this create, and
+  where, when nobody set anything?
+- **The startup order is a contract.** In `serve()`: the schema ladder first,
+  and a ladder that cannot apply is a **refusal to serve** rather than a
+  warning; the ADR 17 maintainer reconciliation; the listener; then an
+  **advisory** readability check that degrades to anonymous instead of dying;
+  then serve. Reordering any of those converts "refuses to boot" into "answers
+  requests over a half-migrated file", which is the worse failure by a wide
+  margin. If a run touches this function, the order is the thing to protect
+  and the comments there are the argument.
+- **Shutdown is part of startup.** `SIGINT`/`SIGTERM` into a 20-second
+  graceful `Shutdown`, with `ReadHeaderTimeout` and `IdleTimeout` set. Merging
+  deploys (ADR 23), so this handler is precisely what makes "a few seconds of
+  downtime" true rather than "a few seconds of dropped requests". Every new
+  long-lived goroutine, lease or worker has to end on the same signal, or the
+  window grows and nobody notices until a deploy drops a write.
+- **Cobra hygiene.** `RunE` rather than `Run` so errors return instead of
+  exiting (the tree is already `RunE` throughout, with `os.Exit` confined to
+  `main.go` and an injectable `osExit`); `SilenceUsage` and `SilenceErrors` set
+  at the root so an operational failure prints one error rather than a wall of
+  usage; `Args:` declared on every command; no orphan flag, and no flag
+  described in words the code does not honour.
+- **Fly's half of the same question.** `fly.toml` is the only Fly-specific
+  file and holds no secrets; deployed switches travel by `fly secrets set`.
+  Drift between the code's names and the instance's is invisible until a
+  feature quietly degrades, so compare the names on the instance against the
+  in-code list, and treat a name that appears in neither `.env.example` nor
+  the instance as **dead config to delete** rather than mystery to preserve.
+
+What is already right here, so a later run does not "fix" it: the config
+package's stated argument for call-time reads, the ladder-first ordering with
+its refusal, the advisory degrade that keeps the door open anonymous, the
+graceful shutdown, and the two flags whose help text names the environment
+variable behind them. Those are the standard; the findings above are the
+places the standard is not being held.
 
 ## Facet: TypeScript / React craft
 

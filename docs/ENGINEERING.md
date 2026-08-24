@@ -9,9 +9,9 @@ that led here live in git and in `docs/adr/`.
 One Go binary (`mtglab`), CGO on for DuckDB, serving everything.
 Performance is measured rather than assumed — `docs/polish/LEDGER.md` keeps
 the baselines — and the deliberate floor is that the app is free to use, so
-nobody is paying us to be slow. The measuring shelf itself (a bench command,
-cache-hit counters) retired with the old backend and is an open ledger item
-to rebuild in Go (`go test -bench` and pprof serve in the meantime).
+nobody is paying us to be slow. The measuring shelf itself — a bench command,
+cache-hit counters — does not exist yet, and building it is an open ledger
+item (`go test -bench` and pprof serve in the meantime).
 
 ## 2. Testing
 
@@ -21,10 +21,12 @@ to rebuild in Go (`go test -bench` and pprof serve in the meantime).
   behavior (seeds, wire shapes, cache-key bytes, emitted YAML). Never
   regenerate one, and never "fix" arithmetic that matches one.
 - **Property-based tests and fuzzing** cover the math-shaped code (the
-  gate, the solver, the generator's `fuzz_test.go`). The mutation-testing
-  harness retired with the old backend; rebuilding one over the Go packages
-  is an open ledger item, and until then a suite's strength is checked the
-  manual way — break the thing, watch the test fail, restore it.
+  gate, the solver, the generator's `fuzz_test.go`), and **mutation testing
+  is `gremlins`** — a standalone binary installed on demand
+  (`go install github.com/go-gremlins/gremlins/cmd/gremlins@latest`), run one
+  package at a time, no `go.mod` entry and no CI gate on it yet. A suite's
+  strength is still checked the manual way wherever that is quicker: break
+  the thing, watch the test fail, restore it.
 - The Go gates, from `go/`: `go vet ./...`, `go test -race ./...`,
   `golangci-lint run ./...`, and `gofmt -l .` printing nothing.
 - Frontend tests run through `npm --prefix web run check` — vitest invoked

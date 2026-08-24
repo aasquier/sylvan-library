@@ -111,10 +111,10 @@ trend is read.
 - Response times from outside, cold and warm (Black measures for speed; this
   facet watches for *degradation* — same numbers, different question, so share
   the measurement and record it once). Cold means the caches are cold, not
-  merely that the machine woke up, and the register that could once prove the
-  difference retired with the old backend — so **label a cold figure as cold
-  only when you know what emptied**, and a "cold" number taken by asking twice
-  is a warm number with a misleading name.
+  merely that the machine woke up, and no cache register exists to prove the
+  difference — so **label a cold figure as cold only when you know what
+  emptied**, and a "cold" number taken by asking twice is a warm number with a
+  misleading name.
 - **Pool staleness is rules staleness.** Bans and new sets reach this site
   only through a refresh, so a stale pool quietly serves yesterday's
   legality. Read `/api/health` — it reports `pool_stale` and the bulk-file

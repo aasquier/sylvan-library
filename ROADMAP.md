@@ -51,9 +51,8 @@ In order:
    (secret scanning, push protection), uptime watching, the wrong-painter
    credit (needs a pool schema change and a refresh), cache-write tokens
    (schema v11), the phone's touch targets, region-scoped motion (Syr
-   Gwyn's torch flame). Two more since the Go crossing: the measuring
-   shelf's rebuild, and the `deploy` job's `needs` list, which is an
-   invariant nothing checks any more.
+   Gwyn's torch flame). Two more that nothing checks today: the measuring
+   shelf's rebuild, and the `deploy` job's `needs` list.
 
 ## The longer arc
 

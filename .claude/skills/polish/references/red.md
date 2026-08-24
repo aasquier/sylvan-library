@@ -102,8 +102,8 @@ robustness, and whether the free tier has grown capabilities worth adopting.
   the only arm64 compiler this project has, and **`deploy` naming every other
   job in `ci.yml` in its `needs`.** Verify that last one by reading both lists
   in the file, because *nothing checks it any more* — it used to be a test
-  that derived the expected set from the file's own job list, and that test
-  died with the old suite. An unguarded invariant is this pass's own standing
+  that derived the expected set from the file's own job list, and that test is
+  gone. An unguarded invariant is this pass's own standing
   lesson: rebuilding it in Go is a queued item, and until it lands, a job
   added without `needs` deploys off a partial suite and nothing says so.
 - **Free-tier feature audit**: check GitHub's changelog for features now free

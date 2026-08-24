@@ -44,8 +44,9 @@ Artwork remains the property of its artists and Wizards of the Coast.
 
 ## Tesseract — the card reader, and the only code this project redistributes
 
-The camera door reads a card in the browser. `src/mtglab/ocr.py` downloads the
-engine once, pins every file by SHA-256, and serves it from `/api/ocr` (ADR 33's
+The camera door reads a card in the browser. `go/internal/shelves/shelves.go` downloads the
+engine once and pins every file by SHA-256 against the manifest in
+`internal/reference`, and `/api/ocr/{name}` serves it (ADR 33's
 arrangement applied to somebody else's compiler output). Nothing is hotlinked
 and nothing enters git — but the bytes do reach every visitor, and *that* is
 distribution in the ordinary way, unlike every other section in this file.
@@ -77,7 +78,7 @@ Three consequences, each with its discharge:
 2. **The Apache-2.0 text is at `licenses/Apache-2.0.txt`.** It covers the three
    files above and one more that is easy to miss: Vite bundles the
    main-thread half of `tesseract.js` into
-   `src/mtglab/web_dist/assets/reader.js`, which *is* committed, and the
+   `web_dist/assets/reader.js`, which *is* committed, and the
    minifier drops the legal comments on the way. The licence has to be carried
    here because it is no longer carried there.
 3. **Nothing about the reader renders, and that is correct rather than a

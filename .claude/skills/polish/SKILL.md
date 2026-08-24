@@ -1,6 +1,6 @@
 ---
 name: polish
-description: "The recurring, ledger-driven quality pass over the sylvan-library repo and its infrastructure, organised as the five colors of Magic plus colorless and a cleanup step. It runs at night while Aaron sleeps: independent, improvements only, and anything it cannot settle alone goes to the daybreak queue (docs/polish/DAYBREAK.md) for the morning. Covers Go craft and the modern-Go sweep (concurrency, goroutines, errgroup, RWMutex, stale pre-generics idioms); TypeScript/React craft; controls and UI/UX quality (dull buttons, missing hover/focus/press states, actions that never disable, links doing a toggle's job); testing discipline, suite speed, t.Parallel, mutation testing and the live determinism replay; performance, profiling and benchmarks; security and user isolation; accessibility for every player (keyboard, screen reader, contrast) and the newcomer walk; licensing and free-use compliance; Claude API spend and the modes' prompt craft; CI/CD and alerting, with the expiry calendar, restore drills and the hot-spot patrol (proactive profiling for where the time goes); cloud resources, infrastructure cost and upgrades; browser and mobile compatibility; scalability; hosted-first alignment (anything the product needs that exists only on a laptop); the relic audit of early-dev leftovers at file and comment granularity (comments exist to help Claude develop, never to record dates or process); the Claude-facing docs; and the spirit of Magic, preferring the game's terminology and iconography over plain conversational English. Use whenever Aaron asks for a polish pass, quality pass, sweep or audit; on any color invocation (polish white/blue/black/red/green/colorless/cleanup); on 'polish converge' or 'polish all' (five colors, one merged report), 'polish rainbow' (all seven at full depth, one at a time), 'run the polish pass' or 'run the night pass'; when asked what the overnight run found, what is in the daybreak queue, or which findings are still outstanding or waiting on a ruling; and on any 'are we doing X right?' question about one of those areas, even if the word polish never appears."
+description: "The recurring, ledger-driven quality pass over the sylvan-library repo and its infrastructure, organised as the five colors of Magic plus colorless and a cleanup step. It runs at night while Aaron sleeps: independent, improvements only, and anything it cannot settle alone goes to the daybreak queue (docs/polish/DAYBREAK.md) for the morning. Covers Go craft and the modern-Go sweep (concurrency, goroutines, errgroup, RWMutex, stale pre-generics idioms); app startup and configuration best practices (the boot sequence and its ordering, environment variables and the one place that reads them, Cobra flags and their env fallbacks and which wins, fail-fast validation of the settings that must agree, graceful shutdown, and config that is undocumented, dead, or reachable in production when it should not be); TypeScript/React craft; controls and UI/UX quality (dull buttons, missing hover/focus/press states, actions that never disable, links doing a toggle's job); testing discipline, suite speed, t.Parallel, mutation testing and the live determinism replay; performance, profiling and benchmarks; security and user isolation; accessibility for every player (keyboard, screen reader, contrast) and the newcomer walk; licensing and free-use compliance; Claude API spend and the modes' prompt craft; CI/CD and alerting, with the expiry calendar, restore drills and the hot-spot patrol (proactive profiling for where the time goes); cloud resources, infrastructure cost and upgrades; browser and mobile compatibility; scalability; hosted-first alignment (anything the product needs that exists only on a laptop); the relic audit of early-dev leftovers at file and comment granularity (comments exist to help Claude develop, never to record dates or process); the Claude-facing docs; and the spirit of Magic, preferring the game's terminology and iconography over plain conversational English. Use whenever Aaron asks for a polish pass, quality pass, sweep or audit; on any color invocation (polish white/blue/black/red/green/colorless/cleanup); on 'polish converge' or 'polish all' (five colors, one merged report), 'polish rainbow' (all seven at full depth, one at a time), 'run the polish pass' or 'run the night pass'; when asked what the overnight run found, what is in the daybreak queue, or which findings are still outstanding or waiting on a ruling; on any question about how the app starts, what it reads from the environment, or whether its configuration and CLI wiring follow best practice; and on any 'are we doing X right?' question about one of those areas, even if the word polish never appears."
 ---
 
 # The Polish Pass
@@ -173,7 +173,7 @@ or out of things that did not need him.
 | Color | Theme | Facets |
 |---|---|---|
 | **White** | Law & Protection | Free-use/licensing compliance (triple-checked); security & user isolation; testing discipline, including the live determinism replay |
-| **Blue** | Craft & Knowledge | Go craft *and the modern-Go sweep*; TypeScript/React craft; the animist toolbox in `tools/`; Claude-first docs & memory audit; the spirit of Magic — terminology, iconography, and the truth of the reference shelves (commandment 3) |
+| **Blue** | Craft & Knowledge | Go craft *and the modern-Go sweep*; the boot sequence and its configuration (one reader per switch, flag/env precedence, fail-fast on the pairs that must agree, graceful shutdown, undocumented and dead config); TypeScript/React craft; the animist toolbox in `tools/`; Claude-first docs & memory audit; the spirit of Magic — terminology, iconography, and the truth of the reference shelves (commandment 3) |
 | **Black** | Ruthless Efficiency | Claude API spend *and the modes' craft, one reading*; static assets over hotlinks; performance & efficiency |
 | **Red** | Speed & Alarum | CI/CD pipeline; alerting & self-healing (the expiry calendar, the dated restore drill); the hot-spot patrol — proactive profiles that find where time goes while it is still smoke; **controls** — commandment 17 made checkable, because a control's virtue is the speed of its reply |
 | **Green** | Growth & Resilience | Browser, mobile & accessibility — every player's device and every player, with the newcomer's walk (commandment 2); cloud resource watch (pool staleness, the held-awake trigger); scalability & user adaptability; hosted-first alignment |
@@ -186,11 +186,13 @@ one you are running, and only that one; the others are for their own runs.
 
 ## The measuring shelf
 
-The purpose-built `bench` and `mutate` commands and the cache register
-retired with the old backend, and **rebuilding that shelf over the Go
-packages is an open ledger item.** Until it lands the stock Go toolchain is
-the instrument set — richer than what it replaces — and the rule is to put
-**raw tool output in the ledger, never a summary of it.**
+The shelf is thinner than it looks: there is no `bench` command and no cache
+register, and **building both over the Go packages is an open ledger item.**
+Mutation sampling is the exception — `gremlins` is the tool, installed on
+demand, and White's testing facet carries the protocol. Otherwise the stock
+Go toolchain is the instrument set — richer than a purpose-built shelf would
+be — and the rule is to put **raw tool output in the ledger, never a summary
+of it.**
 
 Everything below runs from `go/` with this Mac's three exports set (CGO on,
 the 1.26 toolchain on `PATH` *and* `GOROOT`); `animist` runs from `tools/`.
@@ -463,7 +465,7 @@ It is what makes the pass cumulative rather than repetitive.
    each, ask what fails if it stops being true; when the answer is *nothing*,
    it has already drifted or it will. This is the pass's most productive
    single question — it has found a dozen, most recently a 95% coverage floor
-   that no gate had enforced since the Go crossing. **The fix is to make the
+   that no gate enforces at all. **The fix is to make the
    claim machine-checked, never to reword it.**
 3. **Triage every finding** into exactly one of:
    - **Safe fix** — implement it this run. Safe means: behavior-preserving or

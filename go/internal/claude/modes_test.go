@@ -141,7 +141,7 @@ func TestTheScanHasNoFieldForACardName(t *testing.T) {
 // its search -- silently, since the request is still valid without it. Loading
 // panics instead; this proves the ones actually declared do build, and that
 // the modes ADR 19 and ADR 26 give a search to still have one.
-func TestTheHostedSearchSurvivesTheCrossing(t *testing.T) {
+func TestTheCitingModesKeepAWorkingHostedSearch(t *testing.T) {
 	for _, name := range []string{ModeCommanderDossier, ModeResearch} {
 		m, err := GetMode(name)
 		if err != nil {

@@ -1,6 +1,6 @@
 # simulator assets -- provenance
 
-The rule here is the tarot deck's (`src/mtglab/assets/tarot/PROVENANCE.md`):
+The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`):
 every transformation applied is written down, so the derivation is
 reproducible from the source. Like the séance room and the About Claude
 masthead, everything in this directory is **authored** rather than fetched --
