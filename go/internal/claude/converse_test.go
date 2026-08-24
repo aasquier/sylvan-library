@@ -347,6 +347,7 @@ func TestTheConversationCacheMarkerMovesRatherThanAccumulating(t *testing.T) {
 // free. The SDK's ExtraFields marshals in Go map-iteration order, which is
 // randomised; this is the test that keeps the schema out of it.
 func TestTheToolsBlockIsByteStable(t *testing.T) {
+	t.Parallel()
 	mode := testMode(t, func(m *Mode) {
 		m.ToolNames = []string{"deck_stats", "get_cards", "get_deck", "list_decks",
 			"search_cards", "suggest_replacements", "validate_deck"}
@@ -747,6 +748,7 @@ func TestAZeroValueStanceIsRefusedRatherThanRenderingAnEmptyScope(t *testing.T) 
 // proved correct without going through encoding/json it reached the wire as
 // something else entirely.
 func TestATurnKeepsTheRecordedFieldNames(t *testing.T) {
+	t.Parallel()
 	raw, err := json.Marshal(Turn{
 		Mode: "m", Model: "claude-sonnet-5", StopReason: "end_turn", Text: "t",
 		ToolCalls:       []ToolCall{{Tool: "get_deck", Arguments: map[string]any{"slug": "gyome"}}},

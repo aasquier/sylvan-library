@@ -212,6 +212,7 @@ func pieceOf(row []int) *curve.Piece {
 // -------------------------------------------------- differentially, per function
 
 func TestTheConstantsAreStillTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	if corpus.Horizon != curve.Horizon || corpus.DefaultTargetTurn != curve.DefaultTargetTurn ||
 		corpus.DefaultTarget != curve.DefaultTarget || corpus.TooClose != curve.TooClose {
@@ -226,6 +227,7 @@ func TestTheConstantsAreStillTheRecordedOnes(t *testing.T) {
 }
 
 func TestAccelerantsMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	for _, row := range corpus.Accelerants {
 		got := curve.Accelerants(decks[row.Deck].Library)
@@ -242,6 +244,7 @@ func TestAccelerantsMatchTheCorpus(t *testing.T) {
 }
 
 func TestExpectedLandsInPlayMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	if len(corpus.ExpectedLands) < 300 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.ExpectedLands))
@@ -258,6 +261,7 @@ func TestExpectedLandsInPlayMatchesTheCorpus(t *testing.T) {
 }
 
 func TestExpectedRampMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	for _, row := range corpus.ExpectedRamp {
 		for i, want := range row.ByTurn {
@@ -271,6 +275,7 @@ func TestExpectedRampMatchesTheCorpus(t *testing.T) {
 }
 
 func TestLandDistributionMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	for _, row := range corpus.LandDistribution {
 		got := curve.LandDistribution(row.DeckSize, row.Lands, row.Turn, row.OnThePlay)
@@ -279,6 +284,7 @@ func TestLandDistributionMatchesTheCorpus(t *testing.T) {
 }
 
 func TestRampDistributionMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	for _, row := range corpus.RampDistribution {
 		got := curve.RampDistribution(decks[row.Deck].Library, row.Turn, row.OnThePlay,
@@ -288,6 +294,7 @@ func TestRampDistributionMatchesTheCorpus(t *testing.T) {
 }
 
 func TestOnCurveOddsMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	if len(corpus.OnCurveOdds) < 3000 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.OnCurveOdds))
@@ -324,6 +331,7 @@ func TestOnCurveOddsMatchTheCorpus(t *testing.T) {
 }
 
 func TestLandsForEveryDropMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	nils := 0
 	for _, row := range corpus.LandsForEveryDrop {
@@ -350,6 +358,7 @@ func TestLandsForEveryDropMatchesTheCorpus(t *testing.T) {
 }
 
 func TestTypicalAccelerantMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	for _, row := range corpus.TypicalAccelerant {
 		piece, generic := curve.TypicalAccelerant(decks[row.Deck].Library, row.Turn)
@@ -363,6 +372,7 @@ func TestTypicalAccelerantMatchesTheCorpus(t *testing.T) {
 }
 
 func TestTheWholeCurveMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	if len(corpus.Curves) < 50 {
 		t.Fatalf("the curve set has shrunk to %d cases", len(corpus.Curves))
@@ -409,6 +419,7 @@ func project(mc curve.ManaCurve) manaCurveCase {
 // -------------------------------------------------------- the pinned traps
 
 func TestTheLandDistributionSumsToOneAndRespectsTheCap(t *testing.T) {
+	t.Parallel()
 	// You may play one land a turn, so turn 4 tops out at four in play. The
 	// cap living inside the distribution is what stops a nine-land hand on
 	// turn four being counted as nine mana -- the flooding case the whole
@@ -430,6 +441,7 @@ func TestTheLandDistributionSumsToOneAndRespectsTheCap(t *testing.T) {
 }
 
 func TestADeckWithNoAccelerantsHasAllItsRampMassAtZero(t *testing.T) {
+	t.Parallel()
 	_, decks := load(t)
 	dist := curve.RampDistribution(decks["mono-green"].Library, 4, true, nil, 0)
 	if math.Abs(dist[0]-1.0) > 1e-9 {
@@ -438,6 +450,7 @@ func TestADeckWithNoAccelerantsHasAllItsRampMassAtZero(t *testing.T) {
 }
 
 func TestARockTooExpensiveForTheTurnIsNotCounted(t *testing.T) {
+	t.Parallel()
 	// A six-mana rock is not ramp for turn four.
 	_, decks := load(t)
 	library := append([]sim.Card{}, decks["mono-green"].Library...)
@@ -456,6 +469,7 @@ func TestARockTooExpensiveForTheTurnIsNotCounted(t *testing.T) {
 }
 
 func TestSummoningSicknessDelaysAManaCreature(t *testing.T) {
+	t.Parallel()
 	// A dork cast on turn one pays on turn two, so its odds at a given turn
 	// are the odds of having drawn it a turn earlier.
 	_, decks := load(t)
@@ -483,6 +497,7 @@ func TestSummoningSicknessDelaysAManaCreature(t *testing.T) {
 }
 
 func TestALandFetchSpellIsNotCappedByTheLandDrop(t *testing.T) {
+	t.Parallel()
 	// Cultivate has no `Produces` at all and is still acceleration. Omitting
 	// it was a -0.54 mana bias across the whole formula, and the error only
 	// showed up as a pattern: Esper decks accurate, every green deck low. It
@@ -508,6 +523,7 @@ func TestALandFetchSpellIsNotCappedByTheLandDrop(t *testing.T) {
 }
 
 func TestALandIsWorthNothingPastTheTurnItIsPlayedOn(t *testing.T) {
+	t.Parallel()
 	// The rule the whole feature turns on. You may play one land a turn, so on
 	// turn four no number of lands gets you to five mana. This is why "T mana
 	// on turn T" could never recommend ramp, and why the surface asks how much
@@ -532,6 +548,7 @@ func TestALandIsWorthNothingPastTheTurnItIsPlayedOn(t *testing.T) {
 }
 
 func TestAtTheCurveALandIsAtLeastAsGoodAsAnAccelerantAndPastItIsNot(t *testing.T) {
+	t.Parallel()
 	// Measured, and it is the finding that reshaped this module: six decks by
 	// five target turns, and a land was ahead or level in all thirty. Past the
 	// curve the comparison reverses outright, which is why `recommend ==
@@ -556,6 +573,7 @@ func TestAtTheCurveALandIsAtLeastAsGoodAsAnAccelerantAndPastItIsNot(t *testing.T
 }
 
 func TestALandDropEveryTurnIsUnaffordableAndSaysSo(t *testing.T) {
+	t.Parallel()
 	// The answer to the question as originally asked. Fifty-four lands to make
 	// every drop through turn four at 90%. Pinned because it is the number the
 	// feature exists to talk somebody *out* of, and a regression that made it
@@ -575,6 +593,7 @@ func TestALandDropEveryTurnIsUnaffordableAndSaysSo(t *testing.T) {
 }
 
 func TestAnImpossibleDropRequirementReturnsNil(t *testing.T) {
+	t.Parallel()
 	// Nil means no land count reaches it, not "a big number". Harder to
 	// provoke than it looks: 86 lands really does make every drop through turn
 	// ten at 99.9%, because you see 6+T cards for T drops. The genuinely
@@ -585,6 +604,7 @@ func TestAnImpossibleDropRequirementReturnsNil(t *testing.T) {
 }
 
 func TestLandDropOddsFallAsTheTurnsGoOn(t *testing.T) {
+	t.Parallel()
 	// More turns means more drops to have made, and the requirement outruns
 	// the draws. A curve that rose would mean the cap was being ignored.
 	_, decks := load(t)
@@ -598,6 +618,7 @@ func TestLandDropOddsFallAsTheTurnsGoOn(t *testing.T) {
 }
 
 func TestTheTargetTurnIsClampedToTheHorizon(t *testing.T) {
+	t.Parallel()
 	_, decks := load(t)
 	library := decks["mono-green"].Library
 	if got := curve.Curve(library, curve.Options{TargetTurn: 99, Target: 0.9}).TargetTurn; got != curve.Horizon {
@@ -609,6 +630,7 @@ func TestTheTargetTurnIsClampedToTheHorizon(t *testing.T) {
 }
 
 func TestAnEmptyLibraryDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	mc := curve.Curve(nil, curve.DefaultOptions())
 	if mc.DeckSize != 0 || mc.Advice.Odds != 0.0 {
 		t.Errorf("an empty library gave %d cards and odds %v", mc.DeckSize, mc.Advice.Odds)
@@ -616,6 +638,7 @@ func TestAnEmptyLibraryDoesNotPanic(t *testing.T) {
 }
 
 func TestSlotsIsASearchNotADivision(t *testing.T) {
+	t.Parallel()
 	// Odds are not linear in slots, so the count must be found by trying.
 	// Dividing a shortfall by a marginal rate assumes the tenth land buys what
 	// the first did.
@@ -645,6 +668,7 @@ func TestSlotsIsASearchNotADivision(t *testing.T) {
 }
 
 func TestADeckWithNoRampSaysItsComparisonIsAStandIn(t *testing.T) {
+	t.Parallel()
 	// Advice built on a hypothetical Signet has to admit that it is.
 	_, decks := load(t)
 	six := 6

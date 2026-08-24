@@ -158,6 +158,7 @@ func caseID(cost Cost, pool []Source) string {
 }
 
 func TestTheCaseSetIsRebuiltExactlyAsRecorded(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	costs, pools := caseCosts(corpus), casePools(corpus)
 
@@ -198,6 +199,7 @@ func TestTheCaseSetIsRebuiltExactlyAsRecorded(t *testing.T) {
 }
 
 func TestCanPayAnswersEveryCaseAsRecorded(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	costs, pools := caseCosts(corpus), casePools(corpus)
 	if len(costs) != len(corpus.Answers) {
@@ -256,6 +258,7 @@ func TestCanPayAnswersEveryCaseAsRecorded(t *testing.T) {
 // been wrong in the same way, the test above would pass and this one would
 // not.
 func TestTheOraclesAgreeWithTheSolverAcrossTheWholeCaseSet(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	costs, pools := caseCosts(corpus), casePools(corpus)
 
@@ -303,6 +306,7 @@ func TestTheOraclesAgreeWithTheSolverAcrossTheWholeCaseSet(t *testing.T) {
 // oracles judge the solver at all, since a shared representation would have
 // made their agreement circular.
 func TestTheSolversRepresentationsAgreeWithTheOraclesOwn(t *testing.T) {
+	t.Parallel()
 	sets := [][]string{
 		nil, {}, {"W"}, {"U"}, {"C"}, {"U", "W"}, {"B", "G", "R", "U", "W"},
 		{"W", "W"}, {"Z"}, {"W", "Z"},

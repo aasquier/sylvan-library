@@ -60,6 +60,7 @@ func liveDecks(t *testing.T) []*deck.Deck {
 // own card scripts — the data the engine itself loads at startup, which is
 // what makes agreeing with it agreeing with Forge.
 func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
+	t.Parallel()
 	liveForge(t)
 	tier3.ClearIndex()
 	started := time.Now()
@@ -101,6 +102,7 @@ func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
 // changed a format string, the profile file stopped being read, the JVM is too
 // old, AWT would not initialise. Each of those has happened at least once.
 func TestARealMatchPlaysAndParses(t *testing.T) {
+	t.Parallel()
 	liveForge(t)
 	decks := liveDecks(t)
 

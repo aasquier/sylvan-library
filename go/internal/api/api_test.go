@@ -12,6 +12,7 @@ import (
 )
 
 func TestTheProseRoutesAnswerTheEmbeddedPayloads(t *testing.T) {
+	t.Parallel()
 	a := New(Config{})
 	want := map[string][]byte{
 		"/api/colors":   reference.ColorsJSON(),
@@ -44,6 +45,7 @@ func TestTheProseRoutesAnswerTheEmbeddedPayloads(t *testing.T) {
 // is `[]` when it is empty (never `null` -- the frontend iterates it), and
 // an id nobody holds is a 404 whose detail the frontend renders.
 func TestTheGenericJobRoutesAnswerTheRegistry(t *testing.T) {
+	t.Parallel()
 	a := New(Config{})
 	var list, one bool
 	for _, route := range a.Routes() {
@@ -75,6 +77,7 @@ func TestTheGenericJobRoutesAnswerTheRegistry(t *testing.T) {
 }
 
 func TestEveryRouteHasAMethodAPatternAndAHandler(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for _, route := range New(Config{}).Routes() {
 		if route.Method == "" || route.Pattern == "" || route.Handler == nil {

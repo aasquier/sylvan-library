@@ -6,6 +6,7 @@ import (
 )
 
 func TestParseReadsCostsAsRecorded(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		cost string
 		want Cost

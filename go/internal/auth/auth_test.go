@@ -104,12 +104,14 @@ func mint(t *testing.T, writer *sql.DB, token string, userID int64, expires time
 }
 
 func TestTokenHashMatchesTheFixture(t *testing.T) {
+	t.Parallel()
 	if got := HashToken(fixtureToken); got != fixtureTokenHash {
 		t.Fatalf("HashToken = %s, the fixture records %s", got, fixtureTokenHash)
 	}
 }
 
 func TestParsesWhatIsoformatWrites(t *testing.T) {
+	t.Parallel()
 	for _, s := range []string{
 		"2026-08-21T12:00:00.123456+00:00",
 		"2026-08-21T12:00:00+00:00",
@@ -129,6 +131,7 @@ func TestParsesWhatIsoformatWrites(t *testing.T) {
 }
 
 func TestResolvesASessionWrittenInTheRecordedShape(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
 	mint(t, writer, fixtureToken, 1, time.Now().Add(Lifetime))
@@ -162,6 +165,7 @@ func TestResolvesASessionWrittenInTheRecordedShape(t *testing.T) {
 // copied out of the user row, with every route test still green. The first
 // Claude route is what reads it, and it reads it from here.
 func TestAResolvedSessionCarriesTheAccountsModelTier(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
 	if _, err := writer.Exec("UPDATE users SET model_tier = ? WHERE id = ?", "opus", 2); err != nil {
@@ -189,6 +193,7 @@ func TestAResolvedSessionCarriesTheAccountsModelTier(t *testing.T) {
 }
 
 func TestAnUnknownExpiredOrDisabledSessionIsAnonymous(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	writer, reader := fixtureDB(t)
 	mint(t, writer, "expired", 1, time.Now().Add(-time.Minute))
@@ -205,6 +210,7 @@ func TestAnUnknownExpiredOrDisabledSessionIsAnonymous(t *testing.T) {
 }
 
 func TestTheReaderCannotWrite(t *testing.T) {
+	t.Parallel()
 	_, reader := fixtureDB(t)
 	if _, err := reader.Exec("DELETE FROM sessions"); err == nil {
 		t.Fatal("the door's handle wrote to app.db; it must be read-only")
@@ -212,6 +218,7 @@ func TestTheReaderCannotWrite(t *testing.T) {
 }
 
 func TestOpenDoesNotCreateAMissingFile(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "absent.db")
 	db, err := Open(path)
 	if err != nil {
@@ -227,6 +234,7 @@ func TestOpenDoesNotCreateAMissingFile(t *testing.T) {
 }
 
 func TestVerifiesTheFixturesArgon2Hashes(t *testing.T) {
+	t.Parallel()
 	for _, v := range []struct{ pw, hash string }{{alicePassword, aliceHash}, {bobPassword, bobHash}} {
 		h := v.hash
 		if !Verify(&h, v.pw) {
@@ -242,6 +250,7 @@ func TestVerifiesTheFixturesArgon2Hashes(t *testing.T) {
 }
 
 func TestHashesInTheRecordedPHCShape(t *testing.T) {
+	t.Parallel()
 	h, err := HashPassword(alicePassword)
 	if err != nil {
 		t.Fatal(err)
@@ -262,6 +271,7 @@ func TestHashesInTheRecordedPHCShape(t *testing.T) {
 }
 
 func TestEveryFailureIsFalse(t *testing.T) {
+	t.Parallel()
 	for _, h := range []string{"", "not-a-hash", "$argon2i$v=19$m=19456,t=2,p=1$abc$def", "$2b$12$bcrypt"} {
 		h := h
 		if Verify(&h, alicePassword) {
@@ -274,6 +284,7 @@ func TestEveryFailureIsFalse(t *testing.T) {
 }
 
 func TestStrengthFloorMatchesTheFixture(t *testing.T) {
+	t.Parallel()
 	if err := CheckStrength("short"); err == nil {
 		t.Fatal("an 11-character password was accepted")
 	}

@@ -83,6 +83,7 @@ func loadScanCorpus(t *testing.T) scanCorpus {
 }
 
 func TestTheScanConstantsAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	if c.MaxBytes != ScanMaxBytes {
 		t.Errorf("the cap is %d, the corpus says %d", ScanMaxBytes, c.MaxBytes)
@@ -106,6 +107,7 @@ func TestTheScanConstantsAreTheRecordedOnes(t *testing.T) {
 // browser would make work by accident, so the uppercase and padded spellings
 // are here as refusals rather than as passes.
 func TestTheMediaTypeIsMatchedExactly(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	good := base64.StdEncoding.EncodeToString([]byte("xxxx"))
 	for _, row := range c.MediaTypeCases {
@@ -152,6 +154,7 @@ func TestTheMediaTypeIsMatchedExactly(t *testing.T) {
 // the decode and passing the string through would hand the API a byte
 // sequence the recorded contract never would.
 func TestTheBase64StrictnessMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	refusals := 0
 	for _, row := range c.Captures {
@@ -186,6 +189,7 @@ func TestTheBase64StrictnessMatchesTheRecordedCorpus(t *testing.T) {
 // The size gate, at the boundary. Checked by generating the bytes here rather
 // than carrying 4MB of base64 in a corpus for one assertion.
 func TestTheCaptureSizeGateIsTheRecordedOne(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	if len(c.Sizes) == 0 {
 		t.Fatal("no size cases")
@@ -212,6 +216,7 @@ func TestTheCaptureSizeGateIsTheRecordedOne(t *testing.T) {
 // legible" and none of them raises, which is what lets the job hand the result
 // to `identify` unconditionally.
 func TestTheSightingReadsBackAsRecorded(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	for _, row := range c.Sightings {
 		turn := Turn{Mode: "scan", Model: "m", StopReason: "end_turn",
@@ -292,6 +297,7 @@ func TestTheScanStanceMatchesTheCorpus(t *testing.T) {
 // SDK's builders are what decide the wire shape and the claim is about the
 // wire.
 func TestTheImageBlockComesFirst(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	message, _, err := ScanMessage(base64.StdEncoding.EncodeToString([]byte("xxxxxxxxxxxx")), "image/webp")
 	if err != nil {
@@ -352,6 +358,7 @@ func TestTheImageBlockComesFirst(t *testing.T) {
 // refusal IS an `ErrScanRefused` now, since that is the mechanism the route
 // reads to answer 422 rather than 500.
 func TestACaptureThatIsNotTextIsARefusalLikeAnyOther(t *testing.T) {
+	t.Parallel()
 	c := loadScanCorpus(t)
 	if len(c.NotAString) == 0 {
 		t.Fatal("the corpus no longer holds a capture that is not text")

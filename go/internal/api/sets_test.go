@@ -25,6 +25,7 @@ type setsFile []struct {
 // the digital drop, the six-key row and the stable tie order all come from
 // the recorded run, not from a description of it.
 func TestTheSetFilterMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/sets.json")
 	if err != nil {
 		t.Fatalf("sets.json: %v (a frozen golden; never regenerated)", err)

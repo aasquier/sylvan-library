@@ -138,6 +138,7 @@ func newFromString(t *testing.T, seed string) *Random {
 // ------------------------------------------------------------ the generator
 
 func TestTheRawWordStreamIsTheRecordedStream(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -162,6 +163,7 @@ func TestTheRawWordStreamIsTheRecordedStream(t *testing.T) {
 }
 
 func TestRandomIsTheSameDoubleDownToTheBit(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -181,6 +183,7 @@ func TestRandomIsTheSameDoubleDownToTheBit(t *testing.T) {
 }
 
 func TestGetRandBitsAtEveryWidthFromOneToSixtyFour(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).BitsSweep {
 		t.Run(fmt.Sprintf("%s/k=%d", c.Seed, c.K), func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -199,6 +202,7 @@ func TestGetRandBitsAtEveryWidthFromOneToSixtyFour(t *testing.T) {
 }
 
 func TestGetRandBitsThreadsItsStateBetweenWidths(t *testing.T) {
+	t.Parallel()
 	// The sweep above asks one width of a fresh generator, so it cannot see a
 	// fault in how many words a width *consumes*. This asks a single
 	// generator for widths in a changing order, which can.
@@ -218,6 +222,7 @@ func TestGetRandBitsThreadsItsStateBetweenWidths(t *testing.T) {
 // --------------------------------------------------------- the consumers
 
 func TestRandBelowRejectsWhereTheCorpusRejects(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -234,6 +239,7 @@ func TestRandBelowRejectsWhereTheCorpusRejects(t *testing.T) {
 }
 
 func TestRandRangeInEveryFormItIsCalledIn(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -267,6 +273,7 @@ func TestRandRangeInEveryFormItIsCalledIn(t *testing.T) {
 // rather than why it does not: "equivalent for every input that matters" is
 // an argument, and an argument is checked here rather than believed.
 func TestFloorDivisionRoundsTowardNegativeInfinity(t *testing.T) {
+	t.Parallel()
 	cases := load(t).FloorDiv
 	if len(cases) == 0 {
 		t.Fatal("the corpus carries no division cases")
@@ -290,6 +297,7 @@ func TestFloorDivisionRoundsTowardNegativeInfinity(t *testing.T) {
 }
 
 func TestShuffleLaysTheDeckOutAsTheCorpusRecords(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			for _, want := range c.Shuffles {
@@ -306,6 +314,7 @@ func TestShuffleLaysTheDeckOutAsTheCorpusRecords(t *testing.T) {
 }
 
 func TestOneGeneratorShufflesTheDeckOverAndOver(t *testing.T) {
+	t.Parallel()
 	// Tier 1's exact shape: one generator, one shuffle per mulligan, every
 	// game. A `shuffle` that consumed one draw too many would agree on the
 	// first deck here and on none after it.
@@ -324,6 +333,7 @@ func TestOneGeneratorShufflesTheDeckOverAndOver(t *testing.T) {
 }
 
 func TestChoicePicksWhatTheCorpusPicks(t *testing.T) {
+	t.Parallel()
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -345,6 +355,7 @@ func TestChoicePicksWhatTheCorpusPicks(t *testing.T) {
 // the corpus's own two recorded streams -- if the corpus ever showed them
 // differing, this package would be wrong to make them agree.
 func TestANegativeSeedIsItsAbsoluteValue(t *testing.T) {
+	t.Parallel()
 	streams := map[string][]uint32{}
 	for _, c := range load(t).Seeds {
 		streams[c.Seed] = c.Words
@@ -396,6 +407,7 @@ func TestANegativeSeedIsItsAbsoluteValue(t *testing.T) {
 // So a failure here says the digest cannot be reproduced, and says the fault
 // is in the stream before the engine is even in question.
 func TestTheTier1StreamIsTheOneTheDigestIsComputedOver(t *testing.T) {
+	t.Parallel()
 	tier1 := load(t).Tier1
 
 	if tier1.ReferenceDigest == "" || len(tier1.Generators) == 0 {
@@ -447,6 +459,7 @@ func TestTheTier1StreamIsTheOneTheDigestIsComputedOver(t *testing.T) {
 // check: a corpus that quietly stopped recording anything would still be
 // self-consistent and still be worthless.
 func TestTheReferenceRunIsTheShapeItsStreamAssumes(t *testing.T) {
+	t.Parallel()
 	tier1 := load(t).Tier1
 
 	const pinned = "c3e278e3e09ae7766b145886bddf7e07314533c292b6c5aeb9340c73b3ee22d4"

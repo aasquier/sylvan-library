@@ -65,6 +65,7 @@ func liveOrSkip(t *testing.T) {
 }
 
 func TestLiveTheSmallestCallProvesTheKey(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	report := Check(context.Background(), "")
 	if !report.OK {
@@ -84,6 +85,7 @@ func TestLiveTheSmallestCallProvesTheKey(t *testing.T) {
 // buying nothing, and the whole reason it is placed on the system block is
 // wrong.
 func TestLiveAToolRoundTripAndACacheRead(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	stance, err := Preset("second-opinion")
 	if err != nil {
@@ -185,6 +187,7 @@ func TestLiveAToolRoundTripAndACacheRead(t *testing.T) {
 // not one, so a drop count above zero is a real signal about the prompt and
 // not a test failure.
 func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	d := fixtureDeck(t, "kaheera")
 	stance, err := Preset("second-opinion")
@@ -247,6 +250,7 @@ func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
 // not, so a drop count above zero is a signal about the prompt, not a
 // failure), and nothing anywhere in the payload argues FOR the card.
 func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	d := fixtureDeck(t, "kaheera")
 	stance, err := Preset("second-opinion")
@@ -354,6 +358,7 @@ func withRealPool(t *testing.T, fn func(c *pool.Conn)) {
 // passage cites only survivors, every competitor is a pool row -- and the
 // dossier was stored, because that is the row the deck page will serve.
 func TestLiveTheDossierCitesPagesItActuallyRead(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	d := fixtureDeck(t, "kaheera")
 	store := scratchStore(t)
@@ -425,6 +430,7 @@ func TestLiveTheDossierCitesPagesItActuallyRead(t *testing.T) {
 // Research on the real wire, deck-blind: the question the pool cannot answer,
 // answered from pages the search returned, with every finding resting on one.
 func TestLiveResearchAnswersFromPagesItRead(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	plan, err := CheckResearch(
 		"Why is Primeval Titan banned in Commander, and when was it banned?",
@@ -515,6 +521,7 @@ func liveSlots(t *testing.T) []Slot {
 // somebody is and reports that back as something they said -- can only be
 // observed against a real model's output.
 func TestLiveTheThemeTurnAsksAboutThePerson(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	slots := liveSlots(t)
 	raw := make([]any, 0, len(slots))
@@ -582,6 +589,7 @@ func TestLiveTheThemeTurnAsksAboutThePerson(t *testing.T) {
 // Slow -- measured at 226 seconds on the real wire -- which is why it is
 // opt-in.
 func TestLiveTheThemeProposalNamesRealCommanders(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	slots := liveSlots(t)
 	raw := make([]any, 0, len(slots))
@@ -707,6 +715,7 @@ func transcriptAsAny(turns []TranscriptTurn) any {
 // test the model's OCR, which is not this port's business -- this tests the
 // promise.
 func TestLiveTheCameraTranscribesNothingFromNothing(t *testing.T) {
+	t.Parallel()
 	liveOrSkip(t)
 	// Through the mode's own `stance_for`, clamped as a deployment would --
 	// so this exercises the resolution the route uses rather than a preset

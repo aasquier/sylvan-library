@@ -50,6 +50,7 @@ var adminRoutes = []struct{ method, target, payload string }{
 // existence is the secret, and an admin route's existence is published in a
 // public repository.
 func TestEveryAdminRouteRefusesANonAdminItself(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -77,6 +78,7 @@ func TestEveryAdminRouteRefusesANonAdminItself(t *testing.T) {
 // to the next account created.
 
 func TestDeletingAnAccountTakesItsSessionsAndItsJobs(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	rig.api.jobs = jobs.New(jobs.Config{Logger: rig.api.log})
@@ -107,6 +109,7 @@ func TestDeletingAnAccountTakesItsSessionsAndItsJobs(t *testing.T) {
 }
 
 func TestAWrongConfirmIsA422ThatNamesTheAccount(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	for _, body := range []string{`{}`, `{"confirm":"alice"}`, `{"confirm":0}`} {
@@ -121,6 +124,7 @@ func TestAWrongConfirmIsA422ThatNamesTheAccount(t *testing.T) {
 }
 
 func TestAnAdminCannotDeleteTheirOwnSession(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	rec := rig.call(t, adminScope, "DELETE", "/api/admin/users/alice",
@@ -135,6 +139,7 @@ func TestAnAdminCannotDeleteTheirOwnSession(t *testing.T) {
 }
 
 func TestDeletingTheLastUsableAdminIsRefused(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	// A second admin scope that is not alice, so the self-delete guard does
@@ -148,6 +153,7 @@ func TestDeletingTheLastUsableAdminIsRefused(t *testing.T) {
 }
 
 func TestDeletingNobodyIsA404(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	rec := rig.call(t, adminScope, "DELETE", "/api/admin/users/zed",
@@ -173,6 +179,7 @@ func body22(t *testing.T, rec *httptest.ResponseRecorder) string {
 // ---- the account list ------------------------------------------------------
 
 func TestTheListCarriesTheAddressTheStateAndTheRoster(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -256,6 +263,7 @@ func TestTheListCarriesTheAddressTheStateAndTheRoster(t *testing.T) {
 // ---- invites ---------------------------------------------------------------
 
 func TestAnInviteCreatesAnUnclaimedAccountAndMailsIt(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -305,6 +313,7 @@ func TestAnInviteCreatesAnUnclaimedAccountAndMailsIt(t *testing.T) {
 }
 
 func TestAnInviteRefusesOnTheStatusEachReasonEarns(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -361,11 +370,17 @@ func TestAnInviteRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 // maintainer reading it is the person who can set it. `golden/admin.json`
 // records both cases, because the harness runs with no key on purpose.
 func TestWithNoMailConfiguredBothSendersAnswer503(t *testing.T) {
-	t.Setenv("RESEND_API_KEY", "")
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "1")
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
-	rig.api.email = nil // decide from the environment, as a real process does
+	// No injected sender, so the routes fall back to choosing one from the
+	// mail settings -- and these are a deployment that never set a key, which
+	// is the state `auth.SenderFor` refuses rather than answering from the
+	// console. Described here rather than installed on the process: this used
+	// to blank RESEND_API_KEY and set MTGLAB_REQUIRE_AUTH on the whole test
+	// binary to say the same thing.
+	rig.api.email = nil
+	rig.api.mail = auth.MailSettings{RequireAuth: true}
 
 	for _, c := range []struct{ name, method, target, payload string }{
 		{"an invite", "POST", "/api/admin/users", `{"email":"x@example.com"}`},
@@ -389,6 +404,7 @@ func TestWithNoMailConfiguredBothSendersAnswer503(t *testing.T) {
 // ---- patch -----------------------------------------------------------------
 
 func TestPatchGrantsRevokesDisablesAndSetsATier(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -435,6 +451,7 @@ func TestPatchGrantsRevokesDisablesAndSetsATier(t *testing.T) {
 }
 
 func TestPatchRefusesOnTheStatusEachReasonEarns(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -510,6 +527,7 @@ func TestPatchRefusesOnTheStatusEachReasonEarns(t *testing.T) {
 // body against a name nobody holds is a 422 -- not the 404 the account
 // would earn. The order is the wire's, not a preference.
 func TestAMalformedBodyBeatsAMissingAccount(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 
@@ -525,6 +543,7 @@ func TestAMalformedBodyBeatsAMissingAccount(t *testing.T) {
 // ---- the admin's reset link ------------------------------------------------
 
 func TestTheAdminsResetMailsALinkAndRefusesTheTwoCasesItCannot(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -580,6 +599,7 @@ func TestTheAdminsResetMailsALinkAndRefusesTheTwoCasesItCannot(t *testing.T) {
 // The lighter of the two revocations, and the one wanted for a lost laptop:
 // the account is still good, the cookies on that machine are not.
 func TestRevokingSessionsLeavesTheAccountUsable(t *testing.T) {
+	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
 	ctx := context.Background()
@@ -616,6 +636,7 @@ func TestRevokingSessionsLeavesTheAccountUsable(t *testing.T) {
 // The same rule the public routes keep: an absent `app.db` is read as an empty
 // one and nothing here creates it.
 func TestTheAdminSurfaceWithNoDatabase(t *testing.T) {
+	t.Parallel()
 	a := New(Config{AppDBPath: "", DecksDir: t.TempDir(), EmailSender: &recordedSender{}})
 	rig := &accountRig{api: a, close: func() {}}
 

@@ -204,6 +204,7 @@ func corpusTypes(v any) any {
 }
 
 func TestTheConstantsMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	if cache.SimVersion != c.SimVersion {
 		t.Errorf("SimVersion = %d, the corpus says %d", cache.SimVersion, c.SimVersion)
@@ -221,6 +222,7 @@ func TestTheConstantsMatchTheCorpus(t *testing.T) {
 // over, and the
 // only thing left that can move the key is the fingerprint itself.
 func TestThePayloadIsTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	for _, tc := range c.Cases {
 		t.Run(tc.Label, func(t *testing.T) {
@@ -274,6 +276,7 @@ func itoa(n int) string {
 // drift. Both halves are asserted, because either alone would be
 // satisfied by the wrong implementation.
 func TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	engine := cache.Fingerprint()
 	if engine == "" {
@@ -320,6 +323,7 @@ func TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint(t *testing.T) {
 // A cache that missed constantly would look cold rather than broken, which is
 // why this is asserted rather than left to the corpus.
 func TestColourSetsAreSortedIntoTheKey(t *testing.T) {
+	t.Parallel()
 	build := func(colors, pip []string) cache.Input {
 		return cache.Input{
 			Library: []*sim.Card{{
@@ -348,6 +352,7 @@ func TestColourSetsAreSortedIntoTheKey(t *testing.T) {
 }
 
 func TestTheFingerprintIsAStableHexDigest(t *testing.T) {
+	t.Parallel()
 	first := cache.Fingerprint()
 	if len(first) != 64 {
 		t.Fatalf("fingerprint is %q, want 64 hex characters", first)
@@ -382,6 +387,7 @@ type result struct {
 }
 
 func TestARowGoesInAndComesBack(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := scratch(t)
 	if hit := store.Get(ctx, "nothing-stored"); hit != nil {
@@ -413,6 +419,7 @@ func TestARowGoesInAndComesBack(t *testing.T) {
 }
 
 func TestAnEmptyKeyIsAMissAndAnEmptyStore(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := scratch(t)
 	store.Put(ctx, "", "sim.mana", result{Games: 1})
@@ -442,6 +449,7 @@ func TestAnEmptyKeyIsAMissAndAnEmptyStore(t *testing.T) {
 }
 
 func TestAReadTouchesTheRowSoEvictionIsLeastRecentlyUsed(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := scratch(t)
 	store.Put(ctx, "old", "sim.mana", result{Games: 1})
@@ -472,6 +480,7 @@ func lastUsed(t *testing.T, store *cache.Store, key string) string {
 }
 
 func TestTheTableIsBoundedAtMaxRows(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := scratch(t)
 	// Filled directly rather than through `Put`, which would run MaxRows
@@ -530,6 +539,7 @@ func pad6(n int) string {
 }
 
 func TestStatsAndClear(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := scratch(t)
 	empty := store.Stats(ctx)
@@ -567,6 +577,7 @@ func TestStatsAndClear(t *testing.T) {
 // file this created would be a database at version zero, or worse one filled
 // in from a second copy of the schema.
 func TestOpenWillNotCreateTheDatabase(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.db")
 	if _, err := cache.Open(path, nil); err == nil {
@@ -580,6 +591,7 @@ func TestOpenWillNotCreateTheDatabase(t *testing.T) {
 // TestAnUnstorableResultIsAMissNotAFailure: `Put` never fails the caller --
 // the same trade `decklog.Record` and `claude/ledger`'s recorder make.
 func TestAnUnstorableResultIsAMissNotAFailure(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := scratch(t)
 	store.Put(ctx, "bad", "sim.mana", make(chan int)) // encoding/json refuses
@@ -613,6 +625,7 @@ func TestAnUnstorableResultIsAMissNotAFailure(t *testing.T) {
 // would keep passing while saying nothing about the sixth. Reflection is what
 // makes this a question about the struct instead of about the fixture.
 func TestEveryKeepRuleFieldChangesTheKey(t *testing.T) {
+	t.Parallel()
 	input := func(k tier1.KeepRule) cache.Input {
 		return cache.Input{
 			Library:  []*sim.Card{{Name: "Forest", Category: "land", IsLand: true}},

@@ -4,34 +4,35 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
 // The maintainer reconciler's contract, driven through the same scratch
 // `app.db` the accounts tests use.
 //
-// Every test here sets *both* variables through t.Setenv -- including to "" --
-// because `EnsureMaintainer` reads the process environment, and a developer's
-// own MTGLAB_ADMIN_EMAIL leaking into a test would make the suite pass or fail
-// depending on whose laptop ran it. t.Setenv also refuses t.Parallel, which is
-// what makes the shared environment safe to lean on.
+// Every test here hands `EnsureMaintainer` the configuration it is about.
+// This used to set both variables through t.Setenv -- including to "", to stop
+// a developer's own MTGLAB_ADMIN_EMAIL from deciding whether the suite passed
+// on their laptop. Neither the blanking nor the serial execution t.Setenv
+// forced is needed now: an unconfigured instance is `config.Config{}`, which
+// no environment can reach into, so every test here runs in parallel.
 
-func configureMaintainer(t *testing.T, email, username string) {
-	t.Helper()
-	t.Setenv("MTGLAB_ADMIN_EMAIL", email)
-	t.Setenv("MTGLAB_ADMIN_USERNAME", username)
+func maintainer(email, username string) config.Config {
+	return config.Config{AdminEmail: email, AdminUsername: username}
 }
 
-func ensure(t *testing.T, db *sql.DB) {
+func ensure(t *testing.T, db *sql.DB, cfg config.Config) {
 	t.Helper()
-	if err := EnsureMaintainer(context.Background(), db); err != nil {
+	if err := EnsureMaintainer(context.Background(), db, cfg); err != nil {
 		t.Fatalf("EnsureMaintainer: %v", err)
 	}
 }
 
 func TestEnsureMaintainerIsANoOpWhenUnconfigured(t *testing.T) {
-	configureMaintainer(t, "", "ignored-without-an-address")
+	t.Parallel()
 	db := newAccountsDB(t)
-	ensure(t, db)
+	ensure(t, db, maintainer("", "ignored-without-an-address"))
 	everyone, err := AllUsers(context.Background(), db)
 	if err != nil {
 		t.Fatal(err)
@@ -42,10 +43,10 @@ func TestEnsureMaintainerIsANoOpWhenUnconfigured(t *testing.T) {
 }
 
 func TestEnsureMaintainerCreatesTheAccountUnclaimedAndAdmin(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
-	configureMaintainer(t, "Ada.Lovelace@Example.COM", "")
 	db := newAccountsDB(t)
-	ensure(t, db)
+	ensure(t, db, maintainer("Ada.Lovelace@Example.COM", ""))
 
 	account, err := GetByEmail(ctx, db, "ada.lovelace@example.com")
 	if err != nil || account == nil {
@@ -67,7 +68,7 @@ func TestEnsureMaintainerCreatesTheAccountUnclaimedAndAdmin(t *testing.T) {
 
 	// Idempotent: the steady state is every boot after the first changing
 	// nothing.
-	ensure(t, db)
+	ensure(t, db, maintainer("Ada.Lovelace@Example.COM", ""))
 	everyone, err := AllUsers(ctx, db)
 	if err != nil {
 		t.Fatal(err)
@@ -78,10 +79,10 @@ func TestEnsureMaintainerCreatesTheAccountUnclaimedAndAdmin(t *testing.T) {
 }
 
 func TestEnsureMaintainerHonoursTheConfiguredHandle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
-	configureMaintainer(t, "keeper@example.com", "grove-keeper")
 	db := newAccountsDB(t)
-	ensure(t, db)
+	ensure(t, db, maintainer("keeper@example.com", "grove-keeper"))
 	account, err := GetByEmail(ctx, db, "keeper@example.com")
 	if err != nil || account == nil {
 		t.Fatalf("no maintainer account was created (%v)", err)
@@ -92,12 +93,12 @@ func TestEnsureMaintainerHonoursTheConfiguredHandle(t *testing.T) {
 }
 
 func TestEnsureMaintainerFallsBackWhenTheConfiguredHandleIsUnusable(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	// A malformed preference is logged and ignored, never fatal: the handle
 	// falls back to the address' local part.
-	configureMaintainer(t, "keeper@example.com", "!! not a handle !!")
 	db := newAccountsDB(t)
-	ensure(t, db)
+	ensure(t, db, maintainer("keeper@example.com", "!! not a handle !!"))
 	account, err := GetByEmail(ctx, db, "keeper@example.com")
 	if err != nil || account == nil {
 		t.Fatalf("no maintainer account was created (%v)", err)
@@ -108,10 +109,10 @@ func TestEnsureMaintainerFallsBackWhenTheConfiguredHandleIsUnusable(t *testing.T
 }
 
 func TestEnsureMaintainerReconcilesAdminAndEnabledButNeverTheHandle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	// The account exists already -- claimed, demoted and disabled, which is
 	// the restored-from-an-old-backup shape the reconciliation exists for.
-	configureMaintainer(t, "", "")
 	db := newAccountsDB(t)
 	existing := mustCreate(t, db, "aaron", "aaron@example.com", false)
 	claim(t, db, existing)
@@ -122,8 +123,7 @@ func TestEnsureMaintainerReconcilesAdminAndEnabledButNeverTheHandle(t *testing.T
 	// The configured handle differs on purpose: the username is used at
 	// creation and never afterwards, because renaming somebody at boot is a
 	// surprise this has no way to warn them about.
-	configureMaintainer(t, "aaron@example.com", "somebody-else")
-	ensure(t, db)
+	ensure(t, db, maintainer("aaron@example.com", "somebody-else"))
 
 	account, err := GetByID(ctx, db, existing.ID)
 	if err != nil || account == nil {
@@ -148,15 +148,14 @@ func TestEnsureMaintainerReconcilesAdminAndEnabledButNeverTheHandle(t *testing.T
 }
 
 func TestEnsureMaintainerStepsAroundATakenHandle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	// A friend invited as `aaron` before the maintainer was configured.
 	// Renaming theirs would be worse, so the maintainer becomes `aaron2`.
-	configureMaintainer(t, "", "")
 	db := newAccountsDB(t)
 	mustCreate(t, db, "aaron", "friend@example.com", false)
 
-	configureMaintainer(t, "aaron@example.com", "")
-	ensure(t, db)
+	ensure(t, db, maintainer("aaron@example.com", ""))
 	account, err := GetByEmail(ctx, db, "aaron@example.com")
 	if err != nil || account == nil {
 		t.Fatalf("no maintainer account was created (%v)", err)
@@ -170,11 +169,11 @@ func TestEnsureMaintainerStepsAroundATakenHandle(t *testing.T) {
 }
 
 func TestEnsureMaintainerLogsAndSkipsAMalformedAddress(t *testing.T) {
+	t.Parallel()
 	// Loud, and not fatal: refusing to start would turn a typo in one
 	// environment variable into an instance that serves nothing.
-	configureMaintainer(t, "not-an-address", "")
 	db := newAccountsDB(t)
-	ensure(t, db)
+	ensure(t, db, maintainer("not-an-address", ""))
 	everyone, err := AllUsers(context.Background(), db)
 	if err != nil {
 		t.Fatal(err)
@@ -185,6 +184,7 @@ func TestEnsureMaintainerLogsAndSkipsAMalformedAddress(t *testing.T) {
 }
 
 func TestUsernameForManglesDeterministically(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ email, want string }{
 		// The usual case: the local part is the name its owner would pick.
 		{"ada.lovelace@example.com", "ada.lovelace"},

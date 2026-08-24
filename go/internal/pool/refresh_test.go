@@ -72,6 +72,7 @@ func bulkFile(t *testing.T, cards []map[string]any) string {
 // compared through the reader, which parses them — the one knowing
 // divergence, invisible to every query.
 func TestTheLoaderBuildsTheRecordedPool(t *testing.T) {
+	t.Parallel()
 	fx := loadRefresh(t)
 	rawOracle := make([]map[string]any, 0, len(fx.Oracle))
 	names := []string{}
@@ -176,6 +177,7 @@ func staleOf(t *testing.T, path string) bool {
 // the two parsed-JSON columns compared as documents, everything else
 // exactly, and the skip verdicts beside them.
 func TestEveryRowMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	fx := loadRefresh(t)
 	for i, c := range fx.Oracle {
 		if got := pool.SkipOracleLayout(c.Raw); got != c.Skip {

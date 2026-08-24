@@ -205,6 +205,7 @@ func digestOf(lines []string) string {
 // recorded -- which is what every quoted Tier 1 number, every generated
 // primer and ADR 18's cache all rest on.
 func TestTheReferenceRunReproducesThePinnedDigest(t *testing.T) {
+	t.Parallel()
 	got := digestOf(referenceOutputs(t, load(t)))
 	if got != ReferenceDigest {
 		t.Fatalf("the pinned digest is %s; this engine computes %s.\n"+
@@ -221,6 +222,7 @@ func TestTheReferenceRunReproducesThePinnedDigest(t *testing.T) {
 // This says what: the five recorded strings sit in the corpus, and a
 // divergence reports the line and the first character that differs.
 func TestTheReferenceOutputsAreTheRecordedText(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	got := referenceOutputs(t, c)
 	if len(got) != len(c.Reference.Outputs) {
@@ -238,6 +240,7 @@ func TestTheReferenceOutputsAreTheRecordedText(t *testing.T) {
 // re-pinning the gate. The corpus records the digest its run measured; this
 // file holds a literal; they must be the same number.
 func TestTheCorpusAgreesWithThePinnedDigest(t *testing.T) {
+	t.Parallel()
 	if got := load(t).Reference.Digest; got != ReferenceDigest {
 		t.Fatalf("the corpus records %s but the pinned digest is %s -- one of "+
 			"them was changed without the other", got, ReferenceDigest)
@@ -276,6 +279,7 @@ func clip(s string, n int) string {
 // horizon, the play/draw split and both branches of the mulligan bottoming
 // loop.
 func TestEveryGameIsTheRecordedGame(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	for _, tc := range c.Games {
 		name := fmt.Sprintf("%s/seed=%s/turns=%d", tc.Deck, tc.Seed, tc.Turns)
@@ -298,6 +302,7 @@ func TestEveryGameIsTheRecordedGame(t *testing.T) {
 // TestEveryRunIsTheRecordedRun is the same over `Run`: the accumulators, the
 // medians, the timing table and its sort.
 func TestEveryRunIsTheRecordedRun(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	for _, tc := range c.Runs {
 		name := fmt.Sprintf("%s/games=%d/turns=%d", tc.Deck, tc.Games, tc.Turns)
@@ -337,6 +342,7 @@ func TestEveryRunIsTheRecordedRun(t *testing.T) {
 // pays generic with the least flexible units first, so the pool it returns
 // decides what the *next* spell this turn can be paid with.
 func TestConsumeMatchesTheRecordedLeftovers(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	for _, tc := range c.Consume {
 		name := fmt.Sprintf("%s/%s", tc.CostText, tc.Pool)
@@ -376,6 +382,7 @@ func TestConsumeMatchesTheRecordedLeftovers(t *testing.T) {
 // they part company fails here rather than showing up as a different land on
 // turn three.
 func TestCanPayMatchesTheRecordedAnswers(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	agreed := 0
 	for _, tc := range c.Consume {
@@ -413,6 +420,7 @@ func TestCanPayMatchesTheRecordedAnswers(t *testing.T) {
 // which a deterministic sweep catches on the next run rather than on the next
 // fuzz budget.
 func TestConsumeAgreesWithCanPay(t *testing.T) {
+	t.Parallel()
 	// Small alphabets on purpose: a divergence between two matchings shows up
 	// on tight pools where the assignment is forced, not on generous ones
 	// where everything is payable.
@@ -462,6 +470,7 @@ func TestConsumeAgreesWithCanPay(t *testing.T) {
 // the reference run produces, plus the boundaries where the notation changes
 // shape.
 func TestReprFloatMatchesTheRecordedRenderings(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	if len(c.Floats) < 100 {
 		t.Fatalf("only %d float cases; the corpus lost its sweep", len(c.Floats))
@@ -491,6 +500,7 @@ func TestReprFloatMatchesTheRecordedRenderings(t *testing.T) {
 // the corpus: the
 // quote choice, the escapes, and the printable non-ASCII it passes through.
 func TestReprStringMatchesTheRecordedRenderings(t *testing.T) {
+	t.Parallel()
 	for _, tc := range load(t).Strings {
 		if got := ReprString(tc.Value); got != tc.Repr {
 			t.Errorf("ReprString(%q) is %s, the corpus says %s", tc.Value, got, tc.Repr)
@@ -504,6 +514,7 @@ func TestReprStringMatchesTheRecordedRenderings(t *testing.T) {
 // implied by the digest: a digest is one run.
 
 func TestASeededRunRepeatsExactly(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	library, commander := deck(t, c, "golgari-34")
 	seed := int64(99)
@@ -516,6 +527,7 @@ func TestASeededRunRepeatsExactly(t *testing.T) {
 }
 
 func TestDifferentSeedsProduceDifferentResults(t *testing.T) {
+	t.Parallel()
 	// The mirror image, and the one that catches a seed accepted and then
 	// ignored -- which would make every test above pass for the wrong reason.
 	c := load(t)
@@ -529,6 +541,7 @@ func TestDifferentSeedsProduceDifferentResults(t *testing.T) {
 }
 
 func TestARunDoesNotMutateTheLibraryItWasGiven(t *testing.T) {
+	t.Parallel()
 	// `simulate_game` shuffles, draws and resolves land fetches. If any of
 	// that reached the caller's slice, the second point of a sweep would be
 	// simulating a different deck than the first.
@@ -549,6 +562,7 @@ func TestARunDoesNotMutateTheLibraryItWasGiven(t *testing.T) {
 }
 
 func TestTheProgressCallbackDoesNotChangeTheResult(t *testing.T) {
+	t.Parallel()
 	// Instrumentation must be inert: it consumes no randomness and touches no
 	// state, and this is what keeps that true.
 	c := load(t)
@@ -567,6 +581,7 @@ func TestTheProgressCallbackDoesNotChangeTheResult(t *testing.T) {
 }
 
 func TestEverySweepPointStartsFromTheSameSeed(t *testing.T) {
+	t.Parallel()
 	// What makes a land sweep a comparison rather than a collection of
 	// unrelated samples: each point sees the same stream of shuffles, so a
 	// difference in the output is a difference in the deck.
@@ -585,6 +600,7 @@ func TestEverySweepPointStartsFromTheSameSeed(t *testing.T) {
 }
 
 func TestTheReferenceRunIsTheShapeTheDigestAssumes(t *testing.T) {
+	t.Parallel()
 	// A digest is opaque. If the corpus silently stopped simulating anything,
 	// it would still be stable and still be worthless.
 	c := load(t)
@@ -609,6 +625,7 @@ func TestTheReferenceRunIsTheShapeTheDigestAssumes(t *testing.T) {
 // --------------------------------------------------------- the sharp corners
 
 func TestRemoveTakesTheFirstEqualCard(t *testing.T) {
+	t.Parallel()
 	// Removal takes the first EQUAL element, not the one it was
 	// handed. With a compiled deck those are routinely different cards, and
 	// which one leaves reorders everything after it.
@@ -629,6 +646,7 @@ func TestRemoveTakesTheFirstEqualCard(t *testing.T) {
 }
 
 func TestKeepRuleCountsCheapRampAsAManaPiece(t *testing.T) {
+	t.Parallel()
 	rule := DefaultKeepRule()
 	land := &sim.Card{Name: "Forest", IsLand: true,
 		Produces: []sim.Source{{Colors: []string{"G"}, Amount: 1}}}
@@ -652,6 +670,7 @@ func TestKeepRuleCountsCheapRampAsAManaPiece(t *testing.T) {
 }
 
 func TestMedianOfAnOddCountIsAnInt(t *testing.T) {
+	t.Parallel()
 	// The median of an odd count of ints is the middle int, so the median
 	// commander turn renders as `5` and not `5.0` -- and the digest hashes
 	// that text, so the distinction is pinned rather than pedantic.
@@ -669,6 +688,7 @@ func TestMedianOfAnOddCountIsAnInt(t *testing.T) {
 }
 
 func TestAnUnseededRunIsStillARun(t *testing.T) {
+	t.Parallel()
 	// A nil seed is a legal call and must not panic looking for entropy.
 	c := load(t)
 	library, commander := deck(t, c, "duplicates")
@@ -701,6 +721,7 @@ func names(cards []*sim.Card) []string {
 // `4.0` are
 // different text, and that text is inside the determinism digest.
 func TestNumberSurvivesJSONBothWays(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		in   Number

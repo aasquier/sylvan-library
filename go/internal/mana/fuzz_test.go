@@ -271,6 +271,7 @@ func reverseSources(sources []Source) []Source {
 // hand-rolled encoding invites. So the round trip is checked on the two seeds
 // whose exact shape the argument above depends on.
 func TestTheSeedEncodingSaysWhatItMeans(t *testing.T) {
+	t.Parallel()
 	cost, sources, xValue := decodeCase(caseBytes(fuzzCase{
 		pips: []uint8{1<<0 /*W*/ | 1<<1 /*U*/, 1 << 0}, sources: []uint8{1 << 0, 1, 1 << 1, 1},
 	}))

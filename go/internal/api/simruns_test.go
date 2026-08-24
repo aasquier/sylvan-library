@@ -34,6 +34,7 @@ import (
 // runs under and asked the same question of its siblings -- and it is the
 // lesson to carry: **a job's Run never touches the request's context.**
 func TestASimulationJobStoresItsResultAfterTheRequestHasGone(t *testing.T) {
+	t.Parallel()
 	dbPath := appDB(t)
 	db, err := auth.Open(dbPath)
 	if err != nil {
@@ -96,6 +97,7 @@ func TestASimulationJobStoresItsResultAfterTheRequestHasGone(t *testing.T) {
 // sentence — right for the handler, wrong for the job — and the door carried
 // it into every deferred failure until 2026-08-23.
 func TestAMissingDeckCarriesTheBareSlugIntoTheJob(t *testing.T) {
+	t.Parallel()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	db, err := auth.Open(appDB(t))
 	if err != nil {

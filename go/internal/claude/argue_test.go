@@ -53,6 +53,7 @@ func loadArgueCorpus(t *testing.T) argueCorpus {
 }
 
 func TestOnlyChargesAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadArgueCorpus(t)
 	for _, row := range corpus.Charges {
 		kept, dropped := OnlyCharges(row.Items)
@@ -74,6 +75,7 @@ func TestOnlyChargesAgreesWithTheCorpus(t *testing.T) {
 // A charge is rendered into a payload the client reads, so the bytes are the
 // contract and only bytes carry field order.
 func TestAChargeMarshalsInTheRecordedFieldOrder(t *testing.T) {
+	t.Parallel()
 	raw, err := json.Marshal(Charge{Claim: "c", Ground: "cost", Fact: "f", Strength: "minor"})
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +87,7 @@ func TestAChargeMarshalsInTheRecordedFieldOrder(t *testing.T) {
 }
 
 func TestResolveAlternativesAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadArgueCorpus(t)
 	withPool(t, func(c *pool.Conn) {
 		for _, row := range corpus.Alternatives {
@@ -133,6 +136,7 @@ func TestResolveAlternativesAgreesWithTheCorpus(t *testing.T) {
 // exactly the two cases -- stance off, and a refusal -- where the recorded
 // shape leaves it off, which is why there are two types.
 func TestTheEmptyDroppedShapeIsTheRecordedFourKeys(t *testing.T) {
+	t.Parallel()
 	raw, err := json.Marshal(noneDropped())
 	if err != nil {
 		t.Fatal(err)
@@ -163,6 +167,7 @@ func TestTheEmptyDroppedShapeIsTheRecordedFourKeys(t *testing.T) {
 // list is wider here for the same reason -- `keep`, `in_favour` and `why` are
 // what a well-meaning change would actually name it.
 func TestNoLevelOfTheSlotArgumentSchemaCanHoldADefence(t *testing.T) {
+	t.Parallel()
 	mode, err := GetMode(ModeSlotArgument)
 	if err != nil {
 		t.Fatal(err)

@@ -13,7 +13,6 @@ import (
 	"golang.org/x/term"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 )
 
@@ -42,7 +41,7 @@ func usersCommand() *cobra.Command {
 // on a laptop the first `users add` is what creates the file — an open that
 // could not mint the schema would strand the very first command.
 func connectUsers(ctx context.Context) (*sql.DB, error) {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if err := auth.Migrate(path); err != nil {
 		return nil, err
 	}
@@ -50,7 +49,7 @@ func connectUsers(ctx context.Context) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := auth.EnsureMaintainer(ctx, db); err != nil {
+	if err := auth.EnsureMaintainer(ctx, db, settings()); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -162,7 +161,7 @@ func usersAddCommand() *cobra.Command {
 			if user.IsAdmin {
 				role = " (admin)"
 			}
-			fmt.Printf("  created %s%s in %s\n", user.Username, role, config.AppDBPath())
+			fmt.Printf("  created %s%s in %s\n", user.Username, role, settings().AppDBPath())
 			if password == "" {
 				fmt.Println("  no password set -- this account cannot log in yet.")
 			}
@@ -192,7 +191,7 @@ func usersInviteCommand() *cobra.Command {
 			if address == "" {
 				return refused("an invite needs an email address to send to")
 			}
-			sender, err := auth.SenderFromEnv(nil)
+			sender, err := auth.SenderFor(auth.MailSettingsFrom(settings()), nil)
 			if err != nil {
 				return refused("%s", err)
 			}
@@ -274,7 +273,7 @@ func usersListCommand() *cobra.Command {
 				return err
 			}
 			if len(everyone) == 0 {
-				fmt.Printf("  no accounts in %s\n", config.AppDBPath())
+				fmt.Printf("  no accounts in %s\n", settings().AppDBPath())
 				fmt.Println("  create one with `mtglab users add <name>`")
 				return nil
 			}

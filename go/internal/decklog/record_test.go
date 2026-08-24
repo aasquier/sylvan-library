@@ -69,6 +69,7 @@ func strings2(items []any) []string {
 // a different one would change the History panel's wording from that day on
 // -- silently, and only for edits made after the change.
 func TestDescribeWritesTheRecordedSentences(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/describe.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
@@ -94,6 +95,7 @@ func TestDescribeWritesTheRecordedSentences(t *testing.T) {
 // match the recording, and a corpus recorded from a leaking renderer would
 // agree all the way into the table.
 func TestNoRationaleReachesASentence(t *testing.T) {
+	t.Parallel()
 	const secret = "A rationale that must not appear in any log line."
 	raw, err := os.ReadFile("testdata/describe.json")
 	if err != nil {
@@ -124,6 +126,7 @@ func TestNoRationaleReachesASentence(t *testing.T) {
 // branch most likely to be "simplified" away by somebody who notices nothing
 // reaches it. The tenth edit operation is the one somebody adds in a year.
 func TestAnUnknownOperationStillSaysSomething(t *testing.T) {
+	t.Parallel()
 	action, summary := Describe(Edit{})
 	if action != "edit" || summary != "edited the deck" {
 		t.Errorf("an unrecognised operation said %q / %q; silence is the one "+
@@ -148,6 +151,7 @@ func newScratchDB(t *testing.T) string {
 }
 
 func TestRecordWritesAnEntryTheReaderFinds(t *testing.T) {
+	t.Parallel()
 	path := newScratchDB(t)
 	recorder, err := NewRecorder(path, nil)
 	if err != nil {
@@ -206,6 +210,7 @@ func TestRecordWritesAnEntryTheReaderFinds(t *testing.T) {
 // TestRecordNeverFailsTheEdit is the property the whole module is built
 // around: the deck write has already happened by the time this runs.
 func TestRecordNeverFailsTheEdit(t *testing.T) {
+	t.Parallel()
 	// No database at all -- a laptop with auth off that nothing has yet
 	// created `app.db` on.
 	missing := filepath.Join(t.TempDir(), "nothing", "app.db")
@@ -240,6 +245,7 @@ func TestRecordNeverFailsTheEdit(t *testing.T) {
 // ladder (`auth.Migrate`) runs at boot, so an `app.db` minted here would be
 // a database at version zero with no tables in it.
 func TestTheRecorderDoesNotCreateTheDatabase(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if _, err := NewRecorder(path, nil); err == nil {
 		t.Fatal("NewRecorder created app.db; only the boot ladder may make the file")

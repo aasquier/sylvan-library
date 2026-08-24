@@ -139,6 +139,7 @@ var (
 )
 
 func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// Alice is the maintainer: the file tier under her name, writable, and
@@ -216,6 +217,7 @@ func TestTheShelfListsWhatTheCallerMaySee(t *testing.T) {
 }
 
 func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// Another account's private deck is a 404, never a 403; a shared one
@@ -257,6 +259,7 @@ func TestADeckIsReachableExactlyAsFarAsItsLibrary(t *testing.T) {
 }
 
 func TestTheDeckPayloadIsServiceGetDeck(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, false)
 	defer done()
 	status, body, raw := as(t, a, auth.Local, "/api/decks/local/mono-green")
@@ -308,6 +311,7 @@ func TestTheDeckPayloadIsServiceGetDeck(t *testing.T) {
 }
 
 func TestValidateStatsSuggestionsAgreeWithTheFixtures(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, false)
 	defer done()
 	dir := filepath.Join("..", "gate", "testdata")
@@ -388,6 +392,7 @@ func canonicalJSON(t *testing.T, raw []byte) string {
 }
 
 func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// The commander's panel: counted, not recalled.
@@ -482,6 +487,7 @@ func TestCommanderPrintingsLogAndArtifacts(t *testing.T) {
 }
 
 func TestChallengeProgressScoresTheLibrary(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, false)
 	defer done()
 	_, body, raw := as(t, a, auth.Local, "/api/colors/progress")

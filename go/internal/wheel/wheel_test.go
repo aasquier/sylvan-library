@@ -46,6 +46,7 @@ func loadSpins(t *testing.T) spinsFile {
 // encoding could drift present as the same-looking value, so the bytes are
 // the claim.
 func TestEverySpinDealsTheRecordedFate(t *testing.T) {
+	t.Parallel()
 	fx := loadSpins(t)
 	if len(fx.Cases) < 20 {
 		t.Fatalf("only %d spin cases; the corpus has thinned", len(fx.Cases))
@@ -93,6 +94,7 @@ func TestEverySpinDealsTheRecordedFate(t *testing.T) {
 // An unseeded spin invents its own seed -- drawn from entropy, under
 // 2**32 -- and reports it, so any spin can be spun again.
 func TestAnUnseededSpinReportsAReplayableSeed(t *testing.T) {
+	t.Parallel()
 	fx := loadSpins(t)
 	d, err := deck.FromText(fx.Decks["mono-green"], "mono-green")
 	if err != nil {

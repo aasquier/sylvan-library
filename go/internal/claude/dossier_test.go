@@ -235,6 +235,7 @@ func TestTheFingerprintsPartsAreEachTheRecordedOnes(t *testing.T) {
 // ---------------------------------------------------------------- the brief
 
 func TestTheBriefsOpeningMessageMatchesTheGoldenBytes(t *testing.T) {
+	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	mini, headless := miniDecks(t)
 	withPool(t, func(c *pool.Conn) {
@@ -307,6 +308,7 @@ func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
 // The two GET shapes are two types because the difference is which keys
 // exist: no commander means no `answered_by`.
 func TestTheHeadlessGetHasFiveKeysAndNoAnsweredBy(t *testing.T) {
+	t.Parallel()
 	raw, err := json.Marshal(HeadlessDossier{Slug: "x", Dossier: emptyObject})
 	if err != nil {
 		t.Fatal(err)
@@ -421,6 +423,7 @@ func TestOnlyAWholeDossierIsStored(t *testing.T) {
 // ---------------------------------------------------------------- the store
 
 func TestTheStoreNeverFailsTheFeature(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	// A nil store and a store over a nil handle both miss and swallow writes.
 	var none *DossierStore
@@ -460,6 +463,7 @@ func TestTheStoreNeverFailsTheFeature(t *testing.T) {
 // writes; this is what makes the round trip above meaningful rather than a
 // mock.
 func TestTheScratchSchemaCarriesTheDossierTable(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)

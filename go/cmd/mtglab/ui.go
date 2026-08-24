@@ -66,16 +66,16 @@ func envOr(name, fallback string) string {
 //
 // It exists so that a `fly logs` tail answers "is this thing configured the
 // way I think it is" in two seconds rather than by shell-ing in and reading
-// the environment. Every value here is read through `internal/config`, which
-// is the one place that decides a default -- so the line cannot drift from the
-// behaviour it describes without the behaviour changing too.
+// the environment. It is handed the same [config.Config] the process is
+// serving with -- resolved once by [config.Load] -- so the line cannot drift
+// from the behaviour it describes without the behaviour changing too.
 //
 // **Never a secret and never a value that might be one.** A key in a log is a
 // leak forever, and this app's own rule is that it does not hold most of them
 // at all: the mail provider renders as *which sender was chosen*, never as its
 // credential, and no ANTHROPIC_ or _TOKEN value appears in any form.
 // `TestTheBootSummaryLeaksNoSecret` holds that.
-func bootSummary(webDist, tarot string, poolPresent bool) []any {
+func bootSummary(cfg config.Config, webDist, tarot string, poolPresent bool) []any {
 	state := func(on bool, yes, no string) string {
 		if on {
 			return yes
@@ -83,16 +83,16 @@ func bootSummary(webDist, tarot string, poolPresent bool) []any {
 		return no
 	}
 	return []any{
-		"auth", state(config.RequireAuth(), "on", "off"),
-		"cookies", state(config.SecureCookies(), "secure", "plain"),
+		"auth", state(cfg.RequireAuth, "on", "off"),
+		"cookies", state(cfg.SecureCookies, "secure", "plain"),
 		"schema", auth.SchemaVersion,
-		"data_dir", config.DataDir(),
-		"decks_dir", config.DecksDir(),
+		"data_dir", cfg.DataDir,
+		"decks_dir", cfg.DecksDir,
 		"web_dist", webDist,
 		"tarot", tarot,
 		"pool", state(poolPresent, "present", "absent"),
-		"base_url", config.BaseURL(),
-		"mail", state(config.ResendAPIKey() != "", "provider", "console"),
+		"base_url", cfg.BaseURL,
+		"mail", state(cfg.ResendAPIKey != "", "provider", "console"),
 		"forge_worker", tier3.Configured(),
 	}
 }
@@ -100,39 +100,39 @@ func bootSummary(webDist, tarot string, poolPresent bool) []any {
 // configComplaints are the settings that must agree with each other, checked
 // at boot instead of on the request that needed them.
 //
-// Reading configuration at call time is right for a *path* and wrong for a
-// *relationship*: nothing is broken about an unset MTGLAB_EMAIL_FROM until the
-// first person asks for a password reset, and by then the person discovering
-// the misconfiguration is the one worst placed to fix it. Each of these is a
-// deployment that will fail on one specific request, days later, silently.
+// A setting on its own is right or wrong only against the others: nothing is
+// broken about an unset MTGLAB_EMAIL_FROM until the first person asks for a
+// password reset, and by then the person discovering the misconfiguration is
+// the one worst placed to fix it. Each of these is a deployment that will fail
+// on one specific request, days later, silently.
 //
 // They are **warnings, never a refusal.** Merging deploys (ADR 23), so a boot
 // that refuses here would take the site down for a setting the site does not
 // need to serve a single anonymous page. Loud and serving beats silent and
 // serving; refusing to serve is worse than both.
-func configComplaints() []string {
-	if !config.RequireAuth() {
+func configComplaints(cfg config.Config) []string {
+	if !cfg.RequireAuth {
 		// Auth off is a laptop, one person, no invites and no reset mail. Every
 		// relationship below is about a deployment.
 		return nil
 	}
 	var out []string
-	if config.ResendAPIKey() == "" {
+	if cfg.ResendAPIKey == "" {
 		out = append(out, "auth is on and RESEND_API_KEY is unset: invites and "+
 			"password resets are refused rather than sent, because the console "+
 			"fallback would print addresses into this log (docs/HOSTING.md §7)")
 	}
-	if config.BaseURLIsDefault() {
+	if cfg.BaseURLIsDefault() {
 		out = append(out, "auth is on and MTGLAB_BASE_URL is still "+
 			config.DefaultBaseURL+": every invite and reset link mailed from "+
 			"here points at a loopback address")
 	}
-	if config.EmailFromIsDefault() {
+	if cfg.EmailFromIsDefault() {
 		out = append(out, "auth is on and MTGLAB_EMAIL_FROM is still the "+
 			"built-in default: a provider refuses any From address outside a "+
 			"sending domain you have verified with it")
 	}
-	if config.AdminEmail() == "" {
+	if cfg.AdminEmail == "" {
 		out = append(out, "auth is on and MTGLAB_ADMIN_EMAIL is unset: nobody "+
 			"is reconciled to admin at boot, so an accidental demotion cannot "+
 			"repair itself with a restart (ADR 17)")
@@ -142,42 +142,46 @@ func configComplaints() []string {
 
 func serve(host, port, webDist, tarot string) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	// The environment, read once, here. Everything below is handed the
+	// resulting value, so the door and the summary describing it cannot
+	// disagree about what this process was configured to be.
+	cfg := settings()
 	// The schema ladder, before anything opens the file: creating `app.db`
 	// and bringing it to `auth.SchemaVersion` is this command's job, and a
 	// ladder that cannot be applied is a refusal to serve, not a warning — a
 	// request answered over a half-migrated file is worse than no answer.
-	if err := auth.Migrate(config.AppDBPath()); err != nil {
+	if err := auth.Migrate(cfg.AppDBPath()); err != nil {
 		return err
 	}
 	// After the ladder, because `schema` in the summary is a fact about the
 	// file on disk rather than about this binary's ambition for it, and before
 	// anything can fail below, because a boot that dies wants its own
 	// configuration in the log above the error.
-	_, poolErr := os.Stat(config.DBPath())
-	log.Info("configuration", bootSummary(webDist, tarot, poolErr == nil)...)
-	for _, complaint := range configComplaints() {
+	_, poolErr := os.Stat(cfg.DBPath())
+	log.Info("configuration", bootSummary(cfg, webDist, tarot, poolErr == nil)...)
+	for _, complaint := range configComplaints(cfg) {
 		log.Warn(complaint)
 	}
 	// The maintainer, reconciled to admin at every start (ADR 17). A no-op
 	// unless MTGLAB_ADMIN_EMAIL is set, which is what a laptop wants.
-	if err := ensureMaintainerAtBoot(); err != nil {
+	if err := ensureMaintainerAtBoot(cfg); err != nil {
 		return err
 	}
-	requireAuth := config.RequireAuth()
+	requireAuth := cfg.RequireAuth
 	d, err := door.New(door.Config{
 		RequireAuth:   requireAuth,
-		SecureCookies: config.SecureCookies(),
-		AppDB:         config.AppDBPath(),
+		SecureCookies: cfg.SecureCookies,
+		AppDB:         cfg.AppDBPath(),
 		WebDist:       webDist,
 		TarotDir:      tarot,
 		// The pool, on a lease: opened at the first ask, handed back when
 		// idle, re-opened when `data refresh` replaces the file.
-		Pool:        pool.New(config.DBPath(), log),
-		PoolPath:    config.DBPath(),
-		DecksDir:    config.DecksDir(),
-		ScryfallDir: config.ScryfallDir(),
-		DataDir:     config.DataDir(),
-		AdminEmail:  config.AdminEmail(),
+		Pool:        pool.New(cfg.DBPath(), log),
+		PoolPath:    cfg.DBPath(),
+		DecksDir:    cfg.DecksDir,
+		ScryfallDir: cfg.ScryfallDir(),
+		DataDir:     cfg.DataDir,
+		AdminEmail:  cfg.AdminEmail,
 		Logger:      log,
 	})
 	if err != nil {
@@ -232,14 +236,14 @@ func serve(host, port, webDist, tarot string) error {
 // ensureMaintainerAtBoot opens app.db briefly for the reconciliation the
 // serving process owes ADR 17, and closes it again — the door opens its own
 // handles with its own lifetimes.
-func ensureMaintainerAtBoot() error {
-	if config.AdminEmail() == "" {
+func ensureMaintainerAtBoot(cfg config.Config) error {
+	if cfg.AdminEmail == "" {
 		return nil
 	}
-	db, err := auth.OpenReadWrite(config.AppDBPath())
+	db, err := auth.OpenReadWrite(cfg.AppDBPath())
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
-	return auth.EnsureMaintainer(context.Background(), db)
+	return auth.EnsureMaintainer(context.Background(), db, cfg)
 }

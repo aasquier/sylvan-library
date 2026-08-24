@@ -73,6 +73,7 @@ func loadStanceCorpus(t *testing.T) stanceCorpus {
 // Everything below indexes into them, so a reordered axis would make every
 // other test in this file agree with itself and disagree with the corpus.
 func TestTheAxesAndLevelsAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	if got := Axes; !equalStrings(got, c.Axes) {
 		t.Errorf("axes: got %v, corpus %v", got, c.Axes)
@@ -110,6 +111,7 @@ func TestTheAxesAndLevelsAreTheRecordedOnes(t *testing.T) {
 // encoding/json actually produced. A readout with the right values in the
 // wrong field order is that failure again, and only this comparison sees it.
 func TestEveryStanceAnswersAsRecorded(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Stances {
 		s := row.Stance.stance()
@@ -136,6 +138,7 @@ func TestEveryStanceAnswersAsRecorded(t *testing.T) {
 // TestEveryClampPairAgreesWithTheCorpus walks all 1,296. Per-axis minimum is
 // four lines of code and it is the line an operator's cap runs through.
 func TestEveryClampPairAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Clamps {
 		got := Clamp(row.Requested.stance(), row.Limit.stance())
@@ -155,6 +158,7 @@ func TestEveryClampPairAgreesWithTheCorpus(t *testing.T) {
 // recorded refusals quote with single quotes, and they tell `7` from `7.5`
 // by the literal rather than by the value.
 func TestParsingAStanceMatchesTheCorpusIncludingItsRefusals(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Parses {
 		got, err := StanceFromObj(row.Input)
@@ -211,6 +215,7 @@ type statused struct{ status string }
 func (s statused) DeckStatus() string { return s.status }
 
 func TestTheDeckDefaultAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Defaults {
 		var deck DeckStatused = statused{}

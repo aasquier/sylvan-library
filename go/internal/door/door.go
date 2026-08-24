@@ -77,10 +77,17 @@ type Config struct {
 	// rendered.
 	AdminEmail string
 	// EmailSender is ADR 16's seam, handed to the account routes. Nil is what
-	// a real process wants -- the sender is decided from the environment when
-	// a message is actually being sent -- and a test passes a recorder, which
-	// is how no test in this module sends mail.
+	// a real process wants -- the sender is chosen from Mail when a message is
+	// actually being sent -- and a test passes a recorder, which is how no test
+	// in this module sends mail.
 	EmailSender auth.EmailSender
+	// Mail is what that choice is made from when EmailSender is nil: settings
+	// resolved once at config.Load and carried here, never read again from the
+	// environment.
+	Mail auth.MailSettings
+	// ClientIPHeader is MTGLAB_CLIENT_IP_HEADER, handed to the rate limiter.
+	// Empty trusts only the peer, which is the safe default.
+	ClientIPHeader string
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -181,7 +188,8 @@ func New(cfg Config) (*Door, error) {
 		// ADR 16's seam. Nil is the real process's answer -- decide from the
 		// environment when a message is actually being sent -- and a test
 		// passes a recorder, which is how no test here sends mail.
-		EmailSender: cfg.EmailSender})
+		EmailSender: cfg.EmailSender, Mail: cfg.Mail,
+		ClientIPHeader: cfg.ClientIPHeader})
 	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err

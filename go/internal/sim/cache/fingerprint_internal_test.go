@@ -21,6 +21,7 @@ import (
 // `+00:00`, never `Z`. Both happen roughly once in a million, which is exactly
 // why neither shows up in a store test that stamps rows from the clock.
 func TestTheTimestampIsTheRecordedFormat(t *testing.T) {
+	t.Parallel()
 	whole := time.Date(2026, 8, 22, 6, 10, 20, 0, time.UTC)
 	if got := stamp(whole); got != "2026-08-22T06:10:20+00:00" {
 		t.Errorf("a whole second stamps as %q", got)
@@ -169,6 +170,7 @@ func TestTheFingerprintHashesNamesAsWellAsBytes(t *testing.T) {
 // deleted line would be a wrong key nobody could see. This test says the
 // mutation is equivalent *today* and names the day it stops being.
 func TestTheGlobIsSortedAlready(t *testing.T) {
+	t.Parallel()
 	for _, pkg := range engineSources {
 		names, err := fs.Glob(pkg.fs, "*")
 		if err != nil {
@@ -192,6 +194,7 @@ func TestTheGlobIsSortedAlready(t *testing.T) {
 // the fingerprint stays a plausible digest and simply stops covering the file
 // that was added. This reads each directory and fails by name.
 func TestEveryFingerprintedPackageEmbedsItsWholeSelf(t *testing.T) {
+	t.Parallel()
 	// From `go/internal/sim/cache` to the module's `internal`.
 	root := filepath.Join("..", "..", "..", "internal")
 	for _, pkg := range engineSources {

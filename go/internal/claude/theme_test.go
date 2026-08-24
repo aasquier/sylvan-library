@@ -219,6 +219,7 @@ func freezeAngle(t *testing.T, index int) {
 // The constants the whole module is built out of. Cheap, and the one check
 // that fails loudly when a cap moves here and not in the corpus.
 func TestTheThemeConstantsMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range []struct {
 		what      string
@@ -251,6 +252,7 @@ func TestTheThemeConstantsMatchTheCorpus(t *testing.T) {
 }
 
 func TestProseAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Prose {
 		if got := Prose(row.Value); got != row.Prose {
@@ -260,6 +262,7 @@ func TestProseAgreesWithTheCorpus(t *testing.T) {
 }
 
 func TestGroundMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Ground {
 		kept, dropped := Ground(row.Slots, corpus.Transcript)
@@ -283,6 +286,7 @@ func TestGroundMatchesTheRecordedCorpus(t *testing.T) {
 // readiness count that moves and one that does not, which is what a newcomer
 // reads as answering wrong.
 func TestGroundFoldsFullyWhereToLowerWouldNot(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	found := false
 	for _, row := range corpus.Ground {
@@ -314,6 +318,7 @@ func TestGroundFoldsFullyWhereToLowerWouldNot(t *testing.T) {
 }
 
 func TestCarryAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Carry {
 		carried := Carry(row.Previous, row.Fresh)
@@ -327,6 +332,7 @@ func TestCarryAgreesWithTheCorpus(t *testing.T) {
 // The floor may not go backwards, stated as a property rather than a row.
 // This is what `Carry` exists for and the failure it was written after.
 func TestTheReadinessCountNeverFalls(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	known := []Slot{}
 	for _, row := range corpus.Carry {
@@ -339,6 +345,7 @@ func TestTheReadinessCountNeverFalls(t *testing.T) {
 }
 
 func TestRepeatsMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Repeats {
 		if got := Repeats(row.Text, row.Told); got != row.Repeats {
@@ -348,6 +355,7 @@ func TestRepeatsMatchesTheCorpus(t *testing.T) {
 }
 
 func TestCheckToldMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Told {
 		told, err := CheckTold(row.Raw)
@@ -372,6 +380,7 @@ func TestCheckToldMatchesTheRecordedCorpus(t *testing.T) {
 }
 
 func TestCheckTranscriptAgreesWithTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Transcripts {
 		turns, err := CheckTranscript(row.Raw)
@@ -402,6 +411,7 @@ func TestCheckTranscriptAgreesWithTheRecordedCorpus(t *testing.T) {
 }
 
 func TestKeepFactMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Facts {
 		assertSameJSONValue(t, "keep_fact: "+row.Note, KeepFact(row.Raw, corpus.Pages), row.Fact)
@@ -413,6 +423,7 @@ func TestKeepFactMatchesTheCorpus(t *testing.T) {
 // back only because the schema requires it, and a fun fact paraphrased at a
 // fortune-teller's table is the one thing at that table that would be a lie.
 func TestATarotFactIsTheCorpussWordsNotTheModels(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Facts {
 		if !strings.Contains(row.Note, "paraphrased away") {
@@ -434,6 +445,7 @@ func TestATarotFactIsTheCorpussWordsNotTheModels(t *testing.T) {
 // strict decimal grammar. The fullwidth digit is the row that tells them
 // apart: `/api/tarot/reading` refuses `７` and this reads it as seven.
 func TestTheSeedGrammarIsTheLenientOneNotTheRoutes(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	sawFullwidth := false
 	for _, row := range corpus.Seeds {
@@ -462,6 +474,7 @@ func TestTheSeedGrammarIsTheLenientOneNotTheRoutes(t *testing.T) {
 }
 
 func TestTheBudgetFormatMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Budgets {
 		var got string
@@ -551,6 +564,7 @@ func TestThePromptsAreBytes(t *testing.T) {
 // failed, there simply is not enough yet, and a 422 would read as "you sent
 // something wrong" to a client that sent exactly the right thing too early.
 func TestWhatTheTwoChecksRefuse(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Refusals {
 		var err error
@@ -673,6 +687,7 @@ func TestEveryThemeProposalOutcomeAgreesWithTheCorpus(t *testing.T) {
 // one: `Converse`'s own moving marker only ever lands on a tool-result block
 // it created, so nothing downstream would notice this going missing.
 func TestTheCacheBreakpointRidesTheClosingInstruction(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	messages := themeMessages(corpus.Transcript, "CLOSING", "FRAME")
 
@@ -712,6 +727,7 @@ func TestTheCacheBreakpointRidesTheClosingInstruction(t *testing.T) {
 // A transcript that ends on the interviewer's own question gets the closing as
 // a turn of its own rather than an edit to somebody else's.
 func TestAnUnansweredQuestionGetsItsOwnClosingTurn(t *testing.T) {
+	t.Parallel()
 	messages := themeMessages([]TranscriptTurn{
 		{Role: "assistant", Text: "What do you love?"},
 	}, "CLOSING", "FRAME")
@@ -727,6 +743,7 @@ func TestAnUnansweredQuestionGetsItsOwnClosingTurn(t *testing.T) {
 // ADR 20's first decision, held in the types: neither plan can carry a deck.
 // The same shape `TestTheResearchPlanCannotHoldADeck` holds for ADR 26.
 func TestNeitherThemePlanCanHoldADeck(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"AskPlan", "ProposalPlan"} {
 		for _, banned := range []string{"Deck", "Source", "Slug", "Owner", "Library"} {
 			if themePlanHasField(name, banned) {
@@ -740,6 +757,7 @@ func TestNeitherThemePlanCanHoldADeck(t *testing.T) {
 // The ASCII fast path in `casefold` is an optimisation, never a second
 // definition. All 128 through both, plus the whole table.
 func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
+	t.Parallel()
 	for r := rune(0); r < 0x80; r++ {
 		s := string(r)
 		fast, ok := casefoldASCII(s)
@@ -766,6 +784,7 @@ func TestTheCasefoldFastPathAgreesWithTheTable(t *testing.T) {
 // mathematical runs that sit adjacent with no gap -- which is what the
 // walk-down heuristic gets wrong and the table gets right.
 func TestEveryUnicodeDigitReadsAsItsValue(t *testing.T) {
+	t.Parallel()
 	seen, bold := 0, 0
 	for r := rune(0); r <= 0x10FFFF; r++ {
 		if !unicode.IsDigit(r) {
@@ -861,6 +880,7 @@ func themePlanHasField(plan, field string) bool {
 // anything that computes, and that the corpus still holds a case of each
 // former kind so this cannot be green against a corpus that lost one.
 func TestTheBudgetParseMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	sawFormerTypeFailure, sawFormerStringFailure := false, false
 	for _, row := range corpus.Floats {
@@ -951,6 +971,7 @@ func floatLiteral(f float64) string {
 // and `digitValueIn` takes its table as an argument precisely so that case
 // can be built.
 func TestADigitBeyondTheKnownRunsIsRefusedRatherThanGuessed(t *testing.T) {
+	t.Parallel()
 	// A table that stops at ASCII, standing in for one written before a block
 	// existed. `\u0660` (Arabic-Indic zero) is a digit Go knows and this table
 	// does not.

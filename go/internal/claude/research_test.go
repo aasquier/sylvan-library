@@ -78,6 +78,7 @@ func loadResearchCorpus(t *testing.T) researchCorpus {
 // ------------------------------------------------------------ the question
 
 func TestCheckQuestionMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadResearchCorpus(t)
 	sawRejection, sawOddShape := false, false
 	for _, row := range corpus.Questions {
@@ -117,6 +118,7 @@ func TestCheckQuestionMatchesTheRecordedCorpus(t *testing.T) {
 // is empty only because textutil.IsSpace says so. The corpus holds that
 // case; this names the mechanism.
 func TestTheInformationSeparatorsCountAsWhitespace(t *testing.T) {
+	t.Parallel()
 	if strings.TrimSpace("\x1c\x1d") == "" {
 		t.Skip("Go's TrimSpace now strips the information separators; the helper is redundant")
 	}
@@ -129,6 +131,7 @@ func TestTheInformationSeparatorsCountAsWhitespace(t *testing.T) {
 }
 
 func TestTheQuestionKeyMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.Keys {
 		if got := QuestionKey(row.Question); got != row.Key {
@@ -152,6 +155,7 @@ func TestTheQuestionKeyMatchesTheRecordedCorpus(t *testing.T) {
 // the two keys agree, a full folding arrived and the comment on QuestionKey
 // is the thing to delete.
 func TestTheQuestionKeyLowercasesWhereFullFoldingDiffers(t *testing.T) {
+	t.Parallel()
 	corpus := loadResearchCorpus(t)
 	gap := corpus.CasefoldGap
 	if got := QuestionKey(gap.Question); got != gap.LowercasedKey {
@@ -211,6 +215,7 @@ func TestTheDefaultResearchStanceIsNotOff(t *testing.T) {
 }
 
 func TestTheResearchOpeningIsTheRecordedShape(t *testing.T) {
+	t.Parallel()
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.AskFor {
 		if got := researchOpening(row.Question); got != row.Message {
@@ -268,6 +273,7 @@ func TestEveryResearchOutcomeMatchesTheGolden(t *testing.T) {
 // somebody would add to make this mode deck-aware, and the diff that adds it
 // has to fail something.
 func TestTheResearchPlanCannotHoldADeck(t *testing.T) {
+	t.Parallel()
 	for _, typ := range []reflect.Type{
 		reflect.TypeOf(ResearchPlan{}), reflect.TypeOf(ResearchRun{}),
 	} {
@@ -289,6 +295,7 @@ func TestTheResearchPlanCannotHoldADeck(t *testing.T) {
 // And the mode itself offers no deck tool -- the structural half, pinned
 // here as a set rather than tool by tool.
 func TestTheResearchModeOffersNoDeckTool(t *testing.T) {
+	t.Parallel()
 	mode, err := GetMode(ModeResearch)
 	if err != nil {
 		t.Fatal(err)

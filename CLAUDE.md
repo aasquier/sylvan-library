@@ -149,6 +149,41 @@ pytest tests/ -q` — when `tools/` moved; nothing puts `ruff` or a 3.12
 call (re-verified 2026-08-24); the old `bash -lc` wrapper still works and is
 now noise.
 
+## Testing
+
+**A new test calls `t.Parallel` unless it is holding something shared.** The
+suite runs in ~1m25 because 663 of its tests do (ADR 39). Two things forbid it,
+and both travel through helpers — including methods, in other files — so
+neither is visible from the test itself:
+
+- **`t.Setenv`**, which Go panics on inside a parallel test. Configuration is a
+  value now (`config.Config`, resolved once by `config.Load`); describe a
+  deployment with a struct literal rather than installing one on the process.
+  The remaining serial tests are the ones genuinely about the environment:
+  `config.Load`'s own, the CLI tests that drive a real command, and the Claude
+  and Forge tests still waiting on the second injection ADR 39 names.
+- **Writing anything package-level**, which `-race` reports and nothing else
+  will. `internal/sim/cache` swaps `engineSources` and friends to fingerprint a
+  different source set; its callers are serial for that reason alone.
+
+Serial and parallel tests never overlap — Go finishes the serial ones before
+resuming the parallel ones — so mixing them in a package is safe.
+
+**Benchmarks** live beside the determinism kernels (`mt19937`, `floats`,
+`textutil`, `sim/compile`) as `*_bench_test.go`. They are a local measuring
+tool, not a gate: compare two runs on the same machine with `benchstat`, never
+quote an absolute. CI only proves they still build and run.
+
+```bash
+go test -run XXX -bench . -benchtime 100x ./internal/mt19937/
+```
+
+**Mutation testing** is `gremlins unleash ./internal/floats` from `go/`
+(`.gremlins.yaml` argues the settings and how to read the output; `mutants.yml`
+runs it on pull requests, report-only). It answers what coverage cannot:
+whether a test would have *noticed* the code being wrong. A LIVED mutant is a
+hole; a TIMED OUT one was caught, bluntly.
+
 ## Architecture
 
 ```

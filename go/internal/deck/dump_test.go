@@ -29,6 +29,7 @@ import (
 // choices, so feeding it back in shows the parser the tidied version and
 // hides every disagreement about the untidied one.
 func TestDumpWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/dumps.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
@@ -64,6 +65,7 @@ func TestDumpWritesTheRecordedBytes(t *testing.T) {
 // field. Pinned apart from the oracle because it is the one ordering rule
 // that looks like a mistake.
 func TestADraftsBlankRationaleFollowsTheQuantity(t *testing.T) {
+	t.Parallel()
 	d := &Deck{Slug: "d", Name: "D", Status: "theoretical", Stage: "draft",
 		Commander: []string{"Gyome, Master Chef"},
 		Cards:     []CardEntry{{Name: "Forest", Category: "land", Qty: 4}}}
@@ -87,6 +89,7 @@ func TestADraftsBlankRationaleFollowsTheQuantity(t *testing.T) {
 // board and dropped the moment the themes name a class word -- the
 // self-cleaning round trip a file gets on its next write.
 func TestTheLegacyArchetypeIsDroppedOnceShadowed(t *testing.T) {
+	t.Parallel()
 	d := &Deck{Slug: "d", Name: "D", Status: "built", Stage: "curated",
 		Commander:       []string{"Atla Palani, Nest Tender"},
 		LegacyArchetype: "midrange", Themes: []string{"dinosaurs", "sacrifice"}}
@@ -111,6 +114,7 @@ func TestTheLegacyArchetypeIsDroppedOnceShadowed(t *testing.T) {
 // random passes an ordered assertion often enough to be useless and passes a
 // *reversed* one about one time in `n!`.
 func TestNotesKeepTheFilesOrder(t *testing.T) {
+	t.Parallel()
 	const text = `slug: ordered
 name: Ordered
 status: built
@@ -164,6 +168,7 @@ cards:
 // dump against dump and the two files differ. A bare map would have called
 // them equal and reported artifacts as `current` that were not.
 func TestReorderedNotesAreADifferentDeck(t *testing.T) {
+	t.Parallel()
 	head := "slug: d\nname: D\nstatus: built\nstage: curated\ncommander:\n  - Gyome, Master Chef\n"
 	tail := "cards:\n  - name: Sol Ring\n    category: ramp\n    why: Two mana.\n"
 	one, err := FromText(head+"notes:\n  a: first\n  b: second\n"+tail, "d")
@@ -185,6 +190,7 @@ func TestReorderedNotesAreADifferentDeck(t *testing.T) {
 // through -- and a note holding a mapping is written now rather than refused,
 // because the parse keeps its order too.
 func TestAStrategyThatIsNotProseRefusesToDump(t *testing.T) {
+	t.Parallel()
 	d := &Deck{Slug: "d", Name: "D", Status: "built", Stage: "curated",
 		Commander: []string{"Gyome, Master Chef"},
 		Strategy:  map[string]any{"plan": "not prose"}}

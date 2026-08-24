@@ -70,6 +70,7 @@ func withPool(t *testing.T, fn func(c *pool.Conn)) {
 // TestValidateAndStatsMatchTheGoldensWhenCalledDirectly is the fixture
 // check, driven the way a Claude tool will drive it.
 func TestValidateAndStatsMatchTheGoldensWhenCalledDirectly(t *testing.T) {
+	t.Parallel()
 	decks := fixtureDecks(t)
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
@@ -126,6 +127,7 @@ func TestValidateAndStatsMatchTheGoldensWhenCalledDirectly(t *testing.T) {
 }
 
 func TestSuggestionsMatchTheGoldensWhenCalledDirectly(t *testing.T) {
+	t.Parallel()
 	decks := fixtureDecks(t)
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
@@ -173,6 +175,7 @@ func TestSuggestionsMatchTheGoldensWhenCalledDirectly(t *testing.T) {
 // the moment they call these functions, which is the point of them being
 // shared rather than reimplemented.
 func TestTheNilPoolDegradesRatherThanFailing(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	for slug, d := range fixtureDecks(t) {
 		body, err := DeckPayload(ctx, nil, d, true, "local")
@@ -207,6 +210,7 @@ func TestTheNilPoolDegradesRatherThanFailing(t *testing.T) {
 // is deliberate. The payload is ordered pairs for that reason, and this
 // pins the order rather than trusting the type to preserve it.
 func TestTheDeckPayloadKeepsTheRecordedKeyOrder(t *testing.T) {
+	t.Parallel()
 	decks := fixtureDecks(t)
 	var any *deck.Deck
 	for _, d := range decks {
@@ -270,6 +274,7 @@ func canonical(t *testing.T, raw []byte) string {
 // `stale_test.go` already does, and it is not a fixture edit: the recorded
 // corpus on disk is untouched.
 func TestSearchPricesEachCardAtItsCheapestPrintingOrNotAtAll(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := pooltest.Build(t)
 	db, err := pooltest.Writer(path)

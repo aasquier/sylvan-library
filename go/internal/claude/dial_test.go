@@ -110,6 +110,7 @@ func TestTheDialAgreesWithTheRecordedPayload(t *testing.T) {
 // as a decision, so this holds it equal to `ModeNames()` as a set. The next
 // mode added fails here rather than three months later.
 func TestTheDialListsEveryMode(t *testing.T) {
+	t.Parallel()
 	got := DialModes()
 	names := make([]string, 0, len(got))
 	for _, m := range got {

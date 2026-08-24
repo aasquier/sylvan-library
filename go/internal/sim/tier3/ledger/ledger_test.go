@@ -91,6 +91,7 @@ func intp(n int) *int { return &n }
 // TestAMatchIsRecordedAndReadBack is the round trip, and the reading rules
 // with it.
 func TestAMatchIsRecordedAndReadBack(t *testing.T) {
+	t.Parallel()
 	rec, _ := scratch(t)
 	decks := []*deck.Deck{deckOf(t, catText), deckOf(t, dinoText)}
 
@@ -155,6 +156,7 @@ func TestAMatchIsRecordedAndReadBack(t *testing.T) {
 // TestSeatsSnapshotTheLabels is ADR 36's third rule: the boards group by the
 // class a deck wore when it played, so relabelling must not rewrite history.
 func TestSeatsSnapshotTheLabels(t *testing.T) {
+	t.Parallel()
 	rec, _ := scratch(t)
 	cats, dinos := deckOf(t, catText), deckOf(t, dinoText)
 	rec.Record(t.Context(), matchOf(big.NewInt(1),
@@ -191,6 +193,7 @@ func TestSeatsSnapshotTheLabels(t *testing.T) {
 // hangs on: the JVM minutes have already been spent, so a ledger problem costs
 // a warning and never a match somebody watched finish.
 func TestRecordNeverFailsTheMatchThatProducedIt(t *testing.T) {
+	t.Parallel()
 	rec, db := scratch(t)
 	decks := []*deck.Deck{deckOf(t, catText), deckOf(t, dinoText)}
 	good := []tier3.GameResult{game(1, 100, intp(1), nil, false, false)}
@@ -266,6 +269,7 @@ func TestRecordNeverFailsTheMatchThatProducedIt(t *testing.T) {
 // TestANilRecorderRecordsNothingAndSaysNothing is the no-app.db case: an
 // instance with no database records no matches and still plays them.
 func TestANilRecorderRecordsNothingAndSaysNothing(t *testing.T) {
+	t.Parallel()
 	var rec *Recorder
 	if id := rec.Record(t.Context(), Match{}); id != 0 {
 		t.Errorf("a nil recorder reported id %d", id)
@@ -282,6 +286,7 @@ func TestANilRecorderRecordsNothingAndSaysNothing(t *testing.T) {
 // TestAnUnseededRunIsRecordedAsNull: an unseeded CLI run is not reproducible,
 // and the ledger says so rather than inventing a number.
 func TestAnUnseededRunIsRecordedAsNull(t *testing.T) {
+	t.Parallel()
 	rec, _ := scratch(t)
 	decks := []*deck.Deck{deckOf(t, catText), deckOf(t, dinoText)}
 	rec.Record(t.Context(), matchOf(nil,
@@ -305,6 +310,7 @@ func TestAnUnseededRunIsRecordedAsNull(t *testing.T) {
 
 // TestNewestFirstAndLimited is what a recent-history panel asks for.
 func TestNewestFirstAndLimited(t *testing.T) {
+	t.Parallel()
 	rec, _ := scratch(t)
 	decks := []*deck.Deck{deckOf(t, catText), deckOf(t, dinoText)}
 	var ids []int64

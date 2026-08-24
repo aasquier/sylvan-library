@@ -146,6 +146,7 @@ func load(t *testing.T) corpus {
 }
 
 func TestTheTextReadersMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	for _, tc := range load(t).Texts {
 		t.Run(tc.Source+"/"+tc.Label, func(t *testing.T) {
 			if got := compile.EntersTapped(tc.Text); got != tc.EntersTapped {
@@ -174,6 +175,7 @@ func TestTheTextReadersMatchTheCorpus(t *testing.T) {
 // decides one line here, and a deck fixture cannot reach any of them. So the
 // corpus carries the records themselves and the recorded answer for each.
 func TestCardShapesThePoolDoesNotHold(t *testing.T) {
+	t.Parallel()
 	cases := load(t).Records
 	if len(cases) == 0 {
 		t.Fatal("the corpus carries no hand-built records any more")
@@ -219,6 +221,7 @@ func TestCardShapesThePoolDoesNotHold(t *testing.T) {
 }
 
 func TestCompilingADeckMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	p := pooltest.Open(t)
 	cases := load(t).Decks
@@ -336,6 +339,7 @@ func asPool(err error, out **compile.PoolRequired) bool {
 // gate refuses that deck; the compiler has no opinion about it, which is what
 // makes it usable here.
 func TestQtyRepeatsShareOnePointer(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	p := pooltest.Open(t)
 	decks := map[string]*deck.Deck{}
@@ -426,6 +430,7 @@ func TestQtyRepeatsShareOnePointer(t *testing.T) {
 // anywhere above it. `compile.json` records the value for every card, and this
 // says the same thing in one line so the reason survives a corpus trim.
 func TestTheCompilerAlwaysSetsTheCategory(t *testing.T) {
+	t.Parallel()
 	if compile.Category != "utility" {
 		t.Fatalf("Category is %q; the recorded default is \"utility\"",
 			compile.Category)

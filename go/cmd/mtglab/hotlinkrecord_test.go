@@ -87,6 +87,7 @@ var ocrOverrides = []string{
 }
 
 func TestTheBundleReachesForNobodyElsesCodeOrFonts(t *testing.T) {
+	t.Parallel()
 	root, files := bundleFiles(t)
 	bodies := map[string]string{}
 	whole := strings.Builder{}
@@ -126,6 +127,7 @@ func TestTheBundleReachesForNobodyElsesCodeOrFonts(t *testing.T) {
 var cssAbsoluteURL = regexp.MustCompile(`url\(\s*['"]?(?:https?:)?//`)
 
 func TestNoStylesheetFetchesAnythingFromOffTheInstance(t *testing.T) {
+	t.Parallel()
 	root, files := bundleFiles(t)
 	for _, path := range files {
 		if !strings.HasSuffix(path, ".css") {
@@ -151,6 +153,7 @@ func TestNoStylesheetFetchesAnythingFromOffTheInstance(t *testing.T) {
 var htmlURLAttr = regexp.MustCompile(`(?s)<([a-zA-Z]+)([^>]*?)\s(?:href|src)="([^"]*)"`)
 
 func TestTheShellNamesNoAbsoluteURLItDoesNotWarm(t *testing.T) {
+	t.Parallel()
 	root, files := bundleFiles(t)
 	shell := ""
 	for _, path := range files {

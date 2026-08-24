@@ -108,6 +108,7 @@ func held(t *testing.T, src library.Source) []string {
 // A deck nobody has built has no artifacts and no baseline, and neither is an
 // error: that is the ordinary state of a deck on the day it is created.
 func TestAnUnbuiltDeckHasNothingAndThatIsNotAnError(t *testing.T) {
+	t.Parallel()
 	for name, src := range tiers(t) {
 		t.Run(name, func(t *testing.T) {
 			if got := held(t, src); len(got) != 0 {
@@ -125,6 +126,7 @@ func TestAnUnbuiltDeckHasNothingAndThatIsNotAnError(t *testing.T) {
 // the primers first and `swaps.md` last, because that is the order a person
 // reads them and not the order a map or a table happens to yield.
 func TestBothTiersListInDeliverablesOrderNotWriteOrder(t *testing.T) {
+	t.Parallel()
 	backwards := artifacts.Files{}
 	for i := len(artifacts.Deliverables) - 1; i >= 0; i-- {
 		backwards = append(backwards, artifacts.File{Name: artifacts.Deliverables[i], Text: "x"})
@@ -148,6 +150,7 @@ func TestBothTiersListInDeliverablesOrderNotWriteOrder(t *testing.T) {
 // no longer exists, which is stale in the one way indistinguishable from
 // current, and it is where the two tiers disagreed before.
 func TestBothTiersPruneWhatARebuildDidNotProduce(t *testing.T) {
+	t.Parallel()
 	full := artifacts.Files{}
 	for _, n := range artifacts.Deliverables {
 		full = append(full, artifacts.File{Name: n, Text: "from the last build"})
@@ -193,6 +196,7 @@ func TestBothTiersPruneWhatARebuildDidNotProduce(t *testing.T) {
 // build's own bookkeeping, `Deliverables` is what a reader may ask for, and
 // that same tuple is the path-traversal guard.
 func TestNeitherTierServesTheSnapshot(t *testing.T) {
+	t.Parallel()
 	stored := artifacts.Files{
 		{Name: "moxfield.txt", Text: "1 Sol Ring\n"},
 		{Name: artifacts.Snapshot, Text: parityDeck},
@@ -219,6 +223,7 @@ func TestNeitherTierServesTheSnapshot(t *testing.T) {
 // A deck that is not there is ErrNotFound rather than an empty shelf: "never
 // built" and "no such deck" are answers a caller has to be able to tell apart.
 func TestBothTiersRefuseAnUnknownDeck(t *testing.T) {
+	t.Parallel()
 	for name, src := range tiers(t) {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()

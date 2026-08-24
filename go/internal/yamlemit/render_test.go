@@ -74,6 +74,7 @@ func loadCases(t *testing.T) []renderCase {
 // recorded lines; anything but equality is a deck file written in a style
 // the library's existing files do not wear -- a diff nobody asked for.
 func TestRenderMatchesTheRecordedLines(t *testing.T) {
+	t.Parallel()
 	cases := loadCases(t)
 	byGroup := map[string]int{}
 	for _, c := range cases {
@@ -114,6 +115,7 @@ func TestRenderMatchesTheRecordedLines(t *testing.T) {
 // corpus this large is exactly the kind of test that passes because nothing
 // reached it, so one case is checked against a deliberately wrong answer.
 func TestTheOracleWouldNoticeADrift(t *testing.T) {
+	t.Parallel()
 	got, err := Render("why", "yes", 6, 96, true)
 	if err != nil {
 		t.Fatal(err)
@@ -167,6 +169,7 @@ func startsWithASeparator(raw json.RawMessage) bool {
 // holds in the recorded block form is a deck file the app cannot read at
 // all. An edit made today can no longer put one there.
 func TestTheSeparatorDivergence(t *testing.T) {
+	t.Parallel()
 	for _, sep := range []string{"\u2028", "\u2029"} {
 		value := sep + " sep"
 		got, err := Render("why", value, 6, 96, true)

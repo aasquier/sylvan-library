@@ -114,6 +114,7 @@ func TestCheckReportsWhatTheSmallestCallProved(t *testing.T) {
 // the CLI and a health route -- so it is checked through encoding/json rather
 // than field by field.
 func TestTheCheckReportKeepsTheRecordedFieldOrder(t *testing.T) {
+	t.Parallel()
 	raw, err := json.Marshal(CheckReport{
 		Model: "m", OK: true, ServedBy: "s", StopReason: "end_turn",
 		Text: "t", InputTokens: 1, OutputTokens: 2,

@@ -79,6 +79,7 @@ func names(body map[string]any) []string {
 // The whole happy path: four deliverables and a baseline on a first build,
 // the shelf reporting them, and the files on disk being the renderer's own.
 func TestABuildWritesTheDeliverablesAndAnswersTheShelf(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -165,6 +166,7 @@ func TestABuildWritesTheDeliverablesAndAnswersTheShelf(t *testing.T) {
 // declares a slug that is not a deck at all answers **404 after a successful
 // write**, the files sitting on disk under the name that was asked for.
 func TestABuildReportsUnderTheDecksOwnSlug(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -208,6 +210,7 @@ func TestABuildReportsUnderTheDecksOwnSlug(t *testing.T) {
 // function (`service._artifacts_json`), so they cannot describe one build two
 // ways.
 func TestTheBuildAndTheShelfAgree(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -239,6 +242,7 @@ func TestTheBuildAndTheShelfAgree(t *testing.T) {
 // The gate's errors are refused by default and `force` overrides them, which
 // mirrors `mtglab decks build --force`. A refused build writes nothing.
 func TestTheGateRefusesAndForceOverrides(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -280,6 +284,7 @@ func TestTheGateRefusesAndForceOverrides(t *testing.T) {
 // draft is not wrong but unfinished, and the way out is to write the
 // rationales and promote it.
 func TestADraftIsRefusedAndForceDoesNotReachIt(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -316,6 +321,7 @@ func TestADraftIsRefusedAndForceDoesNotReachIt(t *testing.T) {
 // indistinguishable from current -- and the snapshot beside it is not a
 // deliverable and must survive.
 func TestARebuildPrunesAStaleSwapList(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -363,6 +369,7 @@ func TestARebuildPrunesAStaleSwapList(t *testing.T) {
 // never a file timestamp -- so an edit makes it `different` and reverting the
 // edit makes it `current` again.
 func TestTheBaselineFollowsTheDeckAndNotTheClock(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -397,6 +404,7 @@ func TestTheBaselineFollowsTheDeckAndNotTheClock(t *testing.T) {
 // explains. The deliverables are the *shareable* surface, so a reader may
 // have every one of them -- and may not rebuild them.
 func TestWhoMayBuildIsDecidedByTheSource(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -430,6 +438,7 @@ func TestWhoMayBuildIsDecidedByTheSource(t *testing.T) {
 // so a malformed body is a 422 before any 404 about the deck it was aimed
 // at.
 func TestAMalformedBodyIsRefusedBeforeTheDeck(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -453,6 +462,7 @@ func TestAMalformedBodyIsRefusedBeforeTheDeck(t *testing.T) {
 // `"no"` is true and `0` is false, and a route that used `.(bool)` would read
 // both as false.
 func TestForceIsReadWithTheRecordedTruthiness(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -475,6 +485,7 @@ func TestForceIsReadWithTheRecordedTruthiness(t *testing.T) {
 // rebuilding his own deck writes rows, not files -- and the sweep that prunes
 // a stale `swaps.md` from a directory prunes it from the table.
 func TestTheSQLTierBuildsToo(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -557,6 +568,7 @@ func TestTheSQLTierBuildsToo(t *testing.T) {
 // which handled the no-pool case correctly throughout -- is
 // what the route now matches, as rule 3 requires.
 func TestWithNoPoolTheBuildAndTheGateAgree(t *testing.T) {
+	t.Parallel()
 	decks := decksDir(t)
 	// An app.db, because the owner segment is resolved through it -- but no
 	// Pool, which is the state a fresh instance is in before `data refresh`.
@@ -655,6 +667,7 @@ func mustParse(t *testing.T, text, slug string) *deck.Deck {
 // build's two. Not a shape the goldens can see -- they sort -- and the reason
 // ordered marshalling exists at all.
 func TestTheAnswerKeepsTheRecordedKeyOrder(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 

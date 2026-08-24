@@ -163,6 +163,7 @@ func load(t *testing.T) corpus {
 }
 
 func TestTheConstantsAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	if mulligan.Through != c.Through {
 		t.Errorf("Through = %d, the corpus says %d", mulligan.Through, c.Through)
@@ -195,6 +196,7 @@ func TestTheConstantsAreTheRecordedOnes(t *testing.T) {
 // so two cells that tie on deployment and on mulligan rate are separated by
 // nothing except which came first out of the nested loops.
 func TestTheGridIsTheRecordedGrid(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	got := mulligan.Candidates()
 	if len(got) != len(c.Candidates) {
@@ -217,6 +219,7 @@ func TestTheGridIsTheRecordedGrid(t *testing.T) {
 }
 
 func TestEverySweepAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	c := load(t)
 	decks := simDecks(t)
 	for _, want := range c.Sweeps {
@@ -319,6 +322,7 @@ func itoa(n int) string {
 // with a nil check rather than a length check, which is the line that is easy
 // to write the other way.
 func TestSearchRefusesAnEmptyGrid(t *testing.T) {
+	t.Parallel()
 	if _, err := mulligan.Search(nil, nil, mulligan.Options{
 		Games: 1, Turns: 1, Seed: 1, Rules: []tier1.KeepRule{},
 	}); !errors.Is(err, mulligan.ErrNoRules) {
@@ -331,6 +335,7 @@ func TestSearchRefusesAnEmptyGrid(t *testing.T) {
 // the end. It consumes no randomness, so a watched sweep and a plain one must
 // answer identically -- which is also asserted here rather than assumed.
 func TestProgressIsCalledOncePerRulePlusOnce(t *testing.T) {
+	t.Parallel()
 	library := []*sim.Card{
 		{Name: "Forest", IsLand: true, Produces: []sim.Source{{Colors: []string{"G"}, Amount: 1}}},
 		{Name: "Bear", Cost: sim.Cost{Generic: 1, Pips: [][]string{{"G"}}}},

@@ -82,6 +82,7 @@ func isCharacter(r rune) bool { return r < 0xD800 || r > 0xDFFF }
 // TestIsSpaceMatchesTheRecordedTableForEveryCodePoint sweeps all 1,114,112
 // of them.
 func TestIsSpaceMatchesTheRecordedTableForEveryCodePoint(t *testing.T) {
+	t.Parallel()
 	corpus := load(t)
 	wrong := 0
 	for r := rune(0); r <= 0x10FFFF; r++ {
@@ -110,6 +111,7 @@ func TestIsSpaceMatchesTheRecordedTableForEveryCodePoint(t *testing.T) {
 // only checked agreement would go green the day somebody replaced this package
 // with the standard library.
 func TestTheStandardLibraryReallyDisagreesAboutWhitespace(t *testing.T) {
+	t.Parallel()
 	var differ []rune
 	for r := rune(0); r <= 0x10FFFF; r++ {
 		if !isCharacter(r) {
@@ -134,6 +136,7 @@ func TestTheStandardLibraryReallyDisagreesAboutWhitespace(t *testing.T) {
 
 // TestSplitLinesAgreesWithTheCorpus holds the recorded splits case for case.
 func TestSplitLinesAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := load(t)
 	for _, c := range corpus.Splits {
 		t.Run(c.Note, func(t *testing.T) {
@@ -155,6 +158,7 @@ func TestSplitLinesAgreesWithTheCorpus(t *testing.T) {
 // was written for: U+001C..U+001E are both, **U+001F is whitespace and not a
 // boundary**, and U+2028/U+2029 are both.
 func TestEveryLineBoundaryIsOneTheCorpusKnows(t *testing.T) {
+	t.Parallel()
 	corpus := load(t)
 	for r := rune(0); r <= 0x10FFFF; r++ {
 		if !isCharacter(r) {
@@ -172,6 +176,7 @@ func TestEveryLineBoundaryIsOneTheCorpusKnows(t *testing.T) {
 // own, because it is the single fact most likely to be got wrong by somebody
 // deriving one table from the other.
 func TestUnitSeparatorIsWhitespaceButNotABoundary(t *testing.T) {
+	t.Parallel()
 	if !textutil.IsSpace(0x1f) {
 		t.Error("U+001F must be in the whitespace set")
 	}
@@ -190,6 +195,7 @@ func TestUnitSeparatorIsWhitespaceButNotABoundary(t *testing.T) {
 
 // TestStripAndFriendsMatchTheCorpus holds the three trimmers.
 func TestStripAndFriendsMatchTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := load(t)
 	for _, c := range corpus.Strips {
 		t.Run(c.Note, func(t *testing.T) {
@@ -210,6 +216,7 @@ func TestStripAndFriendsMatchTheCorpus(t *testing.T) {
 // bytes, so a question of 2,000 accented characters measures 2,000 and stays
 // well over any byte ceiling.
 func TestLenAndHeadCountCodePoints(t *testing.T) {
+	t.Parallel()
 	corpus := load(t)
 	for _, c := range corpus.Heads {
 		t.Run(c.Note, func(t *testing.T) {
@@ -228,6 +235,7 @@ func TestLenAndHeadCountCodePoints(t *testing.T) {
 // timestamp format drops the fractional part entirely when the microsecond
 // is zero, and a fixed six-digit layout does not.
 func TestIsoformatElidesTheFractionAtAZeroMicrosecond(t *testing.T) {
+	t.Parallel()
 	whole := time.Date(2026, 8, 23, 1, 23, 45, 0, time.UTC)
 	if got := textutil.Isoformat(whole); got != "2026-08-23T01:23:45+00:00" {
 		t.Errorf("Isoformat at a zero microsecond = %q", got)

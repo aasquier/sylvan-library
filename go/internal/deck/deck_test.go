@@ -25,6 +25,7 @@ func richDeck(t *testing.T) *Deck {
 }
 
 func TestFromTextReadsTheRichFixtureAsRecorded(t *testing.T) {
+	t.Parallel()
 	d := richDeck(t)
 	if d.Slug != "rich-fixture" || d.Name != "Rich Fixture: Every Shape the Dumper Writes" {
 		t.Fatalf("%q %q", d.Slug, d.Name)
@@ -78,6 +79,7 @@ func TestFromTextReadsTheRichFixtureAsRecorded(t *testing.T) {
 }
 
 func TestTheDefaultsAreTheModels(t *testing.T) {
+	t.Parallel()
 	d, err := FromText("name: Bare\ncards:\n  - Sol Ring\n  - name: Forest\n    qty: 2\n", "bare-slug")
 	if err != nil {
 		t.Fatal(err)
@@ -117,6 +119,7 @@ func TestTheDefaultsAreTheModels(t *testing.T) {
 }
 
 func TestPayloadIsTheDumpsProjection(t *testing.T) {
+	t.Parallel()
 	d := richDeck(t)
 	p := d.Payload()
 	if p["shared"] != false || p["pilot"] != "Mark's wife" || p["archetype"] != "midrange" || p["bracket"] != 3 {

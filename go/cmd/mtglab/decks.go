@@ -2,7 +2,7 @@ package main
 
 // `mtglab decks` -- the deck-facing quarter of the runbook surface (Phase 8:
 // the binary carries the runbook). The CLI is the LOCAL user at a terminal,
-// so it reads the file tier rooted at `config.DecksDir()` -- always the
+// so it reads the file tier rooted at `settings().DecksDir` -- always the
 // config-resolved paths, never a hard-wired directory -- and the activity
 // log's file-tier rows (`owner_id IS NULL`), which on a deployed instance
 // are the maintainer's own decks too.
@@ -30,7 +30,6 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/artifacts"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
@@ -59,7 +58,7 @@ func decksCommand() *cobra.Command {
 // deckAt reads the deck at `<decks>/<slug>/deck.yaml`, or refuses with the
 // recorded clean sentence when there is nothing there.
 func deckAt(slug string) (*deck.Deck, error) {
-	path := filepath.Join(config.DecksDir(), slug, "deck.yaml")
+	path := filepath.Join(settings().DecksDir, slug, "deck.yaml")
 	if _, err := os.Stat(path); err != nil {
 		return nil, fmt.Errorf("no deck at %s", path)
 	}
@@ -87,7 +86,7 @@ func deckFile(path string) (*deck.Deck, error) {
 // the two are indistinguishable to every caller here, but the narrower list
 // is this command's recorded behaviour and stays its own.
 func poolCards(cmd *cobra.Command, d *deck.Deck) (map[string]*pool.CardRecord, error) {
-	dbPath := config.DBPath()
+	dbPath := settings().DBPath()
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil, nil //nolint:nilnil // no pool, no error: absence is a degraded mode, not a fault
 	}
@@ -144,7 +143,7 @@ func decksListCommand() *cobra.Command {
 		Short: "Every deck in the library, one line each",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			root := config.DecksDir()
+			root := settings().DecksDir
 			if _, err := os.Stat(root); err != nil {
 				return errors.New("no decks/ directory")
 			}
@@ -246,7 +245,7 @@ func decksBuildCommand() *cobra.Command {
 				fmt.Print(renderReport(rep) + " \n\n")
 			}
 
-			outdir := filepath.Join(config.DecksDir(), slug, "artifacts")
+			outdir := filepath.Join(settings().DecksDir, slug, "artifacts")
 
 			// The baseline for swaps.md, resolved before `Store` moves it: an
 			// explicit --against wins, and otherwise the previous build's
@@ -363,7 +362,7 @@ func decksLogCommand() *cobra.Command {
 // create the file: the ladder belongs to the serving command, and a reader
 // that acquires a database is the one thing this surface refuses to be.
 func openAppDB() (*sql.DB, error) {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return nil, nil //nolint:nilerr,nilnil // an absent app.db is an empty history, not a failure
 	}

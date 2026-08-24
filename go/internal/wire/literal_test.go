@@ -50,6 +50,7 @@ func loadPlain(t *testing.T) []plainCase {
 }
 
 func TestPlainAndQuoteMatchTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadPlain(t) {
 		t.Run(c.Note, func(t *testing.T) {
 			decoder := json.NewDecoder(bytes.NewReader([]byte(c.Document)))
@@ -84,6 +85,7 @@ func TestPlainAndQuoteMatchTheRecordedCorpus(t *testing.T) {
 // verbatim, and `fmt.Sprint` writes a different sentence from the recorded
 // one.
 func TestAListSlugRendersAsTheCorpusRecords(t *testing.T) {
+	t.Parallel()
 	if got := wire.Plain([]any{"x"}); got != "['x']" {
 		t.Errorf("a list slug rendered %q, want %q", got, "['x']")
 	}

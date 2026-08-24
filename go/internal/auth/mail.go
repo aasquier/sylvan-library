@@ -231,8 +231,32 @@ func describeMailFailure(status int, body []byte) string {
 	return fmt.Sprintf("the mail provider refused the message: HTTP %d (%s)", status, name)
 }
 
-// SenderFromEnv is the sender this process should use, decided when it is
-// asked for.
+// MailSettings is everything [SenderFor] needs to choose a sender: the three
+// settings and nothing else.
+//
+// A value rather than a lookup, so the choice can be described in a test
+// instead of installed in the process. [MailSettingsFrom] builds one at the
+// composition root.
+type MailSettings struct {
+	// ResendAPIKey picks the real sender when it is set.
+	ResendAPIKey string
+	// From is the address invites and resets are sent as.
+	From string
+	// RequireAuth decides what an absent key *means* -- see [SenderFor].
+	RequireAuth bool
+}
+
+// MailSettingsFrom reads the mail-shaped part of a [config.Config].
+func MailSettingsFrom(cfg config.Config) MailSettings {
+	return MailSettings{
+		ResendAPIKey: cfg.ResendAPIKey,
+		From:         cfg.EmailFrom,
+		RequireAuth:  cfg.RequireAuth,
+	}
+}
+
+// SenderFor is the sender these settings ask for, decided when it is asked
+// for.
 //
 // `RESEND_API_KEY` picks the real one. Without it:
 //
@@ -242,14 +266,16 @@ func describeMailFailure(status int, body []byte) string {
 //     addresses into whatever collects stdout there. `docs/HOSTING.md` §7 lists
 //     the key as a deploy-day requirement and this is that list enforced.
 //
-// Read at call time and not at start, for the reason every other lookup in
-// this project is: a value captured at start is a value a test cannot change
-// and a container cannot set late.
-func SenderFromEnv(transport Transport) (EmailSender, error) {
-	if key := config.ResendAPIKey(); key != "" {
-		return NewResendSender(key, config.EmailFrom(), transport)
+// Decided when a message is actually being sent rather than at start, so an
+// instance whose key is unset answers a 503 at the moment somebody tries to
+// send -- where the maintainer can read it -- instead of refusing to boot. The
+// settings themselves are resolved once, at [config.Load]; it is the *choice*
+// that is late, not the read.
+func SenderFor(s MailSettings, transport Transport) (EmailSender, error) {
+	if s.ResendAPIKey != "" {
+		return NewResendSender(s.ResendAPIKey, s.From, transport)
 	}
-	if config.RequireAuth() {
+	if s.RequireAuth {
 		return nil, failf("%w: this instance requires authentication but has no "+
 			"RESEND_API_KEY, so invites and password resets cannot be delivered -- "+
 			"set one (`fly secrets set RESEND_API_KEY=...`) or the console fallback "+

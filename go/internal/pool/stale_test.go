@@ -42,14 +42,19 @@ func staleOn(t *testing.T, verdict bool, doctoring ...string) {
 	}
 }
 
-func TestACurrentPoolIsNotStale(t *testing.T) { staleOn(t, false) }
+func TestACurrentPoolIsNotStale(t *testing.T) {
+	t.Parallel()
+	staleOn(t, false)
+}
 
 func TestAnEmptyPoolIsNotStale(t *testing.T) {
+	t.Parallel()
 	// Nothing to be wrong about: `health` reports the pool as missing.
 	staleOn(t, false, "DELETE FROM printings", "DELETE FROM oracle_cards")
 }
 
 func TestAPoolWithoutThePrintedStatsIsStale(t *testing.T) {
+	t.Parallel()
 	staleOn(t, true, "UPDATE oracle_cards SET power = NULL")
 	// The column entirely absent -- a pool loaded before it existed. DuckDB
 	// refuses to alter a table an index depends on, so the index goes first.
@@ -58,12 +63,14 @@ func TestAPoolWithoutThePrintedStatsIsStale(t *testing.T) {
 }
 
 func TestAnOracleOnlyRefreshIsNotStale(t *testing.T) {
+	t.Parallel()
 	// `--oracle-only` is a supported refresh: an empty `printings` is a
 	// deliberate state, not an old one.
 	staleOn(t, false, "DELETE FROM printings")
 }
 
 func TestAPoolWithUnsignedPaintingsIsStale(t *testing.T) {
+	t.Parallel()
 	staleOn(t, true, "UPDATE printings SET artist = NULL")
 	staleOn(t, true, "DROP INDEX idx_printings_oracle",
 		"ALTER TABLE printings DROP COLUMN artist")
@@ -80,6 +87,7 @@ func TestAPoolWithUnsignedPaintingsIsStale(t *testing.T) {
 // reason the whole counter exists: a cache can be correct, tested and never
 // once used, and only a counter tells the difference.
 func TestTheStalenessVerdictIsWalkedOncePerOpen(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	p := pool.New(pooltest.Build(t), nil)
 	t.Cleanup(p.Close)

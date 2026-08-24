@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -73,7 +72,7 @@ func simCommand() *cobra.Command {
 // loadSimDeck reads one slug's deck.yaml off the file tier, or refuses with
 // the recorded sentence.
 func loadSimDeck(slug string) (*deck.Deck, error) {
-	path := filepath.Join(config.DecksDir(), slug, "deck.yaml")
+	path := filepath.Join(settings().DecksDir, slug, "deck.yaml")
 	text, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -103,7 +102,7 @@ func deckPool(ctx context.Context, d *deck.Deck) (map[string]*pool.CardRecord, e
 	if d.Companion != nil {
 		names = append(names, *d.Companion)
 	}
-	p := pool.New(config.DBPath(), nil)
+	p := pool.New(settings().DBPath(), nil)
 	defer p.Close()
 	var cards map[string]*pool.CardRecord
 	err := p.Use(ctx, func(c *pool.Conn) error {
@@ -513,11 +512,11 @@ func simCacheCommand() *cobra.Command {
 			defer func() { _ = store.Close() }()
 			if clear {
 				fmt.Printf("cleared %d cached result(s) from %s\n",
-					store.Clear(ctx), config.AppDBPath())
+					store.Clear(ctx), settings().AppDBPath())
 				return nil
 			}
 			info := store.Stats(ctx)
-			fmt.Printf("store:   %s\n", config.AppDBPath())
+			fmt.Printf("store:   %s\n", settings().AppDBPath())
 			enabled := "no -- results are not cached"
 			if info.Enabled {
 				enabled = "yes"
@@ -554,7 +553,7 @@ func simCacheCommand() *cobra.Command {
 // schema ladder run first, so a stale schema is a state this command never
 // sees.
 func openSimStore() *simcache.Store {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
@@ -694,7 +693,7 @@ func simForgeCommand() *cobra.Command {
 // be a regression.
 func recordForgeMatch(result *tier3.SimRun, decks []*deck.Deck, seed *big.Int,
 	clock, games int) {
-	path := config.AppDBPath()
+	path := settings().AppDBPath()
 	if err := auth.Migrate(path); err != nil {
 		fmt.Fprintf(os.Stderr, "match ledger record failed (%v)\n", err)
 		return
@@ -724,7 +723,7 @@ func simMatchesCommand() *cobra.Command {
 		Short: "the match ledger -- every Forge match recorded",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := config.AppDBPath()
+			path := settings().AppDBPath()
 			if _, err := os.Stat(path); err != nil {
 				fmt.Println("no matches recorded yet -- `mtglab sim forge` records as it plays")
 				return nil

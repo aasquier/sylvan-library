@@ -77,6 +77,7 @@ func loadCryptoOracle(t *testing.T) cryptoOracle {
 // first so a mismatch reports as "the profiles differ" rather than as a wall
 // of unequal hashes.
 func TestTheArgon2ProfileIsTheRecordedOne(t *testing.T) {
+	t.Parallel()
 	p := loadCryptoOracle(t).Argon2ID
 	for _, c := range []struct {
 		name      string
@@ -100,6 +101,7 @@ func TestTheArgon2ProfileIsTheRecordedOne(t *testing.T) {
 // which is what keeps a hash stored today interchangeable with every one
 // already in the file.
 func TestTheEncoderWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadCryptoOracle(t).Argon2ID.Cases {
 		salt, err := base64.StdEncoding.DecodeString(c.SaltB64)
 		if err != nil {
@@ -115,6 +117,7 @@ func TestTheEncoderWritesTheRecordedBytes(t *testing.T) {
 // -- and with the negative, because an encoder that ignored the password would
 // pass the test above and this one's first half.
 func TestTheRecordedHashesVerifyHere(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadCryptoOracle(t).Argon2ID.Cases {
 		hash := c.Hash
 		if !Verify(&hash, c.Password) {
@@ -133,6 +136,7 @@ func TestTheRecordedHashesVerifyHere(t *testing.T) {
 // is the one that would catch a salt generator that produced a salt the
 // encoder could not encode.
 func TestAHashWrittenHereVerifiesHere(t *testing.T) {
+	t.Parallel()
 	const password = "a passphrase long enough to store"
 	hash, err := HashPassword(password)
 	if err != nil {
@@ -158,6 +162,7 @@ func TestAHashWrittenHereVerifiesHere(t *testing.T) {
 // Measured in *runes* on the low side and *bytes* on the high side -- the
 // recorded rule, and the reason the two ends are measured differently.
 func TestTheStrengthFloorIsTheRecordedOne(t *testing.T) {
+	t.Parallel()
 	oracle := loadCryptoOracle(t).Argon2ID
 	short := strings.Repeat("é", oracle.MinPasswordLength-1)
 	if err := CheckStrength(short); err == nil {
@@ -177,6 +182,7 @@ func TestTheStrengthFloorIsTheRecordedOne(t *testing.T) {
 // thing that would make a freshly-minted session or invite invisible to the
 // rows already stored.
 func TestTheTokenHashIsTheRecordedDigest(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadCryptoOracle(t).SHA256Hex {
 		if got := HashToken(c.Input); got != c.Digest {
 			t.Errorf("HashToken(%q) = %s, recorded = %s", c.Input, got, c.Digest)
@@ -189,6 +195,7 @@ func TestTheTokenHashIsTheRecordedDigest(t *testing.T) {
 // in a cookie and an auth token rides in a URL fragment, and `+` and `/`
 // survive neither reliably.
 func TestTokensAreURLSafeAndUnpadded(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for i := 0; i < 64; i++ {
 		token := TokenURLSafe(TokenBytes)
