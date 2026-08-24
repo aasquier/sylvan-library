@@ -41,7 +41,7 @@
 //
 // # Lands or ramp, and the rule that decides it
 //
-// Recommending either is Aaron's ruling of 2026-08-21. It is a different
+// Recommending either is Aaron's ruling. It is a different
 // *kind* of advice from anything else in this project -- every other
 // recommendation is about which card, and this one is about which kind of card
 // -- so it was built and then measured, and the measurement changed the
@@ -69,9 +69,9 @@
 //
 // # One ulp, and where it came from
 //
-// The two float sums in this package go through `floats.Fsum` -- **since
-// 2026-08-22, and a found divergence is why**. They were bare running sums
-// before that, and a bare sum's last bits depend on accumulation order and
+// The two float sums in this package go through `floats.Fsum` -- **and a
+// found divergence is why**. They were bare running sums
+// before, and a bare sum's last bits depend on accumulation order and
 // on whatever compensation the arithmetic underneath happens to apply. Same
 // deck, same formula, one ulp
 // apart, depending on nothing anybody chose.
@@ -179,8 +179,8 @@ func ExpectedLandsInPlay(deckSize, lands, turn int, onThePlay bool) float64 {
 	if lands < top {
 		top = lands
 	}
-	// `floats.Fsum` -- and this line was a bare running sum until
-	// 2026-08-22. A bare sum's last bits depend on the accumulation
+	// `floats.Fsum` -- and this line was a bare running sum once.
+	// A bare sum's last bits depend on the accumulation
 	// underneath it, so this expectation could answer one ulp apart for
 	// reasons nobody chose; the package comment carries the
 	// argument for the correctly-rounded answer over any accumulation's own.

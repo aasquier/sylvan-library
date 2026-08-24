@@ -1,8 +1,13 @@
 """The depth seam: a Protocol the pipeline uses, a model only the dev Mac runs.
 
-Torch never enters the container (ADR 32) — the deployed machine is a
-1GB shared CPU and the image installs `.[api,claude]` — so everything above
-this seam takes a `DepthModel` and every test hands in a fake. The real
+Torch never enters the container (ADR 32), and the reason is structural
+rather than a fact about which extras somebody installs: `Dockerfile` copies
+`go/` into the builder and the binary, `web_dist`, `assets/tarot` and the
+entrypoint into the runtime, and nothing else. `tools/` — the only thing in
+this repository that has ever imported torch — never enters the build
+context at all, and the runtime stage carries no Python to import it with.
+So everything above this seam takes a `DepthModel` and every test hands in a
+fake, for the pipeline's own sake rather than the container's. The real
 loader lives behind the `depth` extra, imports torch inside the function,
 and caches the model weights under the gitignored data tree, where the pool
 and every other heavy download already live.

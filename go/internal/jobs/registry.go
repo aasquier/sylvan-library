@@ -340,14 +340,12 @@ func (r *Registry) Submit(kind string, fn Runner, opt Options) (*Job, error) {
 	r.fileLocked(job)
 	r.mu.Unlock()
 
-	r.running.Add(1)
-	go func() {
-		defer r.running.Done()
+	r.running.Go(func() {
 		ln.tokens <- struct{}{}
 		defer func() { <-ln.tokens }()
 		ln.runs.Add(1)
 		r.run(job, fn)
-	}()
+	})
 	return job, nil
 }
 

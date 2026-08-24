@@ -143,7 +143,8 @@ func DesktopJar(forgeHome string) (string, error) {
 	// Forge in it. Deployed, the home directory is `/root` while the app runs
 	// as `mtglab`, so the glob's stat raises a permission error — and the gate
 	// at `/api/forge` answered 500 instead of `available: false` until that
-	// was caught on the live instance (2026-08-20).
+	// was caught on the live instance — the only place it appears, since a
+	// laptop's Forge home is readable by the process that reads it.
 	jars, err := filepath.Glob(filepath.Join(home, "forge-gui-desktop-*-jar-with-dependencies.jar"))
 	if err != nil {
 		return "", NotInstalled("no Forge distribution readable at %s (%v) -- "+

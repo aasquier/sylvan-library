@@ -142,9 +142,12 @@ go vet ./... && go test -race ./... && ~/go/bin/golangci-lint run ./...
 
 `gofmt -l .` should print nothing. Frontend: `npm --prefix web run check`,
 then `npm --prefix web run build` if anything under `web/src` changed (the
-bundle is committed at `web_dist/`). Toolbox: `cd tools && ruff check . &&
-mypy && python -m pytest tests/ -q` when `tools/` moved. `gh`, `npm`, `node`
-and `fly` need a login shell here (`bash -lc`).
+bundle is committed at `web_dist/`). Toolbox: from `tools/`, its own venv's
+binaries — `.venv/bin/ruff check .`, `.venv/bin/mypy`, `.venv/bin/python -m
+pytest tests/ -q` — when `tools/` moved; nothing puts `ruff` or a 3.12
+`pytest` on `PATH` here. `gh`, `npm`, `node` and `fly` resolve in a plain
+call (re-verified 2026-08-24); the old `bash -lc` wrapper still works and is
+now noise.
 
 ## Architecture
 
@@ -214,7 +217,9 @@ errors; promotion to curated is refused while any card is blank (ADR 13).
 credentials — CI enforces by filename and content scan. `app.db` holds
 password hashes and email addresses; an address may be serialised only into a
 response an admin authenticated for. Secrets travel by environment
-(`.env.example` documents the names; `fly secrets` deployed).
+(`.env.example` documents the names — and `configrecord_test.go` holds that
+list equal to what the code reads, both ways, so it is a gate rather than a
+promise; `fly secrets` deployed).
 
 ## The load-bearing invariants
 
