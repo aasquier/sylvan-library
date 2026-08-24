@@ -206,6 +206,45 @@ jobs:
         run: CGO_ENABLED=1 go build -o /dev/null ./cmd/mtglab
       - name: Tests, race-detected
         run: go test -race -count=1 -cover ./...
+      # The coverage floor. A **ratchet, not a target**: it is the number the
+      # tree actually reaches, and it exists so coverage can only go up.
+      #
+      # Measured with `-coverpkg=./...` rather than per package, because the
+      # per-package number is a different question -- it asks how well a
+      # package tests itself, and answers 0% for one whose behaviour is
+      # entirely exercised through its callers. The merged number asks the
+      # question the floor is about: how much of the tree does the suite run.
+      #
+      # Raise MINIMUM when the tree passes a higher number. Never lower it to
+      # make a red check green: a diff that drops coverage is a diff that
+      # added untested code, which is the thing this is here to notice.
+      - name: Coverage floor
+        env:
+          MINIMUM: "89.5"
+        run: |
+          go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > /dev/null
+          TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}' | tr -d '%')
+          echo "statement coverage: ${TOTAL}% (floor ${MINIMUM}%)"
+          awk -v got="$TOTAL" -v want="$MINIMUM" 'BEGIN {
+            if (got + 0 < want + 0) {
+              printf "::error::coverage %.1f%% is below the %.1f%% floor\n", got, want
+              exit 1
+            }
+          }'
+      # What the floor cannot reach, named rather than left as a mystery for
+      # whoever next asks why it is not 100. Everything below needs a JVM with
+      # a Forge distribution beside it, or the live Anthropic or Scryfall
+      # network, and CI has none of the three:
+      #
+      #   internal/sim/tier3/run.go   RunGames, spawn -- the subprocess itself
+      #   cmd/mtglab/shim.go          match, matchStreamed, watchdog (os.Exit)
+      #   cmd/mtglab/sim.go           sim forge's own reporting
+      #   cmd/mtglab/data.go          refresh, which downloads from Scryfall
+      #   cmd/mtglab/claude.go        claude check, which spends a real call
+      #
+      # Their seams ARE covered: the Forge worker client and its shim door
+      # both run against stubs, `pool.DownloadBulkFrom` runs against a stub
+      # Scryfall, and every refusal path around all of them is driven.
       # The benchmarks are a local measuring tool, not a CI gate: a shared
       # runner's numbers are noise, and a threshold over them would fail on
       # a neighbour's workload rather than on this diff. What CI *can* hold
