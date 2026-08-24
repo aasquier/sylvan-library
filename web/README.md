@@ -19,15 +19,18 @@ them as separate steps on purpose, so a type error reports as a type error.
 
 ## Conventions that are load-bearing
 
-- **The browser floor is Safari 16.4** (declared 2026-08-19) — and today it is
-  declared here and enforced **nowhere**: no `browserslist`, no build target,
-  no CI check. Two independent things hold it — Tailwind v4's `@property` and
-  `color-mix(in lab, …)`, and the camera door's SIMD wasm core — so lowering
-  it means answering both. Re-gating it is a queued item, and the shape the
-  gate has to take is the lesson worth keeping: every feature that ever moved
-  this floor arrived through a **dependency**, not through `web/src`, so the
-  check has to read the *committed bundle*. Until it exists, a dependency bump
-  is the diff to read carefully.
+- **The browser floor is Safari 16.4** (declared 2026-08-19), and it is
+  enforced by `go/cmd/mtglab/browserfloor_test.go`, whose comment carries the
+  argument. Two independent things hold it — Tailwind v4's `@property` and
+  `color-mix(in lab, …)`, and the camera door's SIMD wasm core — so lowering it
+  means answering both, and the test pins each separately. **It reads the
+  committed bundle, not `web/src`**, and that is the lesson worth keeping:
+  every feature that ever moved this floor arrived through a **dependency**,
+  so a grep of what we wrote could never have caught one and did not.
+- **Every animation has to be reachable by a reduced-motion guard**, and
+  `go/cmd/mtglab/reducedmotion_test.go` holds that against the same artifact,
+  for the same reason: the two that once escaped were Tailwind utilities that
+  exist only in the built stylesheet.
 - **Routes are lazy.** Every non-landing screen is a `React.lazy` line in
   `App.tsx`; a new screen wants one, not a top-level import. Three are
   deliberately eager — `Library`, `Login`, `Claim`, the screens you arrive on.
