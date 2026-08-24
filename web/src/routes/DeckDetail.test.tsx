@@ -2137,3 +2137,80 @@ describe('the 99 rolls up', () => {
     expect(screen.getByText('Primeval Titan')).toBeTruthy()
   })
 })
+
+/**
+ * The bench, and the sentence that explains an absence.
+ *
+ * `swap_board` has been in the deck model, the importer's section table and
+ * the edit panel since long before the deck page existed, and the page never
+ * rendered it — so the only way to see what a deck was considering was to
+ * read the YAML.
+ *
+ * The read-only line is the other half of the same session's finding: the
+ * header already says "Shared by <owner>", and Aaron still read the missing
+ * action bar as a regression. A muted line four screens above the controls
+ * cannot answer a question somebody only forms where the controls used to be.
+ */
+describe('DeckDetail swap board', () => {
+  const BENCH = [
+    { name: 'Skullclamp', category: 'engines', qty: 1, known: true,
+      why: 'Two mana of draw-two on every one-toughness creature.',
+      mana_cost: '{1}', cmc: 1, type_line: 'Artifact — Equipment',
+      color_identity: [], art_crop: 'https://example.test/clamp.jpg' },
+    { name: 'Sylvan Library', category: 'card-advantage', qty: 1, known: true,
+      why: '', mana_cost: '{1}{G}', cmc: 2, type_line: 'Enchantment',
+      color_identity: ['G'], art_crop: null },
+  ]
+
+  it('is absent while the deck has nothing on it', async () => {
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    expect(screen.queryByText(/Swap board/)).toBeNull()
+  })
+
+  it('renders the cards being considered, and says they are outside the 99',
+     async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, swap_board: BENCH } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(/Swap board/)
+    // `getAllBy`, because a card renders its name in the row and again in
+    // the hover card that rides it.
+    expect(screen.getAllByText('Skullclamp').length).toBeGreaterThan(0)
+    // A card with no rationale is fine here and says nothing about it: the
+    // bench carries no obligation, and "no rationale yet" is the 99's warning.
+    expect(screen.getAllByText('Sylvan Library').length).toBeGreaterThan(0)
+    expect(screen.queryByText('no rationale yet')).toBeNull()
+    expect(screen.getByText(/outside the 99/)).toBeTruthy()
+  })
+
+  it('shows the bench to a reader, the way the graveyard is shown', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, writable: false, swap_board: BENCH } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(/Swap board/)
+    expect(screen.getAllByText('Skullclamp').length).toBeGreaterThan(0)
+  })
+})
+
+describe('a deck somebody else owns', () => {
+  it('says why the controls are gone, where the controls were', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, writable: false } as unknown as Deck)
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    // Named, so it is a fact about a person rather than a permission error.
+    expect(screen.getByText(/This is aasquier’s deck, and you are reading it/))
+      .toBeTruthy()
+    // And it names what is missing, since that is the question being asked.
+    expect(screen.getByText(/entombing one, writing a/)).toBeTruthy()
+    expect(screen.queryByText('Bulk entomb…')).toBeNull()
+  })
+
+  it('says nothing of the kind on your own deck', async () => {
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    expect(screen.queryByText(/you are reading it/)).toBeNull()
+    expect(screen.getByText('Bulk entomb…')).toBeTruthy()
+  })
+})
