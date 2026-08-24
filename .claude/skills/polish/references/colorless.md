@@ -165,9 +165,10 @@ This is where they get a home.
   git ls-files -- '*.md' | xargs -n1 head -1        # 4. every doc, by its own title
   ./mtglab --help  (and each subcommand's)          # 5. every command and flag
   # 6. non-source files nothing else in the tree names -- see the note below
-  git ls-files | grep -E '\.(md|ya?ml|toml|sh|sql|txt)$' | while read -r f; do
-    grep -rqlF --exclude-dir={.git,node_modules,web_dist} "$(basename "$f")" \
-      --exclude="$f" . || echo "$f"; done
+  git ls-files | grep -E '\.(md|ya?ml|toml|sh|sql|txt|json)$' \
+    | grep -v /testdata/ | while read -r f; do b=$(basename "$f")
+      grep -rqF --exclude-dir={.git,node_modules,web_dist} --exclude="$b" \
+        "$b" . || echo "$f"; done
   ```
 
   Pass 1 is the one that pays and the one always skipped: **read the whole
@@ -183,8 +184,13 @@ This is where they get a home.
   failure as not running the pass. Source reachability is the compiler's
   question and `deadcode`/`knip`'s, not this sweep's; what this sweep can see
   is a doc, a workflow, a recipe or a schema that nothing names. Read its
-  output expecting *convention-loaded* survivors — `dependabot.yml`, an
-  embedded migration glob, a `tsconfig` — and stop on anything that is not one.
+  output expecting *convention-loaded* survivors — an embedded migration glob,
+  a `tsconfig`, a `dependabot.yml` GitHub reads by name — and stop on anything
+  that is not one. **2026-08-24: 12 rows, all of them the migration ladder.**
+  Two mechanics worth knowing before reading a row: a file almost never
+  contains its own basename, so the self-exclusion is belt-and-braces rather
+  than load-bearing; and **naming a file in the ledger makes it referenced**,
+  so a relic queued here and left alone stops appearing in later sweeps.
 
   The kinds to expect, so none is dismissed as "probably fine": directories
   from an earlier shape; template and fixture files describing a workflow

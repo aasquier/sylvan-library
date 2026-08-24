@@ -3257,9 +3257,16 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
      reads, which is the same failure the enumerative sweep exists to prevent,
      one layer up. Rewritten to the file kinds where a basename *is* the
      linkage (docs, workflows, recipes, schemas, scripts) with a note on how to
-     read the survivors. Scoped, it returns **14 rows, all convention-loaded
-     and all correct**: `.github/dependabot.yml`, the twelve
-     `internal/auth/migrations/*.sql` (an embed glob), and `web/tsconfig.json`.
+     read the survivors. Scoped, it returns **12 rows, all convention-loaded
+     and all correct**: the twelve `internal/auth/migrations/*.sql`, reached by
+     an embed glob. `.github/dependabot.yml` and `web/tsconfig.json` were the
+     other two rows on the first draft and dropped out of the published
+     command's run for a reason worth writing down — **naming a file in this
+     ledger makes it referenced**, so a relic queued here and then left alone
+     disappears from every later sweep. The rewritten pass was itself run
+     before being published, which is how both of those were caught: the first
+     draft's `--exclude="$f"` matched nothing, because `grep --exclude` takes a
+     basename glob and not a path.
   3. **The comment baseline was a number nobody could reproduce.** Part five
      recorded "88 dated comments in Go (60 outside tests) and 101 more under
      `web/src`" with no command. The Go halves reproduce (89 and 60 today, one
@@ -3426,7 +3433,7 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
     dev server reaches the real API without any CORS switch. The *ruling* those
     sentences record is untouched and still holds.
   - **Pass 6 (files nothing references) — clean once it was made readable**
-    (finding 2). 14 rows, all convention-loaded.
+    (finding 2). 12 rows, all convention-loaded.
   - **No keep/retire decision is owed from this sweep**, and that is worth
     saying plainly: the 2026-08-21 sweep queued six relics, Aaron ruled on all
     six, and the tree has not re-accumulated. The only file-granularity finding
@@ -3546,7 +3553,7 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
   repository root, 25 under one of four other implied roots); **17 `mtglab
   <verb>` mentions over 7 distinct verbs**, one dead (`animist`, fixed on PR
   #282). Relic sweep pass 1: **47 `go/internal` packages, 47 with a package
-  doc, 0 without.** Pass 6 scoped: **14 rows, 0 findings.** Daybreak two-places
+  doc, 0 without.** Pass 6 scoped: **12 rows, 0 findings.** Daybreak two-places
   audit: **6 items opened 2026-08-23, 2 with any ledger entry, 4 with none.**
   Gauntlet on this branch: `gofmt -l .` silent, `go vet ./...` clean,
   `go test -race ./...` **0 failures**, `golangci-lint run ./...` **0 issues**,
