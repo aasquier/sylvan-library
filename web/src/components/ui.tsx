@@ -476,7 +476,16 @@ export function PageMasthead({ art, alt, title, credit, children, mood, video }:
    *  backdrop wash all show the same world the video moves in. */
   video?: { webm: string; mp4: string }
 }) {
-  const artClass = 'masthead-art w-full object-cover sm:w-[260px]'
+  // A painting and a loop are not shown the same way, and the difference is
+  // measured rather than felt. The stills are Scryfall `art_crop`s -- 626x457
+  // -- and a 260px column suits one exactly. The two loops are 16:9, and in
+  // that same column they rendered 260x191: a quarter of the width cropped
+  // off by `object-cover` and the whole picture at a fifth of the band. That
+  // is how the Simulator shipped a goldfish nobody could see move. A loop
+  // gets its own shape and a share of the row instead (`masthead-loop`).
+  const artClass = video
+    ? 'masthead-art masthead-loop w-full sm:w-[46%] sm:max-w-[620px]'
+    : 'masthead-art w-full object-cover sm:w-[260px]'
   return (
     <section className="card-surface overflow-hidden rounded-xl">
       <div className="flex flex-col sm:flex-row">
