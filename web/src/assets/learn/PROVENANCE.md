@@ -7,7 +7,7 @@ The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): nothing ships 
 
 - **Source**: "Carl Spitzweg - "The Bookworm".jpg", <https://commons.wikimedia.org/wiki/File:Carl_Spitzweg_-_%22The_Bookworm%22.jpg>, found via Commons search; the Museum Georg Schäfer original, not the Grohmann or Schweinfurt variants.
 - **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-16).
-- **Transformations** (Pillow, scripted -- `mtglab animist build bookworm.recipe.yaml`):
+- **Transformations** (Pillow, scripted -- `animist build bookworm.recipe.yaml`):
   - `resize`: width=576, height=1072.
   - `ken_burns`: frames=192, fps=16, zoom_from=1.02, zoom_to=1.12, pan_from=[0.5, 0.6], pan_to=[0.5, 0.4], bounce=True.
   - Encoded WEBM, crf 40.

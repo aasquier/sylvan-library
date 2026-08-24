@@ -74,7 +74,7 @@ them as separate steps on purpose, so a type error reports as a type error.
   (rule 5, ADR 6).
 - **A committed asset comes from a recipe.** The exception to the rule above
   is CC0/public-domain imagery that must be ours (the ivy under
-  `src/assets/ambience/`), and it arrives only through `mtglab animist`
+  `src/assets/ambience/`), and it arrives only through `animist`
   (ADR 29): a `*.recipe.yaml` beside the assets records source, per-file
   API-confirmed licence, and every transform; the tool writes the
   PROVENANCE.md entry, and the suite verifies the committed files against

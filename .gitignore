@@ -114,9 +114,12 @@ htmlcov/
 .idea/
 .vscode/
 
-# The Go binary, when somebody builds it in place. `go build ./cmd/mtglab`
-# with no `-o` drops an 89MB Mach-O next to `go.mod`, and `git status` then
-# offers it alongside the source. The image builds to `/out`, CI builds to a
-# temp path, and a local build should use `-o` too — this is the safety net
-# for the time somebody forgets.
+# The Go binary, wherever a local build drops it. Two paths, and the second
+# is the one that mattered: `go build ./cmd/mtglab` with no `-o` leaves an
+# 89MB Mach-O next to `go.mod`, and CLAUDE.md's own Setup block says
+# `go build -o ../mtglab ./cmd/mtglab`, which leaves the same 89MB at the
+# repository root. Only the first was covered, so the net missed the case the
+# documentation actually tells people to run. The image builds to `/out` and
+# CI to a temp path; neither is ever in a working tree.
 go/mtglab
+/mtglab

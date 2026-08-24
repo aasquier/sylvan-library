@@ -10,7 +10,7 @@
 # integer cycle counts), so it tiles horizontally and closes at second six
 # with no crossfade and no seam.
 #
-# crf values sit at `mtglab animist measure`'s knee for each codec; the
+# crf values sit at `animist measure`'s knee for each codec; the
 # dual encode is the browser-floor decision (webm for most, mp4 for the
 # rest, one download per visitor either way). The poster is frame zero of
 # the same derivation, what a reduced-motion visitor sees instead.
