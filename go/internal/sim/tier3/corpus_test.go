@@ -14,8 +14,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
-// The differential corpus: everything in `sim/tier3` that is a pure
-// transformation, held to Python case for case.
+// The recorded corpus: everything in `sim/tier3` that is a pure
+// transformation, held to the frozen golden case for case.
 //
 // What is deliberately NOT here is the JVM and the private network — those are
 // a subprocess and a socket, which a corpus cannot hold and which the tests
@@ -24,8 +24,7 @@ import (
 // the log parser, the `.dck` exporter, the coverage reading, the wire codec,
 // and the shaped result the deck page renders.
 //
-// `tests/go_fixtures.py` writes it and `tests/test_go_fixtures.py` fails when
-// the committed copy is not what Python writes today.
+// `testdata/forge.json` is a frozen recorded golden, never regenerated.
 
 type forgeCorpus struct {
 	Index    []string       `json:"index"`
@@ -132,18 +131,20 @@ func loadForgeCorpus(t *testing.T) forgeCorpus {
 		t.Fatal(err)
 	}
 	if len(corpus.Logs) == 0 || len(corpus.Dck) == 0 {
-		t.Fatal("the Forge corpus is empty; run tests/go_fixtures.py")
+		t.Fatal("the Forge corpus is empty; testdata/forge.json is a frozen " +
+			"golden -- restore it from version control")
 	}
 	return corpus
 }
 
-// TestTheLogParserAgreesWithPython drives every shape a `forge sim -q` stream
+// TestTheLogParserAgreesWithTheCorpus drives every shape a `forge sim -q`
+// stream
 // can take through [tier3.Parse] and compares the whole parse.
 //
 // The whole parse rather than a game count, because the fields that separate a
 // real draw from a clock-out and a winner from a seat are exactly the ones a
 // careless port folds together — and a count would be green for all of them.
-func TestTheLogParserAgreesWithPython(t *testing.T) {
+func TestTheLogParserAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadForgeCorpus(t)
 	for _, c := range corpus.Logs {
 		t.Run(c.Note, func(t *testing.T) {
@@ -170,15 +171,16 @@ func TestTheLogParserAgreesWithPython(t *testing.T) {
 	}
 }
 
-// TestTheStatelessPredicateAgreesWithPython asks `is_game_result` of every
+// TestTheStatelessPredicateAgreesWithTheCorpus asks `IsGameResult` of
+// every
 // line, because it is a second seam over the same regexes: a port could get
 // the machine right and the predicate wrong, and only the tick would notice.
-func TestTheStatelessPredicateAgreesWithPython(t *testing.T) {
+func TestTheStatelessPredicateAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadForgeCorpus(t)
 	for _, c := range corpus.Logs {
 		lines := splitLikeTheCorpus(c.Text)
 		if len(lines) != len(c.IsGameResult) {
-			t.Errorf("%s: split into %d lines, Python got %d",
+			t.Errorf("%s: split into %d lines, the corpus got %d",
 				c.Note, len(lines), len(c.IsGameResult))
 			continue
 		}
@@ -191,14 +193,15 @@ func TestTheStatelessPredicateAgreesWithPython(t *testing.T) {
 	}
 }
 
-// TestTheExporterWritesPythonsBytes holds the `.dck` to Python byte for byte,
+// TestTheExporterWritesTheRecordedBytes holds the `.dck` to the corpus
+// byte for byte,
 // resolved and unresolved.
 //
 // Byte for byte because a `.dck` is what Forge actually reads: a section
 // header in the wrong case, a missing empty `[Sideboard]`, or a sort that puts
 // two cards the other way round is a file that either fails or — worse —
 // works differently.
-func TestTheExporterWritesPythonsBytes(t *testing.T) {
+func TestTheExporterWritesTheRecordedBytes(t *testing.T) {
 	corpus := loadForgeCorpus(t)
 	index := indexOf(corpus.Index)
 	for _, c := range corpus.Dck {
@@ -215,13 +218,14 @@ func TestTheExporterWritesPythonsBytes(t *testing.T) {
 	}
 }
 
-// TestThePreFlightAgreesWithPython holds the coverage reading and every
+// TestThePreFlightAgreesWithTheCorpus holds the coverage reading and
+// every
 // sentence it says.
 //
 // The refusal text is in the corpus because it is what a 422 carries and the
 // deck page renders verbatim — the `unavailable` lesson, where a sentinel's
 // own words shipped as a prefix nobody wrote.
-func TestThePreFlightAgreesWithPython(t *testing.T) {
+func TestThePreFlightAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadForgeCorpus(t)
 	index := indexOf(corpus.Index)
 	for _, c := range corpus.Coverage {
@@ -268,7 +272,7 @@ func TestThePreFlightAgreesWithPython(t *testing.T) {
 			case c.Refusal == nil && err != nil:
 				t.Errorf("refused a covered deck: %v", err)
 			case c.Refusal != nil && err == nil:
-				t.Errorf("did not refuse; Python said %q", *c.Refusal)
+				t.Errorf("did not refuse; the corpus says %q", *c.Refusal)
 			case c.Refusal != nil && err.Error() != *c.Refusal:
 				t.Errorf("refusal:\n got %q\nwant %q", err.Error(), *c.Refusal)
 			}
@@ -276,12 +280,12 @@ func TestThePreFlightAgreesWithPython(t *testing.T) {
 	}
 }
 
-// TestTheWireIsPythonsBytes holds the seam in both directions.
+// TestTheWireIsTheRecordedBytes holds the seam in both directions.
 //
-// The **bytes**, not just the shape: a Python shim and a Go app can be on
-// opposite ends of this wire for the minutes a deploy takes, and key order is
+// The **bytes**, not just the shape: the two ends of this wire can be on
+// different deploys for the minutes a deploy takes, and key order is
 // what `encoding/json` gets wrong for free when a payload is built from a map.
-func TestTheWireIsPythonsBytes(t *testing.T) {
+func TestTheWireIsTheRecordedBytes(t *testing.T) {
 	corpus := loadForgeCorpus(t)
 
 	for i, want := range corpus.Wire.GameJSON {
@@ -340,8 +344,9 @@ func TestTheWireIsPythonsBytes(t *testing.T) {
 	if rebuiltOld := tier3.RunFromWire(old); rebuiltOld.ForgeVersion != "" {
 		t.Errorf("an old shim's run claimed Forge %q", rebuiltOld.ForgeVersion)
 	}
-	// And it re-encodes as Python wrote it, whole-second wall clock included.
-	// `1.0` is `1` to `encoding/json` and `1.0` to `json.dumps`, and a test
+	// And it re-encodes as the corpus records it, whole-second wall clock
+	// included: the recorded wire says `1.0` where `encoding/json` would
+	// write `1`, and a test
 	// that only decoded this row would never have seen the difference.
 	oldRaw, err := json.Marshal(old)
 	if err != nil {
@@ -374,7 +379,7 @@ func TestTheWireIsPythonsBytes(t *testing.T) {
 }
 
 // TestResolvedOrderIsUnobservable pins the one claim `wire.go` makes about a
-// field it does *not* reproduce Python's key order for.
+// field it does *not* reproduce the recorded key order for.
 //
 // The argument is that `resolved` crosses between our own two processes and is
 // read by neither: the receiver calls RaiseUnlessCovered, which reads `slug`,
@@ -474,7 +479,8 @@ func compact(t *testing.T, raw string) string {
 	return normalise(raw)
 }
 
-// normalise strips the insignificant whitespace `json.dumps` puts after `:`
+// normalise strips the insignificant whitespace the recorded wire carries
+// after `:`
 // and `,` so a comparison is about order and values. It walks the string
 // rather than re-encoding, because re-encoding through a map is exactly the
 // operation that would hide the bug this test is looking for.
@@ -583,7 +589,7 @@ func TestAHostileSlugCannotNameAFile(t *testing.T) {
 	// Every escape is aimed inside the running test's own directory, so a
 	// leftover from anywhere else cannot make this pass or fail. Not
 	// fastidiousness: proving the guard means *actually performing the escape*
-	// with it removed, and the first mutation run of the Python twin wrote a
+	// with it removed, and an early mutation run of this guard wrote a
 	// real `/tmp/escaped.dck` that then failed the next full suite. A test
 	// whose subject is a file outside its own sandbox is a test with a memory.
 	root := t.TempDir()

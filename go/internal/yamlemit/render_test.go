@@ -10,8 +10,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// renderCase is one row of the oracle: what `edit._render` was asked, and the
-// exact lines PyYAML gave back. Written by `tests/go_fixtures.py`.
+// renderCase is one row of the oracle: what `Render` is asked, and the
+// exact recorded lines it must give back. The oracle is a frozen golden.
 type renderCase struct {
 	Group  string          `json:"group"`
 	Key    string          `json:"key"`
@@ -63,16 +63,17 @@ func loadCases(t *testing.T) []renderCase {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(cases) == 0 {
-		t.Fatal("the oracle is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the oracle is empty; testdata/render.json is a frozen " +
+			"golden -- restore it from version control")
 	}
 	return cases
 }
 
-// TestRenderMatchesPyYAML is the gate this package exists to pass. Every case
-// is a `(key, value, indent, width, fold)` Python was asked for, beside the
-// bytes PyYAML wrote; anything but equality is a file this runtime would
-// write differently from the other one.
-func TestRenderMatchesPyYAML(t *testing.T) {
+// TestRenderMatchesTheRecordedLines is the gate this package exists to pass.
+// Every case is a `(key, value, indent, width, fold)` beside the exact
+// recorded lines; anything but equality is a deck file written in a style
+// the library's existing files do not wear -- a diff nobody asked for.
+func TestRenderMatchesTheRecordedLines(t *testing.T) {
 	cases := loadCases(t)
 	byGroup := map[string]int{}
 	for _, c := range cases {
@@ -85,14 +86,15 @@ func TestRenderMatchesPyYAML(t *testing.T) {
 		"unicode-width", "int", "list", "bool",
 	} {
 		if byGroup[group] == 0 {
-			t.Errorf("the oracle has no %q cases; regenerate it", group)
+			t.Errorf("the oracle lost its %q cases; restore the frozen golden", group)
 		}
 	}
 
 	for i, c := range cases {
 		if c.Fold && startsWithASeparator(c.Value) {
-			// The one place this port deliberately answers differently, and
-			// it answers *more* safely. See TestTheSeparatorDivergence.
+			// The one place this emitter deliberately departs from the
+			// recording, and it departs *more* safely. See
+			// TestTheSeparatorDivergence.
 			continue
 		}
 		got, err := Render(c.Key, c.value(t), c.Indent, c.Width, c.Fold)
@@ -128,8 +130,9 @@ func TestTheOracleWouldNoticeADrift(t *testing.T) {
 	}
 }
 
-// startsWithASeparator spots the one value shape whose folded form the two
-// runtimes disagree about: a scalar beginning with U+2028 or U+2029.
+// startsWithASeparator spots the one value shape whose folded form
+// deliberately departs from the recording: a scalar beginning with U+2028 or
+// U+2029.
 func startsWithASeparator(raw json.RawMessage) bool {
 	var value string
 	if err := json.Unmarshal(raw, &value); err != nil {
@@ -139,27 +142,30 @@ func startsWithASeparator(raw json.RawMessage) bool {
 }
 
 // TestTheSeparatorDivergence records the one case where this package does not
-// reproduce PyYAML, why that is right, and what it costs.
+// reproduce the recorded corpus, why that is right, and what it costs.
 //
 // A scalar beginning with U+2028 or U+2029 -- the Unicode line and paragraph
-// separators -- is a line break to YAML 1.1 and therefore to PyYAML, which
+// separators -- is a line break to YAML 1.1, so the recorded style
 // folds it into a block scalar with an explicit indentation hint (`>2-`).
 // goccy/go-yaml implements YAML 1.2, where those two characters are ordinary
 // content, so it does not merely *emit* that block differently: it **cannot
-// parse the block PyYAML writes**, failing with "non-map value is specified".
+// parse the recorded block at all**, failing with "non-map value is
+// specified".
 //
-// So `Render`'s round-trip check -- the same check `_render` does, asking
+// So `Render`'s round-trip check -- asking
 // whether the folded form still reads back as the value -- correctly answers
-// no, and the fallback picks a quoted form both parsers read. The bytes differ
-// from Python's; the meaning does not, and the Go file is the one both
-// runtimes can open.
+// no, and the fallback picks a quoted form the app's parser reads. The bytes
+// differ
+// from the recording; the meaning does not, and the emitted file is one the
+// app can actually open.
 //
 // Two consequences worth knowing rather than discovering. The divergence is
-// **only reachable at the start of a value** -- a separator in the middle of a
-// rationale folds identically in both, which the corpus covers -- and it is
-// pre-existing rather than introduced here: a `why` Python already wrote this
-// way is a deck file the Go door cannot read at all. An edit made through Go
-// can no longer put one there.
+// **only reachable at the start of a value** -- a separator in the middle of
+// a rationale folds identically to the recording, which the corpus covers --
+// and it is
+// pre-existing rather than introduced here: a `why` an old file already
+// holds in the recorded block form is a deck file the app cannot read at
+// all. An edit made today can no longer put one there.
 func TestTheSeparatorDivergence(t *testing.T) {
 	for _, sep := range []string{"\u2028", "\u2029"} {
 		value := sep + " sep"
@@ -179,15 +185,15 @@ func TestTheSeparatorDivergence(t *testing.T) {
 			t.Errorf("%q: read back as %q", value, doc["why"])
 		}
 
-		// And the shape PyYAML would have written, for the record.
+		// And the block shape the recording holds, for the record.
 		block, err := dump("why", Folded(value), 90)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if _, err := deckyaml.Parse([]byte(block)); err == nil {
 			t.Errorf("%q: goccy now parses %q -- the divergence is gone, and "+
-				"this test, the skip in TestRenderMatchesPyYAML and the note "+
-				"in the package doc should all go with it", value, block)
+				"this test and the skip in TestRenderMatchesTheRecordedLines "+
+				"should both go with it", value, block)
 		}
 	}
 }

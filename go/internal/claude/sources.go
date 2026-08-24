@@ -40,30 +40,30 @@ import (
 //     that surface exists for. The two are indistinguishable from inside
 //     `get_cards`, so research does not try: it keeps both and marks them.
 
-// pyStr is Python's `str()` over a JSON-decoded value.
+// plain renders a JSON-decoded value in the served vocabulary's plain text.
 //
-// Every instrument in this family spells its field reads `str(row.get(k, ""))`,
-// and `str()` renders whatever it is handed: an int becomes "3", a float "3.0",
-// a bool "True", None "None". Go's obvious `v.(string)` answers "" for all of
-// them, which turns a cited charge into a dropped one and a surviving source id
-// into a missing one.
+// Every instrument in this family reads its fields through this rendering
+// rather than through a type assertion: an int becomes "3", a float "3.0", a
+// bool "True", null "None". Go's obvious `v.(string)` answers "" for all of
+// them, which turns a cited charge into a dropped one and a surviving source
+// id into a missing one.
 //
 // Reachable only when the model breaks its own schema -- every one of these
 // fields is declared `"type": "string"` with `additionalProperties: false` --
-// so this is a divergence that mostly cannot fire. It is reproduced anyway,
+// so this is a rendering that mostly cannot fire. It is pinned anyway,
 // because "mostly cannot fire" is not a property anybody checks again later,
 // and because the corpus can ask the question for free.
 //
 // Numbers rely on `Turn.Parsed` decoding with UseNumber: `json.Number` keeps
-// the literal, so "3" and "3.0" stay distinguishable exactly as Python's int
-// and float do.
+// the literal, so "3" and "3.0" stay distinguishable instead of collapsing
+// through a float64.
 // Exported for `internal/api`, which needs the same rendering at the
-// route boundary: `str(payload.get("media_type") or "image/jpeg")` turns a
-// list into "['a']" and refuses it by name. The api package's own `str` helper
-// stops at `fmt.Sprint`, which renders that list as "[a]".
-func Plain(v any) string { return pyStr(v) }
+// route boundary: a `media_type` that arrives as a list renders "['a']" and
+// is refused by name. `fmt.Sprint` would render that list as "[a]", which is
+// not the recorded sentence.
+func Plain(v any) string { return plain(v) }
 
-func pyStr(v any) string {
+func plain(v any) string {
 	switch value := v.(type) {
 	case nil:
 		return "None"
@@ -81,33 +81,34 @@ func pyStr(v any) string {
 		// happen -- `Turn.Parsed` sets it. The literal is already lost by the
 		// time this branch is reached, so `3` and `3.0` are indistinguishable
 		// and both render "3": the closest honest answer rather than a promise
-		// that this path matches Python. The guard against needing it is
-		// UseNumber, not this.
+		// that this path matches the recorded rendering. The guard against
+		// needing it is UseNumber, not this.
 		return strconv.FormatFloat(value, 'f', -1, 64)
 	case []any, map[string]any:
-		// `str()` of a list or a dict is its repr: `['a', 1, None, True]`.
-		// Reachable from one place a PERSON controls -- `check_question`'s
-		// `str(raw or "")`, when a body carries a list where a string was
-		// expected -- which is why it is reproduced at all.
-		return pyReprJSON(value)
+		// A list or an object renders as its literal: `['a', 1, None, True]`.
+		// Reachable from one place a PERSON controls -- `CheckQuestion`'s
+		// plain-text read of the question field, when a body carries a list
+		// where a string was expected -- which is why the rendering is pinned
+		// at all.
+		return literalJSON(value)
 	default:
 		return fmt.Sprint(value)
 	}
 }
 
-// pyReprJSON is `repr()` over a decoded JSON value, as far as it can be: a
-// list keeps its order and its Python spellings (`None`, `True`, single-quoted
-// strings, a number's literal). **A dict's keys come out sorted**, because
-// `readBody` decodes an object into a Go map and the insertion order Python
-// would print is already gone by the time anything can repr it; that residue
-// is documented here and pinned nowhere, since a question that is a JSON
-// object is a client bug rather than anything a person types.
-func pyReprJSON(v any) string {
+// literalJSON renders a decoded JSON value as a literal, as far as it can
+// be: a list keeps its order and the served spellings (`None`, `True`,
+// single-quoted strings, a number's literal). **An object's keys come out
+// sorted**, because `readBody` decodes an object into a Go map and the order
+// the client wrote is already gone by the time anything can render it; that
+// residue is documented here and pinned nowhere, since a question that is a
+// JSON object is a client bug rather than anything a person types.
+func literalJSON(v any) string {
 	switch x := v.(type) {
 	case []any:
 		parts := make([]string, 0, len(x))
 		for _, item := range x {
-			parts = append(parts, pyReprJSON(item))
+			parts = append(parts, literalJSON(item))
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
 	case map[string]any:
@@ -118,46 +119,50 @@ func pyReprJSON(v any) string {
 		sort.Strings(names)
 		parts := make([]string, 0, len(names))
 		for _, name := range names {
-			parts = append(parts, wire.Quote(name)+": "+pyReprJSON(x[name]))
+			parts = append(parts, wire.Quote(name)+": "+literalJSON(x[name]))
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
 	default:
-		return pyReprAny(v)
+		return literalAny(v)
 	}
 }
 
-// pyStrGet is Python's `str(row.get(key, ""))`: the default is reached only
-// when the key is ABSENT, so an explicit null still goes through `str()` and
+// plainGet reads a field where absence and null are different answers: an
+// ABSENT key is "", while a key explicitly set to null still renders and
 // becomes "None".
 //
-// A Go map lookup cannot tell the two apart -- both give nil -- which is the
-// same trap `pyStrDefault` exists for on the interview's `card` field. It bit
-// here too: with the two spellings otherwise correct, a source item carrying no
-// `url` key at all rendered "None" and matched a page called None.
-func pyStrGet(row map[string]any, key string) string {
+// A bare Go map lookup cannot tell the two apart -- both give nil -- which is
+// the same trap the interview's `card` field guards against at the route
+// boundary. It bit here too: with the two spellings otherwise correct, a
+// source item carrying no `url` key at all rendered "None" and matched a page
+// called None.
+func plainGet(row map[string]any, key string) string {
 	if _, present := row[key]; !present {
 		return ""
 	}
-	return pyStr(row[key])
+	return plain(row[key])
 }
 
-// pyStrOr is Python's `str(v or "")`: a FALSY value becomes the empty string
-// before `str()` ever sees it, so None never renders as "None".
+// plainOr renders a FALSY value as the empty string before the plain
+// rendering ever sees it, so null never renders as "None".
 //
-// The family spells its field reads BOTH ways and the two differ on exactly one
-// input. `str(item.get("url", ""))` reaches `str(None)` for an explicit null and
-// answers "None"; `str(item.get("id") or "")` answers "". Which one each call
-// site uses is copied from the Python line by line rather than harmonised --
-// the same care the interview's `card` field needed, for the same reason.
-func pyStrOr(v any) string {
-	if !pyTruthyValue(v) {
+// The family reads its fields BOTH ways and the two differ on exactly one
+// input: an explicit null reaches the plain rendering through `plainGet` and
+// answers "None", while through this it answers "". Which one each call site
+// uses is part of the recorded shape, kept call site by call site rather than
+// harmonised -- the same care the interview's `card` field needed, for the
+// same reason.
+func plainOr(v any) string {
+	if !truthy(v) {
 		return ""
 	}
-	return pyStr(v)
+	return plain(v)
 }
 
-// pyTruthyValue is Python's truthiness over a JSON-decoded value.
-func pyTruthyValue(v any) bool {
+// truthy is the app's truthiness over a JSON-decoded value: null, false, an
+// empty string, a zero and an empty container are all false, and everything
+// else is true.
+func truthy(v any) bool {
 	switch value := v.(type) {
 	case nil:
 		return false
@@ -188,7 +193,8 @@ const MaxFindings = 6
 // the reader, who has to look at every one of them.
 const MaxResearchCards = 12
 
-// Source is one cited page that survived the check, in Python's key order.
+// Source is one cited page that survived the check, in the recorded key
+// order.
 type Source struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
@@ -202,10 +208,10 @@ type Source struct {
 // whether a trailing slash is a different page.
 //
 // **The path's case is preserved when there is a scheme and lowercased when
-// there is not**, which looks like an inconsistency and is simply what the
-// Python does: the split branch lowercases scheme and host only. Reproduced
-// rather than tidied -- a flip is not the place to decide what a bare string
-// means.
+// there is not**, which looks like an inconsistency and is simply the
+// recorded rule: the split branch lowercases scheme and host only. Pinned
+// rather than tidied -- the frozen corpus rests on this exact matcher, and a
+// tidier rule would be a different one, not a better one.
 func CanonicalURL(url string) string {
 	trimmed := strings.TrimRight(strings.TrimSpace(url), "/")
 	if scheme, rest, found := strings.Cut(trimmed, "://"); found {
@@ -238,13 +244,13 @@ func KeepSources(claimed []any, searched []Page) ([]Source, int) {
 			dropped++
 			continue
 		}
-		url := strings.TrimSpace(pyStrGet(row, "url"))
+		url := strings.TrimSpace(plainGet(row, "url"))
 		match, found := byURL[CanonicalURL(url)]
 		if url == "" || !found {
 			dropped++
 			continue
 		}
-		id := strings.TrimSpace(pyStrOr(row["id"]))
+		id := strings.TrimSpace(plainOr(row["id"]))
 		if id == "" {
 			id = url
 		}
@@ -252,7 +258,7 @@ func KeepSources(claimed []any, searched []Page) ([]Source, int) {
 		// the page and the other is a description of it.
 		title := match.Title
 		if title == "" {
-			title = strings.TrimSpace(pyStrOr(row["title"]))
+			title = strings.TrimSpace(plainOr(row["title"]))
 		}
 		kept = append(kept, Source{ID: id, Title: title, URL: url})
 	}
@@ -271,7 +277,7 @@ type Passage struct {
 func Section(raw any, allowed map[string]bool) Passage {
 	row, _ := raw.(map[string]any)
 	return Passage{
-		Prose:     strings.TrimSpace(pyStrOr(row["prose"])),
+		Prose:     strings.TrimSpace(plainOr(row["prose"])),
 		SourceIDs: survivingIDs(row["source_ids"], allowed),
 	}
 }
@@ -294,7 +300,7 @@ func OnlyGrounded(items []any, allowed map[string]bool) ([]Finding, int) {
 			dropped++
 			continue
 		}
-		claim := strings.TrimSpace(pyStrGet(row, "claim"))
+		claim := strings.TrimSpace(plainGet(row, "claim"))
 		ids := survivingIDs(row["source_ids"], allowed)
 		if claim == "" || len(ids) == 0 {
 			dropped++
@@ -305,14 +311,15 @@ func OnlyGrounded(items []any, allowed map[string]bool) ([]Finding, int) {
 	return kept, dropped
 }
 
-// survivingIDs is `[str(i) for i in (obj.get("source_ids") or []) if str(i) in
-// allowed]` -- stringified first, then filtered, so a numeric id matches a
-// string one exactly as Python's does.
+// survivingIDs keeps the ids that survived the source check. Each id goes
+// through the plain rendering first and is filtered after, so a numeric id
+// matches a string one -- a source cited as `3` survives a source declared as
+// "3".
 func survivingIDs(raw any, allowed map[string]bool) []string {
 	list, _ := raw.([]any)
 	out := []string{}
 	for _, item := range list {
-		id := pyStr(item)
+		id := plain(item)
 		if allowed[id] {
 			out = append(out, id)
 		}
@@ -322,11 +329,12 @@ func survivingIDs(raw any, allowed map[string]bool) []string {
 
 // Competitor is a rival commander as the dossier serves it.
 //
-// **`OracleText` is last**, after `LegalCommander`, and that is Python's order
-// rather than a tidy one: it was added later, for a reason worth keeping --
-// a first run described Trostani Discordant as making Food tokens (she makes
-// 1/1 Soldiers), so the pool's own text is carried and the reader can see the
-// card. Field order is the wire here, so last is where it stays.
+// **`OracleText` is last**, after `LegalCommander`, and that is the recorded
+// order rather than a tidy one: the field arrived after its neighbours, for a
+// reason worth keeping -- a first run described Trostani Discordant as making
+// Food tokens (she makes 1/1 Soldiers), so the pool's own text is carried and
+// the reader can see the card. Field order is the wire here, so last is where
+// it stays.
 type Competitor struct {
 	Name           string   `json:"name"`
 	Prose          string   `json:"prose"`
@@ -346,12 +354,11 @@ type Competitor struct {
 // `ResolveAlternatives`: a double-faced card resolves from either face and
 // comes back under its full `A // B` name, and a model names a competitor by
 // the face it knows. **Until 2026-08-23 this indexed the pool's spelling
-// alone, and that was a reproduction rather than a choice** -- Python's
-// `_competitors` did the same, so "Ajani, Nacatl Pariah" resolved in
-// research and was dropped here as a card the model had invented. Measured
-// against the real pool, pinned by the corpus, raised with Aaron, and fixed
-// in both runtimes in one change; commanders are exactly the population most
-// likely to be double-faced.
+// alone, and that was inherited rather than chosen** -- so "Ajani, Nacatl
+// Pariah" resolved in research and was dropped here as a card the model had
+// invented. Measured against the real pool, raised with Aaron, and fixed in
+// one deliberate change with the corpus re-recorded to match; commanders are
+// exactly the population most likely to be double-faced.
 func Competitors(ctx context.Context, conn *pool.Conn, raw []any,
 	allowed map[string]bool) ([]Competitor, int, error) {
 	items := []map[string]any{}
@@ -362,7 +369,7 @@ func Competitors(ctx context.Context, conn *pool.Conn, raw []any,
 			continue
 		}
 		items = append(items, row)
-		names = append(names, strings.TrimSpace(pyStrOr(row["card"])))
+		names = append(names, strings.TrimSpace(plainOr(row["card"])))
 	}
 	wanted := []string{}
 	for _, n := range names {
@@ -371,8 +378,9 @@ func Competitors(ctx context.Context, conn *pool.Conn, raw []any,
 		}
 	}
 	if len(wanted) == 0 {
-		// Every well-formed item counts as dropped, which is Python's
-		// `len(items)` -- items with no `card` at all included.
+		// Every well-formed item counts as dropped -- items with no `card` at
+		// all included. The recorded count is the item count, not the count of
+		// resolvable names.
 		return []Competitor{}, len(items), nil
 	}
 
@@ -411,8 +419,8 @@ func Competitors(ctx context.Context, conn *pool.Conn, raw []any,
 // ResearchCard is a named card as research serves it, resolved.
 //
 // A DIFFERENT field order from Competitor for the same facts -- `oracle_text`
-// is fifth here and last there. Both are Python's, and field order is the wire,
-// so the two cannot share a type however similar they look.
+// is fifth here and last there. Both orders are recorded, and field order is
+// the wire, so the two cannot share a type however similar they look.
 type ResearchCard struct {
 	Name           string   `json:"name"`
 	InPool         bool     `json:"in_pool"`
@@ -447,7 +455,7 @@ func ResolveCards(ctx context.Context, conn *pool.Conn, names []any,
 	wanted := []string{}
 	seen := map[string]bool{}
 	for _, raw := range names {
-		name := strings.TrimSpace(pyStrOr(raw))
+		name := strings.TrimSpace(plainOr(raw))
 		key := strings.ToLower(name)
 		if name != "" && !seen[key] {
 			seen[key] = true

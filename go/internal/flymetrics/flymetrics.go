@@ -1,18 +1,20 @@
-// Package flymetrics is `api/flymetrics.py`: what the platform sees, when
-// the platform is asked — Fly's managed Prometheus, behind a read-only token
-// the maintainer mints. Off unless configured, and that is the design: unset,
-// the widget hides itself rather than looking broken.
+// Package flymetrics is the admin dashboard's platform panel: what the
+// platform sees, when the platform is asked — Fly's managed Prometheus,
+// behind a read-only token the maintainer mints. Off unless configured, and
+// that is the design: unset, the widget hides itself rather than looking
+// broken.
 //
-// Python's hard-won lessons carry across as code, not prose: the
+// The panel's hard-won lessons are carried as code, not prose: the
 // Authorization value is sent **verbatim when it already carries a scheme**
 // (a Fly macaroon begins `FlyV1 fm2_...`; wrapping that in `Bearer ` is two
 // schemes and no valid credential — the panel spent a fortnight dead on
-// exactly that), the User-Agent is explicit and set above the seam
-// (`Python-urllib` is a banned browser signature to at least one WAF, and
-// Go's default UA earns no more trust), and an empty edge counter is settled
-// against the 2xx witness, because Prometheus has no zero and an empty
-// vector for "no 5xx today" is byte-identical to an empty vector for "this
-// query has never worked" (#172 is the proof that is not hypothetical).
+// exactly that), the User-Agent is explicit and set above the seam (a stock
+// library User-Agent reads as a banned browser signature to at least one
+// WAF, and Go's default UA earns no more trust), and an empty edge counter
+// is settled against the 2xx witness, because Prometheus has no zero and an
+// empty vector for "no 5xx today" is byte-identical to an empty vector for
+// "this query has never worked" (#172 is the proof that is not
+// hypothetical).
 package flymetrics
 
 import (
@@ -42,7 +44,7 @@ const (
 )
 
 // query is one instant query and its name on the wire, in declaration order
-// — the order Python's dict keeps and the payload's `values` renders in.
+// — the recorded key order, which the payload's `values` renders in.
 type query struct{ name, promql string }
 
 func queries(app string) []query {
@@ -75,8 +77,8 @@ var edgeSilent = [...]string{"edge_4xx", "edge_5xx"}
 // Transport is the seam a test injects: `(url, headers) -> (status, body)`.
 type Transport func(url string, headers map[string]string) (int, []byte, error)
 
-// Panel is the cached view. One lives on the API for the process lifetime,
-// which is Python's module-global cache with a home.
+// Panel is the cached view. One lives on the API for the process lifetime —
+// a process-wide cache with a home rather than a global.
 type Panel struct {
 	Transport Transport // nil means real HTTP
 	Now       func() time.Time

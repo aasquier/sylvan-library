@@ -10,7 +10,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// `sim/tier3/wire.py`: what crosses the private network between the app and
+// The wire: what crosses the private network between the app and
 // the Forge worker.
 //
 // ADR 35's hosted shape splits Tier 3 across two machines: the app plans a
@@ -31,10 +31,12 @@ import (
 //     result type. A remote match and a local one are the same thing to
 //     everything downstream, which is the point.
 //
-// **Every struct here carries its fields in Python's order**, which is the
-// rule the job corpus bought: `encoding/json` sorts a map's keys and a Python
-// dict does not, so a payload built from a `map[string]any` comes out
-// alphabetised. The one exception is a coverage report's `resolved`, argued
+// **Every struct here carries its fields in the recorded wire order**,
+// which is the
+// rule the job corpus bought: `encoding/json` sorts a map's keys, so a
+// payload built from a `map[string]any` comes out
+// alphabetised rather than in the recorded order. The one exception is a
+// coverage report's `resolved`, argued
 // where it is written.
 
 // DecksToWire is each deck as its own `deck.yaml` text, in seat order.
@@ -53,7 +55,7 @@ func DecksToWire(decks []*deck.Deck) ([]string, error) {
 // DecksFromWire re-parses what crossed.
 //
 // The slug argument to `FromText` is empty because a wired deck carries its
-// own `slug:` — Python passes none either, and a deck that has lost its slug
+// own `slug:` — a deck that has lost its slug
 // would be a deck the ledger could not name.
 func DecksFromWire(texts []string) ([]*deck.Deck, error) {
 	out := make([]*deck.Deck, 0, len(texts))
@@ -67,10 +69,11 @@ func DecksFromWire(texts []string) ([]*deck.Deck, error) {
 	return out, nil
 }
 
-// WireReport is one [CoverageReport] on the wire, in Python's key order.
+// WireReport is one [CoverageReport] on the wire, in the recorded key order.
 //
 // `Resolved` is a plain map, and it is the one field in this file whose key
-// order is **not** Python's. The argument, stated rather than skipped: it
+// order is **not** the recorded one. The argument, stated rather than
+// skipped: it
 // crosses between our own two processes and is read by neither — the receiver
 // calls [RaiseUnlessCovered], which reads `slug`, `checked` and `missing` and
 // nothing else, and the `.dck` that `resolved` exists to write is written on
@@ -154,8 +157,9 @@ func GameFromWire(w WireGame) GameResult { return GameResult(w) }
 // `startup_seconds` is derived from games and wall clock, so it is not
 // serialised; the rebuilt run computes the same number.
 // **This struct carries no JSON tags, deliberately.** Both halves of its
-// codec are hand-written — [WireRun.MarshalJSON] names the keys in Python's
-// order and [WireRun.UnmarshalJSON] reads them through its own inner struct —
+// codec are hand-written — [WireRun.MarshalJSON] names the keys in the
+// recorded order and [WireRun.UnmarshalJSON] reads them through its own
+// inner struct —
 // so tags here would be read by nothing while looking authoritative. They were
 // here, and a mutation run proved them dead: renaming `forge_version` on the
 // field changed no byte in either direction. The names live in those two
@@ -169,9 +173,9 @@ type WireRun struct {
 	// difference like this is cheap to get right.
 	Seats map[int]string
 	// WallSeconds renders through `floats.Float` in MarshalJSON below:
-	// Python writes `1.0` for a whole-second match and `encoding/json`
-	// writes `1`, on a wire a Python shim and a Go app can be on
-	// opposite ends of.
+	// the recorded wire says `1.0` for a whole-second match where
+	// `encoding/json` would write `1`, and either end of this wire may
+	// predate the other by a deploy.
 	WallSeconds float64
 	// ForgeVersion is for the match ledger (ADR 36). Optional in both
 	// directions on purpose: an old shim omits it and an old app ignores it,
@@ -179,8 +183,8 @@ type WireRun struct {
 	ForgeVersion *string
 }
 
-// MarshalJSON writes the run in Python's key order, with `seats` in seat
-// order.
+// MarshalJSON writes the run in the recorded key order, with `seats` in
+// seat order.
 func (w WireRun) MarshalJSON() ([]byte, error) {
 	games := w.Games
 	if games == nil {

@@ -1,10 +1,9 @@
-// Package cards is `mtglab/cards` above the pool: the reader for the
-// photographed card (`cards/identify.py`, ADR 34's Python half) -- a set code
-// and a collector number off the bottom-left corner is a *lookup* and
-// resolves; a title is a *similarity* and only ever offers five names,
-// because the measured scores of right and wrong answers overlap and no
-// threshold can separate them. The argument, and the numbers, are in the
-// Python module's docstring; the code here is the same code.
+// Package cards is the reader for the photographed card (ADR 34's
+// deterministic half) -- a set code and a collector number off the
+// bottom-left corner is a *lookup* and resolves; a title is a *similarity*
+// and only ever offers five names, because the measured scores of right and
+// wrong answers overlap and no threshold can separate them. ADR 34 holds
+// the argument.
 package cards
 
 import (
@@ -37,7 +36,7 @@ var (
 )
 
 // Sighting is what one capture thought it saw. Every field is optional and
-// independently unreliable; "" is Python's None.
+// independently unreliable; "" is the absent value.
 type Sighting struct {
 	SetCode         string
 	CollectorNumber string

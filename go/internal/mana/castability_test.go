@@ -11,25 +11,27 @@ import (
 	"testing"
 )
 
-// The differential case set: `tests/mana_oracle.py`'s 13,944 (cost, pool)
-// pairs, answered here and compared with Python's answers to each of them.
+// The recorded case set: 13,944 (cost, pool)
+// pairs, answered here and compared with the recorded answer to each of
+// them.
 //
-// This is the instrument PLAN section 5 item 2 is about, and it is older than
-// the port -- `docs/ENGINEERING.md` section 1 built that oracle to be "usable
+// The instrument is older than this implementation --
+// `docs/ENGINEERING.md` section 1 built the oracle to be "usable
 // as the differential case set for a compiled port… in any language, on any
 // machine, forever". The shape of this file follows from taking that
-// literally. **The case set is rebuilt here rather than read.** Go
+// literally. **The case set is rebuilt here rather than read.** This file
 // re-enumerates it from the same alphabets and the same limits, in the same
-// order, and only the answers come out of the corpus; a port that replayed a
-// dump of 13,944 rows would have proved its solver and left the sentence above
+// order, and only the answers come out of the corpus; a suite that replayed a
+// dump of 13,944 rows would have proved its solver and left the sentence
+// above
 // unproven.
 //
 // Two digests, because a single one cannot say which half broke. The
 // enumeration digest is over the case *names* alone and knows nothing about
 // castability, so a failure there means the case set was rebuilt wrongly and
 // the solver has not been tested at all. The answer digest is the project's
-// own golden, the constant `CASES_ANSWER_DIGEST` in
-// `tests/test_mana_properties.py`, and a failure there -- with the first one
+// own long-standing golden,
+// and a failure there -- with the first one
 // passing -- is castability and nothing else. That split is the draw corpus's
 // lesson next door, applied again: record the generator apart from its
 // consumers and a failure localises itself.
@@ -53,8 +55,8 @@ func loadCorpus(t *testing.T) castabilityCorpus {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/castability.json")
 	if err != nil {
-		t.Fatalf("reading the case set: %v (regenerate with "+
-			"`python tests/go_fixtures.py`)", err)
+		t.Fatalf("reading the case set: %v (testdata/castability.json is "+
+			"a frozen golden -- restore it from version control)", err)
 	}
 	var corpus castabilityCorpus
 	if err := json.Unmarshal(raw, &corpus); err != nil {
@@ -63,12 +65,12 @@ func loadCorpus(t *testing.T) castabilityCorpus {
 	return corpus
 }
 
-// combinationsWithReplacement yields index tuples exactly as Python's
-// `itertools.combinations_with_replacement` does -- non-decreasing, in
+// combinationsWithReplacement yields index tuples in the recorded
+// enumeration's discipline -- non-decreasing, in
 // lexicographic order, one empty tuple when r is 0, and nothing at all when
 // the alphabet is empty and r is not.
 //
-// The order is not a detail. `all_cases()` promises the same cases in the same
+// The order is not a detail. The enumeration promises the same cases in the same
 // sequence forever, and the answer digest is taken over that sequence, so a
 // correct set of cases in a different order fails exactly as loudly as a wrong
 // one -- which is the intent.
@@ -155,30 +157,30 @@ func caseID(cost Cost, pool []Source) string {
 	return cost.String() + " <- [" + poolString(pool) + "]"
 }
 
-func TestTheCaseSetIsRebuiltExactlyAsPythonEnumeratesIt(t *testing.T) {
+func TestTheCaseSetIsRebuiltExactlyAsRecorded(t *testing.T) {
 	corpus := loadCorpus(t)
 	costs, pools := caseCosts(corpus), casePools(corpus)
 
 	if len(costs) != len(corpus.Costs) {
-		t.Fatalf("rebuilt %d costs, Python enumerated %d",
+		t.Fatalf("rebuilt %d costs, the corpus enumerates %d",
 			len(costs), len(corpus.Costs))
 	}
 	for i, cost := range costs {
 		if got := cost.String(); got != corpus.Costs[i] {
-			t.Fatalf("cost %d is %q, Python's is %q", i, got, corpus.Costs[i])
+			t.Fatalf("cost %d is %q, the corpus's is %q", i, got, corpus.Costs[i])
 		}
 	}
 	if len(pools) != len(corpus.Pools) {
-		t.Fatalf("rebuilt %d pools, Python enumerated %d",
+		t.Fatalf("rebuilt %d pools, the corpus enumerates %d",
 			len(pools), len(corpus.Pools))
 	}
 	for i, pool := range pools {
 		if got := poolString(pool); got != corpus.Pools[i] {
-			t.Fatalf("pool %d is %q, Python's is %q", i, got, corpus.Pools[i])
+			t.Fatalf("pool %d is %q, the corpus's is %q", i, got, corpus.Pools[i])
 		}
 	}
 	if got := len(costs) * len(pools); got != corpus.Cases {
-		t.Fatalf("the cross product is %d cases, Python counted %d",
+		t.Fatalf("the cross product is %d cases, the corpus counts %d",
 			got, corpus.Cases)
 	}
 
@@ -189,13 +191,13 @@ func TestTheCaseSetIsRebuiltExactlyAsPythonEnumeratesIt(t *testing.T) {
 		}
 	}
 	if got := hex.EncodeToString(digest.Sum(nil)); got != corpus.EnumerationDigest {
-		t.Fatalf("the rebuilt case set hashes to %s, Python's to %s -- the "+
+		t.Fatalf("the rebuilt case set hashes to %s, the corpus's to %s -- the "+
 			"enumeration differs, so nothing below has tested the solver",
 			got, corpus.EnumerationDigest)
 	}
 }
 
-func TestCanPayAnswersEveryCaseAsPythonDoes(t *testing.T) {
+func TestCanPayAnswersEveryCaseAsRecorded(t *testing.T) {
 	corpus := loadCorpus(t)
 	costs, pools := caseCosts(corpus), casePools(corpus)
 	if len(costs) != len(corpus.Answers) {
@@ -221,7 +223,7 @@ func TestCanPayAnswersEveryCaseAsPythonDoes(t *testing.T) {
 			if got != want {
 				disagreements = append(disagreements,
 					caseID(cost, pool)+": Go says "+yesno(got)+
-						", Python says "+yesno(want))
+						", the corpus says "+yesno(want))
 			}
 			digest.Write([]byte(caseID(cost, pool) + "=" + bit(got) + "\n"))
 		}
@@ -232,12 +234,12 @@ func TestCanPayAnswersEveryCaseAsPythonDoes(t *testing.T) {
 		if len(shown) > 10 {
 			shown = shown[:10]
 		}
-		t.Fatalf("%d of %d cases disagree with Python. First %d:\n  %s",
+		t.Fatalf("%d of %d cases disagree with the corpus. First %d:\n  %s",
 			len(disagreements), corpus.Cases, len(shown),
 			strings.Join(shown, "\n  "))
 	}
 	if payable != corpus.Payable {
-		t.Errorf("%d cases are payable, Python counted %d", payable, corpus.Payable)
+		t.Errorf("%d cases are payable, the corpus counts %d", payable, corpus.Payable)
 	}
 	if got := hex.EncodeToString(digest.Sum(nil)); got != corpus.AnswersDigest {
 		t.Fatalf("the answer set hashes to %s, the pinned golden is %s",
@@ -245,12 +247,12 @@ func TestCanPayAnswersEveryCaseAsPythonDoes(t *testing.T) {
 	}
 }
 
-// The two references answer the same 13,944 cases, so the agreement Python
+// The two references answer the same 13,944 cases, so the agreement the corpus
 // records between its three implementations is re-established here between
 // Go's three rather than inherited from the corpus.
 //
 // This is the check that would survive the corpus being deleted, and it is the
-// one that catches a shared misreading: if Go's solver and Python's had both
+// one that catches a shared misreading: if the solver and the recording had both
 // been wrong in the same way, the test above would pass and this one would
 // not.
 func TestTheOraclesAgreeWithTheSolverAcrossTheWholeCaseSet(t *testing.T) {
@@ -282,7 +284,8 @@ func TestTheOraclesAgreeWithTheSolverAcrossTheWholeCaseSet(t *testing.T) {
 // The two pieces the 13,944 cases cannot judge, judged.
 //
 // The enumerated set is a strong instrument and it has a narrow waist: **every
-// pool in it is a single-mana source.** `case_pools` builds `ManaSource(c)` and
+// pool in it is a single-mana source.** The pool enumeration builds
+// one-mana sources and
 // nothing else, so all 13,944 cases together say nothing whatever about Sol
 // Ring -- the amounts that matter, 0 and 2 and negative, are reachable only
 // here and in the fuzzer. That is a second, smaller instance of the blind spot
@@ -290,8 +293,8 @@ func TestTheOraclesAgreeWithTheSolverAcrossTheWholeCaseSet(t *testing.T) {
 // a case count is not coverage.
 //
 // So [ExpandUnits] is held to `oracleUnits`, the oracle's own expansion, over
-// exactly those amounts -- the same independence `mana_oracle.py` buys by
-// reimplementing `_units` rather than importing `expand_units`.
+// exactly those amounts -- the same independence the oracle buys by
+// carrying its own expansion rather than importing [ExpandUnits].
 //
 // And `colorSet.intersects` is held to `oracleOverlap`: the same question
 // asked of packed bits and of strings. The solver compares six-bit masks and

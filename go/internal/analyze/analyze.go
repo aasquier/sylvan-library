@@ -1,5 +1,5 @@
-// Package analyze is `decks/analyze.py`: deterministic deck analysis, a pure
-// function of a deck plus a card pool -- curve, pip demand against source
+// Package analyze is deterministic deck analysis: a pure function of a
+// deck plus a card pool -- curve, pip demand against source
 // supply, category coverage against conventional targets, the Game Changer
 // count against the declared bracket, the opening-hand arithmetic. No
 // database, no judgement that varies between runs; the same deck always
@@ -114,8 +114,9 @@ type Stats struct {
 	Types        orderedCounts `json:"types"`
 }
 
-// orderedCounts serialises as an object in its own order -- Python's dict
-// keeps the order `type_breakdown` sorted it into, and a Go map would not.
+// orderedCounts serialises as an object in its own order -- the wire keeps
+// the order the type breakdown sorted itself into, and a bare map would
+// not.
 type orderedCounts struct {
 	Keys   []string
 	Counts map[string]int
@@ -137,12 +138,13 @@ func (o orderedCounts) MarshalJSON() ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
-// isLand is `analyze._is_land`: the whole type line, as Python reads it here.
+// isLand reads the whole type line for the word -- a substring, not a
+// parsed type list, which is the recorded reading here.
 func isLand(rec *pool.CardRecord) bool {
 	return rec != nil && strings.Contains(rec.TypeLine, "Land")
 }
 
-// round2 is Python's `round(x, 2)`: half to even on the scaled value.
+// round2 rounds to two decimals, half to even on the scaled value.
 func round2(x float64) float64 {
 	return math.RoundToEven(x*100) / 100
 }
@@ -409,17 +411,15 @@ func atLeastOne(deckSize, copies, seen int) float64 {
 	return 1 - ratio(comb(deckSize-copies, seen), total)
 }
 
-// OpeningHand is `analyze.opening_hand`: draw odds for the opening seven and
-// the seen-it-by-turn table, on the draw (`7 + t` cards by the end of turn t).
+// OpeningHand is the draw odds for the opening seven and the
+// seen-it-by-turn table, on the draw (`7 + t` cards by the end of turn t).
 //
-// `keepable` goes through `floats.Fsum` and not a `+=` loop, matching the
-// `math.fsum` Python spells it with. The loop was the obvious transcription of
-// Python's old `sum(...)` and it was wrong in a way that only fires on one of
-// the two interpreters: `sum()` over floats is compensated from CPython 3.12
-// and left to right before it, so a Go accumulation loop reproduces **3.11**
-// while the container runs 3.12. Three terms is enough to see it -- swept over
-// every deck size from 8 to 250, the two arithmetics disagree in 5,098 shapes,
-// 33 of them ordinary Commander decks, and the difference reaches the JSON.
+// `keepable` goes through `floats.Fsum` and not a `+=` loop, because the
+// recorded numbers are compensated sums and an accumulation loop is a
+// different arithmetic in its last bits. Three terms is enough to see it --
+// swept over every deck size from 8 to 250, the two arithmetics disagree in
+// 5,098 shapes, 33 of them ordinary Commander decks, and the difference
+// reaches the JSON.
 func OpeningHand(d *deck.Deck) Opening {
 	n := d.TotalCards()
 	hand := 7

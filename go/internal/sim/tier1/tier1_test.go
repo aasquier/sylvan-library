@@ -16,27 +16,30 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
-// ReferenceDigest is `tests/test_determinism.py`'s REFERENCE_DIGEST, written
+// ReferenceDigest is the determinism gate, written
 // out here as a literal on purpose.
 //
-// It is the phase gate, and a gate read out of the corpus beside it would be
-// a gate that moves when the corpus is regenerated -- which is exactly the
-// failure the Python side guards against by pinning it in source. So the
-// number is typed twice, in two languages, and a test below holds the
-// corpus's copy equal to this one: regenerating the fixture cannot quietly
+// A gate read out of the corpus beside it would be
+// a gate that moves whenever the corpus moves -- which is exactly the
+// failure pinning it in source guards against. So the
+// number is written down twice, here and in the corpus, and a test below
+// holds the
+// corpus's copy equal to this one: a damaged fixture cannot quietly
 // re-pin the digest, and neither can this file.
 const ReferenceDigest = "c3e278e3e09ae7766b145886bddf7e07314533c292b6c5aeb9340c73b3ee22d4"
 
 // ---------------------------------------------------------------- the corpus
 
-// Cards, costs and sources decode straight into `sim.Card` -- the corpus is
-// written by the same `_card_json` the closed forms' corpora use, so there is
-// one encoding for one Go type rather than one per tier.
+// Cards, costs and sources decode straight into `sim.Card` -- the corpus
+// carries the same card encoding the closed forms' corpora carry, so there
+// is
+// one encoding for one type rather than one per tier.
 //
 // It omits fields at their defaults, and one consequence is worth stating:
-// a card whose Python category is "utility" arrives with `Category` empty.
+// a card whose recorded category is "utility" arrives with `Category` empty.
 // Tier 1 never reads the category, and `Card.Equal` still separates exactly
-// the cards Python separates, because every "utility" card is empty here and
+// the cards the corpus separates, because every "utility" card is empty here
+// and
 // every other category is written out.
 
 type keepJSON struct {
@@ -117,10 +120,12 @@ func load(t *testing.T) *corpus {
 
 // deck rebuilds one library from the corpus.
 //
-// Each card decodes to its own pointer where Python repeats one object per
+// Each card decodes to its own pointer where a compiled deck repeats one
+// card per
 // `qty`. That is safe and was checked rather than assumed: the only identity
-// comparison in the engine is `chosen is commander`, and the commander is a
-// separate object in Python too. Everything else -- `list.remove` above all
+// comparison in the engine is against the commander, and the commander is a
+// separate object in a compiled deck too. Everything else -- removal above
+// all
 // -- compares by value, which is why sim.Card.Equal exists.
 func deck(t *testing.T, c *corpus, name string) ([]*sim.Card, *sim.Card) {
 	t.Helper()
@@ -156,7 +161,7 @@ func seedOf(t *testing.T, text string) int64 {
 
 // ------------------------------------------------------------------ the gate
 
-// referenceOutputs is `determinism_probe.reference_outputs()` in Go: the same
+// referenceOutputs is the recorded reference procedure: the same
 // three calls, in the same order, against the same decks.
 func referenceOutputs(t *testing.T, c *corpus) []string {
 	t.Helper()
@@ -192,34 +197,34 @@ func digestOf(lines []string) string {
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
-// TestTheReferenceRunReproducesThePinnedDigest is Phase 5's gate.
+// TestTheReferenceRunReproducesThePinnedDigest is the determinism gate.
 //
 // Not "the numbers are close" and not "the shapes agree": the same sha256
-// CPython computes, over the same text, from a simulator written in another
-// language. If this passes, a seeded run means the same games after the port
-// as before it -- which is what every quoted Tier 1 number, every generated
+// the reference run pinned, over the same text. If this
+// passes, a seeded run means the same games today as the day the digest was
+// recorded -- which is what every quoted Tier 1 number, every generated
 // primer and ADR 18's cache all rest on.
 func TestTheReferenceRunReproducesThePinnedDigest(t *testing.T) {
 	got := digestOf(referenceOutputs(t, load(t)))
 	if got != ReferenceDigest {
-		t.Fatalf("REFERENCE_DIGEST is %s; this engine computes %s.\n"+
+		t.Fatalf("the pinned digest is %s; this engine computes %s.\n"+
 			"The dice are not the suspect -- internal/mt19937 replays the "+
 			"reference run's whole draw stream. Read the per-line failures "+
-			"from TestTheReferenceOutputsAreCPythonsOwnText, which say which "+
+			"from TestTheReferenceOutputsAreTheRecordedText, which say which "+
 			"game and which field moved.", ReferenceDigest, got)
 	}
 }
 
-// TestTheReferenceOutputsAreCPythonsOwnText is the same gate with a diff.
+// TestTheReferenceOutputsAreTheRecordedText is the same gate with a diff.
 //
 // A digest is opaque, so a mismatch above says only that something moved.
-// This says what: the five strings CPython produced sit in the corpus, and a
+// This says what: the five recorded strings sit in the corpus, and a
 // divergence reports the line and the first character that differs.
-func TestTheReferenceOutputsAreCPythonsOwnText(t *testing.T) {
+func TestTheReferenceOutputsAreTheRecordedText(t *testing.T) {
 	c := load(t)
 	got := referenceOutputs(t, c)
 	if len(got) != len(c.Reference.Outputs) {
-		t.Fatalf("the reference run produced %d lines, CPython produced %d",
+		t.Fatalf("the reference run produced %d lines, the corpus records %d",
 			len(got), len(c.Reference.Outputs))
 	}
 	for i, want := range c.Reference.Outputs {
@@ -229,8 +234,8 @@ func TestTheReferenceOutputsAreCPythonsOwnText(t *testing.T) {
 	}
 }
 
-// TestTheCorpusAgreesWithThePinnedDigest stops a regenerated fixture from
-// re-pinning the gate. The Python side writes the digest it measured; this
+// TestTheCorpusAgreesWithThePinnedDigest stops a damaged fixture from
+// re-pinning the gate. The corpus records the digest its run measured; this
 // file holds a literal; they must be the same number.
 func TestTheCorpusAgreesWithThePinnedDigest(t *testing.T) {
 	if got := load(t).Reference.Digest; got != ReferenceDigest {
@@ -260,16 +265,17 @@ func clip(s string, n int) string {
 
 // ---------------------------------------------------- the differential cases
 
-// TestEveryGameIsCPythonsGame widens the gate past the one deck and the one
+// TestEveryGameIsTheRecordedGame widens the gate past the one deck and the
+// one
 // seed it covers.
 //
-// The reference run is `build_golgari`, whose 99 cards all have distinct
-// names -- so it never exercises `list.remove` taking out a different card
+// The reference run's deck ("golgari-34") has 99 distinctly named cards
+// -- so it never exercises removal taking out a different card
 // from the one it was handed, which is what happens in every compiled deck.
 // The duplicates deck here does, and so do a headless deck, a zero-turn
 // horizon, the play/draw split and both branches of the mulligan bottoming
 // loop.
-func TestEveryGameIsCPythonsGame(t *testing.T) {
+func TestEveryGameIsTheRecordedGame(t *testing.T) {
 	c := load(t)
 	for _, tc := range c.Games {
 		name := fmt.Sprintf("%s/seed=%s/turns=%d", tc.Deck, tc.Seed, tc.Turns)
@@ -289,9 +295,9 @@ func TestEveryGameIsCPythonsGame(t *testing.T) {
 	}
 }
 
-// TestEveryRunIsCPythonsRun is the same over `run`: the accumulators, the
+// TestEveryRunIsTheRecordedRun is the same over `Run`: the accumulators, the
 // medians, the timing table and its sort.
-func TestEveryRunIsCPythonsRun(t *testing.T) {
+func TestEveryRunIsTheRecordedRun(t *testing.T) {
 	c := load(t)
 	for _, tc := range c.Runs {
 		name := fmt.Sprintf("%s/games=%d/turns=%d", tc.Deck, tc.Games, tc.Turns)
@@ -304,18 +310,18 @@ func TestEveryRunIsCPythonsRun(t *testing.T) {
 			if got.Repr() != tc.Repr {
 				t.Errorf("run diverges:\n%s", diff(tc.Repr, got.Repr()))
 			}
-			// `spells_through` is how a land sweep is read -- the flood-aware
-			// measure CLAUDE.md says to read instead of commander speed. It
-			// is a Python slice, so its bounds behave like one, and it is an
-			// `fsum`, so the answer is the same on every interpreter and can
-			// be pinned here at all.
+			// `SpellsThrough` is how a land sweep is read -- the flood-aware
+			// measure CLAUDE.md says to read instead of commander speed. Its
+			// slice bounds are the recorded ones, and it is an
+			// exact sum, so the answer does not depend on accumulation order
+			// and can be pinned here at all.
 			for _, th := range tc.Through {
 				if s := ReprFloat(got.SpellsThrough(th.Turn)); s != th.Spells {
-					t.Errorf("spells_through(%d) is %s, CPython said %s",
+					t.Errorf("spells_through(%d) is %s, the corpus says %s",
 						th.Turn, s, th.Spells)
 				}
 				if w := ReprFloat(got.WastedThrough(th.Turn)); w != th.Wasted {
-					t.Errorf("wasted_through(%d) is %s, CPython said %s",
+					t.Errorf("wasted_through(%d) is %s, the corpus says %s",
 						th.Turn, w, th.Wasted)
 				}
 			}
@@ -323,32 +329,33 @@ func TestEveryRunIsCPythonsRun(t *testing.T) {
 	}
 }
 
-// TestConsumeIsCPythonsConsume holds the solver to `engine._consume` -- what
+// TestConsumeMatchesTheRecordedLeftovers holds the solver to the recorded
+// cases -- what
 // it refuses, and exactly which units it leaves behind, in order.
 //
-// The leftovers are the half a "does it fit" test would miss: `_consume`
+// The leftovers are the half a "does it fit" test would miss: `consume`
 // pays generic with the least flexible units first, so the pool it returns
 // decides what the *next* spell this turn can be paid with.
-func TestConsumeIsCPythonsConsume(t *testing.T) {
+func TestConsumeMatchesTheRecordedLeftovers(t *testing.T) {
 	c := load(t)
 	for _, tc := range c.Consume {
 		name := fmt.Sprintf("%s/%s", tc.CostText, tc.Pool)
 		t.Run(name, func(t *testing.T) {
 			got, ok := consume(tc.Cost, tc.Sources)
 			if ok != (tc.Remaining != nil) {
-				t.Fatalf("payable=%v, CPython said %v", ok, tc.Remaining != nil)
+				t.Fatalf("payable=%v, the corpus says %v", ok, tc.Remaining != nil)
 			}
 			if !ok {
 				return
 			}
 			want := tc.Remaining
 			if len(got) != len(want) {
-				t.Fatalf("%d units left, CPython left %d", len(got), len(want))
+				t.Fatalf("%d units left, the corpus left %d", len(got), len(want))
 			}
 			for i := range want {
 				if got[i].Amount != want[i].Amount ||
 					!sim.SameColors(got[i].Colors, want[i].Colors) {
-					t.Fatalf("unit %d is %v x%d, CPython left %v x%d", i,
+					t.Fatalf("unit %d is %v x%d, the corpus left %v x%d", i,
 						got[i].Colors, got[i].Amount,
 						want[i].Colors, want[i].Amount)
 				}
@@ -357,26 +364,29 @@ func TestConsumeIsCPythonsConsume(t *testing.T) {
 	}
 }
 
-// TestCanPayIsCPythonsCanPay is the argument in tier1.go's `canPay` comment,
+// TestCanPayMatchesTheRecordedAnswers is the claim in tier1.go's `canPay`
+// comment,
 // checked instead of believed.
 //
-// Tier 1 asks `mana.can_pay` in `_pick_land` and `engine._consume`
-// everywhere else, and this port answers both through `consume`. The claim is
-// that `_consume(...) is not None` and `can_pay(...)` are the same predicate;
-// the corpus records CPython's answer from *both* functions, so a case where
+// The engine asks `canPay` inside `pickLand` and `consume`
+// everywhere else. The claim is
+// that "consume succeeds" and `canPay` are the same predicate;
+// the corpus records the answer from *both* recorded functions, so a case
+// where
 // they part company fails here rather than showing up as a different land on
 // turn three.
-func TestCanPayIsCPythonsCanPay(t *testing.T) {
+func TestCanPayMatchesTheRecordedAnswers(t *testing.T) {
 	c := load(t)
 	agreed := 0
 	for _, tc := range c.Consume {
 		if tc.CanPay != (tc.Remaining != nil) {
-			t.Fatalf("CPython's own can_pay and _consume disagree on %s / %s "+
-				"-- the equivalence this port rests on is false",
+			t.Fatalf("the corpus's own can_pay and consume answers disagree "+
+				"on %s / %s "+
+				"-- the equivalence this engine rests on is false",
 				tc.CostText, tc.Pool)
 		}
 		if got := canPay(tc.Cost, tc.Sources); got != tc.CanPay {
-			t.Errorf("%s / %s: canPay=%v, CPython said %v",
+			t.Errorf("%s / %s: canPay=%v, the corpus says %v",
 				tc.CostText, tc.Pool, got, tc.CanPay)
 			continue
 		}
@@ -387,17 +397,15 @@ func TestCanPayIsCPythonsCanPay(t *testing.T) {
 	}
 }
 
-// TestConsumeAgreesWithCanPay is `tests/test_mana_properties.py`'s
-// `test_consume_agrees_with_can_pay`, in Go.
+// TestConsumeAgreesWithCanPay holds the two solvers to each other.
 //
 // It exists because of what changed on 2026-08-22: `canPay` now delegates to
 // `mana.CanPay`, so this package and `internal/mana` hold **two independent
 // solvers** -- `consume`, which has to return the leftovers and therefore
-// keeps its own matching, and `CanPay`, which only answers yes or no. Each was
-// checked against Python and, until this test, **neither against the other**.
-// Python pins exactly that pair with the Hypothesis property above; the corpus
-// cannot, because it records what CPython answered rather than what the two Go
-// functions answer about the same input.
+// keeps its own matching, and `CanPay`, which only answers yes or no. Each
+// is held to the corpus and, until this test, **neither to the other**.
+// The corpus cannot pin that pair, because it records one set of answers
+// rather than what the two functions say about the same fresh input.
 //
 // Seeded and bounded rather than a fuzz target: `internal/mana` already fuzzes
 // castability, and what is wanted here is a cheap invariant that runs on every
@@ -449,10 +457,11 @@ func TestConsumeAgreesWithCanPay(t *testing.T) {
 	}
 }
 
-// TestReprFloatIsCPythonsRepr holds the renderer to CPython over every float
+// TestReprFloatMatchesTheRecordedRenderings holds the renderer to the corpus
+// over every float
 // the reference run produces, plus the boundaries where the notation changes
 // shape.
-func TestReprFloatIsCPythonsRepr(t *testing.T) {
+func TestReprFloatMatchesTheRecordedRenderings(t *testing.T) {
 	c := load(t)
 	if len(c.Floats) < 100 {
 		t.Fatalf("only %d float cases; the corpus lost its sweep", len(c.Floats))
@@ -461,7 +470,7 @@ func TestReprFloatIsCPythonsRepr(t *testing.T) {
 	for _, tc := range c.Floats {
 		value := math.Float64frombits(tc.Bits)
 		if got := ReprFloat(value); got != tc.Repr {
-			t.Errorf("bits %#016x: repr is %q, CPython said %q",
+			t.Errorf("bits %#016x: repr is %q, the corpus says %q",
 				tc.Bits, got, tc.Repr)
 		}
 		if strings.ContainsRune(tc.Repr, 'e') {
@@ -478,21 +487,21 @@ func TestReprFloatIsCPythonsRepr(t *testing.T) {
 	}
 }
 
-// TestReprStringIsCPythonsRepr holds the string renderer to CPython: the
+// TestReprStringMatchesTheRecordedRenderings holds the string renderer to
+// the corpus: the
 // quote choice, the escapes, and the printable non-ASCII it passes through.
-func TestReprStringIsCPythonsRepr(t *testing.T) {
+func TestReprStringMatchesTheRecordedRenderings(t *testing.T) {
 	for _, tc := range load(t).Strings {
 		if got := ReprString(tc.Value); got != tc.Repr {
-			t.Errorf("repr(%q) is %s, CPython said %s", tc.Value, got, tc.Repr)
+			t.Errorf("ReprString(%q) is %s, the corpus says %s", tc.Value, got, tc.Repr)
 		}
 	}
 }
 
 // ----------------------------------------------------- the engine's own laws
 //
-// `tests/test_determinism.py` asserts these of the Python engine in prose
-// that says why each one matters. They are asserted of this one for the same
-// reasons, and none of them is implied by the digest: a digest is one run.
+// The laws the engine keeps beyond any single recording. None of them is
+// implied by the digest: a digest is one run.
 
 func TestASeededRunRepeatsExactly(t *testing.T) {
 	c := load(t)
@@ -600,7 +609,7 @@ func TestTheReferenceRunIsTheShapeTheDigestAssumes(t *testing.T) {
 // --------------------------------------------------------- the sharp corners
 
 func TestRemoveTakesTheFirstEqualCard(t *testing.T) {
-	// `list.remove` removes the first EQUAL element, not the one it was
+	// Removal takes the first EQUAL element, not the one it was
 	// handed. With a compiled deck those are routinely different cards, and
 	// which one leaves reorders everything after it.
 	forest := &sim.Card{Name: "Forest", Category: "land", IsLand: true,
@@ -643,9 +652,9 @@ func TestKeepRuleCountsCheapRampAsAManaPiece(t *testing.T) {
 }
 
 func TestMedianOfAnOddCountIsAnInt(t *testing.T) {
-	// `statistics.median` returns `data[n//2]` for an odd count, so
-	// `median_commander_turn` renders as `5` and not `5.0`. The annotation
-	// says `float | None`; the annotation is wrong and the digest is not.
+	// The median of an odd count of ints is the middle int, so the median
+	// commander turn renders as `5` and not `5.0` -- and the digest hashes
+	// that text, so the distinction is pinned rather than pedantic.
 	odd := medianInt([]int{3, 9, 5})
 	if odd.IsFloat || odd.Int != 5 {
 		t.Errorf("median of three ints is %+v, want the int 5", odd)
@@ -660,7 +669,7 @@ func TestMedianOfAnOddCountIsAnInt(t *testing.T) {
 }
 
 func TestAnUnseededRunIsStillARun(t *testing.T) {
-	// `seed=None` is a legal call and must not panic looking for entropy.
+	// A nil seed is a legal call and must not panic looking for entropy.
 	c := load(t)
 	library, commander := deck(t, c, "duplicates")
 	if got := Run(library, commander, Options{Games: 5, Turns: 4}); got.Games != 5 {
@@ -676,18 +685,20 @@ func names(cards []*sim.Card) []string {
 	return out
 }
 
-// TestNumberSurvivesJSONBothWays pins the marshalling `Number` did not have
-// until the sim family flipped.
+// TestNumberSurvivesJSONBothWays pins the marshalling `Number` once lacked.
 //
-// The type is held to CPython by `repr` text and by `Float64bits`, and neither
+// The type is held to the corpus by rendered text and by `Float64bits`, and
+// neither
 // route goes through `encoding/json` -- so for as long as nothing serialised
-// one, the default marshaller applied and `median_commander_turn` would have
+// one, the default marshaller applied and the median commander turn would
+// have
 // reached the browser as `{"IsFloat":false,"Int":4,"Float":0}`. Every corpus
-// was green. The contract suite caught it on the first run through the door.
+// was green; the recorded wire shape is what caught it.
 //
 // Both directions are pinned because the ADR 18 cache needs the round trip: a
 // stored result is decoded into the struct it was encoded from, and a number
-// that went in an int has to come back one -- `repr(4)` and `repr(4.0)` are
+// that went in an int has to come back one -- the renderings of `4` and
+// `4.0` are
 // different text, and that text is inside the determinism digest.
 func TestNumberSurvivesJSONBothWays(t *testing.T) {
 	for _, tc := range []struct {

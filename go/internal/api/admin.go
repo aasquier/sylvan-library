@@ -28,7 +28,7 @@ import (
 // sentence: that rule protects resources whose *existence* is the secret, and
 // an admin route's existence is published in a public repository.
 //
-// What is deliberately **not** here, both from `api/admin.py`:
+// What is deliberately **not** here, both by design:
 //
 //   - **Setting somebody's password.** ADR 16 is unconditional: no password is
 //     ever chosen by one person for another, because an admin-set password is a
@@ -44,22 +44,20 @@ import (
 // explicitly and which is why `accountBody` asks `AsDict(true)`. The rule that
 // replaced "one caller" is narrow and still checkable: an address may be
 // serialised only into a response an admin authenticated for. The door's
-// prefix rule and the check below are two of the three mechanisms that
-// guarantee it of this file; `tests/test_isolation.py` pins the third -- that
-// no *other* module acquires the habit.
+// prefix rule and the check below are the two mechanisms that
+// guarantee it of this file; no *other* module may acquire the habit.
 //
-// **The twelfth registration arrived last, and later than its eleven.**
-// `DELETE /api/admin/users/{username}` stayed Python's through Phase 4
-// because deleting an account also calls `jobs.forget_owner`, and a registry
+// **Deletion and the job registry belong to one process.**
+// `DELETE /api/admin/users/{username}` also calls `ForgetOwner`, and a
+// registry
 // lives in the memory of the process that filled it: `users.id` is reissued
 // by SQLite, so jobs left keyed on a freed integer would be handed to
-// whoever is created next, and only the process holding the jobs could
-// report `jobs_dropped` honestly. Phase 7 dissolved that — no Python route
-// creates a job any more, so uvicorn's registry is always empty and this
-// process's count is the total — and Phase 8 collected the route
+// whoever is created next, and only the process holding the jobs can
+// report `jobs_dropped` honestly. This process is the only one that mints
+// jobs, so its count is the total
 // (`deleteAccount`, at the bottom of this file).
 
-// requireAdmin is `deps.admin`, the second of two checks. It answers 403 and
+// requireAdmin is the second of two checks. It answers 403 and
 // reports whether it did.
 func (a *API) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 	if auth.ScopeFrom(r.Context()).IsAdmin {
@@ -244,17 +242,15 @@ func (a *API) inviteAccount(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// **A divergence the port declined to reproduce, and it has since been
-	// ruled on.** Python handed `payload.get("email")` to `normalise_email`
-	// *raw*, so a body carrying `{"email": 0}` -- or `true`, or a list --
-	// reached `.strip()` on something that has not got one and became a
-	// **500**. This answered 422 with the shape sentence instead, on the
-	// grounds that reproducing a crash is not equivalence, and reported it
-	// rather than ruling on it, the share toggle being the precedent: the port
-	// finds it, Aaron rules, both runtimes are fixed at once.
-	//
-	// `api/admin.py` now coerces the same way, and the sentences match, which
-	// is what the case table beside this pins. `str` and not `field`: `field`
+	// **A crash the route declined to keep, and it has since been ruled
+	// the contract.** The
+	// email field once reached the normaliser *raw*, so a body carrying
+	// `{"email": 0}` -- or `true`, or a list --
+	// hit a strip on something that has not got one and became a
+	// **500**. This answers 422 with the shape sentence instead, on the
+	// grounds that a crash is not a contract; Aaron ruled, and the ruling
+	// is what the case table beside this pins.
+	// `str` and not `field`: `field`
 	// folds `0` and `false` to the empty string, which would report a *missing*
 	// address for a body that supplied one.
 	address, err := auth.NormaliseEmail(str(body, "email"))
@@ -270,7 +266,7 @@ func (a *API) inviteAccount(w http.ResponseWriter, r *http.Request) {
 	wanted := strings.TrimSpace(field(body, "username"))
 	makeAdmin := !falsy(body["is_admin"])
 
-	// Resolved before any database work, exactly as Python resolves it: an
+	// Resolved before any database work, deliberately: an
 	// instance with no mail configured should say so rather than create an
 	// account whose invite can never be sent.
 	sender, ok := a.senderOr503(w)
@@ -350,9 +346,9 @@ func (a *API) updateAccount(w http.ResponseWriter, r *http.Request) {
 	if a.requireAdmin(w, r) {
 		return
 	}
-	// The body first, then the account -- FastAPI validates a declared body
-	// before the handler runs, so a malformed body against a name nobody holds
-	// is a 422 there and must be one here.
+	// The body first, then the account -- the recorded order validates the
+	// body before anything is looked up, so a malformed body against a name
+	// nobody holds is a 422.
 	body, ok := readBody(w, r)
 	if !ok {
 		return
@@ -519,10 +515,9 @@ func (a *API) revokeSessions(w http.ResponseWriter, r *http.Request) {
 		"username": user.Username, "revoked": ended})
 }
 
-// deleteAccount is `DELETE /api/admin/users/{username}` — the twelfth
-// registration, the one Phase 4 deliberately left and Phase 8 collects. The
-// blocker dissolved with Phase 7: no Python route creates a job any more, so
-// uvicorn's registry is always empty and this process's `ForgetOwner` count
+// deleteAccount is `DELETE /api/admin/users/{username}`. It calls
+// `ForgetOwner` before the row goes, and this process is the only one that
+// mints jobs, so its `ForgetOwner` count
 // is the honest `jobs_dropped` — the number the response reports, dropped
 // because `users.id` is reissued by SQLite and the next account created must
 // not be handed this one's results.
@@ -551,10 +546,10 @@ func (a *API) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// `str(payload.get("confirm") or "").strip()`: a falsy confirm is the
-	// empty string, anything else renders as Python's str().
+	// The or-empty read, stripped: a falsy confirm is the
+	// empty string, anything else renders through [wire.Plain].
 	typed := ""
-	if pyTruthy(body["confirm"]) {
+	if truthy(body["confirm"]) {
 		typed = textutil.Strip(wire.Plain(body["confirm"]))
 	}
 	if claude.Casefold(typed) != claude.Casefold(user.Username) {

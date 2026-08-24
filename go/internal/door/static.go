@@ -12,13 +12,11 @@ import (
 )
 
 // The content types the door answers, by extension, named outright rather
-// than asked of the host -- `api/app.py` registers three for the same reason
-// (`.webp`, `.js`, `.woff2`), and Go's `mime` package reads the host's
-// `/etc/mime.types` on top of its built-in table too, so the answer would
-// otherwise depend on where the binary ran. These are the types the Python
-// app produces in the container (CPython's built-in table plus those three
-// registrations, with Starlette's `; charset=utf-8` on every `text/*`),
-// computed by emulating that table on 2026-08-21 and recorded in
+// than asked of the host: Go's `mime` package reads the host's
+// `/etc/mime.types` on top of its built-in table, so the answer would
+// otherwise depend on where the binary ran. These are the recorded serving
+// types -- the deployed container's table, with `; charset=utf-8` on every
+// `text/*` -- captured on 2026-08-21 and pinned by
 // `TestContentTypesMatchTheContainer`.
 var contentTypes = map[string]string{
 	".html":  "text/html; charset=utf-8",
@@ -45,7 +43,7 @@ var contentTypes = map[string]string{
 	".pdf":   "application/pdf",
 }
 
-// What Starlette's FileResponse answers when `mimetypes` has no opinion.
+// The recorded fallback for an extension the table does not name.
 const fallbackContentType = "text/plain; charset=utf-8"
 
 func init() {
@@ -64,10 +62,10 @@ func ContentType(name string) string {
 	return fallbackContentType
 }
 
-// staticSite is the shell, its assets, and the tarot pictures -- what
-// `api/app.py` mounts at `/assets`, `/tarot` and the catch-all. A missing
-// web_dist means no shell at all, as in Python, and a missing tarot
-// directory means no `/tarot` mount.
+// staticSite is the shell, its assets, and the tarot pictures -- the
+// `/assets` and `/tarot` mounts and the catch-all. A missing
+// web_dist means no shell at all rather than a broken one, and a missing
+// tarot directory means no `/tarot` mount.
 type staticSite struct {
 	webDist   string
 	index     string            // path of index.html, or ""
@@ -110,8 +108,9 @@ func newStaticSite(webDist, tarotDir string, log *slog.Logger) (*staticSite, err
 	return s, nil
 }
 
-// ServeHTTP is the static half of Python's routing, in its order: the
-// mounts first (matched on the raw path, as Starlette's Mount matches), then
+// ServeHTTP is the static half of the routing, in its recorded order: the
+// mounts first (matched on the raw path, deliberately -- `dispatch` says
+// why the API half normalises and this half does not), then
 // the catch-all -- a root file by exact name, or the shell.
 func (s *staticSite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	raw := r.URL.Path
@@ -124,9 +123,9 @@ func (s *staticSite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.serveShell(w, r)
 }
 
-// serveMounted is Starlette's StaticFiles: GET and HEAD only (405 otherwise),
+// serveMounted is a mount's file server: GET and HEAD only (405 otherwise),
 // a missing or non-file path is a JSON 404, and a path that would walk out of
-// the directory is the same 404 -- `os.path.commonpath` in Python, `Rel` here.
+// the directory is the same 404 -- `Rel` is the containment check.
 func (s *staticSite) serveMounted(w http.ResponseWriter, r *http.Request, dir, rel string) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"detail": "Method Not Allowed"})
@@ -152,13 +151,13 @@ func (s *staticSite) serveMounted(w http.ResponseWriter, r *http.Request, dir, r
 	serveFile(w, r, full)
 }
 
-// serveShell is the catch-all: GET only (a HEAD of the shell is a 405 in
-// Python, because the route is declared for GET and FastAPI adds nothing),
+// serveShell is the catch-all: GET only (a HEAD of the shell is a 405 --
+// the recorded contract, and the mounts differ on exactly this),
 // a bundle root file by *exact* name -- the lookup key is the raw path, the
 // served path comes from the trusted listing -- else index.html.
 func (s *staticSite) serveShell(w http.ResponseWriter, r *http.Request) {
 	if s.index == "" {
-		// No frontend built: FastAPI's own 404 for a path no route claims.
+		// No frontend built: the plain 404 for a path no route claims.
 		notFound(w)
 		return
 	}
@@ -176,8 +175,8 @@ func (s *staticSite) serveShell(w http.ResponseWriter, r *http.Request) {
 
 // serveFile answers one regular file with the door's content type and
 // `Cache-Control: no-cache` -- revalidate before reuse, every time, which is
-// what a committed bundle with stable filenames needs (`api/app.py:NO_CACHE`
-// says what it cost to learn). `http.ServeContent` supplies Last-Modified,
+// what a committed bundle with stable filenames needs, and a lesson that
+// was paid for once already. `http.ServeContent` supplies Last-Modified,
 // the conditional 304 and Range handling.
 func serveFile(w http.ResponseWriter, r *http.Request, full string) {
 	f, err := os.Open(full)
@@ -197,7 +196,8 @@ func serveFile(w http.ResponseWriter, r *http.Request, full string) {
 	http.ServeContent(w, r, "", info.ModTime(), f)
 }
 
-// notFound is the JSON Starlette's mounts and FastAPI's router both answer.
+// notFound is the static tiers' refusal: `{"detail": "Not Found"}`, the
+// recorded shape for the mounts and the bare router alike.
 func notFound(w http.ResponseWriter) {
 	writeJSON(w, http.StatusNotFound, map[string]any{"detail": "Not Found"})
 }

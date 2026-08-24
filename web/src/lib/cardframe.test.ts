@@ -5,8 +5,8 @@
  * rules, and a real capture returns `LTCENLIK` — the code welded to the
  * language tag and the artist's initials. No client-side rule finds `LTC`
  * in that, because "is this a set code" is a question about which 986
- * exist. That job is `cards/identify.py`'s now, and its tests run against
- * the verbatim output of a real reader on a real card.
+ * exist. That job is the server's card reader's now, and its tests run
+ * against the verbatim output of a real reader on a real card.
  *
  * What is left here is what the browser genuinely owns: the rectangles, and
  * tidying a title that nothing will correct.

@@ -11,12 +11,12 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// The slot argument's two Python-owned halves, held to Python by a corpus.
+// The slot argument's two deterministic halves, held to the recorded corpus.
 //
 // `OnlyCharges` and `ResolveAlternatives` are where ADR 25 stops being a prompt
 // and becomes code: the first decides what counts as an argument, the second is
-// rule 2 made executable. Both are judged against `testdata/argue.json`, which
-// `tests/go_fixtures.py` renders from the real functions against the real
+// rule 2 made executable. Both are judged against `testdata/argue.json`, a
+// frozen golden recorded against the real
 // 21-card pool.
 
 type argueCorpus struct {
@@ -47,25 +47,25 @@ func loadArgueCorpus(t *testing.T) argueCorpus {
 		t.Fatalf("decoding the corpus: %v", err)
 	}
 	if len(corpus.Charges) == 0 || len(corpus.Alternatives) == 0 {
-		t.Fatal("the corpus is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/argue.json is a frozen golden and always carries both")
 	}
 	return corpus
 }
 
-func TestOnlyChargesAgreesWithPython(t *testing.T) {
+func TestOnlyChargesAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadArgueCorpus(t)
 	for _, row := range corpus.Charges {
 		kept, dropped := OnlyCharges(row.Items)
 		if dropped != row.Dropped {
-			t.Errorf("%s: dropped %d, python %d", row.Note, dropped, row.Dropped)
+			t.Errorf("%s: dropped %d, corpus %d", row.Note, dropped, row.Dropped)
 		}
 		if len(kept) != len(row.Kept) {
-			t.Errorf("%s: kept %d, python %d", row.Note, len(kept), len(row.Kept))
+			t.Errorf("%s: kept %d, corpus %d", row.Note, len(kept), len(row.Kept))
 			continue
 		}
 		for i := range kept {
 			if kept[i] != row.Kept[i] {
-				t.Errorf("%s: charge %d is %+v, python %+v", row.Note, i, kept[i], row.Kept[i])
+				t.Errorf("%s: charge %d is %+v, corpus %+v", row.Note, i, kept[i], row.Kept[i])
 			}
 		}
 	}
@@ -73,7 +73,7 @@ func TestOnlyChargesAgreesWithPython(t *testing.T) {
 
 // A charge is rendered into a payload the client reads, so the bytes are the
 // contract and only bytes carry field order.
-func TestAChargeMarshalsInPythonsFieldOrder(t *testing.T) {
+func TestAChargeMarshalsInTheRecordedFieldOrder(t *testing.T) {
 	raw, err := json.Marshal(Charge{Claim: "c", Ground: "cost", Fact: "f", Strength: "minor"})
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +84,7 @@ func TestAChargeMarshalsInPythonsFieldOrder(t *testing.T) {
 	}
 }
 
-func TestResolveAlternativesAgreesWithPython(t *testing.T) {
+func TestResolveAlternativesAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadArgueCorpus(t)
 	withPool(t, func(c *pool.Conn) {
 		for _, row := range corpus.Alternatives {
@@ -110,7 +110,7 @@ func TestResolveAlternativesAgreesWithPython(t *testing.T) {
 				names = append(names, k.Name)
 			}
 			if !reflect.DeepEqual(names, row.Kept) {
-				t.Errorf("%s:\n kept   %v\n python %v", row.Note, names, row.Kept)
+				t.Errorf("%s:\n kept   %v\n corpus %v", row.Note, names, row.Kept)
 			}
 			got := map[string][]string{
 				"not_in_pool": dropped.NotInPool, "banned": dropped.Banned,
@@ -119,7 +119,7 @@ func TestResolveAlternativesAgreesWithPython(t *testing.T) {
 			}
 			for bucket, want := range row.Dropped {
 				if !reflect.DeepEqual(got[bucket], want) {
-					t.Errorf("%s: %s is %v, python %v", row.Note, bucket, got[bucket], want)
+					t.Errorf("%s: %s is %v, corpus %v", row.Note, bucket, got[bucket], want)
 				}
 			}
 		}
@@ -127,12 +127,12 @@ func TestResolveAlternativesAgreesWithPython(t *testing.T) {
 }
 
 // The empty-run shape has FOUR keys where a real run has five, and that is
-// Python's rather than anybody's preference: `argue._report`'s default for
-// `alternatives_dropped` omits `already_in_deck` while `resolve_alternatives`
-// always returns it. A single Go struct would put a fifth key on the wire in
-// exactly the two cases -- stance off, and a refusal -- where Python leaves it
-// off, which is why there are two types.
-func TestTheEmptyDroppedShapeIsPythonsFourKeys(t *testing.T) {
+// the recorded shape rather than anybody's preference: the default for
+// `alternatives_dropped` omits `already_in_deck` while a real resolution
+// always returns it. A single struct would put a fifth key on the wire in
+// exactly the two cases -- stance off, and a refusal -- where the recorded
+// shape leaves it off, which is why there are two types.
+func TestTheEmptyDroppedShapeIsTheRecordedFourKeys(t *testing.T) {
 	raw, err := json.Marshal(noneDropped())
 	if err != nil {
 		t.Fatal(err)

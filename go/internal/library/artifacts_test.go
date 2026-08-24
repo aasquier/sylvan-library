@@ -19,9 +19,8 @@ import (
 // place they have already disagreed: until 2026-08-21 a rebuild that produced
 // no `swaps.md` left the previous build's sitting in the file tier's directory
 // while the memory tier replaced the set, and only one of them could be right.
-// Python's answer is a fixture parametrised over its sources
-// (`tests/test_deck_source.py`); this is the same idea over the two tiers Go
-// actually serves.
+// So the promises are parametrised over the sources: the same assertions run
+// against the two tiers actually served.
 //
 // Every assertion here is deliberately about a *promise* rather than an
 // implementation: what a rebuild leaves behind, what order a reader sees, and

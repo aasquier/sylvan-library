@@ -86,15 +86,15 @@ func TestASimulationJobStoresItsResultAfterTheRequestHasGone(t *testing.T) {
 	}
 }
 
-// TestAMissingDeckCarriesTheBareSlugIntoTheJob is the divergence the pair
+// TestAMissingDeckCarriesTheBareSlugIntoTheJob pins a divergence a wire
 // diff found: a job's `error` becomes a JS `Error` in `lib/api.ts` and the
-// screen shows it, so the two runtimes must say the same sentence.
+// screen shows it, so the sentence must stay the recorded one.
 //
-// Python's `DeckNotFound(slug)` has no `__str__` of its own, so `str(exc)` is
-// the slug alone; the 404's "no deck 'x'" is built by the route's exception
-// handler and belongs only there. Go's `library.ErrNotFound` renders the
+// The recorded job error is
+// the slug alone; the 404's "no deck 'x'" is built at the route
+// and belongs only there. Go's `library.ErrNotFound` renders the
 // sentence — right for the handler, wrong for the job — and the door carried
-// it into every deferred failure from Phase 5 until 2026-08-23.
+// it into every deferred failure until 2026-08-23.
 func TestAMissingDeckCarriesTheBareSlugIntoTheJob(t *testing.T) {
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	db, err := auth.Open(appDB(t))
@@ -113,8 +113,8 @@ func TestAMissingDeckCarriesTheBareSlugIntoTheJob(t *testing.T) {
 
 	for _, c := range []struct{ note, body, want string }{
 		{"a slug nobody has", `{"slug":"nope"}`, "nope"},
-		// `str(["x"])` is `"['x']"`, quotes and all — the other half of the
-		// same finding, in the coercion rather than in the error.
+		// A decoded list renders `['x']`, quotes and all — the other half of
+		// the same finding, in the coercion rather than in the error.
 		{"a list where a slug belongs", `{"slug":["x"]}`, "['x']"},
 	} {
 		t.Run(c.note, func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestAMissingDeckCarriesTheBareSlugIntoTheJob(t *testing.T) {
 			}
 			got := job.Payload().Error
 			if got == nil || *got != c.want {
-				t.Errorf("the job's error is %v, want %q — Python says the "+
+				t.Errorf("the job's error is %v, want %q — the record says the "+
 					"bare slug, and the browser renders this verbatim", got, c.want)
 			}
 		})

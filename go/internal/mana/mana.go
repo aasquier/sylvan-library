@@ -1,19 +1,19 @@
-// Package mana is `mtglab/mana.py`: a Scryfall cost string read into generic
+// Package mana reads a Scryfall cost string into generic
 // mana, coloured pips (each the SET of colours that can pay it), Phyrexian
 // symbols (kept apart: two life always pays them, so they constrain no mana
 // base, yet they count toward mana value and identity) and whether the cost
-// holds an X -- and then the exact castability solver over that reading.
+// holds an X -- and then runs the exact castability solver over that reading.
 //
-// The parser arrived in Phase 3, because `analyze.py`'s curve and pip counts
-// read it. The solver followed in Phase 5 (`solver.go`), held to the
-// 13,944-case enumeration of `tests/mana_oracle.py` and to that case set's
-// pinned answer digest, which is the differential the whole port was promised
-// on: ENGINEERING section 1 built that oracle to be usable "in any language,
-// forever", and this is the language.
+// The parser came first, because the analysis surfaces' curve and pip counts
+// read it. The solver followed (`solver.go`), held to a
+// recorded 13,944-case enumeration and to that case set's
+// pinned answer digest: ENGINEERING section 1 built that oracle to be usable
+// "in any language,
+// forever", and this is the language it holds today.
 //
 // The package takes plain records and keeps no database, no network and no
 // dependency past the standard library -- the same boundary CLAUDE.md draws
-// around `mana.py` and `sim/`, and for the same reason. It is what lets the
+// around the deterministic core, and for the same reason. It is what lets the
 // most correctness-critical function in the project be tested ten thousand
 // times in a few milliseconds.
 package mana
@@ -34,7 +34,7 @@ const Colorless = "C"
 
 var symbolRe = regexp.MustCompile(`\{([^}]+)\}`)
 
-// Cost is `mana.ManaCost`.
+// Cost is a parsed mana cost.
 type Cost struct {
 	Generic   int
 	Pips      [][]string // one sorted colour set per coloured requirement
@@ -42,11 +42,11 @@ type Cost struct {
 	Phyrexian [][]string
 }
 
-// ManaValue is `ManaCost.mana_value`: generic plus one per pip plus one per
+// ManaValue is generic plus one per pip plus one per
 // Phyrexian symbol. X counts as 0.
 func (c Cost) ManaValue() int { return c.Generic + len(c.Pips) + len(c.Phyrexian) }
 
-// ColorsOf is `ManaCost.colors`: every colour in any symbol, sorted.
+// ColorsOf is every colour in any symbol, sorted.
 func (c Cost) ColorsOf() []string {
 	seen := map[string]bool{}
 	for _, pip := range append(append([][]string{}, c.Pips...), c.Phyrexian...) {
@@ -64,12 +64,13 @@ func (c Cost) ColorsOf() []string {
 	return out
 }
 
-// String is `ManaCost.__str__`, and it is load-bearing rather than cosmetic:
-// the differential case set names a case by rendering its cost, so these bytes
-// are compared against Python's for all 168 costs in the enumeration.
+// String renders the cost, and it is load-bearing rather than cosmetic:
+// the recorded case set names a case by rendering its cost, so these bytes
+// are compared against the corpus for all 168 costs in the enumeration.
 //
-// Two details are Python's and are reproduced rather than tidied. A generic of
-// zero is omitted (it is a falsy `if`, not a `> 0`), and a cost that renders to
+// Two details are the recorded rendering's and are reproduced rather than
+// tidied. A generic of
+// zero is omitted entirely, and a cost that renders to
 // nothing at all is "{0}" -- so a bare X is "{X}" and an empty cost is "{0}".
 func (c Cost) String() string {
 	var b strings.Builder
@@ -91,7 +92,8 @@ func (c Cost) String() string {
 	return b.String()
 }
 
-// sortedCopy sorts without disturbing the caller's slice. Python sorts each
+// sortedCopy sorts without disturbing the caller's slice. The rendering
+// sorts each
 // pip at render time and a hand-built Cost need not arrive sorted, so the sort
 // has to happen here -- but a String() that reorders its receiver's fields
 // would be a trap laid for whoever calls it inside a failure message.
@@ -124,7 +126,7 @@ func isDigits(s string) bool {
 	return true
 }
 
-// Parse is `mana.parse_mana_cost`: generic, coloured, {C}, hybrid {G/W},
+// Parse reads a cost string: generic, coloured, {C}, hybrid {G/W},
 // monocolour hybrid {2/G} (a pip any source can satisfy plus the generic --
 // an approximation that never claims a hand castable when it is not),
 // Phyrexian {G/P}, and an unknown symbol as one generic, so castability is

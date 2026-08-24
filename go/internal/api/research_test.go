@@ -212,10 +212,10 @@ func TestAFailedResearchCallIsAReadableJobError(t *testing.T) {
 	}
 }
 
-// The label is `plan_research`'s: sixty characters of the question, cut in
+// The label is the plan's: sixty characters of the question, cut in
 // code points, right-stripped, an ellipsis when it was cut -- held to the
 // corpus the claude package's tests are held to.
-func TestTheResearchLabelIsPythons(t *testing.T) {
+func TestTheResearchLabelMatchesTheCorpus(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "claude", "testdata", "research.json"))
 	if err != nil {
 		t.Fatal(err)

@@ -13,8 +13,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// This file is `claude/client.py`: constructing a client, and saying clearly
-// when we cannot.
+// This file constructs a client, and says clearly when we cannot.
 //
 // **The key is never bound to a name.** The SDK reads ANTHROPIC_API_KEY out of
 // the environment itself, and nothing here ever holds the value. A value we do
@@ -22,23 +21,19 @@ import (
 // into a prompt. `CredentialPresent` therefore asks whether a credential is
 // *present* and never what it is.
 //
-// **One thing Python worries about here does not exist in Go.** `client.py`
-// imports `anthropic` inside functions because the SDK rides with an optional
-// extra, so `sdk_installed()` is a real question there: a base install has a
-// gate, a solver and a simulator that all work with no account. Here the SDK is
-// linked into the binary and cannot be absent, so `Available` is the credential
-// question alone. ADR 15's "off is a real position" survives intact — it just
-// has one fewer way to be true.
+// **`Available` is the credential question alone.** The SDK is linked into
+// the binary and cannot be absent, so there is no "is the SDK installed"
+// question to ask; ADR 15's "off is a real position" survives intact — it
+// just has one fewer way to be true.
 //
-// **A second Python worry also evaporates.** `config.py` deletes a blank
-// ANTHROPIC_API_KEY at import, because Anthropic's precedence treats an empty
-// string as a credential that is present and then fails it as a 401. Go's SDK
-// reads `ok && v != ""`, and `os.Getenv` returns "" for both unset and blank,
-// so "set but empty" cannot reach `CredentialPresent` and read as true. The
-// door has no `.env` reader in any case.
+// **And "set but empty" cannot read as present.** Anthropic's own precedence
+// treats an empty ANTHROPIC_API_KEY as a credential that exists and then
+// fails it as a 401, but the Go SDK reads `ok && v != ""`, and `os.Getenv`
+// returns "" for both unset and blank, so a blank export never reaches
+// `CredentialPresent` as true. The door has no `.env` reader in any case.
 //
-// The Sonnet 5 request-surface facts that `client.py`'s docstring pins are
-// depended on by `converse.go` rather than restated here: adaptive thinking is
+// The Sonnet 5 request-surface facts pinned here are depended on by
+// `converse.go` rather than restated there: adaptive thinking is
 // on by default, `budget_tokens` is a 400, sampling parameters are rejected,
 // prefills are rejected, and depth is `output_config.effort`.
 
@@ -126,17 +121,18 @@ func Require() error {
 // unavailable is ErrUnavailable carrying the fixable reason and NOTHING else.
 //
 // A `fmt.Errorf("%w: ...", ErrUnavailable)` would read "claude is unavailable:
-// no ANTHROPIC_API_KEY ...", and that string is not internal: `str(exc)` on
-// Python's `ClaudeUnavailable` is the bare reason, the route puts it straight
+// no ANTHROPIC_API_KEY ...", and that string is not internal: the recorded
+// shape is the bare reason, the route puts it straight
 // into a 422/503 `detail`, and the deck page renders `detail` verbatim. So the
 // sentinel's own words would have shipped as a prefix nobody wrote, on the
 // first Claude surface to answer from the door.
 //
-// Found by curling the pair rather than by any test: the contract goldens
-// record this body as `{"detail": "string"}`, which is true of both spellings.
-// Same shape as `stanceRejection` -- match on the sentinel, answer in Python's
-// words -- and the same lesson as `converse` handing the model `no deck 'x'`
-// where Python's `DeckNotFound` stringifies to the bare slug.
+// Found by driving the real route rather than by any test: a schema-level
+// golden describes this body only as `{"detail": "string"}`, which is true
+// of both spellings.
+// Same shape as `stanceRejection` -- match on the sentinel, answer in the
+// recorded words -- and the same lesson as `converse` once handing the model
+// `no deck 'x'` where the recorded `DeckNotFound` text is the bare slug.
 type unavailable struct{ reason string }
 
 func (e *unavailable) Error() string { return e.reason }
@@ -164,10 +160,10 @@ func Connect() (anthropic.Client, error) {
 // request means is probably "it expired", not "the integration broke" -- and
 // the person reading the message will have forgotten the key had a lifetime.
 //
-// Python branches on the SDK's exception classes; the Go SDK reports one error
-// type carrying a status code, so this switches on the code. The messages are
-// the same sentences, and a test holds them to Python's word for word: they
-// are what a person reads at 2am, and a port that quietly paraphrased them
+// The SDK reports one error
+// type carrying a status code, so this switches on the code. The messages
+// are recorded sentences, and a test holds them to the golden word for word:
+// they are what a person reads at 2am, and a quiet paraphrase
 // would be losing the only part of this function that matters.
 func Explain(err error) string {
 	if err == nil {
@@ -178,8 +174,8 @@ func Explain(err error) string {
 		if errors.Is(err, ErrUnavailable) {
 			return err.Error()
 		}
-		// The SDK reports a transport failure as a plain error, where Python
-		// has an APIConnectionError class to match on.
+		// The SDK reports a transport failure as a plain error with no
+		// dedicated type to match on.
 		if isConnection(err) {
 			return "could not reach api.anthropic.com -- check network access."
 		}
@@ -205,8 +201,8 @@ func Explain(err error) string {
 	}
 }
 
-// isConnection recognises the transport failures Python catches as
-// APIConnectionError. Matched on the wrapped error's shape rather than its
+// isConnection recognises the could-not-reach family of transport
+// failures. Matched on the wrapped error's shape rather than its
 // text where possible; the string check is the residue for what the standard
 // library does not give a type to.
 func isConnection(err error) bool {
@@ -220,8 +216,8 @@ func isConnection(err error) bool {
 		strings.Contains(msg, "dial tcp")
 }
 
-// CheckReport is what `Check` found, in the field order Python's dict is built
-// in -- so the CLI and a health route render the same facts in the same order.
+// CheckReport is what `Check` found, in the recorded field order -- so the
+// CLI and a health route render the same facts in the same order.
 type CheckReport struct {
 	Model        string `json:"model"`
 	OK           bool   `json:"ok"`

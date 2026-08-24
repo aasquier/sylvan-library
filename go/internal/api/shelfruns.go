@@ -20,11 +20,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// `api/shelfruns.py`: the closed form and the policy search.
+// The closed form and the policy search.
 //
 // Two surfaces of very different weight, shaped differently on purpose --
-// and this is the one place in the port where the sibling-duration rule came
-// out **different for two routes in one module**.
+// this is the one place where the sibling-duration rule came
+// out **different for two routes in one file**.
 //
 // *The shelf is a plain route.* The closed form is arithmetic over an
 // already-compiled deck, measured at 0.03-0.04s on every deck in the library.
@@ -264,9 +264,9 @@ func (a *API) shelfResult(ctx context.Context, src library.Source, slug string,
 
 	onThePlay := true
 	if raw, given := body["on_the_play"]; given {
-		onThePlay = pyTruthy(raw)
+		onThePlay = truthy(raw)
 	}
-	target := pyFloat(body, "target", karsten.Target)
+	target := floatDefault(body, "target", karsten.Target)
 	if target < 0.5 {
 		target = 0.5
 	}
@@ -360,7 +360,7 @@ func policyParams(body map[string]any) (games, turns, seed int) {
 
 func (a *API) planPolicy(ctx context.Context, src library.Source, slug string, body map[string]any) jobs.Plan {
 	games, turns, seed := policyParams(body)
-	label := fmt.Sprintf("%s: mulligan policies, %s games each", slug, pyComma(games))
+	label := fmt.Sprintf("%s: mulligan policies, %s games each", slug, commaGrouped(games))
 
 	c, err := a.compileChecked(ctx, src, slug)
 	if err != nil {
@@ -424,7 +424,8 @@ func (a *API) planPolicy(ctx context.Context, src library.Source, slug string, b
 	}}
 }
 
-// sortGrid is Python's `sorted(...)` over tuples: element-wise, ascending.
+// sortGrid sorts rows as tuples: element-wise, ascending -- the recorded
+// grid order.
 func sortGrid(grid [][]int) {
 	for i := 1; i < len(grid); i++ {
 		cur := grid[i]
@@ -480,7 +481,7 @@ func (a *API) simPolicy(w http.ResponseWriter, r *http.Request) {
 	a.submit(w, r, a.planPolicy(r.Context(), src, slug, body))
 }
 
-func pyFloat(body map[string]any, key string, fallback float64) float64 {
+func floatDefault(body map[string]any, key string, fallback float64) float64 {
 	raw, given := body[key]
 	if !given || raw == nil {
 		return fallback

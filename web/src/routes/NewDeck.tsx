@@ -71,8 +71,8 @@ const TIER_ERA: Record<string, string> = {
 }
 
 /**
- * Canonical WUBRG key for a colour identity — the mirror of `colors.key_for`
- * in Python, and it must stay the mirror: the server's 32 slots are keyed this
+ * Canonical WUBRG key for a colour identity — the mirror of the server's own
+ * key writer, and it must stay the mirror: the server's 32 slots are keyed this
  * way, so a different ordering here would fail to match any of them.
  */
 function keyFor(identity: string[] | undefined): string {

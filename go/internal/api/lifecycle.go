@@ -23,26 +23,26 @@ import (
 
 // The moments a deck begins and ends: `POST /api/decks`, `POST
 // /api/decks/import`, `DELETE /api/decks/{owner}/{slug}` and `PUT
-// .../shared` -- `api/app.py`'s four lifecycle routes over
-// `api/service.py`'s create, import and delete, and the source's own sharing
+// .../shared` -- the four lifecycle routes: create, import and delete, and
+// the source's own sharing
 // verb.
 //
-// Held back from the nine editing routes on purpose, and the reason is
+// Kept apart from the nine editing routes on purpose, and the reason is
 // visible in the shapes below: **none of these goes through `commit`.**
-// Creation and deletion are outside `service._commit` in Python and therefore
+// Creation and deletion are deliberately
 // outside ADR 28's activity log, which is a decision rather than an oversight
 // -- adding them means a second call site, and the log's whole design is that
 // there is one. Sharing is outside it for the same reason and one more: it
 // changes who may *read* a deck, not what the deck is.
 //
 // Two of the four write into the caller's **own** library and never into an
-// owner named in the path (`routes.json` classifies them `shared` for exactly
-// that reason), so they resolve `Mine` rather than `SourceFor`. The other two
+// owner named in the path (no ownership question exists for
+// them), so they resolve `Mine` rather than `SourceFor`. The other two
 // take the owner segment like every other per-deck route, and inherit ADR 22's
 // answers with it: a deck the caller cannot see is absent from their source
 // and every verb against it is a 404 before writability is consulted.
 
-// slugPattern is `service._SLUG`. A slug becomes a directory name under
+// slugPattern is the slug grammar. A slug becomes a directory name under
 // `decks/`, so it is checked rather than trusted: the API takes it from a
 // request body, and "sanitise it later" is how a path component turns into a
 // path.
@@ -209,9 +209,9 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 		var exists library.ErrExists
 		if errors.As(err, &exists) {
 			// Only reachable by two creates racing for one slug: the check
-			// above has already answered the ordinary case. Python leaves this
-			// one uncaught and answers 500; refusing it in the same words as
-			// the check is the honest answer and costs nothing.
+			// above has already answered the ordinary case. The recorded
+			// answer left this race a bare 500; refusing it in the same
+			// words as the check is the honest answer and costs nothing.
 			a.refuseWrite(w, "create", rejectf(
 				"a deck called %s already exists; pick another slug", wire.Quote(slug)))
 			return
@@ -275,7 +275,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 	if status == "" {
 		status = "theoretical"
 	}
-	dryRun := pyTruthy(body["dry_run"])
+	dryRun := truthy(body["dry_run"])
 
 	if !slugPattern.MatchString(slug) {
 		a.refuseWrite(w, "import", rejectf(
@@ -392,9 +392,8 @@ func (a *API) deleteDeck(w http.ResponseWriter, r *http.Request) {
 	// **The deck is resolved before writability is asked**, which is ADR 5 and
 	// not a detail: a deck this caller cannot see is absent from their source,
 	// so every verb against it must be a 404, and a 403 raised first would
-	// confirm it exists. Python arrives at the same order from the other side
-	// -- `service._for_writing` looks the deck up itself when the source hides
-	// things -- and it is what `writeTarget` does for the nine editing routes.
+	// confirm it exists. `writeTarget` keeps the same order for the nine
+	// editing routes.
 	src, d, ok := a.writeTarget(w, r)
 	if !ok {
 		return
@@ -450,8 +449,7 @@ const deleteWord = "bury"
 // shared deck is ErrReadOnly (403), and their private one was never in the
 // source at all, so it is ErrNotFound (404).
 func (a *API) setDeckShared(w http.ResponseWriter, r *http.Request) {
-	// The body first, then the deck: Python checks `"shared" not in payload`
-	// in the handler and resolves the source on the line after, so a request
+	// The body first, then the deck -- the recorded order: a request
 	// with no flag is 422 even for a deck the caller cannot see.
 	body, ok := readBody(w, r)
 	if !ok {
@@ -472,10 +470,10 @@ func (a *API) setDeckShared(w http.ResponseWriter, r *http.Request) {
 	if a.refuseWrite(w, "shared", err) {
 		return
 	}
-	if err := writer.SetShared(r.Context(), slug, pyTruthy(raw)); a.refuseWrite(w, "shared", err) {
+	if err := writer.SetShared(r.Context(), slug, truthy(raw)); a.refuseWrite(w, "shared", err) {
 		return
 	}
-	// The whole deck, which is what Python returns: `shared` is the one deck
+	// The whole deck -- the recorded answer: `shared` is the one deck
 	// field a client changes without already holding the rest of the deck's
 	// new state. Answered by *calling the read route* rather than by a second
 	// renderer -- the path shape is the same, so the two cannot describe one
@@ -485,8 +483,9 @@ func (a *API) setDeckShared(w http.ResponseWriter, r *http.Request) {
 
 // ---- the shared helpers ----------------------------------------------------
 
-// bodyBracket is `int(bracket) if bracket not in (None, "") else None`, whose
-// ValueError the route answers with a 422 naming the field.
+// bodyBracket reads the optional bracket: absent, null or empty is none;
+// anything else goes through the recorded integer coercion, whose refusal
+// the route answers with a 422 naming the field.
 func bodyBracket(body map[string]any) (*int, error) {
 	raw, given := body["bracket"]
 	if !given || raw == nil {
@@ -503,8 +502,8 @@ func bodyBracket(body map[string]any) (*int, error) {
 		}
 		return &n, nil
 	case json.Number:
-		// `int(4.0)` truncates rather than refusing, which is what a JSON
-		// number arriving as a float has to do here too.
+		// A number with a fraction truncates rather than refusing -- the
+		// recorded coercion for a JSON number arriving as a float.
 		f, err := v.Float64()
 		if err != nil {
 			return nil, fmt.Errorf("invalid literal for int(): %s", wire.Quote(v.String()))
@@ -512,8 +511,8 @@ func bodyBracket(body map[string]any) (*int, error) {
 		n := int(f)
 		return &n, nil
 	case bool:
-		// `int(True)` is 1. Nobody sends this; leaving it to the default
-		// branch would refuse where Python accepts.
+		// A boolean coerces to 0 or 1. Nobody sends this; leaving it to the
+		// default branch would refuse where the recorded coercion accepts.
 		n := 0
 		if v {
 			n = 1
@@ -532,8 +531,8 @@ func bodyStrings(body map[string]any, key string) []string {
 		return []string{}
 	case string:
 		if v == "" {
-			// `payload.get("commander") or []` -- an empty string is falsey in
-			// Python, so it never becomes a one-element list.
+			// An empty string is falsy in the recorded reading, so it never
+			// becomes a one-element list.
 			return []string{}
 		}
 		return []string{v}
@@ -548,10 +547,12 @@ func bodyStrings(body map[string]any, key string) []string {
 	}
 }
 
-// pyTruthy is Python's `bool()` over a decoded JSON value. `{"shared": "no"}`
-// is true and `{"shared": 0}` is false, which is not what a Go `bool` cast
-// would say and is what the route has always done.
-func pyTruthy(v any) bool {
+// truthy is the recorded truthiness over a decoded JSON value: an empty
+// string, a zero, an empty container and null are false; everything else is
+// true. So `{"shared": "no"}` is true and `{"shared": 0}` is false, which
+// is not what a Go `bool` cast would say and is what the routes have
+// always done.
+func truthy(v any) bool {
 	switch value := v.(type) {
 	case nil:
 		return false

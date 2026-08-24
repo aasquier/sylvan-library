@@ -16,8 +16,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/compile"
 )
 
-// `sim/compile.py`, held to Python by `testdata/compile.json` (written by
-// `python tests/go_fixtures.py`).
+// The compiler, held to the frozen corpus `testdata/compile.json`.
 //
 // Two corpora in one file, and they are separate on purpose. The **texts** are
 // the three readers on their own -- the functions that read prose, where every
@@ -48,12 +47,13 @@ type cardJSON struct {
 	FetchesLands int          `json:"fetches_lands"`
 }
 
-// want turns a recorded card into the `sim.Card` Go must have built.
+// want turns a recorded card into the `sim.Card` the compiler must build.
 //
 // Every field is written in the corpus, `category` included. That is not
-// tidiness: Python's `SimCard` defaults `category` to "utility" and
-// `compile_one` never assigns it, so the natural Go port leaves the zero value
-// "" -- which no tier reads and the ADR 18 cache key serialises. A corpus that
+// tidiness: the recorded default for `category` is the word "utility" while
+// Go's zero value is
+// "" -- a field no tier reads and the ADR 18 cache key serialises. A corpus
+// that
 // omitted the field would have agreed with the wrong answer.
 func (c cardJSON) want() sim.Card {
 	produces := c.Produces
@@ -139,39 +139,40 @@ func load(t *testing.T) corpus {
 		t.Fatalf("decode corpus: %v", err)
 	}
 	if len(c.Texts) == 0 || len(c.Decks) == 0 {
-		t.Fatal("the corpus is empty; regenerate with `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/compile.json is a frozen " +
+			"golden -- restore it from version control")
 	}
 	return c
 }
 
-func TestTheTextReadersAgreeWithPython(t *testing.T) {
+func TestTheTextReadersMatchTheCorpus(t *testing.T) {
 	for _, tc := range load(t).Texts {
 		t.Run(tc.Source+"/"+tc.Label, func(t *testing.T) {
 			if got := compile.EntersTapped(tc.Text); got != tc.EntersTapped {
-				t.Errorf("EntersTapped = %v, Python says %v\ntext: %q",
+				t.Errorf("EntersTapped = %v, the corpus says %v\ntext: %q",
 					got, tc.EntersTapped, tc.Text)
 			}
 			if got := compile.ManaProduced(tc.Text); got != tc.ManaProduced {
-				t.Errorf("ManaProduced = %d, Python says %d\ntext: %q",
+				t.Errorf("ManaProduced = %d, the corpus says %d\ntext: %q",
 					got, tc.ManaProduced, tc.Text)
 			}
 			if got := compile.FetchesLands(tc.Text); got != tc.FetchesLands {
-				t.Errorf("FetchesLands = %d, Python says %d\ntext: %q",
+				t.Errorf("FetchesLands = %d, the corpus says %d\ntext: %q",
 					got, tc.FetchesLands, tc.Text)
 			}
 		})
 	}
 }
 
-// TestCardShapesThePoolDoesNotHold is `compile_one` over records built by
-// hand, and it is where four of this port's mutations died.
+// TestCardShapesThePoolDoesNotHold runs the compiler over records built by
+// hand, and it is where four mutations died.
 //
 // The 21-card pool is a real pool, which is its whole value and also its
 // limit: it holds no card whose front is an artifact and whose back is a
 // creature, no land that is also a creature, no fetchland, and nothing whose
 // `produced_mana` carries a string Scryfall would never send. Each of those
 // decides one line here, and a deck fixture cannot reach any of them. So the
-// corpus carries the records themselves and Python's answer for each.
+// corpus carries the records themselves and the recorded answer for each.
 func TestCardShapesThePoolDoesNotHold(t *testing.T) {
 	cases := load(t).Records
 	if len(cases) == 0 {
@@ -187,11 +188,11 @@ func TestCardShapesThePoolDoesNotHold(t *testing.T) {
 				ProducedMana: tc.Record.ProducedMana,
 				Layout:       tc.Record.Layout,
 			}
-			// The record's own `is_land` is Python's answer for it, so a
+			// The record's own `is_land` is the recorded answer for it, so a
 			// disagreement here is `internal/pool`'s rather than this
 			// package's -- worth separating, since both feed the same field.
 			if rec.IsLand() != tc.Record.IsLand {
-				t.Fatalf("IsLand = %v, Python says %v (type line %q, layout %q)",
+				t.Fatalf("IsLand = %v, the corpus says %v (type line %q, layout %q)",
 					rec.IsLand(), tc.Record.IsLand, rec.TypeLine, rec.Layout)
 			}
 			d := &deck.Deck{
@@ -211,13 +212,13 @@ func TestCardShapesThePoolDoesNotHold(t *testing.T) {
 				t.Fatalf("compiled %d cards, want 1", len(library))
 			}
 			if diff := cmp.Diff(tc.Card.want(), *library[0]); diff != "" {
-				t.Errorf("differs (-python +go):\n%s", diff)
+				t.Errorf("differs (-corpus +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestCompilingADeckAgreesWithPython(t *testing.T) {
+func TestCompilingADeckMatchesTheCorpus(t *testing.T) {
 	ctx := context.Background()
 	p := pooltest.Open(t)
 	cases := load(t).Decks
@@ -251,7 +252,7 @@ func TestCompilingADeckAgreesWithPython(t *testing.T) {
 					t.Fatalf("want NothingToSimulate, got %v (report %v)", err, report)
 				}
 				if want.Error() != tc.Message {
-					t.Errorf("message = %q, Python says %q", want.Error(), tc.Message)
+					t.Errorf("message = %q, the corpus says %q", want.Error(), tc.Message)
 				}
 				return
 			case "pool_required":
@@ -260,7 +261,7 @@ func TestCompilingADeckAgreesWithPython(t *testing.T) {
 					t.Fatalf("want PoolRequired, got %v (report %v)", err, report)
 				}
 				if want.Error() != tc.Message {
-					t.Errorf("message = %q, Python says %q", want.Error(), tc.Message)
+					t.Errorf("message = %q, the corpus says %q", want.Error(), tc.Message)
 				}
 				return
 			}
@@ -269,42 +270,42 @@ func TestCompilingADeckAgreesWithPython(t *testing.T) {
 			}
 
 			if len(report.Library) != len(tc.Report.Library) {
-				t.Fatalf("library has %d cards, Python says %d",
+				t.Fatalf("library has %d cards, the corpus says %d",
 					len(report.Library), len(tc.Report.Library))
 			}
 			for i, want := range tc.Report.Library {
 				if diff := cmp.Diff(want.want(), *report.Library[i]); diff != "" {
-					t.Errorf("library[%d] (%s) differs (-python +go):\n%s",
+					t.Errorf("library[%d] (%s) differs (-corpus +got):\n%s",
 						i, want.Name, diff)
 				}
 			}
 			switch {
 			case tc.Report.Commander == nil && report.Commander != nil:
-				t.Errorf("commander is %q, Python has none", report.Commander.Name)
+				t.Errorf("commander is %q, the corpus has none", report.Commander.Name)
 			case tc.Report.Commander != nil && report.Commander == nil:
-				t.Errorf("commander is nil, Python has %q", tc.Report.Commander.Name)
+				t.Errorf("commander is nil, the corpus has %q", tc.Report.Commander.Name)
 			case tc.Report.Commander != nil:
 				if diff := cmp.Diff(tc.Report.Commander.want(), *report.Commander); diff != "" {
-					t.Errorf("commander differs (-python +go):\n%s", diff)
+					t.Errorf("commander differs (-corpus +got):\n%s", diff)
 				}
 			}
 			if diff := cmp.Diff(tc.Report.Unresolved, report.Unresolved); diff != "" {
-				t.Errorf("unresolved differs (-python +go):\n%s", diff)
+				t.Errorf("unresolved differs (-corpus +got):\n%s", diff)
 			}
 			if report.DeclaredSize != tc.Report.DeclaredSize {
-				t.Errorf("declared %d, Python says %d",
+				t.Errorf("declared %d, the corpus says %d",
 					report.DeclaredSize, tc.Report.DeclaredSize)
 			}
 			if report.SimulatedSize() != tc.Report.SimulatedSize {
-				t.Errorf("simulated %d, Python says %d",
+				t.Errorf("simulated %d, the corpus says %d",
 					report.SimulatedSize(), tc.Report.SimulatedSize)
 			}
 			if report.CommanderUnresolved != tc.Report.CommanderUnresolved {
-				t.Errorf("commanderUnresolved %v, Python says %v",
+				t.Errorf("commanderUnresolved %v, the corpus says %v",
 					report.CommanderUnresolved, tc.Report.CommanderUnresolved)
 			}
 			if report.Complete() != tc.Report.Complete {
-				t.Errorf("complete %v, Python says %v",
+				t.Errorf("complete %v, the corpus says %v",
 					report.Complete(), tc.Report.Complete)
 			}
 		})
@@ -312,7 +313,7 @@ func TestCompilingADeckAgreesWithPython(t *testing.T) {
 }
 
 // asNothing and asPool name the two refusals, so the switch above reads as
-// Python's two `except` clauses rather than as reflection.
+// the two named failure modes rather than as reflection.
 func asNothing(err error, out **compile.NothingToSimulate) bool {
 	return errors.As(err, out)
 }
@@ -321,13 +322,13 @@ func asPool(err error, out **compile.PoolRequired) bool {
 	return errors.As(err, out)
 }
 
-// TestQtyRepeatsShareOnePointer is the aliasing Python's `[compiled] * qty`
+// TestQtyRepeatsShareOnePointer is the aliasing the qty expansion
 // produces, asserted rather than assumed.
 //
 // It is not decoration. Tier 1 removes a card from a hand by first-EQUAL and
 // compares the commander by identity, and a compiled deck's basics are the
-// same object many times over in Python. Allocating a fresh card per copy
-// would be the obvious Go port and would quietly change what a `==` on
+// same object many times over. Allocating a fresh card per copy
+// would be the obvious implementation and would quietly change what a `==` on
 // pointers means anywhere above this package.
 // It runs over **commander-in-the-99** as well as the legal deck, and the
 // illegal one is the load-bearing half: with the commander absent from the
@@ -382,7 +383,7 @@ func TestQtyRepeatsShareOnePointer(t *testing.T) {
 				repeats++
 				if first != card {
 					t.Fatalf("%q is two different cards in one library; "+
-						"Python's `[compiled] * qty` puts the same object in "+
+						"the qty expansion puts the same object in "+
 						"qty times", card.Name)
 				}
 			}
@@ -391,8 +392,8 @@ func TestQtyRepeatsShareOnePointer(t *testing.T) {
 			}
 
 			// The commander is a SEPARATE card even when the same name is in
-			// the 99, because Python calls `compile_one` again for it and
-			// Tier 1 asks `chosen is commander`.
+			// the 99: the compiler builds it afresh, and Tier 1 matches it
+			// by identity.
 			if report.Commander == nil {
 				t.Fatal("the deck lost its commander")
 			}
@@ -426,7 +427,7 @@ func TestQtyRepeatsShareOnePointer(t *testing.T) {
 // says the same thing in one line so the reason survives a corpus trim.
 func TestTheCompilerAlwaysSetsTheCategory(t *testing.T) {
 	if compile.Category != "utility" {
-		t.Fatalf("Category is %q; Python's SimCard defaults it to \"utility\"",
+		t.Fatalf("Category is %q; the recorded default is \"utility\"",
 			compile.Category)
 	}
 	for _, tc := range load(t).Decks {

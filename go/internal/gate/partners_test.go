@@ -10,7 +10,7 @@ func card(name, typeLine, text string) *pool.CardRecord {
 	return &pool.CardRecord{Name: name, TypeLine: typeLine, OracleText: text}
 }
 
-func TestPairingOfReadsTheAbilityAsPythonDoes(t *testing.T) {
+func TestPairingOfReadsTheAbilityAsTheReportsRecord(t *testing.T) {
 	cases := []struct {
 		text string
 		want *Pairing

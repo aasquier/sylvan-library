@@ -1,15 +1,13 @@
-// Package config is `mtglab/config.py` for the Go side: where things live on
-// disk and the switches the environment sets, read at call time and never
-// bound at start -- the rule that module exists to enforce (`use_paths` in a
-// test, a container's volume in production).
+// Package config is where things live on disk and the switches the
+// environment sets — read at call time and never bound at start, so a test
+// can point the process at a scratch directory and a container at its
+// volume without a restart ceremony.
 //
-// Two deliberate differences from the Python module. There is no `.env`
-// reader: the door is started by the container's CMD or by a developer who
-// exports what the Python server reads from its `.env`, and a file the
-// process found by walking up from its working directory is one more thing a
-// supervisor has to agree about. And secrets are not here at all, for the
-// reason Python's docstring gives -- a value we never hold is a value we
-// cannot log.
+// Two deliberate absences. There is no `.env` reader: the door is started
+// by the container's CMD or by a developer who exports what it needs, and a
+// file the process found by walking up from its working directory is one
+// more thing a supervisor has to agree about. And secrets are not here at
+// all -- a value we never hold is a value we cannot log.
 package config
 
 import (

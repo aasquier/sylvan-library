@@ -1,7 +1,7 @@
 /**
  * The reading room's dead end, and the way out of it.
  *
- * A theme turn can come back with **no question**. `theme.py` deletes an
+ * A theme turn can come back with **no question**. The server deletes an
  * answer that does not end in a question mark — a declarative sentence here is
  * the mode telling somebody what they think instead of asking — and it reports
  * the same empty question when the JSON does not parse or the model declines.

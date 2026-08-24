@@ -58,6 +58,7 @@ func claudeCheckCommand() *cobra.Command {
 	return cmd
 }
 
-// errUnavailable makes `claude check` exit 1 without repeating the reason the
-// report already printed, as cli.py's bare `sys.exit(1)` does.
+// errUnavailable makes `claude check` exit 1 without repeating the reason
+// the report already printed -- the verdict is the code, not a second
+// sentence.
 var errUnavailable = fmt.Errorf("the pipe is not open")

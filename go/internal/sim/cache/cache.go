@@ -1,4 +1,4 @@
-// Package cache is `sim/cache.py`: memoised Tier 1 results, keyed on the
+// Package cache is memoised Tier 1 results, keyed on the
 // simulation's own input ([ADR 18]).
 //
 // The whole design turns on one requirement: **a cached number must never be a
@@ -177,9 +177,11 @@ func Fingerprint() string {
 // rather than null when unused, so every key computed before that parameter
 // existed still hashes to what it hashed to.
 //
-// **Its Go types are Python's types.** An integer must arrive as an `int`,
-// never as a `float64` that happens to be whole: JSON writes `8` and `8.0`
-// differently and the key is the bytes. That is the trap in building one out
+// **Its types are part of the key.** An integer must arrive as an `int`,
+// never as a `float64` that happens to be whole: the serialisation writes
+// `8` and `8.0` differently, the key is the bytes, and every stored row's
+// key was computed over the `8` form -- the `8.0` spelling would orphan it.
+// That is the trap in building one out
 // of decoded JSON -- `encoding/json` puts every number into an `any` as a
 // `float64` -- so build an `Extra` from the values themselves.
 type Input struct {
@@ -192,11 +194,11 @@ type Input struct {
 	Extra     map[string]any
 }
 
-// Key is `cache.key`: the cache key for one `Run`, or "" if caching is
+// Key is the cache key for one `Run`, or "" if caching is
 // unavailable.
 //
-// Every argument here is an argument of `Run`, which is the property Python's
-// `RUN_INPUTS` exists to keep true, and `KeepRule` goes in whole rather than
+// Every argument here is an argument of `Run` -- the property the `Input`
+// struct exists to keep true -- and `KeepRule` goes in whole rather than
 // field by field, so a new mulligan lever is in the key the day it is added
 // instead of the day somebody remembers it.
 func Key(kind string, in Input) string {
@@ -208,14 +210,16 @@ func Key(kind string, in Input) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Payload is the exact bytes `Key` hashes: Python's
-// `json.dumps(payload, sort_keys=True, separators=(",", ":"),
-// ensure_ascii=True)`.
+// Payload is the exact bytes `Key` hashes: one canonical JSON rendering --
+// keys sorted, no spaces, ASCII only.
 //
-// Exported because it is the thing the differential corpus compares. Handed
-// Python's own fingerprint it must reproduce Python's blob **byte for byte**,
-// which is what turns "the two runtimes key differently" into a claim about
-// one field rather than an unexamined difference between two serialisers.
+// The layout is a contract with the deployed database, not a style. Every
+// stored row's key was computed over exactly these bytes, so any drift -- a
+// reordered field, a stray space, a differently-spelled number -- silently
+// orphans every row while the cache reads as merely cold. Exported because
+// the recorded corpus compares these bytes directly, which is what turns
+// "the key moved" into a claim about
+// one field rather than an unexamined difference between two serialisations.
 func Payload(engine, kind string, in Input) string {
 	var b strings.Builder
 	b.WriteByte('{')
@@ -270,23 +274,25 @@ func writeKey(b *strings.Builder, name string) {
 	b.WriteByte(':')
 }
 
-// writeCardForm is `cache._card_form`: one `sim.Card`, as something JSON can
-// serialise the same way every time.
+// writeCardForm is one `sim.Card`, serialised the same way every time.
 //
-// Colour sets are sorted on the way out. Python's are frozensets, whose
-// iteration order varies with `PYTHONHASHSEED`, so serialising one directly
-// would produce a key that changes between processes -- the cache would miss
-// constantly and nobody would notice it was broken rather than merely cold.
+// Colour sets are sorted on the way out. A colour set is a set -- the order
+// its slice happens to hold is incidental, and every stored key was computed
+// over the sorted form -- so serialising the incidental order would produce
+// a key that changes between otherwise-identical inputs: the cache would
+// miss constantly and nobody would notice it was broken rather than merely
+// cold.
 //
-// Tuple order is *preserved*, in `Pips` and in `Produces`, because it is real
+// Sequence order is *preserved*, in `Pips` and in `Produces`, because it is
+// real
 // input: the engine matches pips in order and the leftovers it returns depend
 // on that order.
 //
 // `Category` is carried even though the engine never reads it. Excluding a
 // field is a claim about engine behaviour that can go stale; including one
-// costs a handful of bytes. It is also the field a Go port gets wrong for
-// free, since Python's dataclass default is "utility" and Go's zero value is
-// "" -- see `compile.Category`.
+// costs a handful of bytes. It is also the field easiest to serialise wrong
+// for free, since the recorded default is the word "utility" while Go's zero
+// value is "" -- see `compile.Category`.
 func writeCardForm(b *strings.Builder, c *sim.Card) {
 	b.WriteByte('[')
 	writeString(b, c.Name)
@@ -325,7 +331,7 @@ func writeCardForm(b *strings.Builder, c *sim.Card) {
 }
 
 func writeKeepRule(b *strings.Builder, k tier1.KeepRule) {
-	// `asdict(keep_rule)` under `sort_keys=True`, which is alphabetical and
+	// The rule's fields in alphabetical order -- the recorded key order --
 	// not the declaration order.
 	b.WriteByte('{')
 	for i, pair := range []struct {

@@ -1,4 +1,4 @@
-// Package ledger is `sim/tier3/ledger.py`: the match ledger (ADR 36), every
+// Package ledger is the match ledger (ADR 36): every
 // Forge match recorded as it finishes.
 //
 // The Simulator's next phase is measurement over accumulated games — rating
@@ -60,8 +60,8 @@ const DefaultLimit = 20
 
 // Recorder holds the app.db handle the ledger writes through.
 //
-// A value rather than a package-level connection so a test can point one at a
-// scratch file, which is `path=` in Python's signature.
+// A value rather than a package-level connection so a test can point one at
+// a scratch file.
 type Recorder struct {
 	db  *sql.DB
 	log *slog.Logger
@@ -105,8 +105,8 @@ type Match struct {
 	// not reproducible, and the ledger says so rather than inventing a number.
 	//
 	// A `*big.Int` for the reason the run options carry one — and a seed past
-	// SQLite's 64-bit INTEGER is where Python raises an OverflowError, which
-	// its broad `except` turns into a warning and a match recorded nowhere.
+	// SQLite's 64-bit INTEGER is refused: the recorded behaviour is
+	// a warning and a match recorded nowhere.
 	// [seedForSQL] reproduces that rather than truncating, because a
 	// truncated seed is a row claiming a reproducibility it does not have.
 	Seed           *big.Int
@@ -151,7 +151,7 @@ func (r *Recorder) record(ctx context.Context, m Match) (int64, error) {
 		owners = make([]*int64, len(m.Decks))
 	}
 	if len(owners) != len(m.Decks) {
-		// `zip(..., strict=True)`: a mismatch is a bug in the caller, and the
+		// A strict pairing: a mismatch is a bug in the caller, and the
 		// warning is where it becomes visible.
 		return 0, fmt.Errorf("%d owner ids for %d decks", len(owners), len(m.Decks))
 	}
@@ -231,9 +231,9 @@ func orEmpty(v []string) []string {
 
 // seedForSQL narrows a seed for SQLite's 64-bit INTEGER, or refuses.
 //
-// Python reaches the same place by a different road: `sqlite3` raises
-// `OverflowError` for an integer too large, `record`'s broad `except` logs it,
-// and the match goes unrecorded. Refusing here puts the whole insert on the
+// The recorded behaviour for an oversized seed is a logged warning
+// and a match recorded nowhere. Refusing here, before any row is written,
+// puts the whole insert on the
 // same side of the fence — a match is one row plus its seats plus its games,
 // and half of one is worse than none.
 func seedForSQL(seed *big.Int) (any, error) {
@@ -241,9 +241,9 @@ func seedForSQL(seed *big.Int) (any, error) {
 		return nil, nil
 	}
 	if !seed.IsInt64() {
-		//nolint:staticcheck // sqlite3's own words, capital and all: this is
-		// what Python raises here, and the warning it lands in is read
-		// beside Python's.
+		//nolint:staticcheck // capitalised deliberately: the ledger's
+		// long-standing warning text, preserved verbatim so old and new log
+		// lines read as the same failure.
 		return nil, fmt.Errorf("Python int too large to convert to SQLite INTEGER")
 	}
 	return seed.Int64(), nil
@@ -263,9 +263,11 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-// now is `datetime.now(UTC).isoformat()`, and a variable so a test can freeze
-// it. Through `pytext` rather than a local format string, so the fraction is
-// elided at a zero microsecond exactly as Python elides it.
+// now is the app's recorded timestamp format, and a variable so a test can
+// freeze
+// it. Through `textutil` rather than a local format string, so the fraction
+// is elided at a zero microsecond exactly as the recorded format elides
+// it.
 var now = func() string { return textutil.Isoformat(time.Now()) }
 
 // Seat is one deck's row in a recorded match, with the labels it wore when it
@@ -280,7 +282,7 @@ type Seat struct {
 	Wins      int      `json:"wins"`
 }
 
-// RecordedMatch is one row of [Recent], in Python's key order.
+// RecordedMatch is one row of [Recent], in the recorded wire key order.
 type RecordedMatch struct {
 	ID             int64    `json:"id"`
 	CreatedAt      string   `json:"created_at"`

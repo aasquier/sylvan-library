@@ -7,15 +7,15 @@ import (
 
 // The generative half of the solver's net, and it is not decoration.
 //
-// PLAN section 5 item 2 puts it plainly: Hypothesis's role on the Python side
-// is covered here "by native fuzzing against the same brute-force/Hall's-
-// theorem oracles, re-implemented once in Go". `castability_test.go` proves
-// this package agrees with Python on 13,944 *enumerated* cases; this one looks
+// The fuzzer plays the solver against the brute-force and Hall's-theorem
+// oracles, written once from the definitions. `castability_test.go` proves
+// this package answers the recorded 13,944 *enumerated* cases; this one looks
 // where that enumeration structurally cannot.
 //
-// **And it had to, on the first day it was written.** The enumerated set draws
-// its pips with `itertools.combinations_with_replacement`, which yields index
-// tuples in non-decreasing order -- and the hybrid {W,U} is the *last* entry in
+// **And it had to, on the first day it was written.** The enumerated set
+// draws
+// its pips as non-decreasing index
+// tuples -- and the hybrid {W,U} is the *last* entry in
 // its pip alphabet. So no cost in all 13,944 cases ever presents a **wide pip
 // before a narrow one**: every sequence of pip widths it can produce is
 // non-decreasing. That is not a small omission. Deleting the `seen` reset in
@@ -134,7 +134,7 @@ func FuzzCastability(f *testing.F) {
 	)
 	const any = w | u | b | r | g
 
-	// The seeds are the shapes `tests/test_mana.py` pins, plus the one the
+	// The seeds are the long-pinned trap shapes, plus the one the
 	// enumeration cannot reach. A seed corpus is not a wish list: each of these
 	// is a case somebody was once wrong about, so a fuzzer that wanders off
 	// still starts from the places wrongness has actually lived.
@@ -198,7 +198,7 @@ func FuzzCastability(f *testing.F) {
 
 		// --- nor can the order the sources arrive in. A solver that reads it
 		// makes a seeded simulation irreproducible, which is the bug this
-		// property was written for on the Python side.
+		// property was originally written against.
 		if CanPay(cost, reverseSources(sources), xValue) != got {
 			t.Fatalf("%s (x=%d): answered %v, and %v with the same lands in "+
 				"the other order", name, xValue, got, !got)

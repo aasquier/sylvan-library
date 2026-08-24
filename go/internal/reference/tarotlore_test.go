@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// `tarotlore.py`'s three readers. The theme corpus pins what `TarotOffer`
+// The tarot lore's three readers. The theme corpus pins what `TarotOffer`
 // writes for a real spread, byte for byte -- what it cannot reach is the
 // branches a spread never produces: an offer with nothing left to give, a
 // card nobody wrote about, and an id spelled the way a model shouts it.

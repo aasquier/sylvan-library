@@ -1,11 +1,11 @@
-// Package tarot is src/mtglab/tarot.py: the 78-card deck, Magic's answers to
-// it, the weighted shuffle, and the three-card spread.
+// Package tarot is the 78-card deck, Magic's answers to it, the weighted
+// shuffle, and the three-card spread.
 //
-// **Python decides** (ADR 14). A shuffle has a right answer and lives here;
-// what a spread *means* has none and belongs to the reader. So this package
-// holds all 136 cards and **no card's meaning** — that corpus is
-// `tarotlore.py`, which crossed as reference data, and the reader quotes it by
-// id rather than paraphrasing it.
+// **Deterministic code decides** (ADR 14). A shuffle has a right answer and
+// lives here; what a spread *means* has none and belongs to the reader. So
+// this package holds all 136 cards and **no card's meaning** — that corpus
+// is `internal/reference`'s tarot lore, and the reader quotes it by id
+// rather than paraphrasing it.
 //
 // The load-bearing coupling is in SPREAD: its three slots ARE the theme
 // interview's first three slot kinds, so a card is dealt *for* a slot and
@@ -16,13 +16,13 @@
 //
 // # A seed is a promise
 //
-// This is `internal/mt19937`'s first real caller, and the reason it was built
-// bit-exact rather than merely well-distributed. A reading outlives the request
-// that produced it: the client carries one integer, and a reload must deal the
-// same three cards or it is a different reading of the same person. Across the
-// Python-to-Go cutover that promise has to hold for seeds people already have,
-// which no amount of good shuffling would give — only reproducing CPython's
-// Mersenne Twister exactly does.
+// This is `internal/mt19937`'s first real caller, and the reason it was
+// built bit-exact rather than merely well-distributed. A reading outlives
+// the request that produced it: the client carries one integer, and a
+// reload must deal the same three cards or it is a different reading of the
+// same person. That promise holds for seeds people already carry — which no
+// amount of merely-good shuffling would give. Only a generator reproduced
+// bit for bit against its recorded corpus does.
 package tarot
 
 import (
@@ -64,7 +64,7 @@ type Card struct {
 	// Weight is how often it lands, against a natural card's 1.0.
 	Weight float64 `json:"weight"`
 	Note   *string `json:"note"`
-	// Image and FaceName are Python properties, rendered into the data rather
+	// Image and FaceName are derived facts, rendered into the data rather
 	// than recomputed here — there is no second implementation to disagree.
 	Image    string `json:"image"`
 	FaceName string `json:"face_name"`
@@ -119,9 +119,9 @@ func init() {
 // Drawn is a card, where it landed, and which way up.
 //
 // It marshals through MarshalJSON rather than through struct tags, because
-// Python builds this payload by splatting the card's own dict and adding three
-// keys — so `reversed`, `slot` and `position` come after every card field, in
-// that order. An embedded struct would put them wherever Go felt like.
+// the recorded payload lists every card field first and then the three keys
+// the deal adds — `reversed`, `slot`, `position`, in that order. An
+// embedded struct would put them wherever the encoder felt like.
 type Drawn struct {
 	Card     Card
 	Position Position
@@ -132,12 +132,12 @@ type Drawn struct {
 }
 
 // MarshalJSON writes the card's served fields and then the three the deal
-// adds, in Python's order.
+// adds, in the recorded order.
 //
 // Written WITH the type rather than when a route needed it, which is the
-// lesson `tier1.Number` cost: that type was bit-exact against CPython by repr
-// and by Float64bits and still went onto the wire as a struct, because nothing
-// had ever asked what encoding/json did with it. Note also which card fields
+// lesson `tier1.Number` cost: that type was bit-exact by repr and by
+// Float64bits and still went onto the wire as a struct dump, because
+// nothing had ever asked what encoding/json did with it. Note also which card fields
 // are absent — `art_url`, `echo` and `weight` are the sampler's business and
 // the reader's, never the browser's.
 func (d Drawn) MarshalJSON() ([]byte, error) {
@@ -166,9 +166,9 @@ func (d Drawn) MarshalJSON() ([]byte, error) {
 
 // Reading is a dealt spread. Seeded, so a reload shows the same cards.
 //
-// Seed is a *big.Int and not an int64, which is not fastidiousness: the route
-// declares `seed: int | None`, Python integers are arbitrary precision, and
-// `deal` echoes back the seed it was handed. A client may legitimately hold
+// Seed is a *big.Int and not an int64, which is not fastidiousness: the
+// seed grammar is unbounded (seed.go holds it), and `Deal` echoes back the
+// seed it was handed. A client may legitimately hold
 // 2**70 — and an int64 would truncate it into a DIFFERENT reading returned
 // under a DIFFERENT number, silently, on both halves of the promise this
 // package exists to keep. big.Int marshals as a bare JSON number, so the wire
@@ -181,24 +181,23 @@ type Reading struct {
 // weightedSample draws k distinct cards from FullDeck, crossovers at their
 // weight.
 //
-// random.sample has no weights and random.choices has no "without
-// replacement", so this is the classic successive draw: pick against the
-// remaining total, remove, repeat.
+// A weighted draw without replacement has no single library spelling, so
+// this is the classic successive draw: pick against the remaining total,
+// remove, repeat.
 //
-// **The running total is Fsum because deterministic has to mean deterministic
-// everywhere.** Python's was a bare sum() until 2026-08-22, and sum() over
-// floats is not one function — CPython 3.12 gives it compensated accumulation
-// and 3.11 adds left to right. EchoWeight is 0.14, which no binary float holds
-// exactly, so this was not a corner case: all 9,180 of the 134-card pools this
-// loop reaches on its third draw total differently on the two interpreters. A
-// Go port written as `total += w` would reproduce 3.11 — the one the image is
-// not running.
+// **The running total is Fsum because deterministic has to mean
+// deterministic everywhere.** A bare running total over floats is method-
+// and order-sensitive in its last bits, and the recorded totals are the
+// compensated answer. EchoWeight is 0.14, which no binary float holds
+// exactly, so this was not a corner case: all 9,180 of the 134-card pools
+// this loop reaches on its third draw total differently under a plain
+// `total += w` than under `Fsum` — and the corpus holds the Fsum answer.
 // It returns the running totals it used alongside the cards, and Deal
 // discards them. That second value exists for one reason: the fsum this
 // function depends on is invisible in the cards. A test that recomputes
-// floats.Fsum by hand proves pyfloat works and says nothing about whether
-// THIS loop calls it — the mutation survives, which was measured rather than
-// guessed. Handing the totals back is the smallest change that lets a test
+// floats.Fsum by hand proves the floats package works and says nothing
+// about whether THIS loop calls it — the mutation survives, which was
+// measured rather than guessed. Handing the totals back is the smallest change that lets a test
 // drive the real path instead of a re-implementation of it.
 func weightedSample(rng *mt19937.Random, k int) ([]Card, []float64) {
 	pool := make([]Card, len(FullDeck))
@@ -253,9 +252,10 @@ func Deal(seed *big.Int) Reading {
 	drawn, _ := weightedSample(rng, len(Spread))
 	cards := make([]Drawn, len(drawn))
 	for i, card := range drawn {
-		// Order matters: Python builds the tuple with a generator over
-		// zip(drawn, SPREAD), so every reversal is rolled after every card is
-		// picked, one per card, in spread order.
+		// Order matters: the recorded stream rolls every reversal after
+		// every card is picked, one per card, in spread order — a reversal
+		// interleaved with the draws would be a different walk of the
+		// generator and a different spread.
 		cards[i] = Drawn{Card: card, Position: Spread[i], Reversed: rng.Float64() < 0.5}
 	}
 	return Reading{Seed: new(big.Int).Set(used), Cards: cards}
@@ -310,9 +310,9 @@ func (r Reading) Describe() string {
 	// minors: the natural Ace of Swords and its Magic answer aligning is every
 	// bit the event the two Fools are.
 	//
-	// A slice of keys in first-seen order, not a map: Python iterates
-	// by_trump.values() in insertion order, and with two alignments in one
-	// spread the paragraphs would otherwise be ordered by Go's map randomness.
+	// A slice of keys in first-seen order, not a map: the paragraphs follow
+	// the spread's own order, and with two alignments in one spread a bare
+	// map would order them by iteration randomness instead.
 	type trumpKey struct {
 		arcana string
 		suit   string
@@ -343,19 +343,17 @@ func (r Reading) Describe() string {
 	return text
 }
 
-// joinAnd is Python's " and ".join over the names sharing a trump.
+// joinAnd joins the names sharing a trump with " and ".
 func joinAnd(names []string) string { return strings.Join(names, " and ") }
 
 // mintSeed picks the integer an unseeded deal will be remembered by.
 //
-// Python spells this as an OS-seeded random.Random drawing randrange(2**31)
-// and then re-seeding from the draw; this draws the same range directly. That
-// is not a divergence to reproduce, and the distinction is worth stating
-// because every other line in this package is: pyrand exists so that a seed
-// SOMEBODY ALREADY HOLDS deals the same three cards on either runtime, and
-// nobody holds a seed that has not been minted yet. What must match is the
-// deal FROM a seed, which mt19937.New guarantees; which unheld integer gets
-// chosen is not observable by anyone.
+// The one draw in this package that is NOT held to the recorded generator,
+// and the licence is worth stating because every other line here is held:
+// `mt19937` exists so that a seed SOMEBODY ALREADY HOLDS deals the same
+// three cards forever, and nobody holds a seed that has not been minted
+// yet. What must match is the deal FROM a seed, which `mt19937.New`
+// guarantees; which unheld integer gets chosen is not observable by anyone.
 //
 // crypto/rand rather than math/rand so that two processes starting in the same
 // millisecond cannot hand two people the same reading. It cannot fail on any
@@ -366,7 +364,8 @@ func mintSeed() int64 {
 	if _, err := cryptorand.Read(b[:]); err != nil {
 		panic(fmt.Sprintf("tarot: no entropy to deal from: %v", err))
 	}
-	// Masked to 31 bits, matching randrange(2**31): the seed is rendered in a
-	// URL and a negative or 64-bit one would be a surprise to the client.
+	// Masked to 31 bits — the minted range has always been [0, 2**31): the
+	// seed is rendered in a URL, and a negative or 64-bit one would be a
+	// surprise to the client.
 	return int64(binary.BigEndian.Uint64(b[:]) & (1<<31 - 1))
 }

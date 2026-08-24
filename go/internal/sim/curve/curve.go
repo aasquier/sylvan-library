@@ -1,4 +1,4 @@
-// Package curve is `sim/curve.py`: the mana curve. Do you have T mana on turn
+// Package curve is the mana curve: do you have T mana on turn
 // T, and what fixes it if not.
 //
 // Aaron asked for a land count that guarantees a land drop every turn. **The
@@ -67,15 +67,15 @@
 // Where the two are within `TooClose` the advice says "either" rather than
 // resolving a tie with a coin.
 //
-// # One ulp, and the interpreter it came from
+// # One ulp, and where it came from
 //
-// The two float sums in this package go through `floats.Fsum`, and the Python
-// they are ported from says `fsum` for the same reason -- **since
-// 2026-08-22, and the port is why**. Both said `sum` before that, and
-// CPython 3.12 gave `sum()` compensated (Neumaier) accumulation over floats
-// where 3.11 adds them left to right. Same deck, same arithmetic, one ulp
-// apart, on a project that supports both interpreters and ships 3.12 in the
-// container. `ExpectedLandsInPlay` and `OnCurveOdds` were the two lines
+// The two float sums in this package go through `floats.Fsum` -- **since
+// 2026-08-22, and a found divergence is why**. They were bare running sums
+// before that, and a bare sum's last bits depend on accumulation order and
+// on whatever compensation the arithmetic underneath happens to apply. Same
+// deck, same formula, one ulp
+// apart, depending on nothing anybody chose.
+// `ExpectedLandsInPlay` and `OnCurveOdds` were the two lines
 // affected; the accumulations written as explicit loops never were.
 //
 // It matters because the outputs of this package are an integer and a word:
@@ -85,8 +85,8 @@
 //
 // No sampling, no seed, no model. Every number here has a right answer, and it
 // is `karsten`'s arithmetic underneath -- `Exactly`, `CardsSeen` and
-// `HypergeometricAtLeast` are imported from there exactly as Python imports
-// them, so the two shelves cannot drift apart about what a hypergeometric is.
+// `HypergeometricAtLeast` are imported from there, one implementation for
+// both shelves, so the two cannot drift apart about what a hypergeometric is.
 package curve
 
 import (
@@ -179,12 +179,11 @@ func ExpectedLandsInPlay(deckSize, lands, turn int, onThePlay bool) float64 {
 	if lands < top {
 		top = lands
 	}
-	// `floats.Fsum`, matching Python's `fsum` -- and that line was `sum` on both
-	// sides until 2026-08-22. `sum` over floats is compensated on CPython 3.12
-	// and left to right on 3.11, so this expectation answered differently
-	// depending on the interpreter underneath it. The port found it and both
-	// runtimes were fixed at once; `sim/curve.py`'s docstring carries the
-	// argument for choosing the correctly-rounded answer over either.
+	// `floats.Fsum` -- and this line was a bare running sum until
+	// 2026-08-22. A bare sum's last bits depend on the accumulation
+	// underneath it, so this expectation could answer one ulp apart for
+	// reasons nobody chose; the package comment carries the
+	// argument for the correctly-rounded answer over any accumulation's own.
 	terms := make([]float64, 0, top+1)
 	for k := 0; k <= top; k++ {
 		capped := k
@@ -221,7 +220,7 @@ func ExpectedRamp(library []sim.Card, turn int, onThePlay bool) float64 {
 	return total
 }
 
-// atMostOne is Python's `min(1.0, x)`, which returns x only when it is
+// atMostOne caps at one, returning x only when it is
 // strictly below one -- the distinction that keeps a negative zero out.
 func atMostOne(x float64) float64 {
 	if x < 1.0 {
@@ -238,8 +237,8 @@ func atMostOne(x float64) float64 {
 func LandDistribution(deckSize, lands, turn int, onThePlay bool) []float64 {
 	size := turn + 1
 	if size < 0 {
-		// Python's `[0.0] * -1` is the empty list, and a negative turn reaches
-		// here from a caller that did not guard.
+		// A negative turn answers the empty distribution -- the recorded
+		// behaviour -- and reaches here from a caller that did not guard.
 		size = 0
 	}
 	dist := make([]float64, size)
@@ -339,10 +338,12 @@ type Extra struct {
 // distribution over the whole 99 -- is not something anybody could read off a
 // screen even if it were cheap.
 //
-// `need` is a pointer because Python's is `None`-defaulting and **zero is a
-// real value there**: `need=0` asks for no mana at all and correctly answers
-// 1.0, while `need=None` asks for `turn`. A sentinel would have collapsed the
-// two. `extra` may be nil.
+// `need` is a pointer because absent and zero mean different things, and
+// **zero is a
+// real value here**: `need` of 0 asks for no mana at all and correctly
+// answers
+// 1.0, while a nil `need` asks for `turn`. A sentinel would have collapsed
+// the two. `extra` may be nil.
 func OnCurveOdds(library []sim.Card, turn int, need *int, onThePlay bool, extra *Extra) float64 {
 	deckSize := len(library)
 	if deckSize <= 0 || turn <= 0 {
@@ -378,9 +379,9 @@ func OnCurveOdds(library []sim.Card, turn int, need *int, onThePlay bool, extra 
 		case short <= 0:
 			total += lw
 		case short < len(rampDist):
-			// The inner sum is `Fsum` for the interpreter reason above. The
-			// outer accumulation is a loop in Python too, so it never had the
-			// problem and stays a running total.
+			// The inner sum is `Fsum` for the one-ulp reason above. The
+			// outer accumulation was always an explicit loop, so it never had
+			// the problem and stays a running total.
 			total += floats.Rounded(lw * floats.Fsum(rampDist[short:]))
 		}
 	}
@@ -542,15 +543,16 @@ func slotsToTarget(library []sim.Card, turn, need int, target float64,
 	return nil
 }
 
-// Options are `curve`'s keyword arguments.
+// Options are Curve's levers.
 //
-// `TargetTurn` and `Target` have real defaults in Python rather than `None`
-// ones, and **zero is a legal value for each** -- `curve(target_turn=0)`
+// `TargetTurn` and `Target` have real defaults rather than absent
+// ones, and **zero is a legal value for each** -- a target turn of 0
 // clamps to turn 1, and a test pins that -- so they are plain fields and
-// `DefaultOptions` is how you ask for the defaults. `TargetMana` is `None` in
-// Python and a pointer here for the same reason `OnCurveOdds`'s `need` is.
+// `DefaultOptions` is how you ask for the defaults. `TargetMana` is a
+// pointer for the same reason `OnCurveOdds`'s `need` is: absent and zero
+// mean different things.
 //
-// `OnTheDraw` is inverted from Python's `on_the_play=True` deliberately, so
+// `OnTheDraw` is deliberately the negative of "on the play", so
 // that the zero value is the default and the harder case.
 type Options struct {
 	TargetTurn int
@@ -559,12 +561,12 @@ type Options struct {
 	OnTheDraw  bool
 }
 
-// DefaultOptions is `curve(library)` with nothing passed.
+// DefaultOptions is Curve with nothing asked for.
 func DefaultOptions() Options {
 	return Options{TargetTurn: DefaultTargetTurn, Target: DefaultTarget}
 }
 
-// Curve is `curve.curve`: the whole mana curve for one compiled deck, and what
+// Curve is the whole mana curve for one compiled deck, and what
 // to do about it.
 //
 // `TargetMana` defaults to `TargetTurn` -- the on-curve question. Asking for

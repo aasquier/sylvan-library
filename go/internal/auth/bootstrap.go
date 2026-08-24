@@ -12,7 +12,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The maintainer, reconciled to admin at every start -- `auth/bootstrap.py`.
+// The maintainer, reconciled to admin at every start.
 // ADR 17.
 //
 // A fresh instance has an empty `users` table, which means no session can be
@@ -52,7 +52,7 @@ import (
 // being run.
 //
 // The read half -- the maintainer's *handle*, per request, writing nothing --
-// is `library.MaintainerUsername`, which crossed with the deck reads and
+// is `library.MaintainerUsername`, which lives with the deck reads and
 // deliberately stays there: a reader that lives beside the write would be one
 // import away from becoming it.
 
@@ -75,11 +75,11 @@ func UsernameFor(email string) string {
 	local, _, _ := strings.Cut(email, "@")
 	var kept strings.Builder
 	for _, c := range local {
-		// Python's `c.isalnum()` is Unicode-wide (letters and every numeric
-		// category), so a `ü` is *kept* here and then fails UsernamePattern's
-		// ASCII alphabet below -- landing on "admin", exactly as Python does.
-		// An ASCII-only filter would instead strip the letter and mint a
-		// handle Python never would have.
+		// The keep-filter is Unicode-wide (letters and every numeric
+		// category) on purpose: a `ü` is *kept* here and then fails
+		// UsernamePattern's ASCII alphabet below -- landing on "admin", the
+		// recorded fallback. An ASCII-only filter would instead strip the
+		// letter and mint a handle this rule never minted before.
 		if unicode.IsLetter(c) || unicode.IsNumber(c) || strings.ContainsRune("._-", c) {
 			kept.WriteRune(c)
 		}
@@ -147,8 +147,8 @@ func uniqueUsername(ctx context.Context, db *sql.DB, wanted string) (string, err
 // no log line. Every *change* is logged, because a reconciliation that
 // silently promotes an account is one nobody can audit after the fact.
 //
-// The two malformed-configuration cases return nil rather than an error,
-// exactly as Python logs and carries on: refusing to start would turn a typo
+// The two malformed-configuration cases return nil rather than an error --
+// logged, then carried past: refusing to start would turn a typo
 // in one environment variable into an instance that serves nothing, when the
 // app is perfectly capable of running while its admin is misconfigured. A
 // database failure is still an error -- that one is about the volume, not the
@@ -166,7 +166,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 		// no-logging rule is not protecting from the maintainer.
 		slog.Default().Error(fmt.Sprintf("MTGLAB_ADMIN_EMAIL=%s is not an email "+
 			"address; no maintainer account was reconciled", wire.Quote(address)))
-		return nil //nolint:nilerr // a malformed preference is logged and skipped, never fatal — bootstrap.py's own behavior
+		return nil //nolint:nilerr // a malformed preference is logged and skipped, never fatal — the reconciler's standing rule
 	}
 	if normalised == "" { // unreachable: the `if address == ""` above
 		return nil

@@ -11,13 +11,14 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The differential corpus: `tests/go_fixtures.py` runs `mtglab.api.jobs` and
-// records what it answered, and this file holds Go to it.
+// The recorded corpus: `testdata/jobs.json` is a frozen golden of what the
+// registry answers, and this file holds the package to it.
 //
 // The behaviour half of the registry -- one locked step, a lane that runs one
 // thing at a time -- cannot be recorded, so `registry_test.go` and the race
 // detector carry it. What is recorded here is the arithmetic and the
-// formatting, which is where two runtimes disagree *quietly*: a percentage a
+// formatting, which is where an implementation drifts *quietly*: a
+// percentage a
 // point out and a timestamp with a `Z` on it both look entirely plausible.
 
 type jobsCorpus struct {
@@ -52,12 +53,13 @@ type jobsCorpus struct {
 			Total  int    `json:"total"`
 			// The nested values arrive as **bytes, not as parsed JSON**, and
 			// that is the corpus reporting a real constraint rather than a
-			// convenience. `result` and `partial` are `Any` in Python and a
-			// dict keeps its insertion order; Go's `map[string]any` marshals
-			// with its keys sorted, so a port that carried a result through a
+			// convenience. `result` and `partial` can hold anything, and the
+			// recorded bodies keep insertion order; a `map[string]any`
+			// marshals
+			// with its keys sorted, so a result carried through a
 			// map could not reproduce the body whatever else it did right.
-			// Every family still to flip therefore owes its result a struct
-			// with the fields in Python's order.
+			// Every job family therefore owes its result a struct
+			// with the fields in the recorded order.
 			ResultJSON  *string `json:"result_json"`
 			PartialJSON *string `json:"partial_json"`
 			Error       *string `json:"error"`
@@ -87,8 +89,8 @@ func corpus(t *testing.T) jobsCorpus {
 		corpusErr = json.Unmarshal(raw, &corpusData)
 	})
 	if corpusErr != nil {
-		t.Fatalf("the jobs corpus will not load (regenerate with "+
-			"`python tests/go_fixtures.py`): %v", corpusErr)
+		t.Fatalf("the jobs corpus will not load (testdata/jobs.json is a "+
+			"frozen golden -- restore it from version control): %v", corpusErr)
 	}
 	return corpusData
 }
@@ -113,15 +115,15 @@ func TestTheCorpusIsWholeEnoughToProveAnything(t *testing.T) {
 		}
 	}
 	if ties < 4 {
-		t.Fatalf("only %d exact ties in the percent corpus; without them a "+
-			"port that used math.Round would pass", ties)
+		t.Fatalf("only %d exact ties in the percent corpus; without them an "+
+			"implementation that used math.Round would pass", ties)
 	}
 }
 
-func TestThePercentagesAreThePythonRounding(t *testing.T) {
+func TestThePercentagesAreTheRecordedRounding(t *testing.T) {
 	for _, cse := range corpus(t).Percent {
 		if got := percent(cse.Done, cse.Total); got != cse.Want {
-			t.Errorf("percent(%d, %d) = %d, Python says %d",
+			t.Errorf("percent(%d, %d) = %d, the corpus says %d",
 				cse.Done, cse.Total, got, cse.Want)
 		}
 	}
@@ -136,14 +138,15 @@ func TestTheStampsAreIsoformat(t *testing.T) {
 		when := time.Date(at[0], time.Month(at[1]), at[2], at[3], at[4],
 			at[5], at[6]*1000, time.UTC)
 		if got := stamp(when); got != cse.Want {
-			t.Errorf("stamp(%v) = %q, Python says %q", at, got, cse.Want)
+			t.Errorf("stamp(%v) = %q, the corpus says %q", at, got, cse.Want)
 		}
 	}
 }
 
-func TestAStampIsTruncatedToTheMicrosecondPythonHas(t *testing.T) {
-	// Go's clock has nanoseconds and `datetime` does not, so the nanoseconds
-	// have to go somewhere. Python's answer is truncation -- `datetime`
+func TestAStampIsTruncatedToTheMicrosecond(t *testing.T) {
+	// Go's clock has nanoseconds and the recorded format does not, so the
+	// nanoseconds
+	// have to go somewhere. The recorded answer is truncation -- the format
 	// simply has no place to put them -- and the case that catches a rounding
 	// implementation is the one that would otherwise carry a fraction into a
 	// stamp that must have none.
@@ -158,7 +161,7 @@ func TestAStampIsTruncatedToTheMicrosecondPythonHas(t *testing.T) {
 }
 
 func TestAStampSortsAsTextTheWayItSortsAsTime(t *testing.T) {
-	// `all_jobs` sorts on this string, not on an instant, so the elided
+	// The job listing sorts on this string, not on an instant, so the elided
 	// fraction has to sort below every six-digit one within the same second.
 	// It does, because `+` is 0x2B and every digit is above 0x30 -- but that
 	// is an argument, and an argument about ordering is a thing to check.
@@ -176,7 +179,7 @@ func TestAStampSortsAsTextTheWayItSortsAsTime(t *testing.T) {
 	}
 }
 
-// raw carries a nested value into a job as the bytes Python wrote, so the
+// raw carries a nested value into a job as the recorded bytes, so the
 // comparison below is of the whole body and not only of the envelope around
 // it. A nil stays nil, which is the `null` a poll must see.
 func raw(text *string) any {
@@ -186,7 +189,7 @@ func raw(text *string) any {
 	return json.RawMessage(*text)
 }
 
-func TestThePayloadIsTheBytesPythonWrites(t *testing.T) {
+func TestThePayloadIsTheRecordedBytes(t *testing.T) {
 	for _, cse := range corpus(t).Payloads {
 		t.Run(cse.Name, func(t *testing.T) {
 			job := &Job{
@@ -247,20 +250,20 @@ func TestNeitherTheOwnerNorTheKeyEverSerialises(t *testing.T) {
 	}
 }
 
-func TestTheLaneNamesAndTheBoundsArePythons(t *testing.T) {
+func TestTheLaneNamesAndTheBoundsAreTheRecordedOnes(t *testing.T) {
 	c := corpus(t)
 	for name, want := range map[string]Lane{
 		"cpu": CPU, "net": NET, "forge": FORGE,
 	} {
 		if got := c.Lanes[name]; got != string(want) {
-			t.Errorf("lane %s is %q here and %q in Python", name, want, got)
+			t.Errorf("lane %s is %q here and %q in the corpus", name, want, got)
 		}
 	}
 	if c.MaxJobs != MaxJobs {
-		t.Errorf("MaxJobs is %d here and %d in Python", MaxJobs, c.MaxJobs)
+		t.Errorf("MaxJobs is %d here and %d in the corpus", MaxJobs, c.MaxJobs)
 	}
 	if len(c.Live) != 2 || !live(c.Live[0]) || !live(c.Live[1]) {
-		t.Errorf("Python's LIVE is %v and this port does not agree", c.Live)
+		t.Errorf("the corpus's live set is %v and this package does not agree", c.Live)
 	}
 	for _, status := range []string{Done, Errored} {
 		if live(status) {
@@ -269,17 +272,18 @@ func TestTheLaneNamesAndTheBoundsArePythons(t *testing.T) {
 	}
 }
 
-func TestTheRefusedLaneSaysWhatPythonSays(t *testing.T) {
+func TestTheRefusedLaneSaysWhatTheCorpusSays(t *testing.T) {
 	r := quietRegistry(t, Config{})
 	for _, cse := range corpus(t).UnknownLane {
 		if cse.Lane == "" {
 			// **The one recorded divergence, and it is Go's zero value
-			// rather than a decision.** Python's `lane: str = CPU` is a
-			// default parameter, so an explicitly passed `""` is a third
-			// thing and is refused. A Go string field cannot tell "not set"
+			// rather than a decision.** The recorded refusal treats an
+			// explicitly passed `""` as a third
+			// thing, distinct from "no lane given". A string field cannot
+			// tell "not set"
 			// from "set to empty", so `Options{}` -- which is what "no lane
 			// given" looks like -- has to mean CPU. Nothing can observe the
-			// difference: `Plan.lane` defaults to CPU in Python too and every
+			// difference: `Plan.Lane` defaults to CPU as well, and every
 			// planner passes a real lane, so no caller has ever produced the
 			// empty one. Recorded here rather than left out of the corpus,
 			// because a case silently skipped is a case nobody re-examines.
@@ -291,7 +295,7 @@ func TestTheRefusedLaneSaysWhatPythonSays(t *testing.T) {
 			t.Fatalf("lane %q was accepted", cse.Lane)
 		}
 		if err.Error() != cse.Error {
-			t.Errorf("lane %q refused with %q, Python says %q",
+			t.Errorf("lane %q refused with %q, the corpus says %q",
 				cse.Lane, err, cse.Error)
 		}
 	}
@@ -304,14 +308,15 @@ func TestTheRefusedLaneSaysWhatPythonSays(t *testing.T) {
 }
 
 func TestAnIDIsTwelveHexCharacters(t *testing.T) {
-	// `uuid.uuid4().hex[:12]`, and the length is in the corpus so a port that
+	// Twelve lowercase hex characters, and the length is in the corpus so an
+	// implementation that
 	// reached for a full uuid or a base64 would be caught rather than merely
 	// look different.
 	want := corpus(t).IDLength
 	for range 32 {
 		id := randomID()
 		if len(id) != want {
-			t.Fatalf("id %q is %d characters, Python's is %d", id, len(id), want)
+			t.Fatalf("id %q is %d characters, the corpus says %d", id, len(id), want)
 		}
 		for _, c := range id {
 			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {

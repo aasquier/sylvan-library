@@ -5,7 +5,7 @@ import (
 	"unicode"
 )
 
-// `tarotlore.py`'s three readers, over the corpus this package already
+// The tarot lore's three readers, over the corpus this package already
 // embeds: what may be told at a table where these cards are face up, one
 // fact by the id a reader cited, and the block of prose the theme
 // interview's frame message carries.
@@ -28,9 +28,10 @@ import (
 // `TAROT:PIXIE-FEE` gets past the prefix check and would then miss here on
 // the one difference nobody would ever debug from a dropped-fact counter.
 //
-// Folded with the same rule Python's `casefold()` uses on both sides. Every
-// committed id is ASCII, so the two agree today; matching the function
-// rather than the corpus is what keeps that true of an id somebody adds.
+// Folded with one rule on both sides of the comparison. Every committed id
+// is ASCII, so lowering is the whole of case folding today; folding both
+// sides with the same function is what keeps that true of an id somebody
+// adds.
 func TarotFactByID(id string) *TarotFact {
 	wanted := tarotFold(id)
 	for i := range tarot.Facts {
@@ -41,9 +42,10 @@ func TarotFactByID(id string) *TarotFact {
 	return nil
 }
 
-// tarotFold is `s.strip().casefold()` for an id. Ids are kebab-case ASCII, so
-// `ToLower` is the whole of `casefold` over the set that can occur -- and the
-// strip is Python's, which counts four more characters as space than Go does.
+// tarotFold lowers and trims an id. Ids are kebab-case ASCII, so `ToLower`
+// is the whole of case folding over the set that can occur -- and the trim
+// uses the wide space class, which counts four more characters as space
+// than `unicode.IsSpace` does.
 func tarotFold(id string) string {
 	return strings.ToLower(strings.TrimFunc(id, tarotIsSpace))
 }

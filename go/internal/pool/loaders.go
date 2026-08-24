@@ -11,7 +11,7 @@ import (
 
 // LoadOracle and LoadPrintings replace the table's rows from a bulk file.
 //
-// Two upgrades over `cards/db.py`'s loaders, both the phase plan's:
+// Two upgrades over the loaders' first shape, both sanctioned:
 // **DuckDB's Appender** instead of a prepared statement per row (the
 // ledger's queued 28-minute item — ~110 rows/second measured on the old
 // path, most of it `duckdb::DataChunk::Initialize` churn), and **one
@@ -20,8 +20,8 @@ import (
 // no printings at all — the sixteen-minute window `docs/polish/LEDGER.md`
 // records.
 //
-// One behavioural note the swap makes sharp: Python's `INSERT OR REPLACE`
-// absorbed a duplicate primary key silently, the Appender refuses it at
+// One behavioural note the swap makes sharp: an `INSERT OR REPLACE`
+// absorbs a duplicate primary key silently, the Appender refuses it at
 // flush. Within one run a collision means the bulk file itself repeated an
 // id; refusing loudly beats absorbing invisibly, and the transaction makes
 // the refusal safe.
@@ -100,8 +100,8 @@ func load(ctx context.Context, db *sql.DB, path, table string,
 	return total, nil
 }
 
-// SnapshotPrices is `snapshot_prices`: append today's prices to
-// price_history. One statement, exactly as Python runs it.
+// SnapshotPrices appends today's prices to
+// price_history. One statement, long unchanged.
 func SnapshotPrices(ctx context.Context, db *sql.DB) (int64, error) {
 	if _, err := db.ExecContext(ctx, `
         INSERT OR REPLACE INTO price_history

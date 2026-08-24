@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// The OWASP minimum profile `auth/passwords.py` pins and argues: memory-hard
+// The OWASP minimum profile, pinned: memory-hard
 // enough to matter, small enough (19 MiB a call) that a handful of concurrent
 // logins cannot OOM the 1GB instance. Not a default to tune; the decision is
 // ADR 5's.
@@ -19,8 +19,8 @@ const (
 	MemoryCostKiB = 19_456
 	TimeCost      = 2
 	Parallelism   = 1
-	saltLength    = 16 // argon2-cffi's default
-	keyLength     = 32 // argon2-cffi's default
+	saltLength    = 16 // the recorded hashes' salt length
+	keyLength     = 32 // the recorded hashes' digest length
 )
 
 // MaxPasswordBytes bounds the input a hash will be computed over, and
@@ -56,18 +56,16 @@ func CheckStrength(password string) error {
 	return nil
 }
 
-// HashPassword hashes for storage, in the PHC string form argon2-cffi writes
-// (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`), so a hash made here
-// verifies there and the other way round.
+// HashPassword hashes for storage, in the recorded PHC string form
+// (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`), so a hash made today
+// is interchangeable with every hash already in the file.
 //
 // The salt is drawn here and the encoding is `hashWithSalt` below rather than
 // the library's own `CreateHash`, and that is deliberate: it makes the salt an
 // *argument*, which is what lets `testdata/crypto.json` pin this function's
-// output against argon2-cffi's **byte for byte** instead of settling for a
-// round trip. Phase 2 only had to prove Go could read Python's hashes; the
-// accounts flip makes Go a writer, and a hash written here has to be one
-// `argon2-cffi` verifies for the rest of time -- including after a rollback to
-// a Python-only door.
+// output **byte for byte** against the recorded corpus instead of settling
+// for a round trip. A hash written here has to verify for the rest of the
+// file's life, whatever verifies it next.
 func HashPassword(password string) (string, error) {
 	if err := CheckStrength(password); err != nil {
 		return "", err
@@ -80,14 +78,14 @@ func HashPassword(password string) (string, error) {
 }
 
 // hashWithSalt is the encoder: Argon2id at the profile above, written as the
-// PHC string argon2-cffi writes.
+// recorded PHC string.
 //
-// Every detail here is somebody else's format decision, copied rather than
+// Every detail here is the format's decision, copied rather than
 // chosen. The version field is `v=19` (0x13), the parameter order is `m,t,p`,
 // and the salt and digest are **unpadded** standard base64 -- not the URL
-// alphabet, which is the one mistake that would produce a string Python's
-// parser accepts for some salts and rejects for others, so the corpus carries
-// a salt with both `+` and `/` in it.
+// alphabet, which is the one mistake that would produce a string a strict
+// PHC parser accepts for some salts and rejects for others, so the corpus
+// carries a salt with both `+` and `/` in it.
 func hashWithSalt(password string, salt []byte) string {
 	sum := argon2.IDKey([]byte(password), salt, TimeCost, MemoryCostKiB,
 		Parallelism, keyLength)
@@ -100,7 +98,7 @@ func hashWithSalt(password string, salt []byte) string {
 // Verify asks whether password is the one behind storedHash. A nil hash --
 // an invited account with no password yet -- costs a dummy verification and
 // answers false, so an unclaimed account is not identifiable by how fast it
-// is refused. Every failure mode collapses to false, as in Python: a
+// is refused. Every failure mode collapses to false: a
 // mismatch, a corrupt hash, a hash from some other library.
 func Verify(storedHash *string, password string) bool {
 	if storedHash == nil {
@@ -111,7 +109,7 @@ func Verify(storedHash *string, password string) bool {
 	return err == nil && ok
 }
 
-// dummyHash is computed once per process, like `passwords._dummy_hash`:
+// dummyHash is computed once per process:
 // computing it per call would cost two hashes on an unknown account against
 // one on a known one, the same timing signal pointing the other way.
 var dummyHash = func() string {

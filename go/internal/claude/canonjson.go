@@ -19,41 +19,42 @@ import (
 // RESPONSE_SCHEMA**, and the key is how a stored dossier is found and
 // served -- so "equivalent JSON" is not equivalent here at
 // all; the bytes are the key. Three things `encoding/json` would get wrong:
-// it escapes `<`, `>` and `&` where Python does not; it writes non-ASCII as
-// raw UTF-8 where `ensure_ascii=True` writes `\uXXXX` with a surrogate pair
-// above the BMP; and with `sort_keys=True` Python's item separator is `, `
-// and its key separator `: `, where `encoding/json` writes neither space.
+// it escapes `<`, `>` and `&` where this dialect does not; it writes
+// non-ASCII as raw UTF-8 where this dialect writes `\uXXXX` with a
+// surrogate pair above the BMP; and under sorted keys the dialect's item
+// separator is `, ` and its key separator `: `, where `encoding/json`
+// writes neither space.
 //
-// **The brief's opening message is `json.dumps(facts, indent=2,
-// default=str)`**, and that one goes to the model rather than into a digest.
-// The two runtimes never share a conversation or a prompt cache, so the
-// bytes there do not have to agree -- but reproducing them costs the same
-// renderer a second option, and buys a corpus row that pins the whole brief
-// against Python's, pool facts and all, rather than its key order alone.
+// **The brief's opening message is the two-space-indented rendering**, and
+// that one goes to the model rather than into a digest. Those bytes are
+// hashed nowhere -- but rendering them through the same
+// writer costs one option, and buys a corpus row that pins the whole brief,
+// pool facts and all, rather than its key order alone.
 //
-// The writer is a transcription of `json.encoder` with the set of inputs
-// closed on purpose: a string, a bool, nil, an integer, a pointer to any of
+// The writer keeps the set of inputs closed on purpose: a string, a bool,
+// nil, an integer, a pointer to any of
 // those (`null` when nil), an ordered map, a string-keyed Go map (sorted or
 // refused -- a Go map has no order to reproduce), and slices of any of the
 // above. **Floats are refused.** Neither input carries one today, and a
-// float would need CPython's `repr`, which lives in `sim/tier1` and is not
+// float would need the canonical decimal spelling, which lives in
+// `sim/tier1` and is not
 // this package's to reach for; a renderer that silently wrote `%g` would be
 // a wrong key that looked like a key. `sim/cache` holds the first
-// transcription of this encoder (compact separators, for ADR 18's key) and
+// transcription of this dialect (compact separators, for ADR 18's key) and
 // is private to that package; this is the second, and the package comment
 // there is the argument for why a key's bytes are written out by hand.
 
-// dumpOptions selects between Python's two spellings used here.
+// dumpOptions selects between the dialect's two spellings used here.
 type dumpOptions struct {
-	// Indent is `indent=N`; zero is `indent=None`. With an indent Python's
+	// Indent is the indent width; zero means compact. With an indent the
 	// item separator becomes `,` plus a newline, and without one it is `, `.
 	Indent int
-	// SortKeys is `sort_keys=True`. Required for a Go map, which has no
+	// SortKeys sorts an object's keys. Required for a Go map, which has no
 	// order of its own; an ordered map is written in its order either way.
 	SortKeys bool
 }
 
-// dumpJSON renders v as Python would. It panics on a value outside the closed
+// dumpJSON renders v in the canonical dialect. It panics on a value outside the closed
 // set above, because every caller hashes or sends the result and a plausible
 // rendering of an unknown type is worse than a crash.
 func dumpJSON(v any, opt dumpOptions) string {
@@ -91,14 +92,14 @@ func writeValue(b *strings.Builder, v any, opt dumpOptions, level int) {
 		return
 	case map[string]any:
 		if !opt.SortKeys {
-			panic("claude: dumpJSON was handed a Go map without sort_keys; a " +
+			panic("claude: dumpJSON was handed a Go map without SortKeys; a " +
 				"map has no insertion order to reproduce, so use wire.OrderedMap")
 		}
 		names := make([]string, 0, len(x))
 		for name := range x {
 			names = append(names, name)
 		}
-		// `sort_keys=True` sorts by code point; Go compares bytes, and for
+		// Keys sort by code point; Go compares bytes, and for
 		// valid UTF-8 the two orders are the same.
 		sort.Strings(names)
 		pairs := make([]wire.KV, 0, len(names))
@@ -108,8 +109,8 @@ func writeValue(b *strings.Builder, v any, opt dumpOptions, level int) {
 		writeObject(b, pairs, opt, level)
 		return
 	case float64, float32:
-		panic("claude: dumpJSON was handed a float; CPython's repr is not " +
-			"reproduced here, and nothing this package renders carries one")
+		panic("claude: dumpJSON was handed a float; the canonical decimal " +
+			"spelling is not reproduced here, and nothing this package renders carries one")
 	}
 
 	rv := reflect.ValueOf(v)
@@ -122,7 +123,7 @@ func writeValue(b *strings.Builder, v any, opt dumpOptions, level int) {
 		writeValue(b, rv.Elem().Interface(), opt, level)
 	case reflect.Slice, reflect.Array:
 		if rv.Kind() == reflect.Slice && rv.IsNil() {
-			// A nil slice is Python's `[]` here, never `null`: the brief's
+			// A nil slice renders `[]` here, never `null`: the brief's
 			// lists are built by appending to an empty one.
 			b.WriteString("[]")
 			return
@@ -147,7 +148,7 @@ func writeValue(b *strings.Builder, v any, opt dumpOptions, level int) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		b.WriteString(strconv.FormatUint(rv.Uint(), 10))
 	default:
-		panic(fmt.Sprintf("claude: dumpJSON has no Python rendering for a %T", v))
+		panic(fmt.Sprintf("claude: dumpJSON has no rendering for a %T", v))
 	}
 }
 
@@ -187,12 +188,12 @@ func writeNewline(b *strings.Builder, opt dumpOptions, level int) {
 	b.WriteString(strings.Repeat(" ", opt.Indent*level))
 }
 
-// writeJSONString is `json.encoder.encode_basestring_ascii`: `"` and `\`
+// writeJSONString is the dialect's ASCII string form: `"` and `\`
 // escaped, the five short forms, everything below 0x20 and everything
 // **above 0x7e** as `\uXXXX` in lower-case hex, a rune above the BMP as a
 // UTF-16 surrogate pair. `/`, `<`, `>` and `&` are not escaped. Invalid
-// UTF-8 decodes to U+FFFD, which a Python `str` cannot hold at all -- there
-// is no faithful answer, and the replacement character is a stable one.
+// UTF-8 decodes to U+FFFD -- a byte sequence that was never a string has no
+// faithful answer, and the replacement character is a stable one.
 func writeJSONString(b *strings.Builder, s string) {
 	b.WriteByte('"')
 	for i := 0; i < len(s); {

@@ -1,4 +1,4 @@
-// Package artifacts is `artifacts/generate.py`: the five deliverables, and
+// Package artifacts renders the five deliverables, and
 // the bytes are the product.
 //
 // Rule 3 of the non-negotiables -- five artifacts for every new deck and every
@@ -6,17 +6,17 @@
 // `primer-advanced.md` is the lines and the failure modes,
 // `decklist-annotated.md` is the 99 with a reason beside every card,
 // `moxfield.txt` is the bulk import, and `swaps.md` is a diff -- which is why
-// this package sits over `pyyaml` rather than beside it. A deliverable is
-// markdown a person reads on the train and pastes into Moxfield, so "close
-// enough" is not a standard that exists here: `testdata/artifacts.json` holds
-// what Python renders for every fixture deck and this package reproduces it
-// byte for byte.
+// this package sits over the YAML emitter rather than beside it. A
+// deliverable is markdown a person reads on the train and pastes into
+// Moxfield, so "close enough" is not a standard that exists here:
+// `testdata/artifacts.json` is a frozen golden holding every fixture deck's
+// rendering, and this package reproduces it byte for byte.
 //
-// Three shapes carried across unchanged, each of which is a decision rather
+// Three shapes, each of which is a decision rather
 // than a default:
 //
-//   - **`RenderAll` returns text and `Store` writes it**, split in Python when
-//     the API learned to build. A deck-facing endpoint holds a `DeckSource`,
+//   - **`RenderAll` returns text and `Store` writes it**, split when
+//     the API learned to build. A deck-facing endpoint holds a `Source`,
 //     which is a locator and may not be a disk at all, so generating and
 //     storing had to stop being the same act. Everything above `RenderAll` is
 //     a pure function of the deck; below it is somebody's storage.
@@ -59,20 +59,20 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
-// Snapshot is `generate.SNAPSHOT`: the build's own baseline for the next
+// Snapshot is the build's own baseline for the next
 // `swaps.md`. A normalised dump rather than the hand-written file, because
 // `SwapList` compares decks and not text, and a snapshot that round-trips
 // through a parse is all the baseline it needs.
 const Snapshot = "deck.last-built.yaml"
 
-// Deliverables is `generate.DELIVERABLES`, in the order the module numbers
+// Deliverables is the five, in the order the package numbers
 // them: the set a reader may ask for, and therefore the set a rebuild prunes.
 var Deliverables = []string{"primer-quick.md", "primer-advanced.md",
 	"decklist-annotated.md", "moxfield.txt", "swaps.md"}
 
-// IsDeliverable answers `name in DELIVERABLES` -- membership first, and for
-// the file tier it is the only check that matters, because a name that is not
-// one of the five never becomes a path at all.
+// IsDeliverable answers membership in Deliverables -- membership first, and
+// for the file tier it is the only check that matters, because a name that
+// is not one of the five never becomes a path at all.
 func IsDeliverable(name string) bool {
 	for _, d := range Deliverables {
 		if d == name {
@@ -82,11 +82,11 @@ func IsDeliverable(name string) bool {
 	return false
 }
 
-// categoryTitles is `generate.CATEGORY_TITLES`: the heading a category is
+// categoryTitles is the heading a category is
 // written under. A category with no entry here falls back to the raw word in
-// the quick primer's table and to Python's `str.title()` in the annotated
-// list -- two different fallbacks for the same missing key, which is a fact
-// about the Python rather than a tidy rule, so both are reproduced.
+// the quick primer's table and to `titleCase` in the annotated
+// list -- two different fallbacks for the same missing key, a recorded fact
+// rather than a tidy rule, so both are reproduced.
 var categoryTitles = map[string]string{
 	"land":           "Lands",
 	"ramp":           "Ramp & Mana Acceleration",
@@ -103,31 +103,32 @@ var categoryTitles = map[string]string{
 	"utility":        "Utility",
 }
 
-// ErrDraft is `generate.DraftDeck`: artifacts were asked for a deck nobody has
+// ErrDraft is the draft refusal: artifacts were asked for a deck nobody has
 // finished reasoning about. The message names the cards still owed a `why`,
-// and it reaches a caller verbatim -- `service.build_artifacts` re-raises it
+// and it reaches a caller verbatim -- the build surfaces relay it
 // as the 422's `detail` -- so it is part of the wire and not just a log line.
 var ErrDraft = errors.New("the deck is a draft")
 
-// Stat is one entry of `render_all`'s `stats` mapping, which both primers
+// Stat is one entry of RenderAll's `stats` mapping, which both primers
 // render as `- **key:** value`.
 //
-// A slice rather than a map because Python's is a `dict` and dicts are
-// ordered; strings rather than `any` because Python renders each value with
-// `str()`, and reproducing `str()` over arbitrary objects is not a thing Go
-// can promise. No caller supplies stats today -- neither `mtglab decks build`
-// nor `service.build_artifacts` passes any -- so the shape is carried across
-// rather than the stringifying, and whoever wires one up brings their own.
+// A slice rather than a map because the entries render in the order the
+// caller chose them; strings rather than `any` because the recorded
+// rendering stringifies each value, and reproducing that coercion over
+// arbitrary objects is not a promise this renderer can make. No caller
+// supplies stats today -- neither `mtglab decks build` nor the build route
+// passes any -- so the shape is kept rather than the stringifying, and
+// whoever wires one up brings their own.
 type Stat struct {
 	Key   string
 	Value string
 }
 
-// Options are `render_all`'s keyword arguments.
+// Options are RenderAll's dials.
 type Options struct {
 	// Cards is the pool's reading of the deck, for the mana costs the
 	// annotated list prints. Absent is ordinary: the costs simply do not
-	// render, exactly as when Python is handed `cards=None`.
+	// render, and everything else does.
 	Cards map[string]*pool.CardRecord
 	// Previous is the deck as of its last build, parsed from the snapshot.
 	// `swaps.md` is present only when this is, which is why a build's output
@@ -137,9 +138,9 @@ type Options struct {
 	// unsupplied by either caller today.
 	Prices map[string]float64
 	Stats  []Stat
-	// Today is `date.today()`, injectable so the oracle is not a fixture that
-	// expires at midnight. Zero means ask the clock -- the *local* clock,
-	// because `date.today()` is local and the instance runs in UTC.
+	// Today is the render date, injectable so the oracle is not a fixture
+	// that expires at midnight. Zero means ask the clock -- the *local*
+	// clock, the recorded choice, and the instance runs in UTC.
 	Today time.Time
 }
 
@@ -157,7 +158,7 @@ type File struct {
 	Text string
 }
 
-// Files is a build's output, in the order `render_all` builds it -- which is
+// Files is a build's output, in the order `RenderAll` builds it -- which is
 // the order `Store` writes it in, snapshot last.
 type Files []File
 
@@ -182,11 +183,11 @@ func (f Files) Text(name string) (string, bool) {
 	return "", false
 }
 
-// RenderAll is `generate.render_all`: the deliverables as text, written
+// RenderAll is the deliverables as text, written
 // nowhere. A draft comes back as ErrDraft and nothing is rendered.
 //
-// The snapshot is placed last and `Store` relies on that order. In Python
-// that ordering used to be the whole guard -- a refusal partway through left
+// The snapshot is placed last and `Store` relies on that order. That
+// ordering used to be the whole guard -- a refusal partway through left
 // the old baseline in place -- and it is belt and braces now, because
 // rendering refuses before a single byte is stored.
 func RenderAll(d *deck.Deck, o Options) (Files, error) {
@@ -221,9 +222,9 @@ func RenderAll(d *deck.Deck, o Options) (Files, error) {
 	return append(files, File{Name: Snapshot, Text: snapshot}), nil
 }
 
-// refuseDraft is `generate._refuse_draft`: name the cards still owed a
-// rationale, then refuse. The sentence is the 422's detail, so it is
-// reproduced word for word, `--` and all.
+// refuseDraft names the cards still owed a
+// rationale, then refuses. The sentence is the 422's detail, so it is
+// recorded word for word, `--` and all.
 func refuseDraft(d *deck.Deck) error {
 	pending := d.Unjustified()
 	shown := make([]string, 0, len(pending))
@@ -246,8 +247,8 @@ func refuseDraft(d *deck.Deck) error {
 		"surface. %s", ErrDraft, d.Slug, detail)
 }
 
-// Message is the sentence a refusal carries, without the wrapped sentinel Go
-// needs and Python does not. `service.build_artifacts` turns `str(exc)` into
+// Message is the sentence a refusal carries, without the wrapped sentinel
+// the error chain needs and the wire does not. The build surfaces put it in
 // the 422's detail, and this is that string.
 func Message(err error) string {
 	return strings.TrimPrefix(err.Error(), ErrDraft.Error()+": ")
@@ -255,7 +256,7 @@ func Message(err error) string {
 
 // ---- the five ------------------------------------------------------------
 
-// orderedCategories is `generate._ordered_categories`: the declared order
+// orderedCategories is the declared order
 // first, then anything a deck invented, sorted -- and lands last, because a
 // reader wants the spells first.
 func orderedCategories(d *deck.Deck) []string {
@@ -290,13 +291,13 @@ func orderedCategories(d *deck.Deck) []string {
 	return ordered
 }
 
-// note is `generate._note`: the note under a key, the default when there is
+// note is the note under a key, the default when there is
 // none, and stripped either way.
 //
-// The error has no Python counterpart, and that is the point: `_note` calls
-// `.strip()` on whatever the mapping holds, so a note carrying a number or a
-// nested mapping is an `AttributeError` out of the renderer and a 500 from the
-// route. A refusal here is the same answer with a sentence attached.
+// The error is the honest form of a crash: a note carrying a number or a
+// nested mapping is not prose and cannot be stripped, which used to escape
+// the renderer as a bare 500 from the route. A refusal here is the same
+// answer with a sentence attached.
 func note(d *deck.Deck, key, fallback string) (string, error) {
 	value, present := d.Notes.Get(key)
 	if !present || value == nil {
@@ -308,13 +309,13 @@ func note(d *deck.Deck, key, fallback string) (string, error) {
 			"render prose", key)
 	}
 	if text == "" {
-		// Python's `or`: an empty note is no note.
+		// An empty note is no note, so the fallback stands.
 		return strings.TrimSpace(fallback), nil
 	}
 	return strings.TrimSpace(text), nil
 }
 
-// header is `generate._header`: the two-space-then-newline block every
+// header is the two-space-then-newline block every
 // deliverable opens with.
 func header(d *deck.Deck) string {
 	cmd := strings.Join(d.Commander, " + ")
@@ -333,7 +334,7 @@ func header(d *deck.Deck) string {
 	return strings.Join(bits, "  \n")
 }
 
-// QuickPrimer is `generate.quick_primer`: one page, get somebody playing.
+// QuickPrimer is one page, get somebody playing.
 func QuickPrimer(d *deck.Deck, o Options) (string, error) {
 	counts, _ := d.CategoryCounts()
 	strategy, _ := d.Strategy.(string)
@@ -382,7 +383,7 @@ func QuickPrimer(d *deck.Deck, o Options) (string, error) {
 	for _, cat := range orderedCategories(d) {
 		title, ok := categoryTitles[cat]
 		if !ok {
-			// The raw word, not `title()`: the annotated list capitalises an
+			// The raw word, not `titleCase`: the annotated list capitalises an
 			// unknown category and this table does not.
 			title = cat
 		}
@@ -413,7 +414,7 @@ var advancedSections = [][2]string{
 	{"Rules corners worth knowing", "rules_corners"},
 }
 
-// AdvancedPrimer is `generate.advanced_primer`: lines, sequencing, matchups,
+// AdvancedPrimer is lines, sequencing, matchups,
 // failure modes -- the prose only a person can supply, which is why it lives
 // in `notes:` and survives regeneration instead of being retyped.
 func AdvancedPrimer(d *deck.Deck, o Options) (string, error) {
@@ -437,15 +438,15 @@ func AdvancedPrimer(d *deck.Deck, o Options) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-// AnnotatedDecklist is `generate.annotated_decklist`: the 99 with a reason for
+// AnnotatedDecklist is the 99 with a reason for
 // every card, which is rule 4 rendered.
 func AnnotatedDecklist(d *deck.Deck, o Options) (string, error) {
 	lines := []string{"# " + d.Name + " — Annotated Decklist", "", header(d), ""}
 	if strategy, _ := d.Strategy.(string); strategy != "" {
 		lines = append(lines, strategy, "")
 	}
-	// `for cmd in deck.commander: ...; break` -- the first commander only, and
-	// nothing at all when there is none.
+	// The first commander only, and nothing at all when there is none --
+	// the recorded shape of the Command Zone section.
 	if len(d.Commander) > 0 {
 		why, err := note(d, "commander_why", "_(set `notes.commander_why`)_")
 		if err != nil {
@@ -463,7 +464,7 @@ func AnnotatedDecklist(d *deck.Deck, o Options) (string, error) {
 		sort.SliceStable(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 		title, ok := categoryTitles[cat]
 		if !ok {
-			title = pyTitle(cat)
+			title = titleCase(cat)
 		}
 		total := 0
 		for _, e := range entries {
@@ -508,7 +509,7 @@ func cardLine(entry deck.CardEntry, rec *pool.CardRecord) string {
 	return "**" + qty + entry.Name + "**" + cost + " — " + why
 }
 
-// MoxfieldText is `generate.moxfield_txt`. Moxfield has no public API, so
+// MoxfieldText is the bulk-import text. Moxfield has no public API, so
 // plain text import is the supported path, and the `SIDEBOARD:` marker is
 // where it reads a Commander deck's commander from.
 func MoxfieldText(d *deck.Deck) string {
@@ -530,7 +531,7 @@ func MoxfieldText(d *deck.Deck) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// SwapList is `generate.swap_list`: two versions of a deck diffed into an
+// SwapList is two versions of a deck diffed into an
 // out/in list, plus a shopping list when prices are to hand.
 //
 // `previous` is the deck as of its last build, stashed at
@@ -585,13 +586,12 @@ func SwapList(d, previous *deck.Deck, o Options) string {
 				unknown = append(unknown, name)
 			}
 		}
-		// `floats.Fsum`, matching the `math.fsum` Python spells this with --
-		// and both of them said `sum` until 2026-08-22. A `+=` loop here is
-		// CPython 3.11's `sum()`, which is not CPython 3.12's: 3.12 gave
-		// `sum()` over floats compensated accumulation, and 3.12 is what the
-		// image runs. The bytes of these five files are the product, so a
-		// total that depends on which interpreter rendered it is a defect
-		// whether or not today's prices happen to expose it.
+		// `floats.Fsum` rather than a `+=` loop, and the distinction has
+		// already bitten once: this total was a naive sum until 2026-08-22,
+		// and a naive sum's last bits depend on how the platform accumulates.
+		// The bytes of these five files are the product, so a total that
+		// depends on where it was rendered is a defect whether or not
+		// today's prices happen to expose it.
 		amounts := make([]float64, 0, len(known))
 		for _, k := range known {
 			amounts = append(amounts, k.price)
@@ -599,7 +599,7 @@ func SwapList(d, previous *deck.Deck, o Options) string {
 		total := floats.Fsum(amounts)
 		lines = append(lines, "", "## Shopping list", "",
 			"| Card | Cheapest non-foil (USD) |", "| --- | ---: |")
-		// `sorted(known, key=lambda x: -x[1])` -- dearest first, and stable,
+		// Dearest first, and stable,
 		// so cards at the same price keep the alphabetical order they arrived
 		// in.
 		ordered := append([]priced{}, known...)
@@ -624,7 +624,7 @@ func SwapList(d, previous *deck.Deck, o Options) string {
 	return strings.Join(lines, "\n")
 }
 
-// firstWhy is `next((c for c in cards if c.name == name), None)` and the
+// firstWhy is the first entry wearing the name, and the
 // rationale off it, or the placeholder when the entry has none.
 func firstWhy(cards []deck.CardEntry, name, fallback string) string {
 	for _, c := range cards {
@@ -638,16 +638,15 @@ func firstWhy(cards []deck.CardEntry, name, fallback string) string {
 	return fallback
 }
 
-// money is Python's `f"{price:.2f}"`. Both languages round the shortest
-// decimal representation half to even, so the two agree on the ties as well
-// as on everything else.
+// money renders a price to two places, rounding the shortest decimal
+// representation half to even -- the recorded rendering, ties included.
 func money(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }
 
-// pyTitle is Python's `str.title()` for a category word: the first letter of
+// titleCase is the annotated list's fallback heading: the first letter of
 // each run of letters upper-cased and the rest lowered, so `sac-outlet`
-// becomes `Sac-Outlet`. Only reachable for a category `CATEGORY_TITLES` has
+// becomes `Sac-Outlet`. Only reachable for a category `categoryTitles` has
 // no heading for, which is a category the deck invented.
-func pyTitle(s string) string {
+func titleCase(s string) string {
 	var b strings.Builder
 	previousWasLetter := false
 	for _, r := range s {

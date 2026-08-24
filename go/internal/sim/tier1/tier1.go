@@ -1,55 +1,58 @@
-// Package tier1 is `sim/tier1/engine.py`: the stochastic goldfish.
+// Package tier1 is the stochastic goldfish.
 //
 // It shuffles, draws, plays a land, and pays costs until nothing else can be
 // paid for. It does NOT model opponents, interaction, tutors, cost reduction,
-// or card text beyond mana production and land-fetch ramp -- and the port did
-// not improve any of that, deliberately. Every number a primer quotes comes
+// or card text beyond mana production and land-fetch ramp -- and nothing
+// here improves on any of that, deliberately. Every number a primer quotes
+// comes
 // out of here, so a "better" engine is a silently different product.
 //
-// # What makes this port checkable
+// # What makes this engine checkable
 //
-// Tier 1 consumes randomness through exactly one call -- `rng.shuffle(deck)`
-// in SimulateGame -- and `internal/mt19937` is CPython's `random.Random` bit
+// Tier 1 consumes randomness through exactly one call -- the shuffle
+// in SimulateGame -- and `internal/mt19937` reproduces the recorded
+// generator bit
 // for bit, held to a corpus that includes all 99,274 draws of the reference
-// run below. So the dice were a solved problem before this package was
-// written: a divergence here is an engine divergence, and the fixture in
+// run below. So the dice are a solved problem, separately from the engine:
+// a divergence here is an engine divergence, and the fixture in
 // testdata says which game and which field.
 //
-// The gate is `tests/test_determinism.py`'s REFERENCE_DIGEST, a sha256 over
-// `repr()` of one game, one 300-game run and a three-point land sweep. That
-// is why this package renders Python's `repr` (repr.go): the digest is a hash
+// The gate is ReferenceDigest, a sha256 over
+// the canonical rendering of one game, one 300-game run and a three-point
+// land sweep. That
+// is why this package carries that rendering (repr.go): the digest is a hash
 // of text, so reproducing the numbers is not enough -- the *rendering* is
 // part of the equivalence. Nothing serves those strings; they exist to be
 // hashed.
 //
 // # The five details a reimplementation gets wrong
 //
-// **`list.remove` removes the first EQUAL element, not the one you handed
-// it.** A compiled deck repeats one object per `qty`, so a hand of basics is
+// **Removal takes the first EQUAL element, not the one you handed
+// it.** A compiled deck repeats one card per `qty`, so a hand of basics is
 // a hand of equal cards; taking out the wrong one reorders the rest, and the
 // order of the rest picks the next land. `removeFirstEqual` is that, and
 // `sim.Card.Equal` is why it can be.
 //
-// **`max` and `min` keep the FIRST extreme.** `_pick_land` maxes over lands
-// and the casting loop mins over castable spells; a Go sort or a `>=` would
+// **The extremes keep the FIRST extreme.** `pickLand` maxes over lands
+// and the casting loop mins over castable spells; a sort or a `>=` would
 // break ties the other way and play a different land on turn three.
 //
-// **`chosen is commander` is identity, not equality.** The commander is a
+// **The commander is matched by identity, not equality.** It is a
 // separate object from anything in the library even when a name matches, and
 // it is never removed from hand because it was never in hand.
 //
-// **The dicts are ordered.** `first_cast` and the timing table iterate in
+// **The tables are ordered.** `FirstCast` and the timing table iterate in
 // insertion order, and both are rendered into the digest.
 //
-// **`statistics.median` of ints is an int for an odd count.** So
-// `median_commander_turn` is `5`, not `5.0`, in the repr the digest hashes --
-// even though its annotation says `float | None`. Number carries that.
+// **The median of ints is an int for an odd count.** So a median commander
+// turn renders `5`, not `5.0`, in the text the digest hashes --
+// a whole median stays a whole number. Number carries that.
 //
 // # What is deliberately absent
 //
-// `SimSummary.report()` -- the fixed-width text table -- is `cli.py`'s
-// rendering and no served route reads it; it arrives with the CLI at Phase 8.
-// Nothing else in engine.py is missing.
+// The fixed-width text table a run prints in a terminal is the CLI's
+// rendering, not an engine answer, and no served route reads it; it lives
+// with the CLI. Nothing else is missing.
 package tier1
 
 import (
@@ -63,7 +66,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
-// KeepRule is `engine.KeepRule`: the mulligan policy, tuned per deck.
+// KeepRule is the mulligan policy, tuned per deck.
 //
 // MinLands/MaxLands bound the opener's land count. MinManaPieces counts lands
 // plus cheap ramp (mv <= CheapRampMV); it is the dial most often worth
@@ -77,13 +80,13 @@ type KeepRule struct {
 	MaxMulligans  int `json:"max_mulligans"`
 }
 
-// DefaultKeepRule is `KeepRule()` with every field at its Python default.
+// DefaultKeepRule is every field at its recorded default.
 func DefaultKeepRule() KeepRule {
 	return KeepRule{MinLands: 2, MaxLands: 5, MinManaPieces: 3,
 		CheapRampMV: 2, MaxMulligans: 3}
 }
 
-// Keeps is `KeepRule.keeps`.
+// Keeps reports whether the rule keeps this opening hand.
 func (k KeepRule) Keeps(hand []*sim.Card) bool {
 	lands := 0
 	for _, c := range hand {
@@ -103,22 +106,23 @@ func (k KeepRule) Keeps(hand []*sim.Card) bool {
 	return lands+cheapRamp >= k.MinManaPieces
 }
 
-// Describe is `KeepRule.describe`, and its exact text is in the digest.
+// Describe renders the rule as a sentence, and its exact text is in the
+// digest.
 func (k KeepRule) Describe() string {
 	return fmt.Sprintf("keep %d-%d lands AND lands + ramp(mv<=%d) >= %d",
 		k.MinLands, k.MaxLands, k.CheapRampMV, k.MinManaPieces)
 }
 
-// FirstCast is `dict[str, int]` with CPython's insertion order.
+// FirstCast is a name-to-turn table that iterates in insertion order.
 //
 // It is a type rather than a map because the order is not an implementation
-// detail here: `repr(GameResult)` renders it, and the digest hashes that.
+// detail here: the game's rendering includes it, and the digest hashes that.
 type FirstCast struct {
 	names []string
 	turns map[string]int
 }
 
-// SetDefault is `d.setdefault(name, turn)`: records the turn only the first
+// SetDefault records the turn only the first
 // time a name is seen, which is what makes this a *first* cast.
 func (f *FirstCast) SetDefault(name string, turn int) {
 	if f.turns == nil {
@@ -134,16 +138,17 @@ func (f *FirstCast) SetDefault(name string, turn int) {
 // Names is the keys in insertion order.
 func (f *FirstCast) Names() []string { return f.names }
 
-// Get is `d[name]`, with the second result reporting membership.
+// Get is the recorded turn for a name, with the second result reporting
+// membership.
 func (f *FirstCast) Get(name string) (int, bool) {
 	turn, ok := f.turns[name]
 	return turn, ok
 }
 
-// Len is `len(d)`.
+// Len is how many names have been recorded.
 func (f *FirstCast) Len() int { return len(f.names) }
 
-// GameResult is `engine.GameResult`: one game, as it happened.
+// GameResult is one game, as it happened.
 type GameResult struct {
 	CommanderTurn *int  `json:"commander_turn"`
 	LandsByTurn   []int `json:"lands_by_turn"`
@@ -167,8 +172,8 @@ type GameResult struct {
 	StalledTurns int `json:"stalled_turns"`
 }
 
-// expandUnits is `mana.expand_units`: sources flattened into single mana,
-// each carrying the colour set it can produce.
+// expandUnits flattens sources into single mana,
+// each unit carrying the colour set it can produce.
 //
 // It lives here rather than in `internal/sim` because it is the matching's
 // own vocabulary and nothing else in the simulator asks for it -- the closed
@@ -185,14 +190,14 @@ func expandUnits(sources []sim.Source) [][]string {
 	return units
 }
 
-// consume is `engine._consume`: pay a cost from a pool, and say what is left.
+// consume pays a cost from a pool, and says what is left.
 //
 // Coloured pips are assigned by exact matching (Kuhn's augmenting paths).
 // Generic is then paid from the leftovers, spending the least flexible
 // sources first so the survivors stay as useful as possible for the next
 // spell this turn.
 //
-// The second result is the `is not None` of the Python: a payable cost that
+// The second result is load-bearing: a payable cost that
 // consumes the whole pool returns an empty slice and true, which is a
 // different answer from unpayable and must stay so.
 func consume(cost sim.Cost, sources []sim.Source) ([]sim.Source, bool) {
@@ -246,8 +251,8 @@ func consume(cost sim.Cost, sources []sim.Source) ([]sim.Source, bool) {
 		}
 	}
 
-	// Pay generic with the most restrictive remaining units. Python sorts a
-	// generator of ascending indices, and `sorted` is stable, so units of
+	// Pay generic with the most restrictive remaining units. The recorded
+	// order is a stable sort over ascending indices, so units of
 	// equal breadth stay in index order -- SliceStable, never Slice.
 	leftovers := make([]int, 0, len(units))
 	for j := range units {
@@ -274,25 +279,23 @@ func consume(cost sim.Cost, sources []sim.Source) ([]sim.Source, bool) {
 	return out, true
 }
 
-// canPay is `mana.can_pay(cost, sources)` at Tier 1's one call site, inside
-// `_pick_land`'s scoring -- and since 2026-08-22 it really is that call.
+// canPay is `mana.CanPay` at Tier 1's one call site, inside
+// `pickLand`'s scoring -- and since 2026-08-22 it really is that call.
 //
 // It used to answer through `consume` instead, with an argument attached: the
 // two run the same matching over the same units and agree by construction.
-// The argument was sound and the comment ended *"when `internal/mana` grows
-// the ported `can_pay`, this becomes a call to it"*. #243 grew it, so it has,
-// and the reason for taking the trigger seriously is worth keeping: Python's
-// `_pick_land` calls `mana.can_pay`, so **delegating is the faithful port and
-// the local answer was the deviation**, however well argued. Two solvers each
-// checked against Python and neither against the other is one line of
+// The argument was sound, and #243 retired it anyway, because the recorded
+// engine answers this question through the shared solver -- **delegating is
+// the contract and the local answer was the deviation**, however well
+// argued. Two solvers each
+// checked against the corpus and neither against the other is one line of
 // reasoning away from a silent divergence.
 //
 // The equivalence it used to assert has not been thrown away -- it has been
 // promoted from an argument to a **property test**. `consume` still solves the
 // same problem for every other call site (it has to: it returns the
 // leftovers), and `TestConsumeAgreesWithCanPay` holds the two to each other
-// over random costs and pools, which is `tests/test_mana_properties.py`'s
-// `test_consume_agrees_with_can_pay` in Go.
+// over random costs and pools.
 //
 // The conversion is the whole of the seam and it is free by design: #243 laid
 // `mana.Source` out field for field like `sim.Source`, in order, so the two
@@ -305,8 +308,8 @@ func canPay(cost sim.Cost, sources []sim.Source) bool {
 		// Go's conversion rule ignores the struct tags `sim.Source` carries.
 		pool[i] = mana.Source(s)
 	}
-	// xValue 0: Tier 1 never casts for X, which is why `SimCard` carries
-	// `has_x` and the engine never reads it.
+	// xValue 0: Tier 1 never casts for X, which is why the compiled card
+	// carries `HasX` and the engine never reads it.
 	return mana.CanPay(mana.Cost{
 		Generic:   cost.Generic,
 		Pips:      cost.Pips,
@@ -315,7 +318,7 @@ func canPay(cost sim.Cost, sources []sim.Source) bool {
 	}, pool, 0)
 }
 
-// removeFirstEqual is `list.remove(card)`.
+// removeFirstEqual removes one card from the list.
 //
 // The first EQUAL element leaves, not the one that was handed in. See the
 // package comment: with a compiled deck those are routinely different cards.
@@ -325,10 +328,10 @@ func removeFirstEqual(cards []*sim.Card, card *sim.Card) []*sim.Card {
 			return append(cards[:i:i], cards[i+1:]...)
 		}
 	}
-	panic("tier1: removed a card that is not in the list (ValueError)")
+	panic("tier1: removed a card that is not in the list")
 }
 
-// pickLand is `engine._pick_land`: the land that maximises this turn's
+// pickLand is the land that maximises this turn's
 // options.
 //
 // Ranked by (mana value of the best spell it lets us cast now, new colours it
@@ -394,11 +397,11 @@ func pickLand(hand []*sim.Card, pool []sim.Source, castables []*sim.Card) *sim.C
 	return best
 }
 
-// GameOptions is `simulate_game`'s keyword arguments.
+// GameOptions is SimulateGame's optional levers.
 //
-// Turns has no Go default: Python's is 12, and a zero here simulates zero
-// turns exactly as `turns=0` would there. RNG nil is `random.Random()` --
-// unseeded, and therefore not reproducible.
+// Turns has no default here: a zero simulates zero turns, deliberately --
+// the run layer above owns the conventional horizon. RNG nil means an
+// unseeded generator, and therefore a game that is not reproducible.
 type GameOptions struct {
 	Turns     int
 	KeepRule  *KeepRule
@@ -406,7 +409,7 @@ type GameOptions struct {
 	OnThePlay bool
 }
 
-// SimulateGame is `engine.simulate_game`: one game, start to horizon.
+// SimulateGame plays one game, start to horizon.
 func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) GameResult {
 	rng := opts.RNG
 	if rng == nil {
@@ -433,11 +436,11 @@ func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) Ga
 	hand = append([]*sim.Card(nil), hand...)
 	// Bottom `mulligans` cards -- put back the least useful (excess lands
 	// first, then the highest-cost spells). They are not returned to the
-	// library; Python drops them, and so does this.
+	// library; the recorded engine drops them, and so does this.
 	//
-	// The bound is computed ONCE, because `range(min(mulligans, len(hand) -
-	// 1))` is: Python builds the range before the loop runs, off the hand it
-	// started with. A Go condition re-read each pass shrinks with the hand and
+	// The bound is computed ONCE, off the hand the loop starts with -- the
+	// recorded semantics. A condition re-read each pass shrinks with the
+	// hand and
 	// stops early -- at five mulligans it bottoms four cards instead of five,
 	// and every card drawn after that is a different card. It cannot be seen
 	// below four mulligans, so the reference run (max_mulligans 3) is blind to
@@ -483,8 +486,8 @@ func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) Ga
 
 	for turn := 1; turn <= opts.Turns; turn++ {
 		// The player on the play skips their first draw step, and only that
-		// one. Named rather than inlined so the negation reads: Python writes
-		// `if not (turn == 1 and on_the_play)`.
+		// one. Named rather than inlined so the negation reads as the rule:
+		// skip only the very first draw, and only on the play.
 		skipsTheDraw := turn == 1 && opts.OnThePlay
 		if !skipsTheDraw {
 			if len(libraryLeft) > 0 {
@@ -495,10 +498,11 @@ func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) Ga
 
 		// Available mana this turn: every permanent past its delay.
 		//
-		// The delay test here is dead weight and is kept because Python keeps
-		// it: at the top of a turn every entry on the battlefield arrived on
+		// The delay test here is dead weight and is kept because the recorded
+		// engine keeps it: at the top of a turn every entry on the
+		// battlefield arrived on
 		// an earlier one, so `turn - entered >= 1`, and no compiled card has a
-		// delay above 1 (`compile.py` writes 0 or 1, nothing else). Deleting
+		// delay above 1 (`sim/compile` writes 0 or 1, nothing else). Deleting
 		// it changes no result, which a mutation run confirmed -- it is the
 		// one surviving mutant in this package, and it survives honestly.
 		// Summoning sickness is really enforced in the two places below: the
@@ -530,9 +534,9 @@ func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) Ga
 		// Which makes the second half of the test unreachable, and it is kept
 		// unreachable on purpose: `pickLand` returns nil exactly when the hand
 		// holds no land, so `land == nil` already implies the scan below finds
-		// none. Python writes `land is None and not any(...)`, so this writes
-		// it too. Simplifying it would be correct today and would quietly stop
-		// being correct the day `_pick_land` learns to decline a land drop.
+		// none. The recorded engine tests both halves, so this tests both
+		// too. Simplifying it would be correct today and would quietly stop
+		// being correct the day `pickLand` learns to decline a land drop.
 		missed := land == nil
 		if missed {
 			for _, c := range hand {
@@ -596,7 +600,7 @@ func SimulateGame(library []*sim.Card, commander *sim.Card, opts GameOptions) Ga
 
 			remaining, ok := consume(chosen.Cost, pool)
 			if !ok {
-				panic("tier1: a castable spell became unpayable (assert)")
+				panic("tier1: a castable spell became unpayable")
 			}
 			pool = remaining
 

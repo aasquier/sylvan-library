@@ -75,7 +75,7 @@ import (
 	"math/bits"
 )
 
-// MT19937's constants, from `Modules/_randommodule.c`.
+// MT19937's constants, from the published reference implementation.
 const (
 	n = 624
 	m = 397
@@ -85,7 +85,8 @@ const (
 	lowerMask uint32 = 0x7fffffff // least significant r bits
 )
 
-// Random is one Mersenne Twister, in the state CPython would leave it in.
+// Random is one Mersenne Twister, in the state the recorded stream starts
+// from.
 //
 // `index == n` means the state is spent and the next word triggers a twist,
 // which is the condition `init_genrand` leaves behind and therefore the state
@@ -95,19 +96,20 @@ type Random struct {
 	index int
 }
 
-// New returns a generator seeded as `random.Random(seed)` seeds one.
+// New returns a generator seeded by the package's fixed seeding path:
+// absolute value, little-endian 32-bit words, `seedWords`.
 //
-// Negative seeds are handled the way CPython handles them -- by absolute
-// value -- so New(-7) and New(7) are the same generator. That is not a
-// convenience added here; it is `random_seed` calling `int.__abs__`, and the
-// corpus proves the two streams identical rather than trusting this sentence.
+// Negative seeds seed by absolute value -- New(-7) and New(7) are the same
+// generator. That is not a convenience added here; it is the recorded
+// contract, and the corpus proves the two streams identical rather than
+// trusting this sentence.
 func New(seed int64) *Random {
 	r := &Random{}
 	r.Seed(seed)
 	return r
 }
 
-// Seed re-seeds in place, as `Random.seed(n)` does.
+// Seed re-seeds in place, running the same fixed path New runs.
 func (r *Random) Seed(seed int64) {
 	// abs(seed), as a uint64 because the answer does not always fit an int64.
 	// Written the long way for math.MinInt64, whose absolute value is 2**63:
@@ -130,15 +132,16 @@ func (r *Random) Seed(seed int64) {
 		r.seedWords([]uint32{uint32(u)}) //nolint:gosec // u fits 32 bits here
 		return
 	}
-	//nolint:gosec // the low and high words of u, in CPython's order
+	//nolint:gosec // the low and high words of u, least significant first
 	r.seedWords([]uint32{uint32(u), uint32(u >> 32)})
 }
 
-// NewFromBig seeds from an integer of any size, as CPython's own seeding does.
+// NewFromBig seeds from an integer of any size, which the seeding contract
+// allows.
 //
-// `random.Random(n)` accepts an int with no ceiling, and the key it builds
-// grows a 32-bit word every 32 bits -- so a seed past 2**64 is a *different
-// shape* of key, not merely a bigger number, and the stream it produces
+// A seed has no ceiling, and the key built from one grows a 32-bit word
+// every 32 bits -- so a seed past 2**64 is a *different shape* of key, not
+// merely a bigger number, and the stream it produces
 // cannot be reached from any int64. Nothing in this application passes one;
 // this is here so the corpus can prove the decomposition is right where it is
 // hardest to get right, and so a future caller is not tempted to truncate.
@@ -157,7 +160,7 @@ func (r *Random) SeedBig(seed *big.Int) {
 		keyused = (b-1)/32 + 1
 	}
 
-	// `_PyLong_AsByteArray(..., PY_LITTLE_ENDIAN)` into `keyused` words.
+	// The magnitude's bytes, read into `keyused` little-endian 32-bit words.
 	// FillBytes writes big-endian into the whole buffer, zero-padded on the
 	// left, so word i -- the i-th least significant -- is the four bytes that
 	// far from the right. Done through bytes rather than through `Bits()`
@@ -209,9 +212,9 @@ func (r *Random) seedWords(key []uint32) {
 	r.state[0] = 0x80000000
 }
 
-// initGenrand is the scalar seeding MT19937 was published with. CPython
-// reaches it only through `init_by_array`, never for a user's seed, and
-// neither does anything here.
+// initGenrand is the scalar seeding MT19937 was published with
+// (`init_genrand`). Nothing seeds with it directly: `seedWords` runs it as
+// its first step, and a user's seed only ever arrives through `seedWords`.
 func (r *Random) initGenrand(s uint32) {
 	r.state[0] = s
 	for i := 1; i < n; i++ {
@@ -260,14 +263,14 @@ func (r *Random) twist() {
 	r.index = 0
 }
 
-// Float64 is `random()`: a 53-bit double from two words.
+// Float64 is the generator's uniform double: a 53-bit value from two words.
 //
 // The order and the arithmetic are both load-bearing. `a` is drawn first and
 // keeps 27 bits, `b` second and keeps 26; the multiply-and-add builds the
 // 53-bit significand exactly, and the scale is a power of two, so the whole
-// expression is exact and every result is a double CPython can also name. Any
-// rearrangement that looks equivalent -- dividing twice, or scaling before
-// adding -- is not.
+// expression is exact and every result matches the recorded stream to the
+// bit. Any rearrangement that looks equivalent -- dividing twice, or scaling
+// before adding -- is not.
 func (r *Random) Float64() float64 {
 	a := r.Uint32() >> 5
 	b := r.Uint32() >> 6
@@ -276,25 +279,27 @@ func (r *Random) Float64() float64 {
 
 // MaxBits is the widest `GetRandBits` will answer.
 //
-// CPython's has no ceiling -- it builds an arbitrary-precision integer a word
-// at a time. Nothing in this application asks for one: `getrandbits` has no
-// direct caller at all, and the only indirect one is `_randbelow`, which asks
-// for `n.bit_length()` of a deck size, a card count or a spin. 64 covers
-// every one of those with the whole int64 range to spare, and it means this
-// package answers in a machine word rather than in `math/big`.
+// The draw discipline itself has no ceiling -- wider requests would build an
+// arbitrary-precision integer a word at a time. Nothing in this application
+// asks for one: `GetRandBits` has no direct caller at all, and the only
+// indirect one is `RandBelow`, which asks for `bitLen(n)` of a deck size, a
+// card count or a spin. 64 covers every one of those with the whole int64
+// range to spare, and it means this package answers in a machine word rather
+// than in `math/big`.
 const MaxBits = 64
 
-// GetRandBits is `getrandbits(k)`: k random bits as an unsigned integer.
+// GetRandBits returns k random bits as an unsigned integer.
 //
 // Two paths, and the second is where the reimplementations go wrong. Up to 32
-// bits it is one word shifted down -- `genrand_uint32() >> (32 - k)`, so the
-// bits kept are the *high* ones. Beyond that CPython fills 32-bit words from
-// **least** significant to most, drawing in that order, and shifts only the
-// last one down by whatever the remainder leaves. Draw the words the other
-// way round and every value is wrong while every value still looks random.
+// bits it is one word shifted down -- `Uint32() >> (32 - k)`, so the bits
+// kept are the *high* ones. Beyond that the recorded discipline fills 32-bit
+// words from **least** significant to most, drawing in that order, and
+// shifts only the last one down by whatever the remainder leaves. Draw the
+// words the other way round and every value is wrong while every value still
+// looks random.
 //
-// It panics above MaxBits, and for k == 0 returns 0 without drawing, which is
-// what CPython does and is why `_randbelow` must never be handed a zero.
+// It panics above MaxBits, and for k == 0 returns 0 without drawing -- the
+// recorded behavior, and the reason `RandBelow` must never be handed a zero.
 func (r *Random) GetRandBits(k uint) uint64 {
 	switch {
 	case k == 0:

@@ -17,29 +17,32 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 )
 
-// ADR 18's cache key, held to Python by `testdata/cache.json`.
+// ADR 18's cache key, held to the frozen corpus `testdata/cache.json`.
 //
 // # The question this file exists to answer
 //
-// With both runtimes live, a Go-computed row and a Python-computed row for the
+// The deployed database holds rows keyed by earlier engines, and a row
+// computed today and a row one of those engines computed for the
 // same deck and seed **sit apart**: different keys, both in `sim_cache`,
 // neither able to serve the other. That is the fingerprint doing its job -- see
 // the package comment for the argument -- and it is a claim worth two tests
 // rather than one, because there are two ways to arrive at "the keys differ"
 // and only one of them is right.
 //
-//   - The **wrong** way is a serialiser that disagrees with Python somewhere
+//   - The **wrong** way is a serialisation that drifted somewhere
 //     in the payload. Then the keys differ for a reason nobody chose, and the
 //     day somebody "fixes" the fingerprint the rows would collide while still
 //     meaning different things.
-//   - The **right** way is one field. `TestThePayloadIsPythonsBytes` proves
+//   - The **right** way is one field. `TestThePayloadIsTheRecordedBytes`
+//     proves
 //     the other nine are identical byte for byte, and
-//     `TestTheTwoRuntimesKeysDifferOnlyByTheFingerprint` proves the tenth is
+//     `TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint` proves the tenth
+//     is
 //     the difference and the whole of it.
 //
 // The payload string is recorded, not just the digest, because a sha256
-// mismatch says nothing about *where*: all three ways `encoding/json` differs
-// from `json.dumps` -- HTML escaping, `ensure_ascii`, and float rendering --
+// mismatch says nothing about *where*: the three classic drifts -- HTML
+// escaping, ASCII escaping, and float rendering --
 // present as the same opaque sixty-four characters.
 
 type cardJSON struct {
@@ -122,14 +125,17 @@ func (c caseJSON) input() cache.Input {
 }
 
 type corpus struct {
-	Note              string     `json:"note"`
-	SimVersion        int        `json:"sim_version"`
-	MaxRows           int        `json:"max_rows"`
-	RunInputs         []string   `json:"run_inputs"`
-	RunNonInputs      []string   `json:"run_non_inputs"`
-	EngineSources     []string   `json:"engine_sources"`
-	PythonFingerprint string     `json:"python_fingerprint"`
-	Cases             []caseJSON `json:"cases"`
+	Note          string   `json:"note"`
+	SimVersion    int      `json:"sim_version"`
+	MaxRows       int      `json:"max_rows"`
+	RunInputs     []string `json:"run_inputs"`
+	RunNonInputs  []string `json:"run_non_inputs"`
+	EngineSources []string `json:"engine_sources"`
+	// RecordedFingerprint is the fingerprint of the engine the corpus was
+	// recorded under -- the field's stored name is historical and, like
+	// everything else in the frozen golden, never changes.
+	RecordedFingerprint string     `json:"python_fingerprint"`
+	Cases               []caseJSON `json:"cases"`
 }
 
 func load(t *testing.T) corpus {
@@ -143,7 +149,7 @@ func load(t *testing.T) corpus {
 	// number into an `any` as `float64`, so `8` comes back as `8.0` and
 	// `Payload` renders it `8.0` -- a different key for the same input, and
 	// the corpus would have failed for a reason that is nothing to do with
-	// the port. Python's `extra` really does hold ints and floats as
+	// the key. The recorded `extra` really does hold ints and floats as
 	// different types, so the decode has to keep them apart. It is the same
 	// trap a future caller hits if it builds an `Extra` out of decoded JSON
 	// rather than out of its own values; see `Input.Extra`.
@@ -153,16 +159,18 @@ func load(t *testing.T) corpus {
 		t.Fatalf("decode corpus: %v", err)
 	}
 	for i := range c.Cases {
-		c.Cases[i].Extra = pythonTypes(c.Cases[i].Extra).(map[string]any)
+		c.Cases[i].Extra = corpusTypes(c.Cases[i].Extra).(map[string]any)
 	}
 	if len(c.Cases) == 0 {
-		t.Fatal("the corpus is empty; regenerate with `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/cache.json is a frozen " +
+			"golden -- restore it from version control")
 	}
 	return c
 }
 
-// pythonTypes turns `json.Number` back into the `int` or `float64` Python held.
-func pythonTypes(v any) any {
+// corpusTypes turns `json.Number` back into the `int` or `float64` the
+// recorded case holds.
+func corpusTypes(v any) any {
 	switch x := v.(type) {
 	case nil:
 		return nil
@@ -181,13 +189,13 @@ func pythonTypes(v any) any {
 	case map[string]any:
 		out := make(map[string]any, len(x))
 		for k, item := range x {
-			out[k] = pythonTypes(item)
+			out[k] = corpusTypes(item)
 		}
 		return out
 	case []any:
 		out := make([]any, len(x))
 		for i, item := range x {
-			out[i] = pythonTypes(item)
+			out[i] = corpusTypes(item)
 		}
 		return out
 	default:
@@ -195,33 +203,35 @@ func pythonTypes(v any) any {
 	}
 }
 
-func TestTheConstantsAreThePythonOnes(t *testing.T) {
+func TestTheConstantsMatchTheCorpus(t *testing.T) {
 	c := load(t)
 	if cache.SimVersion != c.SimVersion {
-		t.Errorf("SimVersion = %d, Python says %d", cache.SimVersion, c.SimVersion)
+		t.Errorf("SimVersion = %d, the corpus says %d", cache.SimVersion, c.SimVersion)
 	}
 	if cache.MaxRows != c.MaxRows {
-		t.Errorf("MaxRows = %d, Python says %d", cache.MaxRows, c.MaxRows)
+		t.Errorf("MaxRows = %d, the corpus says %d", cache.MaxRows, c.MaxRows)
 	}
 }
 
-// TestThePayloadIsPythonsBytes is the real gate.
+// TestThePayloadIsTheRecordedBytes is the real gate.
 //
-// Handed Python's own fingerprint, `Payload` must produce the identical string
-// -- so every difference between the two encoders has been dealt with and the
+// Handed the corpus's recorded fingerprint, `Payload` must produce the
+// identical string
+// -- so the serialisation is provably the one the stored keys were computed
+// over, and the
 // only thing left that can move the key is the fingerprint itself.
-func TestThePayloadIsPythonsBytes(t *testing.T) {
+func TestThePayloadIsTheRecordedBytes(t *testing.T) {
 	c := load(t)
 	for _, tc := range c.Cases {
 		t.Run(tc.Label, func(t *testing.T) {
-			got := cache.Payload(c.PythonFingerprint, tc.Kind, tc.input())
+			got := cache.Payload(c.RecordedFingerprint, tc.Kind, tc.input())
 			if got != tc.Payload {
-				t.Fatalf("payload differs\n go: %s\npy: %s\n(%s)",
+				t.Fatalf("payload differs\n got: %s\nrecorded: %s\n(%s)",
 					got, tc.Payload, firstDifference(got, tc.Payload))
 			}
 			sum := sha256.Sum256([]byte(got))
 			if hex.EncodeToString(sum[:]) != tc.Key {
-				t.Errorf("key = %s, Python says %s",
+				t.Errorf("key = %s, the corpus says %s",
 					hex.EncodeToString(sum[:]), tc.Key)
 			}
 		})
@@ -229,19 +239,19 @@ func TestThePayloadIsPythonsBytes(t *testing.T) {
 }
 
 // firstDifference names the byte, because a 4 kB payload diffed by eye is how
-// an `ensure_ascii` bug survives a code review.
+// an ASCII-escaping bug survives a code review.
 func firstDifference(a, b string) string {
 	n := min(len(a), len(b))
 	for i := 0; i < n; i++ {
 		if a[i] != b[i] {
 			lo := max(i-30, 0)
 			return "first difference at byte " + itoa(i) +
-				": go ..." + a[lo:min(i+30, len(a))] +
-				"... vs py ..." + b[lo:min(i+30, len(b))] + "..."
+				": got ..." + a[lo:min(i+30, len(a))] +
+				"... vs recorded ..." + b[lo:min(i+30, len(b))] + "..."
 		}
 	}
-	return "one is a prefix of the other: go is " + itoa(len(a)) +
-		" bytes, py is " + itoa(len(b))
+	return "one is a prefix of the other: got " + itoa(len(a)) +
+		" bytes, recorded " + itoa(len(b))
 }
 
 func itoa(n int) string {
@@ -256,40 +266,43 @@ func itoa(n int) string {
 	return string(out)
 }
 
-// TestTheTwoRuntimesKeysDifferOnlyByTheFingerprint is the decision, pinned.
+// TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint is the decision, pinned.
 //
-// A Go-computed row and a Python-computed row for the same deck and seed do
-// not collide -- and the difference is one field, not a serialiser
-// disagreement. Both halves are asserted, because either alone would be
+// A row computed by this engine and a row the corpus's engine computed for
+// the same deck and seed do
+// not collide -- and the difference is one field, not a serialisation
+// drift. Both halves are asserted, because either alone would be
 // satisfied by the wrong implementation.
-func TestTheTwoRuntimesKeysDifferOnlyByTheFingerprint(t *testing.T) {
+func TestTheKeyDiffersFromTheCorpusOnlyByTheFingerprint(t *testing.T) {
 	c := load(t)
 	engine := cache.Fingerprint()
 	if engine == "" {
 		t.Fatal("Fingerprint is empty, so caching would be off entirely")
 	}
-	if engine == c.PythonFingerprint {
-		t.Fatal("the Go fingerprint equals Python's, which would mean this " +
-			"binary is hashing Python source -- see the package comment")
+	if engine == c.RecordedFingerprint {
+		t.Fatal("the fingerprint equals the corpus's recorded one, which " +
+			"would mean it is not measuring this engine's own source -- see " +
+			"the package comment")
 	}
 	for _, tc := range c.Cases {
 		t.Run(tc.Label, func(t *testing.T) {
 			in := tc.input()
-			goKey := cache.Key(tc.Kind, in)
-			if goKey == tc.Key {
-				t.Fatal("the Go key equals Python's; the rows would collide")
+			key := cache.Key(tc.Kind, in)
+			if key == tc.Key {
+				t.Fatal("the key equals the recorded one; the rows would collide")
 			}
 			// And the payloads differ in exactly the fingerprint: substitute
-			// Python's string for Go's and the bytes must become Python's.
+			// the recorded string for this engine's and the bytes must become
+			// the recorded bytes.
 			mine := cache.Payload(engine, tc.Kind, in)
 			if strings.Count(mine, engine) != 1 {
 				t.Fatalf("the fingerprint appears %d times in the payload; "+
 					"this substitution is not the check it looks like",
 					strings.Count(mine, engine))
 			}
-			if swapped := strings.Replace(mine, engine, c.PythonFingerprint, 1); swapped != tc.Payload {
-				t.Errorf("swapping the fingerprint does not give Python's "+
-					"payload, so the two runtimes differ somewhere else too:\n%s",
+			if swapped := strings.Replace(mine, engine, c.RecordedFingerprint, 1); swapped != tc.Payload {
+				t.Errorf("swapping the fingerprint does not give the recorded "+
+					"payload, so the serialisation drifted somewhere else too:\n%s",
 					firstDifference(swapped, tc.Payload))
 			}
 		})
@@ -299,10 +312,11 @@ func TestTheTwoRuntimesKeysDifferOnlyByTheFingerprint(t *testing.T) {
 // TestColourSetsAreSortedIntoTheKey is the one claim the corpus structurally
 // cannot make.
 //
-// Python's colour sets are `frozenset`s, which have **no order at all** -- so
-// no recorded case can show `sorted()` doing anything, and `sorted()` is
-// exactly what stops a key from depending on `PYTHONHASHSEED`. Go's slices do
-// have an order, so the port can hold an unsorted one and must not key on it.
+// A colour set is a set, and every recorded case carries its sets already in
+// sorted order -- so
+// no corpus case can show the sorting doing anything, and the sorting is
+// exactly what stops a key from depending on the incidental order a slice
+// arrives in.
 // A cache that missed constantly would look cold rather than broken, which is
 // why this is asserted rather than left to the corpus.
 func TestColourSetsAreSortedIntoTheKey(t *testing.T) {
@@ -385,14 +399,15 @@ func TestARowGoesInAndComesBack(t *testing.T) {
 	if got.Games != 20000 || got.Rate != 0.25 {
 		t.Fatalf("stored %+v", got)
 	}
-	// `datetime.now(UTC).isoformat()`: a `+00:00` offset, never `Z`.
+	// The recorded timestamp format: a `+00:00` offset, never `Z`.
 	if !strings.HasSuffix(hit.CreatedAt, "+00:00") {
-		t.Errorf("created_at is %q, which is not Python's isoformat", hit.CreatedAt)
+		t.Errorf("created_at is %q, which is not the recorded timestamp format",
+			hit.CreatedAt)
 	}
 	// A struct keeps its field order where a map would be sorted -- the
-	// constraint `internal/jobs` found and every ported result inherits.
+	// constraint `internal/jobs` found and every stored result inherits.
 	if !strings.HasPrefix(string(hit.Result), `{"games":`) {
-		t.Errorf("stored blob is %s; the fields are not in Python's order",
+		t.Errorf("stored blob is %s; the fields are not in the declared order",
 			hit.Result)
 	}
 }
@@ -562,8 +577,8 @@ func TestOpenWillNotCreateTheDatabase(t *testing.T) {
 	}
 }
 
-// TestAnUnstorableResultIsAMissNotAFailure: `Put` never raises, which is the
-// same call `sim/cache.py`, `decklog.Record` and `claude/ledger.py` all make.
+// TestAnUnstorableResultIsAMissNotAFailure: `Put` never fails the caller --
+// the same trade `decklog.Record` and `claude/ledger`'s recorder make.
 func TestAnUnstorableResultIsAMissNotAFailure(t *testing.T) {
 	ctx := context.Background()
 	store := scratch(t)
@@ -576,26 +591,25 @@ func TestAnUnstorableResultIsAMissNotAFailure(t *testing.T) {
 	}
 }
 
-// TestEveryKeepRuleFieldChangesTheKey is
-// `tests/test_sim_cache.py`'s `test_every_keep_rule_field_changes_the_key`,
-// and it guards the one place this port had to spell out what Python gets for
-// free.
+// TestEveryKeepRuleFieldChangesTheKey guards the one place the serialisation
+// names fields by hand.
 //
-// Python writes `asdict(keep_rule)`, so **a new mulligan lever is in the key
-// the day it is added** -- that sentence is in `cache.key`'s docstring and is
-// the reason it does not name the fields. `writeKeepRule` cannot do that:
+// `Key`'s doc promises **a new mulligan lever is in the key
+// the day it is added**, and for every other input that falls out of the
+// struct going in whole. `writeKeepRule` cannot get it for free:
 // `encoding/json` on a struct would sort nothing and a `map` would sort
-// everything, so the five keys are written out by hand, in Python's
-// `sort_keys=True` order.
+// everything, so the five keys are written out by hand, in the recorded
+// alphabetical order.
 //
 // A hand-written list is a list that can fall behind the struct, and the
 // failure is the exact one ADR 18 exists to prevent rather than a cosmetic
-// drift: a sixth field would be **absent from the Go key while Python's
-// `asdict` put it in**, so two runs under genuinely different keep rules would
-// share one Go row and the second would be served the first one's numbers.
+// drift: a sixth field would be **absent from the key while genuinely
+// changing the run**, so two runs under different keep rules would
+// share one row and the second would be served the first one's numbers.
 // Every figure well-formed, none of them about the rule that was asked for.
 //
-// The corpus cannot see it. It is generated from today's five fields, so it
+// The corpus cannot see it. It is a frozen recording of today's five fields,
+// so it
 // would keep passing while saying nothing about the sixth. Reflection is what
 // makes this a question about the struct instead of about the fixture.
 func TestEveryKeepRuleFieldChangesTheKey(t *testing.T) {
@@ -618,17 +632,17 @@ func TestEveryKeepRuleFieldChangesTheKey(t *testing.T) {
 	for i := range rt.NumField() {
 		field := rt.Field(i)
 		t.Run(field.Name, func(t *testing.T) {
-			// The name Python's `asdict` would use, which is the name that has
-			// to appear in the blob.
+			// The field's wire name from its json tag, which is the name that
+			// has to appear in the blob.
 			name := strings.Split(field.Tag.Get("json"), ",")[0]
 			if name == "" {
-				t.Fatalf("%s carries no json tag, so Python's name for it is "+
+				t.Fatalf("%s carries no json tag, so its wire name is "+
 					"unknowable from here", field.Name)
 			}
 			if !strings.Contains(payload, `"`+name+`":`) {
 				t.Errorf("`%s` is a KeepRule field and does not appear in the "+
 					"cache key. `writeKeepRule` names its fields by hand, so a "+
-					"new one has to be added there -- in Python's sorted order "+
+					"new one has to be added there -- in alphabetical order "+
 					"-- or two different keep rules will share a row.", name)
 			}
 

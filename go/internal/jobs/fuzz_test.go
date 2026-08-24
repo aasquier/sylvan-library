@@ -179,10 +179,10 @@ func TestConcurrentSubmitsAcrossKeysAndOwnersDoNotBleed(t *testing.T) {
 }
 
 func TestPollingWhileAJobRunsIsNotARace(t *testing.T) {
-	// What the race detector is here for. Python's worker writes `status`,
-	// `done` and `result` with no lock at all while a request thread reads
-	// them in `as_dict`; the GIL makes that survivable and `-race` makes it a
-	// hard failure, so the mutable half of a Job is guarded here and this is
+	// What the race detector is here for. A worker writes `status`,
+	// `done` and `result` while request goroutines read
+	// them for polls; unguarded, `-race` makes that a
+	// hard failure, so the mutable half of a Job is guarded and this is
 	// the test that would have found it if it were not.
 	r := quietRegistry(t, Config{CPUWorkers: 4})
 	const jobs, pollers = 8, 8

@@ -10,7 +10,7 @@ import (
 )
 
 // probeCommand is the image's HEALTHCHECK: one GET, answered or not. The
-// runtime image carries no curl and no interpreter, so the binary asks after
+// runtime image carries nothing but the binary, so the binary asks after
 // its own health. Hidden -- it is plumbing for the container, not a command
 // anybody runs by hand.
 func probeCommand() *cobra.Command {

@@ -11,18 +11,19 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
-// CPython's whitespace and line-boundary tables, held to a real interpreter.
+// The recorded whitespace and line-boundary tables, held to the frozen
+// corpus.
 //
-// The corpus sweeps **the whole of Unicode** rather than the code points where
-// Go and Python are known to differ, for the reason `pycasefold`'s table
-// gives: recording only the disagreements would leave the rest resting on Go's
-// `unicode` tables agreeing with CPython's, which is a claim about two
-// projects' Unicode versions and not one this port gets to make.
+// The corpus sweeps **the whole of Unicode** rather than only the code points
+// where Go's tables are known to differ: recording only the disagreements
+// would leave the rest resting on Go's `unicode` tables agreeing with the
+// recorded ones, which is a claim about two projects' Unicode versions and
+// not one this package gets to make.
 //
-// It is **identical under 3.11 and 3.12**, verified by rendering under each and
-// diffing — the check CLAUDE.md requires of any sweep over a character
-// property, after the theme lane found two tables that failed together for two
-// entirely different reasons.
+// The recording was **rendered twice, under two Unicode revisions, and
+// diffed identical** — the check CLAUDE.md requires of any sweep over a
+// character property, after the theme lane found two tables that failed
+// together for two entirely different reasons.
 
 type textCorpus struct {
 	SpaceRanges [][2]int `json:"space_ranges"`
@@ -59,7 +60,8 @@ func load(t *testing.T) textCorpus {
 		t.Fatal(err)
 	}
 	if len(corpus.SpaceRanges) == 0 {
-		t.Fatal("the pytext corpus is empty; run tests/go_fixtures.py")
+		t.Fatal("the corpus is empty; testdata/corpus.json is a frozen " +
+			"golden -- restore it from version control")
 	}
 	return corpus
 }
@@ -77,8 +79,9 @@ func inRanges(ranges [][2]int, r rune) bool {
 // cannot put in a string anyway.
 func isCharacter(r rune) bool { return r < 0xD800 || r > 0xDFFF }
 
-// TestIsSpaceIsStrIsSpaceForEveryCodePoint sweeps all 1,114,112 of them.
-func TestIsSpaceIsStrIsSpaceForEveryCodePoint(t *testing.T) {
+// TestIsSpaceMatchesTheRecordedTableForEveryCodePoint sweeps all 1,114,112
+// of them.
+func TestIsSpaceMatchesTheRecordedTableForEveryCodePoint(t *testing.T) {
 	corpus := load(t)
 	wrong := 0
 	for r := rune(0); r <= 0x10FFFF; r++ {
@@ -88,7 +91,7 @@ func TestIsSpaceIsStrIsSpaceForEveryCodePoint(t *testing.T) {
 		want := inRanges(corpus.SpaceRanges, r)
 		if got := textutil.IsSpace(r); got != want {
 			if wrong < 10 {
-				t.Errorf("IsSpace(U+%04X) = %v, CPython says %v", r, got, want)
+				t.Errorf("IsSpace(U+%04X) = %v, the corpus says %v", r, got, want)
 			}
 			wrong++
 		}
@@ -98,15 +101,15 @@ func TestIsSpaceIsStrIsSpaceForEveryCodePoint(t *testing.T) {
 	}
 }
 
-// TestGoAndPythonReallyDisagreeAboutWhitespace is the reason this package
-// exists, stated as a test rather than as a comment.
+// TestTheStandardLibraryReallyDisagreesAboutWhitespace is the reason this
+// package exists, stated as a test rather than as a comment.
 //
-// If `unicode.IsSpace` were CPython's set, `strings.TrimSpace` would do and
-// none of this would be here. It is not: the four information separators
-// U+001C..U+001F are whitespace to `str.strip()` and not to Go. A test that
+// If `unicode.IsSpace` were the recorded set, `strings.TrimSpace` would do
+// and none of this would be here. It is not: the four information separators
+// U+001C..U+001F are in the recorded set and not in Go's. A test that
 // only checked agreement would go green the day somebody replaced this package
 // with the standard library.
-func TestGoAndPythonReallyDisagreeAboutWhitespace(t *testing.T) {
+func TestTheStandardLibraryReallyDisagreesAboutWhitespace(t *testing.T) {
 	var differ []rune
 	for r := rune(0); r <= 0x10FFFF; r++ {
 		if !isCharacter(r) {
@@ -118,7 +121,8 @@ func TestGoAndPythonReallyDisagreeAboutWhitespace(t *testing.T) {
 	}
 	want := []rune{0x1c, 0x1d, 0x1e, 0x1f}
 	if len(differ) != len(want) {
-		t.Fatalf("Go and CPython differ on %d code points (%U), want exactly %U",
+		t.Fatalf("the standard library and the recorded set differ on %d "+
+			"code points (%U), want exactly %U",
 			len(differ), differ, want)
 	}
 	for i, r := range want {
@@ -128,8 +132,8 @@ func TestGoAndPythonReallyDisagreeAboutWhitespace(t *testing.T) {
 	}
 }
 
-// TestSplitLinesAgreesWithPython holds `str.splitlines()` case for case.
-func TestSplitLinesAgreesWithPython(t *testing.T) {
+// TestSplitLinesAgreesWithTheCorpus holds the recorded splits case for case.
+func TestSplitLinesAgreesWithTheCorpus(t *testing.T) {
 	corpus := load(t)
 	for _, c := range corpus.Splits {
 		t.Run(c.Note, func(t *testing.T) {
@@ -146,11 +150,11 @@ func TestSplitLinesAgreesWithPython(t *testing.T) {
 	}
 }
 
-// TestEveryLineBoundaryIsOneCPythonKnows sweeps the boundary table, which is a
-// DIFFERENT set from the whitespace one — and the near-miss this package was
-// written for: U+001C..U+001E are both, **U+001F is whitespace and not a
+// TestEveryLineBoundaryIsOneTheCorpusKnows sweeps the boundary table, which
+// is a DIFFERENT set from the whitespace one — and the near-miss this package
+// was written for: U+001C..U+001E are both, **U+001F is whitespace and not a
 // boundary**, and U+2028/U+2029 are both.
-func TestEveryLineBoundaryIsOneCPythonKnows(t *testing.T) {
+func TestEveryLineBoundaryIsOneTheCorpusKnows(t *testing.T) {
 	corpus := load(t)
 	for r := rune(0); r <= 0x10FFFF; r++ {
 		if !isCharacter(r) {
@@ -159,7 +163,7 @@ func TestEveryLineBoundaryIsOneCPythonKnows(t *testing.T) {
 		want := inRanges(corpus.BreakRanges, r)
 		got := len(textutil.SplitLines("a"+string(r)+"b")) == 2
 		if got != want {
-			t.Fatalf("U+%04X splits = %v, CPython says %v", r, got, want)
+			t.Fatalf("U+%04X splits = %v, the corpus says %v", r, got, want)
 		}
 	}
 }
@@ -169,7 +173,7 @@ func TestEveryLineBoundaryIsOneCPythonKnows(t *testing.T) {
 // deriving one table from the other.
 func TestUnitSeparatorIsWhitespaceButNotABoundary(t *testing.T) {
 	if !textutil.IsSpace(0x1f) {
-		t.Error("U+001F must be whitespace to str.strip()")
+		t.Error("U+001F must be in the whitespace set")
 	}
 	if got := textutil.SplitLines("a\x1fb"); len(got) != 1 {
 		t.Errorf("U+001F split a line into %q; it is not a boundary", got)
@@ -184,8 +188,8 @@ func TestUnitSeparatorIsWhitespaceButNotABoundary(t *testing.T) {
 	}
 }
 
-// TestStripAndFriendsAgreeWithPython holds the three trimmers.
-func TestStripAndFriendsAgreeWithPython(t *testing.T) {
+// TestStripAndFriendsMatchTheCorpus holds the three trimmers.
+func TestStripAndFriendsMatchTheCorpus(t *testing.T) {
 	corpus := load(t)
 	for _, c := range corpus.Strips {
 		t.Run(c.Note, func(t *testing.T) {
@@ -202,8 +206,8 @@ func TestStripAndFriendsAgreeWithPython(t *testing.T) {
 	}
 }
 
-// TestLenAndHeadCountCodePoints: `len(s)` and `s[:n]` are code points, not
-// bytes, and a question of 2,000 accented characters is 2,000 to Python and
+// TestLenAndHeadCountCodePoints: length and truncation are code points, not
+// bytes, so a question of 2,000 accented characters measures 2,000 and stays
 // well over any byte ceiling.
 func TestLenAndHeadCountCodePoints(t *testing.T) {
 	corpus := load(t)
@@ -220,9 +224,9 @@ func TestLenAndHeadCountCodePoints(t *testing.T) {
 }
 
 // TestIsoformatElidesTheFractionAtAZeroMicrosecond is the behaviour the job
-// corpus found and two older writers in this module still miss: Python's
-// `isoformat()` drops the fractional part entirely when the microsecond is
-// zero, and a fixed six-digit layout does not.
+// corpus found and two older writers in this module still miss: the recorded
+// timestamp format drops the fractional part entirely when the microsecond
+// is zero, and a fixed six-digit layout does not.
 func TestIsoformatElidesTheFractionAtAZeroMicrosecond(t *testing.T) {
 	whole := time.Date(2026, 8, 23, 1, 23, 45, 0, time.UTC)
 	if got := textutil.Isoformat(whole); got != "2026-08-23T01:23:45+00:00" {
@@ -232,7 +236,8 @@ func TestIsoformatElidesTheFractionAtAZeroMicrosecond(t *testing.T) {
 	if got := textutil.Isoformat(fraction); got != "2026-08-23T01:23:45.678901+00:00" {
 		t.Errorf("Isoformat with microseconds = %q", got)
 	}
-	// Nanoseconds are truncated, not rounded — `datetime` has no finer unit.
+	// Nanoseconds are truncated, not rounded — the recorded format has no
+	// unit finer than the microsecond.
 	sub := time.Date(2026, 8, 23, 1, 23, 45, 678901999, time.UTC)
 	if got := textutil.Isoformat(sub); got != "2026-08-23T01:23:45.678901+00:00" {
 		t.Errorf("Isoformat truncating nanoseconds = %q", got)

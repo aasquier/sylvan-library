@@ -23,8 +23,8 @@ import { EditsChart, TrafficChart } from '../components/lazycharts'
  * anything to *do* on it — sat below a screenful of numbers.
  *
  * The readouts are facts the process can report without an external API or a
- * new secret (`api/adminstats.py` says what was deliberately left out, the
- * dollar figure first among them); the far-seeing glass on Machine is the one
+ * new secret (which is why the dollar figure is an estimate from the server's
+ * own price table, never a bill); the far-seeing glass on Machine is the one
  * exception and it is absent unless a token was set. The accounts table is
  * `mtglab users` as a page, unchanged by the rename: who exists, who can sign
  * in, and the four levers.
@@ -148,9 +148,9 @@ type AxisKey = (typeof AXES)[number]['key']
  *
  *  Sub-cent totals are the ordinary case on an instance this size, and `$0.00`
  *  beside real conversations reads as "nothing happened" rather than as "not
- *  very much" — the wrong lesson to draw from a bill that is working. Mirrors
- *  `prices.render` in Python; the two are small enough that a shared
- *  formatter would cost more than it saved, and a test pins the boundary. */
+ *  very much" — the wrong lesson to draw from a bill that is working. Small
+ *  enough that a served, pre-rendered string would cost more than it saved,
+ *  and a test pins the boundary. */
 function money(usd: number): string {
   if (usd && Math.abs(usd) < 0.01) return `$${usd.toFixed(4)}`
   return `$${usd.toLocaleString(undefined, { minimumFractionDigits: 2,

@@ -1,10 +1,9 @@
-// Package gate is `decks/validate.py`, `decks/companion.py` and
-// `decks/partners.py`: the checks a deck must pass before anything is
-// emitted, over a parsed deck and the pool's records -- pure functions,
-// no database, the same shape the Python gate keeps so that the same tests
-// hold it (docs/go-migration/PLAN.md, Phase 3: validate agrees with Python
-// case-for-case). Partners arrived first, because `/api/cards/search` with
-// `commanders_only` asks `can_be_commander` of every hit.
+// Package gate is the checks a deck must pass before anything is emitted:
+// validation, the companion restrictions, and the pairing rules -- pure
+// functions over a parsed deck and the pool's records, no database, held to
+// a recorded report corpus case for case. Partners arrived first, because
+// `/api/cards/search` with `commanders_only` asks `can_be_commander` of
+// every hit.
 package gate
 
 import (
@@ -15,7 +14,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// The pairing abilities, as `decks/partners.py` names them.
+// The pairing abilities, by the names the reports use.
 const (
 	Partner           = "partner"
 	PartnerWith       = "partner-with"

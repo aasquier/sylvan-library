@@ -19,11 +19,12 @@ import (
 // deck: readers may spin a shared deck's wheel, exactly as they may read its
 // stats. `seed` replays a spin; absent, the server rolls one and reports it.
 //
-// The seed goes through `int()` (`claude.PyInt`) because that is the line the
-// Python route runs — a float truncates, `"１２"` reads as twelve — and a
-// value `int()` refuses raises where Python raises, which is an **uncaught
-// 500**: Starlette's plain-text `Internal Server Error`, not a JSON detail.
-// Reproduced rather than tidied, and measured before it was written down.
+// The seed goes through the recorded integer grammar (`claude.IntValue`) —
+// a float truncates, `"１２"` reads as twelve — and a
+// value the grammar refuses raises, which is an **uncaught
+// 500**: the plain-text `Internal Server Error`, not a JSON detail.
+// Recorded rather than tidied, and measured on the live wire before it was
+// written down.
 func (a *API) deckWheel(w http.ResponseWriter, r *http.Request) {
 	body, ok := readOptionalBody(w, r)
 	if !ok {

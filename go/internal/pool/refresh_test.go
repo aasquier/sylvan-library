@@ -32,7 +32,8 @@ func loadRefresh(t *testing.T) refreshFile {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/refresh.json")
 	if err != nil {
-		t.Fatalf("refresh.json: %v (regenerate with `python tests/go_fixtures.py`)", err)
+		t.Fatalf("refresh.json: %v (testdata/refresh.json is a frozen "+
+			"golden -- restore it from version control)", err)
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
@@ -63,14 +64,14 @@ func bulkFile(t *testing.T, cards []map[string]any) string {
 	return path
 }
 
-// TestTheLoaderBuildsThePoolPythonBuilds is the end-to-end gate: the raw
-// tiny_pool cards through DownloadBulk's format, OpenWriter and the Appender
+// TestTheLoaderBuildsTheRecordedPool is the end-to-end gate: the raw
+// tiny-pool cards through DownloadBulk's format, OpenWriter and the Appender
 // loaders, read back through the same `GetCards` the app uses, against the
-// pool `pooltest` builds from Python's own transformed rows. The two JSON
+// pool `pooltest` builds from the recorded transformed rows. The two JSON
 // text columns differ by encoder (ASCII escapes vs raw UTF-8) and are
 // compared through the reader, which parses them — the one knowing
 // divergence, invisible to every query.
-func TestTheLoaderBuildsThePoolPythonBuilds(t *testing.T) {
+func TestTheLoaderBuildsTheRecordedPool(t *testing.T) {
 	fx := loadRefresh(t)
 	rawOracle := make([]map[string]any, 0, len(fx.Oracle))
 	names := []string{}
@@ -169,11 +170,12 @@ func staleOf(t *testing.T, path string) bool {
 	return verdict
 }
 
-// TestEveryRowMatchesPythons is the row-level corpus: each raw card through
-// the builders against `_oracle_row` / `_printing_row`, value for value —
+// TestEveryRowMatchesTheCorpus is the row-level corpus: each raw card
+// through
+// the builders against the recorded row, value for value —
 // the two parsed-JSON columns compared as documents, everything else
 // exactly, and the skip verdicts beside them.
-func TestEveryRowMatchesPythons(t *testing.T) {
+func TestEveryRowMatchesTheCorpus(t *testing.T) {
 	fx := loadRefresh(t)
 	for i, c := range fx.Oracle {
 		if got := pool.SkipOracleLayout(c.Raw); got != c.Skip {
@@ -220,8 +222,8 @@ func compareRow(t *testing.T, label string, columns []string, got []any,
 	}
 }
 
-// valueEqual compares a builder value against the corpus's JSON reading of
-// Python's: numbers through float64, lists elementwise, dates by their ISO
+// valueEqual compares a builder value against the corpus's recorded
+// reading: numbers through float64, lists elementwise, dates by their ISO
 // text, nil against null.
 func valueEqual(g, w any) bool {
 	if g == nil || w == nil {

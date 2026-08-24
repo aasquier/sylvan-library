@@ -1,8 +1,8 @@
-// Package mulligan is `sim/mulligan.py`: searching for a deck's mulligan
+// Package mulligan searches for a deck's mulligan
 // policy instead of assuming one.
 //
-// `KeepRule`'s docstring has said "tuned per deck -- this is a real lever, not
-// a default" since it was written, and then every caller in the project used
+// `KeepRule`'s doc has said "tuned per deck" -- a real lever, not
+// a default -- since it was written, and then every caller in the project used
 // the default anyway. This module is that sentence made executable: run the
 // same deck under a grid of 33 keep rules and report which one deploys the
 // most.
@@ -31,12 +31,12 @@
 // not between shuffles, so the shuffles are held still. A grid where each cell
 // drew its own sample would rank the rules by luck at these sample sizes.
 //
-// **`Best` is picked before the rows are sorted, and Python's `max` keeps the
+// **`Best` is picked before the rows are sorted, keeping the
 // FIRST extreme.** So a tie on the key goes to the rule earlier in the grid,
 // which is the rule with the lower `MinLands`, and re-picking it after the
 // sort would silently answer with a different rule. `Gentlest` is the mirror
-// image and does read the sorted rows, because Python computes it from
-// `self.rows`, which by then is the sorted tuple.
+// image and does read the sorted rows -- by the time it is asked, the sorted
+// order is the rows' order.
 //
 // # What is deliberately absent
 //
@@ -73,18 +73,19 @@ var (
 // the same rule at different seeds move by about this much.
 const Flat = 0.25
 
-// ErrNoRules is `search`'s `ValueError("no keep rules to search")`.
+// ErrNoRules is the refusal for an empty grid.
 var ErrNoRules = errors.New("no keep rules to search")
 
-// Row is `mulligan.PolicyRow`: one keep rule, and what it did.
+// Row is one keep rule, and what it did.
 //
 // `SpellsThroughT8` is the objective; everything else is here so a person can
 // see *why* a rule won rather than being told that it did. A rule that wins by
 // mulliganing less will show it in `MulliganRate`, and one that wins by
 // finding better hands will show it in `MedianCommanderTurn`.
 //
-// Field order is Python's, because a ported job result is a struct precisely
-// so that `encoding/json` writes the fields in a dict's insertion order rather
+// Field order is the recorded wire order, because a job result is a struct
+// precisely
+// so that `encoding/json` writes the fields in their declared order rather
 // than sorted.
 type Row struct {
 	MinLands  int `json:"min_lands"`
@@ -96,7 +97,7 @@ type Row struct {
 	SpellsThroughT8 float64 `json:"spells_through_t8"`
 	MulliganRate    float64 `json:"mulligan_rate"`
 	AvgMulligans    float64 `json:"avg_mulligans"`
-	// MedianCommanderTurn is `statistics.median` of the turns the commander
+	// MedianCommanderTurn is the median of the turns the commander
 	// first landed, and it is an INT for an odd-length list -- which is why it
 	// is `tier1.Number` and not a float. Carried through unrounded.
 	MedianCommanderTurn *tier1.Number `json:"median_commander_turn"`
@@ -105,7 +106,7 @@ type Row struct {
 	Describe            string        `json:"describe"`
 }
 
-// Sweep is `mulligan.PolicySweep`.
+// Sweep is the whole grid, run and ranked.
 type Sweep struct {
 	Games int `json:"games"`
 	Turns int `json:"turns"`
@@ -129,7 +130,7 @@ func (s *Sweep) Gain() float64 {
 	return floats.RoundTo(s.Best.SpellsThroughT8-s.Baseline.SpellsThroughT8, 2)
 }
 
-// IsFlat is `PolicySweep.flat`: is the winner meaningfully better than the
+// IsFlat asks: is the winner meaningfully better than the
 // rule you already have?
 //
 // Measured against the **default**, not against the grid's range -- see the
@@ -137,7 +138,7 @@ func (s *Sweep) Gain() float64 {
 // answer and a confident one.
 func (s *Sweep) IsFlat() bool { return s.Gain() < Flat }
 
-// Gentlest is `PolicySweep.gentlest`: of the rules that deploy as well as the
+// Gentlest is, of the rules that deploy as well as the
 // best, the one that keeps most.
 //
 // The answer for a deck whose sweep is flat, and for most decks that is most
@@ -150,8 +151,8 @@ func (s *Sweep) IsFlat() bool { return s.Gain() < Flat }
 // `Flat` of the winner are eligible, which is exactly the band the objective
 // cannot tell apart anyway.
 //
-// Ties go to the FIRST such row in `Rows`, because Python's `min` keeps the
-// first minimum and `Rows` is already the sorted tuple by the time this is
+// Ties go to the FIRST such row in `Rows`: the scan keeps the
+// first minimum, and `Rows` is already sorted by the time this is
 // asked.
 func (s *Sweep) Gentlest() Row {
 	best := s.Best.SpellsThroughT8
@@ -179,7 +180,7 @@ func less2(a1, a2, b1, b2 float64) bool {
 	return a2 < b2
 }
 
-// Candidates is `mulligan.candidates`: every rule in the grid worth running.
+// Candidates is every rule in the grid worth running.
 //
 // A rule whose minimum exceeds its maximum keeps nothing and would mulligan to
 // `MaxMulligans` every game -- not a policy, an error -- so those cells are
@@ -187,7 +188,8 @@ func less2(a1, a2, b1, b2 float64) bool {
 // argument: a rule demanding fewer mana pieces than lands is asking for
 // something it already got.
 //
-// The order is Python's nested-loop order, and it is load-bearing: `Best`
+// The order is the nested-loop order recorded in the corpus, and it is
+// load-bearing: `Best`
 // keeps the first maximum, so the grid's order decides ties.
 func Candidates() []tier1.KeepRule {
 	out := []tier1.KeepRule{}
@@ -207,7 +209,7 @@ func Candidates() []tier1.KeepRule {
 	return out
 }
 
-// Options is `search`'s keyword arguments.
+// Options is Search's levers.
 //
 // `Games` defaults low against Tier 1's usual twenty thousand, and that is a
 // real trade rather than an oversight: this runs thirty-odd simulations where
@@ -219,14 +221,14 @@ type Options struct {
 	Games int
 	Turns int
 	Seed  int
-	// Rules overrides the grid. Nil is `rules=None`: use `Candidates`.
+	// Rules overrides the grid. Nil means: use `Candidates`.
 	Rules []tier1.KeepRule
 	// Progress is called with (index, total) before each rule and once more
-	// at the end, exactly as Python's is.
+	// at the end.
 	Progress func(done, total int)
 }
 
-// DefaultOptions is `search`'s signature defaults: 2,000 games, 10 turns,
+// DefaultOptions is the standing defaults: 2,000 games, 10 turns,
 // seed 7.
 func DefaultOptions() Options { return Options{Games: 2000, Turns: 10, Seed: 7} }
 
@@ -251,7 +253,7 @@ func row(rule tier1.KeepRule, library []*sim.Card, commander *sim.Card,
 	}
 }
 
-// Search is `mulligan.search`: run the grid and report the best rule, or that
+// Search runs the grid and reports the best rule, or that
 // there is no best rule.
 func Search(library []*sim.Card, commander *sim.Card, opts Options) (*Sweep, error) {
 	grid := opts.Rules
@@ -308,7 +310,8 @@ func Search(library []*sim.Card, commander *sim.Card, opts Options) (*Sweep, err
 	// `(-spells, mulliganRate)` is the exact reverse of this comparison, and
 	// `sortRows` is stable, so `rows[0]` after sorting is the same row: the
 	// maximum, and among full ties the earliest grid cell. The order is kept
-	// this way round because it matches Python line for line and because the
+	// this way round because it is the recorded order of operations and
+	// because the
 	// equivalence rests on the sort being stable -- a fact one careless
 	// `sort.Slice` away from being false.
 	best := rows[0]
@@ -332,8 +335,10 @@ func Search(library []*sim.Card, commander *sim.Card, opts Options) (*Sweep, err
 	}, nil
 }
 
-// sortRows is `rows.sort(key=lambda r: (-r.spells_through_t8, r.mulligan_rate))`
-// -- and it must be a STABLE sort, because Python's is: two rules tying on
+// sortRows orders best-first: descending deployment, then ascending
+// mulligan rate
+// -- and it must be a STABLE sort, the recorded discipline: two rules tying
+// on
 // both keys keep their grid order, which is the order `Gentlest` then walks.
 func sortRows(rows []Row) {
 	// Insertion sort: 33 rows, stable by construction, and no dependency on

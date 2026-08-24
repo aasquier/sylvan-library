@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Stale is `cards/db.py:pool_is_stale`: does this pool predate the columns
+// Stale asks: does this pool predate the columns
 // the app now reads? A database loaded before those columns existed answers
 // every query about them with NULL, which reads exactly like "this card has
 // no power" — the quiet wrong answer rule 1 exists to prevent, arriving

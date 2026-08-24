@@ -11,34 +11,34 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
-// Number is a Python number that may be an int or a float.
+// Number is a number that may be an int or a float, and remembers which.
 //
-// It exists for one field. `statistics.median` over a list of ints returns
-// `data[n//2]` -- an int -- when the count is odd, and the mean of the middle
-// two, a float, when it is even. So `SimSummary.median_commander_turn` is
-// sometimes `5` and sometimes `5.5`, and `repr` renders those differently.
-// Its annotation says `float | None`, which is the annotation being wrong
-// rather than this being pedantic: the digest hashes the repr.
+// It exists for one field. The median of a list of ints is the middle
+// element -- an int -- when the count is odd, and the mean of the middle
+// two, a float, when it is even. So the median commander turn is
+// sometimes `5` and sometimes `5.5`, and the canonical rendering shows those
+// differently. The distinction is not pedantic: the digest hashes the
+// rendering.
 type Number struct {
 	IsFloat bool
 	Int     int
 	Float   float64
 }
 
-// MarshalJSON writes the number Python would write: `5` for an int and `5.5`
+// MarshalJSON writes the number itself: `5` for an int and `5.5`
 // for a float, never the struct.
 //
-// **This was missing until the sim family flipped, and nothing had noticed.**
-// `Number` is checked against CPython by `repr` text and by `Float64bits`,
+// **This was missing once, and nothing had noticed.**
+// `Number` is held to the corpus by rendered text and by `Float64bits`,
 // neither of which goes through `encoding/json` -- so the default marshaller
-// applied, and `median_commander_turn` went onto the wire as
+// applied, and the median commander turn went onto the wire as
 // `{"IsFloat":false,"Int":4,"Float":0}`. Every corpus stayed green; the
-// contract suite caught it on the first run through the door, which is the
-// second time that suite has found a wire-shape bug a package's own tests
-// structurally could not.
+// recorded wire shape is what caught it, finding a bug this package's own
+// tests structurally could not -- a type is only checked in the shapes the
+// checks actually drive.
 //
-// The float branch renders through `ReprFloat`, so `5.5` is `5.5` and a value
-// that Python would print as `5.0` prints as `5.0` -- `encoding/json` writes
+// The float branch renders through `ReprFloat`, so `5.5` is `5.5` and a
+// whole-valued float prints as `5.0` -- `encoding/json` writes
 // `5` for that float64, which is a different token in a payload a client
 // reads as a number either way, but a different one in any text a digest
 // hashes.
@@ -52,7 +52,7 @@ func (n Number) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON reads one back, which the ADR 18 cache needs: a stored result
 // is decoded into the same struct it was encoded from, so a round trip has to
 // preserve which of the two a number was. A JSON number with no `.` or
-// exponent is an int, exactly as Python's own `json` decides it.
+// exponent is an int -- the rule every stored row was written under.
 func (n *Number) UnmarshalJSON(raw []byte) error {
 	s := string(raw)
 	if s == "null" {
@@ -82,7 +82,7 @@ func (n Number) Value() float64 {
 	return float64(n.Int)
 }
 
-// medianInt is `statistics.median` over ints: it sorts, and it returns an int
+// medianInt is the median of ints: it sorts, and it returns an int
 // for an odd count.
 func medianInt(data []int) Number {
 	sorted := append([]int(nil), data...)
@@ -95,7 +95,7 @@ func medianInt(data []int) Number {
 		Float: float64(sorted[n/2-1]+sorted[n/2]) / 2}
 }
 
-// CardTiming is `engine.CardTiming`: when one card actually comes online,
+// CardTiming is when one card actually comes online,
 // over many games.
 //
 // The gap between MV and MedianTurn is the fun number: a four-drop with a
@@ -115,7 +115,7 @@ type CardTiming struct {
 	ByT8 float64 `json:"by_t8"`
 }
 
-// SimSummary is `engine.SimSummary`.
+// SimSummary is a whole run, summarised.
 type SimSummary struct {
 	Games               int             `json:"games"`
 	Turns               int             `json:"turns"`
@@ -155,27 +155,32 @@ func (s SimSummary) WastedThrough(turn int) float64 {
 	return sumPrefix(s.AvgUnusedByTurn, turn)
 }
 
-// sumPrefix is `fsum(xs[:turn])`, and neither half of that is as plain as it
+// sumPrefix is the exact sum of the first `turn` elements, and neither half
+// of that is as plain as it
 // looks.
 //
-// **The slice.** Python's bounds are Python's: `xs[:-1]` is everything but
-// the last element, not nothing, and `xs[:100]` on a ten-element list is all
-// ten. No caller passes a negative turn -- `mulligan.py` and `simruns.py`
-// both ask for 8 -- which is exactly why it is worth being right about while
+// **The slice bounds are the recorded ones**: a negative turn counts from
+// the end (`turn = -1` is everything but
+// the last element, not nothing), and a turn past the end is the whole
+// list. No caller passes a negative turn -- the mulligan grid and the run
+// layer both ask for 8 -- which is exactly why it is worth being right about
+// while
 // it is still two lines.
 //
-// **The sum is `math.fsum`, and it says `fsum` on the Python side too, as of
-// this port.** It said `sum`, which answers differently on the two
-// interpreters this project supports: CPython 3.12 gave `sum()` compensated
-// (Neumaier) accumulation and 3.11 adds left to right, so `sum([0.1] * 10)`
-// is 1.0 under 3.12.13 and 0.9999999999999999 under 3.11.15. That made
-// `SimSummary.spells_through` a fact about the interpreter -- and
-// `sim/mulligan.py` *ranks* keep rules on it and measures a spread against
-// `FLAT`, so a ranking could in principle depend on which Python answered.
-// `sim/curve.py` hit the same trap from the other direction on the same day
-// and fixed it the same way, fsum rather than pinning either interpreter's
-// answer; this follows that call rather than inventing a second one, and
-// `floats.Fsum` is already CPython's `math_fsum_impl` in Go.
+// **The sum is `floats.Fsum`, and the choice has a history worth
+// keeping (2026-08-22).** A bare running total's last bits depend on
+// accumulation order and on whatever compensation the arithmetic underneath
+// happens to apply -- the same list can sum to 1.0 under a compensated
+// accumulation and 0.9999999999999999 under a left-to-right one, as ten
+// copies of 0.1 famously do. That would make
+// `SpellsThrough` a fact about the arithmetic underneath it -- and
+// the mulligan sweep *ranks* keep rules on it and measures a spread against
+// `mulligan.Flat`, so a ranking could in principle depend on which
+// accumulation answered.
+// The curve advice hit the same trap from the other direction on the same
+// day and fixed it the same way: the correctly-rounded sum, rather than
+// pinning either accumulation's answer; this follows that call rather than
+// inventing a second one.
 func sumPrefix(xs []float64, turn int) float64 {
 	if turn < 0 {
 		turn = len(xs) + turn
@@ -184,9 +189,9 @@ func sumPrefix(xs []float64, turn int) float64 {
 	return floats.Fsum(xs[:turn])
 }
 
-// Options is `engine.run`'s keyword arguments.
+// Options is Run's levers.
 //
-// Seed nil is `seed=None` -- an unseeded generator, and therefore a run
+// Seed nil means an unseeded generator, and therefore a run
 // nobody can reproduce. Every served caller passes one.
 type Options struct {
 	Games    int
@@ -196,15 +201,15 @@ type Options struct {
 	Progress func(done, total int)
 }
 
-// Run is `engine.run`: `Games` independent goldfish games, summarised.
+// Run is `Games` independent goldfish games, summarised.
 //
 // Progress is called roughly 100 times over the run, so a UI can show a bar;
 // it consumes no randomness and touches no state, which is what lets a
 // watched run and a plain one produce the same answer.
 func Run(library []*sim.Card, commander *sim.Card, opts Options) SimSummary {
 	if opts.Games <= 0 {
-		// Python divides by `games` in a dozen places and raises
-		// ZeroDivisionError; silently answering NaN would be worse.
+		// The summary divides by `games` in a dozen places; refusing loudly
+		// beats silently answering NaN everywhere.
 		panic("tier1: Run needs at least one game")
 	}
 	seed := int64(0)
@@ -288,7 +293,7 @@ func Run(library []*sim.Card, commander *sim.Card, opts Options) SimSummary {
 	// it -- a card the simulation *never* reached is the most interesting row
 	// of all, and dropping it would hide exactly that. Duplicates collapse by
 	// name, which in a singleton format is only the handful of spells a deck
-	// runs twice by special dispensation. The order is the dict's own
+	// runs twice by special dispensation. The order is the table's own
 	// insertion order, which the stable sort below preserves within ties.
 	var mvNames []string
 	mvByName := map[string]int{}
@@ -330,9 +335,9 @@ func Run(library []*sim.Card, commander *sim.Card, opts Options) SimSummary {
 			ByT8:       float64(byT8) / games,
 		})
 	}
-	// Latest median first; the never-cast rows (median None) lead outright.
-	// Python's key is `(median is not None, -(median or 0), name)`, and False
-	// sorts before True.
+	// Latest median first; the never-cast rows (median nil) lead outright.
+	// The recorded order: rows without a median sort before rows with one,
+	// then by descending median, then by name.
 	sort.SliceStable(timings, func(a, b int) bool {
 		ta, tb := timings[a], timings[b]
 		hasA, hasB := ta.MedianTurn != nil, tb.MedianTurn != nil
@@ -406,7 +411,7 @@ type LandCount struct {
 	Summary SimSummary
 }
 
-// SweepLandCounts is `engine.sweep_land_counts`: find the knee of the curve
+// SweepLandCounts finds the knee of the curve
 // by running the same deck at several land counts.
 //
 // `build(n)` returns (library, commander) for a deck with n lands. Every

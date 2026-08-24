@@ -7,31 +7,32 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
-// DumpWidth is `Deck.dump`'s `width=100`. `edit.py`'s `_render` uses 96 for
-// the lines it surgically rewrites; the two differ because they always have,
-// and a deck written at one width and edited at the other is the ordinary
-// state of every file in the library.
+// DumpWidth is the whole-file wrap width, 100. The surgical editor
+// (`deckedit`) wraps the lines it rewrites at 96; the two differ because
+// they always have, and a deck written at one width and edited at the other
+// is the ordinary state of every file in the library.
 const DumpWidth = 100
 
-// Dump is `decks/model.py:Deck.dump`: the whole file, as PyYAML writes it.
+// Dump renders the whole file, in the recorded emitter shape (`yamlemit`).
 //
 // The write path is surgical everywhere else (ADR 12), so this is reached by
-// exactly two callers and both of them are writing a file that does not exist
-// yet: `service.create_deck` and `service.import_deck`. That is the whole
-// justification for a second way to produce deck YAML -- a deck being born has
-// no comments to destroy, no folded blocks to reflow and no diff to keep
+// exactly two lifecycle callers and both of them are writing a file that
+// does not exist yet: a deck created and a deck imported. That is the whole
+// justification for a second way to produce deck YAML -- a deck being born
+// has no comments to destroy, no folded blocks to reflow and no diff to keep
 // small.
 //
 // **There is a third caller now, and it is the reason the notes are ordered.**
-// This function used to refuse a deck carrying notes outright: `sort_keys=False`
-// means the payload's order *is* the file's order, the package held notes in a
-// Go map, and neither lifecycle caller could reach the case -- a created deck
-// has no notes and an imported one carries none across. The refusal named its
-// own expiry ("the day something dumps a parsed deck -- the artifacts snapshot
-// is the candidate -- ordering the notes is that flip's first job"), and the
-// artifacts flip is that day. `deckyaml.ParseOrdered` keeps the order and
-// `Deck.Notes` is a `deckyaml.Map`, so a note mapping now survives
-// parse -> mutate -> dump exactly as PyYAML's dict does.
+// This function used to refuse a deck carrying notes outright: the emitter
+// never sorts, so the payload's order *is* the file's order, the package
+// held notes in a bare map, and neither lifecycle caller could reach the
+// case -- a created deck has no notes and an imported one carries none
+// across. The refusal named its own expiry ("the day something dumps a
+// parsed deck -- the artifacts snapshot is the candidate -- ordering the
+// notes is that flip's first job"), and the artifacts flip is that day.
+// `deckyaml.ParseOrdered` keeps the order and `Deck.Notes` is a
+// `deckyaml.Map`, so a note mapping now survives parse -> mutate -> dump
+// in the order the author wrote.
 func (d *Deck) Dump() (string, error) {
 	if _, ok := d.Strategy.(string); !ok && d.Strategy != nil {
 		// Same argument one field over: `strategy` is a string in every deck
@@ -117,7 +118,7 @@ func cardList(cards []CardEntry, draft bool) yamlemit.List {
 	return out
 }
 
-// cardObject is `CardEntry.to_obj`, and the draft rule on top of it.
+// cardObject renders one card entry, with the draft rule on top.
 //
 // A blank `why:` is the to-do list written into the file itself, so the work
 // shows up where it has to be done rather than only in the gate's output;
@@ -125,8 +126,8 @@ func cardList(cards []CardEntry, draft bool) yamlemit.List {
 // should not be pre-typed.
 //
 // It lands **last** on a draft card, after `qty` and `art`, and that is not a
-// tidy-looking accident: `to_obj` writes `why` in second place only when there
-// is one, and Python's `setdefault` on a key the mapping has not got appends.
+// tidy-looking accident: `why` is written in second place only when there is
+// one, and the draft's blank entry is appended after every present field.
 // A draft card with a quantity therefore reads `qty` before `why: ”`, which
 // is the sort of thing only a corpus catches.
 func cardObject(c CardEntry, draft bool) yamlemit.Map {
@@ -167,9 +168,8 @@ func cardObject(c CardEntry, draft bool) yamlemit.Map {
 //
 // A value the emitter cannot write comes back as an error rather than as
 // something plausible, the same answer `Dump` already gives a strategy that
-// is not prose. In Python the equivalent is not a refusal but a traceback --
-// `generate._note` calls `.strip()` on whatever the note holds -- so a 500 on
-// both sides is the honest match for a hand-edited file nobody meant to write.
+// is not prose -- and the route renders it as a 500, which is the honest
+// answer for a hand-edited file nobody meant to write.
 func yamlNode(v any) (any, error) {
 	switch t := v.(type) {
 	case deckyaml.Map:

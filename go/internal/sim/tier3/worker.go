@@ -18,7 +18,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 )
 
-// `sim/tier3/worker.py`: the app's side of the hosted Forge — wake the worker,
+// The worker client: the app's side of the hosted Forge — wake the worker,
 // ask it, let it sleep.
 //
 // ADR 35's fifth decision, as client code. The deployed app machine holds no
@@ -56,7 +56,7 @@ const MachinesAPI = "https://api.machines.dev/v1"
 // warm. Generous rather than tight, because the refusal is a 503 somebody
 // sees.
 //
-// Python spells it `BOOT_SECONDS`; the name loses the unit here because the
+// The name carries no unit because the
 // value carries one.
 const BootBudget = 90 * time.Second
 
@@ -170,8 +170,8 @@ func (w *Worker) api(ctx context.Context, method, path string,
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
-		// `exc.read().decode("utf-8", "replace")[:300]` — code points, and
-		// Python slices a `str`, so the cut is by character not by byte.
+		// Truncated at 300 code points, not bytes -- the recorded cut is
+		// by character, so a multibyte rune is never split.
 		detail := truncate(string(raw), 300)
 		return nil, NotInstalled("forge worker: Machines API %s %s answered "+
 			"%d: %s", method, path, resp.StatusCode, detail)
@@ -413,8 +413,8 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck, games, clock 
 		return nil, err
 	}
 
-	// **The budget is per read, not per match**, which is where Go and Python
-	// part company: `urlopen(timeout=...)` sets a *socket* timeout that
+	// **The budget is per read, not per match**, and the distinction is the
+	// contract: a per-read (socket-style) timeout
 	// applies to each read, while `http.Client.Timeout` bounds the whole
 	// exchange including the body — on a twenty-game match that would be a
 	// second, worse copy of the far side's own ceiling, and a shorter one.

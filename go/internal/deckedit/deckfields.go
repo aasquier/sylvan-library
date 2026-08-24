@@ -31,7 +31,7 @@ func deckFieldValue(field string, value any) (any, error) {
 	case "bracket":
 		bracket, err := asInt(value)
 		if err != nil {
-			return nil, failf("bracket must be a number, not %s", pyRepr(value))
+			return nil, failf("bracket must be a number, not %s", quotedValue(value))
 		}
 		if bracket < 1 || bracket > 5 {
 			return nil, failf("bracket runs from 1 to 5")
@@ -46,7 +46,7 @@ func deckFieldValue(field string, value any) (any, error) {
 		pilot := strings.TrimSpace(asString(value))
 		if runes := []rune(pilot); len(runes) > PilotMax {
 			return nil, failf("a pilot name runs at most %d characters; %s… is %d",
-				PilotMax, pyRepr(string(runes[:min(20, len(runes))])), len(runes))
+				PilotMax, quotedValue(string(runes[:min(20, len(runes))])), len(runes))
 		}
 		return pilot, nil
 
@@ -62,7 +62,7 @@ func deckFieldValue(field string, value any) (any, error) {
 			return nil, failf("%s is not a Scryfall printing id. It should look "+
 				"like a UUID; the deck page's art picker sets this for you, and "+
 				"`mtglab decks set <slug> --art <set-code>` takes a set code and "+
-				"looks the id up.", pyRepr(art))
+				"looks the id up.", quotedValue(art))
 		}
 		return art, nil
 
@@ -81,7 +81,7 @@ func deckFieldValue(field string, value any) (any, error) {
 			if !reference.IsTheme(theme) {
 				return nil, failf("%s is not in the theme vocabulary; the list "+
 					"grows by editing THEMES in decks/model.py, never by typo. "+
-					"Known themes: %s", pyRepr(theme),
+					"Known themes: %s", quotedValue(theme),
 					strings.Join(reference.Themes().Themes, ", "))
 			}
 			if !slices.Contains(themes, theme) {
@@ -101,7 +101,7 @@ func deckFieldValue(field string, value any) (any, error) {
 		}
 		if !slices.Contains(allowed, word) {
 			return nil, failf("%s must be one of %s, not %s",
-				field, strings.Join(allowed, ", "), pyRepr(word))
+				field, strings.Join(allowed, ", "), quotedValue(word))
 		}
 		return word, nil
 	}

@@ -9,19 +9,19 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/floats"
 )
 
-// The floor the two closed forms stand on, held to CPython by
-// `testdata/corpus.json` (written by `python tests/go_fixtures.py`).
+// The floor the two closed forms stand on, held to `testdata/corpus.json` --
+// a frozen recorded golden, never regenerated.
 //
 // # The epsilon, pinned per function
 //
-// PLAN section 5 item 4 asks for "an epsilon pinned per function". All three
-// here are pinned at **zero -- bit equality** -- and the justification is the
-// same one in three parts: each of these functions is a *reproduction* of a
-// CPython algorithm rather than an approximation of a mathematical value, so
-// there is no error term to allow for. `Fsum` runs Shewchuk's partials in the
-// same order CPython runs them; `Round` answers an **integer**, so it has no
-// epsilon to pin at all; `RoundTo` does in exact rationals what CPython does
-// by formatting and re-parsing, and both are correctly rounded to the same
+// Every comparison here is pinned at an epsilon, and all three are pinned at
+// **zero -- bit equality** -- with the same justification in three parts:
+// each of these functions is a *reproduction* of a recorded algorithm rather
+// than an approximation of a mathematical value, so there is no error term
+// to allow for. `Fsum` runs Shewchuk's partials in a fixed order; `Round`
+// answers an **integer**, so it has no epsilon to pin at all; `RoundTo` does
+// in exact rationals what the recorded contract defines by decimal
+// formatting and re-parsing, and both are correctly rounded to the same
 // definition. A non-zero epsilon here would not absorb a rounding difference,
 // it would hide a transcription error -- which is the only way any of them can
 // be wrong.
@@ -70,7 +70,7 @@ func same(got, want, epsilon float64) bool {
 	return math.Abs(got-want) <= epsilon
 }
 
-func TestFsumIsCPythonsFsum(t *testing.T) {
+func TestFsumMatchesTheRecordedSums(t *testing.T) {
 	corpus := loadCorpus(t)
 	if len(corpus.Fsum) < 20 {
 		t.Fatalf("the corpus has shrunk to %d sequences", len(corpus.Fsum))
@@ -78,7 +78,7 @@ func TestFsumIsCPythonsFsum(t *testing.T) {
 	for i, c := range corpus.Fsum {
 		got := floats.Fsum(c.Values)
 		if !same(got, c.Value, epsilonFsum) {
-			t.Errorf("case %d (%d terms): Fsum = %v (%#016x), CPython = %v (%#016x)",
+			t.Errorf("case %d (%d terms): Fsum = %v (%#016x), the corpus says %v (%#016x)",
 				i, len(c.Values), got, math.Float64bits(got),
 				c.Value, math.Float64bits(c.Value))
 		}
@@ -111,27 +111,27 @@ func TestRoundBreaksTiesToEven(t *testing.T) {
 	corpus := loadCorpus(t)
 	for _, row := range corpus.Round {
 		if got := floats.Round(row.X); got != row.Value {
-			t.Errorf("Round(%v) = %d, CPython = %d", row.X, got, row.Value)
+			t.Errorf("Round(%v) = %d, the corpus says %d", row.X, got, row.Value)
 		}
 	}
 	// The one that matters, spelled out: Go's own rounding disagrees, and it
 	// disagrees by a whole land in `RegressionLands`.
 	if int(math.Round(34.5)) == floats.Round(34.5) {
-		t.Fatal("math.Round and CPython agree about 34.5, so this guard is vacuous")
+		t.Fatal("math.Round and floats.Round agree about 34.5, so this guard is vacuous")
 	}
 	if floats.Round(34.5) != 34 {
 		t.Errorf("Round(34.5) = %d, want 34 (ties to even)", floats.Round(34.5))
 	}
 }
 
-func TestRoundToIsCPythonsTwoArgumentRound(t *testing.T) {
+func TestRoundToAgreesWithTheCorpus(t *testing.T) {
 	corpus := loadCorpus(t)
 	if len(corpus.RoundTo) < 50 {
 		t.Fatalf("the corpus has shrunk to %d cases", len(corpus.RoundTo))
 	}
 	for _, row := range corpus.RoundTo {
 		if got := floats.RoundTo(row.X, row.Ndigits); !same(got, row.Value, epsilonRoundTo) {
-			t.Errorf("RoundTo(%v, %d) = %v (%#016x), CPython = %v (%#016x)",
+			t.Errorf("RoundTo(%v, %d) = %v (%#016x), the corpus says %v (%#016x)",
 				row.X, row.Ndigits, got, math.Float64bits(got),
 				row.Value, math.Float64bits(row.Value))
 		}

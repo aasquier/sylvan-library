@@ -13,11 +13,12 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
-// The shaped result, held to Python: the payload the deck page renders, the
+// The shaped result, held to a frozen corpus: the payload the deck page
+// renders, the
 // row a tick carries, and the two dials that make a match out of a body.
 //
 // The corpus lives with the engine (`internal/sim/tier3/testdata/forge.json`)
-// because one generator writes it; only the `shape` half is read here.
+// because it is one recording; only the `shape` half is read here.
 
 type shapeCorpusFile struct {
 	Shape struct {
@@ -81,7 +82,7 @@ func loadShapeCorpus(t *testing.T) shapeCorpusFile {
 		t.Fatal(err)
 	}
 	if len(corpus.Shape.Shapes) == 0 {
-		t.Fatal("the Forge shape corpus is empty; run tests/go_fixtures.py")
+		t.Fatal("the Forge shape corpus is empty; forge.json is a frozen golden")
 	}
 	return corpus
 }
@@ -107,13 +108,13 @@ func TestTheConstantsAreClaudesOwnWords(t *testing.T) {
 	}
 }
 
-// TestTheShapedMatchIsPythonsBytes compares the whole payload, marshalled.
+// TestTheShapedMatchIsTheRecordedBytes compares the whole payload, marshalled.
 //
-// **Marshalled**, which is `tier1.Number`'s lesson one phase later: a struct
+// **Marshalled**, which is `tier1.Number`'s lesson again: a struct
 // proved field by field and never once put through `encoding/json` is a struct
 // whose wire form nothing has checked. Key order is contract here — the deck
 // page reads this in DevTools as much as the client does.
-func TestTheShapedMatchIsPythonsBytes(t *testing.T) {
+func TestTheShapedMatchIsTheRecordedBytes(t *testing.T) {
 	corpus := loadShapeCorpus(t)
 	decks := map[string]*deck.Deck{}
 	for name, text := range corpus.Shape.Decks {
@@ -170,28 +171,29 @@ func TestTheRowIsTheSameShapeLiveAndInTheTally(t *testing.T) {
 	}
 }
 
-// TestTheGamesDialAgreesWithPython holds `_games` over every shape a body can
-// carry — including the ones Python **raises** on.
+// TestTheGamesDialMatchesTheCorpus holds `forgeGames` over every shape a
+// body can carry — including the ones the record **raises** on.
 //
-// Those are a wart, pinned rather than tidied: `plan_forge` runs in the
-// request with nothing catching a ValueError, so `{"games": "many"}` is an
-// uncaught 500 rather than the 422 it should be, and `{"games": null}` is a
-// TypeError because `dict.get`'s default only fires for an ABSENT key. The
+// Those are a wart, pinned rather than tidied: the plan runs in the
+// request with nothing catching the refusal, so `{"games": "many"}` is an
+// uncaught 500 rather than the 422 it should be, and `{"games": null}` is
+// recorded as a crash too, because the default only fires for an ABSENT
+// key. The
 // guard beats the fix here, because neither is reachable from the app's own
 // client and an unreachable bug survives forever.
-func TestTheGamesDialAgreesWithPython(t *testing.T) {
+func TestTheGamesDialMatchesTheCorpus(t *testing.T) {
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.GamesDial {
 		t.Run(c.Note, func(t *testing.T) {
 			got, err := forgeGames(decodeBody(t, c.Payload))
 			if c.Raises != "" {
 				if err == nil {
-					t.Fatalf("Python raised %s; Go answered %d", c.Raises, got)
+					t.Fatalf("the corpus raises %s; this answered %d", c.Raises, got)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("Go refused where Python answered %d: %v", *c.Games, err)
+				t.Fatalf("refused where the corpus answers %d: %v", *c.Games, err)
 			}
 			if c.Games == nil || got != *c.Games {
 				t.Errorf("games = %d, want %v", got, c.Games)
@@ -200,24 +202,25 @@ func TestTheGamesDialAgreesWithPython(t *testing.T) {
 	}
 }
 
-// TestTheSeedDialAgreesWithPython holds `_seed`, including a seed past int64.
+// TestTheSeedDialMatchesTheCorpus holds `forgeSeed`, including a seed past
+// int64.
 //
 // Past int64 is not a curiosity: the seed is echoed into the result, the
 // dedupe key and Forge's own command line, so narrowing it would answer a
 // different number than the one somebody asked with — and a seed is a promise.
-func TestTheSeedDialAgreesWithPython(t *testing.T) {
+func TestTheSeedDialMatchesTheCorpus(t *testing.T) {
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.SeedDial {
 		t.Run(c.Note, func(t *testing.T) {
 			got, err := forgeSeed(decodeBody(t, c.Payload))
 			if c.Raises != "" {
 				if err == nil {
-					t.Fatalf("Python raised %s; Go answered %s", c.Raises, got)
+					t.Fatalf("the corpus raises %s; this answered %s", c.Raises, got)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("Go refused where Python answered %s: %v", c.Seed, err)
+				t.Fatalf("refused where the corpus answers %s: %v", c.Seed, err)
 			}
 			if got.String() != c.Seed {
 				t.Errorf("seed = %s, want %s", got, c.Seed)
@@ -226,10 +229,11 @@ func TestTheSeedDialAgreesWithPython(t *testing.T) {
 	}
 }
 
-// TestTheLabelAndKeyArePythonsText holds the two strings a caller sees or
-// collides on: the job label in a list of one-liners, and the dedupe key that
-// decides whether a second click joins the first match or starts a new one.
-func TestTheLabelAndKeyArePythonsText(t *testing.T) {
+// TestTheLabelAndKeyAreTheRecordedText holds the two strings a caller sees
+// or collides on: the job label in a list of one-liners, and the dedupe key
+// that decides whether a second click joins the first match or starts a new
+// one.
+func TestTheLabelAndKeyAreTheRecordedText(t *testing.T) {
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.Labels {
 		plural := "s"

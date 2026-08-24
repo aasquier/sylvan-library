@@ -1,4 +1,4 @@
-// Package karsten is `sim/karsten.py`: Tier 1.5, the closed form. What
+// Package karsten is Tier 1.5, the closed form: what
 // arithmetic can answer about a compiled deck without shuffling it.
 //
 // Tier 1 shuffles a deck twenty thousand times and counts what happened. This
@@ -37,17 +37,17 @@
 // beside this file pins the gap so it stays known. Do not "fix" it toward the
 // table.
 //
-// # On agreeing with Python
+// # On agreeing with the recorded corpus
 //
-// The Python module is `math.comb` and nothing else -- exact integer
-// arithmetic, one division at the end. Go has no `math.Comb`, and a
-// float64 binomial for a 99-card deck loses the agreement in the binomials
+// The recorded arithmetic is exact integer binomials with one division at
+// the end. A
+// float64 binomial for a 99-card deck loses that exactness in the binomials
 // long before the comparison: C(99, 49) is about 2.5e28, six orders of
 // magnitude past the last integer float64 can hold exactly. So the binomials
 // here are `math/big.Int` and the single division is a `big.Rat`, whose
-// `Float64` is the same correctly-rounded, ties-to-even value CPython's
-// int/int true division produces. The result is not "close to" Python's; it
-// is the same bits, which is what the differential corpus asserts.
+// `Float64` is the correctly-rounded, ties-to-even quotient. The result is
+// not "close to" the recorded value; it
+// is the same bits, which is what the corpus asserts.
 //
 // That exactness is not decoration. `RequiredSources` scans for the first
 // count where the odds clear a float target, and `CardOdds.ReliableTurn` does
@@ -80,8 +80,8 @@ const Horizon = 10
 
 // ---------------------------------------------------------- the arithmetic
 
-// cacheLimit mirrors `lru_cache(maxsize=100_000)` on the two Python
-// functions: a bound, not a policy. The heatmap asks for the same tuple once
+// cacheLimit bounds the two memo tables at 100,000 entries: a bound, not a
+// policy. The heatmap asks for the same tuple once
 // per card sharing a cost and a 99-card deck asks a few thousand times, so a
 // memo is the difference between milliseconds and seconds once the binomials
 // are big integers. Eviction is wholesale rather than least-recently-used,
@@ -100,7 +100,7 @@ var (
 	binomCache = map[[2]int]*big.Int{}
 )
 
-// binom is `math.comb`: exact, and zero where Python's is zero (k < 0 or
+// binom is the exact binomial coefficient, and zero out of range (k < 0 or
 // k > n). Memoised because every term of every sum below is one of these and
 // the distinct (n, k) pairs a deck asks for number in the hundreds.
 func binom(n, k int) *big.Int {
@@ -121,7 +121,8 @@ func binom(n, k int) *big.Int {
 	return v
 }
 
-// ratio is CPython's `int / int`: the correctly-rounded float64 nearest the
+// ratio is exact integer division into a float: the correctly-rounded
+// float64 nearest the
 // exact rational, ties to even. `big.Rat.Float64` is documented to be exactly
 // that, which is why this is an equality rather than a tolerance.
 func ratio(num, den *big.Int) float64 {
@@ -162,7 +163,7 @@ func hypergeometricAtLeast(population, successes, draws, wanted int) float64 {
 	if successes < wanted || draws < wanted {
 		return 0.0
 	}
-	// Clamped *after* the check above, exactly as Python clamps it: asking for
+	// Clamped *after* the check above -- the recorded order: asking for
 	// more draws than there are cards is asking to see the whole deck.
 	if draws > population {
 		draws = population
@@ -186,8 +187,8 @@ func hypergeometricAtLeast(population, successes, draws, wanted int) float64 {
 			}
 			below.Add(below, new(big.Int).Mul(binom(successes, i), binom(population-successes, draws-i)))
 		}
-		// `max(0.0, 1.0 - below / total)`: Python's max returns the second
-		// operand only when it is strictly greater, which is what keeps a
+		// Floored at zero, taking the floor only when the value is not
+		// strictly greater -- the distinction that keeps a
 		// negative zero out of the answer.
 		if v := 1.0 - ratio(below, total); v > 0.0 {
 			return v
@@ -207,9 +208,9 @@ func hypergeometricAtLeast(population, successes, draws, wanted int) float64 {
 	return 1.0
 }
 
-// Exactly is `karsten._exactly`: P(exactly `count` successes). The
-// conditioning step's weight, and `sim/curve.py` imports it by name, which is
-// why it is exported here where Python keeps it private.
+// Exactly is P(exactly `count` successes). The
+// conditioning step's weight, and `sim/curve` imports it by name, which is
+// why it is exported rather than kept to this file.
 func Exactly(population, successes, draws, count int) float64 {
 	key := hyperKey{population, successes, draws, count}
 	hyperMu.Lock()
@@ -293,7 +294,7 @@ func RequiredSources(deckSize, pips, turn int, target float64, onThePlay bool) i
 //
 // The order is load-bearing and not cosmetic: `CastableOdds` multiplies one
 // conditional term per bucket, and float multiplication is not associative, so
-// a different iteration order is a different last bit. Python's dicts preserve
+// a different iteration order is a different last bit. The recorded order is
 // insertion order; this preserves the same one.
 type demandEntry struct {
 	colors []string // the pip's colour set, sorted -- `mana.Cost` sorts it
@@ -773,8 +774,8 @@ func Read(library []sim.Card, commander *sim.Card, target float64, onThePlay boo
 			// do I need" for a deck holding {G/W} cards.
 			//
 			// A card demanding both {G/W} and {G} therefore lands in ("G", 1)
-			// twice, which is Python's behaviour and is reproduced rather than
-			// tidied: the tier's card list is what a reader sees.
+			// twice, which is the recorded behaviour and is reproduced rather
+			// than tidied: the tier's card list is what a reader sees.
 			for _, color := range d.colors {
 				key := askKey{color, d.pips}
 				asked[key] = append(asked[key], card)

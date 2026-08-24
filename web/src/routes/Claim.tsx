@@ -5,7 +5,7 @@
  * never sent to a server, so it stays out of the access log of every hop that
  * serves this page — the platform router, any proxy in front of it, and the
  * `Referer` of anything the page later loads. The query-string spelling would
- * write a live credential into all three. `auth/invites.py` builds the link
+ * write a live credential into all three. The server's invite builder makes the link
  * that way and says so; this is the client half of that contract, and the one
  * request that carries the token is the POST below, in a JSON body.
  *

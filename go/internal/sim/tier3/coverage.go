@@ -15,7 +15,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
-// `sim/tier3/coverage.py`: the card-coverage pre-flight — does Forge
+// The card-coverage pre-flight — does Forge
 // implement every card in this deck?
 //
 // **This is the non-negotiable piece.** Forge implements ~99.8% of cards legal
@@ -78,7 +78,7 @@ type coverageFailed struct{ msg string }
 func (e *coverageFailed) Error() string        { return e.msg }
 func (e *coverageFailed) Is(target error) bool { return target == ErrCoverageFailed }
 
-// ErrResultsUntrustworthy is `run.ResultsUntrustworthy`: Forge itself reported
+// ErrResultsUntrustworthy is the refusal for a run where Forge itself reported
 // a dropped card or an unloadable deck.
 //
 // The second of the two coverage checks, and the one that fires if a name ever
@@ -117,10 +117,10 @@ type indexKey struct {
 var (
 	indexMu    sync.Mutex
 	indexCache = map[indexKey]map[string]bool{}
-	// Hits and misses, because `caches.py`'s whole argument is that a cache
-	// can be correct, tested and never once hit. Go has no central register
-	// yet (the migration plan's enforcement table records that gap
-	// deliberately), so the counters live here and a test reads them.
+	// Hits and misses, because the measuring shelf's whole argument is that
+	// a cache can be correct, tested and never once hit. There is no
+	// central cache register yet -- a known, deliberate gap -- so the
+	// counters live here and a test reads them.
 	indexHits, indexMisses int
 )
 

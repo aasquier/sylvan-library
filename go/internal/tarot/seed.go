@@ -5,23 +5,22 @@ import (
 	"strings"
 )
 
-// ParseSeed reads the `?seed=` query value the way FastAPI's `seed: int | None`
-// does, returning nil-and-false for anything it refuses.
+// ParseSeed reads the `?seed=` query value against the recorded seed
+// grammar, returning nil-and-false for anything it refuses.
 //
-// Pydantic's integer grammar is not strconv.ParseInt's, and it is not Python's
-// `int()` either — it sits between them, which is why this is a hand-written
-// scanner rather than either library call:
+// The recorded grammar is not strconv.ParseInt's — it is wider in some
+// directions and narrower in others, which is why this is a hand-written
+// scanner rather than a library call:
 //
 //   - Surrounding whitespace is stripped, so "  7  " is seven.
 //   - A leading "+" is allowed, and "0007" is seven rather than octal.
 //   - SINGLE UNDERSCORES BETWEEN DIGITS are separators, so "1_0" is ten.
 //     Not leading, not trailing, not doubled, not next to the sign.
-//   - Only ASCII digits count. Python's own int() takes any Unicode decimal
-//     digit and reads the fullwidth "７" as seven; Pydantic refuses it, and so
-//     does this. That single row is the reason the corpus is generated from
-//     TypeAdapter(int) rather than from int() — measured, not assumed.
+//   - Only ASCII digits count: the fullwidth "７" is refused, not read as
+//     seven. The corpus records that refusal explicitly — measured, not
+//     assumed.
 //
-// The value is a *big.Int because Python's are unbounded and the seed is
+// The value is a *big.Int because the grammar is unbounded and the seed is
 // echoed back on the wire: 2**70 is a legitimate seed and an int64 would
 // answer a different reading under a different number.
 func ParseSeed(raw string) (*big.Int, bool) {

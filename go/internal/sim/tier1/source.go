@@ -6,7 +6,7 @@ import "embed"
 // `internal/mana.SourceFS` for why, and `internal/sim/cache.Fingerprint` for
 // the only reader.
 //
-// This is `engine.py`'s half of the pair `sim/cache.py` names, and `repr.go`
+// This is the engine's entry in `cache.engineSources`, and `repr.go`
 // is in it even though nothing serves those strings: a change there cannot
 // move a number, but excluding a file is a claim about behaviour that can go
 // stale, and the cost of being wrong about it is a stale figure on a deck page

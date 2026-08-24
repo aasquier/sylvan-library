@@ -1,8 +1,8 @@
 /** The accounts page: what it offers, and the two things it must never offer.
  *
  * The page is not the protection — every route it calls is refused to a
- * non-admin by the middleware before routing (ADR 17), and `tests/test_isolation.py`
- * is what proves that. What is worth pinning here is the pair of server rules
+ * non-admin by the middleware before routing (ADR 17), and the door's own
+ * sweeps are what prove that. What is worth pinning here is the pair of server rules
  * the UI *reflects*, because a UI that reflects them wrongly is a UI that
  * offers a click which can only fail:
  *
@@ -79,7 +79,7 @@ function emptyWindow() {
 }
 
 /** The tiers a server serves. Written out here rather than imported from
- *  `claude/tiers.py`'s roster because TypeScript cannot read it — the seam is
+ *  the server's tier roster because TypeScript cannot read it — the seam is
  *  the payload, and what these cases pin is that the page renders whatever
  *  arrives rather than a list of its own. */
 const TIERS = [

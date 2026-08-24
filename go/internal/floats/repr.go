@@ -77,7 +77,7 @@ func Repr(v float64) string {
 	}
 }
 
-// Float is a float64 that marshals the way Python writes one.
+// Float is a float64 that marshals as its canonical rendering (Repr).
 //
 // A named type rather than a helper at every call site, because the failure it
 // prevents is *forgetting* — a payload struct with a bare `float64` renders
@@ -86,7 +86,7 @@ func Repr(v float64) string {
 // field as this type makes the decision once, where the struct is written.
 type Float float64
 
-// MarshalJSON writes the number Python would write.
+// MarshalJSON writes the number's canonical rendering.
 func (f Float) MarshalJSON() ([]byte, error) {
 	return []byte(Repr(float64(f))), nil
 }

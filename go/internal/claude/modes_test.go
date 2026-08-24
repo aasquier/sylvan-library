@@ -9,15 +9,15 @@ import (
 	"testing"
 )
 
-// Every mode Python defines is loadable here, and the count is not a number
+// Every defined mode is loadable here, and the count is not a number
 // this file remembers.
 //
-// `data/modes.json` is generated **by discovery** rather than from a list, for
-// a reason worth keeping: the first version of that generator was a hand-list
-// gathered by grepping for `= Mode(`, and it silently missed `scan.py`, which
-// spells it `modes.Mode(...)`. Seven became six with nothing looking wrong.
-// So the assertion here is that Go loads exactly what the file holds, and
-// `tests/test_go_fixtures.py` is what holds the file to Python.
+// `data/modes.json` was built **by discovery** rather than from a list, for
+// a reason worth keeping: an earlier hand list silently missed the scan
+// mode, whose definition is spelled differently from its siblings. Seven
+// became six with nothing looking wrong.
+// So the assertion here is that the loader loads exactly what the file
+// holds; the file itself is frozen recorded data.
 func TestEveryDefinedModeLoads(t *testing.T) {
 	var file modeFile
 	raw, err := os.ReadFile("data/modes.json")
@@ -104,8 +104,8 @@ func TestTheSlotArgumentHasNowhereToPutADefence(t *testing.T) {
 			"can invent the field the schema deliberately omits")
 	}
 	if _, present := props["charges"]; !present {
-		t.Error("the slot argument lost its charges array: the schema crossed " +
-			"as something other than itself")
+		t.Error("the slot argument lost its charges array: the schema no " +
+			"longer carries itself")
 	}
 }
 
@@ -183,7 +183,7 @@ func TestAnUnknownHostedToolIsRefused(t *testing.T) {
 	}
 }
 
-// Every mode's prompt actually crossed. A blank instruction block would still
+// Every mode's prompt is really there. A blank instruction block would still
 // build a valid request and would produce an answer -- a much worse one, from
 // a model told nothing about what it is doing.
 func TestEveryModeCarriesItsPromptAndSchema(t *testing.T) {

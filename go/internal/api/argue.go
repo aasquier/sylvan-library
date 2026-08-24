@@ -30,7 +30,7 @@ import (
 // wart in one place rather than two spellings of it.
 //
 // **Synchronous, and that is a measured claim rather than an assumption.**
-// Python's docstring is explicit about it: the interview costs ~4,900 input
+// The interview costs ~4,900 input
 // tokens and makes no tool calls because `Brief` hands the facts over; this
 // mode shares that brief and adds a tool set it uses only when it goes
 // shopping, so it sits in the same seconds class rather than the theme
@@ -41,14 +41,14 @@ import (
 // multiplies this by a selection, which is minutes, and it is a job. It is at
 // the bottom of this file.
 
-// argueSlot is `POST .../argue` -- `service.claude_argue`.
+// argueSlot is `POST .../argue`.
 func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
-	// Body before deck, as FastAPI resolves them; see rationaleInterview.
+	// Body before deck -- the recorded order; see rationaleInterview.
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	card := strings.TrimSpace(pyStrDefault(body, "card", ""))
+	card := strings.TrimSpace(strDefault(body, "card", ""))
 	if card == "" {
 		wire.Detail(w, http.StatusUnprocessableEntity, "card is required")
 		return
@@ -64,11 +64,11 @@ func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	focus := ""
-	if pyTruthy(body["focus"]) {
+	if truthy(body["focus"]) {
 		focus = str(body, "focus")
 	}
 
@@ -97,8 +97,8 @@ func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
 	wire.Raw(w, http.StatusOK, raw)
 }
 
-// The sweep: `POST /api/decks/{owner}/{slug}/argue/deck`, over
-// `api/argueruns.py`. A **job**, where the single-card route one screen up is
+// The sweep: `POST /api/decks/{owner}/{slug}/argue/deck`.
+// A **job**, where the single-card route one screen up is
 // synchronous -- and the difference is arithmetic rather than taste. That one
 // is measured in the seconds class; this multiplies it by a selection, so a
 // few dozen slots is minutes and a full 99 is tens of minutes.
@@ -129,7 +129,7 @@ const ArgueSweepKind = "claude.argue.deck"
 const argueOffReason = "The stance is off, so no calls were made. " +
 	"Everything else about this deck still works."
 
-// argueSweepResult renders the six keys in Python's order.
+// argueSweepResult renders the six keys in the recorded order.
 //
 // `reports` is a list of ordered reports and `errors` is a dict built in
 // SWEEP ORDER -- so both halves need ordered rendering, and a
@@ -236,7 +236,7 @@ func (a *API) argueSweep(w http.ResponseWriter, r *http.Request) {
 	// per-card report still carries the stance `Argue` resolved for it, from
 	// the same inputs.
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	effective, err := claude.Resolve(requested, claude.DeckWithStatus(d.Status), nil)

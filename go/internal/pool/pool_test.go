@@ -29,12 +29,12 @@ func TestInMemoryLinksAndAnswers(t *testing.T) {
 	t.Logf("libduckdb %s", version)
 }
 
-// A pool file Python wrote, read by Go: set MTGLAB_TEST_POOL to a DuckDB
-// file built by `tests/tiny_pool.py` (or the real pool). Skipped without it,
-// because CI's Go jobs have no Python and no pool; the file-level
-// compatibility is proven on the maintainer's machine and, from Phase 3, by
-// the contract suite through the front door.
-func TestReadsAPoolPythonWrote(t *testing.T) {
+// An existing pool file, read in place: set MTGLAB_TEST_POOL to a real
+// DuckDB pool file. Skipped without it,
+// because CI carries no pool file; the file-level
+// compatibility is proven on the maintainer's machine and on the deployed
+// volume.
+func TestReadsAnExistingPoolFile(t *testing.T) {
 	path := os.Getenv("MTGLAB_TEST_POOL")
 	if path == "" {
 		t.Skip("MTGLAB_TEST_POOL not set")

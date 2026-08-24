@@ -14,7 +14,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// `claude/scan.py`: Claude reads a photographed card, and reads it as a camera
+// The scan mode: Claude reads a photographed card, and reads it as a camera
 // would. The seventh mode, and the smallest.
 //
 // It exists for the cards the browser's own reader cannot do, and there are a
@@ -30,7 +30,7 @@ import (
 // text* has no offline implementation here, which is why the reader exists at
 // all. So the boundary runs between the two: Claude returns what is printed,
 // verbatim, and `internal/cards` decides what card that is. The response
-// schema has **no field for a card name**, which crosses in `modes.json` and
+// schema has **no field for a card name**, which lives in `modes.json` and
 // is pinned by its own test; the absence is the feature.
 //
 // So this is a better camera, not a better judge. It has no tools, it never
@@ -40,10 +40,9 @@ import (
 // before a request is built -- the API accepts these four and a wrong label is
 // a 400 that costs a round trip to learn.
 //
-// **Matched exactly, byte for byte.** No trimming and no case folding, which
-// is Python's `media_type not in MEDIA_TYPES` over a frozenset of strings:
+// **Matched exactly, byte for byte.** No trimming and no case folding:
 // `IMAGE/JPEG` and `" image/jpeg "` are both refused. Measured, because the
-// tolerant version is the one a port writes by reflex.
+// tolerant version is the one a reimplementation writes by reflex.
 var ScanMediaTypes = map[string]bool{
 	"image/jpeg": true,
 	"image/png":  true,
@@ -56,8 +55,7 @@ var ScanMediaTypes = map[string]bool{
 // with a sentence somebody can act on, rather than by the platform.
 const ScanMaxBytes = 4 * 1024 * 1024
 
-// ErrScanRefused is `scan.ScanRefused`: the capture was refused before any
-// request was built.
+// ErrScanRefused marks a capture refused before any request was built.
 //
 // A sentinel wrapped by every refusal rather than four distinct errors,
 // because the route maps all of them to one 422 and the *sentence* is what
@@ -76,8 +74,7 @@ func refuseScan(format string, args ...any) error {
 // a transcription where it is the failure mode.
 const ScanDefaultPreset = "consultant"
 
-// ScanStanceFor is `scan.stance_for`: this mode's stance, and the reason it
-// takes one at all.
+// ScanStanceFor is this mode's stance, and the reason it takes one at all.
 //
 // There is no deck to derive a default from, and `Resolve(nil, nil)` is `off`
 // -- the right answer for "no idea what this is about" and the wrong one for a
@@ -88,10 +85,10 @@ const ScanDefaultPreset = "consultant"
 // off a picture. It resolves so the call happens, not so it changes, which is
 // why it takes the narrowest preset that is not `off`.
 //
-// **And `/api/claude` does not ask it**, which the docstring this is ported
-// from says it exists to prevent. `_SURFACE_DEFAULTS` names `theme` and
+// **And `/api/claude` does not ask it**, which is the very thing this
+// function exists to prevent. The dial's surface table names `theme` and
 // `research` and was never extended when ADR 34 landed, so `?surface=scan`
-// answers `off` in both runtimes. See `dialSurfaces`; reproduced, not fixed.
+// answers `off`. See `dialSurfaces`; recorded, not fixed.
 func ScanStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
 		ceil := Ceiling()
@@ -107,8 +104,7 @@ func ScanStanceFor(requested any, limit *Stance) (Stance, error) {
 	return Resolve(requested, nil, limit)
 }
 
-// scanPayload is `scan._payload`: validate a capture and return it
-// base64-encoded.
+// scanPayload validates a capture and returns it base64-encoded.
 //
 // Refuses here rather than at the API for the usual reason: a 400 from the
 // platform arrives after a round trip and says nothing a person can act on.
@@ -129,7 +125,7 @@ func scanPayload(image any, mediaType string) (string, error) {
 	var raw []byte
 	switch value := image.(type) {
 	case string:
-		decoded, err := pyB64Decode(value)
+		decoded, err := strictB64Decode(value)
 		if err != nil {
 			return "", refuseScan("the capture was not valid base64")
 		}
@@ -137,17 +133,16 @@ func scanPayload(image any, mediaType string) (string, error) {
 	case []byte:
 		raw = value
 	case nil:
-		// `payload.get("image") or b""` in the route: an absent or falsy image
-		// arrives as empty bytes and refuses as empty below, never as a type.
+		// The route reads an absent or falsy image as empty bytes, so it
+		// arrives here as nil and refuses as empty below, never as a type.
 		raw = nil
 	default:
-		// **Refused since 2026-08-23, and a 500 before that.** Python's
-		// `else: raw = image` took whatever it was handed, so a list or an
-		// object reached `len()` and `b64encode` and raised an uncaught
-		// `TypeError` -- an internal error for a request that is plainly
-		// malformed, which is the theme proposal's `float(budget)` wart in a
-		// second module. Found by this port on the day that one was ruled, and
-		// ruled with it: a bad field is a 422 here, in a sentence we wrote.
+		// **Refused since 2026-08-23, and a 500 before that.** The old
+		// fallback took whatever it was handed, so a list or an object fell
+		// through to an uncaught internal error -- for a request that is
+		// plainly malformed, which is the theme proposal's budget wart in a
+		// second module. Found on the day that one was ruled, and ruled with
+		// it: a bad field is a 422 here, in a sentence we wrote.
 		return "", refuseScan("the capture must be a base64 string")
 	}
 	if len(raw) == 0 {
@@ -161,23 +156,21 @@ func scanPayload(image any, mediaType string) (string, error) {
 	return base64.StdEncoding.EncodeToString(raw), nil
 }
 
-// pyB64Decode is `base64.b64decode(s, validate=True)`, which is
-// `binascii.a2b_base64(s, strict_mode=True)`.
+// strictB64Decode is strict base64: the alphabet and the padding are checked
+// here, explicitly, and `StdEncoding` is asked only for the arithmetic.
 //
-// **The strictness is load-bearing, not fussy.** The *default* `b64decode`
-// silently discards characters outside the alphabet, so a capture that picked
-// up a newline would decode shorter and go to the API as a corrupt image
-// rather than being refused -- and the model would answer something about it.
-// `validate=True` is what makes that newline a refusal.
+// **The strictness is load-bearing, not fussy.** A lenient decoder silently
+// discards characters outside the alphabet, so a capture that picked up a
+// newline would decode shorter and go to the API as a corrupt image rather
+// than being refused -- and the model would answer something about it. The
+// strictness is what makes that newline a refusal.
 //
-// **And Go's `StdEncoding.DecodeString` is NOT the same strictness**, which
-// the corpus caught and a reading of either library would not have: Go's
-// decoder skips `\r` and `\n` wherever they appear, so
-// `base64.StdEncoding.DecodeString` accepts a capture Python refuses. That is
-// the one difference that matters most here, since a newline is exactly what a
-// client that wrapped its base64 would send. So the alphabet and the padding
-// are checked here, explicitly, and `StdEncoding` is asked only for the
-// arithmetic.
+// **And Go's `StdEncoding.DecodeString` is NOT this strictness**, which the
+// corpus caught and a reading of the library would not have: Go's decoder
+// skips `\r` and `\n` wherever they appear, so `DecodeString` on its own
+// accepts a capture the recorded contract refuses. That is the one
+// difference that matters most here, since a newline is exactly what a
+// client that wrapped its base64 would send.
 //
 // Three rules, each of which a corpus row exercises:
 //
@@ -188,12 +181,12 @@ func scanPayload(image any, mediaType string) (string, error) {
 //   - the length is a multiple of four, which is what refuses `YWJjZA` and
 //     `YWJjZA===`.
 //
-// Non-canonical trailing bits are **not** refused, because Python does not
-// refuse them: `YW==` decodes to `a` in both runtimes and re-encodes to the
-// canonical `YQ==`. That makes the round trip a normalisation rather than the
-// no-op it looks like -- a port that passed the string through untouched
-// would hand the API bytes Python never would.
-func pyB64Decode(s string) ([]byte, error) {
+// Non-canonical trailing bits are **not** refused, because the recorded
+// contract does not refuse them: `YW==` decodes to `a` and re-encodes to the
+// canonical `YQ==`. That makes the round trip a normalisation rather than
+// the no-op it looks like -- passing the string through untouched would hand
+// the API bytes the contract never would.
+func strictB64Decode(s string) ([]byte, error) {
 	if len(s)%4 != 0 {
 		return nil, errNotBase64
 	}
@@ -213,20 +206,19 @@ func pyB64Decode(s string) ([]byte, error) {
 			return nil, errNotBase64
 		}
 	}
-	// An all-padding string has an empty body and non-zero padding: Python
-	// calls that leading padding and refuses it.
+	// An all-padding string has an empty body and non-zero padding: that
+	// counts as leading padding and is refused.
 	if body == "" && len(s) > 0 {
 		return nil, errNotBase64
 	}
 	return base64.StdEncoding.DecodeString(s)
 }
 
-// errNotBase64 is internal: the caller turns every decode failure into the one
-// sentence Python gives, which never says which rule was broken.
+// errNotBase64 is internal: the caller turns every decode failure into the
+// one recorded sentence, which never says which rule was broken.
 var errNotBase64 = errors.New("not base64")
 
-// ScanMessage is `scan.message`: the one user message, the picture then the
-// ask.
+// ScanMessage is the one user message: the picture, then the ask.
 //
 // The image block goes **first**. That is the documented ordering for vision
 // requests, and it is also the order the instruction reads in -- the model is
@@ -242,19 +234,20 @@ func ScanMessage(image any, mediaType string) (anthropic.MessageParam, string, e
 	), data, nil
 }
 
-// ScanRead is what the camera saw: the two strings, in Python's key order.
+// ScanRead is what the camera saw: the two strings, in the recorded key
+// order.
 //
 // **A struct and not a `map[string]string`**, which is the difference between
-// this shipping right and shipping like the Notes tab did. Python builds the
-// sighting by looping `("title", "corner")` and a dict keeps insertion order,
-// so the wire carries title first; `encoding/json` sorts a map's keys and
-// would carry `corner` first. This value goes out as the job's `transcribed`,
+// this shipping right and shipping like the Notes tab did. The recorded wire
+// carries title first; `encoding/json` sorts a map's keys and would carry
+// `corner` first. This value goes out as the job's `transcribed`,
 // which the review screen renders beside the reading so somebody can see what
 // was actually read -- so its order is somebody's reading order.
 //
-// `omitempty` is the other half: Python only *adds* a key whose stripped value
-// is non-empty, so an unreadable field is an absent key rather than an empty
-// string. The two spellings look identical in Go and are different bytes.
+// `omitempty` is the other half: the recorded shape only carries a key whose
+// stripped value is non-empty, so an unreadable field is an absent key
+// rather than an empty string. The two spellings render the same on a screen
+// and are different bytes.
 type ScanRead struct {
 	Title  string `json:"title,omitempty"`
 	Corner string `json:"corner,omitempty"`
@@ -264,7 +257,7 @@ type ScanRead struct {
 // between handing `identify` one sighting and handing it none.
 func (s ScanRead) Empty() bool { return s.Title == "" && s.Corner == "" }
 
-// ScanSighting is `scan.sighting`: a finished turn as the `Sighting` that
+// ScanSighting is a finished turn as the `Sighting` that
 // `/api/cards/identify` already takes.
 //
 // **The deliberate absence here is any resolution step.** What comes back is
@@ -291,12 +284,13 @@ func ScanSighting(turn Turn) ScanRead {
 	if err := json.Unmarshal([]byte(text), &read); err != nil {
 		return out
 	}
-	// `isinstance(value, str)`: a number or a null is not a transcription, and
-	// `pyStr` would turn one into the word "None".
+	// A strict string assertion: a number or a null is not a transcription,
+	// and `plain` would turn one into the word "None".
 	//
-	// `str.strip()` and not `strings.TrimSpace` -- the two disagree on which
-	// code points are whitespace, and a transcription can carry anything the
-	// model typed. The corpus holds U+00A0 and U+2028 for exactly that.
+	// `textutil.Strip` and not `strings.TrimSpace` -- the two disagree on
+	// which code points are whitespace, and a transcription can carry
+	// anything the model typed. The corpus holds U+00A0 and U+2028 for
+	// exactly that.
 	if value, ok := read["title"].(string); ok {
 		out.Title = textutil.Strip(value)
 	}

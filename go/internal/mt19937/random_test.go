@@ -13,10 +13,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// The corpus is CPython's own answers, written by `tests/go_fixtures.py` from
-// a real interpreter. Nothing here is a expectation somebody typed: every
-// number below came out of `random.Random`, and this file's whole job is to
-// say that this package's numbers are the same ones.
+// The corpus is a frozen recorded golden, never regenerated. Nothing here is
+// an expectation somebody typed: every number below was recorded from the
+// reference generator, and this file's whole job is to say that this
+// package's numbers are the same ones.
 //
 // The sections are separate on purpose. `words` is the raw generator; every
 // other section reaches it through a method. A run where `words` matches and
@@ -107,8 +107,8 @@ func load(t *testing.T) corpus {
 		t.Fatalf("parsing the corpus: %v", err)
 	}
 	if len(c.Seeds) == 0 || len(c.BitsSweep) == 0 || len(c.Tier1.Generators) == 0 {
-		t.Fatal("the corpus is missing a section; regenerate with " +
-			"`python tests/go_fixtures.py`")
+		t.Fatal("the corpus is missing a section; testdata/draws.json is a " +
+			"frozen golden -- restore it from version control, never rewrite it")
 	}
 	return c
 }
@@ -117,8 +117,8 @@ func load(t *testing.T) corpus {
 //
 // Seeds are strings because they outgrow a JSON number, and this is also the
 // only place both constructors are exercised on the same value: where the
-// seed fits an int64 the two doors must agree, and where it does not, only
-// one door exists.
+// seed fits an int64 the two constructors must agree, and where it does not,
+// only one of them exists.
 func newFromString(t *testing.T, seed string) *Random {
 	t.Helper()
 	value, ok := new(big.Int).SetString(seed, 10)
@@ -137,7 +137,7 @@ func newFromString(t *testing.T, seed string) *Random {
 
 // ------------------------------------------------------------ the generator
 
-func TestTheRawWordStreamIsTheOneCPythonProduces(t *testing.T) {
+func TestTheRawWordStreamIsTheRecordedStream(t *testing.T) {
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
@@ -151,7 +151,7 @@ func TestTheRawWordStreamIsTheOneCPythonProduces(t *testing.T) {
 			// twist fault -- which is the distinction this length buys.
 			for i := range got {
 				if got[i] != c.Words[i] {
-					t.Fatalf("word %d of %d: got %d, CPython says %d "+
+					t.Fatalf("word %d of %d: got %d, the corpus says %d "+
 						"(%s the first twist)",
 						i, len(got), got[i], c.Words[i],
 						map[bool]string{true: "before", false: "at or after"}[i < 624])
@@ -168,7 +168,7 @@ func TestRandomIsTheSameDoubleDownToTheBit(t *testing.T) {
 			for i, want := range c.Randoms {
 				value := r.Float64()
 				if got := math.Float64bits(value); got != want {
-					t.Fatalf("draw %d: got bits %#016x (%v), CPython says "+
+					t.Fatalf("draw %d: got bits %#016x (%v), the corpus says "+
 						"%#016x (%v)", i, got, value, want,
 						math.Float64frombits(want))
 				}
@@ -187,7 +187,7 @@ func TestGetRandBitsAtEveryWidthFromOneToSixtyFour(t *testing.T) {
 			for i, want := range c.Values {
 				got := r.GetRandBits(c.K)
 				if got != want {
-					t.Fatalf("draw %d at k=%d: got %d, CPython says %d",
+					t.Fatalf("draw %d at k=%d: got %d, the corpus says %d",
 						i, c.K, got, want)
 				}
 				if c.K < 64 && got >= 1<<c.K {
@@ -207,7 +207,7 @@ func TestGetRandBitsThreadsItsStateBetweenWidths(t *testing.T) {
 			r := newFromString(t, c.Seed)
 			for i, want := range c.BitsMixed {
 				if got := r.GetRandBits(want.K); got != want.Value {
-					t.Fatalf("draw %d at k=%d: got %d, CPython says %d",
+					t.Fatalf("draw %d at k=%d: got %d, the corpus says %d",
 						i, want.K, got, want.Value)
 				}
 			}
@@ -217,14 +217,14 @@ func TestGetRandBitsThreadsItsStateBetweenWidths(t *testing.T) {
 
 // --------------------------------------------------------- the consumers
 
-func TestRandBelowRejectsWhereCPythonRejects(t *testing.T) {
+func TestRandBelowRejectsWhereTheCorpusRejects(t *testing.T) {
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
 			for i, want := range c.Below {
 				got := r.RandRange(want.N)
 				if got != want.Value {
-					t.Fatalf("draw %d with n=%d: got %d, CPython says %d "+
+					t.Fatalf("draw %d with n=%d: got %d, the corpus says %d "+
 						"(a mismatch here with the word stream intact is a "+
 						"rejection-loop fault)", i, want.N, got, want.Value)
 				}
@@ -248,8 +248,8 @@ func TestRandRangeInEveryFormItIsCalledIn(t *testing.T) {
 					got = r.RandRangeStep(want.Start, *want.Stop, *want.Step)
 				}
 				if got != want.Value {
-					t.Fatalf("draw %d of randrange(%d, %v, %v): got %d, "+
-						"CPython says %d", i, want.Start,
+					t.Fatalf("draw %d of RandRange(%d, %v, %v): got %d, "+
+						"the corpus says %d", i, want.Start,
 						deref(want.Stop), deref(want.Step), got, want.Value)
 				}
 			}
@@ -257,16 +257,16 @@ func TestRandRangeInEveryFormItIsCalledIn(t *testing.T) {
 	}
 }
 
-// TestFloorDivisionIsPythons pins the one thing in this package that no
-// caller can reach.
+// TestFloorDivisionRoundsTowardNegativeInfinity pins the one thing in this
+// package that no caller can reach.
 //
-// `randrange`'s step count uses Python's `//`; Go's `/` truncates. Worked
+// `RandRangeStep`'s count uses floor division; Go's `/` truncates. Worked
 // through, the two differ only where the range is empty and both then refuse
 // -- so every case in the corpus above passes with either, and a truncating
-// port would look correct. That reasoning is why this test exists rather than
-// why it does not: "equivalent for every input that matters" is an argument,
-// and an argument is checked here rather than believed.
-func TestFloorDivisionIsPythons(t *testing.T) {
+// reimplementation would look correct. That reasoning is why this test exists
+// rather than why it does not: "equivalent for every input that matters" is
+// an argument, and an argument is checked here rather than believed.
+func TestFloorDivisionRoundsTowardNegativeInfinity(t *testing.T) {
 	cases := load(t).FloorDiv
 	if len(cases) == 0 {
 		t.Fatal("the corpus carries no division cases")
@@ -274,7 +274,8 @@ func TestFloorDivisionIsPythons(t *testing.T) {
 	differ := 0
 	for _, c := range cases {
 		if got := floorDiv(c.A, c.B); got != c.Want {
-			t.Errorf("%d // %d: got %d, Python says %d", c.A, c.B, got, c.Want)
+			t.Errorf("floorDiv(%d, %d): got %d, the corpus says %d",
+				c.A, c.B, got, c.Want)
 		}
 		if c.A/c.B != c.Want {
 			differ++
@@ -288,7 +289,7 @@ func TestFloorDivisionIsPythons(t *testing.T) {
 	}
 }
 
-func TestShuffleLaysTheDeckOutAsCPythonDoes(t *testing.T) {
+func TestShuffleLaysTheDeckOutAsTheCorpusRecords(t *testing.T) {
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			for _, want := range c.Shuffles {
@@ -296,7 +297,7 @@ func TestShuffleLaysTheDeckOutAsCPythonDoes(t *testing.T) {
 				got := identity(want.N)
 				ShuffleSlice(r, got)
 				if diff := cmp.Diff(want.Order, got); diff != "" {
-					t.Fatalf("shuffling %d cards (-CPython +go):\n%s",
+					t.Fatalf("shuffling %d cards (-corpus +got):\n%s",
 						want.N, diff)
 				}
 			}
@@ -315,21 +316,21 @@ func TestOneGeneratorShufflesTheDeckOverAndOver(t *testing.T) {
 				got := identity(99)
 				ShuffleSlice(r, got)
 				if diff := cmp.Diff(want, got); diff != "" {
-					t.Fatalf("shuffle %d of 10 (-CPython +go):\n%s", n+1, diff)
+					t.Fatalf("shuffle %d of 10 (-corpus +got):\n%s", n+1, diff)
 				}
 			}
 		})
 	}
 }
 
-func TestChoicePicksWhatCPythonPicks(t *testing.T) {
+func TestChoicePicksWhatTheCorpusPicks(t *testing.T) {
 	for _, c := range load(t).Seeds {
 		t.Run(c.Seed, func(t *testing.T) {
 			r := newFromString(t, c.Seed)
 			seq := identity(7)
 			for i, want := range c.Choices {
 				if got := Choice(r, seq); got != want {
-					t.Fatalf("choice %d: got %d, CPython says %d", i, got, want)
+					t.Fatalf("choice %d: got %d, the corpus says %d", i, got, want)
 				}
 			}
 		})
@@ -339,9 +340,9 @@ func TestChoicePicksWhatCPythonPicks(t *testing.T) {
 // TestANegativeSeedIsItsAbsoluteValue reads the claim off the corpus rather
 // than off this package.
 //
-// `random_seed` runs the argument through `int.__abs__` before splitting it
-// into words, so -7 and 7 are the same generator in CPython. That is asserted
-// here against CPython's own two streams -- if the corpus ever showed them
+// The seeding path takes the absolute value before splitting the seed into
+// words, so -7 and 7 are the same generator. That is asserted here against
+// the corpus's own two recorded streams -- if the corpus ever showed them
 // differing, this package would be wrong to make them agree.
 func TestANegativeSeedIsItsAbsoluteValue(t *testing.T) {
 	streams := map[string][]uint32{}
@@ -358,7 +359,7 @@ func TestANegativeSeedIsItsAbsoluteValue(t *testing.T) {
 			t.Fatalf("the corpus no longer carries both %s and %s", pair[0], pair[1])
 		}
 		if diff := cmp.Diff(positive, negative); diff != "" {
-			t.Fatalf("CPython gives %s and %s different streams; this package "+
+			t.Fatalf("the corpus gives %s and %s different streams; this package "+
 				"gives them the same one (-%s +%s):\n%s",
 				pair[0], pair[1], pair[1], pair[0], diff)
 		}
@@ -373,28 +374,27 @@ func TestANegativeSeedIsItsAbsoluteValue(t *testing.T) {
 
 // ------------------------------------------------------------ Tier 1
 
-// TestTheTier1StreamIsTheOneTheDigestIsComputedOver is this package's answer
-// to PLAN section 5 item 3's gate, as far as it can honestly reach today.
+// TestTheTier1StreamIsTheOneTheDigestIsComputedOver proves the half of
+// Tier 1's determinism gate that belongs to this package.
 //
-// The gate is `REFERENCE_DIGEST` reproduced byte for byte, and reproducing it
-// needs the Tier 1 engine, which is Phase 5's own work and is not ported
-// here. What *is* provable now is the half that was the actual risk: that the
-// randomness the digest is computed over is the randomness this package
-// produces.
+// The gate is Tier 1's reference digest reproduced byte for byte -- tier1's
+// own suite pins it over a full run. What this test isolates is the half
+// that was the actual risk: that the randomness the digest is computed over
+// is the randomness this package produces.
 //
-// It is provable because of a measured fact about the engine. Tier 1 draws
-// through exactly one call -- `rng.shuffle(deck)` in `simulate_game` -- and
-// through nothing else, so a run's entire entropy budget is a sequence of
-// shuffles of a known length from one seeded generator. `tests/go_fixtures.py`
-// reads that sequence off a real reference run by instrumentation that
-// delegates to CPython and therefore changes nothing (it re-checks
-// `REFERENCE_DIGEST` while instrumented, and refuses to write a corpus if it
-// moved). This replays it: same seed, same lengths, through the real
-// `Shuffle`, and the 99,274 draws it makes must be the same 99,274 draws,
-// in order.
+// It is isolable because of a measured fact about the engine. Tier 1 draws
+// through exactly one call -- the shuffle in its game loop -- and through
+// nothing else, so a run's entire entropy budget is a sequence of shuffles
+// of a known length from one seeded generator. The corpus records that
+// sequence off the reference run itself, instrumented in a way that
+// delegated every draw to the real generator and therefore changed nothing
+// (the recording re-checked the reference digest while instrumented, and
+// refused to write a corpus if it moved). This replays it: same seed, same
+// lengths, through the real `Shuffle`, and the 99,274 draws it makes must be
+// the same 99,274 draws, in order.
 //
-// So a failure here says the digest cannot be reproduced, before anybody has
-// written the engine that would try.
+// So a failure here says the digest cannot be reproduced, and says the fault
+// is in the stream before the engine is even in question.
 func TestTheTier1StreamIsTheOneTheDigestIsComputedOver(t *testing.T) {
 	tier1 := load(t).Tier1
 
@@ -411,7 +411,7 @@ func TestTheTier1StreamIsTheOneTheDigestIsComputedOver(t *testing.T) {
 			for _, length := range g.Lengths {
 				// Driven through the real `Shuffle` rather than through a
 				// copy of its loop: the swap callback is handed exactly
-				// `(i, _randbelow(i+1))`, so the direction of the walk and
+				// `(i, RandBelow(i+1))`, so the direction of the walk and
 				// where it stops are under test here, not assumed.
 				r.Shuffle(length, func(i, j int) {
 					draw := belowDraw{N: int64(i) + 1, Value: int64(j)}
@@ -428,10 +428,10 @@ func TestTheTier1StreamIsTheOneTheDigestIsComputedOver(t *testing.T) {
 			// repository has already been bitten once by a golden that stayed
 			// stable while the thing under it stopped happening.
 			if diff := cmp.Diff(g.First, draws[:len(g.First)]); diff != "" {
-				t.Fatalf("the first draws differ (-CPython +go):\n%s", diff)
+				t.Fatalf("the first draws differ (-corpus +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(g.Last, draws[len(draws)-len(g.Last):]); diff != "" {
-				t.Fatalf("the last draws differ (-CPython +go):\n%s", diff)
+				t.Fatalf("the last draws differ (-corpus +got):\n%s", diff)
 			}
 			if got := hex.EncodeToString(sum.Sum(nil)); got != g.Digest {
 				t.Fatalf("the draw sequence digests to %s, the reference "+
@@ -443,8 +443,8 @@ func TestTheTier1StreamIsTheOneTheDigestIsComputedOver(t *testing.T) {
 }
 
 // TestTheReferenceRunIsTheShapeItsStreamAssumes is the shape test beside the
-// stream, for the same reason `test_determinism.py` has one beside the
-// digest: a corpus that quietly stopped recording anything would still be
+// stream, for the same reason the reference digest is pinned beside a shape
+// check: a corpus that quietly stopped recording anything would still be
 // self-consistent and still be worthless.
 func TestTheReferenceRunIsTheShapeItsStreamAssumes(t *testing.T) {
 	tier1 := load(t).Tier1
@@ -452,7 +452,7 @@ func TestTheReferenceRunIsTheShapeItsStreamAssumes(t *testing.T) {
 	const pinned = "c3e278e3e09ae7766b145886bddf7e07314533c292b6c5aeb9340c73b3ee22d4"
 	if tier1.ReferenceDigest != pinned {
 		t.Fatalf("the corpus was recorded from a run digesting to %s; "+
-			"tests/test_determinism.py pins %s. One of them moved, and that "+
+			"the pinned reference digest is %s. One of them moved, and that "+
 			"is a decision rather than a detail",
 			tier1.ReferenceDigest, pinned)
 	}
@@ -501,7 +501,7 @@ func mustInt64(t *testing.T, seed string) int64 {
 
 func deref(v *int64) any {
 	if v == nil {
-		return "None"
+		return "nil"
 	}
 	return *v
 }

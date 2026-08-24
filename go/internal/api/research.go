@@ -16,7 +16,7 @@ import (
 // Research's route (ADR 26): `POST /api/claude/research`, a **job** from the
 // first commit rather than after a deployed failure taught it to be.
 //
-// `api/researchruns.py`. ADR 20's lesson -- *a duration measured for one
+// ADR 20's lesson -- *a duration measured for one
 // surface is a question to ask of every sibling surface* -- had cost three
 // incidents by the time this was written (the proposal at 226 seconds, the
 // theme turn whose docstring said "a few seconds", the dossier at 236), and
@@ -75,7 +75,7 @@ func (a *API) claudeResearch(w http.ResponseWriter, r *http.Request) {
 	}
 	// `payload.get("stance") or None`: a falsy stance is no stance.
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	plan, err := claude.CheckResearch(body["question"], requested,

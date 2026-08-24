@@ -11,9 +11,9 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// dataCommand is `mtglab data`: the pool's care and feeding, on the box that
-// serves it — the reason the runbook's `fly ssh console -C "mtglab data
-// refresh"` had to survive the interpreter leaving the image.
+// dataCommand is `mtglab data`: the pool's care and feeding, on the box
+// that serves it — the runbook's `fly ssh console -C "mtglab data refresh"`
+// depends on the binary alone.
 func dataCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "data",

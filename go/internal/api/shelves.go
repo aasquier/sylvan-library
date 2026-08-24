@@ -15,13 +15,13 @@ import (
 // mana-symbol SVG, one file of the reading engine, and a card-art motion
 // derivative's status and files. Each serves a file off `data/cache/` with
 // an explicit media type -- the container has no /etc/mime.types, the tarot
-// lesson -- and the caching policy `api/app.py` gives it; a 404 is a
+// lesson -- and its own recorded caching policy; a 404 is a
 // complete answer the client already knows how to take.
 
 // serveShelfFile answers one regular file with an explicit media type and
 // cache policy. `http.ServeContent` supplies Last-Modified, the conditional
 // 304 and Range handling -- a video element seeks with Range requests, and
-// Starlette's FileResponse answers them too.
+// the shelves have always answered them.
 func serveShelfFile(w http.ResponseWriter, r *http.Request, path, mediaType, cacheControl string) bool {
 	// The path is the shelf's own -- a validated symbol code, a key of the
 	// reader table, or a member of a derivative found by scan, each under
@@ -43,8 +43,8 @@ func serveShelfFile(w http.ResponseWriter, r *http.Request, path, mediaType, cac
 	return true
 }
 
-// symbolSVG is `GET /api/symbols/{code}.svg` -- `api/app.py:symbol_svg`:
-// one official mana-symbol SVG, the code upper-cased, the module's shape
+// symbolSVG is `GET /api/symbols/{code}.svg`:
+// one official mana-symbol SVG, the code upper-cased, the shelf's shape
 // check the path-traversal guard; a week of caching, since there is no
 // version stamp to bust with and the set moves a few times a year.
 func (a *API) symbolSVG(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +59,8 @@ func (a *API) symbolSVG(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ocrAsset is `GET /api/ocr/{name}` -- `api/app.py:ocr_asset`: one file of
-// the reading engine off the shelf `ocr.py` fills; immutable, because the
+// ocrAsset is `GET /api/ocr/{name}`: one file of
+// the reading engine off its shelf; immutable, because the
 // cache path carries the pinned versions.
 func (a *API) ocrAsset(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
@@ -71,7 +71,7 @@ func (a *API) ocrAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	path := a.shelves.OCR(r.Context(), name)
 	mediaType := asset.MediaType
-	// Starlette adds the charset to every text/* it answers.
+	// Every served text/* carries the charset -- the recorded rule.
 	if strings.HasPrefix(mediaType, "text/") && !strings.Contains(mediaType, "charset=") {
 		mediaType += "; charset=utf-8"
 	}
@@ -80,9 +80,9 @@ func (a *API) ocrAsset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// artMotionTypes is `api/app.py:_ART_MOTION_TYPES`: the allowlist is the
-// path-traversal guard -- `filename` never reaches the filesystem unless it
-// is one of four fixed names.
+// artMotionTypes is the allowlist and the
+// path-traversal guard in one -- `filename` never reaches the filesystem
+// unless it is one of four fixed names.
 var artMotionTypes = map[string]string{
 	"loop.webm": "video/webm", "loop.mp4": "video/mp4",
 	"poster.webp": "image/webp", "depth.png": "image/png",

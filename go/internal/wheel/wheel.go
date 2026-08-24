@@ -1,4 +1,4 @@
-// Package wheel is `decks/wheel.py`: the Wheel of Fortune's spin.
+// Package wheel is the Wheel of Fortune's spin.
 //
 // Daniel Gelon's Alpha painting — a red-cloaked figure spins a plank wheel
 // nailed to a great tree, and the wheel's face carries four fates: a cup, a
@@ -9,11 +9,11 @@
 // (rule 4); a card the deck already runs is excluded before the draw, and so
 // is anything banned or outside the commander's identity.
 //
-// The randomness is `internal/mt19937`, because a seed is a promise: a spin
-// somebody replayed on the Python side deals the same fate, the same face
-// and the same card here — `randrange` over the symbols, then over a fate's
-// faces, then over the candidate count, all off one generator. Held to
-// Python by the generated `testdata/spins.json`.
+// The randomness is `internal/mt19937`, because a seed is a promise: a
+// spin somebody replays deals the same fate, the same face and the same
+// card — `RandRange` over the symbols, then over a fate's faces, then over
+// the candidate count, all off one generator. Held to the recorded corpus,
+// `testdata/spins.json`.
 package wheel
 
 import (
@@ -83,10 +83,10 @@ type face struct {
 	where   string
 }
 
-// faces maps a fate to its wire field and its landings, in the order
-// Python's dict declares them — heads before tails, whole before broken —
-// because the second `randrange` indexes that order exactly as `Symbols`'
-// index is the first one's contract.
+// faces maps a fate to its wire field and its landings, in the recorded
+// order — heads before tails, whole before broken — because the second
+// `RandRange` indexes that order exactly as `Symbols`' index is the first
+// one's contract.
 var faces = map[string]struct {
 	field    string
 	landings []face
@@ -149,7 +149,7 @@ var faces = map[string]struct {
 // (commandment 10): what the user needs is the distinction — blind dice,
 // nobody's judgment. The wire still carries `answered_by: "python"` and
 // `seed` as tokens for clients and tests; rendering them is the sin, not
-// sending them. (`answered_by` keeps Python's spelling across the port for
+// sending them. (`answered_by`'s value keeps its historical spelling for
 // exactly that reason: it is a wire token, not a rendered fact, and clients
 // already key on it.)
 const Caveat = "The wheel is blind dice over the card pool — a fate, then a " +
@@ -267,8 +267,8 @@ func Spin(ctx context.Context, d *deck.Deck, identity map[string]bool,
 }
 
 // deckNames is the exclusion set: the 99, the command zone and the
-// companion, sorted — UTF-8 byte order equals code-point order, which is
-// what Python's `sorted` gives.
+// companion, sorted — UTF-8 byte order equals code-point order, so a plain
+// string sort is the recorded order.
 func deckNames(d *deck.Deck) []string {
 	seen := map[string]bool{}
 	for _, c := range d.Cards {

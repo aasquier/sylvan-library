@@ -1,23 +1,19 @@
-// Package api is `src/mtglab/api`, one family at a time: the served
-// application's routes as they move across the door (docs/go-migration/
-// PLAN.md section 4; the port board in section 10 says which have). The door
-// asks this package for its routes and answers them itself, ahead of the
-// proxy; anything not listed here still goes to the Python server behind it.
+// Package api is every /api route family: the served
+// application's routes, which the door asks for and answers itself.
 //
-// Three rules, each the plan's:
+// Three rules, all standing:
 //
-//   - A route family moves whole. A job-shaped feature's submit and poll
-//     flip together because the registry is per-process; a read family
-//     flips when every route in it is here and the contract suite is green
-//     through the door.
-//   - A route here answers exactly what Python answers: the same status,
-//     the same envelope, the same shape. `tests/contract/golden/` is the
-//     record and `wire` is how the bytes get written.
-//   - Nothing here is a new route. `tests/test_isolation.py` requires every
-//     classified path to exist in FastAPI's table, so a Go-only `/api` path
-//     would be a ghost to it; a route arrives here *from* Python, and the
-//     door test `TestEveryPortedRouteIsInTheSharedTable` holds the list to
-//     `tests/contract/routes.json`.
+//   - A route family lives whole, one file per family. A job-shaped
+//     feature's submit and poll belong together because the registry is
+//     per-process.
+//   - A route answers exactly the recorded wire contract: the same status,
+//     the same envelope, the same shape. The in-package tests and the
+//     frozen goldens are the record, and `wire` is how the bytes get
+//     written.
+//   - No route is invented in passing. The table this package hands the
+//     door is the whole served surface, and the door's auth sweeps derive
+//     from it -- so a new path is a deliberate addition, deny-by-default
+//     at the middleware until `PublicPaths` says otherwise.
 package api
 
 import (
@@ -41,12 +37,12 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/traffic"
 )
 
-// Config is what the ported routes need. It grew with the families: the
+// Config is what the routes need. It grew with the families: the
 // pool with the card reads, the deck library with the deck reads.
 type Config struct {
 	Logger *slog.Logger
-	// Pool is the card pool, or nil for an instance that has none -- the
-	// same degraded answers `service._connect()` returning None produces.
+	// Pool is the card pool, or nil for an instance that has none --
+	// answered in the recorded degraded shapes, never refused.
 	Pool *pool.Pool
 	// AppDB is the door's read-only `app.db` handle when auth is on; nil
 	// otherwise, and then AppDBPath is opened lazily, read-only, only if the
@@ -102,7 +98,8 @@ type Config struct {
 	ForgeWorker *tier3.Worker
 	// RequireAuth mirrors MTGLAB_REQUIRE_AUTH. Two account routes read it and
 	// nothing else does: `me` reports it, and `logout` deletes the session row
-	// only when it is on -- both exactly as `auth.install(require=…)` does.
+	// only when it is on -- facts about this process, passed rather than
+	// looked up.
 	RequireAuth bool
 	// SecureCookies mirrors MTGLAB_SECURE_COOKIES: the `Secure` attribute on
 	// the session cookie, on once TLS fronts the app.
@@ -112,10 +109,9 @@ type Config struct {
 	// real process wants -- and which is also why no test here sends mail: the
 	// tests pass a recorder instead.
 	EmailSender auth.EmailSender
-	// Jobs is this process's job registry, or nil before any job family has
-	// flipped. Nil is what makes the two generic poll routes pure fall-through
-	// again, which is the state PLAN section 10 describes and the state every
-	// test that does not care about jobs runs in.
+	// Jobs is this process's job registry. Nil refuses every submit with a
+	// 503 -- a state no serving process is in, and the state every test
+	// that does not care about jobs runs in.
 	Jobs *jobs.Registry
 	// SimCache is ADR 18's `sim_cache` table, or nil for an instance with no
 	// `app.db`. A nil `*cache.Store` is a working store that caches nothing,
@@ -123,7 +119,7 @@ type Config struct {
 	SimCache *cache.Store
 }
 
-// API holds the ported routes' dependencies.
+// API holds the routes' dependencies.
 type API struct {
 	log           *slog.Logger
 	pool          *pool.Pool
@@ -153,21 +149,21 @@ type API struct {
 	traffic     *traffic.Recorder
 	fly         *flymetrics.Panel
 
-	// The upcoming-sets answer, held for the day it was fetched on -- the
-	// process-lifetime cache `service._SETS_CACHE` keeps, as marshalled
+	// The upcoming-sets answer, held for the day it was fetched on -- a
+	// process-lifetime cache, kept as marshalled
 	// bytes so a replay is byte-identical.
 	setsMu   sync.Mutex
 	setsDay  string
 	setsBody []byte
 
-	// bg tracks the work started after a response has gone -- Starlette's
-	// `BackgroundTasks`, which one route needs (`POST /api/auth/reset`, whose
+	// bg tracks the work started after a response has gone, which one
+	// route needs (`POST /api/auth/reset`, whose
 	// whole timing argument is that the lookup happens where nobody is
 	// waiting). Only tests wait on it.
 	bg sync.WaitGroup
 }
 
-// New builds the ported routes.
+// New builds the route family.
 func New(cfg Config) *API {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
@@ -187,8 +183,8 @@ func New(cfg Config) *API {
 		forgeClient: cfg.ForgeWorker}
 }
 
-// background runs fn after the response has gone, which is Starlette's
-// `BackgroundTasks` and, for the one route that uses it, the whole design:
+// background runs fn after the response has gone, which is, for the one
+// route that uses it, the whole design:
 // `POST /api/auth/reset` must cost the same whether or not the address
 // resolves, and it can only do that if the lookup happens where nobody is
 // timing it.
@@ -230,8 +226,8 @@ func (a *API) actor(ctx context.Context) string {
 	return auth.ScopeFrom(ctx).Username
 }
 
-// Route is one ported route: a method, a path template in the syntax
-// `tests/contract/routes.json` uses (`/api/decks/{owner}/{slug}`), and the
+// Route is one served route: a method, a path template in the app's
+// template syntax (`/api/decks/{owner}/{slug}`), and the
 // handler. Path values are read with `r.PathValue(name)`.
 type Route struct {
 	Method  string
@@ -245,25 +241,24 @@ type Route struct {
 // start.
 func (a *API) Routes() []Route {
 	return []Route{
-		// The reference prose with no pool behind it (Phase 3, the first
-		// family to move): fixed taxonomy, fixed vocabulary, fixed words.
+		// The reference prose with no pool behind it: fixed taxonomy,
+		// fixed vocabulary, fixed words.
 		{Method: http.MethodGet, Pattern: "/api/health", Handler: a.health},
 		{Method: http.MethodGet, Pattern: "/api/sets/upcoming", Handler: a.upcomingSets},
 		{Method: http.MethodGet, Pattern: "/api/colors", Handler: a.colors},
 		{Method: http.MethodGet, Pattern: "/api/glossary", Handler: a.glossary},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
-		// The Claude surface's two free corners (Phase 6, the pure half):
+		// The Claude surface's two free corners:
 		// a checked-in roster of voices, and a seeded deal. Neither needs a
 		// key, a pool or a network, so both answer on a base install --
 		// and the deal is internal/mt19937's first served caller, where a
-		// seed minted before the cutover must still deal its own spread.
+		// seed a browser has held for months must still deal its own spread.
 		{Method: http.MethodGet, Pattern: "/api/claude/personas", Handler: a.personaRoster},
-		// The dial itself, which crosses LAST of the free corners rather than
-		// first: it reports which modes are built and what each surface
-		// defaults to, so it could only answer honestly once the modes and
-		// their stance owners had crossed. Free, reaching no network and no
-		// pool -- but it does resolve the caller's library, because Python
-		// passes `lib.source_for(...)` as an argument and `?owner=nobody`
+		// The dial itself: it reports which modes are built and what each
+		// surface defaults to. Free, reaching no network and no
+		// pool -- but it does resolve the caller's library, because the
+		// owner is resolved as an argument before anything else is
+		// consulted, and `?owner=nobody`
 		// alone is therefore a 404.
 		{Method: http.MethodGet, Pattern: "/api/claude", Handler: a.claudeStatus},
 		{Method: http.MethodGet, Pattern: "/api/tarot/reading", Handler: a.tarotReading},
@@ -297,7 +292,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/ocr/{name}", Handler: a.ocrAsset},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}", Handler: a.artMotionStatus},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}/{filename}", Handler: a.artMotionFile},
-		// The deck writes (Phase 4's first flip): the nine editing routes,
+		// The deck writes: the nine editing routes,
 		// every one of them going out through `commit` -- so the gate's
 		// verdict and ADR 28's log entry are inherited rather than
 		// remembered. A deck the caller cannot see is a 404 before
@@ -311,9 +306,9 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.patchCard},
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}", Handler: a.patchDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/notes/{key}", Handler: a.setNote},
-		// The deck lifecycle (Phase 4's second flip): the moments a deck
+		// The deck lifecycle: the moments a deck
 		// begins and ends. None of these goes through `commit` -- creation
-		// and deletion are outside `service._commit` in Python and therefore
+		// and deletion are deliberately
 		// outside ADR 28's log, which is a decision to keep rather than one
 		// to drift out of. The two collection routes write into the caller's
 		// **own** library and never into an owner named in a path.
@@ -328,9 +323,9 @@ func (a *API) Routes() []Route {
 		// warm across four real decks on the instance. Like the lifecycle
 		// above it does not go through `commit`, and for a sharper reason:
 		// this changes no deck field at all, so ADR 28 has nothing to record.
-		// The two GETs on the same path flipped with the deck reads.
+		// The two GETs on the same path are listed with the deck reads.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/artifacts", Handler: a.buildArtifacts},
-		// The rationale interview (Phase 6's first flipped Claude surface):
+		// The rationale interview:
 		// one plain route, because the mode is handed its facts rather than
 		// sent shopping for them and answers in the seconds class. It reaches
 		// exactly as far as the deck does -- `Library` resolves the owner, and
@@ -347,8 +342,8 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue/deck", Handler: a.argueSweep},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
-		// the NET lane -- the first Claude job family to answer from the door,
-		// landing in the registry the hybrid poll routes below already read.
+		// the NET lane,
+		// landing in the registry the poll routes below read.
 		// A stored dossier and a stance of off are jobs born finished; no
 		// commander the pool knows is a 422 in the request, never four minutes
 		// later.
@@ -376,16 +371,16 @@ func (a *API) Routes() []Route {
 		// other Claude route has.
 		{Method: http.MethodPost, Pattern: "/api/claude/theme", Handler: a.claudeTheme},
 		{Method: http.MethodPost, Pattern: "/api/claude/theme/proposal", Handler: a.claudeThemeProposal},
-		// The accounts (Phase 4's last flip): the five public doors of
-		// `api/auth.py` and the `me` that says who is standing in them, then
-		// the admin surface of `api/admin.py`. The middleware half of
-		// `api/auth.py` crossed in Phase 2 and lives in `internal/door`;
+		// The accounts: the five public doors and
+		// the `me` that says who is standing in them, then
+		// the admin surface. The middleware half
+		// lives in `internal/door`;
 		// these are the routes it lets through.
 		//
-		// **Every one of the first six is in `PUBLIC_PATHS`**, which is the
-		// load-bearing fact about them: reachable with no session, so each is
-		// rate limited and each is written so a refusal tells the caller
-		// nothing it did not already know.
+		// **Every one of the first six is on `door.PublicPaths`**, which is
+		// the load-bearing fact about them: reachable with no session, so
+		// each is rate limited and each is written so a refusal tells the
+		// caller nothing it did not already know.
 		{Method: http.MethodPost, Pattern: "/api/auth/login", Handler: a.login},
 		{Method: http.MethodPost, Pattern: "/api/auth/logout", Handler: a.logout},
 		{Method: http.MethodPost, Pattern: "/api/auth/reset", Handler: a.requestReset},
@@ -398,20 +393,16 @@ func (a *API) Routes() []Route {
 		// `requireAdmin` on each handler is the second check, and the only
 		// one an admin route mounted somewhere else by mistake would have.
 		//
-		// `DELETE /api/admin/users/{username}` is deliberately absent and
-		// still Python's: it calls `jobs.forget_owner` on a registry held in
-		// the uvicorn process's memory, and `users.id` is re-issued by
-		// SQLite, so jobs left keyed on a freed id would be handed to the
-		// next account created. `internal/api/admin.go` argues it; it flips
-		// with the jobs family. A DELETE on that path simply matches no route
-		// here and goes to the proxy as it arrived.
+		// `DELETE /api/admin/users/{username}` forgets the account's jobs in
+		// this process's registry before the row goes, because `users.id` is
+		// re-issued by SQLite and a job left keyed on a freed id would be
+		// handed to the next account created. `admin.go` argues it.
 		{Method: http.MethodGet, Pattern: "/api/admin/users", Handler: a.listAccounts},
 		{Method: http.MethodPost, Pattern: "/api/admin/users", Handler: a.inviteAccount},
 		{Method: http.MethodPatch, Pattern: "/api/admin/users/{username}", Handler: a.updateAccount},
 		{Method: http.MethodPost, Pattern: "/api/admin/users/{username}/reset", Handler: a.sendAccountReset},
 		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}/sessions", Handler: a.revokeSessions},
-		// The twelfth registration and the stats six -- Phase 8's last
-		// batch, after which nothing under /api is Python's.
+		// The account deletion, and the dashboard's six stats views.
 		{Method: http.MethodDelete, Pattern: "/api/admin/users/{username}", Handler: a.deleteAccount},
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/system", Handler: a.statsSystem},
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/storage", Handler: a.statsStorage},
@@ -420,8 +411,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/traffic", Handler: a.statsTraffic},
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/fly", Handler: a.statsFly},
 
-		// The sim family, and with it the two generic job routes -- Phase 5's
-		// flip.
+		// The sim family, and with it the two generic job routes.
 		{Method: http.MethodPost, Pattern: "/api/sim/mana", Handler: a.simMana},
 		{Method: http.MethodPost, Pattern: "/api/sim/lands", Handler: a.simLands},
 		{Method: http.MethodPost, Pattern: "/api/sim/shelf", Handler: a.simShelf},
@@ -436,7 +426,7 @@ func (a *API) Routes() []Route {
 	}
 }
 
-// usePool is `service._connect()` followed by the work: fn runs against a
+// usePool leases the pool and runs the work: fn runs against a
 // leased pool, and ErrNoPool -- no file, an unreadable file, or an instance
 // built with no pool at all -- is returned for the handler to answer in its
 // degraded shape. Any other error is the query's own and is a 500.

@@ -48,8 +48,8 @@ func loadDeals(t *testing.T) dealCorpus {
 	return c
 }
 
-// TestASeedDealsTheSameSpreadAsPython is the promise this package exists to
-// keep, and the reason pyrand was built bit-exact rather than merely
+// TestASeedDealsTheRecordedSpread is the promise this package exists to
+// keep, and the reason mt19937 was built bit-exact rather than merely
 // well-distributed.
 //
 // Compared as the SERIALISED payload, not field by field: this is what the
@@ -57,24 +57,24 @@ func loadDeals(t *testing.T) dealCorpus {
 // is still a broken reload. Drawn.MarshalJSON is what that comparison checks,
 // and it exists because tier1.Number taught this repo that a type proved
 // correct by every other means can still be wrong on the wire.
-func TestASeedDealsTheSameSpreadAsPython(t *testing.T) {
+func TestASeedDealsTheRecordedSpread(t *testing.T) {
 	for _, tc := range loadDeals(t).Cases {
 		got, err := json.Marshal(Deal(big.NewInt(tc.Seed)))
 		if err != nil {
 			t.Fatalf("seed %d: marshalling: %v", tc.Seed, err)
 		}
 		if string(got) != tc.AsDict {
-			t.Errorf("seed %d:\n go     %s\n python %s", tc.Seed, got, tc.AsDict)
+			t.Errorf("seed %d:\n got    %s\n golden %s", tc.Seed, got, tc.AsDict)
 		}
 	}
 }
 
-// TestTheReadersProseIsPythonsOwn covers describe(), whose two extra
+// TestTheReadersProseIsTheRecordedProse covers Describe(), whose two extra
 // paragraphs are detected facts no card field states directly.
-func TestTheReadersProseIsPythonsOwn(t *testing.T) {
+func TestTheReadersProseIsTheRecordedProse(t *testing.T) {
 	for _, tc := range loadDeals(t).Cases {
 		if got := Deal(big.NewInt(tc.Seed)).Describe(); got != tc.Describe {
-			t.Errorf("seed %d describe:\n--- go ---\n%s\n--- python ---\n%s",
+			t.Errorf("seed %d describe:\n--- got ---\n%s\n--- golden ---\n%s",
 				tc.Seed, got, tc.Describe)
 		}
 	}
@@ -206,7 +206,7 @@ func TestAnUnseededDealIsStillReproducibleFromItsOwnSeed(t *testing.T) {
 	for range 32 {
 		first := Deal(nil)
 		if first.Seed.Sign() < 0 || first.Seed.Cmp(big.NewInt(1<<31)) >= 0 {
-			t.Fatalf("minted seed %s is outside randrange(2**31)", first.Seed)
+			t.Fatalf("minted seed %s is outside [0, 2**31)", first.Seed)
 		}
 		seen[first.Seed.String()] = true
 		again := Deal(first.Seed)
@@ -225,20 +225,20 @@ func TestAnUnseededDealIsStillReproducibleFromItsOwnSeed(t *testing.T) {
 // TestTheRunningTotalIsAnFsumAndNotASum tests the one thing the deals above
 // structurally cannot.
 //
-// Swapping floats.Fsum for `total += w` changes no spread in this corpus, and
-// no corpus of any size would change: tarot.py measured 200,000 seeds dealing
-// identically, because mark would have to land inside a 2.8e-14 window out of
-// 90.2 to notice — about 3e-16 per draw. Searching for a separating seed is not
-// slow, it is hopeless, and a mutation that cannot be killed by the obvious
-// instrument is usually reported as "equivalent" and dropped.
+// Swapping floats.Fsum for `total += w` changes no spread in this corpus,
+// and no corpus of any size would change: 200,000 seeds were measured
+// dealing identically, because mark would have to land inside a 2.8e-14
+// window out of 90.2 to notice — about 3e-16 per draw. Searching for a
+// separating seed is not slow, it is hopeless, and a mutation that cannot
+// be killed by the obvious instrument is usually reported as "equivalent"
+// and dropped.
 //
-// It is not equivalent. A bare sum over floats is interpreter-dependent —
-// CPython 3.12 accumulates it compensated, 3.11 adds left to right — and a Go
-// port written as a running total reproduces 3.11, the interpreter the image
-// is NOT running. The two differ here by 2 ULP on every pool a deal touches.
-// Nobody has been dealt a wrong spread by it yet, and "it has not been claimed
-// yet" is not the same as "it cannot be": a seed is a promise to somebody who
-// reloads the page.
+// It is not equivalent. A bare running total over floats is a different
+// arithmetic from the compensated one the recorded totals pin, and the two
+// differ here by 2 ULP on every pool a deal touches. Nobody has been dealt
+// a wrong spread by it yet, and "it has not been claimed yet" is not the
+// same as "it cannot be": a seed is a promise to somebody who reloads the
+// page.
 //
 // So the sum is tested at the sum, where the difference is visible, rather
 // than at the deal, where it is not. The corpus records BOTH arithmetics and
@@ -265,13 +265,13 @@ func TestTheRunningTotalIsAnFsumAndNotASum(t *testing.T) {
 		}
 		got := math.Float64bits(totals[i])
 		if got == row.NaiveBits {
-			t.Errorf("draw %d (%d cards): the sampler is computing 3.11's sum, "+
-				"not an fsum", i+1, row.Cards)
+			t.Errorf("draw %d (%d cards): the sampler is computing a naive "+
+				"running total, not an fsum", i+1, row.Cards)
 			continue
 		}
 		if got != row.FsumBits {
-			t.Errorf("draw %d (%d cards): go %d, python fsum %d (a naive total "+
-				"would be %d)", i+1, row.Cards, got, row.FsumBits, row.NaiveBits)
+			t.Errorf("draw %d (%d cards): got %d, the recorded fsum is %d (a "+
+				"naive total would be %d)", i+1, row.Cards, got, row.FsumBits, row.NaiveBits)
 		}
 	}
 }
@@ -283,10 +283,11 @@ func TestTheRunningTotalIsAnFsumAndNotASum(t *testing.T) {
 // `mark < acc` and `mark <= acc` differ only when a uniform double lands
 // EXACTLY on an accumulated weight boundary. That is reachable in principle and
 // has probability around 2^-52 per draw in practice, so no corpus separates
-// them and none should be built trying. It stays `<` because that is what
-// Python does and the port's rule is to reproduce rather than to improve;
-// this test pins the boundary behaviour that IS observable — the fallback when
-// the loop runs off the end, which the strictness makes reachable at all.
+// them and none should be built trying. It stays `<` because that is the
+// recorded comparison and the rule is to reproduce rather than to improve;
+// this test pins the boundary behaviour that IS observable — the fallback
+// when the loop runs off the end, which the strictness makes reachable at
+// all.
 func TestTheMarkComparisonIsStrictAndThatIsUnobservable(t *testing.T) {
 	// Every draw must return a card, including the path where float summation
 	// leaves mark a hair past the final accumulation.
@@ -306,16 +307,16 @@ func TestTheMarkComparisonIsStrictAndThatIsUnobservable(t *testing.T) {
 	}
 }
 
-// TestTheSeedGrammarIsPydanticsAndNotStrconvs walks every string the corpus
-// records, accepted and refused alike.
+// TestTheSeedGrammarIsTheRecordedOneAndNotStrconvs walks every string the
+// corpus records, accepted and refused alike.
 //
 // Three of the accepted rows are 422s from a door written with
-// strconv.ParseInt — "  7  ", "+7" and above all "1_0", which is ten. Two of
-// the refused rows are 200s from a door written with Python's int(), which
-// takes any Unicode decimal digit: the fullwidth "７" and the Arabic-Indic
-// "٧". Pydantic sits between the two libraries and matches neither, so the
-// grammar is hand-written and this is what holds it there.
-func TestTheSeedGrammarIsPydanticsAndNotStrconvs(t *testing.T) {
+// strconv.ParseInt — "  7  ", "+7" and above all "1_0", which is ten. Two
+// of the refused rows are 200s from a door that took any Unicode decimal
+// digit: the fullwidth "７" and the Arabic-Indic "٧". The recorded grammar
+// sits between those two readings and matches neither library, so it is
+// hand-written and this is what holds it there.
+func TestTheSeedGrammarIsTheRecordedOneAndNotStrconvs(t *testing.T) {
 	c := loadDeals(t)
 	if len(c.SeedStrings) == 0 {
 		t.Fatal("the corpus records no seed strings; the grammar is untested")
@@ -324,7 +325,7 @@ func TestTheSeedGrammarIsPydanticsAndNotStrconvs(t *testing.T) {
 	for _, row := range c.SeedStrings {
 		got, ok := ParseSeed(row.Text)
 		if ok != row.OK {
-			t.Errorf("seed %q: go ok=%v, python ok=%v", row.Text, ok, row.OK)
+			t.Errorf("seed %q: got ok=%v, the corpus says ok=%v", row.Text, ok, row.OK)
 			continue
 		}
 		if !ok {
@@ -333,7 +334,7 @@ func TestTheSeedGrammarIsPydanticsAndNotStrconvs(t *testing.T) {
 		}
 		accepted++
 		if got.String() != row.Value {
-			t.Errorf("seed %q: go %s, python %s", row.Text, got, row.Value)
+			t.Errorf("seed %q: got %s, the corpus says %s", row.Text, got, row.Value)
 		}
 	}
 	// A corpus of all-accepts or all-refuses would pass against a parser that
@@ -349,7 +350,7 @@ func TestTheSeedGrammarIsPydanticsAndNotStrconvs(t *testing.T) {
 func TestAnOversizedSeedIsNotTruncated(t *testing.T) {
 	huge, ok := ParseSeed("1180591620717411303424") // 2**70
 	if !ok {
-		t.Fatal("2**70 is a legal Python seed and must parse")
+		t.Fatal("2**70 is a legal seed by the recorded grammar and must parse")
 	}
 	r := Deal(huge)
 	if r.Seed.Cmp(huge) != 0 {
@@ -362,8 +363,8 @@ func TestAnOversizedSeedIsNotTruncated(t *testing.T) {
 	if !strings.Contains(string(body), `"seed":1180591620717411303424`) {
 		t.Errorf("the seed did not survive the wire:\n%s", body[:120])
 	}
-	// And it must actually deal — pyrand seeds through init_by_array, which
-	// grows the key past 2**32 and again past 2**64.
+	// And it must actually deal — mt19937 seeds through `seedWords`, whose
+	// key grows a word past 2**32 and again past 2**64.
 	if len(r.Cards) != len(Spread) {
 		t.Errorf("an oversized seed dealt %d cards", len(r.Cards))
 	}

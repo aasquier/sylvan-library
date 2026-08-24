@@ -37,7 +37,7 @@ import (
 //
 // **The answer's shape has no field for one.** The response schema has a slot
 // for a question and a slot for the pool fact behind it, and no slot for prose
-// about the card's merit. It crosses as generated data for exactly that
+// about the card's merit. It lives as recorded data for exactly that
 // reason -- see modes.go.
 //
 // **Every question is checked to be a question.** `OnlyQuestions` drops
@@ -73,7 +73,7 @@ const MaxSiblings = 10
 const MaxQuestions = 6
 
 // Question is one thing to answer, and the fact it rests on. Key order is
-// Python's, because this reaches a client.
+// the recorded one, because this reaches a client.
 type Question struct {
 	Question string `json:"question"`
 	Angle    string `json:"angle"`
@@ -139,7 +139,7 @@ func asString(v any) string {
 // the opening message, so its key order is part of the bytes the model reads
 // and part of what the prompt cache hashes. A `map[string]any` here would be
 // alphabetised by encoding/json -- the trap that shipped an alphabetised Notes
-// tab -- so every level is `[]wire.KV`, in the order Python's dict is built.
+// tab -- so every level is `[]wire.KV`, in the recorded order.
 func Brief(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string) (wire.OrderedMap, error) {
 	payload, err := deckread.DeckPayload(ctx, conn, d, false, "")
 	if err != nil {
@@ -225,7 +225,7 @@ func Brief(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string) (wir
 }
 
 // findCard is the card's entry in the deck, matched the way a person would type
-// it -- and across the same three places Python looks: the 99, the swap board,
+// it -- and across all three places a card can live: the 99, the swap board,
 // and the commander. A commander holds a slot and carries a rationale like
 // anything else, so it is interviewable.
 func findCard(payload wire.OrderedMap, slug, name string) (deckread.CardJSON, error) {
@@ -238,7 +238,8 @@ func findCard(payload wire.OrderedMap, slug, name string) (deckread.CardJSON, er
 	return deckread.CardJSON{}, &ErrCardNotInDeck{Card: name, Slug: slug}
 }
 
-// allEntries is every card row the payload holds, in Python's search order.
+// allEntries is every card row the payload holds, in the recorded search
+// order.
 //
 // The commander arrives as a single row rather than a list, which is why this
 // is not one loop: `commander_card` is null for a deck whose commander the pool
@@ -334,7 +335,7 @@ func siblingRationales(payload wire.OrderedMap, category, name string) []wire.Or
 }
 
 // curveBucket is how many cards share this card's mana value. The pool's `cmc`
-// wins over the deck entry's, as Python's does: the deck file records what
+// wins over the deck entry's: the deck file records what
 // somebody typed and the pool records what the card costs.
 func curveBucket(stats analyze.Stats, entry deckread.CardJSON, record any) any {
 	mv, ok := manaValue(entry, record)
@@ -497,8 +498,7 @@ func Interview(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 		// reason worth showing, and the caller wants to render "the answer did
 		// not parse" beside the stance and the usage. Returning the decode
 		// error instead would throw all of that away and turn a 200 with an
-		// explanation into a 500 with none. Python catches the same
-		// JSONDecodeError in the same place and reports it the same way.
+		// explanation into a 500 with none.
 		//nolint:nilerr // an unreadable answer is a reported outcome, not a fault
 		return interviewReport(&turn, d.Slug, name, effective, []Question{}, 0, true,
 			fmt.Sprintf("The answer did not parse (stop reason: %s). Nothing "+

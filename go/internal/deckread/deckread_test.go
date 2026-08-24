@@ -14,8 +14,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The fixtures are `internal/gate/testdata`: each deck's YAML beside Python's
-// own report, stats and suggestions for it. `internal/api` already drives them
+// The fixtures are `internal/gate/testdata`: each deck's YAML beside its
+// recorded report, stats and suggestions. `internal/api` already drives them
 // through the ROUTES, and those tests still pass — which is what proves this
 // extraction moved nothing.
 //
@@ -66,9 +66,9 @@ func withPool(t *testing.T, fn func(c *pool.Conn)) {
 	}
 }
 
-// TestValidateAndStatsAgreeWithPythonWhenCalledDirectly is the fixture check,
-// driven the way a Claude tool will drive it.
-func TestValidateAndStatsAgreeWithPythonWhenCalledDirectly(t *testing.T) {
+// TestValidateAndStatsMatchTheGoldensWhenCalledDirectly is the fixture
+// check, driven the way a Claude tool will drive it.
+func TestValidateAndStatsMatchTheGoldensWhenCalledDirectly(t *testing.T) {
 	decks := fixtureDecks(t)
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
@@ -124,7 +124,7 @@ func TestValidateAndStatsAgreeWithPythonWhenCalledDirectly(t *testing.T) {
 	})
 }
 
-func TestSuggestionsAgreeWithPythonWhenCalledDirectly(t *testing.T) {
+func TestSuggestionsMatchTheGoldensWhenCalledDirectly(t *testing.T) {
 	decks := fixtureDecks(t)
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
@@ -148,7 +148,7 @@ func TestSuggestionsAgreeWithPythonWhenCalledDirectly(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s marshal: %v", slug, err)
 			}
-			// Both runtimes echo the REQUESTED slug; the fixture carries the
+			// The answer echoes the REQUESTED slug; the fixture carries the
 			// deck's own, and `draft.yaml` says `slug: mono-green`.
 			wantDoc["slug"] = slug
 			wantNorm, _ := json.Marshal(wantDoc)
@@ -200,12 +200,12 @@ func TestTheNilPoolDegradesRatherThanFailing(t *testing.T) {
 	}
 }
 
-// TestTheDeckPayloadKeepsPythonsKeyOrder is the regression that already
-// shipped once: the deck page's Notes tab was alphabetical from v159 to v166,
-// because `encoding/json` sorts a map's keys where a Python dict keeps
-// insertion order. The payload is ordered pairs for that reason, and this
+// TestTheDeckPayloadKeepsTheRecordedKeyOrder is the regression that already
+// shipped once: the deck page's Notes tab was alphabetical from v159 to
+// v166, because `encoding/json` sorts a map's keys and the payload's order
+// is deliberate. The payload is ordered pairs for that reason, and this
 // pins the order rather than trusting the type to preserve it.
-func TestTheDeckPayloadKeepsPythonsKeyOrder(t *testing.T) {
+func TestTheDeckPayloadKeepsTheRecordedKeyOrder(t *testing.T) {
 	decks := fixtureDecks(t)
 	var any *deck.Deck
 	for _, d := range decks {

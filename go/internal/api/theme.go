@@ -12,7 +12,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The theme interview's two routes (ADR 20), over `api/themeruns.py`. Both
+// The theme interview's two routes (ADR 20). Both
 // are **jobs**, and the second of them is why the pattern exists at all.
 //
 // The proposal was measured at **226 seconds**, reading a dozen-odd pages and
@@ -116,18 +116,17 @@ func (a *API) claudeThemeProposal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// `theme.read_budget`: a falsy budget is no budget, and anything else
+	// The budget read: a falsy budget is no budget, and anything else
 	// that will not read as a number is a 422 in one sentence.
 	//
 	// **This was a wart until 2026-08-23, and the ruling is recorded here
-	// because the comment that stood here is what raised it.** `float(budget)`
-	// sat in a `try` catching `TranscriptRejected` and `ValueError`; a list
-	// or an object raises the third thing `float()` can raise, so Python
-	// answered an unhandled 500 -- a plain-text Starlette one, no envelope --
-	// to a request that is plainly malformed, while an unreadable *string*
+	// because the comment that stood here is what raised it.** The old read
+	// caught only some of what a bad budget can raise: a list
+	// or an object escaped as an unhandled 500 -- plain text, no envelope --
+	// on a request that is plainly malformed, while an unreadable *string*
 	// was a 422. Two spellings of one bad field, answered two ways. Ruled
-	// with Aaron and fixed in both runtimes at once, the way
-	// `edit.set_shared` and the stance wart went.
+	// with Aaron, and the one-sentence 422 is the contract, the way
+	// the share toggle and the stance wart went.
 	budget, err := claude.ReadBudget(body["budget"])
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
@@ -193,8 +192,8 @@ func (a *API) submitTheme(w http.ResponseWriter, r *http.Request, kind, label st
 	})
 }
 
-// refuseTheme maps what the two checks raise onto the statuses Python gives
-// them, and reports whether it answered.
+// refuseTheme maps what the two checks raise onto their recorded statuses,
+// and reports whether it answered.
 //
 // **`NotReady` is 409 and nothing else is**, which is the whole reason this
 // is not `refuseClaude`: the per-card modes have no floor to fail and this
@@ -227,7 +226,7 @@ func (a *API) refuseTheme(w http.ResponseWriter, what string, err error) bool {
 
 // orNil is `payload.get(key) or None`: a falsy value is no value.
 func orNil(v any) any {
-	if pyTruthy(v) {
+	if truthy(v) {
 		return v
 	}
 	return nil
@@ -238,7 +237,7 @@ func orNil(v any) any {
 // input. This one turns `false` and `0` into `""` where the `get(key, "")`
 // spelling beside it renders them as `False` and `0`.
 func strOr(body map[string]any, key string) string {
-	if !pyTruthy(body[key]) {
+	if !truthy(body[key]) {
 		return ""
 	}
 	return str(body, key)

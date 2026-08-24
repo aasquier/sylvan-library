@@ -34,18 +34,20 @@ func (a *API) personaRoster(w http.ResponseWriter, _ *http.Request) {
 // tarotReading is `GET /api/tarot/reading`: deal three cards. No model, no card
 // pool, no network, no cost.
 //
-// **Python decides** (ADR 14): a shuffle has a right answer and belongs in
+// **The deterministic code decides** (ADR 14): a shuffle has a right answer
+// and belongs in
 // code, while what a spread means has none and belongs to the reader. Seeded
 // and returning its seed, so the client can carry one integer and get the same
 // three cards for the whole conversation — the same stateless trick the
 // transcript uses, and the reason a reading needs no table either.
 //
-// A seed may be supplied to re-deal an existing reading, which is what a reload
-// does. That is the promise the whole port rests on here: a seed minted by the
-// Python door before the cutover must deal the same three cards from this one,
+// A seed may be supplied to re-deal an existing reading, which is what a
+// reload
+// does. That is the promise this route rests on: a seed a browser has held
+// for months must deal the same three cards today,
 // which is what internal/mt19937 is for.
 func (a *API) tarotReading(w http.ResponseWriter, r *http.Request) {
-	// Last value wins, as Starlette's query mapping does — `?seed=7&seed=9`
+	// Last value wins — the recorded reading of `?seed=7&seed=9`
 	// is nine. Go's Query().Get() returns the FIRST, which is the kind of
 	// difference that never shows up until somebody's client appends.
 	vals := r.URL.Query()["seed"]
@@ -58,7 +60,8 @@ func (a *API) tarotReading(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// An absent parameter is a fresh deal; a present but unreadable one is
 		// a 422. `?seed=` with no value takes this branch, which is measured
-		// rather than assumed — Pydantic refuses the empty string.
+		// rather than assumed — the recorded contract refuses the empty
+		// string.
 		wire.Unprocessable(w, wire.IntParsing("query", "seed", raw))
 		return
 	}
@@ -83,15 +86,15 @@ func (a *API) tarotReading(w http.ResponseWriter, r *http.Request) {
 // Two orderings here are contract rather than convenience, both measured
 // against the running app:
 //
-//   - **The owner is resolved even with no slug.** Python passes
-//     `lib.source_for(owner or lib.my_owner)` as an *argument*, so it runs
+//   - **The owner is resolved even with no slug.** The source is resolved
+//     as an *argument*, so it runs
 //     whether or not a deck is going to be read -- and `?owner=nobody` alone
 //     is a 404 rather than a dial.
 //   - **The deck is read before the stance is parsed.** `?stance=garbage&
 //     slug=nope` is the deck's 404, not the stance's 422.
 func (a *API) claudeStatus(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	// Starlette's QueryParams.get returns the LAST repeated value where Go's
+	// The recorded reading takes the LAST repeated value where Go's
 	// Query().Get returns the first -- `?slug=probe&slug=nope` asks about
 	// `nope`. Measured, not assumed; it is the difference nobody sees until a
 	// client appends rather than replaces.
@@ -131,8 +134,7 @@ func (a *API) claudeStatus(w http.ResponseWriter, r *http.Request) {
 	dial, err := claude.Status(requested, asked, surface)
 	if err != nil {
 		// The one thing that can fail here, and it is the caller's: a preset
-		// name that is not one. `except ValueError` in Python, and the same
-		// 422.
+		// name that is not one. The recorded 422.
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

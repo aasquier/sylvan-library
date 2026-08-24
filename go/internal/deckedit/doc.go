@@ -11,9 +11,8 @@ import (
 // operation mutates a deep copy of one to say what the text surgery *ought* to
 // have produced. Nothing in this file touches text.
 
-// deepCopy is `copy.deepcopy` over the value shapes `deckyaml.Parse` yields.
-// Scalars are immutable in Go as they are in Python, so only the containers
-// are rebuilt.
+// deepCopy rebuilds the value shapes `deckyaml.Parse` yields, deeply.
+// Scalars are immutable, so only the containers need new homes.
 func deepCopy(v any) any {
 	switch t := v.(type) {
 	case map[string]any:
@@ -38,7 +37,7 @@ func copyDoc(doc map[string]any) map[string]any {
 	return out
 }
 
-// equalDocs is Python's `!=` on two parsed documents, negated.
+// equalDocs asks whether two parsed documents hold the same values.
 //
 // `reflect.DeepEqual` would nearly do, and is deliberately not used: it
 // separates `[]any(nil)` from `[]any{}`, which the two sides of this
@@ -119,7 +118,7 @@ func firstDifference(expected, actual any, path string) string {
 	if where == "" {
 		where = "the document"
 	}
-	return fmt.Sprintf("%s is %s, expected %s", where, pyRepr(actual), pyRepr(expected))
+	return fmt.Sprintf("%s is %s, expected %s", where, quotedValue(actual), quotedValue(expected))
 }
 
 func unionOfKeys(a, b map[string]any) []string {
@@ -137,11 +136,13 @@ func unionOfKeys(a, b map[string]any) []string {
 	return keys
 }
 
-// pyRepr renders a value the way Python's `repr` would, because these strings
-// land in refusal messages a person reads. A card name is the common case and
-// it is the one that matters: `'Sol Ring'`, not `Sol Ring`, so the quotes show
-// where the name begins and ends.
-func pyRepr(v any) string {
+// quotedValue renders a value in the recorded refusal spelling -- strings
+// quoted, `None`/`True`/`False` for the unspeakables, containers in
+// brackets -- because these strings land in refusal messages a person
+// reads. A card name is the common case and it is the one that matters:
+// `'Sol Ring'`, not `Sol Ring`, so the quotes show where the name begins
+// and ends.
+func quotedValue(v any) string {
 	switch t := v.(type) {
 	case nil:
 		return "None"
@@ -162,13 +163,13 @@ func pyRepr(v any) string {
 	case map[string]any:
 		parts := make([]string, 0, len(t))
 		for _, k := range sortedKeys(t) {
-			parts = append(parts, pyRepr(k)+": "+pyRepr(t[k]))
+			parts = append(parts, quotedValue(k)+": "+quotedValue(t[k]))
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
 	case []any:
 		parts := make([]string, 0, len(t))
 		for _, item := range t {
-			parts = append(parts, pyRepr(item))
+			parts = append(parts, quotedValue(item))
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
 	default:
@@ -185,8 +186,8 @@ func sortedKeys(m map[string]any) []string {
 	return keys
 }
 
-// listOf reads a document key as a list of items, treating absent and null as
-// empty -- `doc.get(key) or []`.
+// listOf reads a document key as a list of items, treating absent and null
+// as empty.
 func listOf(doc map[string]any, key string) []any {
 	items, _ := doc[key].([]any)
 	return items
@@ -202,7 +203,7 @@ func cardAt(items []any, i int) map[string]any {
 }
 
 // nameMatches is the comparison every duplicate check uses: case-folded and
-// trimmed, the way `_locate_card` matches.
+// trimmed, exactly as the operations locate a card.
 func nameMatches(card map[string]any, name string) bool {
 	return strings.EqualFold(strings.TrimSpace(asString(card["name"])),
 		strings.TrimSpace(name))

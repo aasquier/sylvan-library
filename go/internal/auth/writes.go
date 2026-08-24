@@ -19,25 +19,25 @@ import (
 // the same one `Open` above it states for the read side.
 //
 // An absent `app.db` is therefore **read as an empty one**, never created, and
-// that is the honest answer rather than a shortcut. Measured against Python
-// 2026-08-22 on a fresh data directory with `MTGLAB_ADMIN_EMAIL` unset: the
-// database does not exist until the first login, which Python creates and then
-// answers 401 against -- because an empty `users` table has nobody in it. A
-// reader cannot tell an empty database from an absent one, so answering as if
-// it were empty is answering what Python answers, and it leaves the ladder
+// that is the honest answer rather than a shortcut -- measured on the live
+// wire 2026-08-22, on a fresh data directory with `MTGLAB_ADMIN_EMAIL`
+// unset: the recorded answer to a first login on such an instance is 401,
+// because an empty `users` table has nobody in it. A
+// reader cannot tell an empty database from an absent one, so answering as
+// if it were empty is the recorded contract, and it leaves the ladder
 // where it belongs.
 
 // OpenReadWrite opens `app.db` for the writes the account routes make:
 // sessions opened and closed, passwords set, tokens spent, rate-limit windows
 // counted. It does not create the file.
 //
-// Two writers, and it is worth saying which. Python still performs the session
-// touch, the expired-row delete and every schema migration, so this makes two
-// processes writing one file. That is safe here and not by luck: the file is
-// in WAL mode (Python set it, and WAL is persistent in the file), where a
-// writer blocks readers not at all, and the busy timeout matches
-// `auth/db.py`'s 5000ms so two writers collide as a short wait rather than as
-// `database is locked`.
+// Two writers, and it is worth saying which: the serving process (the
+// session touch, the expired-row deletes, the account routes) and `mtglab
+// users` on the machine. Two processes writing one file is safe here and
+// not by luck: the file is in WAL mode (set at creation, and WAL is
+// persistent in the file), where a writer blocks readers not at all, and
+// the 5000ms busy timeout means two writers collide as a short wait rather
+// than as `database is locked`.
 //
 // `foreign_keys` is on because `Delete` leans on it: `sessions` and
 // `auth_tokens` declare ON DELETE CASCADE, and with the pragma off those
@@ -68,7 +68,7 @@ func PingWritable(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// inTx is Python's `with con:` -- a deferred transaction, opened on the first
+// inTx is a deferred transaction -- opened on the first
 // statement, committed on a clean return and rolled back on anything else.
 func inTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) error {
 	tx, err := db.BeginTx(ctx, nil)
@@ -82,7 +82,7 @@ func inTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) error {
 	return tx.Commit()
 }
 
-// exclusive is `users._exclusive`: `with con:`, except the write lock is taken
+// exclusive is a transaction that takes the write lock
 // before the first read.
 //
 // SQLite in its default mode opens a transaction on the first *DML* statement
@@ -123,14 +123,15 @@ func exclusive(ctx context.Context, db *sql.DB, fn func(*sql.Conn) error) error 
 	return nil
 }
 
-// nowISO is what Python writes into every timestamp column:
-// `datetime.now(UTC).isoformat()`, six fractional digits and a `+00:00`
+// nowISO is the timestamp every column carries:
+// UTC, six fractional digits and a `+00:00`
 // offset.
 //
-// One hair of difference, recorded rather than chased, and it is the same one
-// `decklog.nowISO` records: `isoformat` omits the fractional part entirely
-// when the microsecond is exactly zero, which happens about once in a million
-// writes and which both runtimes parse either way.
+// One hair of difference from the recorded rows, noted rather than chased,
+// and it is the same one
+// `decklog.nowISO` records: the recorded format omits the fractional part
+// entirely when the microsecond is exactly zero, which happens about once
+// in a million writes and which `ParseTimestamp` reads either way.
 func nowISO() string {
 	return time.Now().UTC().Format("2006-01-02T15:04:05.000000-07:00")
 }

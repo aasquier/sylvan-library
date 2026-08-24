@@ -6,20 +6,19 @@ import (
 	"testing"
 )
 
-// Native fuzzing is one of the instruments the port buys (PLAN section 5),
-// and this is what it is good for here: the corpus next door proves this
-// package agrees with CPython on tens of thousands of *recorded* draws, but
-// it can only ever cover the seeds and bounds somebody chose. The properties
-// below hold for every seed and every bound there is, so a fuzzer looking for
-// a counter-example is looking somewhere the corpus cannot.
+// What fuzzing is good for here: the corpus next door proves this package
+// reproduces tens of thousands of *recorded* draws, but it can only ever
+// cover the seeds and bounds somebody chose. The properties below hold for
+// every seed and every bound there is, so a fuzzer looking for a
+// counter-example is looking somewhere the corpus cannot.
 //
 // They are deliberately properties this package could satisfy while still
-// being wrong -- a well-made generator that is not CPython's satisfies all of
-// them. That division is the point: exactness is the corpus's job, and
-// internal consistency is this one's. What it catches is the class of bug the
-// corpus is blind to by construction -- an argument the recorded cases happen
-// not to reach, an overflow at a bound nobody dumped, a panic where CPython
-// answers.
+// being wrong -- a well-made generator that agrees with the corpus on
+// nothing satisfies all of them. That division is the point: exactness is
+// the corpus's job, and internal consistency is this one's. What it catches
+// is the class of bug the corpus is blind to by construction -- an argument
+// the recorded cases happen not to reach, an overflow at a bound nobody
+// recorded, a panic where the contract answers.
 
 func FuzzTheGeneratorAgreesWithItself(f *testing.F) {
 	// Seeds worth starting from: the probe's, the boundaries where the key
@@ -47,7 +46,7 @@ func FuzzTheGeneratorAgreesWithItself(f *testing.F) {
 			}
 		}
 
-		// --- the int64 door and the big.Int door are the same door.
+		// --- the int64 constructor and the big.Int constructor agree.
 		if *New(seed) != *NewFromBig(big.NewInt(seed)) {
 			t.Fatalf("seed %d: New and NewFromBig built different states", seed)
 		}
@@ -60,9 +59,9 @@ func FuzzTheGeneratorAgreesWithItself(f *testing.F) {
 			t.Fatalf("seed %d and its negation built different states", seed)
 		}
 
-		// --- getrandbits(32) is exactly one word off the stream. This is the
-		// hinge the whole corpus hangs on: it is why recording
-		// `getrandbits(32)` in Python records the raw generator.
+		// --- GetRandBits(32) is exactly one word off the stream. This is the
+		// hinge the whole corpus hangs on: it is why a recorded 32-bit draw
+		// records the raw generator itself.
 		if a, b := New(seed).GetRandBits(32), New(seed).Uint32(); a != uint64(b) {
 			t.Fatalf("seed %d: GetRandBits(32) gave %d, Uint32 gave %d",
 				seed, a, b)
@@ -80,10 +79,10 @@ func FuzzTheGeneratorAgreesWithItself(f *testing.F) {
 			}
 		}
 
-		// --- randbelow stays below, and RandBelow(1) is the answer it has to
+		// --- RandBelow stays below, and RandBelow(1) is the answer it has to
 		// be. It is not free -- it draws until a 1-bit comes up 0 -- so it is
-		// worth a property of its own: a port that shortcut it would agree
-		// here and desynchronise every draw after it.
+		// worth a property of its own: an implementation that shortcut it
+		// would agree here and desynchronise every draw after it.
 		r = New(seed)
 		for range 16 {
 			if v := r.RandBelow(bound); v < 0 || v >= bound {

@@ -68,7 +68,7 @@ const slowMatch = "Stopping slow match as draw"
 
 // GameResult is one completed game.
 //
-// The fields are `parse.GameResult`'s, in Python's order, because the wire
+// The fields are in the recorded wire order, because the wire
 // codec below writes them by name and the ledger reads them by name.
 type GameResult struct {
 	Index        int
@@ -103,7 +103,7 @@ func (o *SimOutput) Trustworthy() bool {
 // IsGameResult reports whether this line just finished a game — a single-line
 // predicate with no state.
 //
-// `run.py` used to count ticks with this and tally with the parser: two
+// The runner once counted ticks with this and tallied with the parser: two
 // readers of the same stream, kept honest only by sharing regexes. Both ride
 // one [StreamParser] now, so this survives as the cheap question a caller with
 // no state wants answered.

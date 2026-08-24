@@ -23,18 +23,17 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The theme interview: it asks about you, not about Magic (`claude/theme.py`,
-// ADR 20).
+// The theme interview: it asks about you, not about Magic (ADR 20).
 //
 // Two modes and one feature. `theme-conversation` talks -- prose questions, no
 // pool, no deck -- and `theme-proposal` fires once at the end with a schema,
-// the pool and a web search. Both cross here; their definitions crossed
-// earlier, as data, with the other five.
+// the pool and a web search. Their definitions live as data beside the other
+// five modes'.
 //
 // **Neither can see a deck**, and the absence is structural rather than
 // promised: no deck source is passed, ever, and `boundary_test.go` fails the
-// commit that reaches for one. The four instruments that hold ADR 20 all
-// cross with it, and none of them is the system prompt:
+// commit that reaches for one. Four instruments hold ADR 20, and none of
+// them is the system prompt:
 //
 //   - `Ground` intersects a claimed preference with the text of the person
 //     supposedly holding it, and only **user** turns count -- quoting the
@@ -43,16 +42,16 @@ import (
 //   - `Carry` is the readiness floor, and it may not go backwards. Short, shy
 //     answers made the count go 0, 1, 0, 1, 0 before this existed, because
 //     the report was built from this turn's reading alone.
-//   - `MayPropose` counts in Go. There is no `ready` field in the schema for
-//     a model to set.
+//   - `MayPropose` counts in code. There is no `ready` field in the schema
+//     for a model to set.
 //   - Every commander is resolved through the pool, and one whose identity is
 //     not *exactly* the combination's is dropped and counted.
 //
-// The one thing here that is a fact about Go rather than about the design:
-// `openingAngle` is `random.choice` over seven openings, and CPython's global
-// `random` is seeded from the OS. Nothing reproducible rides on it, so this
-// does not go through `pyrand` -- but it is a package var, because a corpus
-// that could not hold it still would be a corpus of one opening question.
+// The one deliberate piece of nondeterminism: `openingAngle` draws one of
+// seven openings from OS-seeded randomness. Nothing reproducible rides on
+// it, so it does not go through the seeded generator -- but it is a package
+// var, because a corpus that could not hold it still would be a corpus of
+// one opening question.
 
 // SlotKinds is what the conversation is trying to learn, and deliberately not
 // a list of things about Magic. `anchor` is the strongest single signal for
@@ -117,42 +116,39 @@ type ErrNotReady struct{ Msg string }
 
 func (e *ErrNotReady) Error() string { return e.Msg }
 
-// BudgetRefusal is `theme.BUDGET_REFUSAL`: what a budget that will not read
-// says back. One sentence, an example, and no mention of what could not read
+// BudgetRefusal is what a budget that will not read says back.
+// One sentence, an example, and no mention of what could not read
 // it -- the old 422 was `could not convert string to float: 'about fifty
 // quid'`, which names a language builtin on the screen a newcomer meets
 // first (commandment 10).
 const BudgetRefusal = "the budget must be a number, like 250"
 
-// ErrBudgetRejected is `theme.BudgetRejected`, and it is a `ValueError` on the
-// Python side for a load-bearing reason: the proposal route's existing 422
-// branch already catches those, so neither runtime needed a new `except` or a
-// new status mapping. The same trick `ErrStanceRejected` uses.
+// ErrBudgetRejected rides the proposal route's existing 422 branch for a
+// load-bearing reason: the route already maps a value refusal to 422, so no
+// new status mapping was needed. The same trick `ErrStanceRejected` uses.
 //
-// It exists because of what the route did before it. `float(budget)` sat in a
-// `try` catching `ValueError` and **not** `TypeError`, so an unreadable
-// *string* was a 422 and a *list* was an uncaught 500 -- two spellings of one
-// malformed field, answered two ways, one of them as though the server had
-// broken. Ruled with Aaron 2026-08-23 and fixed in both runtimes at once, the
-// way `edit.set_shared` and the stance wart went.
+// It exists because of what the route did before it: an unreadable budget
+// *string* was a 422 while a budget *list* was an uncaught 500 -- two
+// spellings of one malformed field, answered two ways, one of them as though
+// the server had broken. Ruled with Aaron 2026-08-23 and fixed in one
+// deliberate change, the way the shared-flag and stance warts went.
 var ErrBudgetRejected = errors.New(BudgetRefusal)
 
-// ReadBudget is `theme.read_budget`: a budget as the proposal takes it, which
-// is a number or nothing at all.
+// ReadBudget is a budget as the proposal takes it: a number or nothing at
+// all.
 //
-// `pyTruthyValue` first, because a falsy budget is **no budget** rather than a bad
-// one -- an empty box, a zero, an absent field, and (Python being Python) an
-// empty list.
+// `truthy` first, because a falsy budget is **no budget** rather than a bad
+// one -- an empty box, a zero, an absent field, an empty list.
 //
-// Everything else goes through `PyFloat` and not `strconv.ParseFloat`, and
-// the ruling did not change that: CPython's `float()` takes underscores
-// between digits, any Unicode decimal digit, a leading `+`, surrounding
-// whitespace, and the words `inf`, `Infinity` and `NaN`, while refusing the
-// `0x1p4` Go would happily read. What the ruling changed is what a refusal
-// *says*, never what is accepted -- so a budget that worked before still
-// works, byte for byte, in both runtimes.
+// Everything else goes through [FloatValue] and not `strconv.ParseFloat`,
+// and the refusal ruling did not change that: the recorded grammar takes
+// underscores between digits, any Unicode decimal digit, a leading `+`,
+// surrounding whitespace, and the words `inf`, `Infinity` and `NaN`, while
+// refusing the `0x1p4` that `strconv` would happily read. What the ruling
+// changed is what a refusal *says*, never what is accepted -- so a budget
+// that worked before still works, byte for byte.
 func ReadBudget(raw any) (*float64, error) {
-	if !pyTruthyValue(raw) {
+	if !truthy(raw) {
 		return nil, nil
 	}
 	value, err := FloatValue(raw)
@@ -187,7 +183,7 @@ var themeLog = slog.Default().With("logger", "mtglab.claude.theme")
 // different clothes" from "the model wrote it that way" is to know whether
 // anything was substituted at all.
 func Prose(text any) string {
-	raw := pyStrOr(text)
+	raw := plainOr(text)
 	removed := 0
 	cleaned := controlChars.ReplaceAllStringFunc(raw, func(string) string {
 		removed++
@@ -271,7 +267,7 @@ func Ground(slots []any, transcript []TranscriptTurn) ([]Slot, int) {
 			dropped++
 			continue
 		}
-		kind := textutil.Strip(pyStrOr(item["kind"]))
+		kind := textutil.Strip(plainOr(item["kind"]))
 		quote := Prose(item["quote"])
 		value := Prose(item["value"])
 		needle := normalise(quote)
@@ -551,8 +547,8 @@ func CheckTranscript(raw any) ([]TranscriptTurn, error) {
 		if !ok {
 			return nil, rejectTranscript("turn %d is not an object", i)
 		}
-		role := textutil.Strip(pyStrOr(turn["role"]))
-		text := textutil.Strip(pyStrOr(turn["text"]))
+		role := textutil.Strip(plainOr(turn["role"]))
+		text := textutil.Strip(plainOr(turn["text"]))
 		if role != "user" && role != "assistant" {
 			return nil, rejectTranscript(
 				"turn %d has role %s; only 'user' and 'assistant' cross this "+
@@ -666,13 +662,13 @@ func themeMessages(transcript []TranscriptTurn, closing, frame string) []anthrop
 
 // themeMode is one half's mode, wearing a persona's voice.
 //
-// Built per request where Python builds `CONVERSATION_MODES` once at import,
-// and the difference is nothing: Python's comment there warns that building
-// one per request would "silently turn every conversation into a cache miss",
-// which is a claim about the *bytes* rather than about object identity. The
-// API caches on the prompt it is sent, and concatenating the same two strings
-// gives the same prompt every time. `GetMode` returns the registry's Mode by
-// value, so the copy's name and instructions are the only things that move.
+// Built per request, and the build costs nothing it appears to: the fear
+// that a per-request build would "silently turn every conversation into a
+// cache miss" is a claim about the *bytes* rather than about object
+// identity. The API caches on the prompt it is sent, and concatenating the
+// same two strings gives the same prompt every time. `GetMode` returns the
+// registry's Mode by value, so the copy's name and instructions are the only
+// things that move.
 func themeMode(base string, who Persona) (Mode, error) {
 	mode, err := GetMode(base)
 	if err != nil {
@@ -691,11 +687,11 @@ func themeMode(base string, who Persona) (Mode, error) {
 // cards the same cards for the whole reading -- the same trick the transcript
 // uses, and the reason this mode still needs no table.
 //
-// **No error, where Python's `_reading_for` raises one.** There the seed is
-// still text and `int(seed)` is the thing that can fail; here `seedFor` has
-// already read it at check time, which is where a malformed one has to be
-// refused anyway -- a job in state `error` four minutes later is not a 422.
-// By the time this runs the seed is a number and `tarot.Deal` takes any.
+// **No error path.** The seed grammar is the thing that can fail, and
+// `seedFor` has already read it at check time, which is where a malformed
+// one has to be refused anyway -- a job in state `error` four minutes later
+// is not a 422. By the time this runs the seed is a number and `tarot.Deal`
+// takes any.
 func readingFor(who Persona, seed *big.Int) *tarot.Reading {
 	if !who.Deals || seed == nil {
 		return nil
@@ -736,8 +732,8 @@ func ThemeStanceFor(requested any, limit *Stance) (Stance, error) {
 // Usage and StanceReadout are shared with the other modes; a theme report's
 // envelope is the same five keys before the per-half fields begin.
 
-// themeEnvelope is `_report`'s fixed head: one response shape for every
-// outcome, including not asking at all.
+// themeEnvelope is every theme report's fixed head: one response shape for
+// every outcome, including not asking at all.
 //
 // `answered_by` is ADR 14's third boundary as a field. It matters more here
 // than anywhere else in the package: this is the first surface whose output is
@@ -761,12 +757,13 @@ func envelopeFor(turn *Turn, mode string, effective Stance) themeEnvelope {
 	return out
 }
 
-// AskReport is one conversation turn's answer, in Python's key order.
+// AskReport is one conversation turn's answer, in the recorded key order.
 //
 // **`Fact` is a pointer and `Slots` is never nil**, because both distinctions
-// are on the wire: Python writes `"fact": null` for a turn with none, and
-// `"slots": []` for a reading with nothing in it. A nil slice marshals as
-// `null`, which is a different payload and a client that renders it as one.
+// are on the wire: the recorded payload writes `"fact": null` for a turn
+// with none, and `"slots": []` for a reading with nothing in it. A nil slice
+// marshals as `null`, which is a different payload and a client that renders
+// it as one.
 type AskReport struct {
 	themeEnvelope
 	Persona      string `json:"persona"`
@@ -786,15 +783,17 @@ type AskReport struct {
 
 // AskAnswered is the same turn when a call was actually made and read. It
 // carries one key more, and the extra key is the whole reason there are two
-// types: Python passes `never` only on the path that reached the model, so a
-// single struct would put it on the wire in exactly the cases Python leaves
-// it off. The same shape `argue`'s four-versus-five keys already has.
+// types: `never` is served only on the path that reached the model, so a
+// single struct would put it on the wire in exactly the cases the recorded
+// shape leaves it off. The same shape `argue`'s four-versus-five keys
+// already has.
 type AskAnswered struct {
 	AskReport
 	Never string `json:"never"`
 }
 
-// ProposalReport is a proposal that did not complete, in Python's key order.
+// ProposalReport is a proposal that did not complete, in the recorded key
+// order.
 type ProposalReport struct {
 	themeEnvelope
 	Persona      string        `json:"persona"`
@@ -837,7 +836,7 @@ type Commander struct {
 	Name      string   `json:"name"`
 	Prose     string   `json:"prose"`
 	SourceIDs []string `json:"source_ids"`
-	// The pool's own fields, carried through under Python's spellings. All
+	// The pool's own fields, carried through under their served spellings. All
 	// five are nullable in the pool and so are pointers here: a card with no
 	// oracle text writes `null`, never `""`.
 	ManaCost      *string  `json:"mana_cost"`
@@ -866,7 +865,7 @@ type Combination struct {
 // ------------------------------------------------------------ the ask, planned
 
 // AskPlan is a conversation turn that has passed every check not needing the
-// network -- `theme.AskRequest`, plus the answer when there is nothing to ask.
+// network, plus the answer when there is nothing to ask.
 //
 // A turn was measured at 4.3-37.7 seconds with **one outlier at 133.8s**, and
 // the transport ceiling it has to fit under is bounded above at 236s only
@@ -915,8 +914,8 @@ func countExchanges(transcript []TranscriptTurn) int {
 	return n
 }
 
-// CheckAsk is `theme.check_ask`: everything that can refuse a turn, done
-// before anything is spent.
+// CheckAsk is everything that can refuse a turn, done before anything is
+// spent.
 //
 // Unlike `CheckProposal` there is no floor to fail: a conversation with
 // nothing in it yet is exactly the case this mode exists for.
@@ -969,19 +968,18 @@ func CheckAsk(transcript, slots, requested, persona, seed, facts any,
 }
 
 // seedFor resolves the reading seed at check time, so an unusable one is a
-// 422 now rather than a job in state `error` later. It also raises for a
-// persona that does not deal, exactly as `_reading_for` does -- which is to
-// say it does not: a seed handed to a plain voice is dropped, not refused.
+// 422 now rather than a job in state `error` later. A seed handed to a voice
+// that does not deal is dropped, never refused.
 func seedFor(who Persona, seed any) (*big.Int, error) {
 	if !who.Deals || seed == nil {
 		return nil, nil
 	}
 	n, err := intValue(seed)
 	if err != nil {
-		// `int(seed)` raises `TypeError` for a list and `ValueError` for a
-		// string that is not a number; Python catches both and says the same
-		// sentence, so this does too.
-		return nil, rejectTranscript("not a usable reading seed: %s", pyReprAny(seed))
+		// A wrong type and an unreadable string are two different failures
+		// inside the grammar; both say this one recorded sentence, so a
+		// caller cannot tell which way the seed was malformed.
+		return nil, rejectTranscript("not a usable reading seed: %s", literalAny(seed))
 	}
 	return n, nil
 }
@@ -1134,13 +1132,12 @@ var OpeningAngles = []string{
 
 // openingAngle draws one. A variable so a corpus can hold it still.
 //
-// **Not `pyrand`.** Python spells this `random.choice`, on the global
-// `Random` seeded from the OS -- so there is no seed to reproduce and nothing
-// downstream depends on which one comes out. What a corpus needs is only that
-// it can pin one, which a package var gives it.
-// conversation starts from, and nothing downstream depends on the draw.
+// **Not `mt19937`.** The draw rides OS-seeded randomness -- there is no seed
+// to reproduce and nothing downstream depends on which opening comes out.
+// What a corpus needs is only that it can pin one, which a package var gives
+// it.
 //
-//nolint:gosec // a die, not a secret: it varies which of seven openings a
+//nolint:gosec // a die, not a secret: it varies which of seven openings a conversation starts from
 var openingAngle = func() string { return OpeningAngles[rand.IntN(len(OpeningAngles))] }
 
 // closingFor is what to ask the model for, given how far along the
@@ -1410,9 +1407,9 @@ func readProposal(ctx context.Context, conn *pool.Conn, plan *ProposalPlan,
 // declare a budget before the tool will talk to them, and `price_max` is
 // literally a `search_cards` argument.
 func proposalAsk(grounded []Slot, budget *float64, avoid string) string {
-	// `json.dumps(grounded, indent=2)`, and it goes to the model rather than
-	// into a digest -- but the same renderer writes it, so the bytes agree
-	// with Python's and the corpus can pin the whole instruction.
+	// The slots render as indented canonical JSON, and the text goes to the
+	// model rather than into a digest -- but the one canonical renderer
+	// writes it, so the corpus can pin the whole instruction byte for byte.
 	rows := make([]any, 0, len(grounded))
 	for _, s := range grounded {
 		rows = append(rows, wire.OrderedMap{
@@ -1428,8 +1425,8 @@ func proposalAsk(grounded []Slot, budget *float64, avoid string) string {
 		dumpJSON(rows, dumpOptions{Indent: 2}),
 		"",
 	}
-	// `if budget:` -- a zero budget is no budget, which is Python's truthiness
-	// and not a nil check.
+	// A zero budget is no budget -- the truthiness rule `ReadBudget`
+	// documents, not a bare nil check.
 	if budget != nil && *budget != 0 {
 		lines = append(lines, fmt.Sprintf(
 			"They have about $%s for the whole deck, so pass price_max to "+
@@ -1447,7 +1444,7 @@ func proposalAsk(grounded []Slot, budget *float64, avoid string) string {
 	return strings.Join(lines, "\n")
 }
 
-// resolveCombinations is `_combinations`: combinations with a real key, and
+// resolveCombinations keeps the combinations with a real key, and the
 // commanders the pool confirms.
 //
 // Two checks in one pass, and both drop rather than repair. A `key` that is
@@ -1469,7 +1466,7 @@ func resolveCombinations(ctx context.Context, conn *pool.Conn, raw any,
 		if !ok {
 			continue
 		}
-		combo, ok := valid[strings.ToUpper(textutil.Strip(pyStrOr(row["key"])))]
+		combo, ok := valid[strings.ToUpper(textutil.Strip(plainOr(row["key"])))]
 		if !ok {
 			lost++
 			continue
@@ -1508,13 +1505,14 @@ func resolveCombinations(ctx context.Context, conn *pool.Conn, raw any,
 	return out, dropped, lost, nil
 }
 
-// allowedIDs is `[str(i) for i in (raw or []) if str(i) in allowed]`: a
-// citation the sources check did not keep is not a citation.
+// allowedIDs keeps the ids the sources check kept, each rendered to plain
+// text before filtering: a citation the check did not keep is not a
+// citation.
 func allowedIDs(raw any, allowed map[string]bool) []string {
 	items, _ := raw.([]any)
 	out := []string{}
 	for _, item := range items {
-		id := pyStr(item)
+		id := plain(item)
 		if allowed[id] {
 			out = append(out, id)
 		}
@@ -1542,7 +1540,7 @@ func resolveCommanders(ctx context.Context, conn *pool.Conn, raw any,
 	names := make([]string, 0, len(rows))
 	wanted := []string{}
 	for _, row := range rows {
-		name := textutil.Strip(pyStrOr(row["card"]))
+		name := textutil.Strip(plainOr(row["card"]))
 		names = append(names, name)
 		if name != "" {
 			wanted = append(wanted, name)
@@ -1608,9 +1606,9 @@ func sameIdentity(colors []string, identity map[string]bool) bool {
 
 // ------------------------------------------------------------- the job labels
 
-// AskLabel and ProposalLabel are `themeruns.plan_ask`'s and
-// `plan_proposal`'s. A job list is a list of one-liners, and these are what
-// somebody reads to tell "asked me something" from "spent four minutes".
+// AskLabel and ProposalLabel are the two job families' one-liners. A job
+// list is a list of one-liners, and these are what somebody reads to tell
+// "asked me something" from "spent four minutes".
 func AskLabel(plan *AskPlan) string {
 	return fmt.Sprintf("theme: a question, from %d thing%s known",
 		len(plan.Carried), plural(len(plan.Carried)))
@@ -1622,9 +1620,8 @@ func ProposalLabel(plan *ProposalPlan) string {
 		len(plan.Grounded), plural(len(plan.Grounded)))
 }
 
-// plural is `” if n == 1 else 's'`, which is **not** `n != 1` spelled the
-// usual way round: Python's conditional puts the singular first, so zero
-// things are "0 things" and one is "1 thing".
+// plural is empty at exactly one and "s" everywhere else, zero included --
+// zero things are "0 things", one is "1 thing".
 func plural(n int) string {
 	if n == 1 {
 		return ""

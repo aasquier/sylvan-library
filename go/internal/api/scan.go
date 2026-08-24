@@ -18,8 +18,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The scan route (ADR 34): `POST /api/claude/scan`, a **job**, over
-// `api/scanruns.py`.
+// The scan route (ADR 34): `POST /api/claude/scan`, a **job**.
 //
 // **This is the one route in the app that receives a photograph**, and it
 // never receives one by accident: the browser's local reader sends nothing but
@@ -64,11 +63,11 @@ const ScanKind = "claude.scan"
 // about a photograph worth putting in a job list.
 const scanLabel = "scan: a photographed card"
 
-// scanResult is the job's answer, in Python's key order.
+// scanResult is the job's answer, in the recorded key order.
 //
-// A struct and not a map, for the rule Phase 5 wrote down: `encoding/json`
-// sorts a map's keys and a dict does not, so a job result must be a struct
-// with its fields in Python's order.
+// A struct and not a map, for the standing rule: `encoding/json`
+// sorts a map's keys and the recorded bodies do not, so a job result must
+// be a struct with its fields in the recorded order.
 type scanResult struct {
 	// Reading is `read["readings"][0] if read["readings"] else None` -- the
 	// pool's verdict on what was transcribed, or null when nothing legible
@@ -89,35 +88,35 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// `payload.get("image") or b""`: a falsy image is empty bytes, which
+	// The or-empty image read: a falsy image is empty bytes, which
 	// refuses as "the capture was empty" rather than as a type.
 	var image any
-	if pyTruthy(body["image"]) {
+	if truthy(body["image"]) {
 		image = body["image"]
 	}
-	// `str(payload.get("media_type") or "image/jpeg")`: `str` and not a cast,
+	// The or-default media type, stringified rather than cast,
 	// so an int media type becomes "7" and refuses by name rather than by
-	// type. Measured -- a list becomes "['a']" and repr-quotes with double
+	// type. Measured -- a list becomes "['a']" and quotes with double
 	// quotes in the refusal, which is `wire.Quote`'s job.
 	mediaType := "image/jpeg"
-	if pyTruthy(body["media_type"]) {
+	if truthy(body["media_type"]) {
 		mediaType = claude.Plain(body["media_type"])
 	}
 
 	// Built here, before anything is queued: this is what validates the
 	// capture, and every one of its refusals is a 422 the page acts on.
-	// Every way a capture can fail is one 422, including the one that used to
-	// be a 500: an image that is neither a string nor bytes reached `len()` in
-	// Python and raised an uncaught `TypeError`. Ruled with Aaron 2026-08-23
-	// alongside the theme proposal's identical `float(budget)` wart, and fixed
-	// in both runtimes at once. See `claude.scanPayload`.
+	// Every way a capture can fail is one 422, including the one that used
+	// to be a 500: an image that is neither a string nor bytes once escaped
+	// as an uncaught crash. Ruled with Aaron 2026-08-23
+	// alongside the theme proposal's identical budget wart, and the 422 is
+	// the contract. See `claude.scanPayload`.
 	ask, data, err := claude.ScanMessage(image, mediaType)
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	stance, err := claude.ScanStanceFor(requested, nil)
@@ -125,8 +124,8 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	// The digest is over the **encoded** capture, which is what Python hashes
-	// (`ask["content"][0]["source"]["data"]`) -- and it matters that it is the
+	// The digest is over the **encoded** capture -- the recorded dedupe key
+	// -- and it matters that it is the
 	// re-encoded form rather than what arrived, since `YW==` and `YQ==` are
 	// the same photograph and must be the same job.
 	sum := sha256.Sum256([]byte(data))

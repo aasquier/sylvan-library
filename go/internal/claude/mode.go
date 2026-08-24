@@ -10,7 +10,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// This file is the first half of `claude/modes.py`: what a mode *is*.
+// This file is what a mode *is*.
 //
 // [ADR 15] defines a Claude surface as four things: a system prompt, a tool
 // set, a declaration of what it may write, and the user's stance over it. The
@@ -46,11 +46,11 @@ type Mode struct {
 	ServerTools []anthropic.ToolUnionParam
 	// ServerToolNames is the same tools by the name the API calls them, kept
 	// because the SDK's typed union does not hand one back and `/api/claude`
-	// publishes them: `[t["name"] for t in mode.server_tools]`.
+	// publishes them.
 	//
 	// A UI says "searches the web" about one of these and says nothing at all
-	// about `get_cards`, which is the whole reason Python lists them apart
-	// from ToolNames rather than merging the two.
+	// about `get_cards`, which is the whole reason they are listed apart
+	// from ToolNames rather than merged.
 	ServerToolNames []string
 	// MayWrite is what this mode may change. Empty, and checked empty -- see
 	// the file comment for why the field exists at all.
@@ -73,8 +73,8 @@ type Mode struct {
 }
 
 // ModeDefaults are the values a mode inherits when it does not say otherwise.
-// Named constants rather than struct-literal defaults because Go has no
-// dataclass field defaults, and a mode that silently got MaxTokens 0 would
+// Named constants filled in by NewMode, because a struct literal carries no
+// defaults of its own and a mode that silently got MaxTokens 0 would
 // fail at the API rather than here.
 const (
 	DefaultModeMaxTokens int64                        = 8192
@@ -83,7 +83,7 @@ const (
 
 // NewMode fills a mode's defaults and checks it, or says why it cannot.
 //
-// This is `Mode.__post_init__`. Two checks, and both fail loudly rather than
+// Two checks, and both fail loudly rather than
 // being tolerated: a mode declaring it may write anything is refused outright,
 // and a tool name outside the registry is refused so a typo in a mode
 // definition fails at startup rather than mid-conversation.
@@ -109,7 +109,7 @@ func NewMode(m Mode) (Mode, error) {
 }
 
 // MustMode is NewMode for a package-level mode definition, where an invalid
-// mode should stop the process exactly as an import-time raise does in Python.
+// mode should stop the process at load rather than answer strangely later.
 //
 // Safe to call from a package-level var initialiser even though it reaches the
 // tools registry: `tools` is a different package, and Go finishes a dependency
@@ -169,11 +169,11 @@ func (m Mode) Schemas() ([]anthropic.ToolUnionParam, error) {
 
 // toolParam turns one entry of `tools.Schemas` into the SDK's tool union.
 //
-// The registry's map is the thing held to Python by a generated corpus, so
+// The registry's map is the thing held to the recorded corpus, so
 // this conversion is the seam where that proof could stop being about what
 // goes on the wire. It is deliberately total: every key the registry writes is
 // carried, `required` included when empty (a non-nil empty slice renders as
-// `[]`, which is what Python emits), and an unexpected shape is an error
+// `[]`, the recorded shape), and an unexpected shape is an error
 // rather than a silent drop.
 func toolParam(schema map[string]any) (anthropic.ToolUnionParam, error) {
 	name, _ := schema["name"].(string)

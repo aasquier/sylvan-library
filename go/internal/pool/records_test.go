@@ -19,7 +19,7 @@ func use(t *testing.T, p *pool.Pool, fn func(c *pool.Conn)) {
 	}
 }
 
-func TestGetCardsResolvesNamesAsPythonDoes(t *testing.T) {
+func TestGetCardsResolvesNamesAsRecorded(t *testing.T) {
 	ctx := context.Background()
 	use(t, pooltest.Open(t), func(c *pool.Conn) {
 		// Case-insensitive; a double-faced card by its front face; a banned

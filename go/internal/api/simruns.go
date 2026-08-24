@@ -23,7 +23,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// `api/simruns.py`: simulation jobs, shaped for the UI.
+// Simulation jobs, shaped for the UI.
 //
 // These reuse the exact compilation path the CLI uses, so a number shown in
 // the app is the same number `mtglab sim mana` prints. Every result carries
@@ -47,8 +47,8 @@ import (
 // from the worker, so the caller still gets a 200 and then a job in state
 // `error`, which is the shape the UI already knows.
 
-// Tier1Caveat and LandSweepCaveat are `simruns.TIER1_CAVEAT` and
-// `LAND_SWEEP_CAVEAT`, rendered into every result.
+// Tier1Caveat and LandSweepCaveat are the two standing captions,
+// rendered into every result.
 const (
 	Tier1Caveat = "Tier 1 shuffles, draws and pays costs. It does not model " +
 		"opponents, interaction, tutors, cost reduction, or card text beyond " +
@@ -65,7 +65,7 @@ const (
 // different "unspecified" seeds in one module would be a trap.
 const DefaultSeed = 7
 
-// movesTheNumbers is `simruns.MOVES_THE_NUMBERS`: gate failures that change
+// movesTheNumbers is the split between gate failures that change
 // what a simulation computes, as opposed to failures that are real but do not
 // touch these numbers. A missing rationale blocks a curated deck and has no
 // effect whatever on mana; a banned card is sitting in the 99 being shuffled.
@@ -88,8 +88,8 @@ type checkError struct {
 	Card    *string `json:"card"`
 }
 
-// deckCheck is `simruns._check_payload`: the gate's answer, shaped for a
-// client that must not re-derive it. Field order is Python's dict order.
+// deckCheck is the gate's answer, shaped for a
+// client that must not re-derive it. Field order is the recorded key order.
 type deckCheck struct {
 	OK           bool         `json:"ok"`
 	ErrorCount   int          `json:"error_count"`
@@ -146,9 +146,9 @@ func (a *API) compileChecked(ctx context.Context, src library.Source, slug strin
 		return nil, err
 	}
 	if len(cards) == 0 {
-		// `service._connect()` answering None, or a pool that has never heard
-		// of any of these names. Python raises a bare RuntimeError with this
-		// text and the route turns it into a job error.
+		// No pool, or a pool that has never heard
+		// of any of these names. The sentence is the recorded one, and the
+		// route turns it into a job error.
 		return nil, fmt.Errorf("simulation needs the card pool -- run `mtglab data refresh`")
 	}
 	report, err := compile.Compile(d, cards)
@@ -208,7 +208,7 @@ func keepRuleFrom(body map[string]any) tier1.KeepRule {
 	return k
 }
 
-// seedFrom is `simruns._seed`: always a real number. Clamped to nothing and
+// seedFrom is always a real number. Clamped to nothing and
 // validated barely -- any integer is a valid seed.
 func seedFrom(body map[string]any) int {
 	raw, ok := body["seed"]
@@ -233,18 +233,18 @@ func manaParamsFrom(body map[string]any) manaParams {
 	return manaParams{games: games, turns: turns, keep: keepRuleFrom(body), seed: seedFrom(body)}
 }
 
-// simInt is Python's `int(payload.get(key, fallback))` over a decoded JSON
-// value.
+// simInt is the recorded integer coercion over a decoded JSON
+// value, with a fallback.
 //
-// Every coercion Python makes is made here: a JSON number truncates toward
-// zero (`int(4.9)` is 4), a numeric string parses, and `True` is 1. An absent
+// Every recorded coercion is made here: a JSON number truncates toward
+// zero (4.9 reads as 4), a numeric string parses, and `true` is 1. An absent
 // key takes the fallback.
 //
 // **An unparseable value takes the fallback too, and that is a deliberate,
-// named divergence rather than an oversight.** Python raises `ValueError` out
-// of `_mana_params`, which sits *before* `plan_mana`'s try, so it escapes the
-// route as an unhandled exception and FastAPI answers 500. Reproducing a 500
-// for `{"games": "abc"}` would mean building a path whose only job is to crash
+// named divergence from the recorded wire rather than an oversight.** The
+// recorded answer to `{"games": "abc"}` is an unhandled 500 -- the coercion
+// sat before any handler's own error path. Reproducing that
+// would mean building a path whose only job is to crash
 // in the same place, for input no client sends and no golden pins. The clamp
 // that follows every call makes the fallback safe in the only way that
 // matters -- the run is a legal run -- and this note is here so the choice is
@@ -266,7 +266,7 @@ func simInt(body map[string]any, key string, fallback int) int {
 			return n
 		}
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			// `int("4.0")` is a ValueError in Python, so this is the fallback
+			// The recorded coercion refuses `"4.0"`, so this is the fallback
 			// branch too -- but a float that arrived as a string is worth
 			// truncating rather than discarding, and the clamp bounds it.
 			return int(f)
@@ -312,12 +312,13 @@ type cardTimingRow struct {
 	ByT8       float64  `json:"by_t8"`
 }
 
-// manaResult is `_mana_result`, and its field order is Python's dict order --
-// a ported payload is a struct precisely so `encoding/json` does not
+// manaResult is the mana result, and its field order is the recorded key
+// order -- a payload is a struct precisely so `encoding/json` does not
 // alphabetise it.
 //
-// `Cached` and `ComputedAt` sit at the end because `_stamp` appends them to an
-// already-built dict, and `DeckCheck` after those because it is assigned last.
+// `Cached` and `ComputedAt` sit at the end because the stamp is appended to
+// an already-built result, and `DeckCheck` after those because it is
+// assigned last.
 type manaResult struct {
 	Slug                string          `json:"slug"`
 	DeckName            string          `json:"deck_name"`
@@ -382,7 +383,7 @@ func manaResultFrom(slug string, d *deck.Deck, summary tier1.SimSummary, p manaP
 
 func (a *API) planMana(ctx context.Context, src library.Source, slug string, body map[string]any) jobs.Plan {
 	p := manaParamsFrom(body)
-	label := fmt.Sprintf("%s: mana, %s games", slug, pyComma(p.games))
+	label := fmt.Sprintf("%s: mana, %s games", slug, commaGrouped(p.games))
 
 	c, err := a.compileChecked(ctx, src, slug)
 	if err != nil {
@@ -535,8 +536,8 @@ func landRowFrom(count int, summary tier1.SimSummary) landRow {
 }
 
 // landSummaryFrom reports the spread so a flat curve is visible as flat rather
-// than being read as a peak. `max` keeps the FIRST maximum, as Python's does,
-// so a tie names the lower land count.
+// than being read as a peak. The scan keeps the FIRST maximum -- the
+// recorded rule -- so a tie names the lower land count.
 func landSummaryFrom(slug string, d *deck.Deck, rows []landRow, games, seed int) landSummary {
 	lo, hi := rows[0].SpellsThroughT8, rows[0].SpellsThroughT8
 	best := rows[0]
@@ -709,17 +710,16 @@ func (a *API) sweep(ctx context.Context, slug string, d *deck.Deck, commander *s
 // 200-then-error shape.
 //
 // **A missing deck carries the BARE SLUG**, which is the one place the message
-// and the route's `detail` part company. `decks.DeckNotFound(slug)` has no
-// `__str__` of its own, so `str(exc)` is its single argument -- the slug --
-// while the 404's sentence is built by the route's exception handler. Go's
+// and the route's `detail` part company: the recorded job error is the
+// slug alone, while the 404's sentence is built at the route. Go's
 // `library.ErrNotFound` renders the sentence, which is right for the handler
 // and wrong here: a job's `error` becomes a JS `Error` in `lib/api.ts` and the
-// screen shows it, so the door said "no deck '['x']'" where Python said
-// "['x']".
+// screen shows it, so an unstripped error once said "no deck '['x']'" where
+// the record says "['x']".
 //
-// The same shape as `converse` handing the model `no deck 'x'` where Python
-// hands it the slug -- fixed there in Phase 6, found here on 2026-08-23 by
-// diffing the pair, live since Phase 5. It is unreachable from the app's own
+// The same shape as `converse` handing the model `no deck 'x'` where the
+// record hands it the slug -- fixed there first, found here on 2026-08-23 by
+// a wire diff. It is unreachable from the app's own
 // client (nothing offers a deck that is not on the shelf), which is exactly
 // why nothing had noticed.
 func deferredFailure(err error) jobs.Runner {
@@ -736,11 +736,12 @@ func progressOf(rep jobs.Progress) func(int, int) {
 
 func int64Ptr(v int) *int64 { n := int64(v); return &n }
 
-// pyComma is Python's `f"{n:,}"`.
-func pyComma(n int) string {
+// commaGrouped renders n with thousands separators (`20,000`), the way
+// every job label spells a games count.
+func commaGrouped(n int) string {
 	s := fmt.Sprintf("%d", n)
 	if n < 0 {
-		return "-" + pyComma(-n)
+		return "-" + commaGrouped(-n)
 	}
 	out := ""
 	for i, ch := range s {

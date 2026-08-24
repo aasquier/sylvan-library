@@ -16,13 +16,12 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// The artifacts oracle: `render_all` over every fixture deck, beside the exact
-// markdown Python writes for it (`tests/go_fixtures.py`, which writes
-// testdata/artifacts.json).
+// The artifacts oracle: `RenderAll` over every fixture deck, beside the exact
+// markdown recorded for it (testdata/artifacts.json, a frozen golden).
 //
 // Byte for byte, and in order, because both of those are the product: a primer
 // is markdown somebody reads and `moxfield.txt` is pasted into a website, and
-// `store` writes the files in the order `render_all` builds them and relies on
+// `Store` writes the files in the order `RenderAll` builds them and relies on
 // the snapshot being last.
 //
 // The date is taken from the oracle rather than from the clock. Every
@@ -63,12 +62,12 @@ func loadOracle(t *testing.T) oracle {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(o.Cases) == 0 {
-		t.Fatal("the oracle is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the oracle is empty; testdata/artifacts.json is a frozen golden")
 	}
 	return o
 }
 
-func TestRenderAllWritesWhatPythonWrites(t *testing.T) {
+func TestRenderAllWritesTheRecordedBytes(t *testing.T) {
 	o := loadOracle(t)
 	today, err := time.Parse("2006-01-02", o.Today)
 	if err != nil {
@@ -106,7 +105,7 @@ func TestRenderAllWritesWhatPythonWrites(t *testing.T) {
 					t.Fatalf("refused with the wrong kind of error: %v", err)
 				}
 				if got := Message(err); got != c.Error {
-					t.Errorf("refusal differs from Python's\n want %q\n  got %q",
+					t.Errorf("refusal differs from the golden's\n want %q\n  got %q",
 						c.Error, got)
 				}
 				return
@@ -115,15 +114,15 @@ func TestRenderAllWritesWhatPythonWrites(t *testing.T) {
 				t.Fatalf("rendering: %v", err)
 			}
 			if len(files) != len(c.Files) {
-				t.Fatalf("built %d files, Python built %d", len(files), len(c.Files))
+				t.Fatalf("built %d files, the golden holds %d", len(files), len(c.Files))
 			}
 			for i, want := range c.Files {
 				if files[i].Name != want.Name {
-					t.Fatalf("file %d is %q, Python's is %q -- the order is what "+
+					t.Fatalf("file %d is %q, the golden's is %q -- the order is what "+
 						"`Store` writes in", i, files[i].Name, want.Name)
 				}
 				if files[i].Text != want.Text {
-					t.Errorf("%s differs from Python's\n--- want ---\n%s\n--- got ---\n%s",
+					t.Errorf("%s differs from the golden\n--- want ---\n%s\n--- got ---\n%s",
 						want.Name, want.Text, files[i].Text)
 				}
 			}
@@ -237,30 +236,29 @@ func TestTheSnapshotIsNotADeliverable(t *testing.T) {
 	}
 }
 
-// Python's `str.title()`, which is the annotated list's fallback heading for a
+// `titleCase` is the annotated list's fallback heading for a
 // category the model does not declare -- and *not* the quick primer's, which
-// prints the raw word. Two fallbacks for one missing key is a fact about the
-// Python rather than a rule, so both are reproduced and this pins the odd one.
+// prints the raw word. Two fallbacks for one missing key is a recorded fact
+// rather than a rule, so both are reproduced and this pins the odd one.
 func TestAnInventedCategoryIsTitleCasedInOnePlaceOnly(t *testing.T) {
 	for word, want := range map[string]string{
 		"stax-piece": "Stax-Piece", "aggro-plan": "Aggro-Plan",
 		"win-con": "Win-Con", "aBc": "Abc", "a1b": "A1B", "": "",
 	} {
-		if got := pyTitle(word); got != want {
-			t.Errorf("pyTitle(%q) = %q, want %q", word, got, want)
+		if got := titleCase(word); got != want {
+			t.Errorf("titleCase(%q) = %q, want %q", word, got, want)
 		}
 	}
 }
 
 // The oracle has to be able to fail.
 //
-// `swaps.md`'s shopping-list total was a `+=` loop here and a bare `sum` in
-// Python until 2026-08-22, and neither is what the other interpreter does:
-// CPython 3.12 gave `sum()` over floats compensated accumulation where 3.11
-// adds left to right, so the loop reproduced 3.11 while the image runs 3.12.
-// The only case that priced anything was `every-category`, whose 12.5, 12.5,
+// `swaps.md`'s shopping-list total was a plain running total until
+// 2026-08-22, when the float-sum sweep moved it to `floats.Fsum` -- and this
+// byte-exact oracle could not have told the two apart. The only case that
+// priced anything was `every-category`, whose 12.5, 12.5,
 // 0.25 and 1.995 are exact until the last addition -- so the running total
-// *was* the correctly-rounded one and this byte-exact oracle passed either
+// *was* the correctly-rounded one and the oracle passed either
 // way. A green test with no way to go red.
 //
 // `half-cent` is the case cut for it: three prices summing to exactly 902.405,
@@ -317,7 +315,7 @@ func TestTheShoppingListSeparatesFsumFromARunningTotal(t *testing.T) {
 			c.Name, fmt.Sprintf("%.2f", naive), fmt.Sprintf("%.2f", exact))
 	}
 	if priced < 2 {
-		t.Fatalf("only %d cases price more than one card; regenerate with `python tests/go_fixtures.py`", priced)
+		t.Fatalf("only %d cases price more than one card; the golden has thinned", priced)
 	}
 	if differs == 0 {
 		t.Fatal("no case's prices render a different total under a running " +

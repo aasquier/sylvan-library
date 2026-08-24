@@ -13,9 +13,9 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
 
-// The importer's oracle: a paste, resolved against the same 21-card pool
-// Python resolved it against, beside the draft `deck.yaml` Python wrote
-// (`tests/go_fixtures.py`, which writes testdata/imports.json).
+// The importer's oracle: a paste, resolved against the 21-card pool, beside
+// the recorded draft `deck.yaml` for it (testdata/imports.json, a frozen
+// golden).
 //
 // The pool is the load-bearing half. `canonicalName` corrects casing and keeps
 // a double-faced card written by its front face, `buildEntries` files a card
@@ -46,7 +46,7 @@ type line struct {
 	Text   string `json:"text"`
 }
 
-func TestBuildDeckWritesWhatPythonWrites(t *testing.T) {
+func TestBuildDeckWritesTheRecordedDraft(t *testing.T) {
 	raw, err := os.ReadFile("testdata/imports.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
@@ -56,7 +56,7 @@ func TestBuildDeckWritesWhatPythonWrites(t *testing.T) {
 		t.Fatalf("decoding the oracle: %v", err)
 	}
 	if len(cases) == 0 {
-		t.Fatal("the oracle is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the oracle is empty; testdata/imports.json is a frozen golden and should never be")
 	}
 
 	cards := pooltest.Open(t)
@@ -79,27 +79,27 @@ func TestBuildDeckWritesWhatPythonWrites(t *testing.T) {
 
 			if c.Refused != "" {
 				if err == nil {
-					t.Fatalf("Python refused with %q; this built a deck", c.Refused)
+					t.Fatalf("the corpus refused with %q; this built a deck", c.Refused)
 				}
 				if !IsRefused(err) {
 					t.Fatalf("refused with the wrong kind of error: %v", err)
 				}
 				if err.Error() != c.Refused {
-					t.Errorf("refusal is\n  %s\nPython's is\n  %s", err.Error(), c.Refused)
+					t.Errorf("refusal is\n  %s\nthe corpus says\n  %s", err.Error(), c.Refused)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("Python built a deck; this refused: %v", err)
+				t.Fatalf("the corpus built a deck; this refused: %v", err)
 			}
 
 			// The header carries the day it was written. Substituting our own
-			// date proves the format as well as the value: a Go side that
-			// wrote it differently would leave the literal date in place and
-			// the comparison below would show it.
+			// date proves the format as well as the value: a writer that
+			// spelled it differently would leave the literal date in place
+			// and the comparison below would show it.
 			got := strings.Replace(report.YAML, time.Now().Format("2006-01-02"), "DATE", 1)
 			if got != c.YAML {
-				t.Errorf("the file differs from Python's\n--- want ---\n%s\n--- got ---\n%s",
+				t.Errorf("the file differs from the recorded draft\n--- want ---\n%s\n--- got ---\n%s",
 					c.YAML, got)
 			}
 			checkStrings(t, "unknown", report.Unknown, c.Unknown)
@@ -107,7 +107,7 @@ func TestBuildDeckWritesWhatPythonWrites(t *testing.T) {
 			checkLines(t, "unreadable", report.Unreadable, c.Unreadable)
 			checkLines(t, "skipped", report.Skipped, c.Skipped)
 			if report.NeedsRationale() != c.NeedsRationale {
-				t.Errorf("needs_rationale %d, Python %d",
+				t.Errorf("needs_rationale %d, the corpus says %d",
 					report.NeedsRationale(), c.NeedsRationale)
 			}
 		})
@@ -117,11 +117,11 @@ func TestBuildDeckWritesWhatPythonWrites(t *testing.T) {
 func checkStrings(t *testing.T, what string, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {
-		t.Fatalf("%s: %v, Python %v", what, got, want)
+		t.Fatalf("%s: %v, the corpus says %v", what, got, want)
 	}
 	for i := range got {
 		if got[i] != want[i] {
-			t.Errorf("%s %d is %q, Python %q", what, i, got[i], want[i])
+			t.Errorf("%s %d is %q, the corpus says %q", what, i, got[i], want[i])
 		}
 	}
 }
@@ -129,11 +129,11 @@ func checkStrings(t *testing.T, what string, got, want []string) {
 func checkLines(t *testing.T, what string, got []decklist.Line, want []line) {
 	t.Helper()
 	if len(got) != len(want) {
-		t.Fatalf("%s: %d, Python %d", what, len(got), len(want))
+		t.Fatalf("%s: %d, the corpus says %d", what, len(got), len(want))
 	}
 	for i := range got {
 		if got[i].LineNo != want[i].LineNo || got[i].Text != want[i].Text {
-			t.Errorf("%s %d is %+v, Python %+v", what, i, got[i], want[i])
+			t.Errorf("%s %d is %+v, the corpus says %+v", what, i, got[i], want[i])
 		}
 	}
 }

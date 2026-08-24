@@ -561,8 +561,7 @@ func TestARefusedToolIsATurnAndNotTheEnd(t *testing.T) {
 	}
 	body := api.raw[1]
 	if !strings.Contains(body, "ToolNotAllowed") {
-		t.Errorf("the model was not told the Python class name it would have "+
-			"been told: %s", body)
+		t.Errorf("the model was not told the recorded fault name it is owed: %s", body)
 	}
 	if !strings.Contains(body, `"is_error":true`) {
 		t.Error("a refused tool was handed back as a success")
@@ -588,8 +587,8 @@ func TestAMissingDeckIsRecoverableAndNamesTheSlug(t *testing.T) {
 		t.Fatalf("a missing deck ended the conversation: %v", err)
 	}
 	if body := api.raw[1]; !strings.Contains(body, "DeckNotFound: no-such-deck") {
-		t.Errorf("want `DeckNotFound: no-such-deck`, which is what Python's "+
-			"`f\"{type(exc).__name__}: {exc}\"` produces for `DeckNotFound(slug)`.\ngot: %s", body)
+		t.Errorf("want `DeckNotFound: no-such-deck` -- the recorded fault name, "+
+			"then the bare slug.\ngot: %s", body)
 	}
 }
 
@@ -649,8 +648,7 @@ func TestCacheReadsAreCountedBesideInputTokensAndNotInside(t *testing.T) {
 }
 
 // An API failure records nothing: the roll-up counts conversations, and a
-// request the API refused is not one. (Python reaches this by letting the SDK's
-// exception propagate before its `finish` runs.)
+// request the API refused is not one.
 func TestAnAPIFailureRecordsNothing(t *testing.T) {
 	api := &scriptedAPI{replies: []string{"!401"}}
 	api.start(t)
@@ -661,8 +659,8 @@ func TestAnAPIFailureRecordsNothing(t *testing.T) {
 		t.Fatal("a 401 was not reported")
 	}
 	// And it is reported in the words somebody reads at 2am -- as the whole
-	// of `err.Error()`, not merely inside it. Python's `str(exc)` for a
-	// failed call is `explain(exc)` and nothing else; a route's 502 and a
+	// of `err.Error()`, not merely inside it. The recorded failure text is
+	// the explanation and nothing else; a route's 502 and a
 	// job's error both render Explain(err) and would hide a prefix here, so
 	// this is the one place a stray "mode: " on the error itself is visible
 	// -- a mutation run found the assertion missing.
@@ -718,8 +716,8 @@ func TestOnTurnFiresAsEachTurnBeginsAndIsACeiling(t *testing.T) {
 }
 
 // A zero-value Stance is one struct literal away, and its scope paragraph is
-// simply missing -- a real change to what the model is told, visible nowhere.
-// Python gets a KeyError here; a Go map lookup answers "".
+// simply missing -- a real change to what the model is told, visible nowhere,
+// because a Go map lookup answers "" for an unknown scope.
 func TestAZeroValueStanceIsRefusedRatherThanRenderingAnEmptyScope(t *testing.T) {
 	api := &scriptedAPI{replies: []string{
 		reply{stop: "end_turn", content: textBlock("hi")}.json(),
@@ -742,12 +740,13 @@ func TestAZeroValueStanceIsRefusedRatherThanRenderingAnEmptyScope(t *testing.T) 
 	}
 }
 
-// Turn's json tags are Python's field names, and a mode's payload is built
+// Turn's json tags are the recorded field names, and a mode's payload is
+// built
 // from them. They are pinned here rather than left as decoration: a tag that
 // nothing marshals is a promise nobody is keeping, and the last time a type was
 // proved correct without going through encoding/json it reached the wire as
 // something else entirely.
-func TestATurnKeepsPythonsFieldNames(t *testing.T) {
+func TestATurnKeepsTheRecordedFieldNames(t *testing.T) {
 	raw, err := json.Marshal(Turn{
 		Mode: "m", Model: "claude-sonnet-5", StopReason: "end_turn", Text: "t",
 		ToolCalls:       []ToolCall{{Tool: "get_deck", Arguments: map[string]any{"slug": "gyome"}}},
