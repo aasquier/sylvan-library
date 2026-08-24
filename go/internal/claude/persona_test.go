@@ -6,13 +6,25 @@ import (
 	"testing"
 )
 
-// TestTheSevenVoicesAreTheRecordedOnes reads the embedded roster back and
-// checks it is the recorded shape — seven voices, plain first, exactly one
-// of them dealing.
-func TestTheSevenVoicesAreTheRecordedOnes(t *testing.T) {
+// TestTheVoicesAreTheRecordedOnes reads the embedded roster back and checks
+// it is the recorded shape — plain first, exactly one of them dealing, and
+// every costume carrying a voice long enough to be one.
+//
+// **No count.** This test began as "expected seven voices" and the number was
+// wrong within a session of a voice being added, which is `modes.go`'s lesson
+// arriving a second time: a count written into source is a claim to re-check
+// rather than a fact, and #257 is the scar where a hand-written list of modes
+// silently lost one. What a count was really guarding — an embed that
+// truncated, or a persona present in one of the file's two lists and missing
+// from the other — is covered below by the roster's key-by-key agreement with
+// `PersonaKeys` and by the length floor on each voice. The roster is meant to
+// grow (ADR 21 names three more voices), and a test that has to be edited
+// every time it does is a test nobody reads.
+func TestTheVoicesAreTheRecordedOnes(t *testing.T) {
 	t.Parallel()
-	if len(PersonaKeys) != 7 {
-		t.Fatalf("expected seven voices, got %d: %v", len(PersonaKeys), PersonaKeys)
+	if len(PersonaKeys) < 2 {
+		t.Fatalf("a grid needs the plain tile and at least one costume; got %v",
+			PersonaKeys)
 	}
 	if PersonaKeys[0] != "plain" || DefaultPersona != "plain" {
 		t.Errorf("the plain voice must open the grid and be the default; got %v / %q",
