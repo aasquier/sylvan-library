@@ -1873,6 +1873,12 @@ search: no-text, WITHOUT price subquery                          median    38.40
 | `GET /api/cards/search?q=goblin` | 43.8ms | 41.1ms | 40.4ms |
 | `GET /api/cards/search` (no text) | — | 87.7ms | **53.1ms** |
 
+  - **Do not read the health win as something a visitor can feel.** 2.4ms off
+    a 172ms round trip is invisible from outside, and the live table below
+    will not move. What it buys is *server work per request* on a machine with
+    two shared cores that answers a platform health check on a fixed cadence
+    forever: six DuckDB statements a call, gone. A win measured locally and
+    quoted as a user-facing speed-up would be this facet's own worst habit.
   - **`/api/decks` is unmeasured this run and that is a gap, not a fact.**
     The laptop's library is empty (ADR 30: the decks live on the instance's
     volume), so the shelf route answers in 0.7ms with nothing to build. The
