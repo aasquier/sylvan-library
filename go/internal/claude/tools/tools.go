@@ -1,8 +1,8 @@
-// Package tools is `mtglab/claude/tools.py`: the read-only surface a mode may
+// Package tools is the read-only surface a mode may
 // reach, and the door that decides what it actually gets.
 //
-// Two halves, deliberately kept apart. The **schemas** are generated data
-// (`data/tools.json`, rendered from the Python registry): a tool description
+// Two halves, deliberately kept apart. The **schemas** are recorded data
+// (`data/tools.json`): a tool description
 // is prescriptive prose about *when to call*, and an under-described tool is
 // the most common reason a model answers from recall instead — which in this
 // codebase is the exact failure rule 1 exists to prevent. Those bytes are
@@ -55,7 +55,7 @@ type Tool struct {
 	TakesSource bool `json:"takes_source"`
 
 	// fn is set by the registry at construction, never by the data. A tool
-	// whose schema crossed but whose function nobody wired is a load-time
+	// whose schema exists but whose function nobody wired is a load-time
 	// failure, not a runtime surprise.
 	fn Handler
 }
@@ -84,15 +84,15 @@ type ErrNotAllowed struct{ Msg string }
 
 func (e *ErrNotAllowed) Error() string { return e.Msg }
 
-// PyName is the Python class this error stands for.
+// WireName is the fault name this error wears on the wire to the model.
 //
 // `converse` hands a recoverable tool failure back to the model as
-// `<ClassName>: <message>`, which is `f"{type(exc).__name__}: {exc}"` in
-// Python. The name therefore reaches the model and has to be Python's, not
-// Go's -- and declaring it on the error is what makes "this failure is
-// recoverable" a property of the error rather than a list `converse` keeps.
+// `<Name>: <message>`. The name therefore reaches the model and is a
+// recorded token, not this type's Go name -- and declaring it on the error
+// is what makes "this failure is recoverable" a property of the error rather
+// than a list `converse` keeps.
 // An error type without this method is a fault the loop refuses to paper over.
-func (e *ErrNotAllowed) PyName() string { return "ToolNotAllowed" }
+func (e *ErrNotAllowed) WireName() string { return "ToolNotAllowed" }
 
 // ErrArgumentsRejected is arguments that do not match the schema, checked
 // before dispatch.
@@ -100,24 +100,23 @@ type ErrArgumentsRejected struct{ Msg string }
 
 func (e *ErrArgumentsRejected) Error() string { return e.Msg }
 
-// PyName is the Python class this error stands for. See ErrNotAllowed.PyName.
-func (e *ErrArgumentsRejected) PyName() string { return "ToolArgumentsRejected" }
+// WireName is this error's recorded fault name. See ErrNotAllowed.WireName.
+func (e *ErrArgumentsRejected) WireName() string { return "ToolArgumentsRejected" }
 
-// ErrDeckNotFound is `decks.source.DeckNotFound`: the slug named no deck.
+// ErrDeckNotFound is a slug that named no deck.
 //
-// **Its message is the bare slug**, which looks wrong until you read the
-// Python: `raise DeckNotFound(slug)` puts nothing else in the exception, so
-// `str(exc)` is the slug alone and the model is handed `DeckNotFound: gyome`.
-// The name still reaches the model -- which is the whole of what the refusal
-// owes it, since the recovery is to call `list_decks` and ask again -- and
-// keeping the two runtimes' words identical is worth more than a prettier
-// sentence in one of them.
+// **Its message is the bare slug**, which looks wrong and is the recorded
+// shape: the fault carries nothing but the slug, so the model is handed
+// `DeckNotFound: gyome`. The name still reaches the model -- which is the
+// whole of what the refusal owes it, since the recovery is to call
+// `list_decks` and ask again -- and keeping the recorded words is worth
+// more than a prettier sentence.
 type ErrDeckNotFound struct{ Slug string }
 
 func (e *ErrDeckNotFound) Error() string { return e.Slug }
 
-// PyName is the Python class this error stands for. See ErrNotAllowed.PyName.
-func (e *ErrDeckNotFound) PyName() string { return "DeckNotFound" }
+// WireName is this error's recorded fault name. See ErrNotAllowed.WireName.
+func (e *ErrDeckNotFound) WireName() string { return "DeckNotFound" }
 
 var registry map[string]*Tool
 
@@ -144,7 +143,7 @@ func init() {
 	registerHandlers()
 }
 
-// Register wires a handler to a schema that already crossed.
+// Register wires a handler to a schema the embedded data already carries.
 //
 // Separate from the data on purpose: the schema is prose and must not drift,
 // the handler is a call the boundary analysis has to be able to see. A name
@@ -154,7 +153,7 @@ func Register(name string, fn Handler) {
 	t, ok := registry[name]
 	if !ok {
 		panic(fmt.Sprintf("claude/tools: no schema for %q; the registry is "+
-			"generated from Python and this name is not in it", name))
+			"the embedded data/tools.json and this name is not in it", name))
 	}
 	if t.fn != nil {
 		panic(fmt.Sprintf("claude/tools: %q is already wired", name))
@@ -177,7 +176,7 @@ func Schemas(names []string) ([]map[string]any, error) {
 	picked := make([]string, 0, len(chosen))
 	for _, name := range chosen {
 		if _, ok := registry[name]; !ok {
-			return nil, &ErrNotAllowed{Msg: fmt.Sprintf("no such tool: %s", pyRepr(name))}
+			return nil, &ErrNotAllowed{Msg: fmt.Sprintf("no such tool: %s", quoted(name))}
 		}
 		picked = append(picked, name)
 	}
@@ -223,18 +222,18 @@ func Run(ctx context.Context, name string, arguments map[string]any, deps Deps, 
 	if !ok {
 		return nil, &ErrNotAllowed{Msg: fmt.Sprintf(
 			"%s is not an available tool. This surface is read-only: "+
-				"available tools are %s.", pyRepr(name), strings.Join(Names, ", "))}
+				"available tools are %s.", quoted(name), strings.Join(Names, ", "))}
 	}
 	if allowed != nil && !contains(allowed, name) {
 		offered := append([]string{}, allowed...)
 		sort.Strings(offered)
 		return nil, &ErrNotAllowed{Msg: fmt.Sprintf(
 			"%s is not offered by this mode. Its tools are %s.",
-			pyRepr(name), strings.Join(offered, ", "))}
+			quoted(name), strings.Join(offered, ", "))}
 	}
 	if t.fn == nil {
 		return nil, &ErrNotAllowed{Msg: fmt.Sprintf(
-			"%s has a schema but no handler; nothing is wired to it", pyRepr(name))}
+			"%s has a schema but no handler; nothing is wired to it", quoted(name))}
 	}
 
 	args := map[string]any{}
@@ -285,9 +284,10 @@ func contains(haystack []string, needle string) bool {
 	return false
 }
 
-// pyRepr is repr() for the refusal sentences, which Python builds with `!r`
-// and which reach the model as tool-result text.
-func pyRepr(s string) string {
+// quoted renders a name as a quoted literal for the refusal sentences, which
+// reach the model as tool-result text: single quotes unless the name holds a
+// single quote and no double quote.
+func quoted(s string) string {
 	if strings.Contains(s, "'") && !strings.Contains(s, `"`) {
 		return `"` + s + `"`
 	}

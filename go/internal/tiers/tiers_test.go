@@ -75,9 +75,9 @@ func TestNoLabelIsAModelId(t *testing.T) {
 	}
 }
 
-// TestTheDefaultTierIsAlwaysResolvable is Python's module-level assertion:
-// `resolve` returning nothing for a key it was told is always valid would be a
-// very quiet bug.
+// TestTheDefaultTierIsAlwaysResolvable pins the package's own boot-time
+// assertion: `Resolve` returning nothing for a key it was told is always
+// valid would be a very quiet bug.
 func TestTheDefaultTierIsAlwaysResolvable(t *testing.T) {
 	if _, ok := byKey[DefaultKey]; !ok {
 		t.Fatalf("the default tier %q is not in the table", DefaultKey)

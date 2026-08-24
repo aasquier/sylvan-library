@@ -32,7 +32,7 @@ func StanceFromObj(obj any) (Stance, error) {
 	case json.RawMessage:
 		return stanceFromRaw(v)
 	}
-	return Stance{}, fmt.Errorf("cannot read a stance from %s", pyTypeName(obj))
+	return Stance{}, fmt.Errorf("cannot read a stance from %s", typeName(obj))
 }
 
 func stanceFromMap(m map[string]any) (Stance, error) {
@@ -44,12 +44,12 @@ func stanceFromMap(m map[string]any) (Stance, error) {
 	}
 	if len(unknown) > 0 {
 		sort.Strings(unknown)
-		// Python interpolates the sorted *list*, so the text carries Python's
-		// list repr — square brackets, single-quoted elements, ", " between —
-		// and this string reaches a 422 body.
+		// The refusal interpolates the sorted axes as a rendered list —
+		// square brackets, single-quoted elements, ", " between — and the
+		// string reaches a 422 body, so the punctuation is the recorded shape.
 		quoted := make([]string, len(unknown))
 		for i, u := range unknown {
-			quoted[i] = wire.PyRepr(u)
+			quoted[i] = wire.Quote(u)
 		}
 		return Stance{}, fmt.Errorf("[%s] are not stance axes; expected %s",
 			strings.Join(quoted, ", "), strings.Join(Axes, ", "))
@@ -62,10 +62,11 @@ func stanceFromMap(m map[string]any) (Stance, error) {
 		}
 		level, ok := raw.(string)
 		if !ok {
-			// Python's replace() sets the non-string and __post_init__ then
-			// refuses it by value, naming the axis and repr-ing what it got.
+			// A non-string level is refused by value, naming the axis and
+			// rendering what arrived as a literal — quoting included, since
+			// the sentence is a recorded shape.
 			return Stance{}, fmt.Errorf("%s is not a %s level; expected one of %s",
-				pyReprAny(raw), axis, strings.Join(levels[axis], ", "))
+				literalAny(raw), axis, strings.Join(levels[axis], ", "))
 		}
 		out.set(axis, level)
 	}
@@ -77,12 +78,12 @@ func stanceFromMap(m map[string]any) (Stance, error) {
 
 // stanceFromRaw decodes with UseNumber so that 7 and 7.5 stay distinguishable.
 //
-// They must be. Python's json module gives `7` an int and `7.5` a float, and
-// the refusal names the type — "cannot read a stance from int" against
-// "...from float". Go's default decoder makes both a float64 and the two
-// sentences collapse into one. The corpus records both, which is how this was
-// found rather than shipped: a plain json.Unmarshal passes every structural
-// test and is wrong on exactly one character of one error string.
+// They must be. The refusal names the type from the literal — `7` earns
+// "cannot read a stance from int" and `7.5` "...from float". Go's default
+// decoder makes both a float64 and the two sentences collapse into one. The
+// corpus records both, which is how this was found rather than shipped: a
+// plain json.Unmarshal passes every structural test and is wrong on exactly
+// one character of one error string.
 func stanceFromRaw(raw json.RawMessage) (Stance, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
@@ -92,19 +93,19 @@ func stanceFromRaw(raw json.RawMessage) (Stance, error) {
 	dec.UseNumber()
 	var decoded any
 	if err := dec.Decode(&decoded); err != nil {
-		return Stance{}, fmt.Errorf("cannot read a stance from %s", pyTypeName(raw))
+		return Stance{}, fmt.Errorf("cannot read a stance from %s", typeName(raw))
 	}
 	return StanceFromObj(decoded)
 }
 
-// pyTypeName spells a decoded JSON value the way Python's type(obj).__name__
-// does, because the refusal text reaches a 422 body and the corpus holds it.
+// typeName spells a decoded JSON value in the refusals' own type vocabulary
+// — NoneType, bool, int, float, str, list, dict — because the refusal text
+// reaches a 422 body and the corpus holds it.
 //
-// json.Number carries its own literal, so int and float are told apart the way
-// Python's json module tells them apart: by whether the source text had a
-// decimal point or an exponent, never by whether the value happens to be
-// integral. `7.0` is a float in both languages.
-func pyTypeName(obj any) string {
+// json.Number carries its own literal, so int and float are told apart by
+// the source text: whether it had a decimal point or an exponent, never
+// whether the value happens to be integral. `7.0` is a float.
+func typeName(obj any) string {
 	switch v := obj.(type) {
 	case nil:
 		return "NoneType"
@@ -129,10 +130,11 @@ func pyTypeName(obj any) string {
 	return "object"
 }
 
-// pyReprAny is repr() for the handful of decoded JSON types a stance mapping
-// can hold. Only scalars reach it — a nested list or object under an axis key
-// is refused by value like anything else, and Python would print its repr.
-func pyReprAny(v any) string {
+// literalAny renders one decoded scalar as a literal for a refusal sentence.
+// Only scalars get the exact rendering — a nested list or object under an
+// axis key is refused by value like anything else, through the `%v` arm
+// rather than the full literal rendering, a residue the corpus never reaches.
+func literalAny(v any) string {
 	switch x := v.(type) {
 	case nil:
 		return "None"
@@ -142,7 +144,7 @@ func pyReprAny(v any) string {
 		}
 		return "False"
 	case string:
-		return wire.PyRepr(x)
+		return wire.Quote(x)
 	case json.Number:
 		return x.String()
 	}
@@ -152,11 +154,10 @@ func pyReprAny(v any) string {
 // ErrStanceRejected marks a refusal that came from reading the caller's own
 // stance rather than from anything the conversation did.
 //
-// It exists because a route has to answer differently: `api/app.py` maps a
-// malformed stance to 422 and a failed call to 502, and it can do that without
-// a sentinel only because `stance.resolve` is a separate statement in Python,
-// raising ValueError before `converse` is ever reached. A mode's orchestration
-// here does both in one function, so the difference has to travel on the error.
+// It exists because a route has to answer differently: a malformed stance is
+// a 422 and a failed call is a 502, and a mode's orchestration does both in
+// one function -- reading the stance and running the conversation -- so the
+// difference has to travel on the error rather than on which line failed.
 //
 // **Wrapped in `Resolve` rather than in each mode**, so the sixth mode inherits
 // it the way it inherits everything else. A rule enforced by nothing drifts,
@@ -164,8 +165,8 @@ func pyReprAny(v any) string {
 // typo in a client's stance, which reads as "the model broke" rather than "you
 // sent nonsense".
 //
-// The message is the parser's own, unchanged -- the stance corpus compares
-// refusal text against Python's, so this may add a category and never a word.
+// The message is the parser's own, unchanged -- the stance corpus pins the
+// refusal text byte for byte, so this may add a category and never a word.
 var ErrStanceRejected = errors.New("the stance could not be read")
 
 // stanceRejection carries a parse refusal under ErrStanceRejected while
@@ -186,7 +187,7 @@ func (e *stanceRejection) Unwrap() error { return e.err }
 // requested may be a Stance, a preset name, a partial mapping, or nil — nil
 // means "use the deck's default", which is how a UI that has never been
 // touched still behaves sensibly. A nil deck with a nil request is Off, not
-// Consultant: Python's `default_for(deck) if deck is not None else OFF`.
+// Consultant: the deck default exists only when there is a deck to read.
 func Resolve(requested any, deck DeckStatused, limit *Stance) (Stance, error) {
 	var asked Stance
 	if requested == nil {
@@ -209,9 +210,9 @@ func Resolve(requested any, deck DeckStatused, limit *Stance) (Stance, error) {
 	return Clamp(asked, ceil), nil
 }
 
-// AxisReadout is one axis of a described stance. A struct in Python's key
-// order, never a map: encoding/json sorts a map's keys and this goes on the
-// wire beside a payload the client renders in order.
+// AxisReadout is one axis of a described stance. A struct in the recorded
+// key order, never a map: encoding/json sorts a map's keys and this goes on
+// the wire beside a payload the client renders in order.
 type AxisReadout struct {
 	Axis     string   `json:"axis"`
 	Question string   `json:"question"`
@@ -223,9 +224,9 @@ type AxisReadout struct {
 // StanceReadout is a stance rendered for a UI: the axes, their levels, and
 // what each means.
 //
-// Preset is a *string so that "no preset matches" marshals as null rather than
-// as "", which is what Python's `next(..., None)` produces and what the client
-// checks for.
+// Preset is a *string so that "no preset matches" marshals as null rather
+// than as "" -- null is the recorded shape, and it is what the client checks
+// for.
 type StanceReadout struct {
 	Preset      *string       `json:"preset"`
 	AllowsCalls bool          `json:"allows_calls"`

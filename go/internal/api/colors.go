@@ -39,10 +39,10 @@ type champion struct {
 // combination is `GET /api/colors/{key}` -- `service.combination_detail`:
 // one of the 32, with its champions and signature cards resolved through the
 // pool and **dropped and counted** when a name does not resolve, plus the
-// count of cards whose identity is exactly this combination. `key_for`
-// canonicalises and collapses anything that is not WUBRG to "C", so an
+// count of cards whose identity is exactly this combination. The
+// canonicaliser collapses anything that is not WUBRG to "C", so an
 // unknown key would be answered by Colourless; the spelling is checked
-// afterwards, exactly as Python checks it.
+// afterwards, deliberately -- the recorded order of the two checks.
 func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 	upper := strings.ToUpper(key)
@@ -72,7 +72,7 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !found {
-		wire.Detail(w, http.StatusNotFound, "no colour combination "+wire.PyRepr(key))
+		wire.Detail(w, http.StatusNotFound, "no colour combination "+wire.Quote(key))
 		return
 	}
 	type base struct {
@@ -150,10 +150,10 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 	wire.JSON(w, http.StatusOK, out)
 }
 
-// lore is `GET /api/lore` -- `service.lore_shelves`: the fact volumes, with
+// lore is `GET /api/lore`: the fact volumes, with
 // every named card resolved through the pool and dropped and counted when it
 // does not resolve; with no pool at all the prose answers whole, every fact
-// complete without its cards, which is a writing rule in `lore.py`.
+// written to be complete without its cards -- the reference's writing rule.
 func (a *API) lore(w http.ResponseWriter, r *http.Request) {
 	type fact struct {
 		Key    string           `json:"key"`

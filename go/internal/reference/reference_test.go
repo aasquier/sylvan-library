@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestTheProseIsWhatThePythonModulesHold(t *testing.T) {
-	// The counts a reader of colors.py, glossary.py and lore.py knows, so a
-	// truncated render cannot embed quietly.
+func TestTheProseHoldsItsRecordedShape(t *testing.T) {
+	// The counts the embedded files have always held, so a truncated file
+	// cannot embed quietly.
 	if n := len(Colors().Combinations); n != 32 {
 		t.Fatalf("%d combinations, want 32 (one colourless, five mono, ten pairs, ten triples, five quads, one five)", n)
 	}
@@ -70,9 +70,9 @@ func TestEveryCombinationIsAddressable(t *testing.T) {
 }
 
 func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
-	// The raw payload is the embedded document with insignificant whitespace
-	// removed and nothing else -- so it parses back to the same value, and
-	// it is what FastAPI's separators would have written.
+	// The raw payload is the embedded document with insignificant
+	// whitespace removed and nothing else -- so it parses back to the same
+	// value, and the bytes are the recorded wire shape.
 	for name, raw := range map[string][]byte{"colors": ColorsJSON(), "glossary": GlossaryJSON(), "themes": ThemesJSON()} {
 		if !json.Valid(raw) {
 			t.Fatalf("%s: not JSON", name)
@@ -85,11 +85,11 @@ func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
 			t.Fatalf("%s: not compact", name)
 		}
 		if strings.Contains(string(raw), `<`) {
-			t.Fatalf("%s: HTML-escaped; FastAPI never escapes", name)
+			t.Fatalf("%s: HTML-escaped; the wire never escapes", name)
 		}
 	}
-	// The key order is the route's: `colors` first in the taxonomy, as
-	// `service.color_taxonomy` builds it.
+	// The key order is the route's: `colors` first in the taxonomy, as the
+	// recorded payload opens.
 	if !strings.HasPrefix(string(ColorsJSON()), `{"colors":[{"code":"W"`) {
 		t.Fatalf("colors.json does not open as the route does: %.60s", ColorsJSON())
 	}
@@ -111,7 +111,8 @@ func TestTheModelVocabularyIsWhatTheGateSpeaks(t *testing.T) {
 	}
 	if !IsSingletonExempt("forest") || !IsSingletonExempt("snow-covered wastes") == true || IsSingletonExempt("Forest") {
 		// snow-covered wastes does not exist and is not exempt; the
-		// lookup is on the lowered name exactly as Python's set is.
+		// lookup is on the lowered name, exactly as the vocabulary is
+		// stored.
 		if !IsSingletonExempt("forest") || IsSingletonExempt("Forest") {
 			t.Fatal("singleton exemptions")
 		}

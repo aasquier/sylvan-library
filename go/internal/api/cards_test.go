@@ -12,7 +12,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 )
 
-// call runs one ported route by method and path, with an optional body,
+// call runs one route by method and path, with an optional body,
 // and decodes the JSON answer. The route is chosen the way the door chooses
 // it -- segments matched literal for literal, a parameter capturing one,
 // the most specific pattern first -- so a test reaches the handler a real
@@ -76,9 +76,9 @@ func callCtx(t *testing.T, a *API, ctx context.Context, method, target, body str
 	}
 	req := httptest.NewRequest(method, target, strings.NewReader(body)).WithContext(ctx)
 	if body != "" {
-		// Starlette parses a body as JSON only when the content type says so,
-		// and hands the raw bytes through as a *string* otherwise -- so a
-		// request without this header is a `dict_type` refusal on both sides,
+		// A body is parsed as JSON only when the content type says so,
+		// and the raw bytes stand as a *string* otherwise -- so a
+		// request without this header is a `dict_type` refusal,
 		// however well-formed the JSON is. Every real client sends it; a rig
 		// that did not was asking a question no client asks, and it hid the
 		// gap `readBody` had until 2026-08-22.
@@ -172,7 +172,7 @@ func TestSearchAnswersAsServiceSearchCardsDoes(t *testing.T) {
 	}
 }
 
-func TestSearchRefusesBadParametersAsFastAPIDoes(t *testing.T) {
+func TestSearchRefusesBadParametersWithTheValidationList(t *testing.T) {
 	a := New(Config{Pool: pooltest.Open(t)})
 	for _, target := range []string{"/api/cards/search?limit=abc", "/api/cards/search?limit=0",
 		"/api/cards/search?limit=201", "/api/cards/search?cmc_max=tall", "/api/cards/search?price_max=x",
@@ -203,7 +203,7 @@ func TestSearchRefusesBadParametersAsFastAPIDoes(t *testing.T) {
 	if len(detail) != 2 || detail[0].(map[string]any)["loc"].([]any)[1] != "cmc_max" {
 		t.Fatalf("two errors: %v", detail)
 	}
-	// pydantic's spellings of a bool.
+	// The recorded spellings of a bool.
 	for _, target := range []string{"/api/cards/search?identity_exact=on", "/api/cards/search?identity_exact=OFF",
 		"/api/cards/search?identity_exact=t", "/api/cards/search?identity_exact=No"} {
 		if status, _, raw := call(t, a, "GET", target, ""); status != 200 {
@@ -287,7 +287,7 @@ func TestCombinationResolvesThroughThePoolAndDropsWhatItLacks(t *testing.T) {
 		}
 	}
 	// Spellings: lower case and reversed order land; a stray C is ignored;
-	// anything else is the 404 with Python's repr in it.
+	// anything else is the 404 with the quoted literal in it.
 	for _, key := range []string{"gw", "WG", "wgc", "c", "C"} {
 		if status, _, raw := call(t, a, "GET", "/api/colors/"+key, ""); status != 200 {
 			t.Errorf("%s: %d %s", key, status, raw)
@@ -336,7 +336,7 @@ func TestLoreResolvesNamesAndCountsTheDropped(t *testing.T) {
 	}
 }
 
-func TestWithoutAPoolTheAnswersDegradeAsPythonsDo(t *testing.T) {
+func TestWithoutAPoolTheAnswersDegradeToTheRecordedShapes(t *testing.T) {
 	a := New(Config{})
 	if _, body, _ := call(t, a, "GET", "/api/cards/search?q=sol", ""); body["total"] != float64(0) || body["message"] == nil {
 		t.Fatalf("search: %v", body)

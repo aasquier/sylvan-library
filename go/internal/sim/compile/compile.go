@@ -1,14 +1,14 @@
-// Package compile is `sim/compile.py`: a deck file plus pool records become
+// Package compile turns a deck file plus pool records into
 // the `sim.Card`s every tier is handed, and a report saying what the pool
 // could not resolve.
 //
-// It is the piece `go/internal/sim` was written around -- that package's
-// comment says "`sim/compile.py` is what builds these, and when it is ported
-// it lands here" -- and it is the only place in the simulator where a card's
+// It is the piece `internal/sim` was written around -- that package's
+// comment says `sim/compile` is what builds these -- and it is the only
+// place in the simulator where a card's
 // *text* is read. Everything above it reasons about `sim.Card`; everything
 // below it is arithmetic. So a wrong answer here is wrong in every tier at
-// once, which is why Python's comments about the three "confidently wrong for
-// every deck" bugs travelled across with the code and are kept below.
+// once, which is why the comments about the three "confidently wrong for
+// every deck" bugs are kept below, at the functions they belong to.
 //
 // # The two behaviours that are contract, not detail
 //
@@ -46,7 +46,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 )
 
-// NothingToSimulate is `compile.NothingToSimulate`: the deck compiled to no
+// NothingToSimulate is a deck that compiled to no
 // cards at all, so there is nothing to measure.
 //
 // Not the same failure as `PoolRequired`, which is "this machine has no card
@@ -71,20 +71,20 @@ func (e *NothingToSimulate) Error() string {
 		"simulate (the deck file declares %d)", e.Slug, e.Declared)
 }
 
-// PoolRequired is `compile.PoolRequired`: a simulation was asked for without
+// PoolRequired is a simulation asked for without
 // the card pool.
 //
 // Mana production cannot be inferred from a deck file alone, and guessing
-// would produce numbers that look authoritative and are not. In Python this
-// was once `sys.exit` -- fine for the CLI, and a confusing way to fail from
-// the worker thread that also reached it.
+// would produce numbers that look authoritative and are not. This
+// was once a process exit -- fine for the CLI, and a confusing way to fail
+// from the worker thread that also reached it.
 type PoolRequired struct{}
 
 func (e *PoolRequired) Error() string {
 	return "simulation needs the card pool -- run `mtglab data refresh` first"
 }
 
-// EntersTapped is `compile.enters_tapped`: whether a land unconditionally
+// EntersTapped is whether a land unconditionally
 // enters tapped.
 //
 // Scryfall retemplated this. Current oracle text reads "This land enters
@@ -121,21 +121,22 @@ var amountWords = map[string]int{
 // manaSymbols is mana in a run of symbols. `{2}` is two, `{G}` is one, `{T}`
 // is none.
 //
-// Two Python details are reproduced rather than tidied, because tidying either
+// Two recorded details are reproduced rather than tidied, because tidying
+// either
 // changes an answer.
 //
-// **The colour test is a SUBSTRING test, not a set membership.** Python reads
-// `any(ch in "WUBRGC" for ch in sym.split("/"))`, where `ch` walks the *parts*
-// of the split rather than characters -- so a half of "wu" counts (it is a
-// substring of "WUBRGC") and a half of "uw" does not, and an empty half counts
+// **The colour test is a SUBSTRING test, not a set membership.** Each part
+// of the symbol, split on `/`, is tested as a substring of
+// "WUBRGC" -- so a part of "wu" counts (it is a
+// substring) and a part of "uw" does not, and an empty part counts
 // because "" is a substring of everything. No real symbol reaches those
-// branches, but the port is held to Python by a corpus that includes them, and
+// branches, but the frozen corpus includes them, and
 // a "cleaner" set test would answer differently on the ones that do.
 //
-// **`isdigit` is narrowed to ASCII on purpose.** Python's `str.isdigit()` is
-// true for superscripts and other Unicode digits that `int()` then refuses, so
-// the only inputs where the two implementations differ are inputs where Python
-// raises `ValueError`. Answering rather than crashing is the safer of the two.
+// **The digit test is ASCII-only on purpose.** A wider Unicode digit test
+// would accept superscripts and their kin, and the only inputs where that
+// widening changes anything are inputs the recorded parser crashed on.
+// Answering rather than crashing is the safer of the two.
 func manaSymbols(text string) int {
 	total := 0
 	for _, m := range symbolRe.FindAllStringSubmatch(text, -1) {
@@ -170,11 +171,11 @@ func isASCIIDigits(s string) bool {
 	return true
 }
 
-// clauseSplit is Python's `re.split(r",| or ", clause)`: alternatives are
-// separated by commas *and* by the word "or".
+// clauseSplit separates a clause's alternatives: commas *and* the word
+// "or".
 var clauseSplit = regexp.MustCompile(`,| or `)
 
-// ManaProduced is `compile.mana_produced`: how many mana one activation of
+// ManaProduced is how many mana one activation of
 // this permanent actually nets.
 //
 // Scryfall's `produced_mana` says *which colours* a card can make and never
@@ -216,8 +217,8 @@ func ManaProduced(oracleText string) int {
 		if !strings.Contains(line, "add") {
 			continue
 		}
-		// `str.partition`: a line with no colon, or one ending in a colon,
-		// has no activation cost and its whole text is the clause.
+		// Split at the first colon: a line with no colon, or one ending in a
+		// colon, has no activation cost and its whole text is the clause.
 		head, tail, _ := strings.Cut(line, ":")
 		costText, body := "", line
 		if tail != "" {
@@ -243,7 +244,7 @@ func ManaProduced(oracleText string) int {
 			}
 		}
 		if added == 0 {
-			// `clause[len("add"):].split()` -- whitespace split, empties
+			// The words after "add" -- whitespace split, empties
 			// dropped, first token only.
 			after := strings.Fields(clause[len("add"):])
 			if len(after) > 0 {
@@ -266,12 +267,12 @@ func ManaProduced(oracleText string) int {
 	return best
 }
 
-// fetchWords are the land words a fetch effect has to name. Python spells the
-// five basics out beside "land" rather than relying on a type line, because
+// fetchWords are the land words a fetch effect has to name. The five basics
+// are spelled out beside "land" rather than relying on a type line, because
 // the sentence being read is oracle text.
 var fetchWords = []string{"land", "forest", "swamp", "island", "mountain", "plains"}
 
-// FetchesLands is `compile.fetches_lands`: how many lands a spell puts onto
+// FetchesLands is how many lands a spell puts onto
 // the battlefield from the library.
 //
 // Nature's Lore, Three Visits, Skyshroud Claim and Sakura-Tribe Elder are ramp
@@ -300,12 +301,12 @@ func FetchesLands(oracleText string) int {
 	return 1
 }
 
-// Report is `compile.CompileReport`: what compiling produced, and what it
+// Report is what compiling produced, and what it
 // could not.
 //
 // `Unresolved` is the field this exists for -- see the package comment. The
-// library is `[]*sim.Card` rather than `[]sim.Card` for the reason Python's is
-// a list of shared objects: `qty` repeats put **the same card** in the list
+// library is `[]*sim.Card` rather than `[]sim.Card` because the aliasing is
+// meaningful: `qty` repeats put **the same card** in the list
 // that many times, and Tier 1's commander check is identity rather than
 // equality. `Values` is the copy the closed forms take.
 type Report struct {
@@ -322,10 +323,10 @@ type Report struct {
 	CommanderUnresolved bool
 }
 
-// SimulatedSize is `CompileReport.simulated_size`.
+// SimulatedSize is how many cards actually compiled, counting copies.
 func (r *Report) SimulatedSize() int { return len(r.Library) }
 
-// Complete is `CompileReport.complete`.
+// Complete is whether nothing went missing.
 func (r *Report) Complete() bool {
 	return len(r.Unresolved) == 0 && !r.CommanderUnresolved
 }
@@ -335,7 +336,7 @@ func (r *Report) Complete() bool {
 //
 // Tier 1 takes the pointers. That split is real: the engine removes cards from
 // a hand by first-equal and compares the commander by identity, so it wants
-// exactly the aliasing Python's `[card] * qty` produces; the closed forms
+// exactly the aliasing the qty expansion produces; the closed forms
 // count and multiply, and a copy is simpler to reason about than a slice of
 // aliases.
 func (r *Report) Values() []sim.Card {
@@ -346,7 +347,7 @@ func (r *Report) Values() []sim.Card {
 	return out
 }
 
-// Compile is `compile.compile_report`: compile a deck and say what happened,
+// Compile compiles a deck and says what happened,
 // including what went missing.
 //
 // Returns `*NothingToSimulate` when the result is empty. That refusal lives
@@ -364,8 +365,9 @@ func (r *Report) Values() []sim.Card {
 // 0` cannot tell from "this machine has no pool". Such a deck is refused as
 // `*PoolRequired` rather than as `*NothingToSimulate`, which is the wrong word
 // for it. The corpus carries both cases (`nothing-resolves` and
-// `empty-lookup`) so the two runtimes agree; changing which refusal a deck
-// gets is a decision for the surface that renders it, not for a port.
+// `empty-lookup`) so the wart stays pinned; changing which refusal a deck
+// gets is a decision for the surface that renders it, not a tidy-up to make
+// in passing.
 func Compile(d *deck.Deck, cards map[string]*pool.CardRecord) (*Report, error) {
 	library, commander, err := compileCards(d, cards)
 	if err != nil {
@@ -391,7 +393,7 @@ func Compile(d *deck.Deck, cards map[string]*pool.CardRecord) (*Report, error) {
 	}, nil
 }
 
-// Deck is `compile.compile_deck`: the library and the commander, and nothing
+// Deck is the library and the commander, and nothing
 // about what went missing.
 //
 // The long-standing shape, kept because most callers only want the cards.
@@ -408,7 +410,7 @@ func compileCards(d *deck.Deck, cards map[string]*pool.CardRecord) ([]*sim.Card,
 	// Expand by qty. Basics carry qty 8-16, so ignoring it simulated a deck of
 	// ~83 cards with ~20 lands instead of 99 with 34 -- which made every
 	// mulligan rate and land-count recommendation wrong. The SAME pointer goes
-	// in qty times, which is `[compiled] * entry.qty` exactly.
+	// in qty times -- the aliasing the engine's identity check relies on.
 	library := []*sim.Card{}
 	for _, entry := range d.Cards {
 		compiled := compileOne(entry.Name, cards)
@@ -421,8 +423,9 @@ func compileCards(d *deck.Deck, cards map[string]*pool.CardRecord) ([]*sim.Card,
 	}
 	var commander *sim.Card
 	if len(d.Commander) > 0 {
-		// A fresh card even when the same name is in the library, because
-		// Python calls `compile_one` again and Tier 1 asks `is commander`.
+		// A fresh card even when the same name is in the library: the
+		// commander must be its own object, because Tier 1 matches it by
+		// identity.
 		commander = compileOne(d.Commander[0], cards)
 	}
 	return library, commander, nil
@@ -442,16 +445,16 @@ func compileOne(name string, cards map[string]*pool.CardRecord) *sim.Card {
 	produced := []string{}
 	seen := map[string]bool{}
 	for _, p := range rec.ProducedMana {
-		// `p in "WUBRGC"` is Python's substring test again, and the set is
-		// deduplicated because Python's is a frozenset.
+		// The same substring test `manaSymbols` runs, and the set is
+		// deduplicated -- a colour counts once however often it is listed.
 		if strings.Contains("WUBRGC", p) && !seen[p] {
 			seen[p] = true
 			produced = append(produced, p)
 		}
 	}
-	// Sorted, because Python's is a frozenset with no order at all: every
-	// place it is serialised -- the cache key, the differential corpus --
-	// writes `sorted(...)`, so sorted is the only order that cannot differ.
+	// Sorted, because a colour set has no order of its own: every
+	// place it is serialised -- the cache key, the recorded corpus --
+	// writes it sorted, so sorted is the only order that cannot differ.
 	sort.Strings(produced)
 
 	var produces []sim.Source
@@ -460,8 +463,8 @@ func compileOne(name string, cards map[string]*pool.CardRecord) *sim.Card {
 		// said which colours. See `ManaProduced` for why that mattered.
 		produces = []sim.Source{{Colors: produced, Amount: ManaProduced(rec.OracleText)}}
 	}
-	// The FULL type line, not the front face -- Python reads `"Creature" in
-	// rec.type_line` here and `front` only for the permanent test, so a
+	// The FULL type line, not the front face -- the recorded rule reads the
+	// whole line here and `front` only for the permanent test, so a
 	// creature on the back of a DFC delays its front face's mana.
 	isCreature := strings.Contains(rec.TypeLine, "Creature")
 	isLand := rec.IsLand()
@@ -494,7 +497,7 @@ func compileOne(name string, cards map[string]*pool.CardRecord) *sim.Card {
 
 // fromManaCost carries `mana.Cost` into the shape a compiled deck holds.
 //
-// Two types for one thing is Python's arrangement too -- `mana.ManaCost` is
+// Two types for one thing is deliberate -- `mana.Cost` is
 // the parser's own and `sim.Cost` is what the simulator carries -- and the
 // conversion is a copy rather than a re-parse, so a disagreement about parsing
 // stays a `mana` failure instead of becoming an arithmetic one here.
@@ -507,18 +510,18 @@ func fromManaCost(c mana.Cost) sim.Cost {
 	}
 }
 
-// Category is what `SimCard.category` holds on a compiled card, and it is a
-// constant here because Python never assigns it: `compile_one` passes no
-// category at all and the dataclass default supplies **"utility"**.
+// Category is what a compiled card's `Category` holds, and it is a
+// constant here because the compiler never assigns anything else: every
+// compiled card carries the word **"utility"**, which is the recorded
+// default.
 //
 // A Go zero value is "", so leaving the field alone would have been the
-// natural port and the wrong one. Nothing in any tier reads the field -- the
+// natural thing and the wrong one. Nothing in any tier reads the field -- the
 // deck file's own category is deliberately not carried, since a second copy of
 // a deck's categorisation is a place for the two to disagree -- so the
 // difference is invisible to every simulation and visible in exactly one
-// place: **the ADR 18 cache key**, whose `_card_form` serialises `category`
+// place: **the ADR 18 cache key**, whose card form serialises `Category`
 // precisely because "the engine ignores this field" is a claim about engine
-// behaviour that can go stale. An empty string there would make every Go key
-// differ from Python's for a reason nobody chose, on top of the one reason
-// this port does choose (`cache.Fingerprint`). A test pins it.
+// behaviour that can go stale. An empty string there would orphan every
+// stored row for a reason nobody chose. A test pins it.
 const Category = "utility"

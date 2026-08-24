@@ -21,15 +21,15 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 )
 
-// `sim/tier3/run.py`: find Forge, hand it decks, run games, time them.
+// The Forge runner: find Forge, hand it decks, run games, time them.
 
 // JavaMinimum is the floor Forge needs. It runs on 21 here; the floor is what
 // matters.
 const JavaMinimum = 17
 
-// ForgeHome is `config.forge_home()`: where the distribution is unpacked.
+// ForgeHome is where the distribution is unpacked.
 //
-// A function rather than a constant, as in Python. Forge is optional — a base
+// A function rather than a constant, deliberately. Forge is optional — a base
 // install has no JVM and never wants one — so the path is resolved when
 // something reaches for it, and a machine that installs Forge mid-session does
 // not need the process restarted. It is also the only path in this project
@@ -115,8 +115,9 @@ func JavaBinary() (string, error) {
 		if ok && major >= JavaMinimum {
 			return candidate, nil
 		}
-		// `f"{candidate} (Java {major})"`, and `major` is None in Python when
-		// the probe failed — which renders as the word `None`.
+		// A candidate renders with its major version, and a failed probe
+		// renders as the word `None` -- the served message's long-standing
+		// spelling of "could not tell", kept verbatim.
 		shown := "None"
 		if ok {
 			shown = strconv.Itoa(major)
@@ -149,18 +150,18 @@ func DesktopJar(forgeHome string) (string, error) {
 			"set MTGLAB_FORGE_HOME to an unpacked Forge distribution", home, err)
 	}
 	if len(jars) == 0 {
-		// Go's `filepath.Glob` reports no error for an unreadable directory
-		// where Python's `Path.glob` raises, so the readability question is
+		// Go's `filepath.Glob` reports no error for an unreadable
+		// directory, so the readability question is
 		// asked explicitly rather than inferred from an empty match.
 		//
 		// **A missing directory is not an unreadable one**, and the first
-		// version of this conflated them -- found by diffing the pair, where
-		// Python said "no Forge desktop jar in X" and the door said "no Forge
-		// distribution readable at X (no such file or directory)" for the same
-		// 503. `Path.glob` on a directory that does not exist yields nothing
-		// and raises nothing; only a permission error raises, which is the
-		// case the Python comment above was written for (deployed, the home
-		// directory is `/root` while the app runs as `mtglab`). So absence
+		// version of this conflated them -- caught against the recorded
+		// messages, which say "no Forge desktop jar in X" for an absent
+		// directory and reserve "no Forge
+		// distribution readable at X (...)" for a real refusal, where the
+		// conflated version served the second for both. Only a permission
+		// error is a refusal -- the deployed shape: the home
+		// directory is `/root` while the app runs as `mtglab`. So absence
 		// falls through to the jar message and only a real refusal takes the
 		// other branch.
 		if _, statErr := os.ReadDir(home); statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
@@ -238,7 +239,7 @@ func EnsureProfile(forgeHome string) (string, error) {
 	}
 
 	deckDir := filepath.Join(profile, "decks", "commander")
-	if err := os.MkdirAll(deckDir, 0o755); err != nil { //nolint:gosec // matches Python's umask; Forge reads it as the same user
+	if err := os.MkdirAll(deckDir, 0o755); err != nil { //nolint:gosec // scratch decks; Forge reads the directory as the same user
 		return "", err
 	}
 	return deckDir, nil
@@ -286,19 +287,19 @@ func (r *SimRun) WinnerSlug(g GameResult) string {
 	return r.Seats[*g.WinnerSeat]
 }
 
-// RunOptions are `run_games`'s keyword arguments.
+// RunOptions are RunGames's levers.
 type RunOptions struct {
 	Games int
 	Clock int
-	// Seed is a `*big.Int` because Python's integers are unbounded and this
-	// one is echoed back to whoever asked: `argv += ["-s", str(seed)]` puts
-	// it on the command line as text, so narrowing it here would hand Forge a
+	// Seed is a `*big.Int` because a request's seed has no ceiling and this
+	// one is echoed back to whoever asked: it goes onto Forge's command
+	// line as text, so narrowing it here would hand Forge a
 	// different number than the request named.
 	Seed   *big.Int
 	Memory int
 	Home   string
-	// Timeout bounds the whole subprocess. Zero means the derived default,
-	// which is what Python's `None` resolves to.
+	// Timeout bounds the whole subprocess. Zero means the derived
+	// default.
 	Timeout time.Duration
 	// OnGame is called with the count of games finished so far (1, 2, ...)
 	// and the game just parsed, as each result line arrives — what lets a job

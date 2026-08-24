@@ -11,16 +11,16 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// health is `GET /api/health` — `service.health`: the platform's health-check
+// health is `GET /api/health`: the platform's health-check
 // target, which must not 500 on any state an instance can actually be in. A
 // missing pool is a correct state between deploy and seeding, answered in the
 // degraded shape; a stale pool is reported so the app can say "re-ingest"
 // instead of showing every creature as statless (`pool.Stale`).
 //
-// `decks` counts the file tier for every caller — Python's `Decks` dependency
-// is the curated library regardless of who asks, and this route is on
-// `PUBLIC_PATHS`, so the platform's anonymous probe and a signed-in browser
-// read the same number.
+// `decks` counts the file tier for every caller — the curated library
+// regardless of who asks, deliberately: this route is on
+// `door.PublicPaths`, so the platform's anonymous probe and a signed-in
+// browser read the same number.
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	var oracle, printings int64
 	var stale bool

@@ -37,21 +37,20 @@ import (
 //
 //	MTGLAB_LIVE_CLAUDE=1 ANTHROPIC_API_KEY=$(...) go test -run Live -v ./internal/claude/
 //
-// **Two of these are genuinely non-deterministic, and it is not flakiness in
-// the port.** The dossier and research cases assert *model outcomes* -- that
+// **Two of these are genuinely non-deterministic, and it is not flakiness
+// in the code.** The dossier and research cases assert *model outcomes* -- that
 // at least one cited page survives `KeepSources`, and that a research answer
 // carries structured findings rather than putting everything in its prose --
 // and both vary run to run. Measured on 2026-08-23: one run gave the dossier
 // "no source survived checking" in 344s and research an answer with six
 // sources and `Findings:[]` in 31s; an immediate re-run of the same binary
-// against the same code passed both, in 693s and 44s. Nothing in the port had
-// moved between them (`modes.json` and both corpora were untouched, and a
-// 36-case pair diff was byte-identical).
+// against the same code passed both, in 693s and 44s. Nothing here had
+// moved between them -- `modes.json` and both corpora were untouched.
 //
 // So: **a red dossier or research case is a question, not a verdict.** Re-run
 // it before believing it, and look at what the failure actually says -- a 400
 // from the API, a prefix on an error, a shape that will not decode are all
-// this port's business; "the model wrote fewer findings this time" is not.
+// this code's business; "the model wrote fewer findings this time" is not.
 // The four other cases assert structure rather than judgement and do not vary.
 //
 // It is skipped everywhere else, CI included.
@@ -179,7 +178,7 @@ func TestLiveAToolRoundTripAndACacheRead(t *testing.T) {
 // response schema round-tripping through the API.
 //
 // What only a live call can answer here is whether the API **accepts the
-// schema** -- `RATIONALE_INTERVIEW`'s is generated data crossed from Python,
+// schema** -- the interview's is recorded data in modes.json,
 // and a schema the API rejects is a 400 that no scripted server would ever
 // produce. The rest is worth watching rather than asserting hard: the model is
 // asked for three to five questions and `OnlyQuestions` drops anything that is
@@ -243,7 +242,8 @@ func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {
 // which is exactly the balanced answer the absence exists to prevent.
 //
 // The assertions are on what must be true rather than on what the model
-// happened to say: every charge cites something (Python drops the ones that do
+// happened to say: every charge cites something (`OnlyCharges` drops the
+// ones that do
 // not, so a drop count above zero is a signal about the prompt, not a
 // failure), and nothing anywhere in the payload argues FOR the card.
 func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
@@ -579,7 +579,8 @@ func TestLiveTheThemeTurnAsksAboutThePerson(t *testing.T) {
 // every commander named resolves through the pool with an identity that is
 // *exactly* the combination's, and every citation survived the source check.
 //
-// Slow -- measured at 226 seconds in Python -- which is why it is opt-in.
+// Slow -- measured at 226 seconds on the real wire -- which is why it is
+// opt-in.
 func TestLiveTheThemeProposalNamesRealCommanders(t *testing.T) {
 	liveOrSkip(t)
 	slots := liveSlots(t)
@@ -640,9 +641,10 @@ func TestLiveTheThemeProposalNamesRealCommanders(t *testing.T) {
 			//
 			// **As a set, because the two orders genuinely differ.** The first
 			// version of this compared the two joined -- and the live run
-			// found Orzhov, where `colors.py` says `[W B]` and the pool says
-			// `[B W]`. The code was right (`sameIdentity` compares sets, as
-			// Python's `set(...) != identity` does); the assertion was the
+			// found Orzhov, where the reference table says `[W B]` and the
+			// pool says
+			// `[B W]`. The code was right (`sameIdentity` compares sets); the
+			// assertion was the
 			// thing that could only be wrong against a real answer.
 			got := map[string]bool{}
 			for _, c := range cmd.ColorIdentity {

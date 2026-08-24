@@ -1,6 +1,6 @@
 ---
 name: polish
-description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Python or TypeScript best practices, testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Also covers hosted-first alignment (anything the deployed product needs that exists only as a local CLI or laptop workflow) and the relic audit (early-dev leftovers — files, docs, commands — that no longer fit the current shape). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' (the artifacts pass over the skill, the ledger and the dev tooling), on 'polish converge' or 'polish all' (all five colors merged into one report), on 'polish rainbow' (all six as separate runs, one at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears. Also covers the repo's measuring shelf itself: mtglab bench (benchmarking, profiling, cache hit rates) and mtglab mutate (mutation testing)."
+description: "The recurring quality pass over the sylvan-library codebase and infrastructure, organised as the five colors of Magic. Use whenever Aaron asks for a polish pass, quality pass, sweep, or audit — of Go or TypeScript best practices (or the Python media toolbox under tools/), testing (including mutation testing), performance, security, licensing/free-use compliance, Claude API efficiency, CI/CD, alerting, cloud resources, infrastructure efficiency/upgrades/cost, browser/mobile compatibility, scalability, the repo's Claude-facing docs (including trimming stale or verbose context), or the spirit of Magic — sweeping copy and UI for chances to prefer Magic: the Gathering terminology and iconography over plain conversational English. Also covers hosted-first alignment (anything the deployed product needs that exists only as a local CLI or laptop workflow) and the relic audit (early-dev leftovers — files, docs, commands — that no longer fit the current shape). Also triggers on a color invocation (polish white/blue/black/red/green), on 'polish colorless' (the artifacts pass over the skill, the ledger and the dev tooling), on 'polish converge' or 'polish all' (all five colors merged into one report), on 'polish rainbow' (all six as separate runs, one at a time), on 'run the polish pass', and on any 'are we doing X right?' question about one of those areas — even if the word polish never appears. Also covers the repo's measuring shelf (benchmarks, profiling, cache hit rates, mutation testing — including the open work of rebuilding those tools for the Go backend)."
 ---
 
 # The Polish Pass
@@ -26,7 +26,7 @@ ledger so the checklist gets fixed.
 | Color | Theme | Facets |
 |---|---|---|
 | **White** | Law & Protection | Free-use/licensing compliance (triple-checked); security & user isolation; testing discipline |
-| **Blue** | Craft & Knowledge | Python best practices; TypeScript/React best practices; Claude-first docs & memory audit; the spirit of Magic (the game's terminology and iconography over plain English, commandment 3) |
+| **Blue** | Craft & Knowledge | Go best practices; TypeScript/React best practices; the tools/ toolbox's Python; Claude-first docs & memory audit; the spirit of Magic (the game's terminology and iconography over plain English, commandment 3) |
 | **Black** | Ruthless Efficiency | Claude API spend; static assets over hotlinks; performance & efficiency |
 | **Red** | Speed & Alarum | CI/CD pipeline; alerting & self-healing |
 | **Green** | Growth & Resilience | Browser & mobile compatibility; cloud resource watch; scalability & user adaptability; hosted-first alignment (nothing the product needs exists only on a laptop) |
@@ -38,26 +38,23 @@ one you are running, and only that one; the others are for their own runs.
 
 ## The measuring shelf
 
-Three tools in the repo answer questions this pass used to answer by hand or
-by guess. Reach for them before hand-timing anything, and put their output in
-the ledger rather than a summary of it.
+The dedicated bench/mutate/cache tools retired with the old backend; only
+`animist verify` (in `tools/`) survives, holding committed assets to their
+recipes. **Rebuilding the shelf over the Go packages is an open ledger
+item** — until it lands, measure with the stock instruments and put raw
+output in the ledger rather than a summary of it:
 
 ```bash
-mtglab bench run [--cold] [--only X]   # the declared suite, medians and p95
-mtglab bench profile <target>          # database budget, imports, hot frames
-mtglab bench caches                    # hit rates — a dead cache is visible
-mtglab mutate run --sample N --seed S  # does the suite hold what it claims?
-mtglab animist verify                  # committed assets vs their recipes
+cd go && go test -bench . -benchmem ./internal/<pkg>/   # medians by hand
+cd go && go test -cpuprofile cpu.out ./internal/<pkg>/  # then go tool pprof
+cd tools && animist verify                              # assets vs recipes
 ```
 
-Each exists because a checklist line failed. `bench profile` splits the
-**database** budget out by measuring it at the query probe rather than
-subtracting it, because cProfile raises no event for an extension call and had
-been blaming DuckDB's 38ms on three lines of Python. `bench caches` counts
-hits, because a cache can be correct, tested, and never once used. `mutate`
-runs against a **throwaway copy** of the package, because the hand protocol it
-replaces edited the real file and put it back. Black's and White's references
-say when to use which.
+The lessons the retired tools encoded still bind whoever rebuilds them: a
+profiler that raises no event for an extension call blames the wrong lines
+(measure the database at the query probe, not by subtraction); a cache can
+be correct, tested, and never once used (count hits); mutation runs belong
+on a **throwaway copy** of the package, never the real file.
 
 ## Choosing the color
 
@@ -271,12 +268,15 @@ It is what makes the pass cumulative rather than repetitive.
    fail, restore it. Match the surrounding code's idiom and comment density,
    and if a finding grows beyond surgical mid-fix, stop, back it out to a
    queued item, and say so.
-5. **Verify.** The full local gauntlet before any push: complete `pytest`
-   (the determinism digest and `SIM_VERSION` move as a pair), `ruff check src
-   tests`, `mypy`, and `npm --prefix web run check`; rebuild the committed
-   bundle (`npm --prefix web run build`) if anything under `web/src` changed.
-   Check `data/app.db` was not dirtied by the suite (`ls -la data/`, not
-   `git status`, which is blind to a gitignored file). For UI-visible changes,
+5. **Verify.** The full local gauntlet before any push, from `go/` with the
+   Mac's three exports set: `go vet ./...`, `go test -race ./...`,
+   `golangci-lint run ./...`, `gofmt -l .` printing nothing; then
+   `npm --prefix web run check`, rebuilding the committed bundle
+   (`npm --prefix web run build`) if anything under `web/src` changed; and
+   `cd tools && ruff check . && mypy && python -m pytest tests/ -q` when
+   `tools/` moved. Check `data/app.db` was not dirtied by a running app
+   (`ls -la data/`, not `git status`, which is blind to a gitignored
+   file). For UI-visible changes,
    drive the real surface — a green jsdom test has not seen a layout. Since
    2026-08-16 that includes authenticated flows on the deployed instance:
    the `claude` account (a plain user; its edits are confined to its own

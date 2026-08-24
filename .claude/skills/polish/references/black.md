@@ -18,9 +18,9 @@ repo rule, and the pricing/caching facts there beat memory.
 - Map the spend first: **seven** modes across six features (interview, argue,
   dossier, research, theme ×2, and **scan** — ADR 34's card transcriber, which
   this file said "six" through the run that measured it), their models, their
-  max_tokens/effort settings, and what `claude/ledger.py` has recorded.
+  max_tokens/effort settings, and what the Claude ledger has recorded.
   Numbers into the ledger — spend trends are the whole point of tracking this
-  facet over runs. Count the modes from `claude/modes.py` rather than from
+  facet over runs. Count the modes from `internal/claude`'s mode table rather than from
   this sentence; the number moves and this line will not.
 - Prompt caching: `converse` caches on its system block, which is why
   personas are **appended** and dealt cards ride in the message. Audit any
@@ -61,7 +61,7 @@ once, deploy it, and be fast forever.
   max-age here without reading `web/vite.config.ts` first.** This repo
   deliberately builds with *stable* filenames rather than content hashes,
   because the bundle is committed and hashing would add two files to git on
-  every rebuild. `Cache-Control: no-cache` (`NO_CACHE` in `api/app.py`) is the
+  every rebuild. `Cache-Control: no-cache` (the door's static tiers) is the
   half that makes stable names safe, and it was added 2026-08-13 after Safari
   assigned its own heuristic lifetime and served a stale `DeckDetail.js`
   against a redeployed server until the page crashed. Verified 2026-08-16:
@@ -97,10 +97,10 @@ mtglab mutate list               # (White's facet, same shelf)
   ledger — not just the millisecond.** `bench run` does this unasked at 25ms.
   Paste the budget breakdown, not the headline.
 - **Three budgets, and only one of them is yours to fix.** `bench profile`
-  reports the database exactly (measured at the query probe in `cards/db.py`,
+  reports the database exactly (measured at the query probe,
   never subtracted), the import-machinery call count, and everything else.
   The reason it is measured: **cProfile raises no event for an extension
-  method**, so a DuckDB `execute` lands in the tottime of whatever Python
+  method**, so a database call can land in the self-time of whatever
   called it — a profile of the card search blamed 38ms on a function whose
   body is three string joins. cProfile's frame table is a **ranking of which
   line**, never a budget of how many milliseconds; its clock is inflated per
@@ -120,12 +120,12 @@ mtglab mutate list               # (White's facet, same shelf)
   run holding the old sentence files a false finding on every profile it
   takes.
 - **Every cache gets a hit-rate check, not only a correctness test.** `mtglab
-  bench caches` reports the register in `caches.py`. A cache that never hits
+  bench caches` reported the retired register. A cache that never hits
   is complexity wearing a win's clothes, and the standing example was correct,
   tested, and dead: `oracle_columns` keyed on the connection object, in an app
   where every endpoint opens one handle, asks one question and closes it. No
   test could have found that; only a counter did. **A cache added since last
-  run that is not in the register is a finding**, and `tests/test_caches.py`
+  run that is not in the register is a finding**, and the register's own test
   fails on it.
 - **Backend numbers** for the routes a session actually hits, on the live
   instance as well as locally — the bench is in-process and cannot see the
@@ -138,7 +138,7 @@ mtglab mutate list               # (White's facet, same shelf)
   component-splitting.** Check `lib/deferred.tsx` and `components/lazycharts.tsx`
   for the pattern, and verify in a real browser's network waterfall which
   chunks a page actually pulls.
-- Tier 1 hot path: `sim/tier1/engine.py` is numpy-vectorised and GIL-bound on
+- Tier 1 hot path: `internal/sim/tier1` runs one goroutine per queued job on
   one CPU worker by design. Profile before touching; a vectorisation win needs
   the determinism digest respected — engine changes move `SIM_VERSION`, which
   invalidates the ADR 18 cache, so a micro-win that dumps every cached result

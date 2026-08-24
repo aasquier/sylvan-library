@@ -40,8 +40,8 @@ const GUILDS: Record<string, string> = {
   BGU: 'Sultai',
   RWB: 'Mardu',
   GUR: 'Temur',
-  // Four-colour: the canonical names from the colour taxonomy in
-  // src/mtglab/colors.py, which is the project's authority on combination
+  // Four-colour: the canonical names from the colour taxonomy the server
+  // owns, which is the project's authority on combination
   // naming -- it makes the Scryfall/Commander-2016 names primary and keeps
   // the Nephilim names as aliases. This table must agree with it, or the
   // library and the Start-a-deck grid call the same deck two different
@@ -55,7 +55,8 @@ const GUILDS: Record<string, string> = {
 }
 
 /**
- * Canonical colour order, and the mirror of `colors.WUBRG` in Python.
+ * Canonical colour order, and the mirror of the order the server writes
+ * every combination key in.
  *
  * Exported because the pentagram is drawn from it: the five vertices go round
  * in this order, which is what makes adjacency mean "allied" and two-apart
@@ -141,7 +142,7 @@ export function manaSymbols(cost?: string | null): string[] {
  * Phyrexian symbol like `{G/W}` or `{U/P}`; a run of colour letters; or one of
  * the standalone symbols X/Y/Z, tap, untap, snow, energy.
  *
- * The colour run is why this is not simply `manaSymbols`. `validate.py` writes
+ * The colour run is why this is not simply `manaSymbols`. The gate writes
  * a colour identity as `{GW}` — one brace, two colours — because that is how
  * Magic writes an identity. It is not a mana cost, and rendering it as a
  * single two-letter blob would be wrong, so it expands to one pip per colour.

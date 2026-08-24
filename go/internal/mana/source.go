@@ -7,8 +7,8 @@ import "embed"
 // It exists for one caller and one reason: ADR 18 keys a cached simulation on
 // **a fingerprint of the code that produced it**, so that no engine change can
 // serve a pre-change number -- "not even one nobody remembered to declare".
-// Python does that by reading `mana.py` off disk through `importlib`; a Go
-// binary has no source at runtime, so the source comes with it. See
+// A built binary has no source on disk at runtime, so the source comes with
+// it. See
 // `internal/sim/cache.Fingerprint`, which is the only reader.
 //
 // **The list is explicit and a test holds it complete.** `*.go` would have

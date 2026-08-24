@@ -20,8 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// `sim/tier3/shim.py`: the worker machine's door — three endpoints in front of
-// a Forge run.
+// The worker machine's door — three endpoints in front of a Forge run.
 //
 // This is what `Dockerfile.forge` runs (ADR 35). It is deliberately the
 // smallest server that can hold a JVM: JSON in and out, no framework — the
@@ -34,14 +33,13 @@ import (
 //	POST /coverage   deck.yaml texts -> coverage reports, no JVM booted
 //	POST /match      deck.yaml texts + games/clock/seed -> a finished run
 //
-// **It is a subcommand of `mtglab` rather than a second binary**, which is the
-// one shape decision this port makes rather than inherits. Python needed a
-// module to run (`python -m mtglab.sim.tier3.shim`); Go needs a binary, and
-// the worker image already has to carry one. `mtglab forge-shim` is that
-// binary wearing a second hat, so the two images ship the same artefact and a
-// version skew between them is impossible rather than merely unlikely.
+// **It is a subcommand of `mtglab` rather than a second binary**, and that
+// shape is a decision, not an accident. The worker image already has to
+// carry the binary; `mtglab forge-shim` is that binary wearing a second
+// hat, so the two images ship the same artefact and an artefact skew
+// between them is impossible rather than merely unlikely.
 //
-// Three properties worth stating, all of them Python's:
+// Three properties worth stating, all of them load-bearing:
 //
 //   - **The pre-flight still runs twice.** `/coverage` answers the request
 //     thread's refusal check, and `/match` calls [tier3.RunGames], which
@@ -339,8 +337,8 @@ func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matc
 	emit(map[string]any{"result": tier3.RunToWire(run)})
 }
 
-// failureText is Python's `f"{type(exc).__name__}: {exc}"`, which is what the
-// app renders as a job's error. The class name is the half that survives
+// failureText renders an error as `<ClassName>: <sentence>`, which is what
+// the app renders as a job's error. The class name is the half that survives
 // translation: the client shows the sentence, and a maintainer reading a job
 // row wants to know whether Forge was missing, the match timed out, or the
 // results were untrustworthy.

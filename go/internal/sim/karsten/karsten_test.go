@@ -14,16 +14,16 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/karsten"
 )
 
-// `sim/karsten.py`, held to Python by `testdata/karsten.json` (written by
-// `python tests/go_fixtures.py`), and to arithmetic that came from neither by
+// The closed form, held to the frozen corpus `testdata/karsten.json`, and to
+// arithmetic that came from nowhere else by
 // an exhaustive enumeration in exact rationals.
 //
 // # The epsilon, pinned per function
 //
-// PLAN section 5 item 4 asks for "an epsilon pinned per function", and a
-// single global tolerance is the lazy answer because it hides which function
+// Every comparison carries an epsilon pinned per function, because a
+// single global tolerance is the lazy answer that hides which function
 // is drifting. Every one below is pinned at **zero -- the float64 bits must
-// match** -- and that is a stronger claim than the plan asked for, so each
+// match** -- which is the strongest claim available, so each
 // carries the reason it is affordable *and* the reason it is wanted. The
 // short version of "wanted", for all of them: every integer this package
 // produces comes out of a `>=` against one of these floats, so a tolerance
@@ -31,8 +31,8 @@ import (
 // different answer.
 const (
 	// hypergeometricAtLeast: exact `big.Int` binomials summed exactly, then
-	// one `big.Rat` division that is correctly rounded to the same definition
-	// CPython's int/int true division uses. There is no float arithmetic
+	// one `big.Rat` division that is correctly rounded, ties to even. There
+	// is no float arithmetic
 	// before the last operation, so there is nothing for an epsilon to absorb.
 	// Wanted because `RequiredSources` scans against `>= target`: one ulp is
 	// one more land in the requirement.
@@ -43,16 +43,17 @@ const (
 
 	// castableOdds: the first function with real float arithmetic -- a chain
 	// of multiplications per term, then `Fsum` over up to a hundred terms.
-	// Exact anyway, because the multiplication order is Python's (the pip
-	// buckets keep first-appearance order, which is what makes float
-	// multiplication's non-associativity harmless) and `pyfloat.Fsum` is CPython's
-	// own summation. Wanted because `CardOdds.ReliableTurn` compares this
+	// Exact anyway, because the multiplication order is the recorded one (the
+	// pip buckets keep first-appearance order, which is what makes float
+	// multiplication's non-associativity harmless) and `floats.Fsum` is the
+	// correctly-rounded sum. Wanted because `CardOdds.ReliableTurn` compares
+	// this
 	// against 0.90, and one ulp there moves a card's `Lateness`, which is the
 	// shelf's sort key.
 	epsilonCastableOdds = 0.0
 
 	// regressionLands: a fitted line over an exact integer mean. Its float
-	// output is `average_mana_value`, rounded to two places by `pyfloat.RoundTo`;
+	// output is `average_mana_value`, rounded to two places by `floats.RoundTo`;
 	// its integer output is a land count rounded ties-to-even. Exact because
 	// the three constants are the same doubles and the evaluation order is the
 	// same, with the fused multiply-add guarded at both product sites.
@@ -60,7 +61,7 @@ const (
 
 	// shelf: no arithmetic of its own -- it is the two above, arranged. Pinned
 	// separately anyway, because the arrangement is an output: `Odds` is
-	// sorted by lateness, and a port with every probability right and the
+	// sorted by lateness, and a shelf with every probability right and the
 	// comparator wrong would pass every other line of this file.
 	epsilonShelf = 0.0
 )
@@ -177,8 +178,8 @@ func load(t *testing.T) (karstenCorpus, map[string]deckCase) {
 }
 
 // A JSON number decodes into `any` as a float64, which is exact for every
-// integer these tables hold and for every probability, because Python wrote
-// them through `repr` -- the shortest string that round-trips -- and Go reads
+// integer these tables hold and for every probability, because the corpus
+// records each value as the shortest string that round-trips and Go reads
 // them with `ParseFloat`, which is correctly rounded.
 func asInt(v any) int       { return int(v.(float64)) }
 func asFloat(v any) float64 { return v.(float64) }
@@ -200,17 +201,17 @@ func exactFloats(epsilon float64) cmp.Option {
 
 // ------------------------------------------------- the arithmetic, differentially
 
-func TestTheConstantsAreStillPythons(t *testing.T) {
+func TestTheConstantsAreStillTheRecordedOnes(t *testing.T) {
 	corpus, _ := load(t)
 	if corpus.Target != karsten.Target {
-		t.Errorf("Target = %v, Python = %v", karsten.Target, corpus.Target)
+		t.Errorf("Target = %v, the corpus says %v", karsten.Target, corpus.Target)
 	}
 	if corpus.Horizon != karsten.Horizon {
-		t.Errorf("Horizon = %v, Python = %v", karsten.Horizon, corpus.Horizon)
+		t.Errorf("Horizon = %v, the corpus says %v", karsten.Horizon, corpus.Horizon)
 	}
 }
 
-func TestHypergeometricAtLeastMatchesPython(t *testing.T) {
+func TestHypergeometricAtLeastMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	if len(corpus.Hypergeometric) < 2000 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.Hypergeometric))
@@ -220,35 +221,35 @@ func TestHypergeometricAtLeastMatchesPython(t *testing.T) {
 		want := asFloat(row[4])
 		got := karsten.HypergeometricAtLeast(pop, suc, dra, wan)
 		if !exact(got, want, epsilonHypergeometric) {
-			t.Errorf("HypergeometricAtLeast(%d, %d, %d, %d) = %v (%#016x), Python = %v (%#016x)",
+			t.Errorf("HypergeometricAtLeast(%d, %d, %d, %d) = %v (%#016x), the corpus says %v (%#016x)",
 				pop, suc, dra, wan, got, math.Float64bits(got), want, math.Float64bits(want))
 		}
 	}
 }
 
-func TestExactlyMatchesPython(t *testing.T) {
+func TestExactlyMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	for _, row := range corpus.Exactly {
 		pop, suc, dra, cnt := asInt(row[0]), asInt(row[1]), asInt(row[2]), asInt(row[3])
 		want := asFloat(row[4])
 		got := karsten.Exactly(pop, suc, dra, cnt)
 		if !exact(got, want, epsilonExactly) {
-			t.Errorf("Exactly(%d, %d, %d, %d) = %v, Python = %v", pop, suc, dra, cnt, got, want)
+			t.Errorf("Exactly(%d, %d, %d, %d) = %v, the corpus says %v", pop, suc, dra, cnt, got, want)
 		}
 	}
 }
 
-func TestCardsSeenMatchesPython(t *testing.T) {
+func TestCardsSeenMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	for _, row := range corpus.CardsSeen {
 		turn, otp, want := asInt(row[0]), asBool(row[1]), asInt(row[2])
 		if got := karsten.CardsSeen(turn, otp); got != want {
-			t.Errorf("CardsSeen(%d, %v) = %d, Python = %d", turn, otp, got, want)
+			t.Errorf("CardsSeen(%d, %v) = %d, the corpus says %d", turn, otp, got, want)
 		}
 	}
 }
 
-func TestRequiredSourcesMatchesPython(t *testing.T) {
+func TestRequiredSourcesMatchesTheCorpus(t *testing.T) {
 	corpus, _ := load(t)
 	if len(corpus.RequiredSource) < 2000 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.RequiredSource))
@@ -258,13 +259,13 @@ func TestRequiredSourcesMatchesPython(t *testing.T) {
 		target, otp, want := asFloat(row[3]), asBool(row[4]), asInt(row[5])
 		got := karsten.RequiredSources(deckSize, pips, turn, target, otp)
 		if got != want {
-			t.Errorf("RequiredSources(%d, %d, %d, %v, %v) = %d, Python = %d",
+			t.Errorf("RequiredSources(%d, %d, %d, %v, %v) = %d, the corpus says %d",
 				deckSize, pips, turn, target, otp, got, want)
 		}
 	}
 }
 
-func TestSourcesForMatchesPython(t *testing.T) {
+func TestSourcesForMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	for _, row := range corpus.SourcesFor {
 		want := map[string]bool{}
@@ -273,12 +274,12 @@ func TestSourcesForMatchesPython(t *testing.T) {
 		}
 		got := karsten.SourcesFor(decks[row.Deck].Library, want)
 		if got != row.Value {
-			t.Errorf("SourcesFor(%s, %v) = %d, Python = %d", row.Deck, row.Colors, got, row.Value)
+			t.Errorf("SourcesFor(%s, %v) = %d, the corpus says %d", row.Deck, row.Colors, got, row.Value)
 		}
 	}
 }
 
-func TestCastableOddsMatchesPython(t *testing.T) {
+func TestCastableOddsMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	if len(corpus.CastableOdds) < 50 {
 		t.Fatalf("the probe set has shrunk to %d rows", len(corpus.CastableOdds))
@@ -301,7 +302,7 @@ func TestCastableOddsMatchesPython(t *testing.T) {
 		for i, want := range row.ByTurn {
 			got := karsten.CastableOdds(*card, deck.Library, i+1, row.OnThePlay)
 			if !exact(got, want, epsilonCastableOdds) {
-				t.Errorf("CastableOdds(%s/%s, turn %d, on_the_play=%v) = %v (%#016x), Python = %v (%#016x)",
+				t.Errorf("CastableOdds(%s/%s, turn %d, on_the_play=%v) = %v (%#016x), the corpus says %v (%#016x)",
 					row.Deck, row.Card, i+1, row.OnThePlay,
 					got, math.Float64bits(got), want, math.Float64bits(want))
 			}
@@ -309,17 +310,17 @@ func TestCastableOddsMatchesPython(t *testing.T) {
 	}
 }
 
-func TestRegressionLandsMatchesPython(t *testing.T) {
+func TestRegressionLandsMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	for _, row := range corpus.RegressionLands {
 		got := projectEstimate(karsten.RegressionLands(decks[row.Deck].Library))
 		if diff := cmp.Diff(row.Value, got, exactFloats(epsilonRegressionLands)); diff != "" {
-			t.Errorf("RegressionLands(%s) differs from Python (-python +go):\n%s", row.Deck, diff)
+			t.Errorf("RegressionLands(%s) differs (-corpus +got):\n%s", row.Deck, diff)
 		}
 	}
 }
 
-func TestTheWholeShelfMatchesPython(t *testing.T) {
+func TestTheWholeShelfMatchesTheCorpus(t *testing.T) {
 	corpus, decks := load(t)
 	if len(corpus.Shelves) < 10 {
 		t.Fatalf("the shelf set has shrunk to %d decks", len(corpus.Shelves))
@@ -328,7 +329,7 @@ func TestTheWholeShelfMatchesPython(t *testing.T) {
 		deck := decks[row.Deck]
 		got := projectShelf(karsten.Read(deck.Library, deck.Commander, row.Target, row.OnThePlay))
 		if diff := cmp.Diff(row.Value, got, exactFloats(epsilonShelf)); diff != "" {
-			t.Errorf("Read(%s, target=%v, on_the_play=%v) differs from Python (-python +go):\n%s",
+			t.Errorf("Read(%s, target=%v, on_the_play=%v) differs (-corpus +got):\n%s",
 				row.Deck, row.Target, row.OnThePlay, diff)
 		}
 	}
@@ -342,7 +343,7 @@ func projectEstimate(e karsten.LandEstimate) estimateCase {
 	}
 }
 
-// projectShelf renders a Go shelf in Python's own JSON shape, calling every
+// projectShelf renders a shelf in the corpus's own JSON shape, calling every
 // derived property on the way -- `Met`, `Shortfall`, `OnCurve`,
 // `ReliableTurn`, `Lag`, `Lateness`, `Unmet`. They are methods here and
 // fields in the corpus, so projecting is also how they get tested.
@@ -387,12 +388,12 @@ func projectShelf(s karsten.Shelf) shelfCase {
 // bruteForceAtLeast is the same probability by enumerating every hand, in
 // exact rationals.
 //
-// Ported from `tests/test_karsten.py`, and deliberately the stupidest correct
+// Deliberately the stupidest correct
 // implementation: label the population, look at every subset of size `draws`,
 // count the ones that qualify. It is unusable past about twenty cards and it
 // cannot be wrong, which is the trade a test wants -- and it is the one check
-// in this file whose answer does not come from the corpus, so a Python bug
-// faithfully ported would still fail it.
+// in this file whose answer does not come from the corpus, so a recorded bug
+// faithfully reproduced would still fail it.
 func bruteForceAtLeast(population, successes, draws, wanted int) *big.Rat {
 	hits := big.NewInt(0)
 	total := big.NewInt(0)
@@ -409,7 +410,7 @@ func bruteForceAtLeast(population, successes, draws, wanted int) *big.Rat {
 }
 
 func TestHypergeometricMatchesExhaustiveEnumeration(t *testing.T) {
-	// The cases `tests/test_karsten.py` names, which are the cases somebody
+	// The long-standing case list, which is the cases somebody
 	// was once wrong about.
 	for _, c := range [][4]int{
 		{12, 5, 4, 1}, {12, 5, 4, 2}, {12, 5, 4, 3}, {12, 5, 4, 5},
@@ -475,7 +476,7 @@ func TestAtLeastIsMonotoneInEveryArgumentThatShouldMoveIt(t *testing.T) {
 	}
 }
 
-// ------------------------------------------------- the pinned Python traps
+// -------------------------------------------------------- the pinned traps
 
 func TestCardsSeenCountsTheSkippedDrawStep(t *testing.T) {
 	for _, c := range []struct {

@@ -10,21 +10,27 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
 )
 
-// Python's `json.dumps(..., sort_keys=True, separators=(",", ":"),
-// ensure_ascii=True)`, written out rather than delegated to `encoding/json`.
+// The cache key's canonical JSON: sorted keys, minimal separators, every
+// non-ASCII rune escaped -- written out rather than delegated to
+// `encoding/json`.
 //
-// The key is a **sha256 over these bytes**, so this is one of the few places
-// in the port where "equivalent JSON" is not equivalent at all. Three
-// differences would each have produced a silently different key:
+// The key is a **sha256 over these bytes**, so this is one of the few
+// places where "equivalent JSON" is not equivalent at all: every stored key
+// was computed over exactly this layout, and a byte of drift silently
+// orphans every row. Three `encoding/json` behaviours would each have
+// produced a different key:
 //
-//   - **Go escapes `<`, `>` and `&`; Python does not.** `SetEscapeHTML(false)`
+//   - **`encoding/json` escapes `<`, `>` and `&`; the recorded layout does
+//     not.** `SetEscapeHTML(false)`
 //     fixes that one, and it is the one everybody knows.
-//   - **`ensure_ascii=True` escapes every non-ASCII rune as `\uXXXX`, with a
-//     surrogate pair above the BMP; Go emits raw UTF-8.** This is not exotic
+//   - **the recorded layout escapes every non-ASCII rune as `\uXXXX`, with a
+//     surrogate pair above the BMP; `encoding/json` emits raw UTF-8.** This
+//     is not exotic
 //     input: the pool holds Bösium Strip, Déjà Vu and Círdan the Shipwright,
-//     so a real deck would have keyed differently in the two runtimes for a
+//     so raw UTF-8 would orphan a real deck's stored rows for a
 //     reason nobody chose.
-//   - **A float renders as CPython's `repr`**, which switches to exponential
+//   - **a float renders in the canonical decimal form** (`tier1.ReprFloat`),
+//     which switches to exponential
 //     notation at different boundaries than Go's `%g`. `Extra` carries
 //     `mulligan.Flat` (0.25), so the path is live rather than theoretical.
 //
@@ -32,15 +38,15 @@ import (
 // an encoder and a `json.Marshaler`, and never through the second. Writing the
 // bytes is shorter than the workaround and says what it means.
 
-// writeString is `json.encoder.encode_basestring_ascii`.
+// writeString is the key's ASCII-only string form.
 //
 // Escapes: `"` and `\`; the five short forms `\b \f \n \r \t`; everything
 // below 0x20 and everything **above 0x7e** as `\uXXXX`, lower-case hex. `/`
 // is not escaped, and neither are `<`, `>` or `&`.
 //
-// A rune above the BMP becomes a UTF-16 surrogate pair, because Python's
-// encoder works in UTF-16 code units. Invalid UTF-8 in a Go string decodes to
-// U+FFFD, which is a shape a Python `str` cannot hold at all -- there is no
+// A rune above the BMP becomes a UTF-16 surrogate pair -- the recorded
+// layout counts in UTF-16 code units. Invalid UTF-8 in a Go string decodes
+// to U+FFFD, a shape no stored key has ever carried -- there is no
 // faithful answer, and the replacement character is at least a stable one.
 func writeString(b *strings.Builder, s string) {
 	b.WriteByte('"')
@@ -143,8 +149,8 @@ func writeAny(b *strings.Builder, v any) {
 		for name := range x {
 			names = append(names, name)
 		}
-		// `sort_keys=True` sorts by code point; Go compares bytes, and for
-		// valid UTF-8 the two orders are the same.
+		// The recorded order sorts keys by code point; Go compares bytes,
+		// and for valid UTF-8 the two orders are the same.
 		sort.Strings(names)
 		b.WriteByte('{')
 		for i, name := range names {
@@ -160,10 +166,10 @@ func writeAny(b *strings.Builder, v any) {
 	}
 }
 
-// writeFloat is `json`'s float, which is `float.__repr__` for a finite value
-// and the three bare words for the others.
+// writeFloat is the key's float form: the canonical decimal rendering for a
+// finite value and the three bare words for the others.
 //
-// `tier1.ReprFloat` already reproduces CPython's rendering, corpus and all, so
+// `tier1.ReprFloat` already carries that rendering, corpus and all, so
 // this borrows it rather than growing a second one -- the same reasoning that
 // keeps `sim.Round` the only banker's-rounding implementation in the module.
 func writeFloat(b *strings.Builder, f float64) {

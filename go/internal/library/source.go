@@ -1,5 +1,4 @@
-// Package library is `decks/source.py`, `decks/sqlsource.py` and
-// `decks/library.py` on the read side: where decks come from, and which
+// Package library is where decks come from, and which
 // decks a caller may see (ADR 22). A Source is **one person's library**,
 // slug-keyed; a Library resolves the owner segment of
 // `/api/decks/{owner}/{slug}` to a Source, so a handler asks a source for a
@@ -12,15 +11,15 @@
 //
 // A private deck is **absent** from the source, so every verb against it is
 // ErrNotFound -> 404 before writability is consulted; a shared deck is
-// present but read-only (the writes are Phase 4's, and `Writable` is
-// reported here so the wire's `writable` field can say what it says today).
-// Hence the rule: 403 is only ever an answer about a deck the caller can
-// already read.
+// present but read-only (`Writable` is reported here so the wire's
+// `writable` field can say what it says today; the refusal itself belongs
+// to the write layer). Hence the rule: 403 is only ever an answer about a
+// deck the caller can already read.
 //
-// Reads only, this phase. The file tier reads `<root>/<slug>/deck.yaml` and
-// `<slug>/artifacts/`; the SQL tier reads `user_decks` and
-// `user_deck_artifacts` in `app.db`, opened read-only -- Python still owns
-// every write and the schema ladder (ADR 38; PLAN risk 6).
+// This file is the read side. The file tier reads `<root>/<slug>/deck.yaml`
+// and `<slug>/artifacts/`; the SQL tier reads `user_decks` and
+// `user_deck_artifacts` in `app.db`, opened read-only -- the write half
+// lives in write.go, on its own handle.
 package library
 
 import (
@@ -38,29 +37,29 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 )
 
-// ErrNotFound is `DeckNotFound`: raised so the route layer can turn it into
-// a 404 without guessing. The text is what the 404 says: `no deck '<x>'`.
+// ErrNotFound is the missing-deck refusal, typed so the route layer can
+// turn it into a 404 without guessing. The text is what the 404 says:
+// `no deck '<x>'`.
 type ErrNotFound struct{ Slug string }
 
 func (e ErrNotFound) Error() string { return "no deck '" + e.Slug + "'" }
 
-// ErrArtifactNotFound is `ArtifactNotFound`: a deliverable this deck has not
-// got -- never built, built with no `swaps.md` to write, or a name that is
-// not a deliverable at all; one answer, on purpose.
+// ErrArtifactNotFound is a deliverable this deck has not got -- never
+// built, built with no `swaps.md` to write, or a name that is not a
+// deliverable at all; one answer, on purpose.
 type ErrArtifactNotFound struct{ Name string }
 
 func (e ErrArtifactNotFound) Error() string { return "no artifact '" + e.Name + "'" }
 
-// Deliverables is `artifacts.generate.DELIVERABLES`: the served set and the
-// path-traversal guard in one. `Snapshot` is deliberately outside it.
+// Deliverables is the served set and the path-traversal guard in one.
+// `Snapshot` is deliberately outside it.
 //
-// Both are the renderer's, and named again here for the reason `source.py`
-// imports them from `artifacts.generate` rather than restating them: the set a
-// reader may ask for and the set a rebuild prunes have to be the same list, and
-// the only way to guarantee that is for there to be one.
+// Both are the renderer's, re-exported here rather than restated: the set a
+// reader may ask for and the set a rebuild prunes have to be the same list,
+// and the only way to guarantee that is for there to be one.
 var Deliverables = artifacts.Deliverables
 
-// Snapshot is `artifacts.generate.SNAPSHOT`: the build's own baseline.
+// Snapshot is the build's own baseline, the renderer's name re-exported.
 const Snapshot = artifacts.Snapshot
 
 func isDeliverable(name string) bool { return artifacts.IsDeliverable(name) }
@@ -72,7 +71,7 @@ type Artifact struct {
 	BuiltAt time.Time
 }
 
-// Source is `DeckSource`, the read side: the questions the API asks about a
+// Source is the read side: the questions the API asks about a
 // person's decks.
 type Source interface {
 	// Slugs is every deck's slug, without parsing any of them.
@@ -90,10 +89,10 @@ type Source interface {
 	// ReadBaseline is the last build's snapshot, or "" with false.
 	ReadBaseline(ctx context.Context, slug string) (string, bool, error)
 	// Writable is whether this caller may edit these decks -- reported, so
-	// the UI can hide a control; the refusal itself is the writes' (Phase 4).
+	// the UI can hide a control; the refusal itself is the write layer's.
 	Writable() bool
-	// OwnerID is `service.owner_id_of`: nil for the file tier, the account
-	// for the SQL tier -- how the activity log keys a deck.
+	// OwnerID is nil for the file tier, the account for the SQL tier --
+	// how the activity log keys a deck.
 	OwnerID() *int64
 }
 

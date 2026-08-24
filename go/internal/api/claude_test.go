@@ -51,16 +51,17 @@ func TestThePersonaRouteServesTheRosterAndNoPrompt(t *testing.T) {
 		t.Errorf("roster is %d entries default %q, want %d / %q",
 			len(got.Personas), got.Default, len(claude.PersonaKeys), claude.DefaultPersona)
 	}
-	// Python builds this dict `personas` first, then `default`; a struct in the
+	// The recorded body is `personas` first, then `default`; a struct in the
 	// wrong field order marshals to different bytes and the goldens hold it.
 	if !strings.HasPrefix(body, `{"personas":`) || !strings.Contains(body, `"default":`) {
-		t.Errorf("field order is not Python's:\n%s", body[:60])
+		t.Errorf("field order is not the recorded one:\n%s", body[:60])
 	}
 }
 
 // TestTheTarotRouteDealsFromTheSeedItIsGiven covers the query-string half,
-// which is where this route's real divergences live: Starlette takes the LAST
-// repeated value where Go's Query().Get takes the first, and Pydantic's
+// which is where this route's real divergences live: the recorded reading
+// takes the LAST
+// repeated value where Go's Query().Get takes the first, and the recorded
 // integer grammar accepts three spellings strconv refuses.
 func TestTheTarotRouteDealsFromTheSeedItIsGiven(t *testing.T) {
 	route := claudeRoute(t, "/api/tarot/reading")
@@ -90,7 +91,8 @@ func TestTheTarotRouteDealsFromTheSeedItIsGiven(t *testing.T) {
 		t.Errorf("repeated seed: took the first, not the last: %s", nine[:40])
 	}
 
-	// The three spellings Pydantic accepts and strconv.ParseInt does not.
+	// The three spellings the recorded grammar accepts and strconv.ParseInt
+	// does not.
 	for target, wantSeed := range map[string]string{
 		"/api/tarot/reading?seed=1_0":     `{"seed":10,`,
 		"/api/tarot/reading?seed=+7":      `{"seed":7,`,
@@ -99,7 +101,7 @@ func TestTheTarotRouteDealsFromTheSeedItIsGiven(t *testing.T) {
 	} {
 		code, body := deal(target)
 		if code != http.StatusOK {
-			t.Errorf("%s: %d, want 200 — Python answers this one", target, code)
+			t.Errorf("%s: %d, want 200 — the record answers this one", target, code)
 			continue
 		}
 		if !strings.HasPrefix(body, wantSeed) {
@@ -107,13 +109,14 @@ func TestTheTarotRouteDealsFromTheSeedItIsGiven(t *testing.T) {
 		}
 	}
 
-	// And what it refuses, as FastAPI's own 422. An EMPTY value is a refusal,
+	// And what it refuses, as the validation 422. An EMPTY value is a
+	// refusal,
 	// not a fresh deal — measured against the real route, because the opposite
 	// is the natural thing to write.
 	for _, target := range []string{
 		"/api/tarot/reading?seed=abc", "/api/tarot/reading?seed=7.5",
 		"/api/tarot/reading?seed=", "/api/tarot/reading?seed=_7",
-		"/api/tarot/reading?seed=%EF%BC%97", // fullwidth 7: int() takes it, Pydantic does not
+		"/api/tarot/reading?seed=%EF%BC%97", // fullwidth 7: the body grammar takes it, the query grammar does not
 	} {
 		code, body := deal(target)
 		if code != http.StatusUnprocessableEntity {
@@ -121,7 +124,7 @@ func TestTheTarotRouteDealsFromTheSeedItIsGiven(t *testing.T) {
 			continue
 		}
 		if !strings.Contains(body, `"int_parsing"`) || !strings.Contains(body, `"query"`) {
-			t.Errorf("%s: not FastAPI's int_parsing shape: %s", target, body)
+			t.Errorf("%s: not the recorded int_parsing shape: %s", target, body)
 		}
 	}
 

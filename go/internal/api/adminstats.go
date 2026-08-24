@@ -1,14 +1,12 @@
-// The admin dashboard's numbers — `api/adminstats.py`, the last route family
-// to cross (Phase 8). Everything lives under the admin prefix the middleware
+// The admin dashboard's numbers. Everything lives under the admin prefix
+// the middleware
 // refuses before routing (ADR 17), and every handler also asks
-// `requireAdmin`, the same two walls Python keeps.
+// `requireAdmin` — the same two walls the rest of the admin family keeps.
 //
-// All the views are facts about this box, read from the box. Two couplings
-// dissolved to let them cross: the job registry census is the door's own now
-// (no Python route creates a job any more, so uvicorn's registry is always
-// empty and this one is the honest total), and `_rss` reports the process on
-// the port — which during the last of the coexistence is the door rather
-// than the pair, and at retirement is simply the process.
+// All the views are facts about this box, read from the box: the job
+// registry census is this process's own — the only registry there is, so
+// the count is the honest total — and the memory view reports the process
+// answering the port, which is simply this one.
 
 package api
 
@@ -23,8 +21,8 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/prices"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 
@@ -44,7 +42,7 @@ func (a *API) statsSystem(w http.ResponseWriter, r *http.Request) {
 	loads := loadAverages()
 	loadOut := make([]any, 0, len(loads))
 	for _, l := range loads {
-		loadOut = append(loadOut, pyfloat.Float(l))
+		loadOut = append(loadOut, floats.Float(l))
 	}
 	total, used, free := diskUsage(a.dataDir)
 	wire.JSON(w, http.StatusOK, wire.OrderedMap{
@@ -215,8 +213,8 @@ func (a *API) statsClaude(w http.ResponseWriter, r *http.Request) {
 	if a.requireAdmin(w, r) {
 		return
 	}
-	// An instance with no app.db answers the shapes Python answers over the
-	// empty database `db.connection()` would mint there: empty roll-ups,
+	// An instance with no app.db answers the shapes an empty database
+	// would answer: empty roll-ups,
 	// never a 404 — the stats are about the instance, not about an account.
 	db, present := a.accountsDB()
 	rec := a.claudeLedger
@@ -282,8 +280,8 @@ func (a *API) statsClaude(w http.ResponseWriter, r *http.Request) {
 // labelled is each row plus how to name the model on a screen — beside the
 // id, never instead of it (commandment 10: the label renders, the id is
 // what the pricing question is about). The key order follows the axis: the
-// grouped column first, then `(various)` — the SELECT order a `dict(row)`
-// preserves in Python.
+// grouped column first, then `(various)` — the SELECT order, which is the
+// recorded key order.
 func labelled(rows []ledger.Summary, by string) []wire.OrderedMap {
 	out := make([]wire.OrderedMap, 0, len(rows))
 	for _, row := range rows {
@@ -349,8 +347,8 @@ func (a *API) statsActivity(w http.ResponseWriter, r *http.Request) {
 	if a.requireAdmin(w, r) {
 		return
 	}
-	// Like `statsClaude`: an absent app.db is Python's freshly-minted empty
-	// one — zeroes and empty lists, never a 404.
+	// Like `statsClaude`: an absent app.db answers as a freshly-minted
+	// empty one — zeroes and empty lists, never a 404.
 	db, present := a.accountsDB()
 	if !present {
 		census := map[string]int{}
@@ -375,8 +373,8 @@ func (a *API) statsActivity(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, "stats/activity", err)
 		return
 	}
-	// First-encounter order over the username-sorted list, exactly the
-	// order Python's dict grows in.
+	// First-encounter order over the username-sorted list -- the recorded
+	// key order for the states map.
 	states := wire.OrderedMap{}
 	for _, u := range users {
 		state, err := accountState(ctx, db, u)
@@ -451,10 +449,10 @@ func (a *API) statsActivity(w http.ResponseWriter, r *http.Request) {
 				}},
 				{Key: "deck_edits_by_day", Value: edits},
 				{Key: "sim_cache_rows", Value: simRows},
-				// A Python dict's order here is whatever order statuses were
-				// first seen in an arbitrary registry walk — not a shape any
-				// golden can hold — so the sorted rendering a Go map gets is
-				// one of the orders Python itself produces.
+				// The census's key order was never a shape: statuses appear
+				// in whatever order an arbitrary registry walk first meets
+				// them, which no golden can hold — so the sorted rendering
+				// a Go map gets is as recorded as any other order.
 				{Key: "jobs", Value: census},
 			})
 			return
@@ -463,7 +461,6 @@ func (a *API) statsActivity(w http.ResponseWriter, r *http.Request) {
 	a.fail(w, "stats/activity", err)
 }
 
-// The four account states come from `accountState` in admin.go — Python
-// restates `_user_state` beside `_state` so a disagreement is visible on one
-// page, but the two are the same predicate and this port's admin surface
-// already carries it; a second copy here would be the drift, not the guard.
+// The four account states come from `accountState` in admin.go — one
+// predicate, deliberately not restated here: the admin surface
+// already carries it, and a second copy would be the drift, not the guard.

@@ -1,14 +1,13 @@
-// Package claude is src/mtglab/claude ported: the dial, the voices, the modes,
+// Package claude is the Claude surface: the dial, the voices, the modes,
 // and the pipe that reaches Anthropic.
 //
-// The order the port takes is the order the Python was written in, and for the
-// same reason. The stance came first there — before any mode existed —
-// because it is the frame every mode plugs into, and retrofitting a gate
+// The stance stands first and alone, deliberately. It predates every mode —
+// it is the frame every mode plugs into, and retrofitting a gate
 // around modes that already exist is how the gate ends up with holes in it.
 // Seven modes plugged into it without changing it, which is the evidence that
-// the order was right; this file therefore ports it first and alone.
+// the order was right.
 //
-// Two invariants cross with the code and are not negotiable at any stance:
+// Two invariants ride with the code and are not negotiable at any stance:
 //
 //   - **Off means no calls.** AllowsCalls reports false and nothing reaches the
 //     network. That is a trust property first and a cost control second, and it
@@ -38,9 +37,9 @@ var (
 	Write      = []string{"none", "proposes", "applies"}
 )
 
-// Axes is the field order Python's AXES tuple has, which is also the order
-// describe() renders them in. A map would alphabetise the wire; this is a
-// slice for the reason every ported payload is a struct.
+// Axes is the recorded field order, which is also the order
+// Describe renders them in. A map would alphabetise the wire; this is a
+// slice for the reason every served payload is a struct.
 var Axes = []string{"initiative", "scope", "write"}
 
 var levels = map[string][]string{
@@ -68,12 +67,12 @@ var levelMeanings = map[[2]string]string{
 	{"write", "applies"}:         "It may make reversible edits without asking each time.",
 }
 
-// index is Python's _index: the level's position on its axis, or an error
-// worded exactly as Python words it, since both strings reach a 422 body.
+// index is the level's position on its axis, or an error in the recorded
+// wording, since both strings reach a 422 body.
 func index(axis, level string) (int, error) {
 	ordered, ok := levels[axis]
 	if !ok {
-		return 0, fmt.Errorf("%s is not one of %s", wire.PyRepr(axis), strings.Join(Axes, ", "))
+		return 0, fmt.Errorf("%s is not one of %s", wire.Quote(axis), strings.Join(Axes, ", "))
 	}
 	for i, candidate := range ordered {
 		if candidate == level {
@@ -81,13 +80,13 @@ func index(axis, level string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("%s is not a %s level; expected one of %s",
-		wire.PyRepr(level), axis, strings.Join(ordered, ", "))
+		wire.Quote(level), axis, strings.Join(ordered, ", "))
 }
 
 // Stance is one setting of the three axes.
 //
-// A value type rather than a pointer, which is Go's spelling of Python's
-// frozen dataclass: a mode that could edit the stance it was handed would be
+// A value type rather than a pointer, so a stance is frozen in the hand
+// that holds it: a mode that could edit the stance it was handed would be
 // widening its own dial, the one thing ADR 15 says a stance is for preventing.
 type Stance struct {
 	Initiative string
@@ -118,7 +117,7 @@ func (s *Stance) set(axis, level string) {
 	}
 }
 
-// Validate is Python's __post_init__, which a Go struct literal cannot run for
+// Validate is the construction check a Go struct literal cannot run for
 // itself. Every constructor here calls it; a hand-built Stance is the caller's
 // to check, and the constructors exist so that it rarely has to be.
 func (s Stance) Validate() error {
@@ -180,8 +179,8 @@ var (
 	Collaborator = Stance{"volunteers", "rethink", "proposes"}
 )
 
-// PresetNames is insertion order, not sorted order: it is what describe() and
-// the /api/claude payload iterate, and Python's dict keeps the order below.
+// PresetNames is presentation order, not sorted order: it is what Describe
+// and the /api/claude payload iterate, and the order is the recorded one.
 var PresetNames = []string{"off", "consultant", "second-opinion", "collaborator"}
 
 var presets = map[string]Stance{
@@ -204,8 +203,8 @@ var PresetBlurbs = map[string]string{
 }
 
 // Preset resolves a preset by name, refusing an unknown one rather than
-// guessing. The refusal lists what there is, sorted — Python builds that list
-// with sorted(PRESETS), which is not PresetNames' order, and the string
+// guessing. The refusal lists what there is, sorted — deliberately not
+// PresetNames' order — and the string
 // reaches a 422 body.
 func Preset(name string) (Stance, error) {
 	key := strings.ToLower(strings.TrimSpace(name))
@@ -218,7 +217,7 @@ func Preset(name string) (Stance, error) {
 	}
 	sort.Strings(known)
 	return Stance{}, fmt.Errorf("%s is not a stance preset; expected one of %s",
-		wire.PyRepr(name), strings.Join(known, ", "))
+		wire.Quote(name), strings.Join(known, ", "))
 }
 
 // DeckStatused is what DefaultFor needs of a deck, which is one string. The

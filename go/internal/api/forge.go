@@ -11,14 +11,14 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// `api/forgeruns.py` and `app.py`'s two Forge routes: Tier 3 matches, shaped
+// The two Forge routes: Tier 3 matches, shaped
 // for the UI (ADR 35).
 //
 // Tier 3 reaches the app the way every slow thing does — a job — with the
@@ -29,8 +29,8 @@ import (
 // pre-flight reads a zip on the request thread and was designed to.
 //
 // Unlike the sim family, planning failures here are *not* deferred into the
-// job. That deferral exists over there for compatibility; this surface was new
-// when it was written, so it got the honest shape from day one: distinct
+// job. That deferral is the sim family's recorded contract; this surface was
+// new when it was written, so it got the honest shape from day one: distinct
 // refusals with status codes, and a job that only ever fails for runtime
 // reasons.
 //
@@ -47,11 +47,6 @@ import (
 // under us; until someone measures that a repeat ask is common, in-flight
 // dedupe is the whole memory.
 //
-// **This is the last job-submitting family to flip** (Phase 7). Until it did,
-// it was the only thing keeping the hybrid poll handler's proxy branch alive;
-// see `jobruns.go`, where that branch now has a test that plants a real job on
-// the upstream rather than one that passes because nothing answered.
-
 // ForgeKind is what `/api/jobs` calls one of these.
 const ForgeKind = "sim.forge"
 
@@ -77,7 +72,7 @@ const (
 	ForgeGamesMax = 20
 )
 
-// forgeStatus is `forgeruns.status`: is the Forge reachable from this process?
+// forgeStatus answers: is the Forge reachable from this process?
 // A fact about the environment.
 //
 // Two environments, one contract. With the hosted worker configured (ADR 35's
@@ -113,25 +108,25 @@ func (a *API) forgeGate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// forgeGames is `_games`: clamped to the cap, and never below one.
+// forgeGames is the games dial: clamped to the cap, and never below one.
 //
-// `int(payload.get("games", GAMES_DEFAULT))` reproduced through Python's own
-// `int()` grammar, which is not `strconv.Atoi` — `"1_0"` is ten, a float
-// truncates, and a bool is 0 or 1. A value `int()` refuses raises where Python
-// raises, and that is a **wart, reproduced rather than tidied**: `plan_forge`
-// runs in the request with no handler for a ValueError, so `{"games": "many"}`
+// The count goes through the recorded integer grammar
+// (`claude.IntValue`), which is not `strconv.Atoi` — `"1_0"` is ten, a float
+// truncates, and a bool is 0 or 1. A value the grammar refuses raises,
+// and that is a **wart, recorded rather than tidied**: the plan
+// runs in the request with no handler for it, so `{"games": "many"}`
 // is an uncaught 500 rather than the 422 it should be. Pinned by
-// `TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives`.
+// `TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred`.
 func forgeGames(body map[string]any) (int, error) {
 	raw, ok := body["games"]
 	if !ok {
 		raw = ForgeGamesDefault
 	}
-	n, err := claude.PyInt(raw)
+	n, err := claude.IntValue(raw)
 	if err != nil {
 		return 0, err
 	}
-	// `max(1, min(n, GAMES_MAX))` over an unbounded integer.
+	// Clamped into [1, ForgeGamesMax] over an unbounded integer.
 	if n.Cmp(big.NewInt(ForgeGamesMax)) > 0 {
 		return ForgeGamesMax, nil
 	}
@@ -141,9 +136,11 @@ func forgeGames(body map[string]any) (int, error) {
 	return int(n.Int64()), nil
 }
 
-// forgeSeed is `_seed`: the default when absent or empty, otherwise `int(raw)`.
+// forgeSeed is the seed dial: the default when absent or empty, otherwise
+// the recorded integer grammar.
 //
-// A `*big.Int` because Python's integers are unbounded and the seed is echoed
+// A `*big.Int` because the recorded grammar is unbounded and the seed is
+// echoed
 // into the result, the dedupe key and Forge's own command line as text. An
 // int64 would silently answer a different number for a seed past 2**63, and a
 // seed is a promise.
@@ -155,7 +152,7 @@ func forgeSeed(body map[string]any) (*big.Int, error) {
 	if s, isString := raw.(string); isString && s == "" {
 		return big.NewInt(DefaultSeed), nil
 	}
-	return claude.PyInt(raw)
+	return claude.IntValue(raw)
 }
 
 // forgeRow is one game as the client renders it, whichever moment it arrives
@@ -169,20 +166,20 @@ func forgeSeed(body map[string]any) (*big.Int, error) {
 type forgeRow struct {
 	Game   int     `json:"game"`
 	Winner *string `json:"winner"`
-	// Seconds is a `pyfloat.Float` and not a `float64`, which is the one
+	// Seconds is a `floats.Float` and not a `float64`, which is the one
 	// thing about this struct that has to be decided rather than typed:
-	// `round(4000/1000, 1)` is `4.0`, Python writes `4.0`, and
+	// four seconds rounded to one place is recorded as `4.0`, and
 	// `encoding/json` writes `4`. Same number to a client, different bytes
 	// in DevTools and in anything that ever hashes this payload.
-	Seconds  pyfloat.Float `json:"seconds"`
-	Turns    *int          `json:"turns"`
-	Draw     bool          `json:"draw"`
-	TimedOut bool          `json:"timed_out"`
+	Seconds  floats.Float `json:"seconds"`
+	Turns    *int         `json:"turns"`
+	Draw     bool         `json:"draw"`
+	TimedOut bool         `json:"timed_out"`
 }
 
 func newForgeRow(g tier3.GameResult, slug *string) forgeRow {
 	row := forgeRow{Game: g.Index,
-		Seconds:  pyfloat.Float(pyfloat.RoundTo(float64(g.Milliseconds)/1000, 1)),
+		Seconds:  floats.Float(floats.RoundTo(float64(g.Milliseconds)/1000, 1)),
 		Turns:    g.Turns,
 		Draw:     g.Draw && !g.TimedOut,
 		TimedOut: g.TimedOut}
@@ -203,19 +200,19 @@ type forgeSeat struct {
 // forgeResult is the payload a match becomes. Medians and tails, never a mean
 // alone.
 type forgeResult struct {
-	Decks          []forgeSeat    `json:"decks"`
-	Games          int            `json:"games"`
-	Played         int            `json:"played"`
-	Draws          int            `json:"draws"`
-	TimedOut       int            `json:"timed_out"`
-	MedianSeconds  *pyfloat.Float `json:"median_seconds"`
-	MaxSeconds     *pyfloat.Float `json:"max_seconds"`
-	StartupSeconds pyfloat.Float  `json:"startup_seconds"`
-	WallSeconds    pyfloat.Float  `json:"wall_seconds"`
-	Clock          int            `json:"clock"`
-	Seed           *big.Int       `json:"seed"`
-	Rows           []forgeRow     `json:"rows"`
-	Caveat         string         `json:"caveat"`
+	Decks          []forgeSeat   `json:"decks"`
+	Games          int           `json:"games"`
+	Played         int           `json:"played"`
+	Draws          int           `json:"draws"`
+	TimedOut       int           `json:"timed_out"`
+	MedianSeconds  *floats.Float `json:"median_seconds"`
+	MaxSeconds     *floats.Float `json:"max_seconds"`
+	StartupSeconds floats.Float  `json:"startup_seconds"`
+	WallSeconds    floats.Float  `json:"wall_seconds"`
+	Clock          int           `json:"clock"`
+	Seed           *big.Int      `json:"seed"`
+	Rows           []forgeRow    `json:"rows"`
+	Caveat         string        `json:"caveat"`
 }
 
 // forgePartial is what the job's `partial` carries while the match plays.
@@ -223,14 +220,14 @@ type forgePartial struct {
 	Rows []forgeRow `json:"rows"`
 }
 
-// shapeForge is `_shape`.
+// shapeForge shapes the finished match.
 //
 // `wins` is counted per seat and reported per deck; real draws and clock-outs
 // are separate columns because they are separate facts (the parser keeps them
 // apart and this must not fold them back).
 //
 // **A deck played against itself reports the combined total on both lines**,
-// and that is Python's, reproduced rather than fixed: `wins` is keyed on the
+// a recorded wart, kept rather than fixed: `wins` is keyed on the
 // slug, so `a_slug == b_slug` collapses two seats into one counter. Unreachable
 // only by convention — nothing refuses the request — and pinned by
 // `TestADeckPlayedAgainstItselfShowsTheCombinedWins`, because the guard beats
@@ -270,8 +267,8 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		Decks:          make([]forgeSeat, 0, len(decks)),
 		Games:          games,
 		Played:         len(rows),
-		StartupSeconds: pyfloat.Float(pyfloat.RoundTo(run.StartupSeconds(), 1)),
-		WallSeconds:    pyfloat.Float(pyfloat.RoundTo(run.WallSeconds, 1)),
+		StartupSeconds: floats.Float(floats.RoundTo(run.StartupSeconds(), 1)),
+		WallSeconds:    floats.Float(floats.RoundTo(run.WallSeconds, 1)),
 		Clock:          ForgeClock,
 		Seed:           seed,
 		Rows:           rows,
@@ -290,9 +287,9 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		}
 	}
 	if len(seconds) > 0 {
-		median := pyfloat.Float(pyfloat.RoundTo(pyMedian(seconds), 1))
+		median := floats.Float(floats.RoundTo(medianOf(seconds), 1))
 		out.MedianSeconds = &median
-		max := pyfloat.Float(seconds[len(seconds)-1])
+		max := floats.Float(seconds[len(seconds)-1])
 		out.MaxSeconds = &max
 	}
 	if out.Rows == nil {
@@ -301,13 +298,13 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 	return out
 }
 
-// pyMedian is `statistics.median` over an already-sorted slice: the middle
+// medianOf is the median over an already-sorted slice: the middle
 // value, or the mean of the two middle values.
 //
 // The two-term mean is a single correctly-rounded addition, so it is the same
-// number under `fsum` and under `+` — the one float sum in this file that
-// needs no argument about which interpreter it agrees with.
-func pyMedian(sorted []float64) float64 {
+// number under `Fsum` and under `+` — the one float sum in this file that
+// needs no argument about how it accumulates.
+func medianOf(sorted []float64) float64 {
 	n := len(sorted)
 	i := n / 2
 	if n%2 == 1 {
@@ -343,10 +340,10 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 	var pairs []pair
 	for _, side := range []string{"a", "b"} {
 		raw := body[side+"_slug"]
-		// `if not slug` — the raw value's truthiness, before `str()`. A `0`
+		// The raw value's truthiness, before the stringification. A `0`
 		// or an empty list is falsy and refused here; a non-empty list is
 		// truthy and becomes a slug that no deck has, which is a 404.
-		if !pyTruthy(raw) {
+		if !truthy(raw) {
 			wire.Detail(w, http.StatusUnprocessableEntity, side+"_slug is required")
 			return
 		}
@@ -357,7 +354,7 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		pairs = append(pairs, pair{owner: owner, slug: str(body, side+"_slug")})
 	}
 
-	// The gate before the decks, exactly as Python orders it: an instance
+	// The gate before the decks -- the recorded order: an instance
 	// with no Forge answers 503 without ever asking the library who these
 	// people are.
 	if available, why := forgeStatus(); !available {
@@ -409,12 +406,12 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 
 	plan, err := a.planForge(decks, addresses, ownerIDs, body, hosted)
 	if err != nil {
-		// `int()` refused the games count or the seed. **Python's 500**, and
-		// reproduced exactly: `plan_forge` runs in the request with nothing
-		// catching a ValueError there, so Starlette answers its plain-text
-		// three words -- not a JSON detail, which is what this wrote until
-		// Phase 8's wheel port measured the real bytes. See [forgeGames].
-		pythonUncaught(w, a.log, "forge", err)
+		// The integer grammar refused the games count or the seed. **The
+		// recorded uncaught 500**, kept exactly: the plan runs in the
+		// request with nothing catching the refusal, so the answer is the
+		// plain-text three words -- not a JSON detail, which is what this
+		// wrote until the real bytes were measured. See [forgeGames].
+		uncaught500(w, a.log, "forge", err)
 		return
 	}
 	a.submit(w, r, plan)

@@ -110,11 +110,11 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 	}
 	if !contains(model.DeckStatuses, d.Status) {
 		rep.add("error", "deck-status", fmt.Sprintf("status %s is not one of %s",
-			wire.PyRepr(d.Status), strings.Join(model.DeckStatuses, ", ")), "")
+			wire.Quote(d.Status), strings.Join(model.DeckStatuses, ", ")), "")
 	}
 	if !contains(model.DeckStages, d.Stage) {
 		rep.add("error", "deck-stage", fmt.Sprintf("stage %s is not one of %s",
-			wire.PyRepr(d.Stage), strings.Join(model.DeckStages, ", ")), "")
+			wire.Quote(d.Stage), strings.Join(model.DeckStages, ", ")), "")
 	}
 	drafting := d.Stage == "draft"
 
@@ -123,7 +123,7 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 		detail := ""
 		if reference.ArchetypeIndex(d.LegacyArchetype) < 0 {
 			detail = fmt.Sprintf("archetype %s is not a class the boards know, so it counts for nothing; ",
-				wire.PyRepr(d.LegacyArchetype))
+				wire.Quote(d.LegacyArchetype))
 		}
 		rep.add("warn", "legacy-archetype", fmt.Sprintf("%s`archetype:` is a legacy key (ADR 37): declare a "+
 			"strategy word in `themes` instead -- %s -- and the edit that does will drop this key itself",
@@ -132,7 +132,7 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 	for _, theme := range d.Themes {
 		if !reference.IsTheme(theme) {
 			rep.add("warn", "unknown-theme", fmt.Sprintf("theme %s is not in the vocabulary; the list "+
-				"grows by editing THEMES in decks/model.py", wire.PyRepr(theme)), "")
+				"grows by editing THEMES in decks/model.py", wire.Quote(theme)), "")
 		}
 	}
 
@@ -203,7 +203,7 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 	for _, card := range d.Cards {
 		if !reference.IsCategory(card.Category) {
 			rep.add("warn", "unknown-category", fmt.Sprintf("category %s is not one of %s",
-				wire.PyRepr(card.Category), strings.Join(model.Categories, ", ")), card.Name)
+				wire.Quote(card.Category), strings.Join(model.Categories, ", ")), card.Name)
 		}
 		if strings.TrimSpace(card.Why) == "" && !drafting {
 			rep.add("error", "missing-rationale", "no `why` -- every inclusion must justify itself", card.Name)
@@ -257,7 +257,7 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 					extra = " -- a Background is only legal as a second commander, and this deck lists one"
 				}
 				rep.add("error", "not-a-commander", fmt.Sprintf("type line is %s and it does not say "+
-					"it can be your commander%s", wire.PyRepr(rec.TypeLine), extra), rec.Name)
+					"it can be your commander%s", wire.Quote(rec.TypeLine), extra), rec.Name)
 			}
 		}
 		if len(cmdRecords) == 2 {
@@ -279,11 +279,11 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 			}
 			if card.Category == "land" && !rec.IsLand() {
 				rep.add("warn", "category-mismatch", fmt.Sprintf("filed under 'land' but type line is %s",
-					wire.PyRepr(rec.TypeLine)), card.Name)
+					wire.Quote(rec.TypeLine)), card.Name)
 			}
 			if card.Category != "land" && rec.IsLand() {
 				rep.add("warn", "category-mismatch", fmt.Sprintf("is a land but filed under %s",
-					wire.PyRepr(card.Category)), card.Name)
+					wire.Quote(card.Category)), card.Name)
 			}
 		}
 	}

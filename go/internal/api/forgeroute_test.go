@@ -42,7 +42,7 @@ type stubShim struct {
 	errorType string
 	// hold, when non-nil, blocks the stream after each game until the test
 	// lets it go. That is what makes the match theater observable: a finished
-	// job clears its `partial` (in both runtimes, deliberately — the result is
+	// job clears its `partial` (deliberately — the result is
 	// the whole answer and a leftover partial is a stale second copy of part
 	// of it), so the only place to see a row seated live is *during* the
 	// match.
@@ -217,7 +217,7 @@ func TestAHostedMatchRunsAfterTheRequestHasGone(t *testing.T) {
 // final tally uses.
 //
 // **Observed mid-match, which is the only place it exists.** A finished job
-// clears its partial in both runtimes — the result is the whole answer, and a
+// clears its partial — the result is the whole answer, and a
 // leftover partial is a stale second copy of part of it — so a test that read
 // the partial off a completed job would be asserting `nil` and calling it
 // green. The stub holds the stream between games so the rows can be read
@@ -587,14 +587,14 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 	reg.Wait()
 }
 
-// TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives is the pin the
-// [forgeGames] comment promised and, until Phase 8's wheel port, did not
-// have -- and what it pins moved when the real bytes were measured: an
-// uncaught ValueError in `plan_forge` is Starlette's **plain-text** three
-// words, not a JSON detail. The first Go version answered
+// TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred is the pin the
+// [forgeGames] comment promised and, for a while, did not
+// have -- and what it pins moved when the real bytes were measured: the
+// recorded uncaught 500 is **plain-text** three
+// words, not a JSON detail. The first version of this route answered
 // `{"detail": "invalid literal ..."}` here, a divergence no golden could see
 // because the goldens record shape and no golden records this case at all.
-func TestAGamesCountThatIsNotANumberIsTheFiveHundredPythonGives(t *testing.T) {
+func TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred(t *testing.T) {
 	shim := &stubShim{stream: true}
 	a, _, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)

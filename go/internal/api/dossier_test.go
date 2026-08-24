@@ -23,11 +23,12 @@ import (
 // these prove is the layer above it -- which refusal lands on which status
 // and BEFORE any job, that a stored dossier and a stance of off are jobs born
 // finished, that a real run is a job on the NET lane whose result is the
-// report in Python's key order, that a second click joins the first, and what
+// report in the recorded key order, that a second click joins the first,
+// and what
 // a failed call leaves in the job's error field.
 //
-// The first Claude surface to be a JOB rather than a plain route from the
-// door, so the rig here is the first to wire a registry beside the ledger.
+// The first Claude surface to be a JOB rather than a plain route,
+// so the rig here is the first to wire a registry beside the ledger.
 
 // jobRig is an API with everything a Claude job needs: the pool, the file
 // tier, app.db both ways (the store writes, the ledger writes), and a
@@ -118,7 +119,7 @@ const wholeDossier = `{"who":{"prose":"A bear of Qal Sisma.","source_ids":["s1"]
 
 // ---- the free half ------------------------------------------------------
 
-func TestTheCachedDossierIsFreeAndShapedAsPythons(t *testing.T) {
+func TestTheCachedDossierIsFreeAndShapedAsRecorded(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
 	defer rig.close()
@@ -145,7 +146,7 @@ func TestTheCachedDossierIsFreeAndShapedAsPythons(t *testing.T) {
 		t.Fatalf("%d %s", status, raw)
 	}
 	if _, present := payload["answered_by"]; present || len(payload) != 5 {
-		t.Errorf("the headless shape is %s; Python's early return has five keys and no answered_by", raw)
+		t.Errorf("the headless shape is %s; the recorded early return has five keys and no answered_by", raw)
 	}
 	if payload["commander"] != "" {
 		t.Errorf("headless commander is %v", payload["commander"])
@@ -343,7 +344,7 @@ func TestTwoAsksInFlightAreOneDossierJob(t *testing.T) {
 
 // The 236-second run is the one place nobody is watching, so what it leaves
 // in the job's error field is the whole of what a person gets to debug from
-// -- and it is `explain(exc)`'s sentence, bare, as Python records it.
+// -- and it is `Explain`'s sentence, bare, as the record has it.
 func TestAFailedDossierCallIsAReadableJobError(t *testing.T) {
 	api := &scriptedClaude{replies: []string{"!401"}}
 	api.start(t)
@@ -359,16 +360,16 @@ func TestAFailedDossierCallIsAReadableJobError(t *testing.T) {
 	}
 	errText, _ := done["error"].(string)
 	if !strings.HasPrefix(errText, "the key was rejected (401)") {
-		t.Errorf("the error reads %q; Python records explain()'s sentence and nothing in front of it", errText)
+		t.Errorf("the error reads %q; the record holds Explain's sentence and nothing in front of it", errText)
 	}
 	if done["result"] != nil {
 		t.Errorf("a failed job carries a result: %v", done["result"])
 	}
 }
 
-// The turn ceiling is Python's `ModeExhausted` sentence, full stop included
+// The turn ceiling is the recorded exhaustion sentence, full stop included
 // and nothing in front of it.
-func TestAnExhaustedDossierRecordsPythonsSentence(t *testing.T) {
+func TestAnExhaustedDossierRecordsTheRecordedSentence(t *testing.T) {
 	replies := make([]string, 8)
 	for i := range replies {
 		replies[i] = answer("tool_use", fmt.Sprintf(

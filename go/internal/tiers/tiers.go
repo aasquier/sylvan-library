@@ -1,6 +1,6 @@
-// Package tiers is `mtglab/claude/tiers.py`: which Claude answers for whom.
+// Package tiers is which Claude answers for whom.
 //
-// It crossed in Phase 4, ahead of the Claude surfaces and for a reason that
+// It landed in Phase 4, ahead of the Claude surfaces and for a reason that
 // was not them: `model_tier` is a column on `users`, and every account the
 // admin routes serialise carries the *resolved* key -- so the table had to be
 // readable from the side that writes the account list. `auth.User.AsDict` is
@@ -8,21 +8,22 @@
 //
 // **This paragraph said the Claude surface "has not moved and may never move
 // as a whole" until 2026-08-22**, which Phase 6 then contradicted -- the dial,
-// the voices and the tarot table crossed that day. It is corrected here rather
+// the voices and the tarot table all arrived that day. It is corrected here rather
 // than quietly deleted because the shape of the mistake is the one this
 // repository keeps finding: a sentence about what the rest of the system has
 // not done yet is a claim with an expiry date, and it expires without telling
 // anybody. `LabelFor` below is the part Phase 6 came back for.
 //
-// The three rules Python states, kept here because each is a decision rather
-// than an implementation detail:
+// Three rules, stated here because each is a decision rather than an
+// implementation detail:
 //
 // **A tier is a name, never a model id.** Accounts carry `opus`, not a model
 // id; a model id is a thing that gets superseded and a column full of them is
 // a migration every time. Commandment 10 says the same thing from the user's
 // side: no technology a person may see is ever named. Nothing in this package
-// puts a model id on the wire -- `Roster` returns key, label and blurb, and
-// `Model` exists for the Claude surfaces that have not crossed yet.
+// puts a model id on the wire -- `Roster` returns key, label and blurb,
+// and the `Model` field is read only by the Claude client on its way to
+// the pipe.
 //
 // **An unknown tier resolves to the default rather than erroring.** The
 // column is data on a volume that outlives any deploy, so a key this build no
@@ -85,9 +86,9 @@ var byKey = func() map[string]Tier {
 	for _, t := range All {
 		m[t.Key] = t
 	}
-	// Stated rather than trusted, as Python states it with an assert: Get
-	// falling through to a key that is not in the table would be a very quiet
-	// bug, and this is the one moment it can be caught for free.
+	// Stated rather than trusted: Get falling through to a key that is not
+	// in the table would be a very quiet bug, and this is the one moment it
+	// can be caught for free.
 	if _, ok := m[DefaultKey]; !ok {
 		panic("tiers: the default tier is not in the roster")
 	}

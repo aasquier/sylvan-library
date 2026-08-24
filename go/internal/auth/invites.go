@@ -10,7 +10,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
-// Issue a link and deliver it -- `mtglab/auth/invites.py`. The one
+// Issue a link and deliver it. The one
 // implementation both entry points call.
 //
 // `mtglab users invite` and `POST /api/auth/reset` are the two doors ADR 16

@@ -41,9 +41,9 @@ type compiledRoute struct {
 	handler  http.Handler
 }
 
-// paramRe is a parameter segment: `{name}`, or `{name}.svg` -- FastAPI's
-// `/api/symbols/{code}.svg`, where the parameter takes everything before a
-// literal suffix.
+// paramRe is a parameter segment: `{name}`, or `{name}.svg` -- the
+// `/api/symbols/{code}.svg` shape, where the parameter takes everything
+// before a literal suffix.
 var paramRe = regexp.MustCompile(`^\{([A-Za-z_][A-Za-z0-9_]*)\}([^{}/]*)$`)
 
 // newRouteTable compiles the API's routes, refusing a table that could match
@@ -123,7 +123,8 @@ func isParam(seg string) bool {
 
 // capture matches one request segment against a parameter segment: the
 // name it binds and the value, or false -- a suffix must be there and the
-// value before it must not be empty, as FastAPI's `[^/]+` requires.
+// value before it must not be empty, because a parameter matches one or
+// more characters, never none.
 func capture(seg, part string) (string, string, bool) {
 	m := paramRe.FindStringSubmatch(seg)
 	if m == nil {
@@ -181,8 +182,8 @@ func (t *routeTable) match(r *http.Request) (http.Handler, string, bool) {
 	return nil, "", false
 }
 
-// Patterns is every ported route as `METHOD /path/{template}`, for tests
-// that hold the table to `tests/contract/routes.json`.
+// Patterns is every served route as `METHOD /path/{template}`, for the
+// sweeps that derive their coverage from the table.
 func (t *routeTable) Patterns() []string {
 	out := make([]string, 0, len(t.routes))
 	for _, c := range t.routes {
@@ -193,7 +194,7 @@ func (t *routeTable) Patterns() []string {
 
 // allowed reports whether the request's path matches any route on another
 // method, and the `Allow` value for the 405 -- the first matching route's
-// method, in declaration order, which is how Starlette's router answers it:
+// method, in declaration order, which is the recorded rule:
 // the first partial match handles the refusal with its own methods.
 func (t *routeTable) allowed(r *http.Request) (string, bool) {
 	raw := r.URL.Path

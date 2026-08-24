@@ -25,8 +25,8 @@ import (
 func (a *API) search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var errs []wire.ValidationError
-	// Built field by field, in FastAPI's DECLARATION order, because that is
-	// the order the 422 lists two bad parameters in -- and a struct literal
+	// Built field by field, in the recorded DECLARATION order, because that
+	// is the order the 422 lists two bad parameters in -- and a struct literal
 	// evaluates its fields in the order they are written, which reordered
 	// `limit` ahead of `cmc_max` the first time this was extracted. A test
 	// caught it; the wire shape is the contract, not just the values.
@@ -99,8 +99,8 @@ type identifyReading struct {
 	Candidates []identifyCandidate `json:"candidates"`
 }
 
-// identifyAnswer is what `service.identify_cards` returns: the readings and
-// the four counts, in Python's key order.
+// identifyAnswer is the camera's answer: the readings and
+// the four counts, in the recorded key order.
 type identifyAnswer struct {
 	Readings []identifyReading `json:"readings"`
 	Resolved int               `json:"resolved"`
@@ -109,13 +109,12 @@ type identifyAnswer struct {
 	Dropped  int               `json:"dropped"`
 }
 
-// identifyAgainst is the body of `service.identify_cards`, lifted out of the
+// identifyAgainst is the identification engine, lifted out of the
 // handler because **two callers need it and neither is the other's parent**:
 // the camera's own route, and the scan job, which resolves what Claude
 // transcribed through exactly this door (ADR 34).
 //
-// That is Python's shape too -- `scanruns` calls `service.identify_cards`, the
-// same function the route calls -- and it is the whole architecture in one
+// One function for both callers is the whole architecture in one
 // line: a card read by Claude gets the same scrutiny as a card read by
 // Tesseract, because it goes through the same code rather than through code
 // that merely looks like it. A corner resolves only if its set code is one of
@@ -241,7 +240,7 @@ func (a *API) identify(w http.ResponseWriter, r *http.Request) {
 
 // --------------------------------------------------------- request helpers
 
-// last is what Starlette's QueryParams.get returns for a repeated name: the
+// last is the recorded reading of a repeated query parameter: the
 // last value. Go's Values.Get would return the first.
 func last(q map[string][]string, name string) string {
 	vals := q[name]
@@ -251,8 +250,8 @@ func last(q map[string][]string, name string) string {
 	return vals[len(vals)-1]
 }
 
-// optionalFloat is `name: float | None = None`: absent is (0, false);
-// present and unparseable is pydantic's float_parsing error.
+// optionalFloat is an optional float query parameter: absent is (0, false);
+// present and unparseable is the recorded float_parsing error.
 func optionalFloat(q map[string][]string, name string, errs *[]wire.ValidationError) (float64, bool) {
 	vals := q[name]
 	if len(vals) == 0 {
@@ -290,7 +289,8 @@ func boundedInt(q map[string][]string, name string, fallback, lo, hi int, errs *
 	return n
 }
 
-// flag is a `bool = False` query parameter, read with pydantic's spellings.
+// flag is a default-false boolean query parameter, read with the recorded
+// boolean spellings.
 func flag(q map[string][]string, name string, errs *[]wire.ValidationError) bool {
 	vals := q[name]
 	if len(vals) == 0 {
@@ -307,9 +307,9 @@ func flag(q map[string][]string, name string, errs *[]wire.ValidationError) bool
 	return false
 }
 
-// readObject reads a JSON object body the way a `payload: dict[str, Any]`
-// parameter does: a body that is not JSON, or not an object, is FastAPI's
-// own 422 rather than the handler's.
+// readObject reads a JSON object body under the recorded contract for a
+// declared object body: a body that is not JSON, or not an object, is the
+// validation 422 rather than the handler's.
 func readObject(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The deck reads (Phase 3's third family): the library shelf and the
+// The deck reads: the library shelf and the
 // per-deck GETs -- the deck, the gate's verdict, the analysis, the
 // suggestions, the commander's panel, the printings, the history and the
 // artifacts shelf -- plus `/api/colors/progress`, which scores the library
@@ -58,7 +58,7 @@ func (a *API) appDB() *sql.DB {
 	return db
 }
 
-// library is `api/deps.py:library`: every deck this caller may reach.
+// library is every deck this caller may reach.
 func (a *API) library(ctx context.Context) (*library.Library, error) {
 	db := a.appDB()
 	resolver := library.Resolver{DecksDir: a.decksDir, AppDB: db, AppWriteDB: a.writeDB,
@@ -320,7 +320,7 @@ func (a *API) commanderPrintings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if entry == nil {
-			wire.Detail(w, http.StatusUnprocessableEntity, wire.PyRepr(vals[len(vals)-1])+" is not in this deck")
+			wire.Detail(w, http.StatusUnprocessableEntity, wire.Quote(vals[len(vals)-1])+" is not in this deck")
 			return
 		}
 		name, selected = entry.Name, entry.Art

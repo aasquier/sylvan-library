@@ -13,7 +13,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// Accounts, and the single path that verifies one -- `mtglab/auth/users.py`.
+// Accounts, and the single path that verifies one.
 //
 // `Authenticate` is the only function in this module that turns a password
 // into an identity, and everything the login checklist asks for lives inside
@@ -76,19 +76,21 @@ var (
 	ErrUnknownTier = errors.New("unknown tier")
 )
 
-// LooksLikeEmail is the shape test `^[^@\s]+@[^@\s]+\.[^@\s]+$` used to make.
+// LooksLikeEmail is the shape test `^[^@\s]+@[^@\s]+\.[^@\s]+$`, taken
+// apart.
 //
 // Not an RFC 5322 validator and not trying to be: the only check that means
 // anything about deliverability is sending a message, which is what the invite
 // flow does, and everything short of that is a shape test whose false
 // negatives are somebody's perfectly real address.
 //
-// Taken apart rather than left as a pattern, exactly as Python takes it apart:
-// both `[^@\s]+` runs also match dots, so every dot in the domain is a
-// candidate separator and an address that cannot match makes a backtracking
-// engine try all of them. Go's RE2 has no backtracking, so the quadratic is
-// not this runtime's problem -- but the two halves must agree case for case,
-// and the way to guarantee that is to run the same decision procedure.
+// Taken apart rather than left as a pattern, so the decision procedure is
+// explicit: both `[^@\s]+` runs also match dots, so every dot in the domain
+// is a candidate separator and an address that cannot match makes a
+// backtracking engine try all of them. Go's RE2 has no backtracking, so the
+// quadratic was never this function's problem -- but the recorded
+// acceptance set is the pattern's, case for case, and the way to keep it is
+// to run the same decision procedure.
 func LooksLikeEmail(candidate string) bool {
 	local, domain, found := strings.Cut(candidate, "@")
 	if !found || local == "" || strings.Contains(domain, "@") {
@@ -109,13 +111,13 @@ func NormaliseUsername(username string) (string, error) {
 	if !UsernamePattern.MatchString(candidate) {
 		return "", failf("%w: %s is not a usable username -- 2 to 32 characters, "+
 			"letters, digits, dot, dash or underscore, starting with a letter "+
-			"or digit", ErrInvalidUsername, wire.PyRepr(username))
+			"or digit", ErrInvalidUsername, wire.Quote(username))
 	}
 	return candidate, nil
 }
 
 // NormaliseEmail trims, lowercases and shape-checks. An empty string means
-// absent, which is `None` in Python and not an error.
+// absent, not an error.
 func NormaliseEmail(email string) (string, error) {
 	if strings.TrimSpace(email) == "" {
 		return "", nil
@@ -125,15 +127,15 @@ func NormaliseEmail(email string) (string, error) {
 		// The message quotes a bounded slice rather than the input: an
 		// oversized address is exactly the case that reaches here, and echoing
 		// it whole would put the caller's own megabyte back into an error
-		// string, a log line and an API response. Sliced by *bytes*, as
-		// Python slices `str` by characters -- the cap is a guard against
+		// string, a log line and an API response. Sliced by *bytes*, though
+		// the cap reads naturally as characters -- it is a guard against
 		// size, and either reading of it holds the sentence to a line.
 		clipped := email
 		if len(clipped) > MaxEmail {
 			clipped = clipped[:MaxEmail]
 		}
 		return "", failf("%w: %s does not look like an email address",
-			ErrInvalidEmail, wire.PyRepr(clipped))
+			ErrInvalidEmail, wire.Quote(clipped))
 	}
 	return candidate, nil
 }
@@ -155,9 +157,9 @@ type User struct {
 	HasEmail bool
 	IsAdmin  bool
 	Disabled bool
-	// CreatedAt is the stored ISO 8601 string, echoed rather than reformatted.
-	// Python serialises `datetime.fromisoformat(col).isoformat()`, which is
-	// the identity on everything `datetime.now(UTC).isoformat()` writes -- so
+	// CreatedAt is the stored ISO 8601 string, echoed rather than
+	// reformatted: a parse-and-rerender is the identity on everything
+	// `nowISO` writes -- so
 	// the column *is* the answer, and re-deriving it would only introduce a
 	// way to disagree about trailing zeros.
 	CreatedAt string
@@ -178,8 +180,7 @@ type User struct {
 // restates it: an address may be serialised only into a response an admin
 // authenticated for. `mtglab users list` prints to the maintainer's own
 // terminal, and the admin routes answer a caller the middleware has already
-// established is an admin. A third caller needs the argument made again;
-// `tests/test_isolation.py` is where it is pinned.
+// established is an admin. A third caller needs the argument made again.
 func (u *User) AsDict(includeEmail bool) map[string]any {
 	body := map[string]any{
 		"id":       u.ID,
@@ -205,11 +206,10 @@ func (u *User) AsDict(includeEmail bool) map[string]any {
 	return body
 }
 
-// userColumns is what every read selects. Python uses `SELECT *` and probes
-// the cursor for `model_tier`, so that a row assembled from a pre-v10 schema
-// still builds a User. Here the columns are named, which is the same tolerance
-// arrived at from the other side: the ladder runs at boot, so a missing column
-// is a deployment fault to fail loudly on rather than one to paper over.
+// userColumns is what every read selects, by name. Naming the columns is a
+// decision rather than a habit: the ladder runs at boot, so a missing
+// column is a deployment fault to fail loudly on rather than one to paper
+// over with a probe.
 const userColumns = "id, username, email, is_admin, disabled_at, created_at, model_tier"
 
 type scanner interface {

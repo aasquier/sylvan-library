@@ -28,8 +28,8 @@ const setsUserAgent = "mtg-lab/0.1 (local personal deckbuilding tool)"
 //
 // A transport failure is a 503 that says so plainly — the only route where
 // "could not reach Scryfall" is a state and not a bug — while a payload that
-// is not the JSON this expects raises where Python's `json.load` raises:
-// uncaught, plain-text 500. (The 503's detail carries this runtime's own
+// is not the JSON this expects raises the recorded way:
+// uncaught, plain-text 500. (The 503's detail carries this process's own
 // rendering of the failure; the *shape* is the contract, the prose of an
 // exception never was.)
 func (a *API) upcomingSets(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +59,8 @@ func (a *API) upcomingSets(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
-		// urllib raises HTTPError -- an OSError -- for these, so Python's
-		// route answers 503 here too.
+		// An upstream error status is a transport failure to this route --
+		// the recorded 503, not a relay of the upstream's code.
 		wire.Detail(w, http.StatusServiceUnavailable,
 			"could not reach Scryfall: HTTP "+resp.Status)
 		return
@@ -75,7 +75,7 @@ func (a *API) upcomingSets(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	if err := dec.Decode(&payload); err != nil {
-		pythonUncaught(w, a.log, "sets", err)
+		uncaught500(w, a.log, "sets", err)
 		return
 	}
 
@@ -90,7 +90,7 @@ func (a *API) upcomingSets(w http.ResponseWriter, r *http.Request) {
 	wire.Raw(w, http.StatusOK, body)
 }
 
-// upcomingFrom filters and shapes the payload exactly as Python does:
+// upcomingFrom filters and shapes the payload the recorded way:
 // unreleased (string comparison is date comparison for ISO dates), not
 // digital, six keys per set in declaration order, stably sorted on
 // `released_at` so ties keep Scryfall's own order.

@@ -9,13 +9,14 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
 // Research's route (ADR 26): `POST /api/claude/research`, a **job** from the
 // first commit rather than after a deployed failure taught it to be.
 //
-// `api/researchruns.py`. ADR 20's lesson -- *a duration measured for one
+// ADR 20's lesson -- *a duration measured for one
 // surface is a question to ask of every sibling surface* -- had cost three
 // incidents by the time this was written (the proposal at 226 seconds, the
 // theme turn whose docstring said "a few seconds", the dossier at 236), and
@@ -58,9 +59,9 @@ const researchLabelChars = 60
 // -- `question[:60]` is a `str` slice -- and the cut end is right-stripped
 // before the ellipsis so it never reads "research: why does ...".
 func researchLabel(question string) string {
-	short := claude.PyHead(question, researchLabelChars)
-	if claude.PyLen(question) > researchLabelChars {
-		short = claude.PyRStrip(short) + "..."
+	short := textutil.Head(question, researchLabelChars)
+	if textutil.Len(question) > researchLabelChars {
+		short = textutil.RStrip(short) + "..."
 	}
 	return "research: " + short
 }
@@ -74,7 +75,7 @@ func (a *API) claudeResearch(w http.ResponseWriter, r *http.Request) {
 	}
 	// `payload.get("stance") or None`: a falsy stance is no stance.
 	var requested any
-	if pyTruthy(body["stance"]) {
+	if truthy(body["stance"]) {
 		requested = body["stance"]
 	}
 	plan, err := claude.CheckResearch(body["question"], requested,

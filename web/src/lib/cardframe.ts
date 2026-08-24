@@ -16,7 +16,7 @@
  * Reading those two fields is worth more than reading the title, because the
  * pair is a *lookup* — one row of `printings`, no judgement — while a title
  * is a similarity whose right and wrong answers score in overlapping ranges
- * (`cards/identify.py` carries the measurement). It is also
+ * (the server's card reader carries the measurement). It is also
  * language-independent: the set code of a Japanese Sol Ring is still `LTC`.
  *
  * ## Why the title is cropped anyway
@@ -77,8 +77,8 @@ export const CORNER_ALPHABET =
  * work, it is a question about which of 986 codes exist, and the answer
  * lives in the pool.
  *
- * So the corner crosses the wire as text and `cards/identify.py` reads it.
- * The browser's job is to find the pixels; deciding what they say is the
+ * So the corner crosses the wire as text and the server's card reader reads
+ * it. The browser's job is to find the pixels; deciding what they say is the
  * pool's, which is `ADR 14` applied to a camera.
  */
 

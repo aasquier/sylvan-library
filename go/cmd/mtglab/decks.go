@@ -1,26 +1,21 @@
 package main
 
-// `mtglab decks` -- the deck-facing quarter of the runbook surface, ported
-// from `cli.py`'s `cmd_decks_list`, `cmd_decks_validate`, `cmd_decks_build`
-// and `cmd_decks_log` (Phase 8: the binary carries the runbook once Python
-// retires). The CLI is the LOCAL user at a terminal, so it reads the file
-// tier rooted at `config.DecksDir()` -- exactly the config-resolved paths the
-// Python commands read -- and the activity log's file-tier rows
-// (`owner_id IS NULL`), which on a deployed instance are the maintainer's own
-// decks too.
+// `mtglab decks` -- the deck-facing quarter of the runbook surface (Phase 8:
+// the binary carries the runbook). The CLI is the LOCAL user at a terminal,
+// so it reads the file tier rooted at `config.DecksDir()` -- always the
+// config-resolved paths, never a hard-wired directory -- and the activity
+// log's file-tier rows (`owner_id IS NULL`), which on a deployed instance
+// are the maintainer's own decks too.
 //
-// The ported behaviours are Python's line for line: the same table, the same
-// refusal sentences, the same exit codes. Three deliberate differences, each
-// the Go CLI's standing convention rather than a judgement call here. A
-// refusal returned as an error is printed by the root as `mtglab: <sentence>`
-// where `sys.exit(str)` prints the bare sentence. A failure Python would
-// surface as a traceback (an unreadable pool, an unparseable file) is an
-// error sentence here. And `decks log` never CREATES `app.db`: Python's
-// reader acquires the file through `auth.db.connect` on the way to answering
-// "nothing recorded yet", while the ladder on this side belongs to the
-// serving command alone (`auth.Migrate`, Phase 8) -- an absent `app.db` is
-// read as an empty history, the same words on the screen with no side effect
-// on the disk.
+// The table, the refusal sentences, and the exit codes are recorded
+// contract, kept to the byte. Three conventions worth stating. A refusal
+// returned as an error is printed by the root as `mtglab: <sentence>`, so
+// no command prints its own prefix. A fault of the environment (an
+// unreadable pool, an unparseable file) comes back as an error sentence,
+// never a stack. And `decks log` never CREATES `app.db`: the ladder belongs
+// to the serving command alone (`auth.Migrate`, Phase 8) -- an absent
+// `app.db` is read as an empty history, the same words on the screen with
+// no side effect on the disk.
 
 import (
 	"database/sql"
@@ -43,7 +38,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// osExit is `sys.exit(code)` for the one command that exits nonzero with no
+// osExit ends the process for the one command that exits nonzero with no
 // sentence to print: `decks validate` on a failing deck. A variable so a test
 // can observe the code instead of dying with the process.
 var osExit = os.Exit
@@ -61,8 +56,8 @@ func decksCommand() *cobra.Command {
 	return cmd
 }
 
-// deckAt is `cli._load`: the deck at `<decks>/<slug>/deck.yaml`, or the same
-// clean sentence Python exits with when there is nothing there.
+// deckAt reads the deck at `<decks>/<slug>/deck.yaml`, or refuses with the
+// recorded clean sentence when there is nothing there.
 func deckAt(slug string) (*deck.Deck, error) {
 	path := filepath.Join(config.DecksDir(), slug, "deck.yaml")
 	if _, err := os.Stat(path); err != nil {
@@ -71,9 +66,9 @@ func deckAt(slug string) (*deck.Deck, error) {
 	return deckFile(path)
 }
 
-// deckFile is `Deck.load(path)`: parse a deck file wherever it sits, the
-// parent directory's name standing in for a slug the file does not declare --
-// which is what Python passes, the `--against` baseline included.
+// deckFile parses a deck file wherever it sits, the parent directory's name
+// standing in for a slug the file does not declare -- the `--against`
+// baseline included, which is exactly a deck file outside the library.
 func deckFile(path string) (*deck.Deck, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -82,19 +77,19 @@ func deckFile(path string) (*deck.Deck, error) {
 	return deck.FromText(string(raw), filepath.Base(filepath.Dir(path)))
 }
 
-// poolCards is `cli._pool`: every card in the deck, looked up. A nil map with
-// no error is an absent pool, so callers degrade to structural checks with
-// the gate's own visible warning -- never a silent pass.
+// poolCards looks up every card in the deck. A nil map with no error is an
+// absent pool, so callers degrade to structural checks with the gate's own
+// visible warning -- never a silent pass.
 //
 // The names are the CLI's own list -- commander, the 99, the swap board, the
 // companion -- and deliberately not `deckread.PoolFor`'s, which adds the
-// graveyard because `service._pool_for` does. The gate reads none of the
-// extra entries, so the two are indistinguishable to every caller here, but
-// this command reproduces `cli.py` and not `service.py`.
+// graveyard for the deck page. The gate reads none of the extra entries, so
+// the two are indistinguishable to every caller here, but the narrower list
+// is this command's recorded behaviour and stays its own.
 func poolCards(cmd *cobra.Command, d *deck.Deck) (map[string]*pool.CardRecord, error) {
 	dbPath := config.DBPath()
 	if _, err := os.Stat(dbPath); err != nil {
-		return nil, nil //nolint:nilnil // Python's `_pool` returns None: no pool, no error
+		return nil, nil //nolint:nilnil // no pool, no error: absence is a degraded mode, not a fault
 	}
 	p := pool.New(dbPath, nil)
 	defer p.Close()
@@ -180,10 +175,9 @@ func decksListCommand() *cobra.Command {
 	}
 }
 
-// decksValidateCommand is `cmd_decks_validate`: the gate, rendered as text,
-// and the exit code is the verdict -- nonzero on any error, with nothing
-// printed beyond the report and its counts, exactly as `sys.exit(1)` prints
-// nothing.
+// decksValidateCommand is the gate, rendered as text, and the exit code is
+// the verdict -- nonzero on any error, with nothing printed beyond the
+// report and its counts.
 func decksValidateCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate <slug>",
@@ -238,17 +232,17 @@ func decksBuildCommand() *cobra.Command {
 			rep := gate.Validate(d, cards, gate.DefaultSize)
 			if n := len(rep.Errors()); n > 0 && !force {
 				fmt.Println(renderReport(rep))
-				// Python's exit message opens with a newline to stand apart
-				// from the report; here the blank line is printed and the
-				// sentence rides the error, so the root's `mtglab: ` prefix
-				// lands on the sentence rather than on an empty line.
+				// The recorded refusal opens with a blank line to stand
+				// apart from the report; the blank line is printed here and
+				// the sentence rides the error, so the root's `mtglab: `
+				// prefix lands on the sentence rather than on an empty line.
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr())
-				return fmt.Errorf("refusing to generate with %d error(s). "+ //nolint:staticcheck // the sentence is Python's, full stop included
+				return fmt.Errorf("refusing to generate with %d error(s). "+ //nolint:staticcheck // the recorded sentence, full stop included
 					"Fix them, or pass --force if you know better.", n)
 			}
 			if len(rep.Warnings()) > 0 {
-				// `print(rep.render(), "\n")`: the report, a space, and a
-				// blank line -- reproduced to the byte.
+				// The report, a trailing space, and a blank line -- the
+				// recorded bytes exactly, odd space included.
 				fmt.Print(renderReport(rep) + " \n\n")
 			}
 
@@ -365,10 +359,9 @@ func decksLogCommand() *cobra.Command {
 }
 
 // openAppDB is the log's read handle: `app.db` opened read-only when the file
-// exists, and nil when it does not -- a deck with no history. Python's reader
-// would create the file on the way past (`auth.db.connect` runs the ladder);
-// this one must not, because the ladder belongs to the serving command and a
-// reader that acquires a database is the one thing the Go side refuses to be.
+// exists, and nil when it does not -- a deck with no history. It must never
+// create the file: the ladder belongs to the serving command, and a reader
+// that acquires a database is the one thing this surface refuses to be.
 func openAppDB() (*sql.DB, error) {
 	path := config.AppDBPath()
 	if _, err := os.Stat(path); err != nil {
@@ -377,14 +370,14 @@ func openAppDB() (*sql.DB, error) {
 	return auth.Open(path)
 }
 
-// logStamp is `cli._when`: an ISO-8601 instant as something a terminal column
-// can hold. Falls back to the raw string rather than failing: a row that
+// logStamp renders an ISO-8601 instant as something a terminal column can
+// hold. Falls back to the raw string rather than failing: a row that
 // cannot be parsed is still a row that says what happened, and a history that
 // refuses to print because one timestamp is odd is worse than one ugly line.
 func logStamp(stamp string) string {
 	for _, layout := range []string{
-		time.RFC3339Nano,                      // what both runtimes' writers produce
-		"2006-01-02T15:04:05.999999999",       // `fromisoformat` also reads a naive instant
+		time.RFC3339Nano,                      // what the log's writer produces
+		"2006-01-02T15:04:05.999999999",       // a naive instant, read rather than refused
 		"2006-01-02 15:04:05.999999999Z07:00", // ... and a space separator
 		"2006-01-02 15:04:05.999999999",
 	} {

@@ -1,5 +1,5 @@
 /**
- * Tier 1.5 on screen, and the four properties a green Python suite cannot see.
+ * Tier 1.5 on screen, and the four properties a green backend suite cannot see.
  *
  * - a colour is rendered as a **ladder**, so a deck short for one greedy card
  *   does not read as a deck short of that colour (commandment 2, and the
@@ -189,7 +189,7 @@ describe('the policy verdict', () => {
     // A large gain with `flat: true` is not a state the server produces, and
     // that is the point: if the client ever recomputed the verdict from
     // `gain`, this would render the recommendation and fail. The rule lives
-    // in Python, where it is measured against the default rather than the
+    // on the server, where it is measured against the default rather than the
     // grid's range.
     render(<PolicyReport policy={policyOf({ flat: true, gain: 5 })} />)
     expect(screen.getByText(/already right/)).toBeTruthy()

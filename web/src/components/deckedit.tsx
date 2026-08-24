@@ -256,7 +256,7 @@ function ClaudeUnavailable({ installed, className = '' }: {
  *
  * The alternatives are rendered as **cards, not as recommendations**. Each one
  * has already been through the pool, the ban list and the deck's colour
- * identity in Python; what is shown beside a name is the card's own oracle
+ * identity on the server; what is shown beside a name is the card's own oracle
  * text, because that is better evidence than a sentence about it and it is the
  * sentence nobody is allowed to write.
  */

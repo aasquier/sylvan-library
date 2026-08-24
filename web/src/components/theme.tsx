@@ -22,8 +22,8 @@
  * the separation survives all the way to here or it did not happen.
  *
  * **The proposal is a proposal.** Picking a commander fills in the create form
- * that already exists — it does not make a deck. Nothing under
- * `src/mtglab/claude/` can reach a write path, and this is the UI telling the
+ * that already exists — it does not make a deck. Nothing in the server's
+ * Claude modes can reach a write path, and this is the UI telling the
  * same truth: the deck is made by the person whose deck it is.
  */
 
@@ -668,7 +668,7 @@ export function ThemeInterview({
     } catch (e) {
       setError(e instanceof ApiError && e.status === 404
         // Same sentence the proposal shows, and the same cause: jobs live in
-        // the server's memory and die with it (`api/jobs.py`).
+        // the server's memory and die with it.
         ? 'That question is gone — the server restarted while it was working. Say something and it will ask again.'
         : String((e as Error).message ?? e))
     } finally {
@@ -704,7 +704,7 @@ export function ThemeInterview({
   /** Ask the same question again, of the same conversation.
    *
    * A turn can come back with **no question** — the model answered with a
-   * declarative sentence and `theme.py` deletes it (a statement here is the
+   * declarative sentence and the server deletes it (a statement here is the
    * mode telling somebody what they think instead of asking), or the JSON did
    * not parse, or the model declined. Every one of those is reported as a
    * `reason` with an empty `question`, and until now that was a dead end: the
@@ -738,7 +738,7 @@ export function ThemeInterview({
     }))
   }
 
-  // The proposal is a background job now (`api/themeruns.py`), because it was
+  // The proposal is a background job now, because it was
   // measured at 226 seconds and a four-minute POST does not survive a hosted
   // proxy. So this is the simulator's shape: submit, poll, read the result off
   // the job. What it adds is that the id is *saved* — a reload reattaches to
@@ -774,9 +774,9 @@ export function ThemeInterview({
         { ...s, proposal: job.result as ThemeProposal, job: null })))
       .catch((e) => {
         setError(e instanceof ApiError && e.status === 404
-          // Jobs live in the server's memory and die with it (`api/jobs.py`).
-          // Say so rather than showing a bare 404 for something the person
-          // never asked to look up.
+          // Jobs live in the server's memory and die with it. Say so rather
+          // than showing a bare 404 for something the person never asked to
+          // look up.
           ? 'That run is gone — the server restarted while it was working. Ask again when you are ready.'
           : String((e as Error).message ?? e))
         setSaved((s) => ({ ...s, job: null }))

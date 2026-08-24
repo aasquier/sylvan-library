@@ -9,8 +9,9 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 )
 
-// The slot argument's route. `internal/claude` already holds its two Python
-// halves to a corpus, and the interview's tests already cover the shape the two
+// The slot argument's route. `internal/claude` already holds the mode's two
+// halves to a corpus, and the interview's tests already cover the shape the
+// two
 // share -- so these are about what is different: the alternatives arriving on
 // the wire, and the two SHAPES `alternatives_dropped` has.
 
@@ -29,8 +30,8 @@ func TestTheArgumentIsTheInterviewsTwinOnRefusals(t *testing.T) {
 		{`{"card":"   "}`, 422, "card is required"},
 		{`{"card":"Black Lotus"}`, 422, "'Black Lotus' is not in kaheera"},
 		// One mapping, shared with the interview: a stance that will not read
-		// is the caller's to fix. (502 until 2026-08-23, when both runtimes
-		// moved together -- see refuseClaude.)
+		// is the caller's to fix. (502 until 2026-08-23, when the ruling
+		// landed -- see refuseClaude.)
 		{`{"card":"Sol Ring","stance":"emperor"}`, 422, "is not a stance preset"},
 		{`{"card":"Sol Ring"}`, 503, "no ANTHROPIC_API_KEY"},
 	} {
@@ -56,9 +57,10 @@ func TestTheArgumentIs404ForADeckTheCallerCannotSee(t *testing.T) {
 }
 
 // At `initiative: off` no call is made -- and `alternatives_dropped` carries
-// **four** keys, because that is what Python's `_report` default holds. The
-// five-key shape only exists once `resolve_alternatives` has actually run.
-func TestAtStanceOffTheDroppedBlockHasPythonsFourKeys(t *testing.T) {
+// **four** keys, because that is what the recorded no-run default holds. The
+// five-key shape only exists once the alternatives have actually been
+// resolved.
+func TestAtStanceOffTheDroppedBlockHasTheRecordedFourKeys(t *testing.T) {
 	noCredential(t)
 	a, done := deckAPI(t, true)
 	defer done()
@@ -72,13 +74,13 @@ func TestAtStanceOffTheDroppedBlockHasPythonsFourKeys(t *testing.T) {
 	}
 	dropped, _ := payload["alternatives_dropped"].(map[string]any)
 	if len(dropped) != 4 {
-		t.Errorf("alternatives_dropped has %d keys (%v); Python's no-run default "+
-			"has four -- already_in_deck is not among them", len(dropped), keysOf(dropped))
+		t.Errorf("alternatives_dropped has %d keys (%v); the recorded no-run "+
+			"default has four -- already_in_deck is not among them", len(dropped), keysOf(dropped))
 	}
 	if _, present := dropped["already_in_deck"]; present {
 		t.Error("already_in_deck is present on a report where nothing ran; " +
-			"Python's default omits it and a client reading five keys here " +
-			"would be reading a shape Python never sends")
+			"the recorded default omits it and a client reading five keys " +
+			"here would be reading a shape the wire never sends")
 	}
 }
 

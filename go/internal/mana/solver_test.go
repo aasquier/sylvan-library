@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// `tests/test_mana.py`'s castability cases, as a table.
+// The long-pinned castability cases, as a table.
 //
 // These are not samples. Every one of them is somewhere somebody was once
-// wrong -- CLAUDE.md says `mana.py` is subtle and that this is the file
+// wrong -- the mana reading is subtle, and this is the file
 // pinning "the cases where naive source-counting gives the wrong answer" --
 // and they are carried over one for one because a port that passes the
 // enumerated case set and fails one of these has reproduced the arithmetic
@@ -48,7 +48,8 @@ func TestCastabilityTraps(t *testing.T) {
 		// matching that does not reset its search between pips never looks at
 		// the Plains again and calls this uncastable.
 		//
-		// This one is not from `test_mana.py`. It is the counterexample the
+		// This one is not from the long-pinned set. It is the counterexample
+		// the
 		// **enumerated case set cannot express**: its pips are drawn with
 		// `combinations_with_replacement` over an alphabet whose hybrid is
 		// last, so no cost among the 13,944 puts a two-colour pip ahead of a
@@ -149,7 +150,8 @@ func TestCastabilityTraps(t *testing.T) {
 	}
 }
 
-// A source's amount is Python's, including the parts of it that look like
+// A source's amount is the recorded semantics, including the parts of it
+// that look like
 // mistakes. `ManaSource(colors)` defaults to one mana and Go's zero value
 // cannot; `ManaSource(colors, 0)` really does produce nothing, and
 // `[colors] * -1` is the empty list rather than an error.
@@ -205,9 +207,11 @@ func TestOneSourceOfNEqualsNSourcesOfOne(t *testing.T) {
 }
 
 // The colour packing has a slow path for strings that are not one of the six
-// producible mana symbols, because Python compares sets of arbitrary strings
+// producible mana symbols, because the contract compares sets of arbitrary
+// strings
 // and nothing structural stops a caller doing the same here. It is unreachable
-// through `Parse` and through `compile.py`, which filters `produced_mana` to
+// through `Parse` and through `sim/compile`, which filters `produced_mana`
+// to
 // WUBRGC -- and this project's standing lesson is that unreachable-by-argument
 // is exactly the claim that rots, so the path is exercised rather than argued.
 func TestAColourOutsideTheSixStillComparesAsASet(t *testing.T) {
@@ -232,10 +236,11 @@ func TestAColourOutsideTheSixStillComparesAsASet(t *testing.T) {
 	}
 }
 
-// String() is the case set's renderer, so it is checked against Python's
+// String() is the case set's renderer, so it is checked against the
+// recorded
 // wording for the shapes the enumeration cannot reach: X, Phyrexian, and the
 // empty cost.
-func TestCostRendersAsPythonDoes(t *testing.T) {
+func TestCostRendersAsRecorded(t *testing.T) {
 	cases := map[string]string{
 		"":                 "{0}",
 		"{0}":              "{0}",

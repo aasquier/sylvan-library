@@ -71,25 +71,27 @@ run reports green, and the bugs are somewhere the file never looks.
 
 ## Part three — the tooling
 
-The developer shelf is artifacts in the plainest sense: `mtglab bench`,
-`mtglab mutate`, the cache register in `caches.py`, `mtglab animist verify`.
-Nothing else in the cycle owns them, and a measuring tool that has gone wrong
-is worse than no tool, because its numbers are believed.
+The developer shelf is artifacts in the plainest sense — and most of it is
+currently an absence: the bench suite, the mutation harness and the cache
+register retired with the old backend, and **rebuilding them over the Go
+packages is this part's standing item** until it lands. What survives today
+is `animist verify` in `tools/`. Nothing else in the cycle owns the shelf,
+and a measuring tool that has gone wrong is worse than no tool, because its
+numbers are believed.
 
 - **Run each one and read the output as evidence about the tool**, not only
   about the code:
 
   ```bash
-  mtglab bench run                 # does the suite still resolve its targets?
-  mtglab bench caches              # is anything registered but dead?
-  mtglab mutate list               # has the catalogue grown or shrunk, and why?
-  mtglab mutate run --only <site>  # are the ledger's survivors still alive?
-  mtglab animist verify
+  cd tools && animist verify       # committed assets vs their recipes
   ```
 
-  A fresh seeded *draw* is White's job and re-drawing one here only adds a
-  sample nobody asked for. The colorless questions are the ones a draw cannot
-  answer: did the catalogue move, and are the survivors on record still there.
+  For the retired instruments the question is the rebuild item itself: is it
+  still queued, still shaped right, and has anything landed that changes what
+  the Go shelf should measure first. The colorless questions the old tools
+  answered — did the catalogue move, are the recorded survivors still alive —
+  go unanswered until the shelf returns, and that gap is worth a ledger line
+  each run so it cannot silently become permanent.
 
 - **A skipped row is the finding.** `bench` reports unavailable targets by
   name for exactly this reason: a suite that quietly shrank still prints a
@@ -97,9 +99,8 @@ is worse than no tool, because its numbers are believed.
   reading anything else on the page.
 - **Check the tool against a bug it is supposed to catch.** The instruments
   here were each built from a specific failure, and the honest test is to
-  reproduce that failure and watch the needle move — `tests/test_bench.py`
-  does this for the import storm by removing #181's sentinel. A tool nobody
-  has re-validated is a tool on trust.
+  reproduce that failure and watch the needle move. A tool nobody has
+  re-validated is a tool on trust.
 - **Mutation kill rate is a trend, not a grade.** Record the sample size, the
   seed and the rate. A rate that moved needs its cause named: new tests, new
   code, or a different draw. Survivors carried forward unread across two runs
@@ -146,7 +147,8 @@ This is where they get a home.
 - **It does not re-audit the five colours.** If it finds a real bug in code,
   it records it in that colour's section as a finding for that colour's next
   run — this run's diff belongs to the skill, the ledger and the tooling.
-  A colourless run that starts fixing Python has stopped being colourless.
+  A colourless run that starts fixing product code has stopped being
+  colourless.
 - It does not open a PR for the ledger alone. Same rule as every other run:
   a doc change rides the branch that does the work. If the only output is
   ledger text and skill edits, that *is* the work and the PR is legitimate —

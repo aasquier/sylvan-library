@@ -19,7 +19,7 @@ import { heatInk, heatPercent, heatWash, lagTone } from '../lib/heat'
  * answer to every mana problem.
  *
  * Pure presentation. Every verdict — met, flat, which rung is short — is
- * decided in Python and read off the payload, never recomputed here. A second
+ * decided on the server and read off the payload, never recomputed here. A second
  * implementation of `flat` in TypeScript would be a second chance to get it
  * wrong, which is the same argument `stance.tsx` makes about `clamp`.
  */

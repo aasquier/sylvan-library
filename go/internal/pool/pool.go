@@ -1,17 +1,17 @@
 // Package pool is the card pool as the served app holds it -- the DuckDB file
-// `mtglab data refresh` writes, opened read-only and **held on a lease**, and
-// the reads `cards/db.py` makes of it (docs/go-migration/PLAN.md, Phase 3).
+// `mtglab data refresh` writes, opened read-only and **held on a lease**,
+// and every read the app makes of it.
 //
-// Read-only, as `cards/db.py:connect_readonly` opens it, so a running refresh
+// Read-only, so a running refresh
 // (which wants DuckDB's single writer lock) degrades the app rather than being
 // locked out by it. And a lease rather than a handle held for the life of the
-// process, for the reason `api/service.py:_pin` argues at length: **a held
+// process, because **a held
 // read-only handle is a held shared lock**, and a door that kept the pool
 // open forever would refuse every `data refresh` on the instance -- which is
-// exactly what the Python app did until 2026-08-19, when its keeper's lease
+// exactly what the app did until 2026-08-19, when its keeper's lease
 // was longer than the health check's cadence. So `Use` opens on demand, a
 // reaper closes the database once nobody has asked for it in `IdleLease`
-// (the same ten seconds Python settled on, and for the same reason: shorter
+// (ten seconds, settled deliberately: shorter
 // than `fly.toml`'s 30-second health check, longer than a page load's burst
 // of requests), and the file's stamp (mtime and size) is checked on the way
 // past so a pool that moved is re-opened rather than served from a snapshot.
@@ -19,14 +19,15 @@
 // `*sql.DB` is the loaded instance, its connections are `duckdb_connect` on
 // that instance, and closing it releases the file.
 //
-// Caching is keyed on the stamp exactly as Python keys it, because the stamp
+// Caching is keyed on the stamp, because the stamp
 // is what makes a cache of a read-only file honest: a refresh rewrites the
 // file, changes `mtime_ns` and size, and every entry keyed on the old stamp
 // becomes unreachable.
 //
 // The driver is github.com/duckdb/duckdb-go (the community driver that used
 // to live at marcboeker/go-duckdb), which links a prebuilt libduckdb per
-// platform -- 1.5.5, the same version the venv's `duckdb` is. Importing this
+// platform -- pinned at 1.5.5, the version the pool files were written
+// under. Importing this
 // package into the door is what makes the door a CGO build.
 package pool
 
@@ -158,8 +159,8 @@ func (p *Pool) acquire(ctx context.Context) (*Conn, error) {
 	defer p.mu.Unlock()
 	if p.db != nil && p.stamp != now {
 		// The file moved under us -- a refresh finished. Let the old instance
-		// go once its leases drain; until then, new users still get it, which
-		// is the snapshot Python serves too until its keeper notices.
+		// go once its leases drain; until then, new users still get it: a
+		// coherent snapshot, a moment out of date, never a torn read.
 		if p.leases == 0 {
 			p.closeLocked()
 		}
@@ -245,7 +246,7 @@ func (p *Pool) Close() {
 // DB is the leased database, for a query this package has no helper for.
 func (c *Conn) DB() *sql.DB { return c.db }
 
-// Columns is `cards/db.py:_table_columns`: the columns `table` actually has
+// Columns is the columns `table` actually has
 // on this pool, memoised per open. Needed because the read-only handle
 // cannot migrate itself, so a pool built before a column existed must
 // degrade to "we do not know" rather than fail to bind.

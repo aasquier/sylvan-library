@@ -1,9 +1,9 @@
-// Package pooltest builds the 21-card `tiny_pool` as a real DuckDB file, for
-// any Go test that wants a pool: the rows `tests/tiny_pool.py` commits --
-// every value read out of the real pool, never typed from memory -- as
-// `tests/go_fixtures.py` renders them into testdata/, loaded through the
-// driver into the schema `pool.Schema` embeds. CI's Go jobs have no Python
-// and no DuckDB file; this is how they read real cards anyway. It is the
+// Package pooltest builds the 21-card tiny pool as a real DuckDB file, for
+// any test that wants a pool: the recorded rows in testdata/ --
+// every value read out of the real pool, never typed from memory --
+// loaded through the
+// driver into the schema `pool.Schema` embeds. CI carries
+// no DuckDB file; this is how its jobs read real cards anyway. It is the
 // same fixture in a second encoding, not a card pool redistribution (ADR 6,
 // CLAUDE.md rule 5).
 package pooltest

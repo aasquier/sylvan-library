@@ -21,8 +21,8 @@ import (
 // The write side of `mtglab/auth`: accounts, tokens, the rate limiter and the
 // mail seam.
 //
-// Every test here builds a real `app.db` from the schema Python's ladder
-// produced (`testdata/app_schema.sql`) rather than from a table written by
+// Every test here builds a real `app.db` from the recorded schema
+// (`authtest/app_schema.sql`) rather than from a table written by
 // hand, for the reason `appSchema` gives.
 //
 // **No test in this file sends mail.** That is ADR 16's seam doing its job and
@@ -38,7 +38,7 @@ const longEnough = "a passphrase long enough"
 // The file is created here with `rwc`, which production deliberately cannot do
 // -- `OpenReadWrite` is `mode=rw` and `TestOpenDoesNotCreateAMissingFile` pins
 // that the read side will not create one either. A test standing in for
-// Python's ladder is the one caller entitled to make the file.
+// the ladder is the one caller entitled to make the file.
 func newAccountsDB(t *testing.T) *sql.DB {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "app.db")
@@ -133,7 +133,7 @@ func TestBothUniqueColumnsSayWhichOneCollided(t *testing.T) {
 	}
 }
 
-func TestNormalisationRefusesWhatPythonRefuses(t *testing.T) {
+func TestNormalisationRefusesTheRecordedSet(t *testing.T) {
 	for _, bad := range []string{"", "a", "1", " ", "has space", "-leading",
 		"way-too-long-a-username-for-any-of-this", "emoji🜁"} {
 		if _, err := NormaliseUsername(bad); !errors.Is(err, ErrInvalidUsername) {
@@ -513,7 +513,7 @@ func TestATokenIsSingleUseAndSetsThePassword(t *testing.T) {
 	}
 }
 
-func TestATokenRefusesForEveryReasonPythonGives(t *testing.T) {
+func TestATokenRefusesForEveryRecordedReason(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)

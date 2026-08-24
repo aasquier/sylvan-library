@@ -9,7 +9,7 @@ import (
 )
 
 // staleOn builds the fixture pool, applies each doctoring statement, and
-// asks `Stale` — the five verdicts `cards/db.py:pool_is_stale` documents.
+// asks `Stale` — the five verdicts its doc comment documents.
 func staleOn(t *testing.T, verdict bool, doctoring ...string) {
 	t.Helper()
 	path := pooltest.Build(t)

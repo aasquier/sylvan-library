@@ -15,8 +15,8 @@ import (
 // held across two steps buys, what a lane's width means, and what a job born
 // finished must never have touched.
 //
-// **Every test here holds its own registry.** Python's is a module global
-// with a `clear()` beside it; a value per test is what lets `go test -race`
+// **Every test here holds its own registry.** A value per test is what lets
+// `go test -race`
 // run these in parallel and mean something by it.
 
 // quietRegistry is a registry whose logger goes nowhere -- a failing job logs
@@ -98,8 +98,7 @@ func noneMore(t *testing.T, ch <-chan string) {
 // ------------------------------------------------------------ the lanes
 
 func TestTheCPULaneIsAsWideAsTheMachineAndTheOthersAreNot(t *testing.T) {
-	// The phase's whole point, said as a number. Python runs one CPU worker
-	// because Tier 1 is GIL-bound; here the lane is a semaphore over
+	// The width, said as a number: the CPU lane is a semaphore over
 	// goroutines and its width is a fact about the machine -- GOMAXPROCS,
 	// which reads the container's quota rather than the host's core count.
 	//
@@ -310,7 +309,7 @@ func TestAFinishedRunIsNotJoined(t *testing.T) {
 }
 
 func TestAFailedRunStaysRetryable(t *testing.T) {
-	// Python documents this and nothing asserted it: a failed job must not be
+	// Long documented and never asserted: a failed job must not be
 	// joined, or a transient Anthropic error would be permanent until the
 	// process restarted.
 	r := quietRegistry(t, Config{})
@@ -542,8 +541,8 @@ func TestProgressIsReportedAndThePartialIsClearedByTheResult(t *testing.T) {
 }
 
 func TestReportWithNoPartialLeavesTheOneThatIsThere(t *testing.T) {
-	// Python's third argument defaults rather than demands, and `None` means
-	// "leave what is there" rather than "clear it" -- which is why the port
+	// An omitted partial means
+	// "leave what is there" rather than "clear it" -- which is why Progress
 	// has two methods instead of one call with a nil.
 	r := quietRegistry(t, Config{})
 	job, err := r.Submit("sim.forge", func(p Progress) (any, error) {
@@ -586,7 +585,7 @@ func TestAFailureRecordsTheMessageAndLeavesTheResultEmpty(t *testing.T) {
 		t.Errorf("a failed job carries a result: %v", got.Result)
 	}
 	// The bar is left where the worker stopped. A failure is not a finished
-	// bar, and Python only fills it on the success path.
+	// bar, and the registry only fills it on the success path.
 	if got.Done != 3 || got.Total != 10 {
 		t.Errorf("a failed job reads %d/%d, want the counts it stopped at",
 			got.Done, got.Total)
@@ -594,11 +593,11 @@ func TestAFailureRecordsTheMessageAndLeavesTheResultEmpty(t *testing.T) {
 }
 
 func TestAPanickingWorkerIsAFailedJobAndNotADeadProcess(t *testing.T) {
-	// Python catches `Exception`, so one job's bug is one job's error string.
+	// One job's bug must cost one job's error string.
 	// Go's default is the opposite -- an unrecovered panic in any goroutine
 	// takes the process with it -- and this door is also serving every other
-	// request, so the recover is the only way the two runtimes fail the same
-	// way rather than defensive habit.
+	// request, so the recover is the containment the registry promises
+	// rather than defensive habit.
 	r := quietRegistry(t, Config{})
 	job, err := r.Submit("sim.mana", func(p Progress) (any, error) {
 		var rows []int
@@ -665,8 +664,8 @@ func TestGetReportsSomebodyElsesJobAsAbsent(t *testing.T) {
 }
 
 func TestTheLocalUserIsOwnerZero(t *testing.T) {
-	// Python's `owner` is `None` when auth is off, which is every local run:
-	// one person, every job theirs. Zero is how this port spells that, and
+	// When auth is off -- every local run -- there is
+	// one person, every job theirs. Owner zero is how that is spelled, and
 	// `auth.Scope` already spells an unauthenticated caller the same way.
 	r := quietRegistry(t, Config{})
 	job := r.Completed("sim.mana", nil, "mine", 0)
@@ -682,7 +681,7 @@ func TestTheLocalUserIsOwnerZero(t *testing.T) {
 }
 
 func TestJobsAreListedNewestFirstAndTiesKeepTheirBirthOrder(t *testing.T) {
-	// `sorted(..., reverse=True)` is stable in Python, so two jobs stamped in
+	// The recorded sort is stable and descending, so two jobs stamped in
 	// the same microsecond keep the order they were made in rather than
 	// having it reversed with everything else. A Go map has no order at all,
 	// so the tie-break has to be carried explicitly or the list is a
@@ -749,8 +748,8 @@ func TestTheOldestFinishedJobIsEvictedAndALiveOneNever(t *testing.T) {
 }
 
 func TestNothingIsEvictedWhenEverythingIsStillLive(t *testing.T) {
-	// Python takes `sorted(finished)[:n]` of an empty list and evicts
-	// nothing, so a registry full of running jobs simply goes over its bound.
+	// Eviction takes the oldest of the *finished* jobs, of which there may
+	// be none, so a registry full of running jobs simply goes over its bound.
 	// That is the right trade -- dropping a job somebody is polling to make
 	// room for one they just asked for is worse -- but it means the bound is
 	// a target rather than a ceiling, and that is worth saying out loud.
@@ -776,10 +775,11 @@ func TestNothingIsEvictedWhenEverythingIsStillLive(t *testing.T) {
 }
 
 func TestABornFinishedJobCanEvictItself(t *testing.T) {
-	// Reproduced rather than chosen. Python builds the whole finished `Job`
-	// and hands it to `_record`, so it is already finished when the bound is
+	// Reproduced rather than chosen. The whole finished job is built and
+	// then filed, so it is already finished when the bound is
 	// checked -- and if it is the only finished job there, it is the one that
-	// goes. Unreachable at MaxJobs=200, and pinned here because a port that
+	// goes. Unreachable at MaxJobs=200, and pinned here because an
+	// implementation that
 	// filed the job *before* finishing it would quietly behave differently
 	// the day somebody dialled the bound down.
 	r := quietRegistry(t, Config{Max: 1})
@@ -795,7 +795,8 @@ func TestABornFinishedJobCanEvictItself(t *testing.T) {
 
 	hit := r.Completed("sim.mana", map[string]any{"cached": true}, "hit", 0)
 	if r.Get(hit.ID, 0) != nil {
-		t.Errorf("the born-finished job stayed, and Python's would not have")
+		t.Errorf("the born-finished job stayed, and the recorded discipline " +
+			"evicts it")
 	}
 	if hit.Status() != Done {
 		t.Errorf("the caller's own handle changed: %q", hit.Status())
@@ -831,9 +832,9 @@ func TestForgetOwnerDropsThatAccountsJobsAndCountsThem(t *testing.T) {
 }
 
 func TestForgetOwnerRefusesTheLocalUser(t *testing.T) {
-	// Python documents that `owner` is never `None` here -- that is the
-	// no-auth local case, where there is one person and no account to delete
-	// -- and zero is how this port spells `None`. Nothing can produce it, so
+	// The owner here is never the local user -- zero is the
+	// no-auth local case, where there is one person and no account to delete.
+	// Nothing can produce it, so
 	// the guard costs nothing; without it a caller that reached here with a
 	// zero would wipe the local user's jobs instead of a deleted account's.
 	r := quietRegistry(t, Config{})
@@ -847,7 +848,7 @@ func TestForgetOwnerRefusesTheLocalUser(t *testing.T) {
 }
 
 func TestARunningJobIsDroppedButNotCancelled(t *testing.T) {
-	// The honest trade, and Python says so at `forget_owner`: the lanes have
+	// The honest trade, long documented at ForgetOwner: the lanes have
 	// no cancellation, so a dropped job's goroutine finishes into a record
 	// nothing points at. Inventing a cancellation here would be a worse lie
 	// than a few seconds of orphaned CPU.

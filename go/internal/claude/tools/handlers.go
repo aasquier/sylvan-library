@@ -13,7 +13,7 @@ import (
 // The seven read-only tools, wired to `internal/deckread` — the same payload
 // builders the routes answer with, which is the whole reason that package was
 // extracted. A tool result and a route payload are therefore the same bytes by
-// construction, exactly as they are in Python where both call `service.py`.
+// construction.
 //
 // Every handler here is a READ. That is not a promise this comment makes; it
 // is what `internal/claude`'s boundary analysis checks over the typed call
@@ -100,8 +100,8 @@ func getDeck(ctx context.Context, args map[string]any, deps Deps) (any, error) {
 		return nil, err
 	}
 	// Ordered pairs go to the model as an ordered object, for the same reason
-	// they go to the browser as one: the key order is Python's, and the model
-	// reads a deck top-down exactly as a person does.
+	// they go to the browser as one: the key order is the recorded one, and
+	// the model reads a deck top-down exactly as a person does.
 	return wire.OrderedMap(body), nil
 }
 

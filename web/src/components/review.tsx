@@ -55,7 +55,8 @@ export function DeckReviewPanel({ deck, deckRef, status, onChanged }: {
 
   // Reattach on mount: a job id in storage is a sweep this deck paid for and
   // may still be running. Follow it rather than forgetting it; a 404 means
-  // the server restarted and the run died with it (`api/jobs.py`).
+  // the server restarted and the run died with it — jobs live only in its
+  // memory.
   useEffect(() => {
     const stored = localStorage.getItem(storageKey(deckRef))
     if (!stored) return

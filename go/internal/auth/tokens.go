@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Single-use, time-limited tokens -- `mtglab/auth/tokens.py`. One
+// Single-use, time-limited tokens. One
 // implementation, two entry points.
 //
 // ADR 16 is specific about why this is one module rather than an invite flow

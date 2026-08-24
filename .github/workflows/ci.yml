@@ -550,7 +550,7 @@ jobs:
     # still be the wrong thing to put on the instance.
     #
     # What makes it worth a guard rather than a note is that it is not
-    # recoverable by redeploying. `auth/db.py`'s ladder is forward-only (ADR
+    # recoverable by redeploying. The schema ladder is forward-only (ADR
     # 23), so a branch carrying a schema change migrates the volume on boot and
     # deploying `main` afterwards does not migrate it back.
     #
@@ -762,7 +762,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl releases --app sylvan-library | head -10
 
-      # The same move `claude/client.py`'s `explain()` makes for a 401: a
+      # The same move the Claude client's `Explain` makes for a 401: a
       # credential that lapsed reads exactly like an integration that broke,
       # and the person reading this will have forgotten the token had a
       # lifetime at all. `FLY_API_TOKEN` is deliberately app-scoped and

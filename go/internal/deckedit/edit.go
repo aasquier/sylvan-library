@@ -1,5 +1,5 @@
-// Package deckedit is `decks/edit.py`: surgical edits to a deck.yaml,
-// preserving every byte they do not change.
+// Package deckedit is surgical edits to a deck.yaml, preserving every byte
+// they do not change.
 //
 // `deck.yaml` is the source of truth (ADR 1) and `swaps.md` is literally a
 // diff of it -- against the last build's own snapshot, since ADR 30 took decks
@@ -7,10 +7,10 @@
 // part of its correctness: a one-card swap has to be a one-card diff, or the
 // swap record it produces is unreadable.
 //
-// Load-and-dump cannot do that, which the Python module measured rather than
-// assumed (829 changed lines on Goreclaw, and all eight comments gone). So
-// this edits the *text*: it finds the lines belonging to one card entry and
-// rewrites only those. ADR 12 has the full argument and the five rules every
+// Load-and-dump cannot do that, which was measured rather than assumed (829
+// changed lines on Goreclaw, and all eight comments gone). So this edits
+// the *text*: it finds the lines belonging to one card entry and rewrites
+// only those. ADR 12 has the full argument and the five rules every
 // operation here obeys.
 //
 // **How an edit proves itself.** Each operation computes the document it
@@ -24,10 +24,9 @@
 //
 // The failure this package must not have is silently corrupting the one file
 // the whole project is built on, so it is checked rather than argued -- and
-// the port carries a second check the original did not need: the lines it
-// writes come from `internal/pyyaml`, which reproduces PyYAML's emitter byte
-// for byte against a corpus Python generated. Same edit, same bytes, either
-// runtime.
+// twice: the lines it writes come from `internal/yamlemit`, which is held
+// byte for byte to a recorded emitter corpus. Same edit, same bytes, every
+// time.
 package deckedit
 
 import (
@@ -37,12 +36,12 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
-	"github.com/aasquier/sylvan-library/go/internal/pyyaml"
+	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
-// Failed is `EditFailed`: the edit could not be made safely, so nothing was
-// changed. Every operation returns text rather than writing it, which is what
-// makes that sentence true.
+// Failed says the edit could not be made safely, so nothing was changed.
+// Every operation returns text rather than writing it, which is what makes
+// that sentence true.
 type Failed struct{ Reason string }
 
 func (e *Failed) Error() string { return e.Reason }
@@ -316,7 +315,7 @@ func locateCard(doc map[string]any, lines []string, name string, lists []string)
 			}
 		}
 	}
-	return "", 0, entry{}, failf("no card entry named %s", pyRepr(name))
+	return "", 0, entry{}, failf("no card entry named %s", quotedValue(name))
 }
 
 func countMismatch(key string, items, spans int) error {
@@ -328,7 +327,7 @@ func countMismatch(key string, items, spans int) error {
 
 // render is `_render` at the deck files' own width.
 func render(key string, value any, indent int) ([]string, error) {
-	return pyyaml.Render(key, value, indent, pyyaml.RenderWidth, false)
+	return yamlemit.Render(key, value, indent, yamlemit.RenderWidth, false)
 }
 
 // cardLines writes a whole card entry, in the key order the deck files use.
@@ -367,10 +366,10 @@ func cardLines(shape entry, name, category, why string, qty int) ([]string, erro
 // A key absent from the change set is copied through untouched, which is the
 // third state and needs no representation.
 //
-// Nothing here folds. `_render`'s `fold` argument defaults to False and only
-// `SetNote` passes it -- a card's `why` is written as PyYAML's own choice at
-// width 96, which for a long rationale is a single-quoted scalar broken across
-// lines rather than a `>` block. That is what the six decks are written in.
+// Nothing here folds. Folding is opt-in and only `SetNote` opts in -- a
+// card's `why` is written as the emitter's own choice at width 96, which
+// for a long rationale is a single-quoted scalar broken across lines rather
+// than a `>` block. That is what the six decks are written in.
 type change struct {
 	drop  bool
 	value any

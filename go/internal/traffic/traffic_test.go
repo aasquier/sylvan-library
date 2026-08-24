@@ -39,14 +39,14 @@ type summaryFile []struct {
 	Rendered string
 }
 
-// TestTheRollUpMatchesPython is the corpus: seeded `request_log` rows
+// TestTheRollUpMatchesTheGolden is the corpus: seeded `request_log` rows
 // through `Summary` with the clock frozen, compared as the bytes the stats
 // route wraps — the seeded 2xx/4xx/5xx keys on every day row, a 3xx
 // appended in encounter order, the cutoff, and the top-twelve order.
-func TestTheRollUpMatchesPython(t *testing.T) {
+func TestTheRollUpMatchesTheGolden(t *testing.T) {
 	raw, err := os.ReadFile("testdata/summary.json")
 	if err != nil {
-		t.Fatalf("summary.json: %v (regenerate with `python tests/go_fixtures.py`)", err)
+		t.Fatalf("summary.json: %v (a frozen golden; never regenerated)", err)
 	}
 	var cases summaryFile
 	if err := json.Unmarshal(raw, &cases); err != nil {

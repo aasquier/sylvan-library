@@ -696,7 +696,7 @@ describe('the proposal', () => {
   })
 
   it('says a lost run is lost rather than showing a bare 404', async () => {
-    // Jobs live in the server's memory and die with it (`api/jobs.py`). A
+    // Jobs live in the server's memory and die with it. A
     // restart mid-run is the one way this fails that is nobody's mistake.
     const { ApiError } = await import('../lib/api')
     vi.mocked(followJob).mockImplementation((_id, _onTick, _ms, initial) => (

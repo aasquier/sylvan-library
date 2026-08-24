@@ -9,9 +9,9 @@ import (
 
 // The reference prose that needs no pool, no deck source and no network --
 // the one corner of the app that works on a fresh clone before `data
-// refresh` has ever run (`api/app.py:color_taxonomy`). Each answer is the
-// embedded payload, byte for byte; the prose is authored in Python and
-// rendered to `reference/data/` (see that package), so there is nothing to
+// refresh` has ever run. Each answer is the
+// embedded payload, byte for byte; the prose is checked-in JSON under
+// `reference/data/` (see that package), so there is nothing to
 // compute here and nothing to get wrong but the route.
 
 // colors is `GET /api/colors`: the 32 combinations, the five colours and

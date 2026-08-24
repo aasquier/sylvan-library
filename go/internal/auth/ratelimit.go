@@ -11,8 +11,7 @@ import (
 	"time"
 )
 
-// A fixed window in SQLite, guarding the endpoints that take a password --
-// `mtglab/auth/ratelimit.py`.
+// A fixed window in SQLite, guarding the endpoints that take a password.
 //
 // A fixed window in SQLite is enough: this is a private site with a dozen
 // accounts on one machine, and the thing being prevented is an unattended
@@ -56,7 +55,7 @@ func (l Limit) Describe() string {
 	return fmt.Sprintf("%d attempts per %d minutes", l.Failures, int(l.Window.Minutes()))
 }
 
-// The budgets, each argued in `ratelimit.py` and copied here unchanged.
+// The budgets, each argued below and none of them tunable in passing.
 //
 // Ten wrong passwords for one account in a quarter hour is somebody who has
 // forgotten theirs; the eleventh is a script. Thirty from one address is

@@ -13,7 +13,7 @@ Commandment 2 makes this concrete: the newcomer someone shares the site with
 is opening it on *their* phone, in *their* browser. It has to just work.
 
 - **The floor is Safari 16.4, declared by Aaron on 2026-08-19** and pinned as
-  `FLOOR` in `tests/test_browser_floor.py`, whose docstring has the argument:
+  the bundle-floor check in CI, whose comment has the argument:
   two independent routes reach the same number — Tailwind v4's `@property` and
   `color-mix(in lab, …)`, and the camera door's SIMD wasm core. Do not
   re-derive it; three runs already did. Note the consequence for this machine:
@@ -23,7 +23,7 @@ is opening it on *their* phone, in *their* browser. It has to just work.
   `structuredClone`, top-level await in served code. When Vite's target and
   reality disagree, reality is the phone that renders white.
 - **Audit `src/mtglab/web_dist/assets/`, not `web/src`, and run
-  `tests/test_browser_floor.py` rather than grepping.** This is the correction
+  the bundle-floor check rather than grepping.** This is the correction
   that run earned the hard way: the floor moved from 15 to 16.4 the day
   Tailwind v4 landed, and no source file changed — v4 emits `@property` and
   `color-mix(in lab, …)` into the *bundle*. A grep of `web/src` cannot see
@@ -44,7 +44,7 @@ is opening it on *their* phone, in *their* browser. It has to just work.
 - Responsive sweep of anything new since last run at phone, tablet, laptop
   widths — and both themes. A screenshot at each width is the evidence;
   "the classes look right" is not.
-- **Motion accessibility: run `tests/test_reduced_motion.py`, and audit the
+- **Motion accessibility: run the reduced-motion checks in the web suite, and audit the
   bundle if you audit by hand at all.** Commandment 6 wants a living page
   *and* `prefers-reduced-motion` is a promise to users who get motion-sick —
   reduced, not necessarily removed. This is the bullet above's lesson a second
@@ -173,9 +173,9 @@ archaeology dig.
   the endpoint to Black's profiler and do not name a cause here.** This is the
   correction the 2026-08-19 pass earned. The probe correctly found
   near-perfect serialisation on the library shelf and this facet then wrote
-  down the reason: "the shelf's pure-Python YAML and aggregation under the
-  GIL". Right that it was pure Python under the GIL, wrong about *which* pure
-  Python — YAML was second at 18ms, and the first was 162ms of failed
+  down the reason: "the shelf's YAML and aggregation costs". Right that it
+  was serial overhead, wrong about *which* — YAML was second at 18ms, and
+  the first was 162ms of failed
   `import pandas` inside DuckDB's parameter binding. The guess was plausible,
   specific, and sat in the ledger as a finding for three days. **Run `mtglab
   bench profile <endpoint>` and paste what it says**; a sentence beginning

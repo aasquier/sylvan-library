@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// TokenBytes is how many random bytes Python draws for a token
-// (`secrets.token_urlsafe(32)`, 43 characters once encoded). ADR 5 names it.
+// TokenBytes is how many random bytes go into a token
+// (43 characters once encoded). ADR 5 names it.
 const TokenBytes = 32
 
 // Lifetime is a session's life, matching the cookie's Max-Age.
@@ -30,7 +30,7 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-// HashToken is `auth/sessions.py:_hash`: the SHA-256 of the token, as lowercase
+// HashToken is the SHA-256 of the token, as lowercase
 // hex. What `app.db` stores, so that reading the file never hands over a live
 // session (ADR 5).
 func HashToken(token string) string {
@@ -39,8 +39,8 @@ func HashToken(token string) string {
 }
 
 // Lookup resolves a token to its session, or nil when it is unknown or
-// expired. Read-only: Python deletes the expired row and touches
-// `last_seen_at`; here an expired row is simply not a session.
+// expired. Read-only: an expired row is simply not a session here, and the
+// deleting and touching belong to `LookupTouching`, the write half.
 func Lookup(ctx context.Context, db *sql.DB, token string) (*Session, error) {
 	if token == "" {
 		return nil, nil
@@ -70,10 +70,10 @@ func Lookup(ctx context.Context, db *sql.DB, token string) (*Session, error) {
 	return &Session{UserID: userID, CreatedAt: createdAt, ExpiresAt: expiresAt}, nil
 }
 
-// ParseTimestamp reads what Python's `datetime.isoformat()` wrote: RFC 3339
+// ParseTimestamp reads the recorded column format: RFC 3339
 // with a `+00:00` offset and microseconds when they are non-zero
 // (`2026-08-21T12:00:00.123456+00:00`, or `2026-08-21T12:00:00+00:00`). A
-// timestamp with no offset at all -- which nothing in `mtglab.auth` writes,
+// timestamp with no offset at all -- which nothing in this package writes,
 // but a hand edit might -- is read as UTC rather than refused.
 func ParseTimestamp(s string) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {

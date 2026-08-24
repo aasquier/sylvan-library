@@ -1616,7 +1616,7 @@ describe('DeckDetail rationale interview discoverability', () => {
 /**
  * A deck somebody may read but not change.
  *
- * The mirror of `tests/test_library_write_gate.py`, and it exists for the same
+ * The mirror of the server's own write-gate tests, and it exists for the same
  * reason: before the write gate landed, every account that could see the
  * curated six could also edit and delete them, and no test on either side of
  * the wire ever logged in as a second person to find out.

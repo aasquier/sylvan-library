@@ -163,8 +163,9 @@ go/internal/sim           tier1 goldfish, karsten + curve (tier 1.5),
                           mulligan grid, compile, ADR 18 cache, tier3 Forge
 go/internal/claude        the pipe, stance, personas, all seven modes
 go/internal/tarot         the 78-card deck and the seeded spread
-go/internal/py*           bit-exact reproductions of CPython behaviors the
-                          app's promises rest on (see Determinism below)
+go/internal/mt19937,      the determinism kernels: seeded generator, exact
+  floats, textutil,       float arithmetic + rendering, recorded string
+  yamlemit                semantics, the deck file's one YAML style
 web/                      React frontend; web/README.md is the conventions map
 web_dist/                 the committed bundle (CI proves it rebuilds)
 assets/tarot/             the 1909 Rider deck; PROVENANCE.md is not optional
@@ -222,14 +223,14 @@ response an admin authenticated for. Secrets travel by environment
   routes are 403 by prefix (ADR 17, argued there). The door's sweeps derive
   from the served route table, so a new route is deny-by-default.
 - **Determinism is contract.** A seed is a promise — the tarot deal a
-  browser reloads, the Wheel's spin, every Tier 1 run. `go/internal/pyrand`
-  is MT19937 bit-for-bit; the `py*` packages beside it (yaml emitter, float
-  repr/fsum, casefold, text splitting) pin the arithmetic the recorded
-  goldens and stored cache keys rest on. **The `testdata/` corpora are
-  frozen goldens — never regenerate them, and never "fix" arithmetic that
-  matches them.** Floating-point sums use `pyfloat.Fsum` and FMA-sensitive
-  expressions use `sim.Rounded`; a scan against `>=` one ulp away is a
-  different recommendation.
+  browser reloads, the Wheel's spin, every Tier 1 run. `go/internal/mt19937`
+  is the seeded generator, bit-for-bit; `floats` (fsum, both roundings, the
+  canonical rendering), `textutil`, `yamlemit` and claude's casefold table
+  pin the arithmetic the recorded goldens and stored cache keys rest on.
+  **The `testdata/` corpora are frozen goldens — never regenerate them, and
+  never "fix" arithmetic that matches them.** Floating-point sums use
+  `floats.Fsum` and FMA-sensitive expressions use `floats.Rounded`; a scan
+  against `>=` one ulp away is a different recommendation.
 - **Tier 1 results are cached on the compiled input** (ADR 18) plus seed and
   an engine fingerprint (a hash of five embedded packages —
   `internal/sim/cache`'s `engineSources` is the list). Every result carries
@@ -244,9 +245,9 @@ response an admin authenticated for. Secrets travel by environment
   tarot lore (`internal/reference`'s embedded JSON): finite, editable, free.
   Card facts inside it still resolve through the pool; an unresolvable name
   is dropped and counted.
-- **Python decides nothing.** The historical split "deterministic code
-  decides, Claude advises" (ADR 14) still governs: legality, identity, mana,
-  simulation and price are deterministic Go, tested without a network.
+- **Deterministic code decides; Claude advises** (ADR 14): legality,
+  identity, mana, simulation and price are deterministic Go, tested without
+  a network.
   Claude owns opinions and research, through seven read-only modes with
   structural guards: the interview returns only questions; the slot argument
   has no field for a defence (ADR 25); research cannot see a deck (ADR 26);

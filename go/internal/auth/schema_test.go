@@ -11,11 +11,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
 )
 
-// dumpSchema renders a migrated file the way `tests/go_fixtures.py`'s
-// `render_app_schema` does — `PRAGMA user_version` first, then every
+// dumpSchema renders a migrated file the way `authtest/app_schema.sql` is
+// rendered — `PRAGMA user_version` first, then every
 // `sqlite_master` row that carries SQL, sorted `type DESC, name`, each
 // statement closed with a semicolon — so the comparison against the
-// generated fixture is byte equality, not a looser reading of it.
+// recorded fixture is byte equality, not a looser reading of it.
 func dumpSchema(t *testing.T, path string) string {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
@@ -48,9 +48,9 @@ func dumpSchema(t *testing.T, path string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// The fixture with its comment header off: what Python's ladder built,
-// rendered by `render_app_schema`, ready to compare against dumpSchema.
-func pythonSchema(t *testing.T) string {
+// The fixture with its comment header off: the recorded schema,
+// ready to compare against dumpSchema.
+func recordedSchema(t *testing.T) string {
 	t.Helper()
 	var lines []string
 	for _, line := range strings.Split(authtest.Schema(), "\n") {
@@ -62,23 +62,21 @@ func pythonSchema(t *testing.T) string {
 	return strings.Join(lines, "\n")
 }
 
-// The retirement gate for the ladder: a file the Go migrator built is
-// byte-for-byte the file Python's ladder builds — same `sqlite_master`
+// The ladder's whole promise in one assertion: a file `Migrate` built is
+// byte-for-byte the recorded schema — same `sqlite_master`
 // text, comments in the CREATE statements included, same `user_version`.
-// `app_schema.sql` is generated from a database `auth/db.py` just migrated
-// (`tests/go_fixtures.py`) and `tests/test_go_fixtures.py` keeps it
-// current, so this one assertion holds the two ladders equal in both
-// directions: a rung added to either side fails here until the other side
-// carries it too.
-func TestMigrateBuildsWhatPythonBuilt(t *testing.T) {
+// `app_schema.sql` records the schema every deployed `app.db` already
+// wears, so a rung that changes what the ladder builds fails here until
+// the recorded schema is updated in the same change — never by drift.
+func TestMigrateBuildsTheRecordedSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := Migrate(path); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
 	got := dumpSchema(t, path)
-	want := pythonSchema(t)
+	want := recordedSchema(t)
 	if got != want {
-		t.Fatalf("the Go ladder built a different schema than Python's:\n"+
+		t.Fatalf("the ladder built a different schema than the recorded one:\n"+
 			"got:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -154,8 +152,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 }
 
 // Rows that already violate a foreign key make the sign-off refuse — the
-// property `auth/db.py` bought by running `foreign_key_check` after
-// switching enforcement off, carried across with the ladder.
+// property bought by running `foreign_key_check` after
+// switching enforcement off for the climb.
 func TestMigrateRefusesAFileThatFailsTheCheck(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.db")
 	buildAtRung(t, path, 1)

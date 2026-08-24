@@ -1,8 +1,7 @@
--- app.db, as `auth/db.py`'s migration ladder leaves it at schema
--- version 12. Written by `python tests/go_fixtures.py`. Since
--- Phase 8 the Go ladder (go/internal/auth/schema.go) owns the deployed
--- file, and TestMigrateBuildsWhatPythonBuilt holds it to these bytes --
--- the lockstep between the two ladders. Do not hand-edit.
+-- app.db's recorded schema at version 12: what the ladder under
+-- go/internal/auth/migrations/ builds, read back out of sqlite_master.
+-- TestMigrateBuildsTheRecordedSchema holds auth.Migrate to these bytes,
+-- so a new rung updates this record in the same change. Do not hand-edit.
 PRAGMA user_version = 12;
 CREATE TABLE auth_tokens (
         -- The hash of the token, for the same reason `sessions` stores one:

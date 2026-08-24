@@ -7,21 +7,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
-	"github.com/aasquier/sylvan-library/go/internal/pyfloat"
 	"github.com/aasquier/sylvan-library/go/internal/suggest"
 )
 
-// The scorer's own corpus (`tests/go_fixtures.py:score_cases`): synthetic
-// target/candidate pairs built to land on chosen component scores, so the
-// arithmetic is covered on purpose rather than wherever four real cards
-// happened to fall.
+// The scorer's own corpus (testdata/scores.json, a frozen golden):
+// synthetic target/candidate pairs built to land on chosen component
+// scores, so the arithmetic is covered on purpose rather than wherever four
+// real cards happened to fall.
 //
-// `TestReplacementsAgreeWithPython` next door is the *integration* case -- the
-// Titan's slot, a real pool, the real ordering. It is four points in a
-// four-dimensional space and it passed throughout the period when this
-// package summed the four weighted parts left to right, which is CPython
-// 3.11's `sum` and not the 3.12 the image runs.
+// `TestReplacementsMatchTheRecordedAnswer` next door is the *integration*
+// case -- the Titan's slot, a real pool, the real ordering. It is four
+// points in a four-dimensional space and it passed throughout the period
+// when this package summed the four weighted parts left to right -- a
+// different arithmetic, in its last bits, from the compensated one the
+// corpus records.
 
 type scoreRecord struct {
 	Name       string   `json:"name"`
@@ -69,11 +70,11 @@ func loadScores(t *testing.T) []scoreCase {
 	return corpus.Cases
 }
 
-func TestScoreAgreesWithPythonToTheBit(t *testing.T) {
+func TestScoreMatchesTheCorpusToTheBit(t *testing.T) {
 	for _, c := range loadScores(t) {
 		got := suggest.Score(c.Target.record(), c.Candidate.record(), "")
 		if math.Float64bits(got.Score) != math.Float64bits(c.Score) {
-			t.Errorf("%s: Score = %v (%#016x), Python = %v (%#016x)",
+			t.Errorf("%s: Score = %v (%#016x), the corpus says %v (%#016x)",
 				c.Note, got.Score, math.Float64bits(got.Score),
 				c.Score, math.Float64bits(c.Score))
 		}
@@ -103,14 +104,14 @@ func TestTheScoreCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
 		products := make([]float64, len(c.Parts))
 		naive := 0.0
 		for i := range c.Parts {
-			products[i] = pyfloat.Rounded(c.Weights[i] * c.Parts[i])
+			products[i] = floats.Rounded(c.Weights[i] * c.Parts[i])
 			naive += products[i]
 		}
-		exact := pyfloat.Fsum(products)
+		exact := floats.Fsum(products)
 		if math.Float64bits(naive) != math.Float64bits(exact) {
 			differs++
-			nudge := pyfloat.Rounded(0.10 * c.Popularity)
-			if pyfloat.RoundTo(naive+nudge, 4) != pyfloat.RoundTo(exact+nudge, 4) {
+			nudge := floats.Rounded(0.10 * c.Popularity)
+			if floats.RoundTo(naive+nudge, 4) != floats.RoundTo(exact+nudge, 4) {
 				rounded++
 			}
 		}

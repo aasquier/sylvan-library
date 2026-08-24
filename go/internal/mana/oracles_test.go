@@ -3,29 +3,25 @@ package mana
 import "math/bits"
 
 // Two answers to "can these sources pay this cost?" that are obviously
-// correct and far too slow to ship -- `tests/mana_oracle.py`'s
-// `brute_force_can_pay` and `hall_can_pay`, in Go.
+// correct and far too slow to ship: a brute-force enumeration and Hall's
+// theorem.
 //
-// PLAN section 5 item 2 asks for them by name: Hypothesis's generative role on
-// the Python side is covered here by native fuzzing "against the same
-// brute-force/Hall's-theorem oracles, re-implemented once in Go". The word
-// doing the work is **re-implemented**. Transliterating the Python would
-// inherit any mistake the Python makes, and the whole point of a second and
+// The word
+// doing the work is **independent**. Deriving either from the solver would
+// inherit any mistake the solver makes, and the whole point of a second and
 // third opinion is that they can be wrong in different ways than the first.
 // So these were written from the definitions:
 //
 //   - the brute force enumerates injective assignments of pips to units, by
-//     recursive backtracking rather than by Python's `itertools.permutations`;
-//   - Hall's condition walks subsets as bitmasks rather than by Python's
-//     size-stratified `itertools.combinations`.
+//     recursive backtracking;
+//   - Hall's condition walks subsets as bitmasks.
 //
 // Both come out at the same answers by different routes, which is what makes
 // agreement mean something.
 //
 // **Nothing here may call into the solver.** `oracleUnits` re-does what
 // [ExpandUnits] does and `oracleOverlap` re-does what colorSet.intersects
-// does, deliberately -- `mana_oracle.py`'s own docstring gives the reason for
-// its `_units`, and it applies verbatim: an oracle that shares code with the
+// does, deliberately: an oracle that shares code with the
 // implementation cannot catch a bug in the shared part. In particular these
 // compare colour **strings**, where the solver compares bits, so the packing
 // is checked rather than assumed.

@@ -25,11 +25,11 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The deck writes: `api/app.py`'s nine editing routes over `api/service.py`'s
-// nine functions over `decks/edit.py`'s nine operations, which
-// `internal/deckedit` already reproduces byte for byte.
+// The deck writes: the nine editing routes over
+// `internal/deckedit`'s nine surgical operations, whose output the
+// recorded goldens pin byte for byte.
 //
-// **Every write goes out through `commit`**, which is `service._commit` and
+// **Every write goes out through `commit`**, which
 // carries its two jobs: no caller can change a deck without being told what
 // the change did to the gate, and no caller can change a deck without the
 // change being recorded (ADR 28). That it is one function rather than nine is
@@ -44,8 +44,8 @@ import (
 // refuses is **422** with the editor's own sentence, because those are
 // answers about the deck rather than about the caller.
 
-// commitResult is `_commit`'s return: the operation's own keywords, then what
-// the edit did to the deck.
+// commitOutcome is what a commit answers: the operation's own keywords,
+// then what the edit did to the deck.
 //
 // The operation's keys are spread in by the caller rather than modelled here,
 // because they differ per operation and the wire has always carried them that
@@ -60,7 +60,7 @@ type commitOutcome struct {
 // commit writes an edited deck and hands back the gate's verdict on the
 // result.
 //
-// The order is the honest one, and it is Python's: the deck is written, then
+// The order is the honest one: the deck is written, then
 // the entry is recorded, then the gate runs. The edit has happened by the time
 // the log is written, so a validation that blows up afterwards must not be
 // able to erase the record of it -- and `Record` never fails the edit, for the
@@ -175,18 +175,18 @@ func (a *API) answer(w http.ResponseWriter, r *http.Request, src library.Source,
 
 // ---- the bodies ------------------------------------------------------------
 
-// readBody parses a JSON object body, answering FastAPI's own 422 for
-// everything that is not one.
+// readBody parses a JSON object body, answering the recorded validation
+// 422 for everything that is not one.
 //
-// It answered `missing` for all four failures until 2026-08-22, and the
-// contract suite is what said so: `POST /api/decks` with a body of `{` and no
-// content type is `dict_type` in FastAPI, because Starlette never parses a
-// body whose content type does not say JSON -- it hands the raw bytes through
-// as a string, and a string is not a dictionary. Nine flipped write routes
+// It answered `missing` for all four failures until 2026-08-22, and a wire
+// diff is what said so: `POST /api/decks` with a body of `{` and no
+// content type is `dict_type`, because a body whose content type does not
+// say JSON is never parsed -- the raw bytes stand
+// as a string, and a string is not a dictionary. Nine write routes
 // shared this function and none of their goldens sent anything but a valid
 // object, so the branch had never been asked a question.
 //
-// Starlette's decision procedure, in its order:
+// The recorded decision procedure, in its order:
 //
 //  1. no body at all -> `missing`;
 //  2. a content type that is not `application/json` (or `application/…+json`),
@@ -212,8 +212,8 @@ func readBody(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 		wire.Unprocessable(w, wire.JSONInvalid("body", decodeOffset(err), err.Error()))
 		return nil, false
 	}
-	// `json.loads` reads the *whole* string, so anything after the first value
-	// is a decode error rather than something to ignore.
+	// The body is read as *one* JSON document, so anything after the first
+	// value is a decode error rather than something to ignore.
 	if decoder.More() {
 		wire.Unprocessable(w, wire.JSONInvalid("body", int(decoder.InputOffset())+1, "Extra data"))
 		return nil, false
@@ -230,7 +230,8 @@ func readBody(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 	return body, true
 }
 
-// isJSONRequest is Starlette's test: maintype `application`, subtype `json` or
+// isJSONRequest is the recorded content-type test: maintype `application`,
+// subtype `json` or
 // something ending `+json`. Parameters (`; charset=utf-8`) are ignored, and an
 // absent header is not JSON.
 func isJSONRequest(contentType string) bool {
@@ -245,8 +246,8 @@ func isJSONRequest(contentType string) bool {
 	return subtype == "json" || strings.HasSuffix(subtype, "+json")
 }
 
-// decodeOffset is CPython's `e.pos`, one-based, from whichever error Go's
-// decoder raised.
+// decodeOffset is the recorded parse position -- one-based -- read from
+// whichever error Go's decoder raised.
 func decodeOffset(err error) int {
 	var syntax *json.SyntaxError
 	if errors.As(err, &syntax) {
@@ -259,24 +260,24 @@ func decodeOffset(err error) int {
 	return 1
 }
 
-// str is `str(payload.get(key) or "")` — the coercion four route families
+// str is the coercion four route families
 // apply to a body field before it becomes a slug, an owner or a card name.
 //
-// An absent or null value is `""` and not `"None"`, because every call site
-// spells it `or ""`; everything else goes through Python's own `str()`, which
-// is **not** `fmt.Sprint` for a container. `str(["x"])` is `"['x']"` where
-// `fmt.Sprint` gives `"[x]"`, and that lands in a 404's `detail` verbatim.
-// Found by diffing the pair; see [wire.PyStr].
+// An absent or null value is `""` and not `"None"` -- the recorded default
+// -- and everything else goes through the recorded stringification, which
+// is **not** `fmt.Sprint` for a container: a decoded list renders `['x']`
+// where `fmt.Sprint` gives `[x]`, and that lands in a 404's `detail`
+// verbatim. Found by a wire diff; see [wire.Plain].
 func str(body map[string]any, key string) string {
 	if v, ok := body[key]; !ok || v == nil {
 		return ""
 	}
-	return wire.PyStr(body[key])
+	return wire.Plain(body[key])
 }
 
 // ---- the nine routes -------------------------------------------------------
 
-// swapCard is `POST .../swap` -- `service.swap_card`. The operation the whole
+// swapCard is `POST .../swap`. The operation the whole
 // editor was written for, and the one that carries rule 4 at the boundary as
 // well as inside the editor.
 func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
@@ -288,8 +289,8 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// `into`, not `in`. The wire has always spelled it that way -- `in` is a
-	// Python keyword, so the parameter could not be called it.
+	// `into`, not `in`. The wire has always spelled it that way, and the
+	// spelling is frozen with the rest of the contract.
 	out, into, why := str(body, "out"), str(body, "into"), str(body, "why")
 	if strings.TrimSpace(why) == "" {
 		// Rule 4. A card that cannot justify its slot is a card to cut, and
@@ -299,19 +300,19 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 	}
 	entry := findCard(d, out)
 	if entry == nil {
-		a.refuseWrite(w, "swap", rejectf("%s is not in this deck", wire.PyRepr(out)))
+		a.refuseWrite(w, "swap", rejectf("%s is not in this deck", wire.Quote(out)))
 		return
 	}
 	wanted := strings.ToLower(strings.TrimSpace(into))
 	for _, c := range append(append([]deck.CardEntry{}, d.Cards...), d.SwapBoard...) {
 		if strings.ToLower(c.Name) == wanted {
-			a.refuseWrite(w, "swap", rejectf("%s is already in this deck", wire.PyRepr(into)))
+			a.refuseWrite(w, "swap", rejectf("%s is already in this deck", wire.Quote(into)))
 			return
 		}
 	}
 	for _, c := range d.Commander {
 		if strings.ToLower(c) == wanted {
-			a.refuseWrite(w, "swap", rejectf("%s is the commander", wire.PyRepr(into)))
+			a.refuseWrite(w, "swap", rejectf("%s is the commander", wire.Quote(into)))
 			return
 		}
 	}
@@ -351,12 +352,12 @@ func (a *API) addCard(w http.ResponseWriter, r *http.Request) {
 	}
 	if into != "cards" && into != "swap_board" {
 		a.refuseWrite(w, "add", rejectf("cards go into %s, not %s",
-			strings.Join(deckedit.CardLists, " or "), wire.PyRepr(into)))
+			strings.Join(deckedit.CardLists, " or "), wire.Quote(into)))
 		return
 	}
 	qty, err := bodyQty(body)
 	if err != nil {
-		// FastAPI's `int(payload.get("qty") or 1)` raises before the handler
+		// The qty coercion refuses before the handler
 		// body, and the route answers 422 with this sentence.
 		wire.Detail(w, http.StatusUnprocessableEntity, "qty must be a number: "+err.Error())
 		return
@@ -399,7 +400,7 @@ func (a *API) removeCard(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	entry := findCard(d, name)
 	if entry == nil {
-		a.refuseWrite(w, "remove", rejectf("%s is not in this deck", wire.PyRepr(name)))
+		a.refuseWrite(w, "remove", rejectf("%s is not in this deck", wire.Quote(name)))
 		return
 	}
 	inThe99 := false
@@ -467,12 +468,12 @@ func (a *API) entombCards(w http.ResponseWriter, r *http.Request) {
 		match, found := in99[strings.ToLower(name)]
 		if !found {
 			a.refuseWrite(w, "entomb", rejectf("%s is not in the 99, so nothing was entombed",
-				wire.PyRepr(name)))
+				wire.Quote(name)))
 			return
 		}
 		for _, already := range resolved {
 			if already == match {
-				a.refuseWrite(w, "entomb", rejectf("%s is listed twice", wire.PyRepr(match)))
+				a.refuseWrite(w, "entomb", rejectf("%s is listed twice", wire.Quote(match)))
 				return
 			}
 		}
@@ -551,7 +552,7 @@ func (a *API) patchCard(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	entry := findCard(d, name)
 	if entry == nil {
-		a.refuseWrite(w, "patch-card", rejectf("%s is not in this deck", wire.PyRepr(name)))
+		a.refuseWrite(w, "patch-card", rejectf("%s is not in this deck", wire.Quote(name)))
 		return
 	}
 	if field == "category" {
@@ -679,7 +680,7 @@ func checkCategory(category string) (string, error) {
 	category = strings.ToLower(strings.TrimSpace(category))
 	if !reference.IsCategory(category) {
 		return "", rejectf("%s is not a category; choose one of %s",
-			wire.PyRepr(category), strings.Join(reference.Deck().Categories, ", "))
+			wire.Quote(category), strings.Join(reference.Deck().Categories, ", "))
 	}
 	return category, nil
 }
@@ -699,7 +700,7 @@ func (a *API) playableCard(ctx context.Context, d *deck.Deck, name, noPool strin
 		}
 		rec = found[name]
 		if rec == nil {
-			return rejectf("%s is not a card the pool knows", wire.PyRepr(name))
+			return rejectf("%s is not a card the pool knows", wire.Quote(name))
 		}
 		if !rec.LegalCommander {
 			return rejectf("%s is not legal in Commander", rec.Name)
@@ -797,7 +798,7 @@ func namedField(w http.ResponseWriter, body map[string]any) (string, any, bool) 
 }
 
 // plainJSON turns `json.Number` into the int or float a caller meant, so the
-// editor's own validation sees what Python's would. A number that is not whole
+// editor's own validation sees plain values. A number that is not whole
 // stays a float and is refused by the field that cares.
 func plainJSON(v any) any {
 	switch t := v.(type) {
@@ -834,7 +835,7 @@ func bodyQty(body map[string]any) (int, error) {
 	case float64:
 		return 0, fmt.Errorf("invalid literal for int() with base 10: %v", v)
 	case string:
-		return 0, fmt.Errorf("invalid literal for int() with base 10: %s", wire.PyRepr(v))
+		return 0, fmt.Errorf("invalid literal for int() with base 10: %s", wire.Quote(v))
 	default:
 		return 0, fmt.Errorf("int() argument must be a string or a number")
 	}

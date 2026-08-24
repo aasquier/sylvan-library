@@ -12,10 +12,10 @@ import (
 	"sync"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
-	"github.com/aasquier/sylvan-library/go/internal/pytext"
+	"github.com/aasquier/sylvan-library/go/internal/textutil"
 )
 
-// `sim/tier3/coverage.py`: the card-coverage pre-flight — does Forge
+// The card-coverage pre-flight — does Forge
 // implement every card in this deck?
 //
 // **This is the non-negotiable piece.** Forge implements ~99.8% of cards legal
@@ -78,7 +78,7 @@ type coverageFailed struct{ msg string }
 func (e *coverageFailed) Error() string        { return e.msg }
 func (e *coverageFailed) Is(target error) bool { return target == ErrCoverageFailed }
 
-// ErrResultsUntrustworthy is `run.ResultsUntrustworthy`: Forge itself reported
+// ErrResultsUntrustworthy is the refusal for a run where Forge itself reported
 // a dropped card or an unloadable deck.
 //
 // The second of the two coverage checks, and the one that fires if a name ever
@@ -117,10 +117,10 @@ type indexKey struct {
 var (
 	indexMu    sync.Mutex
 	indexCache = map[indexKey]map[string]bool{}
-	// Hits and misses, because `caches.py`'s whole argument is that a cache
-	// can be correct, tested and never once hit. Go has no central register
-	// yet (the migration plan's enforcement table records that gap
-	// deliberately), so the counters live here and a test reads them.
+	// Hits and misses, because the measuring shelf's whole argument is that
+	// a cache can be correct, tested and never once hit. There is no
+	// central cache register yet -- a known, deliberate gap -- so the
+	// counters live here and a test reads them.
 	indexHits, indexMisses int
 )
 
@@ -203,9 +203,9 @@ func readNames(path string) (map[string]bool, error) {
 			// card script should cost that card, not the whole pre-flight.
 			// Go's []byte -> string is already lossless-to-invalid, and every
 			// `Name:` line the index needs is ASCII or valid UTF-8.
-			for _, line := range pytext.SplitLines(string(body)) {
+			for _, line := range textutil.SplitLines(string(body)) {
 				if strings.HasPrefix(line, "Name:") {
-					names[pytext.Strip(line[5:])] = true
+					names[textutil.Strip(line[5:])] = true
 				}
 			}
 			return nil
@@ -232,7 +232,7 @@ func Resolve(name string, index map[string]bool) string {
 	}
 	if strings.Contains(name, " // ") {
 		for _, face := range strings.Split(name, " // ") {
-			face = pytext.Strip(face)
+			face = textutil.Strip(face)
 			if index[face] {
 				return face
 			}

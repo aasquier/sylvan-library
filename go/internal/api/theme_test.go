@@ -124,16 +124,16 @@ func TestTheFloorIsRefusedBeforeTheMissingKey(t *testing.T) {
 // Every way a budget can fail refuses **in one sentence**, and that sentence
 // names nothing that computes.
 //
-// This is the wart's own test, kept and inverted. `float(budget)` sat inside
-// a `try` catching `ValueError` and not `TypeError`, so a list was an
-// uncaught 500 and an unreadable string was a 422 quoting `float()` at the
+// This is the wart's own test, kept and inverted. The old budget read
+// caught only some of what a bad field can raise, so a list was an
+// uncaught 500 and an unreadable string was a 422 quoting jargon at the
 // user -- two spellings of one bad field, answered two ways, one of them
-// naming a language builtin on the screen a newcomer meets first. Ruled with
-// Aaron 2026-08-23 and fixed in both runtimes at once.
+// naming machinery on the screen a newcomer meets first. Ruled with
+// Aaron 2026-08-23, and the one-sentence 422 is the contract.
 //
 // The **grammar is deliberately unchanged**: the ruling was about what a
-// refusal says, so everything `float()` accepted before is still accepted,
-// which is what the second half of this table checks.
+// refusal says, so everything the budget grammar accepted before is still
+// accepted, which is what the second half of this table checks.
 func TestEveryUnreadableBudgetRefusesInOneSentence(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
@@ -341,8 +341,8 @@ func TestTheThemeProposalIsAJobWhoseResultIsTheProposal(t *testing.T) {
 }
 
 // The budget rides in the closing instruction as `$50`, not `$50.000000` --
-// Python's `:g`, which Go's default `%g` is not.
-func TestTheBudgetReachesTheModelInPythonsFormat(t *testing.T) {
+// the recorded general format, which Go's default `%g` is not.
+func TestTheBudgetReachesTheModelInTheRecordedFormat(t *testing.T) {
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(themeProposalAnswer))}}
 	api.start(t)
@@ -357,7 +357,7 @@ func TestTheBudgetReachesTheModelInPythonsFormat(t *testing.T) {
 	}
 	sent, _ := json.Marshal(api.requests[0])
 	if !strings.Contains(string(sent), `They have about $50 for the whole deck`) {
-		t.Error("the budget did not reach the model as Python spells it")
+		t.Error("the budget did not reach the model in the recorded spelling")
 	}
 	// `avoid` is stripped, and it is the user's words rather than an
 	// instruction this side composed.
@@ -470,11 +470,11 @@ func exhaustedTranscript() string {
 	return "[" + strings.Join(turns, ",") + "]"
 }
 
-// The label's singular is `” if n == 1 else 's'`, which is the conditional
+// The label's singular fires only at exactly one, which is the conditional
 // the other way round from how it reads: **zero things are "0 things"** and
 // only one is "1 thing". Nothing above reached either edge, so a mutation
 // that spelled it `n == 0` survived a whole suite.
-func TestTheLabelsCountThingsPythonsWay(t *testing.T) {
+func TestTheLabelsCountThingsTheRecordedWay(t *testing.T) {
 	noCredential(t)
 	rig := newJobRig(t)
 	defer rig.close()

@@ -14,8 +14,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
-// The `EmailSender` seam and the two implementations behind it --
-// `mtglab/auth/mail.py`.
+// The `EmailSender` seam and the two implementations behind it.
 //
 // ADR 16 puts a transactional email provider behind an interface for one
 // stated reason: **"the seam is what keeps that dependency out of the tests."**
@@ -48,12 +47,12 @@ const ResendEndpoint = "https://api.resend.com/emails"
 // UserAgent is sent on every request, and it is not a courtesy -- it is the
 // difference between mail working and not.
 //
-// `api.resend.com` is behind Cloudflare, which answered Python's default
-// `Python-urllib/3.12` with **403 and error code 1010**, the "banned browser
-// signature" page. Measured on the instance 2026-08-13, on the first real
-// invite ever sent: the same GET was 200 from a client that set no User-Agent
-// at all and 403 from the one that set that. The domain was verified and the
-// key was valid the whole time.
+// `api.resend.com` is behind Cloudflare, which answered a stock HTTP
+// library's default User-Agent with **403 and error code 1010**, the
+// "banned browser signature" page. Measured on the instance 2026-08-13, on
+// the first real invite ever sent: the same GET was 200 from a client that
+// set no User-Agent at all and 403 from the one wearing the stock
+// signature. The domain was verified and the key was valid the whole time.
 //
 // Go's `net/http` sends `Go-http-client/1.1` by default, which is a signature
 // of exactly the kind that was blocked. The header is set explicitly for that

@@ -7,9 +7,9 @@ import (
 // failf is `fmt.Errorf` for a refusal whose sentence a route answers
 // **verbatim**, and it exists because those two things are in tension.
 //
-// Python raises `LastAdmin("refusing to revoke admin: ...")` and the handler
-// answers `detail=str(exc)` -- so the sentence the caller reads is the
-// exception's whole text, with no class name in front of it. Go's idiom for
+// The recorded refusal sentences carry no kind-marker in front of them --
+// `refusing to revoke admin: ...` reaches the caller bare, as the
+// sentence and nothing else. Go's idiom for
 // "which kind of failure is this" is `fmt.Errorf("%w: ...", ErrLastAdmin)`,
 // and that puts the sentinel's own words at the front of `Error()`: the
 // browser would render `last admin: refusing to revoke admin: ...`. Every

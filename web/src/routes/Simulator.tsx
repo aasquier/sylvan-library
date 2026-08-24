@@ -37,7 +37,7 @@ import { HelpTip, Term } from '../components/term'
 type Mode = 'mana' | 'lands' | 'shelf' | 'policy' | 'forge'
 
 /**
- * Every control and every figure on this screen, keyed to `glossary.py`.
+ * Every control and every figure on this screen, keyed to the served glossary.
  *
  * This screen was the clearest case for the glossary existing: its parameters
  * are words and numbers with no meaning attached — "Min mana pieces" is three
@@ -45,9 +45,9 @@ type Mode = 'mana' | 'lands' | 'shelf' | 'policy' | 'forge'
  * "Deployment spread" is a number nobody can act on without being told what
  * flat means.
  *
- * The keys are pinned from the Python side by `SIMULATOR_KEYS` in
- * `tests/test_glossary.py`, because TypeScript cannot check a string against a
- * table in another language and a renamed key would otherwise just stop
+ * The keys are string names into the glossary table the server owns.
+ * TypeScript cannot check a string against a served table, so a renamed
+ * glossary key would not fail anywhere — the popover would just stop
  * opening.
  */
 const help = (key: string) => <HelpTip name={key} />
@@ -442,7 +442,7 @@ export default function Simulator() {
           screen. The numbers answer a different question -- "would the mana be
           there", not "did you cast it" -- and stacking two true figures that
           answer different questions in one column is how a screen lies with
-          correct numbers. `karsten.py`'s docstring carries the measurement. */}
+          correct numbers. The Karsten shelf's own doc carries the measurement. */}
       {shelf && (
         <section className="card-surface space-y-3 rounded-xl p-5">
           <DeckVerdict check={shelf.deck_check} />

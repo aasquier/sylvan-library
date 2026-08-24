@@ -67,7 +67,7 @@ a display, which is why the spike couldn't have caught it.
 **`-D` does not work for a single match.** The documented "absolute directory
 to load decks from" is only wired into tournament mode; the single-match path
 resolves deck names against Forge's user profile and ignores `-D` silently.
-So `run.py` writes `forge.profile.properties` into the Forge install pointing
+So the runner writes `forge.profile.properties` into the Forge install pointing
 `userDir` at `~/.local/share/mtglab/forge-profile`, and puts generated `.dck`
 files in `<userDir>/decks/commander/`. That is the one thing here that reaches
 into the installation, and it is rewritten only when it would change.
@@ -95,62 +95,56 @@ A 96-card deck, a winner, a turn count, and a result line that says nothing is
 wrong. Every number after that point is poisoned and nothing downstream could
 tell. So coverage is checked twice, by two independent routes:
 
-* **Before**, in `coverage.py`, against `res/cardsfolder/cardsfolder.zip` —
-  the same card scripts the engine loads, 33,587 files yielding 34,532 names in
-  under two seconds, cached per (path, mtime, size) so a Forge upgrade
-  invalidates it. `run_games` raises `CoverageFailed` rather than returning a
-  flag, because a caller that could ignore it would.
-* **After**, in `parse.py`, by scanning Forge's own output for that warning.
-  `ResultsUntrustworthy` discards results that otherwise look perfectly normal.
+* **Before**, in the coverage pre-flight (`sim/tier3/coverage.go`), against
+  `res/cardsfolder/cardsfolder.zip` — the same card scripts the engine loads,
+  33,587 files yielding 34,532 names in under two seconds, cached per (path,
+  mtime, size) so a Forge upgrade invalidates it. `RunGames` refuses rather
+  than returning a flag, because a caller that could ignore a flag would.
+* **After**, in the parser (`sim/tier3/parse.go`), by scanning Forge's own
+  output for that warning. `ErrResultsUntrustworthy` discards results that
+  otherwise look perfectly normal.
 
 All six curated decks pass the pre-flight with no missing cards.
 
 ## Hosted: the worker machine
 
 The deployed app plays matches too, and holds none of the above (ADR 35).
-`Dockerfile.forge` bakes the JRE, the pinned 2.0.14 distribution and
-`sim/tier3/shim.py` into a worker image; the deploy workflow keeps a
+`Dockerfile.forge` bakes the JRE, the pinned 2.0.14 distribution and the
+same `mtglab` binary the app runs — the worker is its `forge-shim`
+subcommand — into a worker image; the deploy workflow keeps a
 dedicated-CPU machine named `forge-worker` pointed at it, stopped between
 matches. The app wakes it per job over the Machines API, runs the same
 pre-flight against the worker's own card scripts (`/coverage`, on the
 request thread, so a 422 still names the cards before any JVM boots), plays
 the match over the private network (`/match`), and the shim stops its own
 machine after `MTGLAB_FORGE_IDLE_SECONDS` of quiet. Results are rebuilt into
-the same `SimRun` a local run returns — `sim/tier3/wire.py` is the seam, and
-`tests/test_forge_worker.py` pins that both halves shape identically.
-`docs/HOSTING.md` §7 has the provisioning runbook and the licensing note
-(the image holds GPL'd Forge and is pushed only to the app's private
-registry — deployment, never distribution).
-
-**Since Phase 7 of the Go migration (2026-08-23) the worker runs `mtglab
-forge-shim`**, a subcommand of the same binary the app's front door is, so
-the image carries no interpreter at all. `shim.py` is still the CLI's local
-path and still the reference the Go side is held to.
+the same `SimRun` a local run returns — `sim/tier3/wire.go` is the seam,
+and the recorded worker-wire corpus pins the shape from both sides. The
+image holds GPL'd Forge and is pushed only to the app's private registry —
+deployment, never distribution.
 
 ### Testing deploy skew on purpose
 
 Every release updates the app **before** the worker, by several minutes and
 deliberately: the app deploy is proven first, so a red worker sync is
-feedback about the worker rather than a rollback of the app. That leaves a
-real window in which the app talks to the *previous* image's shim, and on the
-release that flipped this package the previous image was Python's.
+feedback about the worker rather than a rollback of the app.
 
-That window opened on v195 and closed about a minute before the gate match
-started — and it can never open that way again, because both images carry the
-Go shim now. **The case is permanent even though the opportunity was not**,
-so it is tested here rather than waited for. With a distribution present:
+In that window the app talks to the *previous release's* shim, so the
+client must read an older shim's wire, not merely today's. The case is
+tested rather than waited for: build (or keep) an older release's `mtglab`,
+start its shim, and drive it with today's client. With a distribution
+present:
 
 ```bash
 MTGLAB_FORGE_HOME=~/.local/share/mtglab/forge \
 MTGLAB_FORGE_SHIM_PORT=8899 MTGLAB_FORGE_IDLE_SECONDS=0 \
-  python -m mtglab.sim.tier3.shim &
+  <older-release-mtglab> forge-shim &
 
-cd go && MTGLAB_LIVE_FORGE=1 MTGLAB_PYTHON_SHIM_URL=http://127.0.0.1:8899 \
-  go test ./cmd/... -run PythonShim -v
+cd go && MTGLAB_LIVE_FORGE=1 MTGLAB_OLD_SHIM_URL=http://127.0.0.1:8899 \
+  go test ./cmd/... -run Shim -v
 ```
 
-The Go worker client then drives the Python shim through a real match. Five
-deliberate wire renames die against it — and the first version of that test
+Deliberate wire renames die against it — and the first version of that test
 survived two of them, because it asserted the seats map and a duration while
 a row whose every value is nil still decodes. The assertions follow what the
 app actually does with a game now: resolve its seat to a deck, and put a

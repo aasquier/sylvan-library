@@ -1,12 +1,12 @@
-// Package deckread is the read side of `api/service.py`: the payload builders
-// the deck routes answer with.
+// Package deckread is the deck routes' read side: the payload builders they
+// answer with.
 //
-// It exists because two callers need them and neither is the other's parent.
-// Python has always had this shape -- `service.py` is what the routes call AND
-// what `claude/tools.py` calls, so a tool result and a route payload are the
-// same bytes by construction. The Go port put that logic inside the HTTP
-// handlers, which was fine while the routes were the only caller and stopped
-// being fine the moment the Claude surfaces needed the same facts.
+// It exists because two callers need them and neither is the other's
+// parent: the routes call these builders AND the Claude tools call them, so
+// a tool result and a route payload are the same bytes by construction.
+// This logic once lived inside the HTTP handlers, which was fine while the
+// routes were the only caller and stopped being fine the moment the Claude
+// surfaces needed the same facts.
 //
 // **The layering was not a preference; the boundary guard chose it.**
 // `internal/api` imports `internal/deckedit`, because the same package holds
@@ -256,10 +256,10 @@ type CardJSON struct {
 	Extra []wire.KV
 }
 
-// MarshalJSON writes the row with Python's key set exactly: the pool's keys
-// appear only for a known card (every one of them, null included), and the
-// two hero fields only when asked. `omitempty` alone would drop a known
-// card's null `power`, which Python writes.
+// MarshalJSON writes the row with the recorded key set exactly: the pool's
+// keys appear only for a known card (every one of them, null included), and
+// the two hero fields only when asked. `omitempty` alone would drop a known
+// card's null `power`, which the payload writes.
 func (c CardJSON) MarshalJSON() ([]byte, error) {
 	out := []wire.KV{{Key: "name", Value: c.Name}, {Key: "category", Value: c.Category}, {Key: "why", Value: c.Why}, {Key: "qty", Value: c.Qty},
 		{Key: "art", Value: c.Art}, {Key: "known", Value: c.Known}}
@@ -383,22 +383,22 @@ func TypeParts(typeLine string) ([]string, []string) {
 	return strings.Fields(front), []string{}
 }
 
-// DeckPayload is `service.get_deck`: one deck's whole contents, in Python's
-// key order.
+// DeckPayload is one deck's whole contents, in the recorded key order.
 //
-// The ordered pairs are the payload, not a convenience: `encoding/json` sorts
-// a map's keys where a Python dict keeps insertion order, and that difference
-// has shipped once already -- the deck page's Notes tab was alphabetical from
-// v159 to v166, scrambling a deliberate reading order into nonsense.
+// The ordered pairs are the payload, not a convenience: `encoding/json`
+// sorts a map's keys, the recorded payload holds a deliberate insertion
+// order, and that difference has shipped once already -- the deck page's
+// Notes tab was alphabetical from v159 to v166, scrambling a deliberate
+// reading order into nonsense.
 //
 // `c` may be nil, and the answer is still a deck: `pool_available` says which
 // happened, and every card row degrades to name-and-rationale rather than
 // failing. That is the shape every deck route already had.
 //
 // This left `internal/api`'s getDeck handler in Phase 6 so that the Claude
-// tools could answer with the same bytes the route answers with -- which is
-// what Python gets for free, `service.get_deck` being the one function both
-// call. A second builder would drift, and the drift would be invisible: the
+// tools could answer with the same bytes the route answers with -- one
+// builder, called by both, so agreement is structural rather than tested.
+// A second builder would drift, and the drift would be invisible: the
 // model would simply be told slightly different facts than the screen shows.
 func DeckPayload(ctx context.Context, c *pool.Conn, d *deck.Deck, writable bool, owner string) ([]wire.KV, error) {
 	cards := map[string]*pool.CardRecord{}
@@ -578,10 +578,10 @@ type SearchCard struct {
 	PriceUSD      *float64 `json:"price_usd"`
 }
 
-// SearchQuery is what `service.search_cards` takes. Every field is optional,
-// which mirrors the Python signature rather than guessing at it: "which
-// legends have exactly this colour identity" is a search with no text in it at
-// all, and it is the question ADR 20's proposal is built around.
+// SearchQuery is what the card search takes. Every field is optional, and
+// that is contract rather than convenience: "which legends have exactly
+// this colour identity" is a search with no text in it at all, and it is
+// the question ADR 20's proposal is built around.
 type SearchQuery struct {
 	Text           string
 	Identity       string
@@ -637,8 +637,8 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 			where = append(where, fmt.Sprintf("len(color_identity) = %d", len(allowed)))
 		}
 	}
-	// `contains(lower(col), ?)` rather than ILIKE, as Python: the same
-	// question asked cheaply, and `%` and `_` stop being wildcards.
+	// `contains(lower(col), ?)` rather than ILIKE: the same question asked
+	// cheaply, and `%` and `_` stop being wildcards.
 	if text != "" {
 		where = append(where, "(contains(lower(name), ?) OR contains(lower(oracle_text), ?))")
 		params = append(params, strings.ToLower(text), strings.ToLower(text))
@@ -763,10 +763,10 @@ func QuotedList(items []string) string {
 	return strings.Join(quoted, ", ")
 }
 
-// MaxNamedCards caps one lookup, matching `service.MAX_NAMED_CARDS`.
+// MaxNamedCards caps one lookup.
 const MaxNamedCards = 100
 
-// NamedCard is one row of `service.cards_named`, in Python's key order.
+// NamedCard is one row of the named-cards answer, in the recorded key order.
 type NamedCard struct {
 	// Name is the POOL's spelling, not the caller's: asked for "arahbo, roar
 	// of the world" you get the real name back, which is what any follow-up
@@ -863,9 +863,9 @@ func CardsNamed(ctx context.Context, c *pool.Conn, names []string) (NamedCards, 
 		if keywords == nil {
 			keywords = []string{}
 		}
-		// The three plain strings on the record become pointers here, as the
-		// existing card rows do: Python's field is nullable and an empty
-		// oracle text is not the same as an absent one on the wire.
+		// The three plain strings on the record become pointers here, as
+		// the existing card rows do: the wire field is nullable, and an
+		// empty oracle text is not the same as an absent one.
 		typeLine, oracle, layout := rec.TypeLine, rec.OracleText, rec.Layout
 		out.Cards = append(out.Cards, NamedCard{
 			Name: rec.Name, AskedAs: askedAs, ManaCost: rec.ManaCost, CMC: rec.CMC,
@@ -890,12 +890,11 @@ func CardsNamed(ctx context.Context, c *pool.Conn, names []string) (NamedCards, 
 // `internal/claude`'s boundary analysis fails it. Correctly: that is a Claude
 // surface one hop from a deck write, whatever the intent.
 //
-// Python does not have this problem because it never collapsed the two:
-// `decks/source.py` declares the protocol and `decks/edit.py` is a different
-// module. This restores that separation on the Go side. Go's interfaces are
-// structural, so `library.Source` satisfies this without being changed or even
-// knowing it exists — the narrow interface is purely a statement about what
-// the caller is allowed to want.
+// The cure is to keep the two apart: the reader's protocol declared on its
+// own, never borrowed from the editor's package. Go's interfaces are
+// structural, so `library.Source` satisfies this without being changed or
+// even knowing it exists — the narrow interface is purely a statement about
+// what the caller is allowed to want.
 //
 // Deliberately narrower than `library.Source`: only the methods a reader
 // actually needs. A method added there does not appear here unless somebody

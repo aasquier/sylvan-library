@@ -7,10 +7,9 @@ import (
 	"testing"
 )
 
-func TestMarshalWritesWhatStarletteWrites(t *testing.T) {
+func TestMarshalWritesTheRecordedEncoding(t *testing.T) {
 	// Compact separators, HTML characters untouched, unicode as it is,
-	// no trailing newline: `json.dumps(v, ensure_ascii=False,
-	// separators=(",", ":"))`.
+	// no trailing newline: the recorded body encoding.
 	got, err := Marshal(map[string]any{"a": []any{1, "x<y & z"}, "b": "—"})
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +33,7 @@ func TestDetailIsTheEnvelope(t *testing.T) {
 	}
 }
 
-func TestUnprocessableIsFastAPIsValidationList(t *testing.T) {
+func TestUnprocessableIsTheRecordedValidationList(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Unprocessable(rec, IntParsing("query", "limit", "abc"),
 		GreaterThanEqual("query", "limit", "0", 1))
@@ -65,7 +64,7 @@ func TestUnprocessableIsFastAPIsValidationList(t *testing.T) {
 	if ctx, _ := second["ctx"].(map[string]any); ctx["ge"] != float64(1) {
 		t.Fatalf("second = %v", second)
 	}
-	// Key order is pydantic's, which the wire keeps.
+	// Key order is the recorded one, which the wire keeps.
 	if !strings.HasPrefix(rec.Body.String(), `{"detail":[{"type":"int_parsing","loc":["query","limit"],"msg":`) {
 		t.Fatalf("order: %s", rec.Body.String())
 	}
@@ -77,7 +76,7 @@ func TestUnprocessableIsFastAPIsValidationList(t *testing.T) {
 	}
 }
 
-func TestPyReprWritesWhatPythonWrites(t *testing.T) {
+func TestQuoteMatchesTheRecordedQuoting(t *testing.T) {
 	for in, want := range map[string]string{
 		"nope":     `'nope'`,
 		"no'pe":    `"no'pe"`,
@@ -90,8 +89,8 @@ func TestPyReprWritesWhatPythonWrites(t *testing.T) {
 		"":         `''`,
 		"Æon — é":  `'Æon — é'`,
 	} {
-		if got := PyRepr(in); got != want {
-			t.Errorf("PyRepr(%q) = %s, want %s", in, got, want)
+		if got := Quote(in); got != want {
+			t.Errorf("Quote(%q) = %s, want %s", in, got, want)
 		}
 	}
 }

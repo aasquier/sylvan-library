@@ -14,7 +14,7 @@ import (
 // they own everything they can see, and the URL still has to say so.
 const LocalOwner = "local"
 
-// Library is `decks/library.py:Library`: every deck a caller may reach, in
+// Library is every deck a caller may reach, in
 // both tiers. Built per request from the scope; holds no connection of its
 // own -- the app.db handle is the door's read-only one, or nil on a laptop
 // that has none.
@@ -37,7 +37,7 @@ type Resolver struct {
 	// at the gate that is supposed to answer.
 	AppWriteDB *sql.DB
 	// Maintainer resolves `MTGLAB_ADMIN_EMAIL` to a username through app.db
-	// (`auth/bootstrap.py:maintainer_username`), or "" when unconfigured or
+	// (`MaintainerUsername`), or "" when unconfigured or
 	// unknown. Called only when the caller is authenticated: with auth off
 	// the file owner is `local` regardless, and asking would open a
 	// database a laptop must not acquire as a side effect of listing decks.
@@ -251,7 +251,7 @@ func SharedDecks(ctx context.Context, db *sql.DB) ([]Shared, error) {
 	return out, rows.Err()
 }
 
-// MaintainerUsername is `auth/bootstrap.py:maintainer_username`: the
+// MaintainerUsername is the
 // maintainer's *handle*, resolved through the address `MTGLAB_ADMIN_EMAIL`
 // names (ADR 17) -- and never the address itself, which goes into no URL.
 // "" when unconfigured, malformed, or not yet an account.
@@ -271,10 +271,10 @@ func MaintainerUsername(ctx context.Context, db *sql.DB, adminEmail string) (str
 	return username, nil
 }
 
-// normaliseEmail is `users.normalise_email` without the raise: trimmed,
+// normaliseEmail is `auth.NormaliseEmail`'s rule without the error: trimmed,
 // lowered, and shape-checked (`local@domain.tld`, no whitespace, no second
-// `@`); anything else is "" -- which `maintainer_username` also answers
-// with None for.
+// `@`); anything else is "" -- which `MaintainerUsername` answers as an
+// unconfigured maintainer rather than a refusal.
 func normaliseEmail(email string) string {
 	candidate := strings.ToLower(strings.TrimSpace(email))
 	if candidate == "" || len(candidate) > 254 {

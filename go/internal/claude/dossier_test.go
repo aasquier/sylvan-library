@@ -17,13 +17,13 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// The commander dossier, held to Python by `testdata/dossier.json`.
+// The commander dossier, held to the recorded corpus `testdata/dossier.json`.
 //
 // Four things the corpus pins, in the order they matter. **The cache key**,
-// because a dossier Python wrote is served by Go under it after the cutover
+// because dossiers already stored on the instance are served under it
 // -- a wrong fingerprint costs a four-minute paid search per commander and
 // looks like a cache that simply missed. **The brief's opening message**, as
-// bytes, which is the whole of `DossierBrief` and `pyDumps` checked at once
+// bytes, which is the whole of `DossierBrief` and `dumpJSON` checked at once
 // against the tiny pool. **The free GET's three shapes**, two of them
 // different key sets. And **every outcome of a run**, each report compared as
 // marshalled bytes -- key order included, because the report is the wire and
@@ -78,7 +78,8 @@ type reportCase struct {
 	Report    json.RawMessage `json:"report"`
 }
 
-// turnRecord is what Python recorded of the Turn its fake converse returned.
+// turnRecord is the corpus's record of the Turn a run's conversation
+// returned.
 type turnRecord struct {
 	Model           string   `json:"model"`
 	StopReason      string   `json:"stop_reason"`
@@ -98,8 +99,8 @@ func (r turnRecord) turn(mode string) Turn {
 		CacheReadTokens: r.CacheReadTokens}
 }
 
-// FrozenNow is the corpus's clock. `tests/go_fixtures.py` writes every stamp
-// with it, so a report compares as bytes only while Go's clock reads the same.
+// frozenNow is the corpus's clock: every recorded stamp carries it, so a
+// report compares as bytes only while the test clock reads the same.
 const frozenNow = "2026-08-23T04:05:06.789012+00:00"
 
 func freezeClock(t *testing.T) {
@@ -152,12 +153,13 @@ func loadDossierCorpus(t *testing.T) dossierCorpus {
 		t.Fatalf("decoding the corpus: %v", err)
 	}
 	if len(corpus.Keys) == 0 || len(corpus.Reports) == 0 {
-		t.Fatal("the corpus is empty; run `python tests/go_fixtures.py`")
+		t.Fatal("the corpus is empty; testdata/dossier.json is a frozen golden and always carries both")
 	}
 	return corpus
 }
 
-// scratchStore is a dossier store over a throwaway app.db in Python's shape.
+// scratchStore is a dossier store over a throwaway app.db built by the real
+// schema ladder.
 func scratchStore(t *testing.T) *DossierStore {
 	t.Helper()
 	rec, _ := scratchLedger(t)
@@ -174,7 +176,7 @@ func noEnvOverrides(t *testing.T) {
 
 // ------------------------------------------------------------------ the key
 
-func TestTheDossierCacheKeyIsPythonsByteForByte(t *testing.T) {
+func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
 	noEnvOverrides(t)
 	corpus := loadDossierCorpus(t)
 	for _, row := range corpus.Keys {
@@ -183,7 +185,7 @@ func TestTheDossierCacheKeyIsPythonsByteForByte(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got != row.Key {
-			t.Errorf("cache_key(%q, %q) = %q, python %q", row.OracleID, row.Tier, got, row.Key)
+			t.Errorf("CacheKey(%q, %q) = %q, corpus %q", row.OracleID, row.Tier, got, row.Key)
 		}
 	}
 	// The override wins over every tier, so two seats get one key.
@@ -194,16 +196,16 @@ func TestTheDossierCacheKeyIsPythonsByteForByte(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got != row.Key {
-			t.Errorf("with the model override, cache_key(%q, %q) = %q, python %q",
+			t.Errorf("with the model override, CacheKey(%q, %q) = %q, corpus %q",
 				row.OracleID, row.Tier, got, row.Key)
 		}
 	}
 }
 
 // The fingerprint's parts, apart, so a failure says which half is wrong: the
-// prompt bytes (they cross in modes.json), the schema rendered as
-// `json.dumps(schema, sort_keys=True)` (pyjson.go), and the model id.
-func TestTheFingerprintsPartsAreEachPythons(t *testing.T) {
+// prompt bytes (data in modes.json), the schema's sorted-key canonical
+// rendering (canonjson.go), and the model id.
+func TestTheFingerprintsPartsAreEachTheRecordedOnes(t *testing.T) {
 	noEnvOverrides(t)
 	corpus := loadDossierCorpus(t)
 	mode, err := GetMode(ModeCommanderDossier)
@@ -211,28 +213,28 @@ func TestTheFingerprintsPartsAreEachPythons(t *testing.T) {
 		t.Fatal(err)
 	}
 	if DossierVersion != corpus.Fingerprint.Version {
-		t.Errorf("DossierVersion is %d, python %d", DossierVersion, corpus.Fingerprint.Version)
+		t.Errorf("DossierVersion is %d, corpus %d", DossierVersion, corpus.Fingerprint.Version)
 	}
 	sum := sha256.Sum256([]byte(mode.Instructions))
 	if got := hex.EncodeToString(sum[:]); got != corpus.Fingerprint.InstructionsSHA256 {
-		t.Errorf("the instructions hash %s, python %s -- modes.json has drifted from INSTRUCTIONS",
+		t.Errorf("the instructions hash %s, corpus %s -- modes.json has drifted from the recorded prompt",
 			got, corpus.Fingerprint.InstructionsSHA256)
 	}
-	if got := pyDumps(mode.ResponseSchema, pyDumpOptions{SortKeys: true}); got != corpus.Fingerprint.SchemaDumps {
-		t.Errorf("json.dumps(schema, sort_keys=True) differs:\n go     %s\n python %s",
+	if got := dumpJSON(mode.ResponseSchema, dumpOptions{SortKeys: true}); got != corpus.Fingerprint.SchemaDumps {
+		t.Errorf("the canonical schema rendering differs:\n got    %s\n corpus %s",
 			got, corpus.Fingerprint.SchemaDumps)
 	}
 	if got := ModelFor(""); got != corpus.Fingerprint.Model {
-		t.Errorf("the default model is %q, python %q", got, corpus.Fingerprint.Model)
+		t.Errorf("the default model is %q, corpus %q", got, corpus.Fingerprint.Model)
 	}
 	if got, _ := Fingerprint(""); got != corpus.Fingerprint.Fingerprint {
-		t.Errorf("the fingerprint is %q, python %q", got, corpus.Fingerprint.Fingerprint)
+		t.Errorf("the fingerprint is %q, corpus %q", got, corpus.Fingerprint.Fingerprint)
 	}
 }
 
 // ---------------------------------------------------------------- the brief
 
-func TestTheBriefsOpeningMessageIsPythonsBytes(t *testing.T) {
+func TestTheBriefsOpeningMessageMatchesTheGoldenBytes(t *testing.T) {
 	corpus := loadDossierCorpus(t)
 	mini, headless := miniDecks(t)
 	withPool(t, func(c *pool.Conn) {
@@ -241,7 +243,7 @@ func TestTheBriefsOpeningMessageIsPythonsBytes(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got := dossierOpening(facts); got != corpus.Brief.Opening {
-			t.Errorf("the opening message differs from Python's:\n--- go\n%s\n--- python\n%s",
+			t.Errorf("the opening message differs from the corpus:\n--- got\n%s\n--- corpus\n%s",
 				got, corpus.Brief.Opening)
 		}
 		_, err = DossierBrief(context.Background(), c, "mini", headless)
@@ -250,7 +252,7 @@ func TestTheBriefsOpeningMessageIsPythonsBytes(t *testing.T) {
 			t.Fatalf("a headless deck answered %v, want ErrNoCommander", err)
 		}
 		if refusal.Error() != corpus.Brief.HeadlessRefusal {
-			t.Errorf("the refusal reads\n  %q\nwant Python's\n  %q", refusal.Error(), corpus.Brief.HeadlessRefusal)
+			t.Errorf("the refusal reads\n  %q\nthe corpus says\n  %q", refusal.Error(), corpus.Brief.HeadlessRefusal)
 		}
 	})
 	// No pool is the same refusal: `card` is null either way.
@@ -263,7 +265,7 @@ func TestTheBriefsOpeningMessageIsPythonsBytes(t *testing.T) {
 
 // --------------------------------------------------------------- the GET
 
-func TestTheCachedGetShapesArePythons(t *testing.T) {
+func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadDossierCorpus(t)
@@ -287,7 +289,7 @@ func TestTheCachedGetShapesArePythons(t *testing.T) {
 		}
 		assertSameJSONValue(t, "no commander the pool knows", got, byNote["no commander the pool knows"])
 
-		// The stored row is Python's own bytes, served raw -- under the
+		// The stored row is the corpus's own bytes, served raw -- under the
 		// default tier's key, which is the GET's wart.
 		key, _ := CacheKey(corpus.Brief.OracleID, "")
 		if key != corpus.Stored.Key {
@@ -327,10 +329,10 @@ func TestTheHeadlessGetHasFiveKeysAndNoAnsweredBy(t *testing.T) {
 
 // --------------------------------------------------------------- the runs
 
-// Every outcome of a run, driven with the Turn Python's fake converse
-// returned and compared as bytes. The order is the corpus's, because "served
+// Every outcome of a run, driven with the corpus's recorded Turn and
+// compared as bytes. The order is the corpus's, because "served
 // from the store" can only follow "a whole dossier" having stored one.
-func TestEveryDossierOutcomeAgreesWithPython(t *testing.T) {
+func TestEveryDossierOutcomeAgreesWithTheCorpus(t *testing.T) {
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadDossierCorpus(t)
@@ -347,10 +349,10 @@ func TestEveryDossierOutcomeAgreesWithPython(t *testing.T) {
 			}
 			var report DossierReport
 			if row.Turn == nil {
-				// Python's fake converse would have raised: nothing may be
-				// asked. So the plan must already carry the answer.
+				// A row with no recorded Turn means nothing may be asked. So
+				// the plan must already carry the answer.
 				if plan.Answer == nil {
-					t.Errorf("%s: the plan wants a call and Python made none", row.Note)
+					t.Errorf("%s: the plan wants a call and the corpus made none", row.Note)
 					continue
 				}
 				report = *plan.Answer
@@ -359,7 +361,7 @@ func TestEveryDossierOutcomeAgreesWithPython(t *testing.T) {
 				}
 			} else {
 				if plan.Answer != nil {
-					t.Errorf("%s: the plan answered without a call and Python called", row.Note)
+					t.Errorf("%s: the plan answered without a call and the corpus called", row.Note)
 					continue
 				}
 				report, err = readDossier(ctx, c, plan, row.Turn.turn(ModeCommanderDossier))
@@ -375,7 +377,7 @@ func TestEveryDossierOutcomeAgreesWithPython(t *testing.T) {
 				}
 				assertSameJSONValue(t, "the stored row", hit.Result, corpus.Stored.Result)
 				if hit.CreatedAt != corpus.Stored.CreatedAt {
-					t.Errorf("stored at %q, python %q", hit.CreatedAt, corpus.Stored.CreatedAt)
+					t.Errorf("stored at %q, corpus %q", hit.CreatedAt, corpus.Stored.CreatedAt)
 				}
 				sawStore = true
 			}
@@ -410,7 +412,7 @@ func TestOnlyAWholeDossierIsStored(t *testing.T) {
 				t.Fatal(err)
 			}
 			if store.Get(ctx, plan.Key) != nil {
-				t.Errorf("%s: a dossier was stored where Python stores nothing", row.Note)
+				t.Errorf("%s: a dossier was stored where nothing may be stored", row.Note)
 			}
 		}
 	})
@@ -454,8 +456,9 @@ func TestTheStoreNeverFailsTheFeature(t *testing.T) {
 	}
 }
 
-// A scratch app.db in Python's shape holds the table the store writes; this
-// is what makes the round trip above meaningful rather than a mock.
+// A scratch app.db built by the real schema holds the table the store
+// writes; this is what makes the round trip above meaningful rather than a
+// mock.
 func TestTheScratchSchemaCarriesTheDossierTable(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := authtest.NewScratchDB(path); err != nil {

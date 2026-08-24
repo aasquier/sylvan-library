@@ -10,13 +10,14 @@ import (
 	"testing"
 )
 
-// WriteSurface is `test_claude_boundary.py`'s list, by name.
+// writeSurface is the deck-write surface, by name.
 //
 // `set_card_field` is the one ADR 15 names — it is the only route to the `why`
 // field — but the whole write surface is here, because a mode that can call
 // `swap_card` can launder a rationale through its `why` argument just as
-// effectively. These are the PYTHON names, deliberately: the model asks for
-// tools by the name it was told, and what it was told is Python's registry.
+// effectively. The snake_case spellings are deliberate: the model asks for
+// tools by the names it was told, and those names are the registry's own
+// recorded vocabulary.
 var writeSurface = []string{
 	"add_card", "remove_card", "set_card_field", "set_deck_field",
 	"set_note", "swap_card", "import_deck", "create_deck", "_commit",
@@ -110,7 +111,7 @@ func TestNoToolSchemaAcceptsAWhy(t *testing.T) {
 }
 
 // TestEverySchemaIsWired catches the half that would otherwise fail at request
-// time: a description that crossed as data with no Go function behind it.
+// time: a description that exists as data with no function behind it.
 func TestEverySchemaIsWired(t *testing.T) {
 	for _, name := range Names {
 		if registry[name].fn == nil {
@@ -127,13 +128,13 @@ func TestEverySchemaIsWired(t *testing.T) {
 	}
 }
 
-// TestTheSchemasAreThePythonOnes reads the generated data back and holds the
-// rendered block to it, including the sort.
+// TestTheSchemasAreTheRecordedOnes reads the embedded data back and holds
+// the rendered block to it, including the sort.
 //
 // The order is load-bearing and its failure is silent: tools render FIRST in
 // the prompt, so an unstable order invalidates the prompt cache on every turn
 // — for free, and invisibly.
-func TestTheSchemasAreThePythonOnes(t *testing.T) {
+func TestTheSchemasAreTheRecordedOnes(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("data", "tools.json"))
 	if err != nil {
 		t.Fatalf("reading the schemas: %v", err)
@@ -186,8 +187,8 @@ func TestArgumentsAreCheckedBeforeDispatch(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "missing required argument(s) slug") {
 		t.Errorf("a missing slug was accepted: %v", err)
 	}
-	// An EMPTY required argument counts as missing, as Python's
-	// `args.get(r) in (None, "")` does.
+	// An EMPTY required argument counts as missing -- nil and "" both read
+	// as absent.
 	_, err = Run(ctx, "get_deck", map[string]any{"slug": ""}, Deps{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "missing required argument(s) slug") {
 		t.Errorf("an empty slug was accepted: %v", err)
