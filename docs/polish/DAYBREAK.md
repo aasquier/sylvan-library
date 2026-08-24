@@ -103,6 +103,38 @@ $1. It is a small change and it is a *behaviour* change (different cards
 appear), which is the only reason it is a question rather than a fix. Ledger:
 Black, 2026-08-24.
 
+**4. The card pool's memory is thrown away every time nobody has asked it
+anything for ten seconds, and the lore shelf pays 84× for that.** Measured
+tonight on the full pool: the shelf answers in **0.9ms** while the pool is
+held open and **75.6ms** on the first request after a ten-second gap, because
+the remembered card lookups are filed under the *open* rather than under the
+pool file — and the pool is handed back on a timer so that `mtglab data
+refresh` can always get in, which is a rule worth keeping and must not be
+touched. A reap and a refresh are not the same event, though: only a refresh
+makes the old answers wrong. · *Cost of leaving it:* on a quiet instance
+almost every visitor is the first one, so almost everybody pays the slow
+number and nobody sees the fast one; the front page's own shelf is the worst
+case. · **Recommendation:** yes — let the remembered lookups survive a
+hand-back as long as the pool file has not changed underneath them, which is
+the rule the code already says it follows. It is a change to how long
+something is remembered rather than to what is remembered, which is the only
+reason it waited for daylight. Ledger: Black, 2026-08-24.
+
+**5. Five of the seven `Loading…` labels are flat text with no motion, and one
+of them is the door into the fortune-teller's table.** Blue found them by
+driving the real site (their ledger has the list); this run timed what each
+one is waiting for, because "it feels slow" and "it *is* slow" want different
+answers. **It is not slow.** Every one of the five waits on a single request
+that the server answers in well under a millisecond — so there is nothing to
+speed up, and the whole of it is the page sitting still while it waits. ·
+*Cost of leaving it:* the site's promise is that it is alive and moving, and
+the five places it visibly is not include the way in to the reading — the one
+room that is meant to get the best of everything. · **Recommendation:** yes —
+give them the same treatment the two good ones already have (`App.tsx` uses a
+proper spinner in both of its waits), or a held frame so nothing jumps when
+the answer lands. It renders, so it wants your eye before it merges. Ledger:
+Blue and Black, 2026-08-24.
+
 ## Open — 2026-08-23
 
 **1. The 95% coverage floor is gone, and the drop is half unit-change and half

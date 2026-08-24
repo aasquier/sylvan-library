@@ -1874,6 +1874,40 @@ unwalked because they never shipped.
 | `GET /api/cards/search?q=goblin` | 43.8ms | 41.1ms | 40.4ms |
 | `GET /api/cards/search` (no text) | — | 87.7ms | **53.1ms** |
 
+  - **Held versus reaped: the ten-second lease is the biggest single number
+    in this facet, and it is nowhere in the warm tables above.** `fly.toml`
+    health-checks `GET /api/health` every **30s**; the pool's `IdleLease` is
+    **10s**; so the reaper hands the database back twenty seconds before every
+    check re-opens it, and an idle instance opens a 100MB DuckDB file roughly
+    **2,880 times a day**. Driving one process, this Mac:
+
+    ```
+    first ever /api/health (pool never opened): 43.9ms
+      held /api/health #1: 2.1ms   #2: 2.1ms   #3: 2.1ms   #4: 2.2ms   #5: 2.1ms
+    waiting 16s for the reaper...
+    after the lease expired: 37.7ms
+      held again #1: 1.9ms   #2: 2.0ms   #3: 2.1ms
+    lore cold: 75.6ms
+      lore held #1: 0.8ms   #2: 0.9ms   #3: 0.9ms
+    search cold: 62.5ms
+      search held #1: 40.8ms   #2: 40.1ms
+    ```
+
+    **The lease must not simply be lengthened.** 10s-under-30s is exactly what
+    guarantees a `data refresh` can take DuckDB's write lock, and an app
+    keeper that outlived the health check is the 2026-08-19 failure `pool.go`
+    records in its own comment. Two consequences follow that the warm tables
+    hide. First, **every warm number in this facet is the second request of a
+    visit** — the first pays ~40ms of open. Second, and this is the finding:
+    **`GetCards`'s memo is thrown away by the reaper, and a reap is not a
+    refresh.** `pool.go`'s package comment says caching is keyed on the
+    *stamp* — "a refresh rewrites the file, changes `mtime_ns` and size, and
+    every entry keyed on the old stamp becomes unreachable" — but the memo is
+    keyed on the *open*, and an open ends for two different reasons. The lore
+    shelf asks the same ~120 names forever and pays **75.6ms instead of
+    0.9ms**, an 84× difference, every time the pool has been idle ten seconds.
+    Queued rather than fixed: a cache *lifetime* change on the card pool wants
+    daylight, not 5am.
   - **⚠️ Time the route you meant, and check the status code.** A first pass
     of this table carried `/api/tarot/lore` at 0.7ms. There is no such route:
     it 404s, and the 404 is *fast*, so the row looked like the healthiest
@@ -1886,7 +1920,10 @@ unwalked because they never shipped.
     a 172ms round trip is invisible from outside, and the live table below
     will not move. What it buys is *server work per request* on a machine with
     two shared cores that answers a platform health check on a fixed cadence
-    forever: six DuckDB statements a call, gone. A win measured locally and
+    forever: six DuckDB statements a call, gone. Keep it in proportion,
+    though — see the lease measurement below: on the instance a health check
+    usually finds the pool *reaped*, so it pays ~40ms of DuckDB open and the
+    2.4ms is a slice of about fifty, not of four. A win measured locally and
     quoted as a user-facing speed-up would be this facet's own worst habit.
   - **`/api/decks` is unmeasured this run and that is a gap, not a fact.**
     The laptop's library is empty (ADR 30: the decks live on the instance's
