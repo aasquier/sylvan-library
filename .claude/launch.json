@@ -4,7 +4,7 @@
     {
       "name": "mtglab-ui",
       "runtimeExecutable": "go/mtglab",
-      "runtimeArgs": ["ui", "--no-open", "--port", "8765"],
+      "runtimeArgs": ["ui", "--port", "8765"],
       "port": 8765
     },
     {
@@ -12,7 +12,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "MTGLAB_DATA_DIR=$(mktemp -d) go/mtglab ui --no-open --port 8766"
+        "MTGLAB_DATA_DIR=$(mktemp -d) go/mtglab ui --port 8766"
       ],
       "port": 8766
     },
@@ -21,7 +21,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "MTGLAB_DATA_DIR=${TMPDIR:-/tmp}/mtglab-auth-demo MTGLAB_REQUIRE_AUTH=1 MTGLAB_BASE_URL=http://127.0.0.1:8767 go/mtglab ui --no-open --port 8767"
+        "MTGLAB_DATA_DIR=${TMPDIR:-/tmp}/mtglab-auth-demo MTGLAB_REQUIRE_AUTH=1 MTGLAB_BASE_URL=http://127.0.0.1:8767 go/mtglab ui --port 8767"
       ],
       "port": 8767
     },
@@ -30,7 +30,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "MTGLAB_DECKS_DIR=$(mktemp -d) go/mtglab ui --no-open --port 8768"
+        "MTGLAB_DECKS_DIR=$(mktemp -d) go/mtglab ui --port 8768"
       ],
       "port": 8768
     },

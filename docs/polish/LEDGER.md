@@ -1047,12 +1047,326 @@ kill rate is bad enough to want every mutant rather than a sample.
 
 ## Blue — Craft & Knowledge
 
-*Python craft · TypeScript/React craft · Claude-first docs & memory · the
-spirit of Magic*
+*Go craft and the modern-Go sweep · the boot sequence and its configuration ·
+TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
+the spirit of Magic*
 
-- **Last run:** 2026-08-19 (rainbow) — the *spirit of Magic* facet's first
-  outing, so its section below is a baseline rather than a delta. Previous:
-  2026-08-18 (punch-list item 5, Blue + Red in one session).
+- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
+  2026-08-18.
+- **Read every block below the 2026-08-24 one as history, not as state.**
+  All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
+  mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
+  finished 2026-08-23 and none of those files exist. The *lessons* still bind
+  (a test written against a claim cannot tell you the claim is wrong; a
+  tripwire must flatten a wrapped comment; a probe finds which, only the right
+  column finds why) — but no path, number or test name down there is current.
+  The section's own subtitle said "Python craft" until tonight, which is the
+  drift this facet exists to catch, sitting on its own heading.
+
+### 2026-08-24 (rainbow)
+
+- **Fixed this run:**
+  1. **`.env.example` was twenty names short, and CLAUDE.md's sentence about
+     it was the kind of claim this facet's standing question is for.** Measured
+     before: **32 switch names read by shipping Go, 18 documented, 14
+     undocumented** — every `MTGLAB_FORGE_*`, `MTGLAB_JAVA`, `MTGLAB_FLY_APP`,
+     both Claude dials, both served-file paths. CLAUDE.md said "`.env.example`
+     documents the names"; nothing could tell that it had stopped being true,
+     and an operator meeting an undocumented switch meets it in production.
+     **The fix is the check, not the paragraph**:
+     `go/cmd/mtglab/configrecord_test.go` walks `go/`, extracts every *quoted*
+     `MTGLAB_`/`ANTHROPIC_`/`RESEND_`/`FLY_` literal, and holds it equal to
+     `.env.example`'s entries **in both directions** — an undocumented switch
+     fails, and so does a name kept after its reader was deleted. The fourteen
+     are now written up from the code that reads them (defaults included:
+     `MTGLAB_FORGE_IDLE_SECONDS` 180, `MTGLAB_FORGE_MEMORY_MB` 3072,
+     `MTGLAB_FORGE_SHIM_PORT` 8080), and both directions are empty.
+
+     **The test-switch worry the checklist carried turned out to be already
+     answered, structurally.** `MTGLAB_TEST_POOL`, `MTGLAB_TEST_FLAG`,
+     `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`, `MTGLAB_OLD_SHIM_URL` and
+     `ANTHROPIC_BASE_URL` are read **only** by `_test.go` files, so they are
+     not compiled into the binary at all — a stronger guarantee than a build
+     tag or a boot-time refusal, and it now has a test holding it (plus a
+     third assertion that `.env.example` never documents one, since writing a
+     test switch into the operator's list is how it gets set).
+
+     **The trap this cost, and it is the reason the mutation discipline
+     exists**: the first draft's "documented" regex matched a name at the head
+     of any line, so `# MTGLAB_JAVA beats the JDK unpacked beside…` — a
+     sentence of the *prose* — read as documentation, and deleting the entry
+     left the guard green. Requiring the `=` is what makes it an entry rather
+     than a mention. **Mutation-verified six ways**, all firing: undocument a
+     name (with its prose left in place); document a name nothing reads;
+     document a test switch; read `MTGLAB_TEST_POOL` from `internal/config`;
+     misspell a flag in `.claude/launch.json`; name a subcommand that does not
+     exist there.
+  2. **`--no-open` was help text lying, and it is gone.** `cmd/mtglab/ui.go`
+     parsed it into a variable and threw it away with `_ = noOpen` while
+     promising "serve without opening a browser" — a promise about behaviour
+     the command has never had, since nothing in the process opens anything.
+     Deleted, with the argument left where the flag was, and taken out of the
+     four `.claude/launch.json` entries that passed it. That deletion is what
+     bought the second half of the test above: `.claude/launch.json` is how
+     commandment 16's browser walk starts, cobra *exits* on an unknown flag
+     rather than ignoring it, so a stale entry there costs Aaron the minutes
+     he is waiting to look at something. It is now held against `newRoot()`.
+  3. **The boot sequence says what it decided, once, and complains about the
+     pairs that must agree.** `serve()` logs one `configuration` line — auth,
+     cookie mode, schema, data dir, decks dir, web-dist, tarot, pool
+     present/absent, base URL, which mail sender, whether the Forge worker is
+     configured — placed **after the ladder** (so `schema` is a fact about the
+     file rather than this binary's ambition) and **before anything that can
+     fail** (so a boot that dies has its own configuration above the error).
+     Four relationships then warn: auth on against a missing `RESEND_API_KEY`,
+     a `MTGLAB_BASE_URL` still on the loopback default, a `MTGLAB_EMAIL_FROM`
+     no provider will accept, and an unset `MTGLAB_ADMIN_EMAIL`. Each is a
+     deployment that answers pages and fails one specific request days later.
+
+     **Warnings, never a refusal**, and the argument is written at the
+     function: merging deploys (ADR 23), so a boot that refuses takes the site
+     down for a setting the site does not need to serve an anonymous page.
+     `config.DefaultBaseURL` and `DefaultEmailFrom` are named so the *question*
+     derives from the answer — nothing reads either variable a second time to
+     ask it, which is the one-reader-per-switch rule holding while the surface
+     grows. `TestTheBootSummaryLeaksNoSecret` is the half to keep: it
+     **discovers** the credential-shaped switches off the same walk that holds
+     `.env.example` honest, sets each to a sentinel, and demands none come
+     back out — so a credential added tomorrow is covered the day it lands.
+     Mutation-verified: logging the Resend key instead of the sender's *name*
+     fires it; dropping one complaint fires the complaint test; inverting the
+     cookie state fires the summary test.
+  4. **`internal/config`'s package comment claimed something its own code
+     contradicts.** "And secrets are not here at all -- a value we never hold
+     is a value we cannot log", a hundred lines above `ResendAPIKey`, whose own
+     comment calls itself "the one secret this package names". The absolute was
+     the tidier sentence and the false one. Rewritten as one absence and one
+     *exception*, with the reason (the mail sender puts that value in a header
+     itself) and where the others are read instead. `.env.example` was pointing
+     at `tests/test_config.py` for the pin — a Python-era file — and now points
+     at the package comment that carries the argument.
+  5. **Modern-Go sweep, and most of it is a "no".** Re-measured tonight against
+     the 2026-08-23 inventory: `interface{}` **0**, `ioutil` **0**,
+     `rand.Seed` **0**, `strings.Title` **0** — still clean. Two conversions
+     landed, both `sync.WaitGroup` `Add`/`defer Done` pairs replaced with
+     `wg.Go` (`internal/api`'s `background`, `internal/jobs`' run launcher):
+     one line each, and the Add/Done mismatch class stops existing. Verified
+     with `go test -race -count=2` on both packages.
+
+     **Deliberately not converted, with the reason, so the next run does not
+     re-open it:** the two remaining plain `sort.Slice` calls (both in
+     `internal/jobs/registry.go`, against 15 `sort.SliceStable` elsewhere)
+     each break ties on a unique `seq`, so the comparator is **total** and
+     stability is irrelevant — `slices.SortFunc` would be a pure spelling
+     change in a package that has a golden (`testdata/jobs.json`), which is
+     the wrong trade. And **0 of 19 `sync.Mutex` sites is the read-mostly map
+     `RWMutex` is for**: they are memo caches, lease state, counters, and a
+     check-then-fetch day cache (`api.setsMu`) whose read path *writes*. The
+     honest answer is that this tree is not lock-bound and a conversion wants
+     a profile first, which is Black's.
+  6. **Docs rot, six sites, each verified against the thing it names rather
+     than patched by analogy.** `tools/cardmotion/depth.py` said torch stays
+     out of the container because "the image installs `.[api,claude]`" —
+     extras that no longer exist; the discharge is now structural, read off
+     `Dockerfile` (the builder takes `go/`, the runtime takes the binary,
+     `web_dist`, `assets/tarot` and the entrypoint, and carries no Python at
+     all, so `tools/` never enters the build context). `house-codes.md` still
+     sent the house mother to `mtglab animist`; that family lives in `tools/`.
+     CLAUDE.md's `bash -lc` wrapper is noise — `gh`, `npm`, `node`, `fly`,
+     `uv` all resolve in a plain call (re-verified tonight; the memory file
+     has said so since 2026-08-19 while CLAUDE.md and `MEMORY.md`'s own index
+     went on saying the opposite). And **four places tell you to run the
+     toolbox gates as bare `ruff` / `mypy` / `pytest` / `animist`, which on
+     this Mac fail with `command not found`** — they were copied from
+     `ci.yml`, where `pip install -e './tools[dev]'` puts them on the runner's
+     PATH; corrected in CLAUDE.md and in the skill's three copies to
+     `tools/.venv/bin/…`.
+  7. **`web/README.md`'s entry-chunk figure had rotted.** It reads "~266 kB"
+     as the reason the lazy-route rule matters; measured tonight
+     `web_dist/assets/app.js` is **291,776 bytes — 285 kB raw, 91 kB
+     gzipped**. Corrected, named as unenforced (nothing re-measures it), and
+     the three deliberately-eager routes written down so the "every non-landing
+     screen" claim reads as the true thing it is. *Cross-color: a bundle-size
+     budget is Black's and there is none.*
+- **Also landed, outside the repo (memory audit):**
+  `mtglab-python-environment.md` was rewritten end to end — it described the
+  retired app in every particular (`src/`, `tests/`, the 95% coverage floor,
+  `[dev,api]`, fastapi/uvicorn, `.venv/bin/mtglab`, `tiny_pool.py`,
+  `test_isolation.py`) and would have sent a fresh session at files that do
+  not exist. What replaced it is the toolbox venv, how its gates actually run
+  here, the measured interpreters (`python3` **3.7.3**, `/usr/bin/python3`
+  **3.8.2**, `python3.11` **3.11.15**, `python3.12` **3.12.13**), and what the
+  three other venvs in the tree are (`.venv-depth` is torch's; root `.venv`
+  and `.venv311` are the retired app's, last touched 2026-08-16, read by
+  nothing). Three `MEMORY.md` index lines corrected besides — the `bash -lc`
+  one contradicted its own file, and the Phase 8 headline quotes `#276/v204`
+  as state while the tree is at `#281`/v208.
+- **The spirit of Magic — the shelves, fact-checked against the pool:**
+  **one wrong fact found, and it is queued as a UI change** (below). The
+  measurements are in the *Measured* block; the short version is that the
+  shelves resolve completely — **0 dropped card names across all 32 colour
+  combinations and the 42 lore facts** — so the counter that nobody reads is,
+  today, honestly zero.
+- **Queued for Aaron (daybreak 2026-08-24):**
+  1. **Five CodeQL alerts are permanently red and can never close by
+     themselves** — handed forward by White, re-checked here rather than
+     inherited: all five are Python findings on files the crossing deleted,
+     and the Python analysis never runs again, so nothing will ever mark them
+     fixed. A permanently-red alert list trains everyone to ignore code
+     scanning, which is the actual cost. **Recommendation: dismiss all five as
+     no-longer-relevant.** It is Aaron's account and Aaron's call; the six Go
+     alerts are already dismissed with sound arguments.
+  2. **A one-word correction to the artists shelf, built and waiting on a
+     branch** — see the finding below. It renders, so it stops at a green PR
+     (commandment 16).
+- **The lore shelf says a card was in the wrong set, and it is the exact
+  failure commandment 3 cares about most.** `internal/reference/data/lore.json`,
+  the `mark-poole` entry in the artists volume: *"Mark Poole painted Ancestral
+  Recall, and the game's most famous library after this one: **Alpha's own**
+  Library of Alexandria."* The painter is right and the set is not. Read out of
+  the 2026-08-19 Scryfall bulk rather than recalled (rule 1):
+
+  | card | first printing | released | artist |
+  |---|---|---|---|
+  | Ancestral Recall | `lea` Limited Edition Alpha | 1993-08-05 | Mark Poole |
+  | **Library of Alexandria** | **`arn` Arabian Nights** | **1993-12-17** | Mark Poole |
+
+  Alpha is 295 cards and Library of Alexandria is not one of them. A wrong
+  ruling in the lore teaches a newcomer something false about the game, which
+  is worse than any plain-English button — and this shelf is read by exactly
+  the audience that will catch it. **Fixed on `polish/blue-lore-2026-08-24`
+  and stopped at a green PR**, because the sentence renders.
+- **Deferred:**
+  - **The half-set `MTGLAB_FORGE_*` pair, the one boot complaint that did not
+    land.** `tier3.Configured()` answers the whole question (worker on *and* a
+    token) and cannot say which half is missing, so an operator who sets
+    `MTGLAB_FORGE_WORKER` and forgets `MTGLAB_FLY_API_TOKEN` gets `false` with
+    no reason. The boot line at least *shows* `forge_worker=false` beside the
+    rest now, which is most of the value. Trigger: the next session in
+    `internal/sim/tier3`, which can export the predicate cheaply while it is
+    already in there.
+  - **Three local environment readers, all tiny, none worth a diff yet.**
+    `cmd/mtglab/ui.go`'s `envOr`, `internal/flymetrics`'s identical `envOr`,
+    and `cmd/mtglab/shim.go`'s `envInt`. The duplication is real but two of
+    the three are *deliberate*: flymetrics reads the environment directly on
+    purpose (a credential must not travel through `config`), and the shim is a
+    separate process configured entirely by its environment. The one genuine
+    inconsistency is that `envOr` does not `TrimSpace` where every
+    `config` accessor does, so `MTGLAB_WEB_DIST=" "` is a blank path from one
+    reader and a default from the other. Trigger: a fourth reader, or a bug
+    that traces to the whitespace.
+  - **Nothing reads the dropped-name counter.** Every reference shelf serves
+    `dropped` and no client declares the field, exactly as `pool_stale` did
+    before Green put `SCHEMA_VERSION` on the dashboard. Today the count is 0
+    everywhere, which is why this is deferred rather than queued — there is
+    nothing to surface. Trigger: the first pool refresh after a shelf gains a
+    card name, or any non-zero reading.
+  - **The spirit of Magic — considered and rejected, so it is not
+    re-litigated.** The rendered-string sweep across `web/src` now finds
+    **four** generic strings in the whole app (it found two in 2026-08-19's
+    baseline and both were dealt with): two `Spinner label="Loading…"` in
+    `App.tsx` (the pre-auth shell and the route suspense fallback), the
+    catch-all's "Nothing here. Try the library.", and Admin's "Delete". Admin
+    is maintainer-facing and stays. The other three are real flavour
+    candidates — "Shuffling up…" is Magic's own phrase for a game about to
+    start and a spinner label is not a control, so commandment 2's bound does
+    not bite — but they were **not** taken tonight: this run's user-visible
+    branch carries a factual correction, and mixing a taste change into it
+    doubles what Aaron has to weigh at a glance. Next spirit run starts here.
+
+    **CORRECTION, found on the live walk an hour later, and the method is the
+    finding.** The count above is wrong: there are **seven** rendered
+    `Loading…` strings, not two. The sweep grepped for the *quoted* form
+    (`"Loading…"`) and so saw only the two `Spinner label=` sites; the other
+    five are bare JSX text nodes — `>Loading…<` — in `components/tarot.tsx`,
+    `components/theme.tsx`, `routes/Learn.tsx` (twice) and `routes/NewDeck.tsx`.
+    **A rendered string is not always a quoted string**, and a sweep that only
+    knows one spelling of "rendered" under-reports by a factor of three. This
+    is [[a-completeness-list-must-be-discovered]] in a new costume, and the
+    next spirit run should grep both shapes.
+
+    It matters beyond the count, because **five of the seven are a bare
+    `<p class="text-sm">` with no spinner and no motion at all** — a page that
+    sits there, which is commandment 6 — and one of the five is on the
+    fortune-teller's table, which commandment 15 says is rationed last.
+    Caught by driving `/new` on the instance and watching it render "Loading…"
+    flat and left-aligned for about three seconds before the persona picker
+    arrived. *Cross-color: the missing motion is Red's controls facet as much
+    as this one's; the word itself is Blue's.*
+  - **The live walk, 2026-08-24 (deployed instance, riding the signed-in
+    `claude` seat through Claude-in-Chrome — never signed in by Claude).**
+    `/api/health`: pool true, **35,393 oracle rows, 107,355 printings, 7
+    decks, `pool_stale: false`**. The door holds: `/` 200 while `/api/lore`
+    and `/api/colors` answer **401** unauthenticated, which is the middleware
+    refusing before routing. The library, `/claude`, `/new` and the persona
+    picker all render.
+
+    **The About Claude keeper duty (commandment 18) — the page is in good
+    order and one of its claims did real work.** Both exhibit commanders
+    resolved live out of the pool with their own rules text (Kwain, Itinerant
+    Meddler and Tatyova, Benthic Druid), all four paintings name their painter
+    (Mark Poole, John Avon, Rebecca Guay, Seb McKinnon), and the page's own
+    sentence — "every other picture on this page names its painter" — holds.
+    **And its Library of Alexandria plate credits *Arabian Nights, 1993*.** So
+    the site contradicted itself about one painting across two surfaces, and
+    the surface that was right is the one that also matches the pool. That is
+    worth more than the one-word diff: the correction is not a judgement call.
+
+    **The fortune-teller's table (commandment 15) is still the best room on
+    the site.** The persona picker carries three painted tiles with credits
+    (Volkan Baǵa on the fortune-teller), a sound toggle, an explicit
+    "Pick colours myself" escape hatch, and copy that promises the questions
+    are "about you and never about Magic". The one tile with no painting —
+    "Chat with Claude, no costume" — is deliberately the uncostumed option and
+    correctly the only one carrying no credit. Nothing has slipped past it.
+    The `Loading…` finding above is the single blemish and it is on the way
+    *in* to the room.
+- **Measured (2026-08-24, this Mac, quiet, after the fixes):**
+  - **Go gauntlet, all four gates green.** `gofmt -l .` prints nothing;
+    `go vet ./...` clean; `go test -race ./...` **exit 0, 0 FAIL lines across
+    48 packages** in **1m19s** wall (`user 3m54s`, warm cache);
+    `golangci-lint run ./...` → **`0 issues.`** Slowest packages, from the
+    cold baseline run at the top of the night: `internal/api` **71.7s**,
+    `internal/claude` **57.9s**, `internal/door` **12.2s**,
+    `internal/deckedit` **10.3s**, `internal/deckread` **10.0s**,
+    `cmd/mtglab` **9.2s**. *(The two slow ones are Black's and Red's
+    question, not this facet's.)*
+  - **Frontend:** `npm --prefix web run check` green — **615 tests across 38
+    files in 25.2s**. `web_dist/assets/app.js` **291,776 B raw / 91,138 B
+    gzipped**; `charts.js` 399,398 B / 111,506 B.
+  - **Toolbox:** `ruff` clean, `mypy` clean over **23 source files**,
+    **210 tests passed in 12.35s**, and `animist verify` **held all 12
+    recipes** (exit 0).
+  - **Environment switches:** 33 `os.Getenv`/`os.LookupEnv` reads outside
+    tests in 8 files (unchanged from 2026-08-23), of which 9 are inside
+    `internal/config` and `internal/sim/tier3/worker.go` holds ten on its own.
+    **32 names read by shipping code; 32 documented; both `comm` directions
+    empty.** Six more names are read only by `_test.go` files.
+  - **Layering, grepped not trusted:** no `duckdb` import outside
+    `internal/pool`; `internal/api` imports `internal/door` **nowhere** (only
+    names it in comments); the determinism kernels import nothing above them
+    (`yamlemit` → `deckyaml`, which is itself first-party-import-free).
+    **Every package has a doc comment** — `cmd/mtglab` uses the `// Command
+    mtglab …` form, which a `// Package ` grep reports as a false positive.
+  - **The reference shelves, resolved against the 2026-08-19 pool:** **0
+    dropped** on every one of the **32** colour combinations; the lore shelf
+    is **42 facts across 5 volumes** (history 10, mechanics 10, curiosities 8,
+    artists 7, table 7) resolving **25 card objects, 0 dropped**; the glossary
+    serves **54 terms**. Sampled against the Scryfall bulk rather than recall:
+    Dan Frazier painted all five Alpha Moxes ✓, Christopher Rush painted Black
+    Lotus ✓, Alpha is 295 cards ✓, Innistrad 2011-09-30 ✓, Ravnica: City of
+    Guilds 2005-10-07 ✓, Library of Alexandria **✗ Arabian Nights, not Alpha**.
+  - **Frontend compatibility:** **zero** regex lookbehind under `web/src`;
+    zero `structuredClone` / `findLast` / `toSorted` / `toReversed` /
+    `Object.hasOwn` / `.at(-n)` outside tests; zero `forwardRef`,
+    `React.memo`, `defaultProps`, `propTypes` — React 19 idiom throughout.
+    10 lazy routes against 3 deliberately eager (`Library`, `Login`, `Claim`).
+  - **`data/app.db` mtime unmoved** across the whole run (`Aug 23 22:23`,
+    checked with `ls -la`, which `git status` cannot do): the scratch instance
+    used to read the shelves ran with `MTGLAB_DATA_DIR` pointed at a temp
+    directory holding a symlink to the pool.
+
+### 2026-08-19 and earlier — the Python era
 - **Fixed this run (2026-08-19, rainbow):**
   1. **The one paragraph in CLAUDE.md that states the re-check-completeness
      rule had drifted again, in the other direction.** It says *"a sentence in

@@ -52,6 +52,35 @@ the wider docs-rot question, and it is the same shape as daybreak item 5 from
 implementation reuse this test's two helpers rather than write a second pair —
 both halves are built, tested and mutation-verified.
 
+**3. Five code-scanning alerts are permanently red and can never close by
+themselves.** All five are Python findings on files the Go crossing deleted,
+and the Python analysis never runs again — so nothing will ever mark them
+fixed, and the list will read "5 open" forever. The cost is not the findings
+(the code is gone); it is that a permanently-red alert list teaches everyone
+to stop looking at code scanning, which is the one place a real finding would
+appear. The six *Go* alerts are already dismissed, each with a sound argument.
+· *Cost of leaving it:* nothing today, and a genuine alert missed on the day
+there is one. · **Recommendation:** dismiss all five as "no longer relevant"
+— it is your account and your call, which is the only reason this is a
+question rather than a fix. Ledger: Blue, 2026-08-24.
+
+**4. A one-word correction to the artists shelf is built, green, and waiting
+for your eye.** The lore shelf tells a reader that Library of Alexandria is
+"Alpha's own". It is not: its first printing is Arabian Nights, 1993-12-17,
+and Alpha is the 295 cards of 1993-08-05 (read out of the Scryfall bulk, not
+recalled — Mark Poole did paint it, so only the set is wrong). It renders, so
+it stopped at a green PR rather than merging. · *Cost of leaving it:* the
+shelf teaches a newcomer something false about the game's own history, to the
+one audience most likely to notice. · **Recommendation:** merge it. **The walk
+is cheaper than it looks, and here is the honest version:** the diff is one
+word in checked-in prose and touches no render path, so the two-second check
+is `curl -s localhost:8765/api/lore | grep -o "Mark Poole[^\"]*"`. If you want
+it on the page: `.claude/launch.json`'s `mtglab-ui` entry (or `go/mtglab ui
+--port 8765`), then http://127.0.0.1:8765/ — the shelf sits under the Library
+masthead and shows **one fact at a time from a random opening offset**, so
+finding this one means clicking **Another** up to 42 times. Nothing animates
+and there is no cycle time to wait out. Ledger: Blue, 2026-08-24.
+
 **Black —**
 
 **1. PR #284 is green and unmerged, and nothing in it renders.** Three fixes,

@@ -23,7 +23,7 @@ non-compliant until he rules.
 
 Work the list:
 
-- `cd tools && animist verify` passes: every committed asset matches its
+- `cd tools && .venv/bin/animist verify` passes: every committed asset matches its
   recipe (ADR 29) — the toolbox owns this command; `mtglab` has no `animist`
   subcommand and never did. Then sweep for binaries that *bypassed* the
   pipeline: compare
