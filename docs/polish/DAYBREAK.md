@@ -70,9 +70,10 @@ person answering. · **Recommendation:** yes — a small test asserting every op
 item here names the ledger section holding its record, with the section names
 read out of `LEDGER.md`'s own headings rather than restated, and a failure when
 it finds no items at all so an inert guard cannot pass quietly. It was not
-built tonight because four of the eight open items would fail it and repairing
-them means editing the 2026-08-23 block, which this rainbow was told to leave
-alone. Ledger: Colorless, 2026-08-24.
+built tonight because the whole 2026-08-23 block would fail it — none of those
+six names a ledger section and four have none to name — and repairing them
+means editing that block, which this rainbow was told to leave alone.
+Ledger: Colorless, 2026-08-24.
 
 **2. Editing a comment in five particular packages silently throws away the
 deployed instance's whole simulation cache.** `internal/sim`,

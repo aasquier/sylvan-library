@@ -3576,11 +3576,11 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
      `DAYBREAK.md` should name the ledger section holding its record, and a
      test should hold that true — reading the section names *out of*
      `LEDGER.md`'s own headings rather than restating them, and failing if it
-     finds no items at all, so an inert guard cannot pass silently. Today four
-     of the eight open items would fail it, which is the argument and also the
-     reason it was not landed tonight: repairing them means editing the
-     2026-08-23 block, and the rainbow's own instruction is to leave those
-     items untouched.
+     finds no items at all, so an inert guard cannot pass silently. Today the
+     whole 2026-08-23 block would fail it — none of those six names a ledger
+     section and four have none to name — which is the argument and also the
+     reason it was not landed tonight: repairing them means editing that block,
+     and the rainbow's own instruction is to leave those items untouched.
   2. **Rule on comment edits inside the five fingerprinted packages.** Finding
      1 gives the mechanism; what is owed is the policy. Recommendation: no
      prose-only edit in `internal/sim`, `internal/sim/tier1`, `internal/mana`,
