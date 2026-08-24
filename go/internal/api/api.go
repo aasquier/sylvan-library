@@ -193,13 +193,11 @@ func New(cfg Config) *API {
 // a cancelled one must not abort a message that is already owed. It carries a
 // ceiling so a hung mail provider cannot leak a goroutine per attempt.
 func (a *API) background(fn func(context.Context)) {
-	a.bg.Add(1)
-	go func() {
-		defer a.bg.Done()
+	a.bg.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), backgroundBudget)
 		defer cancel()
 		fn(ctx)
-	}()
+	})
 }
 
 // backgroundBudget bounds one background task. Comfortably past `MailTimeout`

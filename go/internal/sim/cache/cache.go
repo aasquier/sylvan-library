@@ -102,11 +102,20 @@ const MaxRows = 2000
 // package's embed is held complete against its own directory by a test, and
 // that test is satisfied on *both* sides when a file moves out: it is gone
 // from the directory and gone from the list, so nothing is missing anywhere
-// and the fingerprint quietly stops covering it. `floats.go` did exactly that
-// on 2026-08-22 (#249, out of `internal/sim` into `internal/floats`), and
+// and the fingerprint quietly stops covering it. `floats.go` did exactly that,
+// moving out of `internal/sim` into `internal/floats`, and
 // what noticed was the build refusing an embed pattern that matched no file --
 // a move into an *existing* package would not even have done that. So adding
 // a package under the engine is a decision to take here, deliberately.
+//
+// **A comment counts.** The fingerprint hashes each package's embedded source
+// *bytes*, not its behaviour, so reflowing a doc comment inside any package
+// listed below changes the key, and every stored Tier 1 row on the volume
+// stops matching. Nothing fails and no test speaks -- the instance simply
+// recomputes what it had already paid for. So a prose-only edit under one of
+// these packages is a deliberate cost, not a free tidy; the list is the
+// authority on which they are, and it is ten lines down rather than repeated
+// here for exactly that reason.
 type engineSource struct {
 	name string
 	fs   fs.FS

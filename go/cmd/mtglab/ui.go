@@ -19,6 +19,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/door"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // uiCommand is `mtglab ui`: the app served whole from one process — every
@@ -29,10 +30,7 @@ import (
 // server has no `.env` reader, so on a laptop export what you need, or leave
 // auth off, which is the local default.
 func uiCommand() *cobra.Command {
-	var (
-		host, port, webDist, tarot string
-		noOpen                     bool
-	)
+	var host, port, webDist, tarot string
 	cmd := &cobra.Command{
 		Use:   "ui",
 		Short: "Serve the app",
@@ -48,8 +46,12 @@ func uiCommand() *cobra.Command {
 		"the built frontend (MTGLAB_WEB_DIST)")
 	f.StringVar(&tarot, "tarot", envOr("MTGLAB_TAROT_DIR", filepath.Join("assets", "tarot")),
 		"the packaged tarot art (MTGLAB_TAROT_DIR)")
-	f.BoolVar(&noOpen, "no-open", false, "serve without opening a browser")
-	_ = noOpen
+	// There is deliberately no `--no-open`. It existed here, parsed into a
+	// variable and thrown away with `_ = noOpen`, while its help text promised
+	// "serve without opening a browser" -- a promise about behaviour this
+	// command has never had, since nothing in the process opens anything. For
+	// an operator `--help` is the only documentation there is, so a flag that
+	// describes an action the code does not take is worse than no flag.
 	return cmd
 }
 
@@ -60,6 +62,84 @@ func envOr(name, fallback string) string {
 	return fallback
 }
 
+// bootSummary is what this process decided, said once, in one line.
+//
+// It exists so that a `fly logs` tail answers "is this thing configured the
+// way I think it is" in two seconds rather than by shell-ing in and reading
+// the environment. Every value here is read through `internal/config`, which
+// is the one place that decides a default -- so the line cannot drift from the
+// behaviour it describes without the behaviour changing too.
+//
+// **Never a secret and never a value that might be one.** A key in a log is a
+// leak forever, and this app's own rule is that it does not hold most of them
+// at all: the mail provider renders as *which sender was chosen*, never as its
+// credential, and no ANTHROPIC_ or _TOKEN value appears in any form.
+// `TestTheBootSummaryLeaksNoSecret` holds that.
+func bootSummary(webDist, tarot string, poolPresent bool) []any {
+	state := func(on bool, yes, no string) string {
+		if on {
+			return yes
+		}
+		return no
+	}
+	return []any{
+		"auth", state(config.RequireAuth(), "on", "off"),
+		"cookies", state(config.SecureCookies(), "secure", "plain"),
+		"schema", auth.SchemaVersion,
+		"data_dir", config.DataDir(),
+		"decks_dir", config.DecksDir(),
+		"web_dist", webDist,
+		"tarot", tarot,
+		"pool", state(poolPresent, "present", "absent"),
+		"base_url", config.BaseURL(),
+		"mail", state(config.ResendAPIKey() != "", "provider", "console"),
+		"forge_worker", tier3.Configured(),
+	}
+}
+
+// configComplaints are the settings that must agree with each other, checked
+// at boot instead of on the request that needed them.
+//
+// Reading configuration at call time is right for a *path* and wrong for a
+// *relationship*: nothing is broken about an unset MTGLAB_EMAIL_FROM until the
+// first person asks for a password reset, and by then the person discovering
+// the misconfiguration is the one worst placed to fix it. Each of these is a
+// deployment that will fail on one specific request, days later, silently.
+//
+// They are **warnings, never a refusal.** Merging deploys (ADR 23), so a boot
+// that refuses here would take the site down for a setting the site does not
+// need to serve a single anonymous page. Loud and serving beats silent and
+// serving; refusing to serve is worse than both.
+func configComplaints() []string {
+	if !config.RequireAuth() {
+		// Auth off is a laptop, one person, no invites and no reset mail. Every
+		// relationship below is about a deployment.
+		return nil
+	}
+	var out []string
+	if config.ResendAPIKey() == "" {
+		out = append(out, "auth is on and RESEND_API_KEY is unset: invites and "+
+			"password resets are refused rather than sent, because the console "+
+			"fallback would print addresses into this log (docs/HOSTING.md §7)")
+	}
+	if config.BaseURLIsDefault() {
+		out = append(out, "auth is on and MTGLAB_BASE_URL is still "+
+			config.DefaultBaseURL+": every invite and reset link mailed from "+
+			"here points at a loopback address")
+	}
+	if config.EmailFromIsDefault() {
+		out = append(out, "auth is on and MTGLAB_EMAIL_FROM is still the "+
+			"built-in default: a provider refuses any From address outside a "+
+			"sending domain you have verified with it")
+	}
+	if config.AdminEmail() == "" {
+		out = append(out, "auth is on and MTGLAB_ADMIN_EMAIL is unset: nobody "+
+			"is reconciled to admin at boot, so an accidental demotion cannot "+
+			"repair itself with a restart (ADR 17)")
+	}
+	return out
+}
+
 func serve(host, port, webDist, tarot string) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	// The schema ladder, before anything opens the file: creating `app.db`
@@ -68,6 +148,15 @@ func serve(host, port, webDist, tarot string) error {
 	// request answered over a half-migrated file is worse than no answer.
 	if err := auth.Migrate(config.AppDBPath()); err != nil {
 		return err
+	}
+	// After the ladder, because `schema` in the summary is a fact about the
+	// file on disk rather than about this binary's ambition for it, and before
+	// anything can fail below, because a boot that dies wants its own
+	// configuration in the log above the error.
+	_, poolErr := os.Stat(config.DBPath())
+	log.Info("configuration", bootSummary(webDist, tarot, poolErr == nil)...)
+	for _, complaint := range configComplaints() {
+		log.Warn(complaint)
 	}
 	// The maintainer, reconciled to admin at every start (ADR 17). A no-op
 	// unless MTGLAB_ADMIN_EMAIL is set, which is what a laptop wants.
