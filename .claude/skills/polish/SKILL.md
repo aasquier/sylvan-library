@@ -75,19 +75,34 @@ morning costs a day; a regression merged at 3am costs the site.
 **What may merge, and what may not.** Merging is deploying (ADR 23), so this
 is the one place night work touches the live instance:
 
-- **Anything a user can see does not merge at night.** Commandment 16 is
-  explicit — Aaron walks UI changes in a browser before they land — so a
-  night run takes those to a green PR and stops there, with the branch named
-  in the daybreak queue and a note on where to look.
+- **Anything a user can see does not merge at night — and here is the
+  commandment 16 reading, settled so no session re-derives it at 2am.** The
+  commandment's body says "before any user-visible change is committed" and
+  its title says "before it lands"; the night reading is the title's:
+  building and committing UI work on its own branch is how the work gets
+  *ready* for Aaron's eye, and his eye comes before the **merge**, which is
+  what landing means here (merging deploys). So a night run may build a
+  controls fix or a flavour pass to a green PR and must stop there — and the
+  daybreak line for it carries what commandment 16 itself demands: the dev
+  server to start, exactly where to look, and the cycle time if anything
+  animates, so his morning walk costs minutes. If Aaron ever rules the
+  stricter reading — no UI commits at all without his eye — night runs
+  audit and queue UI work instead, and this bullet changes.
 - **Everything else may merge when the required checks are green**: backend
   behaviour with no rendered change, tests, tooling, docs, the skill, the
   ledger.
 - **A night merge is not done when the deploy is green.** `/api/health`
   answers 200 from an instance whose every page is broken — it reports the
   pool and the process, not the product. Commandment 14 asks for the real
-  surface, and 3am is precisely when nobody else will notice, so **walk it**:
-  sign in on the `claude` seat, open a deck page, the simulator and the tarot
-  table, and read the console for errors. Perhaps four minutes, and it is the
+  surface, and 3am is precisely when nobody else will notice, so **walk it —
+  with the access that actually exists at 3am.** Claude never signs in
+  (credentials are Aaron's to type; the arrangement is that he signs the
+  `claude` seat in and Claude rides): if that seat is already signed in
+  through Claude-in-Chrome, ride it — open a deck page, the simulator and
+  the tarot table, and read the console. If it is not, walk the public
+  surface — the door, the sign-in page rendering, the reference shelves,
+  `/api/health`'s body — and write in the daybreak line that the
+  authenticated walk is owed. Four minutes either way, and it is the
   difference between a bad merge caught at 3am and one found by a friend at
   breakfast.
 - **If that walk fails, roll back — do not debug.** HOSTING has the runbook.
@@ -126,7 +141,8 @@ invented at 4am.
 this while he sleeps. **A night is a rainbow that stops when the night does:**
 begin at the color "Choosing the color" picks, work onward in WUBRG order —
 colorless after green, cleanup after colorless — and keep going until the work
-runs out or the night does. Each color is still a full solo run with its own
+runs out or the night does (the clock is checkable — `date` — and morning
+means Aaron's morning; when in doubt, one more color is usually right). Each color is still a full solo run with its own
 branch and PR; finishing one is a checkpoint, not a finish line. Two bounds
 that keep it honest:
 
