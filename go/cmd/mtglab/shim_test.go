@@ -57,6 +57,7 @@ func ask(t *testing.T, srv *httptest.Server, method, path, body, token string) (
 // calls before it has any work to send: the machine is up, the process is
 // listening, the door answers.
 func TestHealthzIsWhatTheAppPollsAfterAMachineStart(t *testing.T) {
+	t.Parallel()
 	srv := shimServer(t)
 	status, body := ask(t, srv, http.MethodGet, "/healthz", "", "")
 	if status != 200 {
@@ -74,6 +75,7 @@ func TestHealthzIsWhatTheAppPollsAfterAMachineStart(t *testing.T) {
 // TestAnUnknownRouteIs404 keeps the door small: three endpoints, and anything
 // else is a mistake worth naming.
 func TestAnUnknownRouteIs404(t *testing.T) {
+	t.Parallel()
 	srv := shimServer(t)
 	for _, c := range []struct{ method, path string }{
 		{http.MethodGet, "/"},
@@ -124,6 +126,7 @@ func TestTheTokenGatesEveryRequest(t *testing.T) {
 // TestAnUnreadableBodyIs400 keeps a malformed ask apart from a failed match:
 // one is the caller's, the other is the JVM's.
 func TestAnUnreadableBodyIs400(t *testing.T) {
+	t.Parallel()
 	srv := shimServer(t)
 	for _, body := range []string{"not json", "[1,2,3]", `{"decks": 7}`, ""} {
 		status, answer := ask(t, srv, http.MethodPost, "/coverage", body, "")
@@ -144,6 +147,7 @@ func TestAnUnreadableBodyIs400(t *testing.T) {
 // machine — and the only thing standing between a four-minute match and a
 // machine that exits underneath it.
 func TestTheWatchdogJudgesWorkRatherThanTime(t *testing.T) {
+	t.Parallel()
 	state := newShimState()
 	state.lastActivity = time.Now().Add(-time.Hour)
 	if state.idleFor() < time.Hour {
@@ -173,6 +177,7 @@ func TestTheWatchdogJudgesWorkRatherThanTime(t *testing.T) {
 // process on another machine, and the `.dck` directory this process hands to
 // Forge is racy under two JVMs.
 func TestOneMatchAtATime(t *testing.T) {
+	t.Parallel()
 	state := newShimState()
 	state.match.Lock()
 	locked := make(chan struct{})
@@ -200,6 +205,7 @@ func TestOneMatchAtATime(t *testing.T) {
 // off a job row to know whether Forge was missing, the match timed out, or the
 // results were untrustworthy — three very different mornings.
 func TestFailureTextNamesTheClass(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		err  error
 		want string

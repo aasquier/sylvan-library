@@ -20,6 +20,7 @@ func use(t *testing.T, p *pool.Pool, fn func(c *pool.Conn)) {
 }
 
 func TestGetCardsResolvesNamesAsRecorded(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	use(t, pooltest.Open(t), func(c *pool.Conn) {
 		// Case-insensitive; a double-faced card by its front face; a banned
@@ -78,6 +79,7 @@ func keys(m map[string]*pool.CardRecord) []string {
 }
 
 func TestGetCardsIsMemoisedPerOpen(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	p := pooltest.Open(t)
 	use(t, p, func(c *pool.Conn) {
@@ -102,6 +104,7 @@ func TestGetCardsIsMemoisedPerOpen(t *testing.T) {
 }
 
 func TestSearchOrdersAndLimits(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	use(t, pooltest.Open(t), func(c *pool.Conn) {
 		recs, err := c.Search(ctx, "type_line LIKE ? AND json_extract_string(legalities, 'commander') = 'legal'",
@@ -125,6 +128,7 @@ func TestSearchOrdersAndLimits(t *testing.T) {
 }
 
 func TestColumnsAreReadFromThePool(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	use(t, pooltest.Open(t), func(c *pool.Conn) {
 		cols, err := c.Columns(ctx, "printings")
@@ -142,6 +146,7 @@ func TestColumnsAreReadFromThePool(t *testing.T) {
 }
 
 func TestArtCropFrom(t *testing.T) {
+	t.Parallel()
 	normal := "https://cards.scryfall.io/normal/front/9/1/91fdb56b.jpg?1"
 	if got := pool.ArtCropFrom(&normal); got == nil || *got != "https://cards.scryfall.io/art_crop/front/9/1/91fdb56b.jpg?1" {
 		t.Fatalf("%v", got)
@@ -153,6 +158,7 @@ func TestArtCropFrom(t *testing.T) {
 }
 
 func TestTheLeaseHandsThePoolBack(t *testing.T) {
+	t.Parallel()
 	p := pooltest.Open(t)
 	p.SetIdle(50 * time.Millisecond)
 	if p.Held() {
@@ -190,6 +196,7 @@ func TestTheLeaseHandsThePoolBack(t *testing.T) {
 }
 
 func TestAMissingPoolIsErrNoPool(t *testing.T) {
+	t.Parallel()
 	p := pool.New("/nowhere/at/all.duckdb", nil)
 	err := p.Use(context.Background(), func(*pool.Conn) error { t.Fatal("ran"); return nil })
 	if !errors.Is(err, pool.ErrNoPool) {
@@ -198,6 +205,7 @@ func TestAMissingPoolIsErrNoPool(t *testing.T) {
 }
 
 func TestAMovedPoolIsReopened(t *testing.T) {
+	t.Parallel()
 	// A `data refresh` rewrites the file; the next use must read the new
 	// one rather than the snapshot the old instance held.
 	first := pooltest.Build(t)

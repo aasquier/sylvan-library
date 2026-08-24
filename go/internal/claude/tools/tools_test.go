@@ -30,6 +30,7 @@ var writeSurface = []string{
 // invariant. `internal/claude`'s analysis pass holds the source; this holds the
 // door.
 func TestTheRegistryExposesNoWriteFunction(t *testing.T) {
+	t.Parallel()
 	for _, name := range writeSurface {
 		if _, exposed := registry[name]; exposed {
 			t.Errorf("%q is in the read-only registry", name)
@@ -45,6 +46,7 @@ func TestTheRegistryExposesNoWriteFunction(t *testing.T) {
 // the advertisement: a model can request any tool name it likes, including one
 // never offered, and `Run` decides on the name it actually received.
 func TestAskingForAWriteByNameIsRefused(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	for _, name := range writeSurface {
 		_, err := Run(ctx, name, map[string]any{
@@ -66,6 +68,7 @@ func TestAskingForAWriteByNameIsRefused(t *testing.T) {
 // widen what a mode does, never what it is allowed to do — and neither may a
 // mode.
 func TestAModeCannotWidenTheToolSetByAsking(t *testing.T) {
+	t.Parallel()
 	if _, err := Schemas([]string{"get_deck", "set_card_field"}); err == nil {
 		t.Error("a mode declared a write tool and Schemas allowed it")
 	}
@@ -84,6 +87,7 @@ func TestAModeCannotWidenTheToolSetByAsking(t *testing.T) {
 // Even a read-only tool would be a laundering route if it took prose destined
 // for a rationale. Nothing in the registry may have a `why` input.
 func TestNoToolSchemaAcceptsAWhy(t *testing.T) {
+	t.Parallel()
 	for _, name := range Names {
 		for prop := range registry[name].Properties {
 			if strings.Contains(strings.ToLower(prop), "why") {
@@ -113,6 +117,7 @@ func TestNoToolSchemaAcceptsAWhy(t *testing.T) {
 // TestEverySchemaIsWired catches the half that would otherwise fail at request
 // time: a description that exists as data with no function behind it.
 func TestEverySchemaIsWired(t *testing.T) {
+	t.Parallel()
 	for _, name := range Names {
 		if registry[name].fn == nil {
 			t.Errorf("%s has a schema but nothing is wired to it", name)
@@ -135,6 +140,7 @@ func TestEverySchemaIsWired(t *testing.T) {
 // the prompt, so an unstable order invalidates the prompt cache on every turn
 // — for free, and invisibly.
 func TestTheSchemasAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile(filepath.Join("data", "tools.json"))
 	if err != nil {
 		t.Fatalf("reading the schemas: %v", err)
@@ -176,6 +182,7 @@ func TestTheSchemasAreTheRecordedOnes(t *testing.T) {
 // the way in — which the API does NOT enforce without `strict`, which is why
 // it is done here as well as advertised.
 func TestArgumentsAreCheckedBeforeDispatch(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	// An unknown argument is refused by name.
 	_, err := Run(ctx, "get_deck", map[string]any{"slug": "x", "why": "nope"}, Deps{}, nil)

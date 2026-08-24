@@ -99,8 +99,7 @@ func UsernameFor(email string) string {
 // fatal, for the same reason a malformed address is: an instance that refuses
 // to start because a preference is misspelled has turned a cosmetic problem
 // into an outage.
-func wantedUsername(email string) string {
-	configured := config.AdminUsername()
+func wantedUsername(configured, email string) string {
 	if configured == "" {
 		return UsernameFor(email)
 	}
@@ -153,8 +152,8 @@ func uniqueUsername(ctx context.Context, db *sql.DB, wanted string) (string, err
 // app is perfectly capable of running while its admin is misconfigured. A
 // database failure is still an error -- that one is about the volume, not the
 // preference.
-func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
-	address := config.AdminEmail()
+func EnsureMaintainer(ctx context.Context, db *sql.DB, cfg config.Config) error {
+	address := cfg.AdminEmail
 	if address == "" {
 		return nil
 	}
@@ -177,7 +176,7 @@ func EnsureMaintainer(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	if account == nil {
-		wanted := wantedUsername(normalised)
+		wanted := wantedUsername(cfg.AdminUsername, normalised)
 		name, err := uniqueUsername(ctx, db, wanted)
 		if err != nil {
 			return err

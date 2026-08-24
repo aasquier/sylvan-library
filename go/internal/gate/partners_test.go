@@ -11,6 +11,7 @@ func card(name, typeLine, text string) *pool.CardRecord {
 }
 
 func TestPairingOfReadsTheAbilityAsTheReportsRecord(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		text string
 		want *Pairing
@@ -41,6 +42,7 @@ func TestPairingOfReadsTheAbilityAsTheReportsRecord(t *testing.T) {
 }
 
 func TestCanBeCommanderHoldsTheLegendaryLine(t *testing.T) {
+	t.Parallel()
 	legend := card("Gyome, Master Chef", "Legendary Creature — Troll Warlock", "")
 	background := card("Raised by Giants", "Legendary Enchantment — Background", "Commander creatures you own have base power and toughness 10/10.")
 	battlebond := card("Ley Weaver", "Creature — Elf Druid", "Partner with Lore Weaver\n{T}: Untap two target lands.")
@@ -64,6 +66,7 @@ func TestCanBeCommanderHoldsTheLegendaryLine(t *testing.T) {
 }
 
 func TestCheckPairSaysWhyNot(t *testing.T) {
+	t.Parallel()
 	plainA := card("Akiri, Line-Slinger", "Legendary Creature — Kor Soldier Ally", "Partner")
 	plainB := card("Bruse Tarl, Boorish Herder", "Legendary Creature — Human Ally", "Partner")
 	ffA := card("Ruby", "Legendary Creature — Human", "Partner—Friends forever")

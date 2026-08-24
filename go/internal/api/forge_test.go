@@ -93,6 +93,7 @@ func loadShapeCorpus(t *testing.T) shapeCorpusFile {
 // requires it quoted **with** the numbers, so it is part of every result's
 // bytes; a reworded copy would ship as a silently different payload.
 func TestTheConstantsAreClaudesOwnWords(t *testing.T) {
+	t.Parallel()
 	corpus := loadShapeCorpus(t)
 	if ForgeCaveat != corpus.Shape.Caveat {
 		t.Errorf("caveat:\n got %q\nwant %q", ForgeCaveat, corpus.Shape.Caveat)
@@ -115,6 +116,7 @@ func TestTheConstantsAreClaudesOwnWords(t *testing.T) {
 // whose wire form nothing has checked. Key order is contract here — the deck
 // page reads this in DevTools as much as the client does.
 func TestTheShapedMatchIsTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	corpus := loadShapeCorpus(t)
 	decks := map[string]*deck.Deck{}
 	for name, text := range corpus.Shape.Decks {
@@ -157,6 +159,7 @@ func TestTheShapedMatchIsTheRecordedBytes(t *testing.T) {
 // be the drift the wire codec exists to prevent, one layer up. Marshalled, for
 // the reason the shape above is.
 func TestTheRowIsTheSameShapeLiveAndInTheTally(t *testing.T) {
+	t.Parallel()
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.Rows {
 		t.Run(c.Note, func(t *testing.T) {
@@ -182,6 +185,7 @@ func TestTheRowIsTheSameShapeLiveAndInTheTally(t *testing.T) {
 // guard beats the fix here, because neither is reachable from the app's own
 // client and an unreachable bug survives forever.
 func TestTheGamesDialMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.GamesDial {
 		t.Run(c.Note, func(t *testing.T) {
@@ -209,6 +213,7 @@ func TestTheGamesDialMatchesTheCorpus(t *testing.T) {
 // dedupe key and Forge's own command line, so narrowing it would answer a
 // different number than the one somebody asked with — and a seed is a promise.
 func TestTheSeedDialMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.SeedDial {
 		t.Run(c.Note, func(t *testing.T) {
@@ -234,6 +239,7 @@ func TestTheSeedDialMatchesTheCorpus(t *testing.T) {
 // that decides whether a second click joins the first match or starts a new
 // one.
 func TestTheLabelAndKeyAreTheRecordedText(t *testing.T) {
+	t.Parallel()
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.Labels {
 		plural := "s"

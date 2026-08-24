@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -123,8 +122,8 @@ func (a *API) accountsDB() (*sql.DB, bool) {
 // logged is an address this process constructed. The one visible cost of
 // the strictness is that a garbage header never becomes a rate-limit key of
 // its own -- which was never a key worth having.
-func clientAddress(r *http.Request) string {
-	if header := config.ClientIPHeader(); header != "" {
+func clientAddress(r *http.Request, header string) string {
+	if header != "" {
 		// `X-Forwarded-For` is a chain; the client is the first entry.
 		first, _, _ := strings.Cut(r.Header.Get(header), ",")
 		if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
@@ -305,7 +304,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	}
 	username, password := field(body, "username"), field(body, "password")
 	username = strings.TrimSpace(username)
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 	if username == "" || password == "" {
 		wire.Detail(w, http.StatusUnprocessableEntity,
 			"username and password are required")
@@ -409,7 +408,7 @@ func (a *API) requestReset(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, "an email is required")
 		return
 	}
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 
 	if db, present := a.accountsDB(); present {
 		budgets := []budget{
@@ -481,7 +480,7 @@ func (a *API) claim(w http.ResponseWriter, r *http.Request) {
 			"a token and a password are required")
 		return
 	}
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 
 	db, present := a.accountsDB()
 	if !present {
@@ -550,7 +549,7 @@ func (a *API) claimPreview(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, "a token is required")
 		return
 	}
-	address := clientAddress(r)
+	address := clientAddress(r, a.clientIPHeader)
 
 	db, present := a.accountsDB()
 	if !present {

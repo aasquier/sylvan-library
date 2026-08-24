@@ -52,6 +52,7 @@ they differ.
 | [36](0036-the-match-ledger-records-declared-labels.md) | The match ledger records real games, and the labels it snapshots are declared | Accepted |
 | [37](0037-the-archetype-is-a-reading-of-the-themes.md) | The archetype is a reading of the themes, not a second declaration | Accepted — supersedes the labelling half of 36 |
 | [38](0038-the-served-backend-is-rewritten-in-go.md) | The served backend is rewritten in Go, and the bench stays Python | Accepted |
+| [39](0039-configuration-is-a-value-and-tests-run-in-parallel.md) | Configuration is a value, resolved once and passed, and tests run in parallel | Accepted — supersedes the "read at call time" reasoning in [`internal/config`](../../go/internal/config/config.go) |
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the

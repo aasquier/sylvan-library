@@ -8,6 +8,7 @@ import (
 )
 
 func TestTheProseHoldsItsRecordedShape(t *testing.T) {
+	t.Parallel()
 	// The counts the embedded files have always held, so a truncated file
 	// cannot embed quietly.
 	if n := len(Colors().Combinations); n != 32 {
@@ -42,6 +43,7 @@ func TestTheProseHoldsItsRecordedShape(t *testing.T) {
 }
 
 func TestEveryCombinationIsAddressable(t *testing.T) {
+	t.Parallel()
 	for _, c := range Colors().Combinations {
 		if KeyFor(c.Colors) != c.Key {
 			t.Errorf("%s: KeyFor(%v) = %q", c.Name, c.Colors, KeyFor(c.Colors))
@@ -70,6 +72,7 @@ func TestEveryCombinationIsAddressable(t *testing.T) {
 }
 
 func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
+	t.Parallel()
 	// The raw payload is the embedded document with insignificant
 	// whitespace removed and nothing else -- so it parses back to the same
 	// value, and the bytes are the recorded wire shape.
@@ -102,6 +105,7 @@ func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
 }
 
 func TestTheModelVocabularyIsWhatTheGateSpeaks(t *testing.T) {
+	t.Parallel()
 	m := Deck()
 	if len(m.Categories) != 13 || m.Categories[0] != "land" || m.Categories[12] != "utility" {
 		t.Fatalf("categories %v", m.Categories)
@@ -129,6 +133,7 @@ func TestTheModelVocabularyIsWhatTheGateSpeaks(t *testing.T) {
 }
 
 func TestTheShelvesAreWhatTheModulesHold(t *testing.T) {
+	t.Parallel()
 	sh := Runtime()
 	if sh.Symbols.CDN == "" || sh.Symbols.Code != "[0-9A-Z]{1,10}" || sh.Symbols.MaxBytes != 65536 {
 		t.Fatalf("symbols %+v", sh.Symbols)
@@ -143,6 +148,7 @@ func TestTheShelvesAreWhatTheModulesHold(t *testing.T) {
 }
 
 func TestArchetypeIndexFollowsThePilotedOrder(t *testing.T) {
+	t.Parallel()
 	if ArchetypeIndex("aggro") != 0 || ArchetypeIndex("combo") != 3 || ArchetypeIndex("cedh") != -1 {
 		t.Fatal("ArchetypeIndex is not ARCHETYPES' order")
 	}

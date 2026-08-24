@@ -206,6 +206,17 @@ jobs:
         run: CGO_ENABLED=1 go build -o /dev/null ./cmd/mtglab
       - name: Tests, race-detected
         run: go test -race -count=1 -cover ./...
+      # The benchmarks are a local measuring tool, not a CI gate: a shared
+      # runner's numbers are noise, and a threshold over them would fail on
+      # a neighbour's workload rather than on this diff. What CI *can* hold
+      # is that they still build and still run -- a benchmark that stopped
+      # compiling six months ago is discovered the day somebody needs it,
+      # which is the day they least want to fix it.
+      #
+      # `-benchtime 1x` runs each exactly once and `-run XXX` matches no test,
+      # so this is a compile-and-execute check that costs seconds.
+      - name: Benchmarks still build and run
+        run: go test -run XXX -bench . -benchtime 1x ./... > /dev/null
       - name: go.mod and go.sum are tidy
         run: |
           go mod tidy

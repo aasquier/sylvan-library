@@ -216,6 +216,7 @@ func TestAFailedResearchCallIsAReadableJobError(t *testing.T) {
 // code points, right-stripped, an ellipsis when it was cut -- held to the
 // corpus the claude package's tests are held to.
 func TestTheResearchLabelMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile(filepath.Join("..", "claude", "testdata", "research.json"))
 	if err != nil {
 		t.Fatal(err)

@@ -97,6 +97,7 @@ func callCtx(t *testing.T, a *API, ctx context.Context, method, target, body str
 }
 
 func TestSearchAnswersAsServiceSearchCardsDoes(t *testing.T) {
+	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t)})
 	status, body, raw := call(t, a, "GET", "/api/cards/search?q=sol", "")
 	if status != 200 {
@@ -173,6 +174,7 @@ func TestSearchAnswersAsServiceSearchCardsDoes(t *testing.T) {
 }
 
 func TestSearchRefusesBadParametersWithTheValidationList(t *testing.T) {
+	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t)})
 	for _, target := range []string{"/api/cards/search?limit=abc", "/api/cards/search?limit=0",
 		"/api/cards/search?limit=201", "/api/cards/search?cmc_max=tall", "/api/cards/search?price_max=x",
@@ -213,6 +215,7 @@ func TestSearchRefusesBadParametersWithTheValidationList(t *testing.T) {
 }
 
 func TestIdentifyCountsResolvedAndOfferedApart(t *testing.T) {
+	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t)})
 	status, body, raw := call(t, a, "POST", "/api/cards/identify",
 		`{"sightings": [{"set": "LTC", "number": "284/281"}, {"title": "Sol Rng"}, {"corner": "U0284\nLTCENLIK"}, {}, "not an object"]}`)
@@ -263,6 +266,7 @@ func TestIdentifyCountsResolvedAndOfferedApart(t *testing.T) {
 }
 
 func TestCombinationResolvesThroughThePoolAndDropsWhatItLacks(t *testing.T) {
+	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t)})
 	status, body, raw := call(t, a, "GET", "/api/colors/G", "")
 	if status != 200 {
@@ -303,6 +307,7 @@ func TestCombinationResolvesThroughThePoolAndDropsWhatItLacks(t *testing.T) {
 }
 
 func TestLoreResolvesNamesAndCountsTheDropped(t *testing.T) {
+	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t)})
 	status, body, raw := call(t, a, "GET", "/api/lore", "")
 	if status != 200 {
@@ -337,6 +342,7 @@ func TestLoreResolvesNamesAndCountsTheDropped(t *testing.T) {
 }
 
 func TestWithoutAPoolTheAnswersDegradeToTheRecordedShapes(t *testing.T) {
+	t.Parallel()
 	a := New(Config{})
 	if _, body, _ := call(t, a, "GET", "/api/cards/search?q=sol", ""); body["total"] != float64(0) || body["message"] == nil {
 		t.Fatalf("search: %v", body)

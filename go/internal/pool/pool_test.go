@@ -9,6 +9,7 @@ import (
 // The CGO spike: if this links and runs, the driver's prebuilt libduckdb is
 // usable on this platform. An in-memory database so the test needs no pool.
 func TestInMemoryLinksAndAnswers(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, err := Open(ctx, "")
 	if err != nil {
@@ -35,6 +36,7 @@ func TestInMemoryLinksAndAnswers(t *testing.T) {
 // compatibility is proven on the maintainer's machine and on the deployed
 // volume.
 func TestReadsAnExistingPoolFile(t *testing.T) {
+	t.Parallel()
 	path := os.Getenv("MTGLAB_TEST_POOL")
 	if path == "" {
 		t.Skip("MTGLAB_TEST_POOL not set")
@@ -58,6 +60,7 @@ func TestReadsAnExistingPoolFile(t *testing.T) {
 }
 
 func TestCountRefusesAnUnknownTable(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, err := Open(ctx, "")
 	if err != nil {

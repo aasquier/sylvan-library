@@ -15,6 +15,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
 // newRoot is the whole command tree, assembled. Separate from [main] so a
@@ -47,3 +49,13 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+// settings is this process's configuration.
+//
+// **The one call to [config.Load] in the binary.** Every command reads the
+// environment through here and then passes the resulting value down; nothing
+// below `cmd/` reads a variable at all. Kept a function rather than a package
+// variable because Cobra builds its command tree at init, before a `main` has
+// had a chance to load anything, and a value captured then would be read
+// before the process is fully its own.
+func settings() config.Config { return config.Load() }

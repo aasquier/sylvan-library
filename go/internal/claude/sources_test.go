@@ -87,6 +87,7 @@ func allowedSet(ids []string) map[string]bool {
 // and host are lowercased and THE PATH KEEPS ITS CASE; with no scheme,
 // everything goes down.
 func TestCanonicalURLMatchesTheRecordedCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	for _, row := range corpus.Canonical {
 		if got := CanonicalURL(row.URL); got != row.Canonical {
@@ -96,6 +97,7 @@ func TestCanonicalURLMatchesTheRecordedCorpus(t *testing.T) {
 }
 
 func TestKeepSourcesAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	for _, row := range corpus.Keep {
 		kept, dropped := KeepSources(row.Claimed, row.Searched)
@@ -112,6 +114,7 @@ func TestKeepSourcesAgreesWithTheCorpus(t *testing.T) {
 // this cannot pass by treating them alike: a dossier passage keeps its prose
 // when every citation failed, and a research finding does not.
 func TestAPassageAndAFindingAnswerDifferently(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	sawTheAsymmetry, sawAFindingSurvive := false, false
 	for _, row := range corpus.Grounded {
@@ -157,6 +160,7 @@ func TestAPassageAndAFindingAnswerDifferently(t *testing.T) {
 // accident is that a DFC named by its front face resolves in one and not the
 // other -- see Competitors.
 func TestCompetitorsAndResearchCardsAgreeWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadSourcesCorpus(t)
 	withPool(t, func(c *pool.Conn) {
 		for _, row := range corpus.Pool {
@@ -238,6 +242,7 @@ func compactJSON(t *testing.T, raw json.RawMessage) string {
 // keys. All three are recorded, none is tidy, and a single shared type would
 // break at least two of them.
 func TestTheThreeCardShapesKeepTheirOwnKeyOrders(t *testing.T) {
+	t.Parallel()
 	cost, line, text := "{2}{G}", "Creature", "Trample"
 	comp, err := json.Marshal(Competitor{
 		Name: "X", Prose: "p", SourceIDs: []string{"s1"},

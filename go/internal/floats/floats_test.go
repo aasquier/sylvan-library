@@ -71,6 +71,7 @@ func same(got, want, epsilon float64) bool {
 }
 
 func TestFsumMatchesTheRecordedSums(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	if len(corpus.Fsum) < 20 {
 		t.Fatalf("the corpus has shrunk to %d sequences", len(corpus.Fsum))
@@ -86,6 +87,7 @@ func TestFsumMatchesTheRecordedSums(t *testing.T) {
 }
 
 func TestFsumBeatsANaiveSumOnAtLeastOneCase(t *testing.T) {
+	t.Parallel()
 	// A corpus that a running total would also pass proves nothing about the
 	// algorithm, only about the arithmetic. This asserts the corpus is
 	// discriminating -- the lesson recorded as "a probe that cannot fail
@@ -108,6 +110,7 @@ func TestFsumBeatsANaiveSumOnAtLeastOneCase(t *testing.T) {
 }
 
 func TestRoundBreaksTiesToEven(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	for _, row := range corpus.Round {
 		if got := floats.Round(row.X); got != row.Value {
@@ -125,6 +128,7 @@ func TestRoundBreaksTiesToEven(t *testing.T) {
 }
 
 func TestRoundToAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	if len(corpus.RoundTo) < 50 {
 		t.Fatalf("the corpus has shrunk to %d cases", len(corpus.RoundTo))
@@ -162,6 +166,7 @@ func fusedSubProbe(a, b, start float64) float64 {
 }
 
 func TestNoFusedMultiplyAddSurvivesTheGuard(t *testing.T) {
+	t.Parallel()
 	// (1 + 2^-27) * (1 - 2^-27) is exactly 1 - 2^-54, which is precisely
 	// halfway between 1 - 2^-53 and 1.0 and so rounds, ties to even, to 1.0.
 	// An FMA keeps the exact product and the low half survives into the sum;

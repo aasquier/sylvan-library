@@ -24,6 +24,7 @@ import (
 // handler says.
 
 func TestTheDialAnswersWithoutADeck(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	status, payload, raw := as(t, a, alice, "/api/claude")
@@ -51,6 +52,7 @@ func TestTheDialAnswersWithoutADeck(t *testing.T) {
 // caught `never` carrying a typographic apostrophe where the record writes
 // an ASCII one, a difference every structural check in this file would pass.
 func TestTheDialsKeyOrderIsTheRecordedOne(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	_, _, raw := as(t, a, alice, "/api/claude")
@@ -82,6 +84,7 @@ func TestTheDialsKeyOrderIsTheRecordedOne(t *testing.T) {
 // a built one, because a wild suggestion about a list costs a moment's thought
 // and one about sleeved cardboard costs a trip to the box.
 func TestTheDialReadsTheDecksStatus(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	for slug, want := range map[string]string{
@@ -110,6 +113,7 @@ func TestTheDialReadsTheDecksStatus(t *testing.T) {
 // because reading it off the source is exactly how this gets written wrong:
 // the natural Go shape resolves the source lazily and answers 200.
 func TestAnUnknownOwnerIsA404EvenWithNoSlug(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	for _, target := range []string{
@@ -131,6 +135,7 @@ func TestAnUnknownOwnerIsA404EvenWithNoSlug(t *testing.T) {
 // fault and they carry different codes, so which one is reported when both are
 // wrong is contract rather than taste -- and it is the deck's, measured.
 func TestTheDeckIsRefusedBeforeTheStanceIs(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// Both wrong: the deck wins.
@@ -159,6 +164,7 @@ func TestTheDeckIsRefusedBeforeTheStanceIs(t *testing.T) {
 // goes through the same helper, so all four are checked -- the failure mode is
 // a client that appends rather than replaces, and it is silent.
 func TestTheLastQueryValueWinsOnEveryParameter(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	// slug: the second one is the one that must 404.
@@ -199,6 +205,7 @@ func TestTheLastQueryValueWinsOnEveryParameter(t *testing.T) {
 // a default only applies **when there is no deck**, so a theme surface asking
 // about a built deck gets the deck's answer and not the surface's.
 func TestASurfacesDefaultAppliesOnlyWithNoDeck(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	_, payload, _ := as(t, a, alice, "/api/claude?surface=theme")
@@ -220,6 +227,7 @@ func TestASurfacesDefaultAppliesOnlyWithNoDeck(t *testing.T) {
 // somebody else owns and has not shared is a 404 here too, not a 403 and not a
 // dial about a stranger's deck.
 func TestTheDialCannotSeeAnotherAccountsPrivateDeck(t *testing.T) {
+	t.Parallel()
 	a, done := deckAPI(t, true)
 	defer done()
 	if status, _, raw := as(t, a, alice, "/api/claude?owner=bob&slug=bobs-private"); status != 404 {
@@ -254,6 +262,7 @@ func TestTheDialCannotSeeAnotherAccountsPrivateDeck(t *testing.T) {
 // probe that can fail differently, which is the only kind worth writing about
 // a security boundary.
 func TestTheDialsSlugCannotWalkOutOfTheLibrary(t *testing.T) {
+	t.Parallel()
 	// Two decks the caller must never reach, both outside the library. The
 	// second one is directly in the parent, and it is what makes the
 	// **dot-only** branch testable: without it `..` joins to

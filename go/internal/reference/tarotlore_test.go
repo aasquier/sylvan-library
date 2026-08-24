@@ -13,6 +13,7 @@ import (
 // The deck tier comes first and always, which is why a reading of three
 // minors is not a reading with nothing to say.
 func TestTheDeckTierLeadsEveryReading(t *testing.T) {
+	t.Parallel()
 	deckTier := 0
 	for _, f := range Tarot().Facts {
 		if f.Card == "" {
@@ -64,6 +65,7 @@ func TestTheDeckTierLeadsEveryReading(t *testing.T) {
 // No real spread reaches this -- the deck tier alone is eighteen facts -- so
 // it is driven directly.
 func TestAnOfferWithNothingLeftIsEmpty(t *testing.T) {
+	t.Parallel()
 	keys := []string{"00-fool"}
 	full := TarotOffer(keys, nil)
 	// The offer lists fact **ids**, never the card key -- the id is what the
@@ -102,6 +104,7 @@ func TestAnOfferWithNothingLeftIsEmpty(t *testing.T) {
 // would then miss here on the one difference nobody would ever debug from a
 // dropped-fact counter.
 func TestAFactIsFoundHoweverItsIdIsSpelled(t *testing.T) {
+	t.Parallel()
 	want := Tarot().Facts[0].ID
 	for _, spelling := range []string{want, strings.ToUpper(want), "  " + want + " "} {
 		got := TarotFactByID(spelling)

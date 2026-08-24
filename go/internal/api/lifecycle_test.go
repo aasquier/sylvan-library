@@ -26,6 +26,7 @@ func (r *writeRig) read(t *testing.T, slug string) (string, bool) {
 // ---- create ----------------------------------------------------------------
 
 func TestCreateWritesADraftAndNothingElse(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -69,6 +70,7 @@ func TestCreateWritesADraftAndNothingElse(t *testing.T) {
 }
 
 func TestCreateRefusesBeforeWritingAnything(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ name, body, says string }{
 		{"a slug with spaces", `{"slug":"not a slug","commander":["Sol Ring"]}`, "not a usable slug"},
 		{"a slug already taken", `{"slug":"mono-green-clean","commander":["Sol Ring"]}`, "already exists"},
@@ -107,6 +109,7 @@ func TestCreateRefusesBeforeWritingAnything(t *testing.T) {
 // before the handler body -- so it is a 422 naming the field rather than
 // one of the editor's sentences.
 func TestCreateRefusesABracketThatIsNotANumber(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks",
@@ -124,6 +127,7 @@ func TestCreateRefusesABracketThatIsNotANumber(t *testing.T) {
 const paste = "1 Sol Ring\n1 Cultivator Colossus\n30 Forest\n"
 
 func TestImportWritesADraftWithEveryRationaleOwed(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -156,6 +160,7 @@ func TestImportWritesADraftWithEveryRationaleOwed(t *testing.T) {
 // The preview runs the identical code path and writes nothing, which is what
 // makes it a preview rather than a description of one.
 func TestADryRunWritesNothing(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -177,6 +182,7 @@ func TestADryRunWritesNothing(t *testing.T) {
 }
 
 func TestImportRefusesAListWithNothingInIt(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
@@ -190,6 +196,7 @@ func TestImportRefusesAListWithNothingInIt(t *testing.T) {
 }
 
 func TestImportPassesTheImportersOwnRefusalThrough(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
@@ -208,6 +215,7 @@ func TestImportPassesTheImportersOwnRefusalThrough(t *testing.T) {
 // ---- delete ----------------------------------------------------------------
 
 func TestDeleteMovesTheDeckAndSaysWhere(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -235,6 +243,7 @@ func TestDeleteMovesTheDeckAndSaysWhere(t *testing.T) {
 // The confirmation is deliberately not a yes/no, and it takes either spelling
 // because a 26-character slug typed by eye is a gate nobody gets through.
 func TestDeleteNeedsAConfirmationSomebodyHadToType(t *testing.T) {
+	t.Parallel()
 	for name, query := range map[string]string{
 		"nothing at all": "",
 		"a boolean":      "?confirm=true",
@@ -276,6 +285,7 @@ func TestDeleteNeedsAConfirmationSomebodyHadToType(t *testing.T) {
 // ---- sharing ---------------------------------------------------------------
 
 func TestSharingIsASurgicalEditAndAnswersWithTheDeck(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	before := rig.text(t)
@@ -305,6 +315,7 @@ func TestSharingIsASurgicalEditAndAnswersWithTheDeck(t *testing.T) {
 }
 
 func TestSharingNeedsTheFlag(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	status, body, raw := rig.do(t, alice, "PUT",
@@ -320,6 +331,7 @@ func TestSharingNeedsTheFlag(t *testing.T) {
 // The recorded truthiness, not Go's cast: `"no"` is true and `0` is false,
 // which is what this route has always done.
 func TestTheSharingFlagIsReadWithTheRecordedTruthiness(t *testing.T) {
+	t.Parallel()
 	for body, want := range map[string]bool{
 		`{"shared":"no"}`: true,
 		`{"shared":0}`:    false,
@@ -348,6 +360,7 @@ func TestTheSharingFlagIsReadWithTheRecordedTruthiness(t *testing.T) {
 // day these four were written and a test caught it; the same ordering
 // governs all of them.
 func TestAnotherAccountsPrivateDeckIsA404ToEveryLifecycleVerb(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	for _, c := range []struct{ method, target, body string }{

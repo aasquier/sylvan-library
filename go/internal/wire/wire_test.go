@@ -8,6 +8,7 @@ import (
 )
 
 func TestMarshalWritesTheRecordedEncoding(t *testing.T) {
+	t.Parallel()
 	// Compact separators, HTML characters untouched, unicode as it is,
 	// no trailing newline: the recorded body encoding.
 	got, err := Marshal(map[string]any{"a": []any{1, "x<y & z"}, "b": "—"})
@@ -20,6 +21,7 @@ func TestMarshalWritesTheRecordedEncoding(t *testing.T) {
 }
 
 func TestDetailIsTheEnvelope(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	Detail(rec, 404, "no deck 'x'")
 	if rec.Code != 404 || rec.Header().Get("Content-Type") != "application/json" {
@@ -34,6 +36,7 @@ func TestDetailIsTheEnvelope(t *testing.T) {
 }
 
 func TestUnprocessableIsTheRecordedValidationList(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	Unprocessable(rec, IntParsing("query", "limit", "abc"),
 		GreaterThanEqual("query", "limit", "0", 1))
@@ -77,6 +80,7 @@ func TestUnprocessableIsTheRecordedValidationList(t *testing.T) {
 }
 
 func TestQuoteMatchesTheRecordedQuoting(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]string{
 		"nope":     `'nope'`,
 		"no'pe":    `"no'pe"`,

@@ -17,6 +17,7 @@ import (
 // fixture -- the banned Titan's slot, its four candidates, their scores and
 // their reasons -- against the recorded answer.
 func TestReplacementsMatchTheRecordedAnswer(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join("..", "gate", "testdata")
 	text, err := os.ReadFile(filepath.Join(dir, "mono-green.yaml"))
 	if err != nil {
@@ -89,6 +90,7 @@ func TestReplacementsMatchTheRecordedAnswer(t *testing.T) {
 }
 
 func TestTheScorersReadCardsAsRecorded(t *testing.T) {
+	t.Parallel()
 	if suggest.PrimaryType("Legendary Artifact Creature — Golem") != "Creature" {
 		t.Fatal("a creature is a creature first")
 	}

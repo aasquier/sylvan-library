@@ -39,6 +39,7 @@ type wantList struct {
 }
 
 func TestParseReadsTheRecordedStructure(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/lists.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)

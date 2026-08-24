@@ -71,6 +71,7 @@ func loadScores(t *testing.T) []scoreCase {
 }
 
 func TestScoreMatchesTheCorpusToTheBit(t *testing.T) {
+	t.Parallel()
 	for _, c := range loadScores(t) {
 		got := suggest.Score(c.Target.record(), c.Candidate.record(), "")
 		if math.Float64bits(got.Score) != math.Float64bits(c.Score) {
@@ -95,6 +96,7 @@ func TestScoreMatchesTheCorpusToTheBit(t *testing.T) {
 // pair of cards lands there, so the fixture was cut for it, exactly as
 // `curve`'s `tie-breaker` deck was.
 func TestTheScoreCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
+	t.Parallel()
 	cases := loadScores(t)
 	differs, rounded := 0, 0
 	for _, c := range cases {

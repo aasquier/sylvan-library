@@ -1,0 +1,64 @@
+# Mutation testing over the determinism kernels.
+#
+# Coverage says a line ran. Mutation testing says somebody would have *noticed*
+# if it were wrong -- it edits the source (flips a `>` to a `>=`, negates a
+# condition, changes a `+` to a `-`) and reruns the tests. A mutant that
+# survives is a hole shaped exactly like a future bug. `go/.gremlins.yaml`
+# argues the settings and explains how to read the output.
+#
+# **Its own workflow, not a job in `ci.yml`, and that is the point.** `ci.yml`'s
+# `deploy` waits on every job in its file -- `TestTheDeployJobWaitsForEveryOtherJobInTheFile`
+# holds that -- so a job living there is a deploy gate by construction. This one
+# must not be: it is report-only, it has no baseline yet, and it only runs on
+# pull requests. `codeql.yml` and `dependency-review.yml` are here for the same
+# reason.
+#
+# **Report-only, deliberately, and scoped to four packages.** Report-only
+# because the first PRs are what establish what the numbers normally are, and a
+# threshold guessed before that would either never fire or fire on everything.
+# Scoped because testing a mutant means rerunning a package's suite, and the
+# packages that link DuckDB would turn minutes into tens of minutes for mutants
+# the frozen goldens already hold. These four are pure, fast, and the ones where
+# being subtly wrong is most expensive -- every seed, every cached key and every
+# recorded number rests on them.
+#
+# `--diff` mutates only what the branch changed, so a PR that does not touch
+# them finds nothing and finishes in seconds.
+name: mutants
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go-mutants:
+    name: mutation (determinism kernels)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # --diff needs history to compare against; a shallow clone has none.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Install gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+      - name: Mutate what this branch changed
+        run: |
+          # `fetch-depth: 0` above already has the base ref; a second, shallow
+          # fetch here would truncate the history `--diff` needs to compare.
+          base="origin/${{ github.base_ref }}"
+          for pkg in ./internal/mt19937 ./internal/floats ./internal/textutil ./internal/sim/compile; do
+            echo "::group::$pkg"
+            gremlins unleash --diff "$base" "$pkg" || echo "::warning::gremlins reported a problem in $pkg"
+            echo "::endgroup::"
+          done
+

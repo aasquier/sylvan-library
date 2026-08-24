@@ -30,6 +30,7 @@ func claudeRoute(t *testing.T, pattern string) Route {
 // differently — the type test catches a RosterEntry that grows a field, and
 // this catches a handler that stops using RosterEntry.
 func TestThePersonaRouteServesTheRosterAndNoPrompt(t *testing.T) {
+	t.Parallel()
 	route := claudeRoute(t, "/api/claude/personas")
 	rec := httptest.NewRecorder()
 	route.Handler(rec, httptest.NewRequest(http.MethodGet, route.Pattern, nil))
@@ -64,6 +65,7 @@ func TestThePersonaRouteServesTheRosterAndNoPrompt(t *testing.T) {
 // repeated value where Go's Query().Get takes the first, and the recorded
 // integer grammar accepts three spellings strconv refuses.
 func TestTheTarotRouteDealsFromTheSeedItIsGiven(t *testing.T) {
+	t.Parallel()
 	route := claudeRoute(t, "/api/tarot/reading")
 	deal := func(target string) (int, string) {
 		rec := httptest.NewRecorder()

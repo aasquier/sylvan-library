@@ -10,6 +10,7 @@ import (
 )
 
 func TestFromCornerReadsTheBlockAsMeasured(t *testing.T) {
+	t.Parallel()
 	codes := map[string]bool{"LTC": true, "CHR": true, "MH3": true, "LTR": true}
 	// The real Lord of the Rings Sol Ring capture ADR 34 records.
 	s := cards.FromCorner("U0284\nLTCENLIK", codes)
@@ -39,6 +40,7 @@ func TestFromCornerReadsTheBlockAsMeasured(t *testing.T) {
 }
 
 func TestReadResolvesOnlyThroughAPrinting(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	p := pooltest.Open(t)
 	if err := p.Use(ctx, func(c *pool.Conn) error {

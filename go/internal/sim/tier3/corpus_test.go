@@ -145,6 +145,7 @@ func loadForgeCorpus(t *testing.T) forgeCorpus {
 // real draw from a clock-out and a winner from a seat are exactly the ones a
 // careless port folds together — and a count would be green for all of them.
 func TestTheLogParserAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadForgeCorpus(t)
 	for _, c := range corpus.Logs {
 		t.Run(c.Note, func(t *testing.T) {
@@ -176,6 +177,7 @@ func TestTheLogParserAgreesWithTheCorpus(t *testing.T) {
 // line, because it is a second seam over the same regexes: a port could get
 // the machine right and the predicate wrong, and only the tick would notice.
 func TestTheStatelessPredicateAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadForgeCorpus(t)
 	for _, c := range corpus.Logs {
 		lines := splitLikeTheCorpus(c.Text)
@@ -202,6 +204,7 @@ func TestTheStatelessPredicateAgreesWithTheCorpus(t *testing.T) {
 // two cards the other way round is a file that either fails or — worse —
 // works differently.
 func TestTheExporterWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	corpus := loadForgeCorpus(t)
 	index := indexOf(corpus.Index)
 	for _, c := range corpus.Dck {
@@ -226,6 +229,7 @@ func TestTheExporterWritesTheRecordedBytes(t *testing.T) {
 // deck page renders verbatim — the `unavailable` lesson, where a sentinel's
 // own words shipped as a prefix nobody wrote.
 func TestThePreFlightAgreesWithTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadForgeCorpus(t)
 	index := indexOf(corpus.Index)
 	for _, c := range corpus.Coverage {
@@ -286,6 +290,7 @@ func TestThePreFlightAgreesWithTheCorpus(t *testing.T) {
 // different deploys for the minutes a deploy takes, and key order is
 // what `encoding/json` gets wrong for free when a payload is built from a map.
 func TestTheWireIsTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	corpus := loadForgeCorpus(t)
 
 	for i, want := range corpus.Wire.GameJSON {
@@ -386,6 +391,7 @@ func TestTheWireIsTheRecordedBytes(t *testing.T) {
 // `checked` and `missing`. If that ever stops being true, this fails with the
 // comment that made the claim.
 func TestResolvedOrderIsUnobservable(t *testing.T) {
+	t.Parallel()
 	scrambled := []tier3.WireReport{{
 		Slug: "x", Checked: 3,
 		Resolved: map[string]string{"b": "b", "a": "a", "c": "c"},
@@ -586,6 +592,7 @@ func showInt(v *int) string {
 // ordinary slug still writes exactly where it should. A guard whose test
 // cannot tell "refused" from "wrote it somewhere else" is not a guard.
 func TestAHostileSlugCannotNameAFile(t *testing.T) {
+	t.Parallel()
 	// Every escape is aimed inside the running test's own directory, so a
 	// leftover from anywhere else cannot make this pass or fail. Not
 	// fastidiousness: proving the guard means *actually performing the escape*

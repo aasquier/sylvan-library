@@ -12,6 +12,7 @@ import (
 // database, backed up while a writer holds it open, yields a copy that
 // opens, carries the same schema version, and holds the same rows.
 func TestBackupCopiesALiveAppDB(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	src := filepath.Join(dir, "app.db")
 	if err := auth.Migrate(src); err != nil {
@@ -63,6 +64,7 @@ func TestBackupCopiesALiveAppDB(t *testing.T) {
 // TestBackupRefusesAnExistingDestination pins the refusal: the command that
 // protects the good copy may not be the one that overwrites it.
 func TestBackupRefusesAnExistingDestination(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	src := filepath.Join(dir, "app.db")
 	if err := auth.Migrate(src); err != nil {

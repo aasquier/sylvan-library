@@ -202,6 +202,7 @@ func exactFloats(epsilon float64) cmp.Option {
 // ------------------------------------------------- the arithmetic, differentially
 
 func TestTheConstantsAreStillTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	if corpus.Target != karsten.Target {
 		t.Errorf("Target = %v, the corpus says %v", karsten.Target, corpus.Target)
@@ -212,6 +213,7 @@ func TestTheConstantsAreStillTheRecordedOnes(t *testing.T) {
 }
 
 func TestHypergeometricAtLeastMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	if len(corpus.Hypergeometric) < 2000 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.Hypergeometric))
@@ -228,6 +230,7 @@ func TestHypergeometricAtLeastMatchesTheCorpus(t *testing.T) {
 }
 
 func TestExactlyMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	for _, row := range corpus.Exactly {
 		pop, suc, dra, cnt := asInt(row[0]), asInt(row[1]), asInt(row[2]), asInt(row[3])
@@ -240,6 +243,7 @@ func TestExactlyMatchesTheCorpus(t *testing.T) {
 }
 
 func TestCardsSeenMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	for _, row := range corpus.CardsSeen {
 		turn, otp, want := asInt(row[0]), asBool(row[1]), asInt(row[2])
@@ -250,6 +254,7 @@ func TestCardsSeenMatchesTheCorpus(t *testing.T) {
 }
 
 func TestRequiredSourcesMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, _ := load(t)
 	if len(corpus.RequiredSource) < 2000 {
 		t.Fatalf("the grid has shrunk to %d rows", len(corpus.RequiredSource))
@@ -266,6 +271,7 @@ func TestRequiredSourcesMatchesTheCorpus(t *testing.T) {
 }
 
 func TestSourcesForMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	for _, row := range corpus.SourcesFor {
 		want := map[string]bool{}
@@ -280,6 +286,7 @@ func TestSourcesForMatchesTheCorpus(t *testing.T) {
 }
 
 func TestCastableOddsMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	if len(corpus.CastableOdds) < 50 {
 		t.Fatalf("the probe set has shrunk to %d rows", len(corpus.CastableOdds))
@@ -311,6 +318,7 @@ func TestCastableOddsMatchesTheCorpus(t *testing.T) {
 }
 
 func TestRegressionLandsMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	for _, row := range corpus.RegressionLands {
 		got := projectEstimate(karsten.RegressionLands(decks[row.Deck].Library))
@@ -321,6 +329,7 @@ func TestRegressionLandsMatchesTheCorpus(t *testing.T) {
 }
 
 func TestTheWholeShelfMatchesTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus, decks := load(t)
 	if len(corpus.Shelves) < 10 {
 		t.Fatalf("the shelf set has shrunk to %d decks", len(corpus.Shelves))
@@ -410,6 +419,7 @@ func bruteForceAtLeast(population, successes, draws, wanted int) *big.Rat {
 }
 
 func TestHypergeometricMatchesExhaustiveEnumeration(t *testing.T) {
+	t.Parallel()
 	// The long-standing case list, which is the cases somebody
 	// was once wrong about.
 	for _, c := range [][4]int{
@@ -426,6 +436,7 @@ func TestHypergeometricMatchesExhaustiveEnumeration(t *testing.T) {
 }
 
 func TestBothSummationBranchesAreExercisedAndAgree(t *testing.T) {
+	t.Parallel()
 	// Two code paths for one number is two chances to be wrong, so drive a
 	// case on each side of the branch and check both against the enumeration.
 	// wanted=1 of 5 in 4 draws: the complement is one term, the direct sum is
@@ -444,6 +455,7 @@ func TestBothSummationBranchesAreExercisedAndAgree(t *testing.T) {
 }
 
 func TestTheProbabilityMassFunctionSumsToOne(t *testing.T) {
+	t.Parallel()
 	total := 0.0
 	for k := 0; k < 10; k++ {
 		total += karsten.Exactly(99, 36, 9, k)
@@ -454,6 +466,7 @@ func TestTheProbabilityMassFunctionSumsToOne(t *testing.T) {
 }
 
 func TestAtLeastIsMonotoneInEveryArgumentThatShouldMoveIt(t *testing.T) {
+	t.Parallel()
 	// Properties that hold whatever the arithmetic is. More sources cannot
 	// hurt, more draws cannot hurt, and asking for more pips cannot help. A
 	// sign error survives a spot-check of one number and does not survive
@@ -479,6 +492,7 @@ func TestAtLeastIsMonotoneInEveryArgumentThatShouldMoveIt(t *testing.T) {
 // -------------------------------------------------------- the pinned traps
 
 func TestCardsSeenCountsTheSkippedDrawStep(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		turn      int
 		onThePlay bool
@@ -491,6 +505,7 @@ func TestCardsSeenCountsTheSkippedDrawStep(t *testing.T) {
 }
 
 func TestRequiredSourcesIsTheSmallestCountThatClearsTheBar(t *testing.T) {
+	t.Parallel()
 	// The definition, checked as a definition rather than as a number.
 	// Whatever `RequiredSources` returns must clear the target, and one fewer
 	// must not. That cannot be satisfied by a lookup table that has drifted.
@@ -509,6 +524,7 @@ func TestRequiredSourcesIsTheSmallestCountThatClearsTheBar(t *testing.T) {
 }
 
 func TestASinglePipWantsAboutAFifthOfACommanderDeck(t *testing.T) {
+	t.Parallel()
 	// The landmark, as a band rather than as a figure. A range this can never
 	// leave would test nothing.
 	need := karsten.RequiredSources(99, 1, 4, karsten.Target, true)
@@ -518,6 +534,7 @@ func TestASinglePipWantsAboutAFifthOfACommanderDeck(t *testing.T) {
 }
 
 func TestThisPackageIsStricterThanThePublishedTableAndByHowMuch(t *testing.T) {
+	t.Parallel()
 	// Pins the documented gap, in the documented direction. The package
 	// comment claims 86.1% where Karsten's table reads 90%, at 14 sources in
 	// 60 cards for a turn-one single pip, and explains the difference as the
@@ -536,6 +553,7 @@ func TestThisPackageIsStricterThanThePublishedTableAndByHowMuch(t *testing.T) {
 }
 
 func TestLatenessRanksACheapCardThatNeverArrivesAboveAnExpensiveOne(t *testing.T) {
+	t.Parallel()
 	// The ranking's whole job, and the bug it was written against. Sorting by
 	// raw castability leads with every twelve-drop and reports that expensive
 	// cards are expensive.
@@ -551,6 +569,7 @@ func TestLatenessRanksACheapCardThatNeverArrivesAboveAnExpensiveOne(t *testing.T
 }
 
 func TestACardPastTheHorizonReportsNotAskedRatherThanNever(t *testing.T) {
+	t.Parallel()
 	// Nil, not zero. Zero would be a claim the shelf did not make.
 	huge := karsten.CardOdds{Name: "Ghalta", MV: 12, ByTurn: make([]float64, karsten.Horizon)}
 	if huge.OnCurve() != nil {
@@ -562,6 +581,7 @@ func TestACardPastTheHorizonReportsNotAskedRatherThanNever(t *testing.T) {
 }
 
 func TestLagIsTheGapBetweenCostAndReliability(t *testing.T) {
+	t.Parallel()
 	odds := karsten.CardOdds{
 		Name: "Three Drop", MV: 3,
 		ByTurn: []float64{0.0, 0.0, 0.5, 0.7, 0.95, 1.0, 1.0, 1.0, 1.0, 1.0},
@@ -581,6 +601,7 @@ func TestLagIsTheGapBetweenCostAndReliability(t *testing.T) {
 }
 
 func TestTheRegressionScalesWithDeckSizeRatherThanIgnoringIt(t *testing.T) {
+	t.Parallel()
 	// A 60-card fit applied to 99 cards without scaling recommends a 60-card
 	// mana base for a Commander deck, which is the whole trap.
 	_, decks := load(t)
@@ -595,6 +616,7 @@ func TestTheRegressionScalesWithDeckSizeRatherThanIgnoringIt(t *testing.T) {
 }
 
 func TestADeckWithNoSpellsDoesNotDivideByZero(t *testing.T) {
+	t.Parallel()
 	_, decks := load(t)
 	e := karsten.RegressionLands(decks["all-lands"].Library)
 	if e.Recommended != 99 || e.LandsNow != 99 {
@@ -606,6 +628,7 @@ func TestADeckWithNoSpellsDoesNotDivideByZero(t *testing.T) {
 }
 
 func TestTheCommanderSetsRequirementsButIsNotDrawnFromTheLibrary(t *testing.T) {
+	t.Parallel()
 	// Both halves matter: a mana base that cannot cast the commander is the
 	// first thing to know, and counting it as a hundredth card would make
 	// every probability on the shelf slightly wrong.
@@ -636,6 +659,7 @@ func TestTheCommanderSetsRequirementsButIsNotDrawnFromTheLibrary(t *testing.T) {
 }
 
 func TestAnEmptyLibraryDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	shelf := karsten.Read(nil, nil, karsten.Target, true)
 	if shelf.DeckSize != 0 || len(shelf.Colors) != 0 {
 		t.Errorf("an empty library gave %d cards and %d colours", shelf.DeckSize, len(shelf.Colors))
@@ -643,6 +667,7 @@ func TestAnEmptyLibraryDoesNotPanic(t *testing.T) {
 }
 
 func TestHybridPipsAreChargedToBothColours(t *testing.T) {
+	t.Parallel()
 	// A {G/W} card needs green sources *or* white ones, so both are asked.
 	// The alternative -- charging it to neither, or picking one -- is how a
 	// deck full of hybrid cards reports a mana base it does not have.
@@ -658,6 +683,7 @@ func TestHybridPipsAreChargedToBothColours(t *testing.T) {
 }
 
 func TestPhyrexianPipsPlaceNoDemandOnTheManaBase(t *testing.T) {
+	t.Parallel()
 	// Two life always pays, so a Phyrexian symbol asks the mana base nothing.
 	// Checked here because this package reads the parsed cost directly, and
 	// the property it depends on is one somebody could reasonably "fix".
@@ -696,6 +722,7 @@ func TestPhyrexianPipsPlaceNoDemandOnTheManaBase(t *testing.T) {
 }
 
 func TestACardIsNeverCastableBeforeItsOwnManaValue(t *testing.T) {
+	t.Parallel()
 	_, decks := load(t)
 	library := decks["mono-green"].Library
 	card := sim.Card{Name: "Four Drop", Cost: sim.Cost{Generic: 3, Pips: [][]string{{"G"}}}}
@@ -710,6 +737,7 @@ func TestACardIsNeverCastableBeforeItsOwnManaValue(t *testing.T) {
 }
 
 func TestConditioningOnTheDrawBeatsMultiplyingTwoProbabilities(t *testing.T) {
+	t.Parallel()
 	// The reason `CastableOdds` is not two hypergeometrics multiplied. In a
 	// mono-green deck "I have four lands" and "I have one green source" are
 	// very nearly the same event; multiplying them unconditionally prices the
@@ -741,6 +769,7 @@ func TestConditioningOnTheDrawBeatsMultiplyingTwoProbabilities(t *testing.T) {
 }
 
 func TestMultiColourCardsAreNamedAsApproximated(t *testing.T) {
+	t.Parallel()
 	// The one place the method stops being exact, reported rather than hidden.
 	_, decks := load(t)
 	naya := decks["naya"]

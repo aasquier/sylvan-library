@@ -47,6 +47,7 @@ type line struct {
 }
 
 func TestBuildDeckWritesTheRecordedDraft(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("testdata/imports.json")
 	if err != nil {
 		t.Fatalf("reading the oracle: %v", err)
@@ -143,6 +144,7 @@ func checkLines(t *testing.T, what string, got []decklist.Line, want []line) {
 // ability is a pool fact, and concluding that this deck runs the card as its
 // companion is a judgement the import does not make.
 func TestACompanionOnTheBoardIsPointedAtRatherThanAssumed(t *testing.T) {
+	t.Parallel()
 	text := "1 Sol Ring\n"
 	parsed := decklist.Parse(text + "Sideboard\n1 Kaheera, the Orphanguard\n")
 	kaheera := &pool.CardRecord{

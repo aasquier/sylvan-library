@@ -143,14 +143,19 @@ func (a *API) findAccount(w http.ResponseWriter, r *http.Request, db *sql.DB) (*
 }
 
 // emailSender is the ADR 16 seam reaching the edge. A nil configured sender
-// means "decide from the environment, when a message is actually being sent"
-// -- which is what a real process wants, and which is also why no test in this
-// module sends mail: the tests pass a recorder instead.
+// means "choose from the injected mail settings, when a message is actually
+// being sent" -- which is what a real process wants, and which is also why no
+// test in this module sends mail: the tests pass a recorder instead.
+//
+// The *choice* is still late, so an instance with no key answers a 503 at the
+// moment somebody tries to send rather than refusing to boot. What is no
+// longer late is the *read*: the settings came from config.Load at startup, so
+// nothing here consults the process environment.
 func (a *API) emailSender() (auth.EmailSender, error) {
 	if a.email != nil {
 		return a.email, nil
 	}
-	return auth.SenderFromEnv(nil)
+	return auth.SenderFor(a.mail, nil)
 }
 
 // senderOr503 resolves the sender, answering 503 when nothing is configured.

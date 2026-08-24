@@ -104,9 +104,9 @@ type Config struct {
 	// SecureCookies mirrors MTGLAB_SECURE_COOKIES: the `Secure` attribute on
 	// the session cookie, on once TLS fronts the app.
 	SecureCookies bool
-	// EmailSender is ADR 16's seam reaching the edge. Nil means "decide from
-	// the environment, when a message is actually being sent", which is what a
-	// real process wants -- and which is also why no test here sends mail: the
+	// EmailSender is ADR 16's seam reaching the edge. Nil means "choose from
+	// Mail, when a message is actually being sent", which is what a real
+	// process wants -- and which is also why no test here sends mail: the
 	// tests pass a recorder instead.
 	EmailSender auth.EmailSender
 	// Jobs is this process's job registry. Nil refuses every submit with a
@@ -117,6 +117,15 @@ type Config struct {
 	// `app.db`. A nil `*cache.Store` is a working store that caches nothing,
 	// so no caller branches on it.
 	SimCache *cache.Store
+	// Mail is what EmailSender falls back to when it is nil: the three
+	// settings `auth.SenderFor` chooses between. Passed rather than looked up,
+	// so a test describes an instance with no mail key instead of unsetting
+	// one on the process it shares with every other test.
+	Mail auth.MailSettings
+	// ClientIPHeader is MTGLAB_CLIENT_IP_HEADER: the header a trusted proxy
+	// sets to the real client IP, or empty to trust only the peer. Empty is
+	// the safe default and the one every test wants.
+	ClientIPHeader string
 }
 
 // API holds the routes' dependencies.
@@ -134,10 +143,15 @@ type API struct {
 	requireAuth   bool
 	secureCookies bool
 	email         auth.EmailSender
-	jobs          *jobs.Registry
-	simCache      *cache.Store
-	matchLedgerOf *matchledger.Recorder
-	forgeClient   *tier3.Worker
+	// mail is what emailSender falls back to when no sender was injected:
+	// the settings, resolved once at config.Load, rather than the environment
+	// read at the moment of sending.
+	mail           auth.MailSettings
+	clientIPHeader string
+	jobs           *jobs.Registry
+	simCache       *cache.Store
+	matchLedgerOf  *matchledger.Recorder
+	forgeClient    *tier3.Worker
 
 	lazy        sync.Mutex
 	lazyDB      *sql.DB
@@ -180,7 +194,8 @@ func New(cfg Config) *API {
 		secureCookies: cfg.SecureCookies, email: cfg.EmailSender,
 		jobs: cfg.Jobs, simCache: cfg.SimCache,
 		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
-		forgeClient: cfg.ForgeWorker}
+		forgeClient: cfg.ForgeWorker,
+		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader}
 }
 
 // background runs fn after the response has gone, which is, for the one

@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
@@ -32,7 +31,7 @@ func cardsShowCommand() *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			p := pool.New(config.DBPath(), nil)
+			p := pool.New(settings().DBPath(), nil)
 			defer p.Close()
 			var missing []string
 			err := p.Use(ctx, func(c *pool.Conn) error {

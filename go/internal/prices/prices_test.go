@@ -48,6 +48,7 @@ func load(t *testing.T) pricesFile {
 // rates, which is the whole reason the corpus records the table and not
 // only the answers.
 func TestTheTableMatchesTheRecordedRates(t *testing.T) {
+	t.Parallel()
 	fx := load(t)
 	if len(fx.Table) != len(Table) {
 		t.Fatalf("the corpus prices %d models, the table %d", len(fx.Table), len(Table))
@@ -81,6 +82,7 @@ func TestTheTableMatchesTheRecordedRates(t *testing.T) {
 // compared as marshalled bytes — the half-to-even rounding, the window on
 // both sides of Sonnet 5's changeover, and the unpriced accounting.
 func TestEveryEstimateMatchesTheGolden(t *testing.T) {
+	t.Parallel()
 	fx := load(t)
 	if len(fx.Cases) < 6 {
 		t.Fatalf("only %d cases; the corpus has thinned", len(fx.Cases))

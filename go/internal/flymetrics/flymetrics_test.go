@@ -14,6 +14,7 @@ import (
 // panel spent a fortnight dead on exactly that. Detected as "first word, no
 // underscore", never by matching `FlyV1` literally.
 func TestAuthorizationKeepsASchemeAndAddsBearerOtherwise(t *testing.T) {
+	t.Parallel()
 	for secret, want := range map[string]string{
 		"FlyV1 fm2_lJPE":     "FlyV1 fm2_lJPE",
 		"FlyV9 fm9_x y":      "FlyV9 fm9_x y",

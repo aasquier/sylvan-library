@@ -144,6 +144,7 @@ func TestTheStampsAreIsoformat(t *testing.T) {
 }
 
 func TestAStampIsTruncatedToTheMicrosecond(t *testing.T) {
+	t.Parallel()
 	// Go's clock has nanoseconds and the recorded format does not, so the
 	// nanoseconds
 	// have to go somewhere. The recorded answer is truncation -- the format
@@ -161,6 +162,7 @@ func TestAStampIsTruncatedToTheMicrosecond(t *testing.T) {
 }
 
 func TestAStampSortsAsTextTheWayItSortsAsTime(t *testing.T) {
+	t.Parallel()
 	// The job listing sorts on this string, not on an instant, so the elided
 	// fraction has to sort below every six-digit one within the same second.
 	// It does, because `+` is 0x2B and every digit is above 0x30 -- but that
@@ -215,6 +217,7 @@ func TestThePayloadIsTheRecordedBytes(t *testing.T) {
 }
 
 func TestNeitherTheOwnerNorTheKeyEverSerialises(t *testing.T) {
+	t.Parallel()
 	// The payload test above would catch this only because every corpus case
 	// happens to carry one; said directly, it is a rule rather than a
 	// coincidence. An owner must not serialise because a caller who can see a

@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 	simcache "github.com/aasquier/sylvan-library/go/internal/sim/cache"
@@ -49,7 +48,7 @@ func simHome(t *testing.T, withPool bool) string {
 
 func writeSimDeck(t *testing.T, slug, text string) {
 	t.Helper()
-	dir := filepath.Join(config.DecksDir(), slug)
+	dir := filepath.Join(settings().DecksDir, slug)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +147,7 @@ func TestSimManaReportsTheGoldfish(t *testing.T) {
 func TestSimManaRefusesAMissingDeck(t *testing.T) {
 	simHome(t, false)
 	_, err := runSim(t, "mana", "nope")
-	want := "no deck at " + filepath.Join(config.DecksDir(), "nope", "deck.yaml")
+	want := "no deck at " + filepath.Join(settings().DecksDir, "nope", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -580,7 +579,7 @@ func TestSimForgeRefusesWithoutForge(t *testing.T) {
 
 	// A deck that does not exist is refused before Forge is even looked for.
 	_, err := runSim(t, "forge", "a", "zz")
-	want := "no deck at " + filepath.Join(config.DecksDir(), "zz", "deck.yaml")
+	want := "no deck at " + filepath.Join(settings().DecksDir, "zz", "deck.yaml")
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -593,6 +592,7 @@ func TestSimForgeRefusesWithoutForge(t *testing.T) {
 // slice bounds, and widths counted in code points rather than bytes.
 
 func TestTableTextHelpers(t *testing.T) {
+	t.Parallel()
 	if got := groupThousands(20); got != "20" {
 		t.Errorf("groupThousands(20) = %q", got)
 	}

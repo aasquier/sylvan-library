@@ -13,6 +13,7 @@ import (
 // The no-pool shape, as bytes: the degraded answer is the platform's normal
 // state between deploy and seeding, and its key order is part of the wire.
 func TestHealthWithNoPoolIsTheDegradedShapeExactly(t *testing.T) {
+	t.Parallel()
 	a := New(Config{DecksDir: t.TempDir()})
 	status, _, raw := call(t, a, http.MethodGet, "/api/health", "")
 	if status != 200 {
@@ -28,6 +29,7 @@ func TestHealthWithNoPoolIsTheDegradedShapeExactly(t *testing.T) {
 // A healthy pool reports its counts, the bulk files on the shelf, the deck
 // count and a false staleness flag -- with the keys in the recorded order.
 func TestHealthReportsThePoolTheShelfAndTheDecks(t *testing.T) {
+	t.Parallel()
 	scryfall := t.TempDir()
 	for _, name := range []string{"oracle_cards-2026-08-20.jsonl.gz",
 		"default_cards-2026-08-21.jsonl.gz"} {
@@ -62,6 +64,7 @@ func TestHealthReportsThePoolTheShelfAndTheDecks(t *testing.T) {
 // A pool that predates the printed stats answers `pool_stale` and the
 // re-ingest message -- `pool.Stale`'s verdict on the route.
 func TestHealthReportsAStalePool(t *testing.T) {
+	t.Parallel()
 	path := pooltest.Build(t)
 	db, err := pooltest.Writer(path)
 	if err != nil {

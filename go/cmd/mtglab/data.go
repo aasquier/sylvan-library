@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
-	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
@@ -33,7 +32,7 @@ func dataBackupCommand() *cobra.Command {
 		Short: "Write a consistent copy of app.db, safe while the app runs",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			version, err := auth.Backup(cmd.Context(), config.AppDBPath(), args[0])
+			version, err := auth.Backup(cmd.Context(), settings().AppDBPath(), args[0])
 			if err != nil {
 				return err
 			}
@@ -56,14 +55,14 @@ func dataRefreshCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			db, err := pool.OpenWriter(ctx, config.DBPath())
+			db, err := pool.OpenWriter(ctx, settings().DBPath())
 			if err != nil {
 				return err
 			}
 			defer func() { _ = db.Close() }()
 
 			fmt.Println("downloading oracle_cards ...")
-			oracle, err := pool.DownloadBulk(ctx, "oracle_cards", config.ScryfallDir())
+			oracle, err := pool.DownloadBulk(ctx, "oracle_cards", settings().ScryfallDir())
 			if err != nil {
 				return err
 			}
@@ -78,7 +77,7 @@ func dataRefreshCommand() *cobra.Command {
 				return nil
 			}
 			fmt.Println("downloading default_cards (large) ...")
-			printings, err := pool.DownloadBulk(ctx, "default_cards", config.ScryfallDir())
+			printings, err := pool.DownloadBulk(ctx, "default_cards", settings().ScryfallDir())
 			if err != nil {
 				return err
 			}
@@ -103,7 +102,7 @@ func dataSnapshotCommand() *cobra.Command {
 		Short: "Append today's prices to the price history",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			db, err := pool.OpenWriter(cmd.Context(), config.DBPath())
+			db, err := pool.OpenWriter(cmd.Context(), settings().DBPath())
 			if err != nil {
 				return err
 			}

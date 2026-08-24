@@ -69,6 +69,7 @@ func recordedSchema(t *testing.T) string {
 // wears, so a rung that changes what the ladder builds fails here until
 // the recorded schema is updated in the same change — never by drift.
 func TestMigrateBuildsTheRecordedSchema(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := Migrate(path); err != nil {
 		t.Fatalf("Migrate: %v", err)
@@ -120,6 +121,7 @@ func buildAtRung(t *testing.T, path string, k int) {
 // `users` rebuild — and this drives it from every starting point rather
 // than trusting one.
 func TestMigrateClimbsFromEveryRung(t *testing.T) {
+	t.Parallel()
 	fresh := filepath.Join(t.TempDir(), "fresh.db")
 	if err := Migrate(fresh); err != nil {
 		t.Fatalf("Migrate fresh: %v", err)
@@ -138,6 +140,7 @@ func TestMigrateClimbsFromEveryRung(t *testing.T) {
 }
 
 func TestMigrateIsIdempotent(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := Migrate(path); err != nil {
 		t.Fatalf("first Migrate: %v", err)
@@ -155,6 +158,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 // property bought by running `foreign_key_check` after
 // switching enforcement off for the climb.
 func TestMigrateRefusesAFileThatFailsTheCheck(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	buildAtRung(t, path, 1)
 	db, err := sql.Open("sqlite",
@@ -182,6 +186,7 @@ func TestMigrateRefusesAFileThatFailsTheCheck(t *testing.T) {
 // every later handle inherits it, which is what lets a reader never block
 // the writer without each DSN having to ask.
 func TestMigrateLeavesTheFileInWAL(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := Migrate(path); err != nil {
 		t.Fatalf("Migrate: %v", err)
@@ -204,6 +209,7 @@ func TestMigrateLeavesTheFileInWAL(t *testing.T) {
 // beside a version of 12 would otherwise sit there unapplied, looking
 // landed.
 func TestTheEmbeddedLadderIsExactlyTheVersion(t *testing.T) {
+	t.Parallel()
 	entries, err := migrationFS.ReadDir("migrations")
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)

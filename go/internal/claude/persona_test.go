@@ -10,6 +10,7 @@ import (
 // checks it is the recorded shape — seven voices, plain first, exactly one
 // of them dealing.
 func TestTheSevenVoicesAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	if len(PersonaKeys) != 7 {
 		t.Fatalf("expected seven voices, got %d: %v", len(PersonaKeys), PersonaKeys)
 	}
@@ -50,6 +51,7 @@ func TestTheSevenVoicesAreTheRecordedOnes(t *testing.T) {
 // asserts over the MARSHALLED bytes, so a `Voice` field added to RosterEntry
 // with any tag at all fails here.
 func TestTheRosterCannotCarryAVoice(t *testing.T) {
+	t.Parallel()
 	body, err := json.Marshal(Roster())
 	if err != nil {
 		t.Fatalf("marshalling the roster: %v", err)
@@ -86,6 +88,7 @@ func TestTheRosterCannotCarryAVoice(t *testing.T) {
 // TestAnUnknownPersonaIsRefusedByName pins the refusal text, which reaches a
 // 422 body — and whose recorded quoting is single quotes, never Go's.
 func TestAnUnknownPersonaIsRefusedByName(t *testing.T) {
+	t.Parallel()
 	if _, err := GetPersona(nil); err != nil {
 		t.Errorf("nil must be the default, not an error: %v", err)
 	}
@@ -114,6 +117,7 @@ func TestAnUnknownPersonaIsRefusedByName(t *testing.T) {
 // a time, never propose, every slot quotes them — would become a persona's to
 // soften, which is the one thing ADR 21 says a voice may not do.
 func TestAVoiceIsAppendedNeverSubstituted(t *testing.T) {
+	t.Parallel()
 	const base = "## The rules\n\nOne question at a time. Never propose."
 	for _, key := range PersonaKeys {
 		who := personas[key]

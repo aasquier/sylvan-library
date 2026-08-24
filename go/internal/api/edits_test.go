@@ -88,6 +88,7 @@ func (r *writeRig) do(t *testing.T, scope auth.Scope, method, target, body strin
 const cleanDeck = "/api/decks/alice/mono-green-clean"
 
 func TestEveryWriteLeavesADeckAndAnEntry(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -135,6 +136,7 @@ func TestEveryWriteLeavesADeckAndAnEntry(t *testing.T) {
 }
 
 func TestTheNineOperationsAllRun(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -201,6 +203,7 @@ func TestTheNineOperationsAllRun(t *testing.T) {
 }
 
 func TestARationaleIsNeverWrittenForYou(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -227,6 +230,7 @@ func TestARationaleIsNeverWrittenForYou(t *testing.T) {
 }
 
 func TestTheCardIsLookedUpBeforeItIsWritten(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -266,6 +270,7 @@ func TestTheCardIsLookedUpBeforeItIsWritten(t *testing.T) {
 // TestWhoMayWriteIsDecidedByTheSource holds the three-way refusal, which is
 // the part of ADR 5 and ADR 22 a write can get wrong in a way a read cannot.
 func TestWhoMayWriteIsDecidedByTheSource(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -308,6 +313,7 @@ func TestWhoMayWriteIsDecidedByTheSource(t *testing.T) {
 // TestTheSQLTierWritesToo proves the second tier, which the file tier's tests
 // cannot: bob editing his own deck writes a row, not a file.
 func TestTheSQLTierWritesToo(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 
@@ -343,6 +349,7 @@ func TestTheSQLTierWritesToo(t *testing.T) {
 // layer: `Record` never fails the edit that produced it, so an instance with
 // no `app.db` still writes decks.
 func TestAnEditWithoutADatabaseStillEdits(t *testing.T) {
+	t.Parallel()
 	decks := decksDir(t)
 	// No AppDB, no write handle, no recorder -- a laptop with auth off.
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks})
@@ -369,6 +376,7 @@ func TestAnEditWithoutADatabaseStillEdits(t *testing.T) {
 // ignored, which is what an edit that answered 200 and changed nothing would
 // be.
 func TestABodyThatNamesNothingIsRefused(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	// A body with no `value` is refused before the editor: `value` is the one
@@ -403,6 +411,7 @@ func TestABodyThatNamesNothingIsRefused(t *testing.T) {
 // batch with nothing written, because a sweep that silently skipped two of its
 // ten cards would report a deck state nobody chose.
 func TestTheBulkSweepIsAllOrNothing(t *testing.T) {
+	t.Parallel()
 	rig := newWriteRig(t)
 	defer rig.close()
 	before := rig.text(t)

@@ -103,6 +103,7 @@ func apply(step editStep, text string) (string, error) {
 
 // TestEveryOperationWritesTheRecordedBytes is the family's whole gate.
 func TestEveryOperationWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	for _, c := range fixture.Cases {
 		t.Run(fmt.Sprintf("%s/%d", c.Deck, c.Chain), func(t *testing.T) {
@@ -146,6 +147,7 @@ func TestEveryOperationWritesTheRecordedBytes(t *testing.T) {
 // generator that quietly stopped emitting one operation would leave this
 // package proving less while reporting the same green.
 func TestTheOracleCoversEveryOperation(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	applied := map[string]int{}
 	refused := map[string]int{}
@@ -220,6 +222,7 @@ func sameRefusal(want, got string) bool {
 // because a prefix comparison is exactly the kind that would keep passing if
 // the refusal stopped happening at all.
 func TestABrokenParseRefuses(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	text, ok := fixture.Decks["tight"]
 	if !ok {
@@ -253,6 +256,7 @@ func TestABrokenParseRefuses(t *testing.T) {
 // separate question: a one-card swap has to be a one-card diff, or `swaps.md`
 // is unreadable, which is the whole reason this package is text surgery.
 func TestAnEditIsTheSizeItClaimsToBe(t *testing.T) {
+	t.Parallel()
 	fixture := loadEdits(t)
 	text, ok := fixture.Decks["rich"]
 	if !ok {

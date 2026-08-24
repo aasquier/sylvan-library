@@ -22,6 +22,7 @@ import (
 // the same document -- same keys, same order, same numbers.
 
 func TestDeckStatsMatchesTheGoldenCaseForCase(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join("..", "gate", "testdata")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -114,6 +115,7 @@ func canonical(t *testing.T, raw []byte) string {
 // 3.11 answers 0.010640320706772594 and 3.12 answers 0.010640320706772595.
 // This asserts that some deck in the corpus still lands there.
 func TestTheStatsCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join("..", "gate", "testdata")
 	entries, err := os.ReadDir(dir)
 	if err != nil {

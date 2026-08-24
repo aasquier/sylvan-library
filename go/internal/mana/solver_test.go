@@ -26,6 +26,7 @@ var (
 )
 
 func TestCastabilityTraps(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		why     string
 		cost    string
@@ -156,6 +157,7 @@ func TestCastabilityTraps(t *testing.T) {
 // cannot; `ManaSource(colors, 0)` really does produce nothing, and
 // `[colors] * -1` is the empty list rather than an error.
 func TestASourcesAmountIsExactlyWhatItSays(t *testing.T) {
+	t.Parallel()
 	if got := NewSource([]string{"W"}, 1).Units(); len(got) != 1 {
 		t.Errorf("NewSource(W, 1) made %d units, want 1", len(got))
 	}
@@ -190,6 +192,7 @@ func TestASourcesAmountIsExactlyWhatItSays(t *testing.T) {
 // one mana that is worth two, and the expansion in [Source.Units] is the only
 // thing that makes the matching see it that way.
 func TestOneSourceOfNEqualsNSourcesOfOne(t *testing.T) {
+	t.Parallel()
 	for _, cost := range []string{"{2}", "{C}{C}", "{G}{G}", "{1}{C}", "{W}{U}"} {
 		for amount := 1; amount <= 4; amount++ {
 			var spread []Source
@@ -215,6 +218,7 @@ func TestOneSourceOfNEqualsNSourcesOfOne(t *testing.T) {
 // WUBRGC -- and this project's standing lesson is that unreachable-by-argument
 // is exactly the claim that rots, so the path is exercised rather than argued.
 func TestAColourOutsideTheSixStillComparesAsASet(t *testing.T) {
+	t.Parallel()
 	odd := Cost{Pips: [][]string{{"Z"}}}
 	if !CanPay(odd, []Source{NewSource([]string{"Z"}, 1)}, 0) {
 		t.Error("a Z source did not pay a Z pip")
@@ -241,6 +245,7 @@ func TestAColourOutsideTheSixStillComparesAsASet(t *testing.T) {
 // wording for the shapes the enumeration cannot reach: X, Phyrexian, and the
 // empty cost.
 func TestCostRendersAsRecorded(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"":                 "{0}",
 		"{0}":              "{0}",

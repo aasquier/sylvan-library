@@ -14,6 +14,7 @@ import (
 // its recorded parse, value for value. Both files are frozen goldens
 // (testdata/rich-deck.yaml and its .parsed.json), never regenerated.
 func TestParsesTheFixtureAsRecorded(t *testing.T) {
+	t.Parallel()
 	text, err := os.ReadFile(filepath.Join("testdata", "rich-deck.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -49,6 +50,7 @@ func TestParsesTheFixtureAsRecorded(t *testing.T) {
 // The shapes the fixture was built to carry, asserted by name so a quieter
 // fixture cannot pass this file by saying less.
 func TestTheShapesThatMatter(t *testing.T) {
+	t.Parallel()
 	text, err := os.ReadFile(filepath.Join("testdata", "rich-deck.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -103,6 +105,7 @@ func TestTheShapesThatMatter(t *testing.T) {
 }
 
 func TestRefusesANonMapping(t *testing.T) {
+	t.Parallel()
 	if _, err := Parse([]byte("- just\n- a list\n")); err == nil {
 		t.Fatal("a list parsed as a deck")
 	}
@@ -122,6 +125,7 @@ func TestRefusesANonMapping(t *testing.T) {
 // random passes an in-order assertion often enough to be no assertion at all,
 // and a *reversed* one about once in n!.
 func TestParseOrderedKeepsTheDocumentsOrder(t *testing.T) {
+	t.Parallel()
 	const text = `zebra: last in the file, first in nothing
 notes:
   wincons: win

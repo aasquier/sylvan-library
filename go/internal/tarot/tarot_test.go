@@ -58,6 +58,7 @@ func loadDeals(t *testing.T) dealCorpus {
 // and it exists because tier1.Number taught this repo that a type proved
 // correct by every other means can still be wrong on the wire.
 func TestASeedDealsTheRecordedSpread(t *testing.T) {
+	t.Parallel()
 	for _, tc := range loadDeals(t).Cases {
 		got, err := json.Marshal(Deal(big.NewInt(tc.Seed)))
 		if err != nil {
@@ -72,6 +73,7 @@ func TestASeedDealsTheRecordedSpread(t *testing.T) {
 // TestTheReadersProseIsTheRecordedProse covers Describe(), whose two extra
 // paragraphs are detected facts no card field states directly.
 func TestTheReadersProseIsTheRecordedProse(t *testing.T) {
+	t.Parallel()
 	for _, tc := range loadDeals(t).Cases {
 		if got := Deal(big.NewInt(tc.Seed)).Describe(); got != tc.Describe {
 			t.Errorf("seed %d describe:\n--- got ---\n%s\n--- golden ---\n%s",
@@ -91,6 +93,7 @@ func TestTheReadersProseIsTheRecordedProse(t *testing.T) {
 // because it would be regenerated from the same code. So the states are
 // asserted here by name, against the Go implementation, rather than trusted.
 func TestTheSearchedSeedsReachEveryProseBranch(t *testing.T) {
+	t.Parallel()
 	c := loadDeals(t)
 	for _, want := range []string{"crossover", "echo", "reversed", "alignment"} {
 		seed, ok := c.Searched[want]
@@ -148,6 +151,7 @@ func TestTheSearchedSeedsReachEveryProseBranch(t *testing.T) {
 // own words the only evidence — a card is not something they said. Drift, and
 // nothing errors: the proposal button simply never lights up.
 func TestTheSpreadIsTheThemeInterviewsFirstThreeSlots(t *testing.T) {
+	t.Parallel()
 	want := []string{"taste", "temperament", "posture"}
 	if len(Spread) != len(want) {
 		t.Fatalf("the spread is %d positions, the floor is %d", len(Spread), len(want))
@@ -166,6 +170,7 @@ func TestTheSpreadIsTheThemeInterviewsFirstThreeSlots(t *testing.T) {
 // make every seeded deal above disagree, but it would disagree confusingly;
 // this says what actually happened.
 func TestTheDeckIsAllOfIt(t *testing.T) {
+	t.Parallel()
 	if len(FullDeck) != 136 {
 		t.Errorf("the shuffled deck is %d cards, want 136 "+
 			"(78 natural, plus Magic's crossovers and echoes)", len(FullDeck))
@@ -202,6 +207,7 @@ func TestTheDeckIsAllOfIt(t *testing.T) {
 // corpus cannot: nobody holds a seed that has not been minted yet, so what
 // must hold is that the answer carries the seed that reproduces it.
 func TestAnUnseededDealIsStillReproducibleFromItsOwnSeed(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for range 32 {
 		first := Deal(nil)
@@ -244,6 +250,7 @@ func TestAnUnseededDealIsStillReproducibleFromItsOwnSeed(t *testing.T) {
 // than at the deal, where it is not. The corpus records BOTH arithmetics and
 // asserts they disagree, so this test proves it can fail before it passes.
 func TestTheRunningTotalIsAnFsumAndNotASum(t *testing.T) {
+	t.Parallel()
 	c := loadDeals(t)
 	if len(c.PoolTotals) == 0 {
 		t.Fatal("the corpus records no pool totals; the fsum claim is untested")
@@ -289,6 +296,7 @@ func TestTheRunningTotalIsAnFsumAndNotASum(t *testing.T) {
 // when the loop runs off the end, which the strictness makes reachable at
 // all.
 func TestTheMarkComparisonIsStrictAndThatIsUnobservable(t *testing.T) {
+	t.Parallel()
 	// Every draw must return a card, including the path where float summation
 	// leaves mark a hair past the final accumulation.
 	for seed := int64(0); seed < 2000; seed++ {
@@ -317,6 +325,7 @@ func TestTheMarkComparisonIsStrictAndThatIsUnobservable(t *testing.T) {
 // sits between those two readings and matches neither library, so it is
 // hand-written and this is what holds it there.
 func TestTheSeedGrammarIsTheRecordedOneAndNotStrconvs(t *testing.T) {
+	t.Parallel()
 	c := loadDeals(t)
 	if len(c.SeedStrings) == 0 {
 		t.Fatal("the corpus records no seed strings; the grammar is untested")
@@ -348,6 +357,7 @@ func TestTheSeedGrammarIsTheRecordedOneAndNotStrconvs(t *testing.T) {
 // TestAnOversizedSeedIsNotTruncated is the row an int64 port gets wrong twice
 // over: a different reading, returned under a different number.
 func TestAnOversizedSeedIsNotTruncated(t *testing.T) {
+	t.Parallel()
 	huge, ok := ParseSeed("1180591620717411303424") // 2**70
 	if !ok {
 		t.Fatal("2**70 is a legal seed by the recorded grammar and must parse")

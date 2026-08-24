@@ -68,6 +68,7 @@ func loadOracle(t *testing.T) oracle {
 }
 
 func TestRenderAllWritesTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	o := loadOracle(t)
 	today, err := time.Parse("2006-01-02", o.Today)
 	if err != nil {
@@ -133,6 +134,7 @@ func TestRenderAllWritesTheRecordedBytes(t *testing.T) {
 // The oracle is only worth what it covers, and three of its branches are the
 // ones a smaller corpus would quietly have skipped.
 func TestTheOracleCoversTheBranchesItClaimsTo(t *testing.T) {
+	t.Parallel()
 	o := loadOracle(t)
 	var refused, withSwaps, withShopping, withStats int
 	for _, c := range o.Cases {
@@ -165,6 +167,7 @@ func TestTheOracleCoversTheBranchesItClaimsTo(t *testing.T) {
 // `store` writes what a build made and removes the deliverables it did not --
 // and leaves everything else alone, the snapshot included.
 func TestStorePrunesOnlyTheDeliverablesItDidNotMake(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// A previous build: all five, plus the baseline and something a person put
 	// there.
@@ -223,6 +226,7 @@ func TestStorePrunesOnlyTheDeliverablesItDidNotMake(t *testing.T) {
 // they already have, and a name that is not one of the five never becomes a
 // path at all.
 func TestTheSnapshotIsNotADeliverable(t *testing.T) {
+	t.Parallel()
 	if IsDeliverable(Snapshot) {
 		t.Error("the baseline is the build's own bookkeeping, not a deliverable")
 	}
@@ -241,6 +245,7 @@ func TestTheSnapshotIsNotADeliverable(t *testing.T) {
 // prints the raw word. Two fallbacks for one missing key is a recorded fact
 // rather than a rule, so both are reproduced and this pins the odd one.
 func TestAnInventedCategoryIsTitleCasedInOnePlaceOnly(t *testing.T) {
+	t.Parallel()
 	for word, want := range map[string]string{
 		"stax-piece": "Stax-Piece", "aggro-plan": "Aggro-Plan",
 		"win-con": "Win-Con", "aBc": "Abc", "a1b": "A1B", "": "",
@@ -267,6 +272,7 @@ func TestAnInventedCategoryIsTitleCasedInOnePlaceOnly(t *testing.T) {
 // two decimals, *none* renders a different total, so no plausible Scryfall
 // data could have produced this fixture by accident.
 func TestTheShoppingListSeparatesFsumFromARunningTotal(t *testing.T) {
+	t.Parallel()
 	o := loadOracle(t)
 	priced, differs := 0, 0
 	for _, c := range o.Cases {

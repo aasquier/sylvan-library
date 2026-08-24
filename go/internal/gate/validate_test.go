@@ -88,6 +88,7 @@ func same(t *testing.T, name, mode string, got, want []issue) {
 }
 
 func TestTheGateMatchesTheGoldenCaseForCase(t *testing.T) {
+	t.Parallel()
 	p := pooltest.Open(t)
 	ctx := context.Background()
 	for _, name := range cases(t) {
@@ -122,6 +123,7 @@ func TestTheGateMatchesTheGoldenCaseForCase(t *testing.T) {
 }
 
 func TestTheReportKnowsItsErrorsFromItsWarnings(t *testing.T) {
+	t.Parallel()
 	// Without a pool the banned card cannot be seen: the report is OK, and
 	// carries exactly the one warning that says so.
 	d, _ := load(t, "mono-green")

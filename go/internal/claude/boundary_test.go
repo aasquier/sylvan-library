@@ -109,6 +109,7 @@ func loadClaudePackages(t *testing.T) []*packages.Package {
 // the rule — which is exactly how a determined-but-well-meaning commit would
 // otherwise land it.
 func TestNothingUnderTheClaudeSurfacesCanReachTheWriteEngine(t *testing.T) {
+	t.Parallel()
 	for _, root := range loadClaudePackages(t) {
 		if path, reached := findImport(root, writeEngine, map[string]bool{}); reached {
 			t.Errorf("%s reaches the deck editor: %s\n\nNothing under the "+
@@ -156,6 +157,7 @@ func findImport(p *packages.Package, target string, seen map[string]bool) ([]str
 // here discuss `SetCardField` by name — as they must, to explain why it is
 // absent.
 func TestNoIdentifierUnderTheClaudeSurfacesResolvesToAWrite(t *testing.T) {
+	t.Parallel()
 	banned := map[string]map[string]bool{}
 	for pkg, names := range writeSurface {
 		banned[pkg] = map[string]bool{}
@@ -203,6 +205,7 @@ func TestNoIdentifierUnderTheClaudeSurfacesResolvesToAWrite(t *testing.T) {
 // obvious. This is the half of the guard
 // that decays on its own, which is why it exists at all.
 func TestTheWriteSurfaceNamedHereStillExists(t *testing.T) {
+	t.Parallel()
 	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedTypes}
 	paths := make([]string, 0, len(writeSurface))
 	for pkg := range writeSurface {
@@ -255,6 +258,7 @@ func TestTheWriteSurfaceNamedHereStillExists(t *testing.T) {
 // The risk is sharp here, because the pattern is a prefix and a package moved
 // out of the tree would simply stop being checked rather than fail.
 func TestTheGuardCoversThePackagesThatExist(t *testing.T) {
+	t.Parallel()
 	loaded := loadClaudePackages(t)
 	var covered []string
 	for _, p := range loaded {

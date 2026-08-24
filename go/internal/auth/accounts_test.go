@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/aasquier/sylvan-library/go/internal/config"
 )
 
 // The write side of `mtglab/auth`: accounts, tokens, the rate limiter and the
@@ -84,6 +86,7 @@ func mustCreate(t *testing.T, db *sql.DB, name, email string, admin bool) *User 
 // ---- accounts --------------------------------------------------------------
 
 func TestAnAccountIsCreatedUnclaimedAndFoundEveryWay(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	created := mustCreate(t, db, "  Ada  ", " Ada@Example.COM ", true)
@@ -119,6 +122,7 @@ func TestAnAccountIsCreatedUnclaimedAndFoundEveryWay(t *testing.T) {
 }
 
 func TestBothUniqueColumnsSayWhichOneCollided(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	mustCreate(t, db, "ada", "ada@example.com", false)
@@ -134,6 +138,7 @@ func TestBothUniqueColumnsSayWhichOneCollided(t *testing.T) {
 }
 
 func TestNormalisationRefusesTheRecordedSet(t *testing.T) {
+	t.Parallel()
 	for _, bad := range []string{"", "a", "1", " ", "has space", "-leading",
 		"way-too-long-a-username-for-any-of-this", "emoji🜁"} {
 		if _, err := NormaliseUsername(bad); !errors.Is(err, ErrInvalidUsername) {
@@ -168,6 +173,7 @@ func TestNormalisationRefusesTheRecordedSet(t *testing.T) {
 // CLAUDE.md rule 5 and ADR 17: an address may be serialised only into a
 // response an admin authenticated for, so `AsDict` withholds it unless asked.
 func TestTheAddressIsWithheldUnlessAsked(t *testing.T) {
+	t.Parallel()
 	db := newAccountsDB(t)
 	user := mustCreate(t, db, "ada", "ada@example.com", false)
 
@@ -198,6 +204,7 @@ func TestTheAddressIsWithheldUnlessAsked(t *testing.T) {
 // ---- authenticate ----------------------------------------------------------
 
 func TestAuthenticateRefusesEveryWayTheSame(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -233,6 +240,7 @@ func TestAuthenticateRefusesEveryWayTheSame(t *testing.T) {
 // The hash is upgraded when the plaintext is in hand -- the only moment it can
 // be, and the reason `Authenticate` takes a writable handle.
 func TestAWeakerHashIsUpgradedAtLogin(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "", false)
@@ -282,6 +290,7 @@ func TestAWeakerHashIsUpgradedAtLogin(t *testing.T) {
 // password. An instance whose only remaining admin is an unclaimed invite is
 // locked out exactly as thoroughly as one with no admin at all.
 func TestTheLastAdminWhoCanSignInIsRefusedEveryWay(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", true)
@@ -321,6 +330,7 @@ func TestTheLastAdminWhoCanSignInIsRefusedEveryWay(t *testing.T) {
 // where refusing would mean an instance with no admin could never disable
 // anybody.
 func TestANonAdminIsNeverRefusedByTheGuard(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	bob := mustCreate(t, db, "bob", "", false)
@@ -334,6 +344,7 @@ func TestANonAdminIsNeverRefusedByTheGuard(t *testing.T) {
 }
 
 func TestDisablingRevokesAndDeletingCascades(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "", false)
@@ -390,6 +401,7 @@ func TestDisablingRevokesAndDeletingCascades(t *testing.T) {
 }
 
 func TestRenamingKeepsSessionsAndSettingAPasswordDoesNot(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "", false)
@@ -423,6 +435,7 @@ func TestRenamingKeepsSessionsAndSettingAPasswordDoesNot(t *testing.T) {
 }
 
 func TestTheModelTierIsWrittenStrictlyAndReadLoosely(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "", false)
@@ -465,6 +478,7 @@ func TestTheModelTierIsWrittenStrictlyAndReadLoosely(t *testing.T) {
 // ---- tokens ----------------------------------------------------------------
 
 func TestATokenIsSingleUseAndSetsThePassword(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -514,6 +528,7 @@ func TestATokenIsSingleUseAndSetsThePassword(t *testing.T) {
 }
 
 func TestATokenRefusesForEveryRecordedReason(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -579,6 +594,7 @@ func TestATokenRefusesForEveryRecordedReason(t *testing.T) {
 // **retryable** invite rather than a spent link and an account nobody can get
 // into.
 func TestATakenNameRollsTheTokenSpendBack(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	mustCreate(t, db, "grace", "", false)
@@ -607,6 +623,7 @@ func TestATakenNameRollsTheTokenSpendBack(t *testing.T) {
 // One live link per purpose: a re-issued reset replaces the one somebody is
 // worried about, and leaves an unclaimed invite alone.
 func TestIssuingReplacesOnlyItsOwnPurpose(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -635,6 +652,7 @@ func TestIssuingReplacesOnlyItsOwnPurpose(t *testing.T) {
 }
 
 func TestPurgingKeepsSpentLinksLongEnoughToExplainThemselves(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -661,6 +679,7 @@ func TestPurgingKeepsSpentLinksLongEnoughToExplainThemselves(t *testing.T) {
 // ---- the rate limiter ------------------------------------------------------
 
 func TestTheBudgetIsSpentCountedAndCleared(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	key := AccountKey(" Ada ")
@@ -695,6 +714,7 @@ func TestTheBudgetIsSpentCountedAndCleared(t *testing.T) {
 }
 
 func TestALapsedWindowStartsAgain(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	key := AddressKey("198.51.100.7", "login")
@@ -723,6 +743,7 @@ func TestALapsedWindowStartsAgain(t *testing.T) {
 // The scopes are the point: failing to redeem a link must not spend the budget
 // somebody needs to log in.
 func TestTheKeyspacesDoNotOverlap(t *testing.T) {
+	t.Parallel()
 	keys := map[string]bool{
 		AccountKey("ada"):                           true,
 		AddressKey("198.51.100.7", "login"):         true,
@@ -766,6 +787,7 @@ func (r *recordingSender) Send(m Message) error {
 }
 
 func TestAnInviteCarriesALinkWithTheTokenInItsFragment(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	ada := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -807,6 +829,7 @@ func TestAnInviteCarriesALinkWithTheTokenInItsFragment(t *testing.T) {
 // the shape that makes ADR 16's identical answer a property of the signature
 // rather than a rule somebody has to remember.
 func TestAResetIsSilentForEveryAddressThatCannotHaveOne(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := newAccountsDB(t)
 	claimed := mustCreate(t, db, "ada", "ada@example.com", false)
@@ -861,10 +884,11 @@ func TestAResetIsSilentForEveryAddressThatCannotHaveOne(t *testing.T) {
 	}
 }
 
-func TestSenderFromEnvRefusesTheConsoleWhenDeployed(t *testing.T) {
-	t.Setenv("RESEND_API_KEY", "")
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "1")
-	sender, err := SenderFromEnv(nil)
+func TestSenderForRefusesTheConsoleWhenDeployed(t *testing.T) {
+	t.Parallel()
+	// A deployment with no key: refused, loudly, rather than printing
+	// addresses into whatever collects stdout there.
+	sender, err := SenderFor(MailSettings{RequireAuth: true}, nil)
 	if !errors.Is(err, ErrEmailNotConfigured) {
 		t.Fatalf("a deployment with no key got %T (%v)", sender, err)
 	}
@@ -874,8 +898,7 @@ func TestSenderFromEnvRefusesTheConsoleWhenDeployed(t *testing.T) {
 	}
 
 	// A laptop gets the console sender, and the printed link is the feature.
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "0")
-	sender, err = SenderFromEnv(nil)
+	sender, err = SenderFor(MailSettings{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -883,9 +906,9 @@ func TestSenderFromEnvRefusesTheConsoleWhenDeployed(t *testing.T) {
 		t.Fatalf("a laptop got %T", sender)
 	}
 
-	t.Setenv("RESEND_API_KEY", "re_not_a_real_key")
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "1")
-	if sender, err = SenderFromEnv(nil); err != nil {
+	// A key picks the real sender, deployed or not.
+	sender, err = SenderFor(MailSettings{ResendAPIKey: "re_not_a_real_key", RequireAuth: true}, nil)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := sender.(*ResendSender); !ok {
@@ -893,7 +916,22 @@ func TestSenderFromEnvRefusesTheConsoleWhenDeployed(t *testing.T) {
 	}
 }
 
+// TestMailSettingsFromReadsTheMailShapedHalf holds the mapping the composition
+// root depends on: three fields, off one config, with nothing invented.
+func TestMailSettingsFromReadsTheMailShapedHalf(t *testing.T) {
+	t.Parallel()
+	got := MailSettingsFrom(config.Config{
+		ResendAPIKey: "re_key", EmailFrom: "a <b@example.test>", RequireAuth: true,
+		AdminEmail: "not-mail-shaped@example.test",
+	})
+	want := MailSettings{ResendAPIKey: "re_key", From: "a <b@example.test>", RequireAuth: true}
+	if got != want {
+		t.Errorf("MailSettingsFrom = %+v, want %+v", got, want)
+	}
+}
+
 func TestTheConsoleSenderWritesWhereAPersonCanReadIt(t *testing.T) {
+	t.Parallel()
 	var out strings.Builder
 	sender := ConsoleSender{Stream: &out}
 	if err := sender.Send(Message{To: "ada@example.com", Subject: "hello",
@@ -911,6 +949,7 @@ func TestTheConsoleSenderWritesWhereAPersonCanReadIt(t *testing.T) {
 // is a seam inside the seam and it exists because the one thing that ever
 // broke delivery was a header.
 func TestTheProviderRequestCarriesTheUserAgent(t *testing.T) {
+	t.Parallel()
 	var captured *http.Request
 	var body []byte
 	sender, err := NewResendSender("re_key", "mtglab <no-reply@example.com>",
@@ -981,6 +1020,7 @@ func TestTheProviderRequestCarriesTheUserAgent(t *testing.T) {
 }
 
 func TestOpenReadWriteDoesNotCreateAMissingFile(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "absent.db")
 	db, err := OpenReadWrite(path)
 	if err != nil {
