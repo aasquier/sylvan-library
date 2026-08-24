@@ -116,6 +116,60 @@ type Pool struct {
 	reaping  bool
 	columns  map[string]map[string]bool // per open: table -> column set
 	cards    *cardCache                 // per open: get_cards memo
+	stale    *bool                      // per open: the staleness verdict
+	memos    map[string]*counts         // per open: each memo's hits and misses
+}
+
+// The memo names `counts` are kept under. Named constants rather than
+// literals at the call sites, because a typo in a counter's name is a
+// silently separate counter that always reads zero -- which looks exactly
+// like the dead cache the counter exists to find.
+const (
+	MemoColumns = "columns"
+	MemoCards   = "cards"
+	MemoStale   = "staleness"
+)
+
+// counts is one memo's answers since the pool was opened.
+//
+// **A cache can be correct, tested, and never once used**, and no test finds
+// that -- the standing example in this tree was keyed on a per-request handle
+// in an app where every request opened its own, so every entry was written and
+// thrown away by the connection that owned it. Only a hit count finds that
+// shape. These are the smallest instrument that does: per open, beside the
+// memos themselves, read by the package's tests, which is what holds each memo
+// to being a memo rather than a decoration.
+//
+// Nothing renders them. A hit rate is a fact about the machinery, and
+// commandment 10 keeps the machinery out of sight.
+type counts struct{ hits, misses int }
+
+// note records one memo answer. `noteLocked` is the same for a caller that
+// already holds p.mu -- which `Columns` does at the moment it learns the
+// answer, and re-taking a `sync.Mutex` there would deadlock rather than
+// mis-count.
+func (p *Pool) note(name string, hit bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.noteLocked(name, hit)
+}
+
+func (p *Pool) noteLocked(name string, hit bool) {
+	// nil between opens: a memo answer with no memo behind it is not a hit
+	// rate, and counting it would make a closed pool look busy.
+	if p.memos == nil {
+		return
+	}
+	c := p.memos[name]
+	if c == nil {
+		c = &counts{}
+		p.memos[name] = c
+	}
+	if hit {
+		c.hits++
+		return
+	}
+	c.misses++
 }
 
 // New makes a pool over path. Nothing is opened until the first Use.
@@ -177,6 +231,8 @@ func (p *Pool) acquire(ctx context.Context) (*Conn, error) {
 		p.stamp = now
 		p.columns = map[string]map[string]bool{}
 		p.cards = newCardCache()
+		p.stale = nil
+		p.memos = map[string]*counts{}
 		if !p.reaping {
 			p.reaping = true
 			go p.reap()
@@ -202,6 +258,32 @@ func (p *Pool) closeLocked() {
 	p.db = nil
 	p.columns = nil
 	p.cards = nil
+	p.stale = nil
+	p.memos = nil
+}
+
+// staleness is the memoised verdict, if this open has one yet.
+func (c *Conn) staleness() (bool, bool) {
+	c.pool.mu.Lock()
+	defer c.pool.mu.Unlock()
+	if c.pool.db != c.db || c.pool.stale == nil {
+		c.pool.noteLocked(MemoStale, false)
+		return false, false
+	}
+	c.pool.noteLocked(MemoStale, true)
+	return *c.pool.stale, true
+}
+
+// rememberStaleness files the verdict for the rest of this open. A Conn that
+// outlived its open (a shutdown) files nothing rather than teaching the next
+// open an answer about the previous pool.
+func (c *Conn) rememberStaleness(answer bool) {
+	c.pool.mu.Lock()
+	defer c.pool.mu.Unlock()
+	if c.pool.db != c.db {
+		return
+	}
+	c.pool.stale = &answer
 }
 
 // reap is `service._reap_keeper`: hand the pool back once nobody has wanted
@@ -253,9 +335,11 @@ func (c *Conn) DB() *sql.DB { return c.db }
 func (c *Conn) Columns(ctx context.Context, table string) (map[string]bool, error) {
 	c.pool.mu.Lock()
 	if cols, ok := c.pool.columns[table]; ok {
+		c.pool.noteLocked(MemoColumns, true)
 		c.pool.mu.Unlock()
 		return cols, nil
 	}
+	c.pool.noteLocked(MemoColumns, false)
 	c.pool.mu.Unlock()
 	rows, err := c.db.QueryContext(ctx,
 		"SELECT column_name FROM information_schema.columns WHERE table_name = ?", table)

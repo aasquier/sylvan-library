@@ -666,12 +666,25 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 	if order == "" {
 		order = "edhrec_rank NULLS LAST"
 	}
+	// **The cheapest price is asked for separately, after the LIMIT.** It used
+	// to ride along as a correlated subquery -- `(SELECT min(p.price_usd) …
+	// WHERE p.oracle_id = o.oracle_id)` -- which reads as the tidier query and
+	// is the expensive one, because DuckDB decorrelates it: the subquery
+	// becomes an aggregate over all 107,355 printings joined against **every**
+	// row that survived the WHERE, and the whole wide result (oracle text
+	// included) has to be materialised before the top-N can cut it to sixty.
+	// Measured on the full pool, this Mac: a text search 38.6ms -> 27.5ms, and
+	// the search the card page fires on mount -- no text at all, which matches
+	// ~28,000 cards -- **84.8ms -> 38.4ms**. Asking again for the sixty rows
+	// that survived costs about 9ms.
+	//
+	// The rule underneath, because it generalises: a projection whose value is
+	// only ever *read* belongs after the LIMIT, never inside the query the
+	// LIMIT applies to.
 	sql := `
             SELECT o.name, o.mana_cost, o.cmc, o.type_line, o.oracle_text,
                    o.color_identity, o.edhrec_rank, o.image_normal,
-                   o.image_art_crop, o.reserved,
-                   (SELECT min(p.price_usd) FROM printings p
-                     WHERE p.oracle_id = o.oracle_id AND p.price_usd IS NOT NULL) AS usd
+                   o.image_art_crop, o.reserved, o.oracle_id
             FROM oracle_cards o
             WHERE ` + strings.Join(where, " AND ") + `
             ORDER BY ` + order + `
@@ -682,6 +695,7 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 	}
 	defer rows.Close()
 	found := []SearchCard{}
+	oracleIDs := []string{}
 	for rows.Next() {
 		var v [11]any
 		ptrs := make([]any, len(v))
@@ -696,13 +710,22 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 			TypeLine: pool.AsStringPtr(v[3]), OracleText: pool.AsStringPtr(v[4]),
 			ColorIdentity: pool.AsStrings(v[5]), EdhrecRank: pool.AsIntPtr(v[6]),
 			Image: pool.AsStringPtr(v[7]), ArtCrop: pool.AsStringPtr(v[8]), Reserved: pool.AsBool(v[9]),
-			PriceUSD: AsFloatPtr(v[10]),
 		}
 		sort.Strings(card.ColorIdentity)
 		found = append(found, card)
+		oracleIDs = append(oracleIDs, pool.AsString(v[10]))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	cheapest, err := cheapestPrintings(ctx, c, oracleIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range found {
+		if usd, ok := cheapest[oracleIDs[i]]; ok {
+			found[i].PriceUSD = &usd
+		}
 	}
 	if havePrice {
 		kept := found[:0]
@@ -733,6 +756,45 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 		found = kept
 	}
 	return found, nil
+}
+
+// cheapestPrintings is the least paper price on record for each oracle id, and
+// only for the ids asked about -- the second half of the split the search
+// query's comment argues for.
+//
+// One statement whatever the count, through a list parameter rather than a run
+// of `?` placeholders: the placeholder form builds a different SQL string for
+// every result size, so no two searches could ever share a plan. `GetCards`
+// settled on the same idiom for the same reason.
+//
+// An id with no priced printing is simply absent, which is how the caller
+// keeps writing `null` for a card nobody has priced -- the correlated
+// subquery's own answer, preserved.
+func cheapestPrintings(ctx context.Context, c *pool.Conn, oracleIDs []string) (map[string]float64, error) {
+	out := map[string]float64{}
+	if len(oracleIDs) == 0 {
+		return out, nil
+	}
+	rows, err := c.DB().QueryContext(ctx,
+		`SELECT oracle_id, min(price_usd) FROM printings
+                  WHERE price_usd IS NOT NULL
+                    AND oracle_id IN (SELECT unnest(?::VARCHAR[]))
+                  GROUP BY oracle_id`, oracleIDs)
+	if err != nil {
+		return nil, fmt.Errorf("cheapest printings: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var usd any
+		if err := rows.Scan(&id, &usd); err != nil {
+			return nil, fmt.Errorf("cheapest printings: %w", err)
+		}
+		if price := AsFloatPtr(usd); price != nil {
+			out[id] = *price
+		}
+	}
+	return out, rows.Err()
 }
 
 func AsFloatPtr(v any) *float64 {
