@@ -1,0 +1,477 @@
+Error handling registered!
+15:54:01 [INFO ] GuiBase: ##########################################
+15:54:01 [INFO ] GuiBase: APP: Forge v.2.0.14-SNAPSHOT-08.08
+15:54:01 [INFO ] GuiBase: Java: 21.0.12 (Eclipse Adoptium)
+15:54:01 [INFO ] GuiBase: OS: Mac OS X 12.7.6 x86_64
+15:54:01 [INFO ] GuiBase: RAM: 4096 MB max, 8 CPUs
+15:54:01 [INFO ] GuiBase: ##########################################
+Language 'en-US' loaded successfully.
+(ThreadUtil first call): Running with priority 5
+Read cards: 33617 archived files in 1 ms (25 parts) using thread pool
+Upcoming set Star Trek (TRK) dated in the future. All `upcoming` cards will be added to this set with unknown rarity.
+The card A-Alrund's Epiphany was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Baba Lysaga, Night Witch was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Divide by Zero was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Esika's Chariot was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Faceless Haven was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Fires of Invention was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Goldspan Dragon was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Hullbreaker Horror was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Kumano Faces Kakkazan was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Luminarch Aspirant was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Monster Manual was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Omnath, Locus of Creation was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-The Meathook Massacre was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card A-Unholy Heat was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card Blinding Radiance was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card Goblin Bruiser was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card Ogre Painbringer was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card Titanic Pelagosaur was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+The card Treetop Recluse was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+Upcoming set Star Trek (TRK) dated in the future. All `upcoming` cards will be added to this set with unknown rarity.
+Read cards: 836 files in 0 ms (8 parts) using thread pool
+Simulation mode
+Ai(1)-Arahbo, Roar of the World — Cats vs Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy - one game of Commander seed 12345
+Warning: default (ie. inherited from base class) implementation of confirmAction is used by Arahbo, Roar of the World for forge.ai.ability.PermanentCreatureAi. Consider declaring an overloaded method
+Warning: default (ie. inherited from base class) implementation of confirmAction is used by Goreclaw, Terror of Qal Sisma for forge.ai.ability.PermanentCreatureAi. Consider declaring an overloaded method
+Mulligan: Ai(1)-Arahbo, Roar of the World — Cats has kept a hand of 7 cards
+Mulligan: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy has kept a hand of 7 cards
+Turn: Turn 1 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Hushwood Verge (99)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 2 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Forest (136)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 3 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Rogue's Passage (22)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 4 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Replacement Effect: Castle Garenbrig enters tapped unless you control a Forest.
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Castle Garenbrig (178)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Mana: Forest (136) - {T}: Add {G}.
+Mana: Castle Garenbrig (178) - {T}: Add {G}.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy cast Fauna Shaman
+Resolve Stack: Fauna Shaman - Creature 2 / 2
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 5 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Command Tower (13)
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Hushwood Verge (99) - {T}: Add {G}.
+Mana: Rogue's Passage (22) - {T}: Add {C}.
+Zone Change: Kaheera, the Orphanguard has moved from Command Zone to Ai(1)-Arahbo, Roar of the World — Cats's hand.
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 6 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy assigned Fauna Shaman (126) to attack Ai(1)-Arahbo, Roar of the World — Cats.
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats didn't block Fauna Shaman (126).
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Damage: Fauna Shaman (126) deals 2 combat damage to Ai(1)-Arahbo, Roar of the World — Cats.
+Life: Life: Ai(1)-Arahbo, Roar of the World — Cats 40 > 38
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Replacement Effect: Mosswort Bridge enters tapped.
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Mosswort Bridge (201)
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy triggered Mosswort Bridge
+Resolve Stack: Hideaway 4 (When this permanent enters, look at the top four cards of your library, exile one face down, then put the rest on the bottom of your library.) [Zone Changer: Mosswort Bridge (201)]
+Mana: Forest (136) - {T}: Add {G}.
+Mana: Castle Garenbrig (178) - {T}: Add {G}.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy cast Survival of the Fittest
+Resolve Stack: Survival of the Fittest
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 7 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Forest (28)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Mana: Forest (28) - {T}: Add {G}.
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Hushwood Verge (99) - {T}: Add {W}. Activate only if you control a Forest or a Plains.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Kaheera, the Orphanguard
+Resolve Stack: Kaheera, the Orphanguard - Creature 3 / 2
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 8 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Nykthos, Shrine to Nyx (160)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Mana: Forest (136) - {T}: Add {G}.
+Mana: Castle Garenbrig (178) - {T}: Add {G}.
+Mana: Mosswort Bridge (201) - {T}: Add {G}.
+Mana: Nykthos, Shrine to Nyx (160) - {T}: Add {C}.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy cast Goreclaw, Terror of Qal Sisma
+Resolve Stack: Goreclaw, Terror of Qal Sisma - Creature 4 / 3
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 9 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Replacement Effect: Razorverge Thicket enters tapped unless you control two or fewer other lands.
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Razorverge Thicket (38)
+Mana: Forest (28) - {T}: Add {G}.
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Hushwood Verge (99) - {T}: Add {W}. Activate only if you control a Forest or a Plains.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Beastmaster Ascension
+Resolve Stack: Beastmaster Ascension
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World targeting [Kaheera, the Orphanguard (100)]
+Resolve Stack:  (Targeting: [[Kaheera, the Orphanguard (100)]]) [Phase: Ai(1)-Arahbo, Roar of the World — Cats]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats assigned Kaheera, the Orphanguard (100) to attack Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Kaheera, the Orphanguard (100)]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Kaheera, the Orphanguard (100).
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Damage: Kaheera, the Orphanguard (100) deals 6 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Life: Life: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy 40 > 34
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 10 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Deserted Temple (118)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy assigned Goreclaw, Terror of Qal Sisma (203) and Fauna Shaman (126) to attack Ai(1)-Arahbo, Roar of the World — Cats.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy triggered Goreclaw, Terror of Qal Sisma
+Resolve Stack: Whenever Goreclaw, Terror of Qal Sisma attacks, each creature you control with power 4 or greater gets +1/+1 and gains trample until end of turn. [Attacker: Goreclaw, Terror of Qal Sisma (203)]
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats didn't block Goreclaw, Terror of Qal Sisma (203).
+Ai(1)-Arahbo, Roar of the World — Cats didn't block Fauna Shaman (126).
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Damage: Goreclaw, Terror of Qal Sisma (203) deals 5 combat damage to Ai(1)-Arahbo, Roar of the World — Cats.
+Damage: Fauna Shaman (126) deals 2 combat damage to Ai(1)-Arahbo, Roar of the World — Cats.
+Life: Life: Ai(1)-Arahbo, Roar of the World — Cats 38 > 31
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Mana: Forest (136) - {T}: Add {G}.
+Mana: Castle Garenbrig (178) - {T}: Add {G}.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy cast Sakura-Tribe Elder
+Resolve Stack: Sakura-Tribe Elder - Creature 1 / 1
+Zone Change: Sakura-Tribe Elder (188) was put into Graveyard from Battlefield.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy activated Sakura-Tribe Elder
+Resolve Stack: Sakura-Tribe Elder (188) - Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy searches their library for a basic land card, puts it onto the battlefield tapped, then shuffles.
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 11 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Forest (33)
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Forest (28) - {T}: Add {G}.
+Mana: Forest (33) - {T}: Add {G}.
+Mana: Razorverge Thicket (38) - {T}: Add {G} or {W}.
+Mana: Hushwood Verge (99) - {T}: Add {W}. Activate only if you control a Forest or a Plains.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Arahbo, Roar of the World
+Resolve Stack: Arahbo, Roar of the World - Creature 5 / 5
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World targeting [Kaheera, the Orphanguard (100)]
+Resolve Stack: Eminence — At the beginning of combat on your turn, if Arahbo, Roar of the World is in the command zone or on the battlefield, another target Cat you control gets +3/+3 until end of turn. (Targeting: [[Kaheera, the Orphanguard (100)]]) [Phase: Ai(1)-Arahbo, Roar of the World — Cats]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats assigned Kaheera, the Orphanguard (100) to attack Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World
+Resolve Stack: Whenever another Cat you control attacks, you may pay {1}{G}{W}. If you do, it gains trample and gets +X/+X until end of turn, where X is its power. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Kaheera, the Orphanguard (100)]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Kaheera, the Orphanguard (100).
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Damage: Kaheera, the Orphanguard (100) deals 6 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Life: Life: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy 34 > 28
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 12 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Forest (135)
+Mana: Forest (136) - {T}: Add {G}.
+Mana: Forest (148) - {T}: Add {G}.
+Mana: Forest (135) - {T}: Add {G}.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy cast Genesis Wave
+Resolve Stack: Genesis Wave (189) - [Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy] Reveal the top X cards of your library. You may put any number of permanent cards with mana value X or less from among them onto the battlefield. Then put all cards revealed this way that weren't put onto the battlefield into your graveyard. (X=0)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 13 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Forest (30)
+Mana: Forest (28) - {T}: Add {G}.
+Mana: Forest (33) - {T}: Add {G}.
+Mana: Forest (30) - {T}: Add {G}.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Pride Sovereign
+Resolve Stack: Pride Sovereign - Creature 2 / 2
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Razorverge Thicket (38) - {T}: Add {G} or {W}.
+Mana: Hushwood Verge (99) - {T}: Add {W}. Activate only if you control a Forest or a Plains.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Sword of Light and Shadow
+Resolve Stack: Sword of Light and Shadow
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World targeting [Kaheera, the Orphanguard (100)]
+Resolve Stack: Eminence — At the beginning of combat on your turn, if Arahbo, Roar of the World is in the command zone or on the battlefield, another target Cat you control gets +3/+3 until end of turn. (Targeting: [[Kaheera, the Orphanguard (100)]]) [Phase: Ai(1)-Arahbo, Roar of the World — Cats]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats assigned Arahbo, Roar of the World (102) and Kaheera, the Orphanguard (100) to attack Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World
+Resolve Stack: Whenever another Cat you control attacks, you may pay {1}{G}{W}. If you do, it gains trample and gets +X/+X until end of turn, where X is its power. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Arahbo, Roar of the World (102)]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy assigned Fauna Shaman (126) and Goreclaw, Terror of Qal Sisma (203) to block Arahbo, Roar of the World (102).
+Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Kaheera, the Orphanguard (100).
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Damage: Arahbo, Roar of the World (102) deals 3 damage to Goreclaw, Terror of Qal Sisma (203).
+Damage: Arahbo, Roar of the World (102) deals 3 damage to Fauna Shaman (126).
+Damage: Kaheera, the Orphanguard (100) deals 6 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Damage: Fauna Shaman (126) deals 2 damage to Arahbo, Roar of the World (102).
+Damage: Goreclaw, Terror of Qal Sisma (203) deals 4 damage to Arahbo, Roar of the World (102).
+Life: Life: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy 28 > 22
+Zone Change: Arahbo, Roar of the World (102) was put into Graveyard from Battlefield.
+Zone Change: Fauna Shaman (126) was put into Graveyard from Battlefield.
+Zone Change: Goreclaw, Terror of Qal Sisma (203) was put into Graveyard from Battlefield.
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 14 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Forest (144)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Mana: Forest (136) - {T}: Add {G}.
+Mana: Forest (148) - {T}: Add {G}.
+Mana: Forest (135) - {T}: Add {G}.
+Mana: Forest (144) - {T}: Add {G}.
+Mana: Castle Garenbrig (178) - {T}: Add {G}.
+Mana: Deserted Temple (118) - {T}: Add {C}.
+Add To Stack: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy cast Goreclaw, Terror of Qal Sisma
+Resolve Stack: Goreclaw, Terror of Qal Sisma - Creature 4 / 3
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 15 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Land: Ai(1)-Arahbo, Roar of the World — Cats played Forest (32)
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Forest (28) - {T}: Add {G}.
+Mana: Forest (33) - {T}: Add {G}.
+Mana: Forest (30) - {T}: Add {G}.
+Mana: Forest (32) - {T}: Add {G}.
+Mana: Razorverge Thicket (38) - {T}: Add {G} or {W}.
+Mana: Hushwood Verge (99) - {T}: Add {W}. Activate only if you control a Forest or a Plains.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Arahbo, Roar of the World
+Resolve Stack: Arahbo, Roar of the World - Creature 5 / 5
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World targeting [Pride Sovereign (82)]
+Resolve Stack: Eminence — At the beginning of combat on your turn, if Arahbo, Roar of the World is in the command zone or on the battlefield, another target Cat you control gets +3/+3 until end of turn. (Targeting: [[Pride Sovereign (82)]]) [Phase: Ai(1)-Arahbo, Roar of the World — Cats]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats assigned Pride Sovereign (82) and Kaheera, the Orphanguard (100) to attack Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World
+Resolve Stack: Whenever another Cat you control attacks, you may pay {1}{G}{W}. If you do, it gains trample and gets +X/+X until end of turn, where X is its power. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever another Cat you control attacks, you may pay {1}{G}{W}. If you do, it gains trample and gets +X/+X until end of turn, where X is its power. [Attacker: Pride Sovereign (82)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Pride Sovereign (82)]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Pride Sovereign (82).
+Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Kaheera, the Orphanguard (100).
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Damage: Pride Sovereign (82) deals 8 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Damage: Kaheera, the Orphanguard (100) deals 3 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Life: Life: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy 22 > 11
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End of Combat Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, postcombat
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' End step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Cleanup step
+Turn: Turn 16 (Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Untap step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Upkeep step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Draw step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, precombat
+Land: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy played Forest (146)
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Beginning of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Attackers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Declare Blockers Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's First Strike Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Combat Damage Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End of Combat Step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Main phase, postcombat
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's End step
+Phase: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy's Cleanup step
+Turn: Turn 17 (Ai(1)-Arahbo, Roar of the World — Cats)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Untap step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Upkeep step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Draw step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Main phase, precombat
+Mana: Command Tower (13) - {T}: Add one mana of any color in your commander's color identity.
+Mana: Forest (28) - {T}: Add {G}.
+Mana: Forest (33) - {T}: Add {G}.
+Mana: Forest (30) - {T}: Add {G}.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Sovereign Okinec Ahau
+Resolve Stack: Sovereign Okinec Ahau - Creature 3 / 4
+Mana: Razorverge Thicket (38) - {T}: Add {G} or {W}.
+Mana: Forest (32) - {T}: Add {G}.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats cast Fleecemane Lion
+Resolve Stack: Fleecemane Lion - Creature 3 / 3
+Mana: Hushwood Verge (99) - {T}: Add {W}. Activate only if you control a Forest or a Plains.
+Mana: Rogue's Passage (22) - {T}: Add {C}.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats activated Sword of Light and Shadow targeting [Pride Sovereign (82)]
+Resolve Stack: Sword of Light and Shadow (2) -  Attach to Pride Sovereign (82)
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Beginning of Combat Step
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World targeting [Kaheera, the Orphanguard (100)]
+Resolve Stack: Eminence — At the beginning of combat on your turn, if Arahbo, Roar of the World is in the command zone or on the battlefield, another target Cat you control gets +3/+3 until end of turn. (Targeting: [[Kaheera, the Orphanguard (100)]]) [Phase: Ai(1)-Arahbo, Roar of the World — Cats]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Attackers Step
+Combat: Ai(1)-Arahbo, Roar of the World — Cats assigned Pride Sovereign (82), Kaheera, the Orphanguard (100) and Arahbo, Roar of the World (102) to attack Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Beastmaster Ascension
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World
+Add To Stack: Ai(1)-Arahbo, Roar of the World — Cats triggered Arahbo, Roar of the World
+Resolve Stack: Whenever another Cat you control attacks, you may pay {1}{G}{W}. If you do, it gains trample and gets +X/+X until end of turn, where X is its power. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever another Cat you control attacks, you may pay {1}{G}{W}. If you do, it gains trample and gets +X/+X until end of turn, where X is its power. [Attacker: Pride Sovereign (82)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Arahbo, Roar of the World (102)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Kaheera, the Orphanguard (100)]
+Resolve Stack: Whenever a creature you control attacks, you may put a quest counter on Beastmaster Ascension. [Attacker: Pride Sovereign (82)]
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Declare Blockers Step
+Combat: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy assigned Goreclaw, Terror of Qal Sisma (203) to block Pride Sovereign (82).
+Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Kaheera, the Orphanguard (100).
+Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy didn't block Arahbo, Roar of the World (102).
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' First Strike Damage Step
+Phase: Ai(1)-Arahbo, Roar of the World — Cats' Combat Damage Step
+Damage: Pride Sovereign (82) deals 14 damage to Goreclaw, Terror of Qal Sisma (203).
+Damage: Kaheera, the Orphanguard (100) deals 11 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Damage: Arahbo, Roar of the World (102) deals 11 combat damage to Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy.
+Damage: Goreclaw, Terror of Qal Sisma (203) deals 4 damage to Pride Sovereign (82).
+Life: Life: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy 11 > -11
+Player Control: Ai(1)-Arahbo, Roar of the World — Cats has restored control over themself
+Player Control: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy has restored control over themself
+Game Outcome: Turn 9
+Game Outcome: Ai(1)-Arahbo, Roar of the World — Cats has won because all opponents have lost
+Game Outcome: Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy has lost because life total reached 0
+Match Result: Ai(1)-Arahbo, Roar of the World — Cats: 1 Ai(2)-Goreclaw, Terror of Qal Sisma — Mono-Green Stompy: 0 
+
+Game Result: Game 1 ended in 8055 ms. Ai(1)-Arahbo, Roar of the World — Cats has won!
+

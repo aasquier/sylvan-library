@@ -43,10 +43,15 @@ jar and `res/`. `MTGLAB_FORGE_HOME` overrides where it lives.
 ```bash
 mtglab sim forge arahbo-cats atla-palani-dinos --games 10
 mtglab sim forge tivit-cedh gyome-food --check-only   # pre-flight, no JVM
+mtglab sim forge arahbo-cats goreclaw-stompy --games 1 --narrate
 ```
 
 Two to four decks. `--check-only` is the card-coverage pre-flight on its own:
 it reads a zip, needs no Java, and is the cheap thing to run first.
+
+`--narrate` tells each game as it is played — turns, lands, casts, attacks,
+blocks, damage, life and the ending — instead of only the tally. See below for
+what it costs and why it is never on by default.
 
 ## What the bridge had to work around
 
@@ -105,6 +110,50 @@ tell. So coverage is checked twice, by two independent routes:
   otherwise look perfectly normal.
 
 All six curated decks pass the pre-flight with no missing cards.
+
+## Narrating a game
+
+`sim -q` prints one line per finished game. Forge's own help calls `-q` the
+flag that prints "just the game result, not the entire game log" — so dropping
+it is how a game gets told, and `--narrate` is that absence.
+
+**The flag is free in time and expensive in output.** Measured 2026-08-24 on
+the same seed: 8055ms of game narrated against 8205ms quiet, which is inside
+the noise of one sample, with the whole subprocess at 17s either way because
+JVM boot and the card database dominate both. What it costs is volume — 477
+lines for a nine-turn game, 727 for a longer one. That is the whole reason it
+is asked for per run: a nightly sweep has nobody watching it, and `--games 10
+--narrate` is five thousand lines nobody wants.
+
+`sim/tier3/events.go` reads that log into about a hundred typed beats per game
+— roughly a fifth of the lines, because 217 of those 477 are `Phase:` and
+"Untap step" is not a beat. It rides the same single pass over the subprocess's
+output that the tally does, so a game's beats and the row that closes it cannot
+come from different readings and disagree.
+
+Four things about the format, each found by reading real output:
+
+* **A player is `Ai(<seat>)-<deck name>`, and the name is unbounded** — it is
+  whatever `[metadata] name=` said, commas and em dashes included. So nothing
+  tries to find where a label ends: the seat is read off the front and the
+  interesting half is anchored to the end of the line.
+* **Forge drops the `Combat: ` prefix on grouped lines.** The first "didn't
+  block" of a combat carries it and the rest do not. A parser that required it
+  saw one unblocked attacker out of three.
+* **`Add To Stack` has three verbs** — `cast`, `triggered`, `activated` — and
+  only the first is a spell somebody paid for. Triggers are most of the stack
+  traffic in a real game.
+* **Forge resolves a whole combat before moving anybody's life.** Three
+  attackers produce three `Damage:` lines and one `Life:` line for the total,
+  so damage sums per combat rather than matching blow for blow. The first
+  version of the test asserted per blow and failed against a real game.
+
+**What the log does not say**, which bounds what can ever be built on it:
+there are no counters (none, not even the quest counters a trigger's own text
+mentions), no token creation, and effectively no tapped state — 5 mentions in
+727 lines. So this is a record of what *happened*, not a snapshot of what
+*is*. A board reconstructed from it would be quietly wrong on exactly the
+decks that need it most.
 
 ## Hosted: the worker machine
 
