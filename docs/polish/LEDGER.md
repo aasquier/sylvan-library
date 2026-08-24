@@ -3329,6 +3329,25 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
   and nothing in the process ever opened a browser, so the flag was help text
   lying and the deletion is right.
 
+  **A fourth spot-check, taken against the live instance, corrects a "CLOSED"
+  in Green's section.** Green 5a opens *"`SCHEMA_VERSION` is surfaced nowhere.
+  Re-grepped: **not in `/api/health`, not on the admin panel**"* and is marked
+  **CLOSED 2026-08-19 (PR #192)**. Read against the tree and against the
+  deployed instance tonight: the **admin tile crossed** (`GET
+  /api/admin/stats/system` answers `schema.applied` / `schema.expected`, and
+  `Admin.tsx` renders the pair), and **`/api/health` does not carry the number,
+  in Go or in the Python it replaced** — `cf0a640` touched `adminstats.py`,
+  `Admin.tsx` and their tests, and never the health route. So this is not a fix
+  reverted by the crossing; it is **an item closed on half of its own opening
+  sentence**, which reads identically from a distance and is the reason part
+  one asks for spot-checks at all. Nothing is broken by it — the health half
+  survives as the precondition of Red 3, which is still open and still says so
+  — but the word CLOSED is doing more work than the fix did. *Correction filed
+  here rather than in Green's section, whose branch is open tonight; it belongs
+  beside Green 5a once #286 lands.* Live body, for the record:
+  `{"pool":true,"oracle_cards":35393,"printings":107355,"decks":7,
+  "pool_stale":false}` — no `schema_version`, no `app_db`, no `disk_free_mb`.
+
 - **Part two — is the checklist finding things, or reciting them?** Verdicts,
   measured as what each colour's run tonight actually found against what its
   file spends its words on:
@@ -3532,6 +3551,12 @@ crossing. Parts one through five all run; the relic sweep ran all six passes.
   Gauntlet on this branch: `gofmt -l .` silent, `go vet ./...` clean,
   `go test -race ./...` **0 failures**, `golangci-lint run ./...` **0 issues**,
   `npm --prefix web run check` **38 files / 615 tests passed in 26.11s**.
+
+  The deployed instance as it stands (**v208**, White's merge; nothing else
+  merged tonight): `GET /` **200 in 182ms**, `GET /api/health` **200**, pool
+  present, `oracle_cards` 35,393, `printings` 107,355, `decks` 7,
+  `pool_stale` false. Recorded because five legs of this rainbow end at green
+  unmerged PRs, so v208 is what the morning is looking at.
 
 - **Queued for Aaron (2026-08-24):** two, both in `DAYBREAK.md` under
   **Colorless**.
