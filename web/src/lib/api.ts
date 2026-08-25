@@ -668,6 +668,10 @@ export interface ForgeBoardCard {
   art?: string
   /** Carried for tokens, whose printing is chosen rather than looked up. */
   artist?: string
+  /** Whether the card makes mana, from Scryfall's `produced_mana`. A card
+   *  fact, sent because a board keeps mana rocks back with the lands and
+   *  reading rules text in a browser is how that judgement would rot. */
+  mana?: boolean
 }
 
 /** One card's change at one step. Everything is optional because almost

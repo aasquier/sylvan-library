@@ -469,9 +469,20 @@ function FieldRow({ label, cards, size = 'normal', empty }: {
   label: string
   cards: BoardCard[]
   size?: 'normal' | 'small'
+  /** What to say when the row is empty — and **whether to draw it at all**.
+   *
+   *  Without one the row simply is not there. Splitting the old single
+   *  "permanents" row into artifacts, enchantments and planeswalkers is worth
+   *  doing because it is how a player sorts a table, and it is only worth
+   *  doing if the rows that hold nothing cost nothing: a deck with no
+   *  planeswalkers would otherwise pay a labelled empty row all game, twice,
+   *  once per seat. Creatures and lands pass a line instead, because those two
+   *  are the spine of a board and an empty one in the early turns is the news
+   *  rather than the absence of it. */
   empty?: string
 }) {
   const stacks = stackRow(cards)
+  if (stacks.length === 0 && !empty) return null
   return (
     <div className="field-row" aria-label={`${label}: ${cards.length}`}>
       {stacks.length === 0 ? (
@@ -751,13 +762,24 @@ function FieldSide({ side, name, facing }: {
   name: string
   facing: 'far' | 'near'
 }) {
-  // Outermost first. The near player's side is the same list reversed, so the
-  // two creature rows finish up either side of the seam.
+  // **Outermost first**, and the near player's side is the same list reversed,
+  // so the two creature rows finish up either side of the seam.
+  //
+  // Five rows where there were three. Two of them draw only when they hold
+  // something, and that is the difference between organising a board and
+  // padding it: artifacts and enchantments come and go, planeswalkers may
+  // never appear at all, and a permanently empty row labelled "planeswalkers"
+  // is furniture that costs a phone a third of its board. Creatures and lands
+  // always draw — those two are the spine, and an empty one early is news.
   const rows = [
-    <FieldRow key="land" label="Lands" cards={side.land} size="small"
+    <FieldRow key="land" label="Lands and mana" cards={side.land} size="small"
               empty="no lands yet" />,
-    <FieldRow key="perm" label="Artifacts and enchantments"
-              cards={side.permanents} size="small" empty="—" />,
+    <FieldRow key="ench" label="Enchantments" cards={side.enchantments}
+              size="small" />,
+    <FieldRow key="arti" label="Artifacts" cards={side.artifacts}
+              size="small" />,
+    <FieldRow key="walk" label="Planeswalkers" cards={side.walkers}
+              size="small" />,
     <FieldRow key="crea" label="Creatures" cards={side.creatures}
               empty="no creatures" />,
   ]

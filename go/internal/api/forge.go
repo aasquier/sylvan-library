@@ -280,6 +280,16 @@ type forgeBoardCard struct {
 	// Artist is carried for tokens, whose painting is chosen here rather than
 	// looked up — somebody painted it, and rule 9 says name them.
 	Artist string `json:"artist,omitempty"`
+	// Mana is whether this card makes mana, from Scryfall's own
+	// `produced_mana` rather than from reading rules text here.
+	//
+	// It exists for one layout rule and is a *card fact* rather than that
+	// rule: a player keeps mana rocks back with the lands, because what those
+	// rows answer is "what can this deck pay for" (Aaron, 2026-08-25: "mana
+	// producing artifacts could really stay back with the lands"). Which row
+	// that becomes is the browser's business; whether Sol Ring makes mana is
+	// the pool's.
+	Mana bool `json:"mana,omitempty"`
 }
 
 // forgeBoard is the battlefield as the room receives it.
@@ -294,6 +304,7 @@ type boardArt struct {
 	Image  string
 	Art    string
 	Artist string
+	Mana   bool
 }
 
 // resolveBoardArt fills `known` with the paintings for any card in `cards` it
@@ -340,7 +351,7 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 				return err
 			}
 			for name, rec := range found {
-				art := boardArt{}
+				art := boardArt{Mana: rec.MakesMana()}
 				if rec.ImageNormal != nil {
 					art.Image = *rec.ImageNormal
 				}
@@ -405,7 +416,8 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 		out.Cards = append(out.Cards, forgeBoardCard{
 			ID: card.ID, Name: card.Name, Token: card.Token,
 			Types: card.Types, Seat: card.Seat,
-			Image: painted.Image, Art: painted.Art, Artist: painted.Artist})
+			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
+			Mana: painted.Mana})
 	}
 	return out
 }

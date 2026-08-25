@@ -32,6 +32,59 @@ function board(steps: ForgeBoard['steps']): ForgeBoard {
   }
 }
 
+describe('sorting a side of the table', () => {
+  /** One permanent, on the battlefield, described the way the wire does. */
+  const sorted = (types: string, mana = false) => {
+    const b: ForgeBoard = {
+      seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],
+      cards: [{ id: 1, name: 'A card', types, seat: 1, mana }],
+      steps: [{ changes: [{ id: 1, zone: 'battlefield', seat: 1 }] }],
+    }
+    const side = foldBoard(b, 1).sides[0]!
+    return (['creatures', 'walkers', 'artifacts', 'enchantments',
+      'land'] as const).find((row) => side[row].length > 0)
+  }
+
+  // The whole of Aaron's item 10, one line each. This used to be a single
+  // "permanents" row holding all four of these — which is not how anybody lays
+  // out a table, and is the reason you cannot find your own Equipment.
+  it('gives artifacts and enchantments rows of their own', () => {
+    expect(sorted('Artifact - Equipment')).toBe('artifacts')
+    expect(sorted('Enchantment - Aura')).toBe('enchantments')
+  })
+
+  it('stands mana rocks back with the lands', () => {
+    // "Mana producing artifacts could really stay back with the lands" — those
+    // two rows together answer one question, and a Sol Ring answers it the
+    // same way a Forest does. The flag is Scryfall's `produced_mana`; nothing
+    // here reads rules text.
+    expect(sorted('Artifact', true)).toBe('land')
+    expect(sorted('Artifact', false)).toBe('artifacts')
+  })
+
+  it('keeps battles with the enchantments', () => {
+    // Strictly neither, and rarely more than one on a board — a row of their
+    // own would be an empty row all game.
+    expect(sorted('Battle - Siege')).toBe('enchantments')
+  })
+
+  it('puts anything that is a creature at the front, whatever else it is', () => {
+    // The front line is decided by what can be blocked, not by what is printed
+    // first on a type line. A crewed Vehicle is in the fight; so is a mana dork
+    // that would otherwise be filed under the lands for making mana.
+    expect(sorted('Artifact Creature - Vehicle')).toBe('creatures')
+    expect(sorted('Creature - Elf Druid', true)).toBe('creatures')
+    expect(sorted('Enchantment Creature - Nymph')).toBe('creatures')
+  })
+
+  it('keeps a row for the planeswalkers, and for whatever comes next', () => {
+    expect(sorted('Legendary Planeswalker - Ajani')).toBe('walkers')
+    // A type nobody has invented yet still lands somewhere rather than falling
+    // off the table.
+    expect(sorted('Legendary Contraption')).toBe('walkers')
+  })
+})
+
 describe('the board at a moment', () => {
   it('is folded to exactly the number of beats that have been told', () => {
     const b = board([
@@ -130,10 +183,11 @@ describe('the board at a moment', () => {
       // A tap is a change to the *first* card; it must not send it to the end.
       { changes: [{ id: 10, tapped: true }] },
     ])
-    // Gyome is a creature and a Food token is not, so they sit in different
-    // rows now — the order that matters is within a row.
+    // Gyome is a creature and a Food token is an artifact, so they sit in
+    // different rows now — the order that matters is within a row.
     expect(foldBoard(b, 3).sides[0]?.creatures.map((c) => c.id)).toEqual([10])
-    expect(foldBoard(b, 3).sides[0]?.permanents.map((c) => c.id)).toEqual([12])
+    expect(foldBoard(b, 3).sides[0]?.artifacts.map((c: BoardCard) => c.id))
+      .toEqual([12])
     expect(foldBoard(b, 3).sides[0]?.creatures[0]?.tapped).toBe(true)
   })
 
@@ -171,7 +225,7 @@ describe('the board at a moment', () => {
     const b = board([
       { changes: [{ id: 12, zone: 'battlefield', seat: 1, power: 0, toughness: 0 }] },
     ])
-    const food = foldBoard(b, 1).sides[0]?.permanents[0]
+    const food = foldBoard(b, 1).sides[0]?.artifacts[0]
     expect(food?.token).toBe(true)
     expect(fightingStats(food!)).toBeNull()
   })
@@ -183,7 +237,7 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped = false): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      power: null, toughness: null, counters: [], casts: 0,
+      mana: false, power: null, toughness: null, counters: [], casts: 0,
     })
     const stacks = stackRow([forest(1), forest(2), forest(3)])
     expect(stacks).toHaveLength(1)
@@ -200,7 +254,7 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped: boolean): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      power: null, toughness: null, counters: [], casts: 0,
+      mana: false, power: null, toughness: null, counters: [], casts: 0,
     })
     const stacks = stackRow([
       forest(1, true), forest(2, false), forest(3, true), forest(4, false),
@@ -216,7 +270,8 @@ describe('the board at a moment', () => {
     const cat = (id: number, over: Partial<BoardCard> = {}): BoardCard => ({
       id, name: 'Cat Token', token: true, types: 'Creature - Cat',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
-      tapped: false, power: 1, toughness: 1, counters: [], casts: 0, ...over,
+      tapped: false, mana: false, power: 1, toughness: 1, counters: [],
+      casts: 0, ...over,
     })
     const stacks = stackRow([
       cat(1),

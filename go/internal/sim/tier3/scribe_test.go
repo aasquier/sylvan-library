@@ -277,6 +277,92 @@ func TestTheTokensAreOnTheBoard(t *testing.T) {
 	}
 }
 
+// A token that leaves the battlefield ceases to exist -- rule 111.7 with rule
+// 704.5d -- and the board has to say so, because a graveyard full of tokens is
+// a zone Magic does not have.
+//
+// The rule is two-sided and both sides matter here. A dying token *does* go to
+// its owner's graveyard: that is why its death triggers, and it is why the
+// `dies` beat is still correct to fire. Then a state-based action removes it
+// from the game, and it can never move again. So there is no moment at which
+// anybody could look and find it in there.
+//
+// The recording is the right witness. Both decks in it are about tokens, and
+// seat one sacrifices Treasures for mana all game -- so the graveyard it ends
+// with is exactly the pile that used to be wrong, and it is wrong in the way
+// that hurts: thirty tokens burying the handful of real cards somebody is
+// reading the zone to find.
+func TestATokenLeavingTheBattlefieldGoesToTheEther(t *testing.T) {
+	t.Parallel()
+	logs, _ := scribed(t, true)
+
+	// The recording has to contain the thing being ruled on, or this passes by
+	// describing a game that never happened.
+	sacrificed := 0
+	for _, log := range logs {
+		for _, step := range log.Board.Steps {
+			for _, change := range step.Changes {
+				if change.Zone == tier3.ZoneGraveyard {
+					sacrificed++
+				}
+			}
+		}
+	}
+	if sacrificed == 0 {
+		t.Fatal("nothing reached a graveyard in this recording, so it cannot " +
+			"say anything about what does")
+	}
+
+	// Fold every game to its end and read the zones, the way the browser does.
+	for _, log := range logs {
+		token := map[int]string{}
+		for _, card := range log.Board.Cards {
+			if card.Token {
+				token[card.ID] = card.Name
+			}
+		}
+		if len(token) == 0 {
+			t.Fatalf("game %d made no tokens; both decks are about them",
+				log.Game)
+		}
+		zone := map[int]string{}
+		for _, step := range log.Board.Steps {
+			for _, change := range step.Changes {
+				if change.Zone != "" {
+					zone[change.ID] = change.Zone
+				}
+			}
+		}
+		for id, name := range token {
+			switch zone[id] {
+			case tier3.ZoneBattlefield, tier3.ZoneLand, tier3.ZoneGone, "":
+				// On the table, or gone from the game. Both are real.
+			default:
+				t.Errorf("game %d: %s (%d) is drawn in %q -- a token that has "+
+					"left the battlefield has ceased to exist and is in no "+
+					"zone at all", log.Game, name, id, zone[id])
+			}
+		}
+	}
+
+	// And the death still happens. Silencing the zone must not silence the
+	// sentence: the beat is raised from the scribe's line rather than from the
+	// board's answer, and that separation is the whole reason this is safe.
+	died := false
+	for _, log := range logs {
+		for _, e := range log.Events {
+			if e.Kind == tier3.EventDies && strings.Contains(e.Card, "Token") {
+				died = true
+			}
+		}
+	}
+	if !died {
+		t.Error("no token died in either game -- a token that ceases to " +
+			"exist still went to a graveyard on the way, and its death is " +
+			"still worth a sentence")
+	}
+}
+
 // The account's vocabulary, held against a real match.
 //
 // **This test exists because a whole beat kind went missing and nothing
