@@ -67,6 +67,7 @@ import { type Arriving, type Speed, type StagedBeat, useReel }
 import {
   beatLine, playerTurns, shortName, theaterBeats, theaterRows, turnsTaken,
 } from '../lib/theater'
+import { CrossedSwordsGlyph } from '../components/glyphs'
 import { HelpTip, Term } from '../components/term'
 
 /** Every control and figure here, keyed to the served glossary — the same
@@ -125,14 +126,23 @@ function Hero() {
       <img className="coliseum-hero-art" src={HERO.url} alt={HERO.alt} />
       <div className="coliseum-hero-sky" aria-hidden="true" />
 
-      <h1 className="coliseum-title text-3xl font-semibold text-white sm:text-4xl">
-        The Coliseum
-      </h1>
-      {/* The credit as a footnote on the painting rather than a caption under
-          it — small, but never absent: it is somebody's work. */}
-      <p className="coliseum-footnote">
-        <em>Grand Coliseum</em>, {HERO.printing} — art by {HERO.artist}
-      </p>
+      {/* One bar, not two absolutes. Both used to be anchored to the bottom
+          of the frame and they closed to twelve pixels on a laptop and
+          overlapped outright on a phone; a flex row cannot overlap itself,
+          and below the width where both fit the credit takes its own line.
+          The scrim under them is in `.coliseum-plate` and is what makes the
+          credit legible over pale stone in the light theme. */}
+      <div className="coliseum-plate">
+        <h1 className="coliseum-title text-3xl font-semibold text-white
+                       sm:text-4xl">
+          The Coliseum
+        </h1>
+        {/* The credit as a footnote on the painting rather than a caption
+            under it — small, but never absent: it is somebody's work. */}
+        <p className="coliseum-footnote">
+          <em>Grand Coliseum</em>, {HERO.printing} — art by {HERO.artist}
+        </p>
+      </div>
     </div>
   )
 }
@@ -554,9 +564,15 @@ export default function ColiseumRoom() {
               so without its own word the slowest action in the app would be
               the one whose button sat unchanged for seconds after the click.
               The honest reading of that is that the click missed. */}
+          {/* `.btn-arena`, not the chart accent it used to wear: this is the
+              one control in the app that starts a fight, and `--series-1` is
+              the colour of *series one of a line chart*. Blood, sand and the
+              smithy's brass, with the pair squaring up under the hand
+              (Aaron, 2026-08-25 — "could be red with some swords"). */}
           <button type="button" onClick={() => void sendThemIn()}
                   disabled={running || !a || !b}
-                  className="btn btn-primary btn-accent-1 w-full sm:w-auto">
+                  className="btn btn-arena w-full sm:w-auto">
+            <CrossedSwordsGlyph />
             {lighting ? 'Lighting the forge…'
               : running ? 'The match is on…' : 'Send them in'}
           </button>
@@ -701,9 +717,15 @@ export default function ColiseumRoom() {
                     {facts[slide] && <Slide key={slide} fact={facts[slide]} />}
                   </div>
                   <div className="mt-4 flex items-center gap-2">
-                    <button type="button" className="btn btn-sm"
+                    {/* `.btn` alone is a border-box with a transparent
+                        border and no voice at all: no hover, no press,
+                        nothing. These two carry the whole thirteen-slide
+                        walk through an arena's lore and they answered the
+                        hand with silence. `.btn-quiet` is the house's
+                        patient voice and it was one word away. */}
+                    <button type="button" className="btn btn-quiet btn-sm"
                             onClick={() => step(-1)}>Back</button>
-                    <button type="button" className="btn btn-sm"
+                    <button type="button" className="btn btn-quiet btn-sm"
                             onClick={() => step(1)}>Next</button>
                     <span className="ml-1 text-[0.75rem] text-[var(--muted)]">
                       {facts.length === 0 ? 'nothing to tell'

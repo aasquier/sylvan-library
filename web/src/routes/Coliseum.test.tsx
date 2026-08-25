@@ -27,6 +27,7 @@ import type {
 } from '../lib/api'
 import ColiseumRoom from './Coliseum'
 
+
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
   return {
@@ -437,5 +438,55 @@ describe('the tale of the tape', () => {
     expect(screen.getByText('hit the clock')).toBeTruthy()
     // The wall-clock line speaks Magic, not machinery.
     expect(screen.getByText(/lighting\s+the forge/)).toBeTruthy()
+  })
+  /** The house's voices — the `.btn-*` classes in `index.css` that actually
+   *  define a hover, a press and a pressed state. Written down here rather
+   *  than derived from the stylesheet, and that is a limitation rather than a
+   *  preference: vitest does not process CSS, so `import '../index.css?raw'`
+   *  hands a test the **empty string** and every class in it looks undressed.
+   *  A guard reading nothing reports nothing wrong, which is the worst kind,
+   *  so this list is explicit and will fail loudly if a voice is renamed —
+   *  the stylesheet is still the authority, this is only the roll-call. */
+  const VOICES = [
+    'btn-primary', 'btn-quiet', 'btn-danger', 'btn-danger-solid',
+    'btn-ghost', 'btn-felt', 'btn-arena',
+  ]
+
+  it('gives every control in the gates and the walk a voice to answer with',
+     async () => {
+    // `.btn` on its own is a transparent border and a cursor: no hover, no
+    // press, no reply of any kind. `Back` and `Next` wore exactly that while
+    // carrying the whole thirteen-slide walk through an arena's lore, and the
+    // gate wore the *chart* accent. Commandment 17 is the rule; this is the
+    // gate on it. The suite's own beforeEach already stands a forge up and a
+    // shelf of decks behind it, which is what puts the gates on the page.
+    show()
+    await screen.findByText(/harena/)
+
+    for (const name of ['Back', 'Next', 'Send them in']) {
+      const button = await screen.findByRole('button', { name })
+      const answers = [...button.classList].filter((c) => VOICES.includes(c))
+      expect(answers, `${name} wears no voice from index.css`)
+        .not.toHaveLength(0)
+    }
+  })
+
+  it('keeps the title and the credit in one bar so they cannot collide',
+     async () => {
+    // Two absolutes both anchored to the bottom of the frame is how these
+    // came to sit twelve pixels apart on a laptop and straight through each
+    // other on a phone (Aaron photographed it, 2026-08-25). jsdom has no
+    // layout and can never measure that overlap — but it can hold the shape
+    // that makes it impossible: one flex bar owning both.
+    const { container } = show()
+    await screen.findByText(/harena/)
+
+    const plate = container.querySelector('.coliseum-plate')
+    expect(plate).toBeTruthy()
+    expect(plate?.querySelector('.coliseum-title')).toBeTruthy()
+    expect(plate?.querySelector('.coliseum-footnote')).toBeTruthy()
+    // And neither is positioned out of the bar's flow behind the other's back.
+    expect(container.querySelector('.coliseum-title')?.parentElement)
+      .toBe(container.querySelector('.coliseum-footnote')?.parentElement)
   })
 })
