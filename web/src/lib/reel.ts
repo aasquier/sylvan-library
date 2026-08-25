@@ -34,6 +34,15 @@ export interface StagedBeat {
   kind: string
   who: string | null
   text: string
+  /** The card this beat is about, in Forge's own spelling, carried past the
+   *  sentence so the *board* can find it too.
+   *
+   *  The account only ever needed `text`; a mark on the battlefield needs to
+   *  know which permanent the sentence was about, and re-parsing English to
+   *  get back a name it already had would be a fine way to introduce a bug. */
+  card?: string
+  /** The card on the other end — the attacker a blocker stepped in front of. */
+  target?: string
 }
 
 /** How fast the room is telling it, or whether it is telling it at all.

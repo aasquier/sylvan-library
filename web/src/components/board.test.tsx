@@ -20,6 +20,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, it, vi } from 'vitest'
 
 import type { ForgeBoard } from '../lib/api'
+import type { StagedBeat } from '../lib/reel'
 import { MatchBoard } from './board'
 
 afterEach(cleanup)
@@ -280,4 +281,117 @@ it('opens the hand the same way, and to a tap as well as a hover', () => {
   tap(container.querySelector('.field-hand-far .field-hand-label') as Element)
   expect(container.querySelector('.field-hand-far .field-hand-tray')?.className)
     .toContain('is-open')
+})
+
+/** A board mid-combat, with a creature each side and one of them dead. */
+const COMBAT: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 50, name: 'Fleecemane Lion', types: 'Creature - Cat', seat: 1,
+      image: 'https://example.test/lion.jpg' },
+    { id: 51, name: 'Regal Caracal', types: 'Creature - Cat', seat: 2,
+      image: 'https://example.test/caracal.jpg' },
+    { id: 52, name: 'Qasali Pridemage', types: 'Creature - Cat', seat: 1,
+      image: 'https://example.test/pridemage.jpg' },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 50, zone: 'battlefield', seat: 1, power: 3, toughness: 3 },
+      { id: 51, zone: 'battlefield', seat: 2, power: 4, toughness: 4 },
+      { id: 52, zone: 'graveyard', seat: 1 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function combat(beat: StagedBeat | null) {
+  return render(
+    <MatchBoard board={COMBAT} shown={1} game={1} running={false} beat={beat}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+const said = (over: Partial<StagedBeat>): StagedBeat => ({
+  key: 'k1', game: 1, turn: 1, kind: 'attack', who: 'Arahbo',
+  text: 'attacks', ...over,
+})
+
+it('marks the card the beat is about, and only that card', () => {
+  const { container } = combat(said({ kind: 'attack', card: 'Fleecemane Lion' }))
+  const lion = container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card')
+  const caracal = container.querySelector('img[alt="Regal Caracal"]')
+    ?.closest('.field-card')
+  expect(lion?.className).toContain('is-attacks')
+  expect(lion?.querySelector('.field-mark-attacks')).toBeTruthy()
+  // The other creature on the board is not attacking and must not say it is.
+  expect(caracal?.className).not.toContain('is-attacks')
+  expect(caracal?.querySelector('.field-mark')).toBeNull()
+})
+
+it('brings a shield up on a blocker and nothing else', () => {
+  const { container } = combat(said({ kind: 'block', card: 'Regal Caracal',
+    target: 'Fleecemane Lion' }))
+  const caracal = container.querySelector('img[alt="Regal Caracal"]')
+    ?.closest('.field-card')
+  expect(caracal?.querySelector('.field-mark-blocks img')).toBeTruthy()
+  // The attacker it stepped in front of does not also get a shield: `target`
+  // is who was blocked, not who blocked.
+  const lion = container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card')
+  expect(lion?.querySelector('.field-mark')).toBeNull()
+})
+
+it('lays the skull on the grave, because the creature is already in it', () => {
+  // **The constraint this encodes.** Forge reports the death and the zone
+  // change on one line, so the step that tells the beat is the step that moves
+  // the card: there is no instant at which the board holds a dead creature
+  // still standing, and a mark aimed at the battlefield would land on nothing.
+  const { container } = combat(said({ kind: 'dies', card: 'Qasali Pridemage' }))
+  const grave = container.querySelector(
+    '.field-side-far .field-pile-wrap:has([aria-label^="Graveyard"])')
+  expect(grave?.querySelector('.field-pile-buried img'),
+    'the grave that received it is marked').toBeTruthy()
+  // The other seat's graveyard is empty and stays unmarked.
+  const other = container.querySelector(
+    '.field-side-near .field-pile-wrap:has([aria-label^="Graveyard"])')
+  expect(other?.querySelector('.field-pile-buried')).toBeNull()
+})
+
+it('draws no mark at all for a beat that is not one of the three', () => {
+  const { container } = combat(said({ kind: 'life', card: undefined }))
+  expect(container.querySelectorAll('.field-mark')).toHaveLength(0)
+  expect(container.querySelectorAll('.field-pile-buried')).toHaveLength(0)
+  cleanup()
+  // And none before a game has said anything.
+  const quiet = combat(null)
+  expect(quiet.container.querySelectorAll('.field-mark')).toHaveLength(0)
+})
+
+it('marks a transforming creature, whose two names are spelled differently', () => {
+  // **The silent one.** Forge names a *face* and the board can carry
+  // Scryfall's combined `A // B`, so a strict equality here would let every
+  // transforming creature attack, block and die with no mark ever landing —
+  // and only on the decks that play them, which is the worst way to be wrong.
+  const dfc = {
+    ...COMBAT,
+    cards: [{ id: 60, name: 'Kazandu Mammoth // Kazandu Valley',
+      types: 'Creature - Elephant', seat: 1,
+      image: 'https://example.test/mammoth.jpg' }],
+    steps: [{ turn: 1, seat: 1, changes: [
+      { id: 60, zone: 'battlefield', seat: 1, power: 3, toughness: 3 }] }],
+  } as unknown as ForgeBoard
+
+  const { container } = render(
+    <MatchBoard board={dfc} shown={1} game={1} running={false}
+                beat={said({ kind: 'attack', card: 'Kazandu Mammoth' })}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  const card = container.querySelector(
+    'img[alt="Kazandu Mammoth // Kazandu Valley"]')?.closest('.field-card')
+  expect(card?.className).toContain('is-attacks')
 })

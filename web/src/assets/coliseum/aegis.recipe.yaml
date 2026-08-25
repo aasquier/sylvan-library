@@ -1,0 +1,68 @@
+# The shield that comes up when something blocks.
+#
+# Forge's event stream says `block` and names both cards — the blocker and the
+# attacker it stepped in front of — and the board drew nothing for it. A block
+# is the most decisive thing that happens in a Magic combat and it was the one
+# beat with no picture.
+#
+# **A disc, because a disc is what survives at forty pixels.** A permanent on
+# this board is about 42x59, and a mark laid over it has maybe 30 pixels of
+# room. Almost nothing photographic reads at that size; a round shield does,
+# because its meaning is carried entirely by its *silhouette* and its silhouette
+# is a circle with a boss in the middle. The Met has nine public-domain shields
+# and four were tried: an Italian parade shield of 1535 carries an embossed
+# battle scene that is glorious at full size and mud at thirty pixels, and a
+# square Italian one reads as a box. This one is a circle first and an object
+# second, which is the right order for a mark.
+#
+# It is fifteenth-century Ottoman rather than Roman, and that is a knowing
+# choice. The Met's open access holds no Roman scutum, and the alternative was
+# no shield at all. A round shield is legible to everyone as *a shield*, which
+# is the job here — the secutor two panels away carries the Roman authenticity,
+# and this one carries the verb.
+animist: 1
+
+why_committed: >
+  It is drawn at the moment a beat lands and lives for about a second, which
+  makes it the worst possible thing to fetch from somebody else's CDN: a mark
+  that arrives after the sentence it belongs to has been read is not a mark, it
+  is a flicker on an unrelated card. It is also small enough that committing it
+  costs less than the request would.
+
+sources:
+  # `isPublicDomain` is true on object 24296, and the plate is what makes the
+  # cut possible: a flat, even studio ground with the disc floating on it, which
+  # is exactly the shape `matte_backdrop` was written for.
+  aegis:
+    provider: met
+    identifier: "24296"
+    title: "Shield, Turkish or Mamluk, late 15th century"
+    landing: https://www.metmuseum.org/art/collection/search/24296
+    found_via: >
+      the Met Open Access API, searching `shield`, `buckler` and `scutum` and
+      keeping only the public-domain results whose objectName is actually a
+      shield -- nine of them, of which this is the one that is a clean circle
+      on an even ground
+    licence: CC0-1.0
+
+outputs:
+  # 220 wide for a mark that renders at 30-44: the ceiling is a retina card at
+  # its largest, and there is no case where this is drawn big.
+  #
+  # **`matte_backdrop` here and not `matte_neutral`**, which is the opposite
+  # call from the secutor's and for the opposite reason. This shield is
+  # *steel* — measured, the ground sits at a chroma of 0-2 and the shield
+  # itself at 8, so a chroma key cannot tell them apart and would take the
+  # subject with the ground. What separates them here is connectivity: the
+  # ground touches the frame and the disc does not. Two plates, two keys, and
+  # the choice is made by measuring rather than by habit.
+  - file: aegis.webp
+    from: aegis
+    ops:
+      - matte_backdrop: {tolerance: 20, soft: 10, border: 2, enclosed: keep}
+      # The disc's own bounding box, read off the matte's alpha rather than by
+      # eye, plus six pixels so the soft edge is not clipped back to a hard one.
+      - crop: {frac_box: [0.1933, 0.0889, 0.8067, 0.8933]}
+      - resize: {width: 220}
+    encode: {format: webp, quality: 84}
+    expect: {width: 220, height: 216, budget_kb: 44, metadata: none}

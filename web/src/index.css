@@ -7289,6 +7289,147 @@ button:hover .tarot-fan-card {
   background: #e2736a;
   color: #1c0503;
 }
+/* ------------------------------------------------- what the beat just did
+ *
+ * Three marks, drawn on the card the sentence is about, for exactly as long as
+ * that sentence is the one being read. The room drains beats at reading pace
+ * and folds the board to the same count, so these ride a clock that already
+ * exists: the beat being spoken is the beat being drawn, and when the next one
+ * lands this one is over. Nothing accumulates and nothing needs timing out.
+ *
+ * **The frequent beat gets light; the decisive ones get objects.** A creature
+ * is declared an attacker several times a turn, so attacking is a red lamp and
+ * a lunge and no photograph at all — hanging a picture on the commonest event
+ * in Magic would turn a battlefield into a slideshow. Blocking and dying
+ * happen once each and settle something, so they get the real things: a Met
+ * shield and the Pompeii memento mori.
+ */
+.field-mark {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* --- declared an attacker: the lamp and the lunge ---------------------- */
+
+/* Red from the gate's own blood rather than a fresh one — the control that
+   starts a fight and the mark that shows one are the same red. */
+.field-mark-attacks {
+  border-radius: 4px;
+  background: radial-gradient(ellipse at 50% 55%,
+    color-mix(in srgb, var(--arena-blood-lit) 62%, transparent) 0%,
+    color-mix(in srgb, var(--arena-blood) 26%, transparent) 62%,
+    transparent 100%);
+  box-shadow:
+    0 0 13px 3px color-mix(in srgb, var(--arena-blood-lit) 55%, transparent),
+    inset 0 0 11px color-mix(in srgb, #ff6a52 46%, transparent);
+  animation: mark-lamp 900ms ease-out both;
+}
+@keyframes mark-lamp {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  55%  { opacity: 0.75; }
+  100% { opacity: 0; }
+}
+
+/* The lunge goes *toward the seam*, which is where the other player is: the
+   far seat leans down the page and the near seat leans up it. A creature that
+   has been declared an attacker is committed, and committing is a movement in
+   a direction rather than a wobble on the spot. */
+.field-card.is-attacks { z-index: 6; }
+.field-side-far .field-card.is-attacks { --lunge: 9px; }
+.field-side-near .field-card.is-attacks { --lunge: -9px; }
+.field-card.is-attacks { animation: card-lunge 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes card-lunge {
+  0%   { transform: none; }
+  20%  { transform: translateY(calc(var(--lunge, 0px) * -0.45)); }
+  48%  { transform: translateY(var(--lunge, 0px)) scale(1.05); }
+  100% { transform: none; }
+}
+
+/* --- blocked: the shield comes up -------------------------------------- */
+
+.field-mark-blocks img {
+  width: 78%;
+  height: auto;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.72));
+  animation: mark-guard 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Big and turned at the start, so it arrives from *somewhere* rather than
+   fading up in place — a shield that appears is a decal, and a shield that is
+   swung into the way is a block. The overshoot at 26% and the settle at 38%
+   are the impact. */
+@keyframes mark-guard {
+  0%   { opacity: 0; transform: scale(2.2) rotate(-17deg); }
+  26%  { opacity: 1; transform: scale(0.93) rotate(3deg); }
+  38%  { opacity: 1; transform: scale(1.04) rotate(-1deg); }
+  72%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: none; }
+}
+.field-card.is-blocks { animation: card-braced 1000ms ease-out both; }
+@keyframes card-braced {
+  0%, 100% { transform: none; }
+  26%      { transform: translateX(-2px); }
+  32%      { transform: translateX(2px); }
+  40%      { transform: translateX(-1px); }
+}
+
+/* --- died: the stone goes down ----------------------------------------- */
+
+.field-mark-dies img,
+.field-pile-buried img {
+  width: 70%;
+  height: auto;
+  border-radius: 2px;
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, 0.8),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 40%, transparent);
+  animation: mark-buried 1500ms ease-out both;
+}
+/* It drops and stops, rather than drifting: a headstone is set down. The long
+   hold before it goes is deliberate — this is the one beat in a game somebody
+   might want a second to register. */
+@keyframes mark-buried {
+  0%   { opacity: 0; transform: translateY(-10px) scale(1.14); }
+  18%  { opacity: 1; transform: translateY(0) scale(1); }
+  74%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(2px) scale(0.98); }
+}
+/* Whatever it lands on goes cold under it. */
+.field-mark-dies { background: rgba(6, 5, 4, 0.55); border-radius: 4px; }
+.field-card.is-dies .field-card-turn { filter: grayscale(0.85) brightness(0.62); }
+
+/* The grave's own copy, smaller because a pile is 26px wide and the skull has
+   to sit inside its rim rather than over it. */
+.field-pile-buried {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(6, 5, 4, 0.5);
+}
+.field-pile-buried img { width: 76%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .field-card.is-attacks,
+  .field-card.is-blocks { animation: none; }
+  .field-mark-attacks { animation: mark-lamp 900ms steps(2, end) both; }
+  .field-mark-blocks img,
+  .field-mark-dies img,
+  .field-pile-buried img {
+    animation: mark-still 1200ms ease-out both;
+  }
+  @keyframes mark-still {
+    0%, 100% { opacity: 0; }
+    12%, 76% { opacity: 1; }
+  }
+}
+
 /* Charge, loyalty, quest, stun: counters with no opinion attached. They keep
    the rail's own brass, because painting them green would be the board taking
    a view it has no basis for. */
