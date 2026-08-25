@@ -293,15 +293,24 @@ function FieldPile({ label, cards, short, throne }: {
   /** The command zone, which is the one pile whose *emptiness* is news. */
   throne?: boolean
 }) {
+  // Held open by a tap. Hover and keyboard focus open it in CSS; this is for
+  // the pointer that has no hover to give.
+  const [open, setOpen] = useState(false)
   const top = cards[cards.length - 1]
   const seat = throne && !top
   const title = top ? `${label}: ${cards.length}, ${top.name} on top`
     : seat ? `${label}: empty — out on the battlefield`
     : `${label}: empty`
   return (
+    <div className="field-pile-wrap">
     <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
                     + (seat ? ' is-throne' : '')}
-         title={title} aria-label={`${label}: ${cards.length}`}>
+         title={title} aria-label={`${label}: ${cards.length}`}
+         tabIndex={cards.length > 0 ? 0 : -1}
+         onPointerUp={(e) => {
+           if (e.pointerType === 'mouse' || cards.length === 0) return
+           setOpen((was) => !was)
+         }}>
       {top && top.image ? (
         <img className="field-pile-art" src={top.image} alt="" loading="lazy"
              draggable={false} />
@@ -312,6 +321,34 @@ function FieldPile({ label, cards, short, throne }: {
       {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
       <span className="field-pile-label">{short}</span>
       <span className="field-pile-n tabular">{cards.length}</span>
+    </div>
+    {/* **The pile, opened out.** A closed zone drawn as its top card answers
+        one question — what is on top — and a graveyard is asked a different
+        one all game: *what is in there*. You can pick up somebody's graveyard
+        at a real table and look through it, and it is public information in
+        every format, so there was never a reason this could not be read.
+
+        It spills onto the sand rather than out of the frame: the field clips
+        its own overflow, so a tray hung outside the rail would be cut in half.
+        Down from the far player's rail and up from the near player's, which
+        is the only direction each has room in.
+
+        Hover keeps it open across the gap because the tray is inside the same
+        wrapper as the pile — the pointer never leaves the hover target on its
+        way in, which is the trap that makes most hover panels unusable. */}
+    {cards.length > 0 && (
+      <div className={`field-tray${open ? ' is-open' : ''}`}
+           role="group" aria-label={`${label}, all ${cards.length}`}>
+        <span className="field-tray-head">
+          {label}<span className="field-tray-n tabular">{cards.length}</span>
+        </span>
+        <div className="field-tray-cards">
+          {cards.map((c) => (
+            <FieldCard key={c.id} card={c} size="small" count={1} />
+          ))}
+        </div>
+      </div>
+    )}
     </div>
   )
 }
@@ -374,11 +411,41 @@ function FieldHand({ side, name, facing }: {
   name: string
   facing: 'far' | 'near'
 }) {
+  const [spread, setSpread] = useState(false)
   return (
-    <div className={`field-hand field-hand-${facing}`}>
-      <span className="field-hand-label">
+    <div className={`field-hand field-hand-${facing}`
+                    + (spread ? ' is-spread' : '')}>
+      {/* **The hand opens out too, and it opens the same way the piles do.**
+          Seven cards overlapped to the 27px strip that carries a name is how a
+          hand is *held*; it is not how one is read.
+
+          Spreading the fan in place was the first answer and the geometry
+          refuses it: on a wide screen the fan is a *column* inside a 112px
+          rail, so sliding seven cards apart needs 400 pixels of a space that
+          has 250, and the accordion becomes a scrollbar in a gutter. A tray
+          onto the sand has the whole arena to open into, and it means all four
+          zones — hand, graveyard, exile, command — answer one gesture with one
+          kind of panel instead of four with two. */}
+      <span className="field-hand-label"
+            onPointerUp={(e) => {
+              if (e.pointerType === 'mouse' || side.hand.length === 0) return
+              setSpread((was) => !was)
+            }}>
         {name}<span className="field-hand-n tabular">{side.hand.length}</span>
       </span>
+      {side.hand.length > 0 && (
+        <div className={`field-tray field-hand-tray${spread ? ' is-open' : ''}`}
+             role="group" aria-label={`Hand, all ${side.hand.length}`}>
+          <span className="field-tray-head">
+            Hand<span className="field-tray-n tabular">{side.hand.length}</span>
+          </span>
+          <div className="field-tray-cards">
+            {side.hand.map((card) => (
+              <FieldCard key={card.id} card={card} size="small" count={1} />
+            ))}
+          </div>
+        </div>
+      )}
       <div className="field-hand-fan"
            aria-label={`Hand: ${side.hand.length}`}>
         {side.hand.length === 0 ? (

@@ -215,3 +215,69 @@ it('leaves a card with no painting alone rather than opening an empty sheet', ()
   tap(plate as Element)
   expect(screen.queryByRole('dialog')).toBeNull()
 })
+
+/** A board with something in every closed zone, so each one has a tray to
+ *  open. */
+const ZONES: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 40, name: 'Fleecemane Lion', types: 'Creature - Cat', seat: 1 },
+    { id: 41, name: 'Qasali Pridemage', types: 'Creature - Cat', seat: 1 },
+    { id: 42, name: 'Swords to Plowshares', types: 'Instant', seat: 1 },
+    { id: 43, name: 'Regal Caracal', types: 'Creature - Cat', seat: 1 },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 40, zone: 'graveyard', seat: 1 },
+      { id: 41, zone: 'graveyard', seat: 1 },
+      { id: 42, zone: 'exile', seat: 1 },
+      { id: 43, zone: 'hand', seat: 1 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+it('opens a closed zone into something you can look through', () => {
+  const { container } = render(
+    <MatchBoard board={ZONES} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  // **A graveyard is public information in every format**, and it was drawn
+  // as a number with a picture on it. Every card in it is in the tray, not
+  // just the one on top.
+  const grave = container.querySelector('.field-side-far .field-pile-wrap:has('
+    + '[aria-label^="Graveyard"]) .field-tray') as HTMLElement
+  expect(grave, 'the graveyard has a tray').toBeTruthy()
+  expect(grave.getAttribute('aria-label')).toBe('Graveyard, all 2')
+  expect(grave.querySelectorAll('.field-card')).toHaveLength(2)
+
+  // An empty zone gets no tray at all rather than an empty one: there is
+  // nothing to look through, and a panel that opens onto nothing is a worse
+  // answer than a pile that stays shut.
+  const exileWrap = container.querySelector(
+    '.field-side-near .field-pile-wrap:has([aria-label^="Exile"])')
+  expect(exileWrap?.querySelector('.field-tray'),
+    "the near seat's exile is empty, so it does not open").toBeNull()
+})
+
+it('opens the hand the same way, and to a tap as well as a hover', () => {
+  const { container } = render(
+    <MatchBoard board={ZONES} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const tray = container.querySelector('.field-hand-far .field-hand-tray')
+  expect(tray, 'the hand opens the same way the piles do').toBeTruthy()
+  expect(tray?.querySelectorAll('.field-card')).toHaveLength(1)
+
+  // Hover is CSS and a phone has none, so the label carries the tap.
+  expect(tray?.className).not.toContain('is-open')
+  tap(container.querySelector('.field-hand-far .field-hand-label') as Element)
+  expect(container.querySelector('.field-hand-far .field-hand-tray')?.className)
+    .toContain('is-open')
+})

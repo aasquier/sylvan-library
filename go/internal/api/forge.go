@@ -714,7 +714,7 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		}
 		wire.Detail(w, http.StatusUnprocessableEntity, addresses[i]+
 			" has no cards in it yet, so no result would mean anything "+
-			"-- add its cards and send them in again")
+			"— add its cards and send them in again")
 		return
 	}
 
