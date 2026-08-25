@@ -6113,9 +6113,11 @@ button:hover .tarot-fan-card {
    whole face out — which is what every Magic client does, and what the rest of
    this app does through `CardHover`.
 
-   `position: fixed` and a transform, so the preview escapes the row's own
-   `overflow-x: auto` instead of being clipped by it — the trap that makes
-   most hover previews inside scrollers useless. Pointer-events off, so it can
+   It is positioned against the card and the rows no longer clip — see
+   `.field-row`, which used to scroll and therefore cut this away entirely.
+   Previews open **toward the middle of the field**: the far player's downward,
+   the near player's upward, so neither runs off the field's own edge, which is
+   the one boundary still doing any clipping. Pointer-events off, so it can
    never eat the hover that summoned it. */
 .field-card-peek {
   position: absolute;
@@ -6244,18 +6246,25 @@ button:hover .tarot-fan-card {
   text-align: right;
 }
 
-/* A row of cards. It scrolls itself rather than shrinking the cards: a
-   battlefield of thirty permanents is a real state, and stamps nobody can
-   see are worse than a scrollbar. */
+/* A row of cards. It **wraps rather than scrolls**, and that changed when
+   identical cards started stacking: a land row that was twenty Forests is now
+   two piles, so the horizontal scroller it needed is gone and a long row costs
+   a second line instead.
+
+   The scroller had to go anyway. `overflow` on a row clips its children in
+   *both* axes — `overflow-x: auto` implies `overflow-y: auto`, and hiding the
+   y then clips anything that leaves the row's 42 pixels. The hover preview is
+   272 pixels tall, so it was being cut away entirely: measured at 104-376
+   against a row ending at 100, invisible in every case. A preview inside a
+   scroller is the classic version of this trap, and the way out is not to be
+   inside one. */
 .field-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 3px;
   min-height: 42px;
   padding: 2px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
 .field-row-empty {
   font-size: 0.72rem;
