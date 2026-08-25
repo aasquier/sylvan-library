@@ -90,6 +90,28 @@ it.
 Five things must stay identical, and they are marked PARITY in `Main.java`:
 the global RNG seeding, `RegisteredPlayer.forCommander`, the applied variants
 set, `setSimTimeout` with Forge's own timed block, and the AI player and seat
-index. ADR 42 requires a gate that plays the same decks on the same seed
-through both paths and fails unless they agree — until that gate is green,
-nothing recorded through the scribe belongs in the ledger.
+index.
+
+`TestTheScribePlaysTheSameMagicAsStockSim` in
+`go/internal/sim/tier3/parity_test.go` is the gate, and it is green:
+
+```
+game 1 — stock: seat 1 turns 23 | scribe: seat 1
+game 2 — stock: seat 2 turns  5 | scribe: seat 2
+```
+
+**Two games, deliberately.** They are different games — a grind and a rout —
+so the run reproduces a seeded *sequence*. A scribe that reseeded per game
+would agree on the first and diverge on the second, which a one-game gate
+cannot see. Run it after changing anything marked PARITY:
+
+```bash
+MTGLAB_LIVE_FORGE=1 MTGLAB_SCRIBE_CLASSES=$(pwd)/scribe/out \
+  go test ./internal/sim/tier3/ -run TestTheScribePlaysTheSameMagicAsStockSim -v
+```
+
+It needs a JVM, a Forge distribution and about a minute, so it does not run in
+CI. What CI does prove is that the scribe still compiles against the jar the
+worker image ships — `Dockerfile.forge` builds it in a stage of its own, so a
+`FORGE_URL` bump that moved an event is a red build rather than a listener
+that quietly stopped hearing something.

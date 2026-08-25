@@ -62,3 +62,8 @@ forge/
 .DS_Store
 .idea/
 .vscode/
+
+# The scribe's compiled classes. It is built inside the image against the very
+# jar that image ships (ADR 42), so a local `scribe/out` reaching the context
+# could only ever be a stale copy compiled against a different Forge.
+scribe/out/

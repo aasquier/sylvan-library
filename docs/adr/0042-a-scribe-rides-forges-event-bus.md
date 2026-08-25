@@ -171,6 +171,22 @@ same game emitted **3,300** of them against 473 for everything else —
 the whole card whether anything moved or not. Only 23 were ever news. Any
 future listener added to this bus should assume the same until it has counted.
 
+**And the parity gate is green.** `TestTheScribePlaysTheSameMagicAsStockSim`
+plays the two live fixtures on seed 11 through both paths and compares the
+winner by seat, the clock-outs and the draws:
+
+```
+game 1 — stock: seat 1 turns 23 | scribe: seat 1
+game 2 — stock: seat 2 turns  5 | scribe: seat 2
+```
+
+**Two games rather than one, and that is the whole design of the test.** The
+games are different from each other — a 23-turn grind and a 5-turn rout — so
+the run reproduces a seeded *sequence* rather than a single lucky match. A
+scribe that seeded the RNG per game instead of once before the match would
+agree on game one and diverge on game two, which is precisely the failure a
+one-game gate cannot see.
+
 Two things the run surfaced that the design has to answer, and neither is
 settled here:
 

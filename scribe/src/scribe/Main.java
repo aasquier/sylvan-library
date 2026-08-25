@@ -131,15 +131,25 @@ public final class Main {
             long ms = (System.nanoTime() - began) / 1_000_000L;
 
             GameOutcome outcome = game.getOutcome();
-            String winner = null;
-            if (!clocked && outcome != null && !outcome.isDraw()
-                    && outcome.getWinningPlayer() != null) {
-                winner = outcome.getWinningPlayer().getPlayer().getName();
+            RegisteredPlayer won = null;
+            if (!clocked && outcome != null && !outcome.isDraw()) {
+                won = outcome.getWinningPlayer();
             }
             Json line = new Json("result").put("game", number)
                     .put("ms", (int) ms).put("timed_out", clocked);
-            if (winner != null) line.put("winner", winner);
-            else line.put("draw", !clocked || false);
+            if (won != null) {
+                // **The seat, one-based, and the name.** The seat is what the
+                // Go side works in — `SimRun.Seats` maps 1..n to slugs in the
+                // order the decks were passed, and the parity gate compares
+                // seats because two decks can share a name and never share a
+                // seat. The name rides along because it is what Forge's own
+                // result line carries, so a human reading this stream sees
+                // what they would have seen in the log.
+                line.put("seat", seats.indexOf(won) + 1)
+                    .put("winner", won.getPlayer().getName());
+            } else if (!clocked) {
+                line.put("draw", true);
+            }
             out.println(line);
             out.flush();
         }
