@@ -48,6 +48,15 @@ export interface BoardCard {
   power: number | null
   toughness: number | null
   counters: { kind: string; n: number }[]
+  /** How many times this card has *left* the command zone.
+   *
+   *  Commander tax is two generic for each previous cast from the command
+   *  zone, and Forge never reports the tax — but it reports every zone
+   *  change, and a card going command-to-anywhere is that cast. Counted here
+   *  rather than in the view because it is history: the view holds one folded
+   *  moment, and by the time a commander is home again the casts that made it
+   *  expensive have scrolled past. */
+  casts: number
 }
 
 /**
@@ -79,6 +88,14 @@ export interface BoardSide {
   graveyard: BoardCard[]
   exile: BoardCard[]
   command: BoardCard[]
+  /** This seat's commanders, **wherever they are standing.**
+   *
+   *  `command` is the zone and holds only the ones currently home, which is
+   *  the wrong list for the one question the zone is asked: what would it cost
+   *  to get them back out. A commander on the battlefield still has a tax, and
+   *  it is the tax that made the last cast expensive. Nothing but a commander
+   *  begins in the command zone, so having-been-there is the whole test. */
+  commanders: BoardCard[]
 }
 
 /** The board at one moment. */
@@ -101,7 +118,7 @@ function emptySide(seat: ForgeBoardSeat): BoardSide {
   return {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
     creatures: [], permanents: [], land: [], hand: [], graveyard: [],
-    exile: [], command: [],
+    exile: [], command: [], commanders: [],
   }
 }
 
@@ -154,12 +171,21 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           art: known?.art ?? '',
           artist: known?.artist ?? '',
           zone: 'gone', seat: known?.seat ?? 0, tapped: false,
-          power: null, toughness: null, counters: [],
+          power: null, toughness: null, counters: [], casts: 0,
         }
         state.set(change.id, card)
         order.push(change.id)
       }
-      if (change.zone) card.zone = change.zone
+      if (change.zone) {
+        // Before the assignment, because the transition is the fact: a card
+        // that was in the command zone and is now anywhere else was cast from
+        // it. (Put onto the battlefield without casting would over-count, and
+        // Forge's AI does not do it with commanders.)
+        if (card.zone === 'command' && change.zone !== 'command') {
+          card.casts += 1
+        }
+        card.zone = change.zone
+      }
       if (change.seat) card.seat = change.seat
       if (change.tapped != null) card.tapped = change.tapped
       if (change.power != null) card.power = change.power
@@ -180,6 +206,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     if (!card) continue
     const side = bySeat.get(card.seat)
     if (!side) continue
+    if (card.zone === 'command' || card.casts > 0) side.commanders.push(card)
     // A zone the browser does not draw — `gone`, or a word a newer server
     // learned — simply takes the card off the table rather than throwing.
     if (card.zone === 'battlefield') {

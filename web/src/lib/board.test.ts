@@ -183,7 +183,7 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped = false): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      power: null, toughness: null, counters: [],
+      power: null, toughness: null, counters: [], casts: 0,
     })
     const stacks = stackRow([forest(1), forest(2), forest(3)])
     expect(stacks).toHaveLength(1)
@@ -200,7 +200,7 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped: boolean): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      power: null, toughness: null, counters: [],
+      power: null, toughness: null, counters: [], casts: 0,
     })
     const stacks = stackRow([
       forest(1, true), forest(2, false), forest(3, true), forest(4, false),
@@ -216,7 +216,7 @@ describe('the board at a moment', () => {
     const cat = (id: number, over: Partial<BoardCard> = {}): BoardCard => ({
       id, name: 'Cat Token', token: true, types: 'Creature - Cat',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
-      tapped: false, power: 1, toughness: 1, counters: [], ...over,
+      tapped: false, power: 1, toughness: 1, counters: [], casts: 0, ...over,
     })
     const stacks = stackRow([
       cat(1),
