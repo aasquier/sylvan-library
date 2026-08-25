@@ -6539,6 +6539,33 @@ button:hover .tarot-fan-card {
 .field-hand-fan > .field-card + .field-card { margin-left: -24px; }
 .field-hand-fan > .field-card { flex: 0 0 auto; }
 
+/* The hand's own tray, on the same rails as the piles'. It opens away from
+   whichever edge the hand is held at, which is a different edge at each
+   breakpoint: stacked, the far hand is at the top of the field and the near
+   one at the foot; side by side, both are the right-hand column and the only
+   room either has is inward. */
+.field-hand { position: relative; }
+.field-hand-far .field-hand-tray {
+  top: calc(100% + 4px);
+  transform: translateY(-7px) scale(0.97);
+  transform-origin: top right;
+}
+.field-hand-near .field-hand-tray {
+  bottom: calc(100% + 4px);
+  transform: translateY(7px) scale(0.97);
+  transform-origin: bottom right;
+}
+.field-hand:hover .field-hand-tray,
+.field-hand:focus-within .field-hand-tray,
+.field-hand-tray.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+/* The label is the handle on touch, so it should not look like prose. */
+.field-hand-label { cursor: default; }
+
 /* Held, not played: a card in a hand lifts toward the person holding it when
  * the pointer finds it, so a tight fan can still be read one card at a time.
  * The peek that opens above it is `.field-card-peek`'s, unchanged. */
@@ -6590,6 +6617,22 @@ button:hover .tarot-fan-card {
   .field-hand-fan .field-card:hover,
   .field-hand-fan .field-card:focus-visible {
     transform: translateX(-7px);
+  }
+
+  /* Side by side, the hands are the right-hand column and the arena is to
+     their left, which is the only direction with room. */
+  .field-hand-far .field-hand-tray,
+  .field-hand-near .field-hand-tray {
+    top: 0;
+    bottom: auto;
+    right: calc(100% + 6px);
+    transform: translateX(7px) scale(0.97);
+    transform-origin: top right;
+  }
+  .field-hand:hover .field-hand-tray,
+  .field-hand:focus-within .field-hand-tray,
+  .field-hand-tray.is-open {
+    transform: none;
   }
 
   /* **A hand card's preview opens into the field**, not upward and not
@@ -6695,6 +6738,95 @@ button:hover .tarot-fan-card {
     -2px -2px 0 -1px rgba(0, 0, 0, 0.45);
 }
 .field-pile.is-empty { opacity: 0.4; }
+
+/* The wrapper is the hover target, and it holds the pile *and* the tray that
+   opens off it. That is the whole trick: a panel anchored to a 26px pile which
+   the pointer has to leave the pile to reach is a panel nobody can reach, and
+   keeping both inside one hover group means the pointer never crosses a gap.
+   `focus-within` gives the keyboard the same thing for free. */
+.field-pile-wrap { position: relative; flex: 0 0 auto; }
+
+.field-tray {
+  position: absolute;
+  right: 0;
+  z-index: 8;
+  width: max-content;
+  max-width: min(58vw, 430px);
+  max-height: 178px;
+  /* Vertical only. The cards wrap, so there is never anything to scroll
+     sideways to — and `overflow: auto` still reserved a horizontal bar and
+     painted a scroll corner in the tray's bottom-right, which at this size
+     reads as a bit of chrome that fell off. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 6px 8px 8px;
+  border-radius: 8px;
+  background: linear-gradient(180deg,
+    rgba(16, 12, 8, 0.97) 0%, rgba(9, 7, 5, 0.97) 100%);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 34%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease,
+              transform 210ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0s linear 140ms;
+}
+/* Onto the sand, because the field clips its own overflow and a tray hung
+   outside the rail would be cut in half. Each rail opens the only way it has
+   room to. */
+.field-side-far .field-tray {
+  top: calc(100% + 6px);
+  transform: translateY(-7px) scale(0.97);
+  transform-origin: top right;
+}
+.field-side-near .field-tray {
+  bottom: calc(100% + 6px);
+  transform: translateY(7px) scale(0.97);
+  transform-origin: bottom right;
+}
+.field-pile-wrap:hover .field-tray,
+.field-pile-wrap:focus-within .field-tray,
+.field-tray.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+.field-tray-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-bottom: 5px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+}
+.field-tray-n {
+  padding: 0 3px;
+  border-radius: 2px;
+  font-size: 0.54rem;
+  color: #1a1409;
+  background: var(--field-brass);
+}
+.field-tray-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-tray,
+  .field-side-far .field-tray,
+  .field-side-near .field-tray {
+    transform: none;
+    transition: opacity 120ms ease, visibility 0s linear 120ms;
+  }
+}
 .field-pile-art {
   position: absolute;
   inset: 0;
