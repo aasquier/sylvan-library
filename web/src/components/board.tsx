@@ -42,7 +42,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ForgeBoard } from '../lib/api'
-import { type BoardCard, type BoardSide, fightingStats, foldBoard }
+import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
   from '../lib/board'
 
 /** One card on the field.
@@ -52,13 +52,18 @@ import { type BoardCard, type BoardSide, fightingStats, foldBoard }
  * creature that dies has to be the same DOM node in the graveyard or the
  * animation has nothing to animate.
  */
-function FieldCard({ card, size }: { card: BoardCard; size: 'normal' | 'small' }) {
+function FieldCard({ card, size, count }: {
+  card: BoardCard
+  size: 'normal' | 'small'
+  /** How many identical cards this one stands for. See `stackRow`. */
+  count: number
+}) {
   const stats = fightingStats(card)
   const counters = card.counters.filter((c) => c.n > 0)
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
-    card.name,
+    count > 1 ? `${count} × ${card.name}` : card.name,
     stats,
     counters.map((c) => `${c.n} ${c.kind}`).join(', '),
     card.tapped ? 'tapped' : '',
@@ -66,8 +71,13 @@ function FieldCard({ card, size }: { card: BoardCard; size: 'normal' | 'small' }
   ].filter(Boolean).join(' · ')
 
   return (
-    <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`}
+    <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
+                    + (count > 1 ? ' is-stacked' : '')}
          title={title}>
+      {/* The pile behind it. Two leaves is enough to read as depth and few
+          enough not to fatten the row — a real stack of nine Forests does not
+          look nine cards thick from across a table either. */}
+      {count > 1 && <span className="field-card-pile" aria-hidden="true" />}
       <div className="field-card-turn">
         {card.image ? (
           <img className="field-card-art" src={card.image} alt={card.name}
@@ -79,6 +89,10 @@ function FieldCard({ card, size }: { card: BoardCard; size: 'normal' | 'small' }
         )}
         {card.token && <span className="field-card-token" aria-hidden="true" />}
         {stats && <span className="field-card-stats tabular">{stats}</span>}
+        {count > 1 && (
+          <span className="field-card-count tabular">{count}<span
+            className="field-card-times">×</span></span>
+        )}
         {counters.length > 0 && (
           <span className="field-card-counters tabular">
             {counters.map((c) => c.n).reduce((a, b) => a + b, 0)}
@@ -89,19 +103,33 @@ function FieldCard({ card, size }: { card: BoardCard; size: 'normal' | 'small' }
   )
 }
 
-/** A row of cards, with a name and a count when it is empty. */
+/**
+ * A row of cards, identical ones stacked.
+ *
+ * Nine Forests is one pile with a nine on it, which is how they sit on a real
+ * table and the only way a row of them fits on a phone. `stackRow` decides
+ * what "identical" means, and the answer is *identical in play* — a tapped
+ * Forest and an untapped one are two piles, because the difference between
+ * them is the thing somebody is looking at the board to find out.
+ *
+ * The key is the first card's id rather than the stack's position: a pile that
+ * grows keeps its element, so its count animates instead of the row rebuilding
+ * itself every time a land comes down.
+ */
 function FieldRow({ label, cards, size = 'normal', empty }: {
   label: string
   cards: BoardCard[]
   size?: 'normal' | 'small'
   empty?: string
 }) {
+  const stacks = stackRow(cards)
   return (
     <div className="field-row" aria-label={`${label}: ${cards.length}`}>
-      {cards.length === 0 ? (
+      {stacks.length === 0 ? (
         <span className="field-row-empty">{empty ?? label}</span>
-      ) : cards.map((card) => (
-        <FieldCard key={card.id} card={card} size={size} />
+      ) : stacks.map((stack) => (
+        <FieldCard key={stack.card.id} card={stack.card} size={size}
+                   count={stack.count} />
       ))}
     </div>
   )

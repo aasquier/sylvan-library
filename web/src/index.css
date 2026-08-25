@@ -6144,6 +6144,54 @@ button:hover .tarot-fan-card {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--field-brass) 78%, transparent);
 }
 
+/* A stack of identical cards: two leaves of pile behind the face, and the
+   count on it. Nine Forests is one pile with a nine on it, which is how they
+   sit on a real table — and the only way a row of them fits on a phone.
+
+   The pile is drawn *behind* and offset up-left rather than fanned sideways,
+   so a stack occupies exactly one card's width in the row. A fan would read
+   more like cards and would put the row back where it started. */
+.field-card-pile {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background: var(--field-plate);
+  box-shadow:
+    -2px -2px 0 0 color-mix(in srgb, var(--field-stone-deep) 70%, transparent),
+    -4px -4px 0 0 color-mix(in srgb, var(--field-stone-deep) 45%, transparent),
+    -5px -5px 6px rgba(0, 0, 0, 0.4);
+}
+/* The pile leans with the card when it turns, because it is the same pile. */
+.field-card.is-stacked.is-tapped .field-card-pile {
+  transform: rotate(90deg);
+  transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+
+.field-card-count {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 3.5px;
+  border-radius: 2px;
+  background: var(--field-brass);
+  color: #1a1409;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+/* Smaller and quieter than the number: "9×" reads as a count, "9" alone reads
+   as a stat, and this board already puts real stats in the other corner. */
+.field-card-times {
+  font-size: 0.78em;
+  font-weight: 600;
+  opacity: 0.72;
+  margin-left: 0.5px;
+}
+
 .field-card-stats,
 .field-card-counters {
   position: absolute;
@@ -6257,6 +6305,7 @@ button:hover .tarot-fan-card {
   .field-dust-2,
   .field-dust-3 { display: none; animation: none; }
   .field-card { animation: none; }
-  .field-card-turn { transition: none; }
+  .field-card-turn,
+  .field-card-pile { transition: none; }
   .field-life { animation: none; }
 }

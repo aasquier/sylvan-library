@@ -158,6 +158,58 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   return { turn, active, sides }
 }
 
+/** A run of identical cards, drawn as one stack with a count on it. */
+export interface BoardStack {
+  /** The first of them, which is what gets drawn. */
+  card: BoardCard
+  count: number
+}
+
+/**
+ * Collapse identical cards into stacks, the way a hand of nine Forests sits on
+ * a real table.
+ *
+ * Nine separate Forests laid out flat is not what a board looks like and it is
+ * not what anybody reads: it takes a whole row to say one thing, and on a
+ * phone it takes several. A player stacks them and knows the count.
+ *
+ * **Identical means identical in play, not identical in name**, and that is
+ * the whole difficulty. Three tapped Forests and six untapped ones are not
+ * nine Forests — they are two piles, and which pile is which is exactly the
+ * information somebody is looking at the board to get. So the key carries
+ * everything a player would notice from across the table: the name, whether it
+ * is turned, what it is currently worth in a fight, and what is sitting on it.
+ * Two cards merge only when nothing visible tells them apart.
+ *
+ * The card's own instance id is deliberately **not** in the key — the id is
+ * what makes two Forests different to Forge and what makes them the same to a
+ * person.
+ *
+ * Order is the order the cards arrived in, taken from the first of each run,
+ * so a stack does not jump across the row when its count changes.
+ */
+export function stackRow(cards: BoardCard[]): BoardStack[] {
+  const out: BoardStack[] = []
+  const at = new Map<string, BoardStack>()
+  for (const card of cards) {
+    const key = [
+      card.name,
+      card.tapped ? 't' : '',
+      card.power ?? '', card.toughness ?? '',
+      card.counters.map((c) => `${c.kind}:${c.n}`).join('+'),
+    ].join('|')
+    const already = at.get(key)
+    if (already) {
+      already.count++
+      continue
+    }
+    const stack: BoardStack = { card, count: 1 }
+    at.set(key, stack)
+    out.push(stack)
+  }
+  return out
+}
+
 /** A card's power and toughness, when it has any worth showing.
  *
  * Blank for anything that is not a creature: a Food token is a 0/0 in Forge's

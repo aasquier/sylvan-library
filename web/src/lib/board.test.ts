@@ -12,7 +12,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ForgeBoard } from './api'
-import { fightingStats, foldBoard } from './board'
+import type { BoardCard } from './board'
+import { fightingStats, foldBoard, stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -136,6 +137,67 @@ describe('the board at a moment', () => {
     const food = foldBoard(b, 1).sides[0]?.battlefield[0]
     expect(food?.token).toBe(true)
     expect(fightingStats(food!)).toBeNull()
+  })
+
+  it('stacks identical cards, the way they sit on a table', () => {
+    // Commander is a singleton format, so the only things that ever repeat are
+    // basic lands and tokens — which is precisely where a flat row is worst:
+    // nine Forests and eight Food take the whole board and say two things.
+    const forest = (id: number, tapped = false): BoardCard => ({
+      id, name: 'Forest', token: false, types: 'Basic Land - Forest',
+      image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
+      power: null, toughness: null, counters: [],
+    })
+    const stacks = stackRow([forest(1), forest(2), forest(3)])
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0]?.count).toBe(3)
+    // The first card is the one drawn, so the pile keeps its place in the row.
+    expect(stacks[0]?.card.id).toBe(1)
+  })
+
+  it('keeps tapped and untapped as separate piles', () => {
+    // **The ruling that makes this worth testing.** Three tapped Forests and
+    // six untapped ones are not nine Forests — they are two piles, and which
+    // is which is the thing somebody is reading the board to find out. Merging
+    // them would delete the answer to "can they still pay for that?"
+    const forest = (id: number, tapped: boolean): BoardCard => ({
+      id, name: 'Forest', token: false, types: 'Basic Land - Forest',
+      image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
+      power: null, toughness: null, counters: [],
+    })
+    const stacks = stackRow([
+      forest(1, true), forest(2, false), forest(3, true), forest(4, false),
+    ])
+    expect(stacks).toHaveLength(2)
+    expect(stacks.map((s) => [s.card.tapped, s.count]))
+      .toEqual([[true, 2], [false, 2]])
+  })
+
+  it('keeps creatures apart when anything visible differs', () => {
+    // A 1/1 Cat with a +1/+1 counter on it is not the same object as the 1/1
+    // beside it, and a player can see that from across the table.
+    const cat = (id: number, over: Partial<BoardCard> = {}): BoardCard => ({
+      id, name: 'Cat Token', token: true, types: 'Creature - Cat',
+      image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
+      tapped: false, power: 1, toughness: 1, counters: [], ...over,
+    })
+    const stacks = stackRow([
+      cat(1),
+      cat(2),
+      cat(3, { power: 2, toughness: 2, counters: [{ kind: '+1/+1', n: 1 }] }),
+    ])
+    expect(stacks.map((s) => s.count)).toEqual([2, 1])
+  })
+
+  it('leaves a row of different cards alone', () => {
+    const b = board([
+      { changes: [
+        { id: 10, zone: 'battlefield', seat: 1 },
+        { id: 20, zone: 'battlefield', seat: 1 },
+      ] },
+    ])
+    const bf = foldBoard(b, 1).sides[0]?.battlefield ?? []
+    expect(stackRow(bf).every((s) => s.count === 1)).toBe(true)
   })
 
   it('answers a match with no board at all', () => {
