@@ -30,10 +30,67 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api, type Coliseum, type ColiseumArena, type ColiseumFact } from '../lib/api'
-import { PageMasthead } from '../components/ui'
+import { CardHover } from '../components/ui'
 
 /** How long a slide holds. Long, deliberately: see the note above. */
-const SLIDE_MS = 30_000
+const SLIDE_MS = 24_000
+
+/** How long the room stays in one arena before walking to the next.
+ *
+ *  Ninety seconds is roughly four slides, and six arenas is then a nine-minute
+ *  circuit — longer than most matches, so a match rarely sees the same arena
+ *  twice and never sits in one for its whole length. Both timers restart on a
+ *  click: a person who has chosen where to stand should not be walked off. */
+const ARENA_MS = 90_000
+
+/** The pennants, laid out once rather than per render.
+ *
+ *  Every value here is a *different* number on purpose. Nine banners sharing
+ *  one period and one phase read as a screensaver; nine with their own read as
+ *  wind. The heraldry is five hues so no two neighbours match. */
+/** The room's own painting, and it does not rotate.
+ *
+ *  The six arenas below take turns; this one does not, and the distinction is
+ *  load-bearing rather than cosmetic. The banners and the crowd are placed
+ *  against *this* painting's geometry — its rim, its gates — so pointing the
+ *  hero at whichever arena happens to be selected hangs pennants in the middle
+ *  of Valor's Reach's drawing room. An effect tuned to one painting belongs to
+ *  that painting.
+ *
+ *  Grand Coliseum, Onslaught (ONS) #319, art by Carl Critchlow — the arena
+ *  this room is named for, from the set that also printed its champion. */
+const HERO = {
+  url: 'https://cards.scryfall.io/art_crop/front/c/2/c2dc8061-a855-4a81-9eb7-350b355a9b3f.jpg?1783945028',
+  printing: 'Onslaught',
+  artist: 'Carl Critchlow',
+  alt: 'A vast oval arena of pale stone standing alone on a bare plain, '
+     + 'ringed with gatehouses and crowned by two tall statues, under a wide '
+     + 'and hazy sky.',
+}
+
+/** The hero: the whole painting at page width, with what the painting implies
+ *  but cannot do — banners flying from the wall, and a crowd filing in.
+ *
+ *  **Whole, not cropped.** Spanning the page and cropping the page are
+ *  different asks; `art_crop` is 1.37:1 and this frame keeps that ratio, so
+ *  none of Critchlow's arena is thrown away to make a letterbox. */
+function Hero() {
+  return (
+    <div className="coliseum-hero">
+      <img className="coliseum-hero-art" src={HERO.url} alt={HERO.alt} />
+      <div className="coliseum-hero-sky" aria-hidden="true" />
+
+      <h1 className="coliseum-title text-3xl font-semibold text-white sm:text-4xl">
+        The Coliseum
+      </h1>
+      {/* The credit as a footnote on the painting rather than a caption under
+          it — small, but never absent: it is somebody's work. */}
+      <p className="coliseum-footnote">
+        <em>Grand Coliseum</em>, {HERO.printing} — art by {HERO.artist}
+      </p>
+    </div>
+  )
+}
 
 /** What each kind of slide is called on screen. The label is the promise the
  *  slide keeps — a reader who wants the Magic ones can find them. */
@@ -121,39 +178,60 @@ export default function ColiseumRoom() {
   const arena: ColiseumArena | undefined = data?.arenas[chosen]
   const facts = useMemo(() => arena?.facts ?? [], [arena])
 
-  // The rotation restarts whenever the arena changes, so walking into a house
-  // always begins at its first fact rather than halfway through the last
-  // one's.
-  useEffect(() => { setSlide(0) }, [chosen])
+  // `nudge` is bumped by every deliberate click, which restarts both clocks
+  // below. Without it a click could be followed a heartbeat later by the timer
+  // firing anyway — the room walking off just as somebody chose to stand
+  // still, which is the single most irritating thing a carousel does.
+  const [nudge, setNudge] = useState(0)
+
+  // Walking into a house begins at its first fact rather than halfway through
+  // the last one's — done by moving both values together in `enter`, never by
+  // an effect that watches `chosen` and calls `setSlide`. That shape schedules
+  // a second render for every arena change and oxlint refuses it by name
+  // ("calling setState synchronously within an effect can trigger cascading
+  // renders"); the two pieces of state change for one reason, so they change
+  // in one place.
+  const enter = useCallback((next: number) => {
+    setNudge((n) => n + 1)
+    setChosen(next)
+    setSlide(0)
+  }, [])
 
   useEffect(() => {
     if (facts.length < 2) return
     const id = window.setInterval(
       () => setSlide((n) => (n + 1) % facts.length), SLIDE_MS)
     return () => window.clearInterval(id)
-  }, [facts.length])
+  }, [facts.length, chosen, nudge])
+
+  // And the room itself walks on, so six arenas are seen rather than one.
+  const arenaCount = data?.arenas.length ?? 0
+  useEffect(() => {
+    if (arenaCount < 2) return
+    const id = window.setInterval(() => {
+      setChosen((n) => (n + 1) % arenaCount)
+      setSlide(0)
+    }, ARENA_MS)
+    return () => window.clearInterval(id)
+  }, [arenaCount, chosen, nudge])
 
   const step = useCallback((by: number) => {
     if (facts.length === 0) return
+    setNudge((n) => n + 1)
     setSlide((n) => (n + by + facts.length) % facts.length)
   }, [facts.length])
 
+
+
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16">
-      <PageMasthead
-        // Grand Coliseum, Onslaught (ONS) #319, Carl Critchlow — the arena
-        // this whole room is named for, from the set that also printed its
-        // champion.
-        art="https://cards.scryfall.io/art_crop/front/c/2/c2dc8061-a855-4a81-9eb7-350b355a9b3f.jpg?1783945028"
-        alt="A vast open-air arena of pale stone, tiered seating rising on
-             every side above a bare floor, under a hot and cloudless sky."
-        title="The Coliseum"
-        credit={<>
-          <em>Grand Coliseum</em>, Onslaught — art by Carl Critchlow. Onslaught
-          is Magic&rsquo;s pit-fighting set, and it printed both this arena and
-          Jareth, Leonine Titan, who fought in it.
-        </>}
-      />
+      {/* Not `PageMasthead`, and that is a deliberate departure rather than
+          an oversight. That component is a *nameplate* — the painting beside
+          the title — and its rule exists to stop a 1.37:1 crop being flattened
+          into a band. This room's subject IS a place, so the place is the
+          page's first fact; the ratio is kept whole, which is what that rule
+          was actually protecting. The h1 moves here with it. */}
+      <Hero />
 
       <p className="mt-6 max-w-2xl text-[0.95rem] leading-relaxed text-[var(--muted)]">
         Six houses, and what Rome did in each of them. A match played here takes
@@ -182,7 +260,7 @@ export default function ColiseumRoom() {
                 key={a.key}
                 role="tab"
                 aria-selected={i === chosen}
-                onClick={() => setChosen(i)}
+                onClick={() => enter(i)}
                 className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${
                   i === chosen ? ' is-active' : ''}`}
               >
@@ -231,19 +309,25 @@ export default function ColiseumRoom() {
             ) : (
               <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {arena.champions.map((c) => (
-                  <li key={c.name} className="flex gap-3">
-                    {c.art_crop && (
-                      <img src={c.art_crop} alt="" loading="lazy"
-                           className="h-16 w-24 shrink-0 rounded object-cover" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-[0.85rem] font-semibold text-[var(--ink)]">
-                        {c.name}
-                      </p>
-                      <p className="mt-0.5 text-[0.78rem] leading-snug text-[var(--muted)]">
-                        {c.role}
-                      </p>
-                    </div>
+                  <li key={c.name}>
+                    {/* The card itself on hover: a gladiator named and not
+                        shown is a name, and the whole point is who fights. */}
+                    <CardHover card={c} className="block">
+                      <div className="flex gap-3">
+                        {c.art_crop && (
+                          <img src={c.art_crop} alt="" loading="lazy"
+                               className="h-16 w-24 shrink-0 rounded object-cover" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[0.85rem] font-semibold text-[var(--ink)]">
+                            {c.name}
+                          </p>
+                          <p className="mt-0.5 text-[0.78rem] leading-snug text-[var(--muted)]">
+                            {c.role}
+                          </p>
+                        </div>
+                      </div>
+                    </CardHover>
                   </li>
                 ))}
               </ul>
