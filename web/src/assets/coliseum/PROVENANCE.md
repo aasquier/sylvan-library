@@ -31,3 +31,32 @@ Why committed rather than hotlinked: Two reasons, and the first is the licence. 
 
 Why committed rather than hotlinked: The licence is clean and the figure is small, but the real reason is that he stands in a slot that is empty by construction. He fills the slack between a short slide and the controls pinned under it — space that exists because the painting beside him is tall, and that varies with every one of thirteen slides. A decoration that is sometimes 224 pixels tall and sometimes 80 has to be a local file: a figure that resolves from somebody else's CDN would pop in at a different size on every slide, and the one place a reader's eye is already moving is exactly where a late-arriving image is most obvious.
 <!-- animist:end secutor -->
+
+<!-- animist:begin aegis -->
+## aegis.webp
+
+- **Source**: "Shield, Turkish or Mamluk, late 15th century", <https://www.metmuseum.org/art/collection/search/24296>, found via the Met Open Access API, searching `shield`, `buckler` and `scutum` and keeping only the public-domain results whose objectName is actually a shield -- nine of them, of which this is the one that is a clean circle on an even ground
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-25).
+- **Transformations** (Pillow, scripted -- `animist build aegis.recipe.yaml`):
+  - `matte_backdrop`: tolerance=20, soft=10, border=2, enclosed='keep'.
+  - `crop`: frac_box=[0.1933, 0.0889, 0.8067, 0.8933].
+  - `resize`: width=220.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: It is drawn at the moment a beat lands and lives for about a second, which makes it the worst possible thing to fetch from somebody else's CDN: a mark that arrives after the sentence it belongs to has been read is not a mark, it is a flicker on an unrelated card. It is also small enough that committing it costs less than the request would.
+<!-- animist:end aegis -->
+
+<!-- animist:begin memento -->
+## memento.webp
+
+- **Source**: "Skull mosaic MAN Naples Inv 109982.jpg", <https://commons.wikimedia.org/wiki/File:Skull_mosaic_MAN_Naples_Inv_109982.jpg>, found via Commons, searching `memento mori mosaic Pompeii skull`, then filtering the results by licence -- the gladiator steles found alongside it are mostly CC BY-SA and one is Attribution-only, obligations a decoration must not carry
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-25).
+- **Transformations** (Pillow, scripted -- `animist build memento.recipe.yaml`):
+  - `crop`: frac_box=[0.28, 0.235, 0.72, 0.665].
+  - `resize`: width=200.
+  - Encoded WEBP, quality 82.
+
+Why committed rather than hotlinked: The same reason as the shield beside it: this is drawn on the beat that says a creature died and it is gone about a second later, so it has to be in the bundle rather than a request away. There is a second reason here, though — the licence is a *photograph of an ancient work*, and that is exactly the category where somebody else's file can quietly change licence or vanish. A copy checked once and committed is a copy whose provenance stays true.
+<!-- animist:end memento -->

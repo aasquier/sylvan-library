@@ -1,0 +1,65 @@
+# What settles over a creature when it dies.
+#
+# Aaron asked for "a skull or tombstone", and a real gladiator's tombstone was
+# tried first: the Louvre holds a funerary stele of a gladiator and Commons has
+# it under a public-domain photograph. It is the more moving object and it is
+# the wrong one. It is photographed *in situ* — bolted to a museum wall with
+# two grey brackets in frame, on stone the same colour as the marble — so
+# neither key can cut it; and a Roman stele's silhouette is a plain rectangle,
+# which at thirty pixels is a grey box rather than a grave.
+#
+# **A skull is a silhouette everybody already knows**, which is the whole
+# requirement for a mark this small. And there is a Roman one: the memento mori
+# from Pompeii, in the Naples archaeological museum — the skull hung from a
+# plumb-level, with Fortune's wheel beneath it and the purple of wealth and the
+# rags of poverty balanced either side. A mosaic laid in a Roman dining room to
+# remind the diners that death levels everyone, and it is *about* this room.
+#
+# **No matte, deliberately.** The skull sits on the mosaic's own green-grey
+# tesserae and cutting it out would be cutting a mosaic apart — the thing it is
+# made of is the thing you would be throwing away. So it is a tile: a fragment
+# of Roman floor laid over the card, which is what it is and what it looks
+# like. That also sidesteps a key that could not have worked anyway; the skull
+# and its ground are both warm stone, and neither brightness nor chroma
+# separates them.
+animist: 1
+
+why_committed: >
+  The same reason as the shield beside it: this is drawn on the beat that says
+  a creature died and it is gone about a second later, so it has to be in the
+  bundle rather than a request away. There is a second reason here, though —
+  the licence is a *photograph of an ancient work*, and that is exactly the
+  category where somebody else's file can quietly change licence or vanish. A
+  copy checked once and committed is a copy whose provenance stays true.
+
+sources:
+  # Public domain outright, confirmed through the Commons API: both the mosaic
+  # (1st century) and the photograph of it.
+  memento:
+    provider: wikimedia
+    title: "Skull mosaic MAN Naples Inv 109982.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Skull_mosaic_MAN_Naples_Inv_109982.jpg
+    found_via: >
+      Commons, searching `memento mori mosaic Pompeii skull`, then filtering
+      the results by licence -- the gladiator steles found alongside it are
+      mostly CC BY-SA and one is Attribution-only, obligations a decoration
+      must not carry
+    licence: Public domain
+
+outputs:
+  # 200 wide for a mark drawn at 30-44, the same ceiling the shield takes.
+  # Quality 82 rather than the sand's 70: a mosaic is thousands of hard little
+  # edges, which is the pattern a low quality setting turns to soup — the grid
+  # of tesserae is the entire reason this reads as a mosaic and not a smudge.
+  - file: memento.webp
+    from: memento
+    ops:
+      # The skull alone: the cranium whole at the top, the teeth whole at the
+      # bottom, and a suggestion of Fortune's wheel below them. Tried three
+      # tighter boxes first and every one of them clipped the cranium — the
+      # skull is larger in the panel than it looks, because the wooden frame
+      # around the mosaic reads as part of the picture until it is cropped off.
+      - crop: {frac_box: [0.28, 0.235, 0.72, 0.665]}
+      - resize: {width: 200}
+    encode: {format: webp, quality: 82}
+    expect: {width: 200, height: 238, budget_kb: 40, metadata: none}

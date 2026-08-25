@@ -39,14 +39,18 @@
  * rules it turns off, the way the rest of this project does it.
  */
 
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import {
+  type CSSProperties, createContext, useContext, useEffect, useRef, useState,
+} from 'react'
 
 import type { ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { ThroneGlyph } from './glyphs'
+import aegisArt from '../assets/coliseum/aegis.webp'
+import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
   from '../lib/board'
-import type { Speed } from '../lib/reel'
+import type { Speed, StagedBeat } from '../lib/reel'
 
 /** One card on the field.
  *
@@ -74,6 +78,49 @@ function counterSign(kind: string): 'up' | 'down' | 'flat' {
   return 'flat'
 }
 
+/**
+ * What the beat that just landed did, as a mark on the board.
+ *
+ * **One mark at a time, and it is the sentence's own.** The room drains beats
+ * at reading pace and the board is folded to exactly the same count, so the
+ * picture moves when the sentence is spoken — the marks ride that clock rather
+ * than inventing a second one. The beat being read is the beat being drawn,
+ * and when the next one arrives this one is over. Nothing accumulates, nothing
+ * has to be timed out, and a scrub backwards is a mark that simply was not
+ * there, because the mark is a *function of the beat* and not a thing that
+ * happened once.
+ */
+type Mark = 'attacks' | 'blocks' | 'dies'
+
+/** Whether a beat's card and a board card are the same card.
+ *
+ *  Not `===`, and the reason is written down one layer below: Forge names a
+ *  **face**, never Scryfall's combined `A // B` (`events.go`, and
+ *  `docs/FORGE.md`'s fourth fact). The board's names come from the scribe and
+ *  can carry the combined spelling, so a transforming creature would attack,
+ *  block and die without a single mark ever landing on it — silently, and only
+ *  on the decks that play them. Comparing the front face costs one split. */
+function sameCard(onBoard: string, inBeat: string): boolean {
+  return onBoard === inBeat || onBoard.split(' // ')[0] === inBeat
+}
+
+function markOf(kind: string): Mark | null {
+  return kind === 'attack' ? 'attacks'
+    : kind === 'block' ? 'blocks'
+    : kind === 'dies' ? 'dies'
+    : null
+}
+
+/** The card the current beat is about, and what happened to it.
+ *
+ *  A context rather than four more props: `FieldCard` is drawn in the rows, in
+ *  a hand and inside every tray, and threading a mark down three levels to
+ *  reach all of them would be the same fact written four times. `key` is the
+ *  beat's own identity, and it is what makes the second attack by the same
+ *  creature animate again rather than sitting there already-animated. */
+const Struck = createContext<{ card: string; mark: Mark; key: string } | null>(
+  null)
+
 function FieldCard({ card, size, count }: {
   card: BoardCard
   size: 'normal' | 'small'
@@ -85,6 +132,11 @@ function FieldCard({ card, size, count }: {
   // only for the pointer that has no hover to give.
   const [peeking, setPeeking] = useState(false)
   const stats = fightingStats(card)
+  const struck = useContext(Struck)
+  // Matched on Forge's own spelling, which is what both ends of this carry.
+  // Two copies of one name is a token or a basic; marking both is a better
+  // wrong answer than marking neither, and in a singleton format it is rare.
+  const mark = struck && sameCard(card.name, struck.card) ? struck : null
   // `!== 0` rather than `> 0`: a -1/-1 counter is a counter, and the pile of
   // them on a creature that is about to die is exactly the thing somebody is
   // reading the board to find.
@@ -101,7 +153,8 @@ function FieldCard({ card, size, count }: {
 
   return (
     <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
-                    + (count > 1 ? ' is-stacked' : '')}
+                    + (count > 1 ? ' is-stacked' : '')
+                    + (mark ? ` is-${mark.mark}` : '')}
          title={title} tabIndex={card.image ? 0 : -1}
          onPointerUp={(e) => {
            // **The peek below is `:hover` and `:focus-visible`, and a phone is
@@ -213,6 +266,27 @@ function FieldCard({ card, size, count }: {
           })}
         </span>
       )}
+      {/* **The marks.** Keyed on the beat so the same creature attacking twice
+          plays twice — without it React keeps the element and the animation,
+          having already run, never runs again.
+
+          Attacking is light and motion rather than an object, and that is a
+          choice about *frequency*: a creature is declared an attacker several
+          times a turn, and hanging a photograph on the most common beat in the
+          game would turn the board into a slideshow. The rare, decisive beats
+          get the objects — the shield when something steps in front, the
+          Pompeii skull when something dies. */}
+      {mark && (
+        <span key={mark.key} aria-hidden="true"
+              className={`field-mark field-mark-${mark.mark}`}>
+          {mark.mark === 'blocks' && (
+            <img src={aegisArt} alt="" draggable={false} />
+          )}
+          {mark.mark === 'dies' && (
+            <img src={mementoArt} alt="" draggable={false} />
+          )}
+        </span>
+      )}
       {held && card.image && (
         <CardSheet name={card.name} image={card.image}
                    onClose={() => setHeld(false)} />
@@ -296,6 +370,15 @@ function FieldPile({ label, cards, short, throne }: {
   // Held open by a tap. Hover and keyboard focus open it in CSS; this is for
   // the pointer that has no hover to give.
   const [open, setOpen] = useState(false)
+  const struck = useContext(Struck)
+  // **The skull lands on the grave, and it has to.** By the time the sentence
+  // "X dies" is read, the card is already in the graveyard — Forge reports the
+  // death and the zone change on one line, so the step that tells the beat is
+  // the step that moves the card, and there is no instant at which the board
+  // holds a dead creature still standing. Marking the pile it went into is not
+  // a consolation for that; it is where a headstone goes.
+  const buried = struck?.mark === 'dies'
+    && cards.some((c) => sameCard(c.name, struck.card))
   const top = cards[cards.length - 1]
   const seat = throne && !top
   const title = top ? `${label}: ${cards.length}, ${top.name} on top`
@@ -319,6 +402,11 @@ function FieldPile({ label, cards, short, throne }: {
           is the opposite of an empty graveyard and was drawn the same way.
           The chair says which: theirs, and nobody in it. */}
       {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
+      {buried && struck && (
+        <span key={struck.key} className="field-pile-buried" aria-hidden="true">
+          <img src={mementoArt} alt="" draggable={false} />
+        </span>
+      )}
       <span className="field-pile-label">{short}</span>
       <span className="field-pile-n tabular">{cards.length}</span>
     </div>
@@ -590,10 +678,13 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
  * picture moves when the sentence is spoken and there is one clock rather than
  * two to keep in step.
  */
-export function MatchBoard({ board, shown, game, name, running,
+export function MatchBoard({ board, shown, game, name, running, beat,
   speed, setSpeed, of, seek, games, playing, chooseGame }: {
   board: ForgeBoard | null
   shown: number
+  /** The beat the room has just spoken, which is the one the board marks.
+   *  Null before a game starts, and while the account is silent. */
+  beat?: StagedBeat | null
   game: number
   /** Turns a seat's slug into whatever the room calls that deck. Passed in
    *  because only the room has the shelf. */
@@ -611,6 +702,14 @@ export function MatchBoard({ board, shown, game, name, running,
   const state = foldBoard(board, shown)
   const far = state.sides[0]
   const near = state.sides[1]
+  // One mark, belonging to one beat. No `useMemo`: the compiler does that,
+  // and identity is not what governs replay here anyway — every mark is keyed
+  // on `beat.key`, so a fresh object with the same key reconciles onto the
+  // same element and does *not* restart an animation that is already running.
+  const mark = beat ? markOf(beat.kind) : null
+  const struck = mark && beat?.card
+    ? { card: beat.card, mark, key: beat.key }
+    : null
 
   if (!board || !far || !near) {
     return (
@@ -629,6 +728,7 @@ export function MatchBoard({ board, shown, game, name, running,
   }
 
   return (
+    <Struck.Provider value={struck}>
     <section className="field" aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">
@@ -675,5 +775,6 @@ export function MatchBoard({ board, shown, game, name, running,
                       seek={seek} games={games} playing={playing}
                       chooseGame={chooseGame} />
     </section>
+    </Struck.Provider>
   )
 }

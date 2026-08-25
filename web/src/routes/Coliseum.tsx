@@ -459,6 +459,10 @@ export default function ColiseumRoom() {
           turn: (beat.turn == null ? 0 : turns.get(beat.turn) ?? beat.turn),
           kind: beat.kind,
           who: said.who, text: said.text,
+          // Carried alongside the sentence rather than dug back out of it:
+          // the board marks the card a beat names, and Forge already said
+          // which one.
+          card: beat.card, target: beat.target,
         }
       }),
     }
@@ -630,6 +634,7 @@ export default function ColiseumRoom() {
           <MatchBoard key={`board-${job?.id}`} board={reel.board}
                       shown={reel.told} game={reel.game}
                       name={seatName} running={running}
+                      beat={reel.shown[reel.shown.length - 1] ?? null}
                       speed={speed} setSpeed={setSpeed}
                       of={reel.shown.length + reel.queue.length}
                       seek={seek}
