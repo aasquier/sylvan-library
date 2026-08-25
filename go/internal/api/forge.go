@@ -290,6 +290,16 @@ type forgeBoardCard struct {
 	// that becomes is the browser's business; whether Sol Ring makes mana is
 	// the pool's.
 	Mana bool `json:"mana,omitempty"`
+	// Keywords is Scryfall's list for the card, sent whole rather than
+	// filtered.
+	//
+	// **Unfiltered on purpose.** The board draws a small mark for the
+	// keywords it has a mark for and ignores the rest, and which ones those
+	// are is a drawing decision that belongs where the drawing is — adding a
+	// glyph should be one file's change, not two and a deploy. The cost is a
+	// few hundred short strings on a payload already measured in tens of
+	// kilobytes.
+	Keywords []string `json:"keywords,omitempty"`
 }
 
 // forgeBoard is the battlefield as the room receives it.
@@ -301,10 +311,11 @@ type forgeBoard struct {
 
 // boardArt is one card's painting, resolved once per match.
 type boardArt struct {
-	Image  string
-	Art    string
-	Artist string
-	Mana   bool
+	Image    string
+	Art      string
+	Artist   string
+	Mana     bool
+	Keywords []string
 }
 
 // resolveBoardArt fills `known` with the paintings for any card in `cards` it
@@ -351,7 +362,7 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 				return err
 			}
 			for name, rec := range found {
-				art := boardArt{Mana: rec.MakesMana()}
+				art := boardArt{Mana: rec.MakesMana(), Keywords: rec.Keywords}
 				if rec.ImageNormal != nil {
 					art.Image = *rec.ImageNormal
 				}
@@ -417,7 +428,7 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 			ID: card.ID, Name: card.Name, Token: card.Token,
 			Types: card.Types, Seat: card.Seat,
 			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
-			Mana: painted.Mana})
+			Mana: painted.Mana, Keywords: painted.Keywords})
 	}
 	return out
 }

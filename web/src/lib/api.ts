@@ -672,6 +672,10 @@ export interface ForgeBoardCard {
    *  fact, sent because a board keeps mana rocks back with the lands and
    *  reading rules text in a browser is how that judgement would rot. */
   mana?: boolean
+  /** Every keyword Scryfall lists for the card, unfiltered — the board draws
+   *  the ones it has a sign for and ignores the rest, so adding a sign is a
+   *  change to one file in the browser. */
+  keywords?: string[]
 }
 
 /** One card's change at one step. Everything is optional because almost

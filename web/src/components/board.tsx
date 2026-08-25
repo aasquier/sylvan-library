@@ -53,10 +53,12 @@ import { createPortal } from 'react-dom'
 import type { ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { ThroneGlyph } from './glyphs'
+import { KeywordMarks } from './keywords'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
   from '../lib/board'
+import { drawableKeywords } from '../lib/keywords'
 import type { Speed, StagedBeat } from '../lib/reel'
 
 /** One card on the field.
@@ -307,6 +309,7 @@ function FieldCard({ card, size, count, inPlay = false }: {
     stats,
     counters.map((c) => `${c.n} ${c.kind}`).join(', '),
     card.tapped ? 'tapped' : '',
+    inPlay ? drawableKeywords(card.keywords).join(', ') : '',
     card.artist ? `art by ${card.artist}` : '',
   ].filter(Boolean).join(' · ')
 
@@ -368,6 +371,16 @@ function FieldCard({ card, size, count, inPlay = false }: {
           card, not your head. Each piece pivots about its own anchor corner,
           so counter-rotating moves it nowhere. */}
       <div className="field-card-arm" aria-hidden="true">
+        {/* **What the card does, in the one corner that was free.**
+            A painting at fifty-eight pixels tells you this is a Dragon. It
+            does not tell you the Dragon flies, and whether it flies is the
+            whole question when the other side has ground blockers — so the
+            board made you hover forty cards one at a time to find the one
+            that could block (Aaron, 2026-08-25, on Arena's keyword icons).
+
+            Only on the battlefield, for `inPlay`'s reason one field up: these
+            are facts about a fight, and a card in a hand is not in one. */}
+        {inPlay && <KeywordMarks keywords={card.keywords} />}
         {/* **The loupe.** Power and toughness were a black tab printed over
             the corner of the painting at all times — legible, and permanently
             in the way of the one part of a card everybody already looks at.

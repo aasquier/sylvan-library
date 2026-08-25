@@ -7229,6 +7229,64 @@ button:hover .tarot-fan-card {
 .field-card-count { transform-origin: 100% 0; }
 .field-card-counters { transform-origin: 0 100%; }
 .field-card-lens { transform-origin: 100% 100%; }
+.field-keywords { transform-origin: 0 0; }
+
+/* ------------------------------------------------- what the card can do
+ *
+ * **The upper-left corner, which was the one this board had left.** Count
+ * upper-right, counters lower-left, loupe lower-right — and a creature's
+ * keywords are the fourth fact a player reads off a permanent and the one
+ * nothing on this board was saying. A painting at fifty-eight pixels tells you
+ * it is a Dragon; whether the Dragon *flies* is the question when the other
+ * side has ground blockers, and the only way to answer it was to hover forty
+ * cards one at a time.
+ *
+ * Drawn on a dark chip rather than straight onto the painting, and that is not
+ * decoration: card art is a photograph, and a ten-pixel silhouette laid on an
+ * arbitrary photograph is invisible about a third of the time. The chip is what
+ * guarantees a constant ground under every mark; the brass ink is the house's.
+ */
+.field-keywords {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5px;
+}
+.field-keyword {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 2.5px;
+  color: color-mix(in srgb, var(--field-brass) 92%, #fff);
+  background: rgba(8, 6, 4, 0.82);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--field-brass) 40%, transparent);
+}
+.field-keyword svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+/* The overflow chip. Type rather than a mark, because "there are two more" is
+   a count and every other count on this card is set in figures. */
+.field-keyword-more {
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+/* A small card is a land or a permanent behind the line, and those rarely have
+   a keyword at all — but when one does (a manland that woke up), the marks
+   come down with the card rather than covering a third of it. */
+.field-card-small .field-keyword { width: 11px; height: 11px; }
+.field-card-small .field-keyword svg { width: 8.5px; height: 8.5px; }
+.field-card-small .field-keyword-more { font-size: 0.44rem; }
 
 .field-card-count {
   position: absolute;

@@ -175,9 +175,22 @@ func TestPaintingsAreLookedUpOncePerMatch(t *testing.T) {
 	// The second game of the same pairing names the same hundred cards. If
 	// the cache did not hold, that would be a pool round trip per game for
 	// nothing.
-	a.resolveBoardArt(context.Background(), cards, known)
-	if known["Gyome, Master Chef"] != first {
+	//
+	// Compared field by field rather than with `!=`, because boardArt now
+	// carries the card's keywords and a struct holding a slice is not
+	// comparable. `reflect.DeepEqual` would say the same thing in one line and
+	// would also say it about two *different* slices that happen to match —
+	// which is the opposite of what this asks. The question is whether the
+	// second call left the entry alone, so the slice is checked by identity:
+	// same backing array means nothing re-resolved it.
+	again := known["Gyome, Master Chef"]
+	if again.Image != first.Image || again.Art != first.Art ||
+		again.Artist != first.Artist || again.Mana != first.Mana ||
+		len(again.Keywords) != len(first.Keywords) {
 		t.Error("a second game re-resolved a card the match had already asked about")
+	}
+	if len(first.Keywords) > 0 && &again.Keywords[0] != &first.Keywords[0] {
+		t.Error("the keywords were rebuilt, so the pool was asked again")
 	}
 }
 

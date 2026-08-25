@@ -281,6 +281,53 @@ it('opens a closed zone into something you can look through', () => {
     "the near seat's exile is empty, so it does not open").toBeNull()
 })
 
+it('says what a creature does in the one corner that was free', () => {
+  // A painting at fifty-eight pixels tells you this is a Dragon. Whether the
+  // Dragon *flies* is the question when the other side has ground blockers,
+  // and the only way to ask it was to hover forty cards one at a time.
+  const board = {
+    seats: [{ seat: 1, slug: 'a', name: 'A', life: 40 },
+      { seat: 2, slug: 'b', name: 'B', life: 40 }],
+    cards: [
+      { id: 1, name: 'A flier', types: 'Creature - Dragon', seat: 1,
+        image: 'https://example.test/d.jpg',
+        // Scryfall's own casing, and a keyword with no sign, both on purpose.
+        keywords: ['Flying', 'Lifelink', 'Kicker'] },
+      { id: 2, name: 'Held back', types: 'Creature - Bear', seat: 1,
+        image: 'https://example.test/b.jpg', keywords: ['Trample'] },
+    ],
+    steps: [
+      { changes: [{ id: 1, zone: 'battlefield', seat: 1 }] },
+      { changes: [{ id: 2, zone: 'hand', seat: 1 }] },
+    ],
+  } as unknown as ForgeBoard
+  const { container } = render(
+    <MatchBoard board={board} shown={2} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const flier = container.querySelector('.field-rows .field-card') as HTMLElement
+  const marks = flier.querySelectorAll('.field-keyword')
+  expect(marks, 'flying and lifelink are drawn; Kicker is not')
+    .toHaveLength(2)
+  // On the arm, so they ride the card round when it turns and stay upright —
+  // the same reason the loupe and the counters are there.
+  expect(marks[0]?.closest('.field-card-arm')).toBeTruthy()
+  // The arm is `aria-hidden`, so the card's own title is how anybody not
+  // looking at ten-pixel pictures gets these.
+  expect(flier.getAttribute('title')).toContain('flying, lifelink')
+  expect(flier.getAttribute('title'), 'and only what is drawn')
+    .not.toContain('Kicker')
+
+  // Not in a hand. Keywords are facts about a fight, and a card being held is
+  // not in one — the same line `inPlay` draws for the loupe.
+  // Seat one is the far side of the table, which is where its hand is.
+  const held = container.querySelector('.field-hand-far .field-card')
+  expect(held, 'the fixture put a card in a hand').toBeTruthy()
+  expect(held?.querySelectorAll('.field-keyword')).toHaveLength(0)
+})
+
 it('keeps the loupe on the battlefield, where a fight is the question', () => {
   const { container } = show()
   // A hand is a fan overlapped to the 27px strip carrying each card's name, so

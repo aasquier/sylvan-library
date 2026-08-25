@@ -55,6 +55,9 @@ export interface BoardCard {
   /** Whether this card makes mana, from Scryfall's `produced_mana` by way of
    *  Go. A card fact rather than a layout rule — see `rowFor`. */
   mana: boolean
+  /** Scryfall's keywords for the card, unfiltered. `components/keywords.tsx`
+   *  decides which of them the board has a sign for. */
+  keywords: string[]
   power: number | null
   toughness: number | null
   counters: { kind: string; n: number }[]
@@ -228,7 +231,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           art: known?.art ?? '',
           artist: known?.artist ?? '',
           zone: 'gone', seat: known?.seat ?? 0, tapped: false,
-          mana: known?.mana ?? false,
+          mana: known?.mana ?? false, keywords: known?.keywords ?? [],
           power: null, toughness: null, counters: [], casts: 0,
         }
         state.set(change.id, card)
