@@ -121,3 +121,24 @@ it('asks for the glossary once however many marks are on the screen', async () =
   await screen.findAllByRole('button', { name: 'What is Mulligan?' })
   expect(vi.mocked(api.glossary)).toHaveBeenCalledTimes(1)
 })
+
+it('gives the help pip a target and a hand, not an inline colour', async () => {
+  // Measured on the deployed Coliseum before this: 18x17px, no focus ring, and
+  // its border and ink written inline where no `:hover` could reach them — in
+  // forty-four places. WCAG 2.5.8 puts the floor at 24x24 and it missed by a
+  // third. jsdom cannot measure a pixel, but it can hold the two properties
+  // that were missing: a class the stylesheet can reach, and a mark whose
+  // colours are not nailed shut inline.
+  render(<HelpTip name="mulligan" />)
+  const pip = await screen.findByRole('button', { name: 'What is Mulligan?' })
+  expect(pip.className).toMatch(/\bhelp-pip\b/)
+
+  const mark = pip.querySelector('.pip-mark')
+  expect(mark, 'the pip needs a class a :hover can reach').toBeTruthy()
+  expect(mark?.getAttribute('style') ?? '',
+    'the pip may not carry its colours where no :hover can reach them')
+    .not.toMatch(/border|color/)
+
+  // The open state is the trigger's own, so CSS can show it filled.
+  expect(pip.getAttribute('aria-expanded')).toBe('false')
+})

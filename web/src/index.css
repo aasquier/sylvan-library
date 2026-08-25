@@ -4304,6 +4304,126 @@ button:hover .tarot-fan-card {
 .btn-arena:active:not(:disabled) .glyph-sword-a { transform: rotate(4deg); }
 .btn-arena:active:not(:disabled) .glyph-sword-b { transform: rotate(-4deg); }
 
+/* ------------------------------------------------- the glossary's two hands
+ *
+ * `components/term.tsx` renders both: a word in a sentence with its
+ * definition one hover away, and a pip beside a label that has no sentence to
+ * underline. They had one thing in common — their colours were written
+ * *inline*, where a `:hover` cannot reach, so neither ever answered the hand.
+ * Forty-four of them.
+ *
+ * The pip was worse. Measured on the deployed Coliseum it was **18x17px**,
+ * which is below WCAG 2.5.8's 24x24 floor by a third, with no focus ring at
+ * all — the smallest and least reachable control in the app, and the one a
+ * newcomer needs most (commandment 2). It grows a little, and `::after`
+ * reaches past the mark for the rest of the target so the line it sits on
+ * does not move.
+ *
+ * `[aria-expanded]` is already on the trigger, so the open state styles
+ * itself: filled while the definition is showing, which is the difference
+ * between a link and a toggle that admits it is one. */
+.help-pip {
+  position: relative;
+  border-radius: 999px;
+}
+/* The target, not the mark. Reaching further sideways than up and down is
+ * deliberate: the field this usually sits above is four pixels below it, and
+ * a target that swallows the top of a number input has traded one bad tap for
+ * another. */
+.help-pip::after {
+  content: '';
+  position: absolute;
+  inset: -6px -9px;
+}
+.pip-mark {
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+  transition: color 140ms ease, border-color 140ms ease,
+    background-color 140ms ease;
+}
+.help-pip:hover .pip-mark {
+  border-color: var(--vine);
+  color: var(--vine);
+}
+.help-pip:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 3px;
+}
+.help-pip[aria-expanded='true'] .pip-mark {
+  background: var(--vine);
+  border-color: var(--vine);
+  color: var(--page);
+}
+
+/* A word in prose. The dotted rule is the affordance; it inks up rather than
+ * fading, because light added is what a live control does. */
+.term-word {
+  border-bottom: 1px dotted var(--text-muted);
+  text-decoration: none;
+  transition: border-bottom-color 140ms ease, color 140ms ease;
+}
+.term-trigger:hover .term-word,
+.term-trigger[aria-expanded='true'] .term-word {
+  border-bottom-color: var(--vine);
+  color: var(--vine);
+}
+.term-trigger:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pip-mark,
+  .term-word {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------- the card, held up
+ *
+ * `CardHover`'s answer for a hand with no cursor. The cursor preview sits
+ * beside the pointer because there is a pointer to sit beside; a finger
+ * covers the exact point it would use, and near an edge the card clips. So a
+ * tap gets the card *centred*, over a dimmed room, the way you would hold one
+ * up rather than lay it down.
+ *
+ * The corner radius is a real Magic card's: 4.75% of the width, which on a
+ * 63x88mm card is the 3mm die the printer actually cuts. A card with square
+ * corners is the one thing no Magic player has ever held. */
+.card-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgb(0 0 0 / 0.74);
+  animation: card-sheet-in 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-sheet-art {
+  display: block;
+  max-width: min(80vw, 23rem);
+  max-height: 84vh;
+  border-radius: 4.75% / 3.4%;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.65);
+  animation: card-sheet-rise 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes card-sheet-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes card-sheet-rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-sheet,
+  .card-sheet-art {
+    animation: none;
+  }
+}
+
 /* Chip pickers (the Learn page's tiers and guilds, the create flow's doors,
  * the vocabulary's see-also trail): aria-pressed toggles that used to wear
  * their states inline, where no :hover could reach them. One class, one

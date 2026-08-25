@@ -15,9 +15,9 @@
  * a refactor drops the role nothing else in the suite would ever notice.
  */
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
-import { ErrorNote, Spinner } from './ui'
+import { CardHover, ErrorNote, Spinner } from './ui'
 
 afterEach(cleanup)
 
@@ -52,4 +52,61 @@ it('interrupts for a refusal, because a failure that waits its turn is a wait', 
   // `alert` rather than `status`: everywhere else polite is right, and here it
   // is not -- somebody is still waiting for an answer that is never coming.
   expect(screen.getByRole('alert').textContent).toBe('The reading could not be dealt.')
+})
+
+/** A tap, the way a phone makes one. jsdom has no PointerEvent of its own, so
+ *  the type rides on a plain Event — which is all the handler reads. */
+function tap(el: Element) {
+  for (const type of ['pointerdown', 'pointerup']) {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'pointerType', { value: 'touch' })
+    fireEvent(el, ev)
+  }
+}
+
+const CARD = { name: 'Jareth, Leonine Titan', image: 'https://example.test/j.jpg' }
+
+it('hands the whole card to a tap, for the half of the room with no cursor', () => {
+  // `CardHover` was `onMouseEnter` and nothing else, which meant that on a
+  // phone the card behind a 96x64 crop was unreachable in twenty-three places.
+  // A hover-only mechanism locks out every touch user, and here it was the
+  // only answer to "what is this card" — the newcomer's first question.
+  render(<CardHover card={CARD}><span>tile</span></CardHover>)
+  expect(screen.queryByRole('dialog')).toBeNull()
+
+  tap(screen.getByText('tile'))
+
+  const sheet = screen.getByRole('dialog', { name: CARD.name })
+  expect(sheet).toBeTruthy()
+  expect(screen.getByAltText(CARD.name).getAttribute('src')).toBe(CARD.image)
+})
+
+it('leaves the tap alone where the tile is already a control', () => {
+  // Four of the twenty-three wrap a real button — the commander picker on the
+  // create flow, and the reading room's tiles. There a tap already means
+  // *choose this*, and stealing it would break the newcomer's most important
+  // decision to show them a picture they never asked for.
+  const chosen: string[] = []
+  render(
+    <CardHover card={CARD} tapOpens={false}>
+      <button type="button" onClick={() => chosen.push(CARD.name)}>pick</button>
+    </CardHover>)
+
+  tap(screen.getByRole('button', { name: 'pick' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'pick' }))
+  expect(chosen).toEqual([CARD.name])
+})
+
+it('closes the held card on a tap anywhere and on Escape', () => {
+  render(<CardHover card={CARD}><span>tile</span></CardHover>)
+
+  tap(screen.getByText('tile'))
+  fireEvent.click(screen.getByRole('dialog'))
+  expect(screen.queryByRole('dialog')).toBeNull()
+
+  tap(screen.getByText('tile'))
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
 })

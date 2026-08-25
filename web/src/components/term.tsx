@@ -32,10 +32,15 @@ import { ManaText } from './ui'
  * focus as well as click because a keyboard has no pointer. All three set the
  * same piece of state, so there is one open panel and one way to close it.
  */
-function Popover({ label, term, children }: {
+function Popover({ label, term, children, trigger = '' }: {
   label: string
   term: TermData
   children: React.ReactNode
+  /** A class for the button itself. The two callers below want different
+   *  hands: a word in a sentence underlines, a pip beside a label fills. Both
+   *  need somewhere a `:hover` can actually reach, which an inline style is
+   *  not (commandment 17, and the reason a hundred dull controls happened). */
+  trigger?: string
 }) {
   const [open, setOpen] = useState(false)
   const [pinned, setPinned] = useState(false)
@@ -71,7 +76,7 @@ function Popover({ label, term, children }: {
         onFocus={() => setOpen(true)}
         onBlur={() => !pinned && setOpen(false)}
         onClick={() => { setPinned((p) => !p); setOpen(true) }}
-        className="cursor-help align-baseline"
+        className={`cursor-help align-baseline ${trigger}`}
         style={{ font: 'inherit', color: 'inherit', textAlign: 'inherit' }}
       >
         {children}
@@ -125,13 +130,8 @@ export function Term({ name, children }: {
   const term = useTerm(name)
   if (!term) return <>{children}</>
   return (
-    <Popover label={term.term} term={term}>
-      <span style={{
-        borderBottom: '1px dotted var(--text-muted)',
-        textDecoration: 'none',
-      }}>
-        {children}
-      </span>
+    <Popover label={term.term} term={term} trigger="term-trigger">
+      <span className="term-word">{children}</span>
     </Popover>
   )
 }
@@ -147,15 +147,18 @@ export function HelpTip({ name }: { name: string }) {
   const term = useTerm(name)
   if (!term) return null
   return (
-    <Popover label={term.term} term={term}>
-      <span
-        aria-hidden
-        className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold leading-none"
-        style={{
-          border: '1px solid var(--text-muted)',
-          color: 'var(--text-muted)',
-        }}
-      >
+    // **The smallest control in the app was the beginner's one.** Measured on
+    // the deployed Coliseum: 18x17px, no focus ring, and its border and ink
+    // written inline where no `:hover` could ever reach them — in 44 places.
+    // WCAG's own floor for a target is 24x24 (2.5.8) and it missed that by a
+    // third. The mark itself grows a little, which a help affordance can
+    // afford to do, and `.help-pip` reaches past it for the rest of the
+    // target, so nothing around it moves.
+    <Popover label={term.term} term={term} trigger="help-pip">
+      <span aria-hidden
+            className="pip-mark ml-1 inline-flex h-[1.1rem] w-[1.1rem]
+                       items-center justify-center rounded-full
+                       text-[0.62rem] font-bold leading-none">
         ?
       </span>
     </Popover>
