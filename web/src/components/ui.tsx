@@ -595,6 +595,39 @@ export function CardArt({
 }
 
 /**
+ * One card, held up: centred over a dimmed room, dismissed by a tap anywhere
+ * or by Escape.
+ *
+ * Its own component because two very different surfaces need the same
+ * gesture — a thumbnail in a list (`CardHover` below) and a permanent on the
+ * arena floor (`components/board.tsx`) — and both need it for the same
+ * reason: their reading affordance was `:hover`, and half the room has no
+ * pointer to hover with.
+ *
+ * Portalled to the body. A `position: fixed` sheet rendered in place is
+ * trapped by any ancestor carrying a transform, and both callers sit inside
+ * several that do — the board's cards are literally mid-rotation.
+ */
+export function CardSheet({ name, image, onClose }: {
+  name: string
+  image: string
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return createPortal(
+    <span role="dialog" aria-modal="true" aria-label={name}
+          className="card-sheet" onClick={onClose}>
+      <img src={image} alt={name} className="card-sheet-art" />
+    </span>,
+    document.body)
+}
+
+/**
  * Full card image on hover, positioned near the cursor — and on a tap,
  * centred, for the half of the audience that has no cursor at all.
  *
@@ -655,14 +688,6 @@ export function CardHover({
     return () => window.removeEventListener('scroll', clear, true)
   }, [showing])
 
-  // Escape closes the sheet, the way it closes every other held thing here.
-  useEffect(() => {
-    if (!held) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setHeld(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [held])
-
   return (
     <span
       ref={ref}
@@ -680,15 +705,10 @@ export function CardHover({
       onMouseLeave={() => setPos(null)}
     >
       {children}
-      {held && card.image && createPortal(
-        // Portalled to the body: a `position: fixed` sheet rendered inside the
-        // tile would be trapped by any ancestor carrying a transform, and this
-        // component is used inside several that do.
-        <span role="dialog" aria-modal="true" aria-label={card.name}
-              className="card-sheet" onClick={() => setHeld(false)}>
-          <img src={card.image} alt={card.name} className="card-sheet-art" />
-        </span>,
-        document.body)}
+      {held && card.image && (
+        <CardSheet name={card.name} image={card.image}
+                   onClose={() => setHeld(false)} />
+      )}
       {pos && card.image && (
         <span
           className="pointer-events-none fixed z-50 block"

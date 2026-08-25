@@ -42,6 +42,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ForgeBoard } from '../lib/api'
+import { CardSheet } from './ui'
 import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
   from '../lib/board'
 import type { Speed } from '../lib/reel'
@@ -59,6 +60,7 @@ function FieldCard({ card, size, count }: {
   /** How many identical cards this one stands for. See `stackRow`. */
   count: number
 }) {
+  const [held, setHeld] = useState(false)
   const stats = fightingStats(card)
   const counters = card.counters.filter((c) => c.n > 0)
   // A token's painting is a *chosen* printing (the earliest, which is the
@@ -74,7 +76,18 @@ function FieldCard({ card, size, count }: {
   return (
     <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
                     + (count > 1 ? ' is-stacked' : '')}
-         title={title} tabIndex={card.image ? 0 : -1}>
+         title={title} tabIndex={card.image ? 0 : -1}
+         onPointerUp={(e) => {
+           // **The peek below is `:hover` and `:focus-visible`, and a phone is
+           // neither.** Forty cards on a floor, none of them readable at forty
+           // pixels, and the one mechanism that made them readable needed a
+           // pointer — so on a touch screen the whole board was a mosaic. The
+           // sheet is the same answer the card lists got: held up, centred,
+           // and free of the field's own `overflow: hidden`, which is what
+           // clips a peek opening near an edge.
+           if (e.pointerType === 'mouse' || !card.image) return
+           setHeld(true)
+         }}>
       {/* **The card, readable.** A permanent on this board is forty pixels of
           painting — enough to know a Forest from a Dragon and nowhere near
           enough to read one. Hovering lifts the whole face out at a size a
@@ -123,6 +136,10 @@ function FieldCard({ card, size, count }: {
         <span className="field-card-counters tabular">
           {counters.map((c) => c.n).reduce((a, b) => a + b, 0)}
         </span>
+      )}
+      {held && card.image && (
+        <CardSheet name={card.name} image={card.image}
+                   onClose={() => setHeld(false)} />
       )}
     </div>
   )
@@ -230,12 +247,57 @@ function FieldRail({ side, name }: { side: BoardSide; name: string }) {
 }
 
 /**
+ * A hand, held at the side of the table rather than laid out on it.
+ *
+ * **A hand is not on the battlefield, and it used to be drawn as though it
+ * were** — a full-width row in the same stack as lands and creatures, one per
+ * seat. Eight rows for two players, two of them cards nobody has played yet,
+ * and the field itself squeezed for the room (Aaron, 2026-08-25: *"maybe it
+ * isn't in the field but is to the side to give more room for cards"*). He is
+ * describing a real table: your hand is in your hand, off to one side, and the
+ * sand is for what has been committed to it.
+ *
+ * So the cards overlap the way cards in a hand overlap, each showing the strip
+ * that carries its name, and the whole hand costs one narrow column instead of
+ * a row across the field. Below `--field-wide` the column has nowhere to go
+ * and the fan turns on its side into a strip, which is the same gesture read
+ * across instead of down.
+ *
+ * Not `stackRow`: two copies of the same card in a hand are two cards, and a
+ * hand is small enough that seeing seven of them is the point. On the
+ * battlefield stacking nine Forests into one is a mercy; here it would be a
+ * lie about how many cards somebody is holding.
+ */
+function FieldHand({ side, name, facing }: {
+  side: BoardSide
+  name: string
+  facing: 'far' | 'near'
+}) {
+  return (
+    <div className={`field-hand field-hand-${facing}`}>
+      <span className="field-hand-label">
+        {name}<span className="field-hand-n tabular">{side.hand.length}</span>
+      </span>
+      <div className="field-hand-fan"
+           aria-label={`Hand: ${side.hand.length}`}>
+        {side.hand.length === 0 ? (
+          <span className="field-hand-empty">an empty hand</span>
+        ) : side.hand.map((card) => (
+          <FieldCard key={card.id} card={card} size="small" count={1} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
  * One player's half of the field.
  *
  * `facing` is which edge of the table they sit at, and it does one thing:
  * reverses the row order. The far player's battlefield is nearest the seam and
- * their hand is at the outer edge, which is exactly how it looks from the
- * other side of a real table.
+ * their lands are at the outer edge, which is exactly how it looks from the
+ * other side of a real table. The hand is no longer among these rows — it is
+ * held at the side (`FieldHand` above).
  */
 function FieldSide({ side, name, facing }: {
   side: BoardSide
@@ -245,8 +307,6 @@ function FieldSide({ side, name, facing }: {
   // Outermost first. The near player's side is the same list reversed, so the
   // two creature rows finish up either side of the seam.
   const rows = [
-    <FieldRow key="hand" label="Hand" cards={side.hand} size="small"
-              empty="an empty hand" />,
     <FieldRow key="land" label="Lands" cards={side.land} size="small"
               empty="no lands yet" />,
     <FieldRow key="perm" label="Artifacts and enchantments"
@@ -426,6 +486,14 @@ export function MatchBoard({ board, shown, game, name, running,
 
       <FieldSide side={near} facing="near"
                  name={name(near.slug, near.name)} />
+
+      {/* Both hands, held at the side of the table. Far above near, the same
+          way the seats are, so a hand stays with the person holding it. */}
+      <div className="field-hands">
+        <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
+        <FieldHand side={near} facing="near"
+                   name={name(near.slug, near.name)} />
+      </div>
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
                       seek={seek} games={games} playing={playing}
