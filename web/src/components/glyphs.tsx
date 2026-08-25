@@ -51,3 +51,60 @@ export function HandFanGlyph({ size = 14 }: { size?: number }) {
     </svg>
   )
 }
+
+/** Crossed swords in saltire: the sign the Coliseum's gate wears.
+ *
+ *  Drawn rather than photographed, and that is a size argument rather than a
+ *  taste one. The wheel's clash is a real Met plate because it plays at 380px,
+ *  where a museum photograph earns every one of them; this mark plays at 15px
+ *  inside a button, where a matted photograph is a smudge and a silhouette is
+ *  legible. Commandment 5 forbids clip art, not drawing — `ReplayGlyph` above
+ *  settled that, and this file is where the house keeps its own marks.
+ *
+ *  What makes it read as *swords* rather than as an X is the crossguard: two
+ *  bars and two pommels, which is the whole difference between heraldry and a
+ *  multiplication sign. One sword is drawn once and mounted twice at ±45°,
+ *  because a matched pair is what a pair of gladiators is — and it is mounted
+ *  so the blades cross just above the guards, which is where every crossed
+ *  pair since the Romans has crossed.
+ *
+ *  Each sword carries its own class and its own wrapper so a button can move
+ *  it — `transform-box: fill-box` makes that wrapper's own centre the pivot,
+ *  which is the crossing point, so a rotation opens the pair rather than
+ *  swinging it. `.btn-arena` in `index.css` does exactly that on hover;
+ *  nothing here animates on its own. */
+export function CrossedSwordsGlyph({ size = 17 }: { size?: number }) {
+  const sword = (
+    <>
+      {/* Blade: parallel edges most of the way, then a taper to the point. */}
+      <path d="M -1.55 -3.1 L 1.55 -3.1 L 1.55 -10.8 L 0 -14 L -1.55 -10.8 Z"
+            fill="currentColor" />
+      {/* Crossguard, grip and pommel — the half that makes it a sword rather
+          than a stroke, and the half that disappears first. Drawn heavier
+          than the proportions of a real blade would give it: at seventeen
+          pixels a historically honest guard is one pixel tall and the mark
+          collapses into a multiplication sign. The bar is what carries it. */}
+      <rect x="-4.5" y="-4.1" width="9" height="2.3" rx="0.9"
+            fill="currentColor" />
+      <rect x="-1.1" y="-2.4" width="2.2" height="4.3" rx="0.9"
+            fill="currentColor" />
+      <circle cx="0" cy="2.8" r="1.7" fill="currentColor" />
+    </>
+  )
+  // 4.8 is the sword's own midpoint: it spans -14 (point) to 4.35 (pommel),
+  // so sliding it down by half that puts its centre on the crossing and the
+  // pair balances — points reaching as far as pommels, which is what keeps a
+  // saltire from looking like it is falling over.
+  const mounted = (deg: number) => (
+    <g transform={`rotate(${deg}) translate(0 4.8)`}>{sword}</g>
+  )
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      <g transform="translate(10 10)">
+        <g className="glyph-sword glyph-sword-a">{mounted(-45)}</g>
+        <g className="glyph-sword glyph-sword-b">{mounted(45)}</g>
+      </g>
+    </svg>
+  )
+}

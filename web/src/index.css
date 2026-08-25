@@ -4212,6 +4212,98 @@ button:hover .tarot-fan-card {
   box-shadow: none;
 }
 
+/* ---------------------------------------------------------- the arena gate
+ *
+ * `.btn-arena` — the one control in this app that starts a *fight*, and the
+ * chart palette was never going to carry it. `--series-1` means "series one
+ * of a line chart"; on the gate of a Roman arena it read as a form's submit
+ * button, which is what Aaron saw from a phone and said out loud
+ * (2026-08-25). A control wears the room it serves (commandment 17), and
+ * this room's materials are blood, sand and brass.
+ *
+ * The three reds are declared on `:root` beside the anvil's iron, for the
+ * anvil's own reason: blood on sand is an *object* sitting on the surface,
+ * not the surface, and an object lit from above is the same object in
+ * daylight as it is at night. The ink is the wheel's candlelight rather than
+ * white — 7.7:1 against the body of the gradient and 5.3:1 against its lit
+ * end, so the label clears AA on every band it crosses.
+ *
+ * The face is not a fill. A lit top edge, a shaded lower one and a drop
+ * beneath put the plate *above* the card rather than printed on it; that is
+ * the wheel's spin button at a quieter volume, which is the volume a control
+ * inside a form should be. The strike is the hover: the pair draws apart the
+ * way two fighters square up before they close, and a glint crosses the
+ * steel. Reduced motion keeps the whole material and removes only the parts
+ * that move.
+ */
+:root {
+  --arena-blood-lit: #a8332c;
+  --arena-blood: #7e2420;
+  --arena-blood-deep: #4a1310;
+}
+
+.btn-arena {
+  background-image: linear-gradient(
+    180deg,
+    var(--arena-blood-lit) 0%,
+    var(--arena-blood) 58%,
+    var(--arena-blood-deep) 100%);
+  border-color: color-mix(in srgb, var(--anvil-brass) 58%, #2a0d0b);
+  color: var(--anvil-glint);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 168, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+/* The glint, as `.btn-primary` cuts it — steel takes a light better than
+ * paint does, so this one is allowed to be a shade brighter than the one
+ * upstairs. Still nowhere near the wheel's. */
+.btn-arena::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 226, 168, 0.38) 47%,
+    rgba(255, 226, 168, 0.12) 56%,
+    transparent 68%);
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+.btn-arena:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--anvil-brass) 88%, #2a0d0b);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 168, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 4px 14px rgba(126, 36, 32, 0.5);
+}
+.btn-arena:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+.btn-arena:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 226, 168, 0.1);
+}
+
+/* The pair squares up. `fill-box` puts each sword's pivot on its own centre,
+ * which is the crossing, so the blades open rather than swing. Twelve
+ * degrees: enough to read as a movement, not enough to become a windmill. */
+.glyph-sword {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-arena:hover:not(:disabled) .glyph-sword-a { transform: rotate(-12deg); }
+.btn-arena:hover:not(:disabled) .glyph-sword-b { transform: rotate(12deg); }
+/* Pressed, they close again — the strike itself. */
+.btn-arena:active:not(:disabled) .glyph-sword-a { transform: rotate(4deg); }
+.btn-arena:active:not(:disabled) .glyph-sword-b { transform: rotate(-4deg); }
+
 /* Chip pickers (the Learn page's tiers and guilds, the create flow's doors,
  * the vocabulary's see-also trail): aria-pressed toggles that used to wear
  * their states inline, where no :hover could reach them. One class, one
@@ -4349,11 +4441,24 @@ button:hover .tarot-fan-card {
   .btn:hover:not(:disabled),
   .btn-primary:hover:not(:disabled),
   .btn-quiet:hover:not(:disabled),
+  .btn-arena:hover:not(:disabled),
   .btn-danger-solid:hover:not(:disabled) {
     transform: none;
   }
-  .btn-primary:hover:not(:disabled)::after {
+  .btn-primary:hover:not(:disabled)::after,
+  .btn-arena:hover:not(:disabled)::after {
     transform: translateX(-130%);
+  }
+  /* The gate keeps its blood, its brass and its swords; only the squaring
+     up is dropped. A pair frozen mid-open is a pair drawn crooked. */
+  .glyph-sword {
+    transition: none;
+  }
+  .btn-arena:hover:not(:disabled) .glyph-sword-a,
+  .btn-arena:hover:not(:disabled) .glyph-sword-b,
+  .btn-arena:active:not(:disabled) .glyph-sword-a,
+  .btn-arena:active:not(:disabled) .glyph-sword-b {
+    transform: none;
   }
 }
 
@@ -5462,6 +5567,13 @@ button:hover .tarot-fan-card {
   border-radius: 1rem;
   aspect-ratio: 1.37 / 1;
   max-height: 48vh;
+  /* The height cap is what sets the width — 1.37:1 against 48vh comes out
+     narrower than the column on any laptop — and a block box narrower than
+     its container hugs the start unless it is told not to. Measured on the
+     deployed room at 1456px: a 534px painting at the left edge of a 1024px
+     column with 490px of nothing beside it. Centred, the same painting reads
+     as hung; it was only ever missing one line. */
+  margin-inline: auto;
 }
 
 .coliseum-hero-art {
@@ -5493,26 +5605,54 @@ button:hover .tarot-fan-card {
   50%      { transform: scale(1.05) translate3d(-1%, -0.8%, 0); }
 }
 
-/* The credit, as a footnote on the painting rather than a caption under it. */
-.coliseum-footnote {
+/* The nameplate: the title and the credit share one bar across the foot of
+ * the frame, and that is a bug fix rather than a tidy-up. They used to be two
+ * absolutes both anchored to the bottom, which is a collision waiting for a
+ * narrow enough frame — twelve pixels apart at 1456px and straight through
+ * each other on a phone, which is where Aaron photographed it (2026-08-25).
+ * A flex row cannot overlap itself.
+ *
+ * The scrim is the other half. White ink at 78% over Critchlow's *pale* stone
+ * was legible at night and nearly gone in daylight, because the light theme
+ * dims this painting by 5% and that is all; a credit is somebody's name and it
+ * does not get to be optional in one theme. A bottom-up wash is what every
+ * printed poster does, it costs the plain at the foot of the painting and
+ * nothing else, and it makes both lines land the same way in both themes. */
+.coliseum-plate {
   position: absolute;
-  right: 0.9rem;
-  bottom: 0.7rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 4;
-  max-width: min(46ch, 70%);
-  text-align: right;
-  font-size: 0.68rem;
-  line-height: 1.45;
-  color: color-mix(in oklab, #fff 78%, transparent);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 1rem;
+  padding: 2.2rem 1.25rem 0.95rem;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgb(0 0 0 / 0.5) 62%,
+    rgb(0 0 0 / 0.72) 100%);
 }
 
 .coliseum-title {
-  position: absolute;
-  left: 1.25rem;
-  bottom: 1.1rem;
-  z-index: 4;
+  flex: 0 1 auto;
   text-shadow: 0 2px 12px rgb(0 0 0 / 0.85);
+}
+
+/* The credit, as a footnote on the painting rather than a caption under it.
+ * `margin-left: auto` keeps it against the right edge on the shared line and
+ * still against it on its own line when the bar wraps. */
+.coliseum-footnote {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: color-mix(in oklab, #fff 86%, transparent);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
 }
 
 /* ------------------------------------------------- the per-arena stage ---
