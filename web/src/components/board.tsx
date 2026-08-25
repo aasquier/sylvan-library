@@ -28,9 +28,15 @@
  * the poker hole-card camera. Showing the library would be showing the
  * answers. The library is dropped in Go so it cannot arrive here by accident.
  *
- * **A tapped permanent is turned ninety degrees**, because that is what tapped
- * *is*. No badge, no dimming, no icon: the card lies on its side the way it
- * would on a table, and it turns rather than jumping there.
+ * **A tapped permanent is turned**, because that is what tapped *is*. No
+ * badge, no dimming, no icon: the card leans the way it would on a table, and
+ * it turns rather than jumping there. Forty-five degrees rather than ninety —
+ * a full quarter-turn reads correctly and costs a card's whole height in
+ * width, which on a board of forty permanents is the difference between a row
+ * and two rows. Half a turn is unmistakably *turned* and stays inside its own
+ * slot (Aaron, 2026-08-25: *"more compact use of space in general"*). What it
+ * costs is that a card's corners no longer line up with its slot's, which is
+ * what `.field-card-arm` is for.
  *
  * **Nothing here is a plain `<img>` on a plain `<div>`** (commandment 17's
  * spirit one layer down). A card that arrives grows into place, a card that
@@ -42,6 +48,7 @@
 import {
   type CSSProperties, createContext, useContext, useEffect, useRef, useState,
 } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
@@ -121,17 +128,169 @@ function markOf(kind: string): Mark | null {
 const Struck = createContext<{ card: string; mark: Mark; key: string } | null>(
   null)
 
-function FieldCard({ card, size, count }: {
+/** How wide the card held up on hover is drawn, and how much room it needs.
+ *
+ *  A Scryfall `normal` face is 488x680, so the height follows the width; the
+ *  artist line under it is the rest. Both are needed *before* the element
+ *  exists, because the placement below decides where to put it rather than
+ *  putting it somewhere and correcting. */
+const PEEK_W = 300
+/** The narrowest a held-up card is allowed to be. Narrower than the smallest
+ *  phone this room supports, so it only ever binds on a viewport that is
+ *  lying — see the floor's argument in `FieldPeek`. */
+const PEEK_MIN_W = 160
+const PEEK_RATIO = 680 / 488
+const PEEK_GAP = 10
+const PEEK_EDGE = 8
+
+/**
+ * The one card held up off the board, drawn in the body rather than in the row.
+ *
+ * **Three separate bugs, one cause.** The preview used to be a sibling `span`
+ * inside each card, absolutely positioned and centred on it, and that shape
+ * fails three ways at once (Aaron, 2026-08-25):
+ *
+ * - a card near the left edge had its preview *"clipped by the black border"* —
+ *   the field clips its own overflow, and a 300px panel centred on a card 30px
+ *   from the edge hangs 120px into the wall;
+ * - opening a hand or a graveyard and then hovering a card inside it put a
+ *   preview *"in conflict"* with the tray it opened from, because the tray is a
+ *   scrolling box and the preview was inside it;
+ * - and the cards in those trays are 42 pixels wide, where *"I can't even make
+ *   out the printing"*.
+ *
+ * All three are the same fact: a preview parented to the thing it previews
+ * inherits that thing's clipping, its scrolling and its stacking. So it is
+ * **portalled to the body and placed in viewport coordinates**, measured from
+ * the card's own rectangle — which is also the only way to clamp it, because
+ * clamping needs to know where the edges are and CSS centring never does.
+ *
+ * `position: fixed` alone would not have done it. The board's cards sit inside
+ * several transformed ancestors and are *literally mid-rotation*, and a
+ * transform makes a new containing block for fixed children — the same trap
+ * `CardSheet` documents one file over.
+ */
+function FieldPeek({ card, at, avoid }: {
+  card: BoardCard
+  at: DOMRect
+  /** The opened tray this card is sitting in, when it is sitting in one.
+   *
+   *  A hand or a graveyard spread out is a panel somebody opened *in order to
+   *  look at it*, and dropping a 300px card into the middle of it covers the
+   *  thing they opened (Aaron, 2026-08-25: the full-hand view "conflicts with
+   *  the individual hover preview on each card"). Given the panel's rectangle
+   *  the preview can step out beside it instead of onto it — so the pile stays
+   *  readable and the one card being asked about stands next to it, which is
+   *  what picking a card out of a pile looks like. */
+  avoid: DOMRect | null
+}) {
+  const room = document.documentElement
+  // **A floor, because a viewport can measure zero.** A background or hidden
+  // tab reports `clientWidth: 0` — the whole document does, `vw` included —
+  // and the shrink-to-fit above then hands back a *negative* width, which is a
+  // card drawn inside out. Nobody is looking at a hidden tab, but they are
+  // looking the instant it comes back, and the preview must not be the thing
+  // that arrives broken.
+  const width = Math.max(PEEK_MIN_W,
+    Math.min(PEEK_W, room.clientWidth - 2 * PEEK_EDGE))
+  const height = width * PEEK_RATIO + (card.artist ? 18 : 0)
+  const fits = (x: number) => x >= PEEK_EDGE
+    && x + width <= room.clientWidth - PEEK_EDGE
+  const clamp = (v: number, max: number) =>
+    Math.min(Math.max(v, PEEK_EDGE), Math.max(max, PEEK_EDGE))
+
+  // Beside the panel when there is one and either flank has room; otherwise
+  // the ordinary placement, which will land on top of it — better a covered
+  // tray than a preview half off the screen.
+  const beside = avoid
+    ? [avoid.right + PEEK_GAP, avoid.left - PEEK_GAP - width].find(fits)
+    : undefined
+  if (beside !== undefined) {
+    return draw(beside,
+      clamp(at.top + at.height / 2 - height / 2,
+        room.clientHeight - height - PEEK_EDGE))
+  }
+  // Above the card by preference, below it when there is no room above —
+  // which is most of the far player's half, and every tray that opened
+  // downward.
+  const above = at.top - PEEK_GAP - height
+  return draw(
+    clamp(at.left + at.width / 2 - width / 2,
+      room.clientWidth - width - PEEK_EDGE),
+    above >= PEEK_EDGE ? above
+      : clamp(at.bottom + PEEK_GAP, room.clientHeight - height - PEEK_EDGE))
+
+  function draw(left: number, top: number) {
+    return createPortal(
+      <span className="field-peek" aria-hidden="true"
+            style={{ left, top, width }}>
+        <img src={card.image} alt="" draggable={false} />
+        {card.artist && (
+          <span className="field-peek-artist">art by {card.artist}</span>
+        )}
+      </span>,
+      document.body)
+  }
+}
+
+function FieldCard({ card, size, count, inPlay = false }: {
   card: BoardCard
   size: 'normal' | 'small'
   /** How many identical cards this one stands for. See `stackRow`. */
   count: number
+  /** Whether this card is standing on the battlefield, as opposed to being
+   *  held, buried, exiled or waiting in the command zone.
+   *
+   *  **Only the loupe reads it, and only the loupe should.** Power and
+   *  toughness on this board are what a creature is fighting at *now* — the
+   *  live figures, counters and anthems included — and that is a question the
+   *  battlefield asks and nowhere else does. A card in a hand has printed
+   *  numbers and no fight to have them in.
+   *
+   *  It is also a real fault rather than a nicety. The hand is a fan overlapped
+   *  to the 27px strip carrying each card's name, so a card's bottom-right
+   *  corner is *under the next card* — and a loupe pinned there is a set of
+   *  numbers drawn on somebody else's painting, belonging to a card you cannot
+   *  see. Measured on a live board before it was believed. */
+  inPlay?: boolean
 }) {
   const [held, setHeld] = useState(false)
-  // The loupe, held open by a tap. Hover and focus open it in CSS; this is
-  // only for the pointer that has no hover to give.
-  const [peeking, setPeeking] = useState(false)
-  const stats = fightingStats(card)
+  // Where this card is standing, the moment a pointer or the keyboard found
+  // it — and null the rest of the time, which is what keeps exactly one
+  // preview on the page. Measured rather than remembered: a card in a tray
+  // that has just scrolled, or one mid-rotation, is not where it was.
+  const box = useRef<HTMLDivElement>(null)
+  const [at, setAt] = useState<{ card: DOMRect; tray: DOMRect | null } | null>(
+    null)
+  // Which kind of hand last touched this. Touch browsers fire `mouseenter`
+  // synthetically after a tap, so without this a tap would open the sheet and
+  // arm a hover preview behind it — `CardHover` learned the same thing.
+  const coarse = useRef(false)
+  const show = () => {
+    if (coarse.current || !card.image || !box.current) return
+    // The panel this card is sitting in, if any. Asked of the DOM rather than
+    // passed down: the same `FieldCard` is drawn on the sand, in a fan and in
+    // four kinds of tray, and threading "are you in a tray" through all of
+    // them would be a prop that exists to restate what the tree already says.
+    const tray = box.current.closest('.field-tray')
+    setAt({
+      card: box.current.getBoundingClientRect(),
+      tray: tray ? tray.getBoundingClientRect() : null,
+    })
+  }
+  const hide = () => setAt(null)
+  // A preview placed in viewport coordinates is wrong the moment the page
+  // moves under it, and the room scrolls while a match is playing. Registered
+  // only while one is open, so a board of forty cards costs zero listeners at
+  // rest rather than forty.
+  const showing = at !== null
+  useEffect(() => {
+    if (!showing) return
+    const clear = () => setAt(null)
+    window.addEventListener('scroll', clear, true)
+    return () => window.removeEventListener('scroll', clear, true)
+  }, [showing])
+  const stats = inPlay ? fightingStats(card) : null
   const struck = useContext(Struck)
   // Matched on Forge's own spelling, which is what both ends of this carry.
   // Two copies of one name is a token or a basic; marking both is a better
@@ -155,37 +314,26 @@ function FieldCard({ card, size, count }: {
     <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
                     + (count > 1 ? ' is-stacked' : '')
                     + (mark ? ` is-${mark.mark}` : '')}
-         title={title} tabIndex={card.image ? 0 : -1}
+         ref={box} title={title} tabIndex={card.image ? 0 : -1}
+         onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
          onPointerUp={(e) => {
-           // **The peek below is `:hover` and `:focus-visible`, and a phone is
+           // **The preview is `:hover` and keyboard focus, and a phone is
            // neither.** Forty cards on a floor, none of them readable at forty
            // pixels, and the one mechanism that made them readable needed a
            // pointer — so on a touch screen the whole board was a mosaic. The
            // sheet is the same answer the card lists got: held up, centred,
-           // and free of the field's own `overflow: hidden`, which is what
-           // clips a peek opening near an edge.
+           // and free of every box on the way out.
            if (e.pointerType === 'mouse' || !card.image) return
+           hide()
            setHeld(true)
-         }}>
-      {/* **The card, readable.** A permanent on this board is forty pixels of
-          painting — enough to know a Forest from a Dragon and nowhere near
-          enough to read one. Hovering lifts the whole face out at a size a
-          person can actually read, which is what every Magic client does and
-          what the rest of this app already does through `CardHover`.
-
-          Drawn as a sibling rather than in a portal, and only on hover or
-          keyboard focus: a board holds forty of these, and forty always-mounted
-          previews is forty more images than the page needs. `tabIndex` is what
-          gives it to the keyboard — a hover-only affordance is one nobody
-          without a mouse ever gets. */}
-      {card.image && (
-        <span className="field-card-peek" aria-hidden="true">
-          <img src={card.image} alt="" loading="lazy" draggable={false} />
-          {card.artist && (
-            <span className="field-card-peek-artist">art by {card.artist}</span>
-          )}
-        </span>
-      )}
+         }}
+         // **The card, readable.** A permanent on this board is fifty-eight
+         // pixels of painting — enough to know a Forest from a Dragon and
+         // nowhere near enough to read one. These four lift the whole face
+         // out at a size a person can actually read; `FieldPeek` decides
+         // where it goes and why it is not drawn here.
+         onMouseEnter={show} onMouseLeave={hide}
+         onFocus={show} onBlur={hide}>
       {/* The pile behind it. Two leaves is enough to read as depth and few
           enough not to fatten the row — a real stack of nine Forests does not
           look nine cards thick from across a table either. */}
@@ -202,70 +350,76 @@ function FieldCard({ card, size, count }: {
         {/* The gold edge belongs to the card, so it turns with the card. */}
         {card.token && <span className="field-card-token" aria-hidden="true" />}
       </div>
-      {/* **Outside the part that turns.** A tapped permanent lies on its side
-          and its numbers must not: a sideways "19/19" is unreadable, and by
-          the late turns most of a board is tapped. These sit on the outer box,
-          which never rotates. */}
-      {/* **The loupe.** Power and toughness were a black tab printed over the
-          corner of the painting at all times — legible, and permanently in
-          the way of the one part of a card everybody already looks at. A
-          board holds forty of them, so forty little black tabs sat on forty
-          paintings whether anybody wanted a number or not (Aaron, 2026-08-25:
-          *"a magnifying glass effect instead when hovering in that corner"*).
+      {/* **The arm: everything written in the card's corners.**
 
-          So the numbers are behind glass. The lens sits where a card's own
-          power/toughness box sits, magnifies the painting under it, and puts
-          the *current* figures on the glass in crisp type — current rather
-          than printed, because a 2/2 with three +1/+1 counters is a 5/5 and
-          the printed box would be a lie told very clearly.
+          A card's furniture belongs to the card's *corners*, and until now it
+          belonged to the slot's — three chips pinned to a box that never
+          turned, while the card inside it did. At ninety degrees that was
+          survivable, because a card turned ninety degrees still fills the
+          corners of its own slot. At forty-five (Aaron, 2026-08-25: *"make
+          sure you get any overlays correct"*) it is not: the card's corners
+          swing a fifth of its width clear of the slot's, so a count pinned
+          top-right of the box floats over the sand, and the counters pinned
+          bottom-left sit on the neighbour.
 
-          Hover, focus **and** tap all open it. A hover-only reading
-          affordance does not exist on a phone, which this room has now
-          learned twice. */}
-      {stats && (
-        <span className={`field-card-lens${peeking ? ' is-open' : ''}`}
-              aria-hidden="true"
-              style={card.image
-                ? ({ '--lens-art': `url(${card.image})` } as CSSProperties)
-                : undefined}
-              onPointerUp={(e) => {
-                // The corner is its own gesture: a tap here is *what are its
-                // numbers*, and a tap anywhere else on the card is still
-                // "hold it up", which is a different question.
-                if (e.pointerType === 'mouse') return
-                e.stopPropagation()
-                setPeeking((was) => !was)
-              }}>
-          <span className="field-card-lens-glass" />
-          <span className="field-card-lens-pt tabular">{stats}</span>
-        </span>
-      )}
-      {count > 1 && (
-        <span className="field-card-count tabular">{count}<span
-          className="field-card-times">×</span></span>
-      )}
-      {/* Counters, one chip each rather than one sum. A creature carrying
-          three +1/+1 and two -1/-1 was drawn as a "1", which is arithmetic
-          the board should not be doing on somebody's behalf — the two kinds
-          annihilate as a state-based action, and until they do they are two
-          different things on the card. Green for what is being added and red
-          for what is being taken away, which is the one colour convention
-          every player already has, and brass for the ones that are neither.
-          The count carries the sign in type as well, for anybody who does not
-          separate those two hues. */}
-      {counters.length > 0 && (
-        <span className="field-card-counters">
-          {counters.map((c) => {
-            const way = counterSign(c.kind)
-            return (
-              <span key={c.kind} title={`${c.n} ${c.kind}`}
-                    className={`field-counter tabular is-${way}`}>
-                {way === 'down' ? '-' : way === 'up' ? '+' : ''}{c.n}
-              </span>
-            )
-          })}
-        </span>
-      )}
+          So the arm turns with the card and each thing on it turns back. The
+          furniture rides the corner it names and stays upright to be read,
+          which is exactly what a player does with a tapped card: turn the
+          card, not your head. Each piece pivots about its own anchor corner,
+          so counter-rotating moves it nowhere. */}
+      <div className="field-card-arm" aria-hidden="true">
+        {/* **The loupe.** Power and toughness were a black tab printed over
+            the corner of the painting at all times — legible, and permanently
+            in the way of the one part of a card everybody already looks at.
+            The glass replaced the tab, and then hid until hovered, which
+            traded one fault for its opposite: a board of forty creatures with
+            no numbers on it at all unless you went hunting one at a time
+            (Aaron, 2026-08-25: *"what I meant is that it always appeared"*).
+
+            So it is always there and it never turns. It sits where a card's
+            own power/toughness box sits, magnifies the painting under it, and
+            carries the *current* figures on the glass in crisp type — current
+            rather than printed, because a 2/2 with three +1/+1 counters is a
+            5/5 and the printed box would be a lie told very clearly. Upright
+            through the whole rotation, because the one thing a magnifier is
+            for is reading: *"the magnifying glass should always be upright
+            and oriented so the viewer can read it"*. */}
+        {stats && (
+          <span className="field-card-lens"
+                style={card.image
+                  ? ({ '--lens-art': `url(${card.image})` } as CSSProperties)
+                  : undefined}>
+            <span className="field-card-lens-glass" />
+            <span className="field-card-lens-pt tabular">{stats}</span>
+          </span>
+        )}
+        {count > 1 && (
+          <span className="field-card-count tabular">{count}<span
+            className="field-card-times">×</span></span>
+        )}
+        {/* Counters, one chip each rather than one sum. A creature carrying
+            three +1/+1 and two -1/-1 was drawn as a "1", which is arithmetic
+            the board should not be doing on somebody's behalf — the two kinds
+            annihilate as a state-based action, and until they do they are two
+            different things on the card. Green for what is being added and red
+            for what is being taken away, which is the one colour convention
+            every player already has, and brass for the ones that are neither.
+            The count carries the sign in type as well, for anybody who does
+            not separate those two hues. */}
+        {counters.length > 0 && (
+          <span className="field-card-counters">
+            {counters.map((c) => {
+              const way = counterSign(c.kind)
+              return (
+                <span key={c.kind} title={`${c.n} ${c.kind}`}
+                      className={`field-counter tabular is-${way}`}>
+                  {way === 'down' ? '-' : way === 'up' ? '+' : ''}{c.n}
+                </span>
+              )
+            })}
+          </span>
+        )}
+      </div>
       {/* **The marks.** Keyed on the beat so the same creature attacking twice
           plays twice — without it React keeps the element and the animation,
           having already run, never runs again.
@@ -286,6 +440,9 @@ function FieldCard({ card, size, count }: {
             <img src={mementoArt} alt="" draggable={false} />
           )}
         </span>
+      )}
+      {at && card.image && (
+        <FieldPeek card={card} at={at.card} avoid={at.tray} />
       )}
       {held && card.image && (
         <CardSheet name={card.name} image={card.image}
@@ -320,8 +477,11 @@ function FieldRow({ label, cards, size = 'normal', empty }: {
       {stacks.length === 0 ? (
         <span className="field-row-empty">{empty ?? label}</span>
       ) : stacks.map((stack) => (
+        // The only four rows a permanent actually stands in: creatures,
+        // artifacts and enchantments, and lands. Everything else that draws a
+        // `FieldCard` is a card somebody is holding or has already lost.
         <FieldCard key={stack.card.id} card={stack.card} size={size}
-                   count={stack.count} />
+                   count={stack.count} inPlay />
       ))}
     </div>
   )
@@ -499,7 +659,30 @@ function FieldHand({ side, name, facing }: {
   name: string
   facing: 'far' | 'near'
 }) {
+  // **The nameplate is the handle, and the fan is not.**
+  //
+  // The whole hand used to be the hover target, so running the pointer along
+  // the fan to read one card sprang the entire hand open underneath it — two
+  // panels answering one gesture, fighting over the same patch of sand (Aaron,
+  // 2026-08-25: the full-hand view "conflicts with the individual hover
+  // preview on each card"). They are two different questions: *what is this
+  // one card* is the fan's, and the preview answers it; *show me the whole
+  // hand* is the nameplate's.
+  //
+  // Held in state rather than in `:hover`, because the tray opens across a gap
+  // and past the fan — a CSS hover group would have to be the whole hand
+  // again, which is the bug. The delay on the way out is what lets the pointer
+  // cross that gap.
   const [spread, setSpread] = useState(false)
+  const [over, setOver] = useState(false)
+  const leaving = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(leaving.current), [])
+  const enter = () => { window.clearTimeout(leaving.current); setOver(true) }
+  const leave = () => {
+    window.clearTimeout(leaving.current)
+    leaving.current = window.setTimeout(() => setOver(false), 130)
+  }
+  const open = (over || spread) && side.hand.length > 0
   return (
     <div className={`field-hand field-hand-${facing}`
                     + (spread ? ' is-spread' : '')}>
@@ -513,17 +696,25 @@ function FieldHand({ side, name, facing }: {
           has 250, and the accordion becomes a scrollbar in a gutter. A tray
           onto the sand has the whole arena to open into, and it means all four
           zones — hand, graveyard, exile, command — answer one gesture with one
-          kind of panel instead of four with two. */}
-      <span className="field-hand-label"
-            onPointerUp={(e) => {
-              if (e.pointerType === 'mouse' || side.hand.length === 0) return
-              setSpread((was) => !was)
-            }}>
+          kind of panel instead of four with two.
+
+          A real button, because it is a real disclosure: it has to be
+          reachable by keyboard (the tray is `visibility: hidden` until it
+          opens, so nothing inside it can be tabbed to first) and it has to say
+          whether it is open. A `span` did neither. */}
+      <button type="button"
+              className={`field-hand-label${open ? ' is-open' : ''}`}
+              aria-expanded={open} disabled={side.hand.length === 0}
+              onMouseEnter={enter} onMouseLeave={leave}
+              onFocus={enter} onBlur={leave}
+              onClick={() => setSpread((was) => !was)}>
         {name}<span className="field-hand-n tabular">{side.hand.length}</span>
-      </span>
+      </button>
       {side.hand.length > 0 && (
-        <div className={`field-tray field-hand-tray${spread ? ' is-open' : ''}`}
-             role="group" aria-label={`Hand, all ${side.hand.length}`}>
+        <div className={`field-tray field-hand-tray${open ? ' is-open' : ''}`}
+             role="group" aria-label={`Hand, all ${side.hand.length}`}
+             onMouseEnter={enter} onMouseLeave={leave}
+             onFocus={enter} onBlur={leave}>
           <span className="field-tray-head">
             Hand<span className="field-tray-n tabular">{side.hand.length}</span>
           </span>

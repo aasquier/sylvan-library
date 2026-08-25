@@ -182,13 +182,19 @@ it('puts power and toughness behind glass rather than over the painting', () => 
   expect(lens?.querySelector('.field-card-lens-pt')?.textContent?.trim())
     .toBe('3/3')
 
-  // And it opens to a tap, because hover is not a gesture a phone has.
+  // **It is there before anybody asks.** The glass replaced an always-on
+  // black tab and then hid until hovered, which traded the tab's fault for its
+  // opposite: a board of forty creatures carrying no numbers at all, learnable
+  // only one hover at a time (Aaron, 2026-08-25: "what I meant is that it
+  // always appeared"). Nothing was touched above this line.
   expect(lens?.className).not.toContain('is-open')
-  tap(lens as Element)
-  expect(container.querySelector('.field-card-lens')?.className)
-    .toContain('is-open')
-  // The tap stayed in the corner: it did not also hold the whole card up.
-  expect(screen.queryByRole('dialog')).toBeNull()
+
+  // And it hangs on the arm, which is what carries it round to the card's own
+  // stat corner when the card turns. The property is the parentage: a loupe
+  // pinned to the slot instead of the card sits on the neighbouring permanent
+  // the moment a card leans, and no rendered angle in jsdom would say so.
+  expect(lens?.closest('.field-card-arm'),
+    'the loupe rides the card, not the slot').toBeTruthy()
 })
 
 it('hands the whole card to a tap, because a phone cannot hover a peek', () => {
@@ -265,7 +271,101 @@ it('opens a closed zone into something you can look through', () => {
     "the near seat's exile is empty, so it does not open").toBeNull()
 })
 
-it('opens the hand the same way, and to a tap as well as a hover', () => {
+it('keeps the loupe on the battlefield, where a fight is the question', () => {
+  const { container } = show()
+  // A hand is a fan overlapped to the 27px strip carrying each card's name, so
+  // a card's bottom-right corner — where the loupe goes — is *under the next
+  // card*. Drawn there, a creature's numbers land on a different card's
+  // painting, belonging to one nobody can see. Found by measuring a live board
+  // rather than by reading this file.
+  const fan = container.querySelector('.field-hand-far .field-hand-fan')
+  expect(fan?.querySelectorAll('.field-card').length,
+    'the far seat is holding something').toBeGreaterThan(0)
+  expect(fan?.querySelectorAll('.field-card-lens'),
+    'nothing in a hand is fighting at anything').toHaveLength(0)
+
+  // And the reason is not the overlap alone: power and toughness on this board
+  // are what a creature is fighting at *now*, counters and anthems included.
+  // That is a battlefield question, and the rows still ask it — the fixture
+  // that gives a creature real figures is `throne`, which is why the positive
+  // half of this property is checked against that board rather than this one.
+  cleanup()
+  expect(throne(5).container
+    .querySelectorAll('.field-rows .field-card-lens').length)
+    .toBeGreaterThan(0)
+})
+
+/** The viewport the placement tests are argued against, and one card's place
+ *  in it. jsdom measures everything as zero, so a test about *where a thing
+ *  is put* has to say where everything was — which is no worse than the truth:
+ *  this geometry is only ever as good as the numbers it is handed. */
+function viewport(w: number, h: number) {
+  for (const [prop, value] of [['clientWidth', w], ['clientHeight', h]] as const) {
+    Object.defineProperty(document.documentElement, prop,
+      { value, configurable: true })
+  }
+}
+function standing(el: Element, at: Partial<DOMRect>) {
+  const box = { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0,
+    width: 0, height: 0, ...at }
+  el.getBoundingClientRect = () => ({ ...box, toJSON: () => box }) as DOMRect
+}
+
+it('holds a card up clear of the wall it was standing against', () => {
+  viewport(1200, 800)
+  const { container } = show()
+  // The one card the fixture gave a painting to, standing hard against the
+  // left edge of the field — which is where the fault was reported (Aaron,
+  // 2026-08-25: "they get clipped by the black border").
+  const card = [...container.querySelectorAll('.field-card')]
+    .find((c) => c.querySelector('.field-card-art')) as Element
+  standing(card, { left: 4, right: 62, width: 58,
+    top: 300, bottom: 381, height: 81 })
+  fireEvent.mouseEnter(card)
+
+  const peek = document.querySelector('.field-peek') as HTMLElement
+  expect(peek, 'hovering a card holds it up').toBeTruthy()
+  // **Out of the field entirely.** The preview used to be a child of the card,
+  // so it inherited the field's `overflow: hidden` and was cut off at the wall.
+  // Nothing about widening it or moving it would have survived that parentage.
+  expect(peek.closest('.field'), 'drawn in the body, not in the row').toBeNull()
+  expect(peek.parentElement).toBe(document.body)
+  // Centred on a card 4px from the edge, a 300px preview starts at -117.
+  expect(Number.parseFloat(peek.style.left)).toBeGreaterThanOrEqual(8)
+  expect(Number.parseFloat(peek.style.left) + Number.parseFloat(peek.style.width))
+    .toBeLessThanOrEqual(1200 - 8)
+
+  fireEvent.mouseLeave(card)
+  expect(document.querySelector('.field-peek'),
+    'and exactly one of them exists at a time').toBeNull()
+})
+
+it('steps a preview beside the pile it was opened from, never onto it', () => {
+  viewport(1200, 800)
+  const { container } = show()
+  // The far seat's hand, spread — the panel somebody opened *in order to look
+  // at it*, and the one a 300px card was landing in the middle of.
+  fireEvent.click(container.querySelector(
+    '.field-hand-far .field-hand-label') as Element)
+  const tray = container.querySelector(
+    '.field-hand-far .field-hand-tray') as Element
+  standing(tray, { left: 300, right: 700, width: 400,
+    top: 100, bottom: 360, height: 260 })
+  const card = tray.querySelector('.field-card') as Element
+  standing(card, { left: 320, right: 396, width: 76,
+    top: 130, bottom: 236, height: 106 })
+  fireEvent.mouseEnter(card)
+
+  const peek = document.querySelector('.field-peek') as HTMLElement
+  const left = Number.parseFloat(peek.style.left)
+  const width = Number.parseFloat(peek.style.width)
+  // Beside the tray, on the flank that has room: the tray's right edge is at
+  // 700 and there are 500 pixels of room after it.
+  expect(left, 'clear of the tray it came out of').toBeGreaterThanOrEqual(700)
+  expect(left + width).toBeLessThanOrEqual(1200 - 8)
+})
+
+it('opens the hand from its nameplate, and never from the fan', () => {
   const { container } = render(
     <MatchBoard board={ZONES} shown={1} game={1} running={false}
                 name={(_slug, fallback) => fallback}
@@ -276,11 +376,32 @@ it('opens the hand the same way, and to a tap as well as a hover', () => {
   expect(tray, 'the hand opens the same way the piles do').toBeTruthy()
   expect(tray?.querySelectorAll('.field-card')).toHaveLength(1)
 
-  // Hover is CSS and a phone has none, so the label carries the tap.
+  // **The handle is a button, and the fan is not part of it.** The tray used
+  // to open on `.field-hand:hover`, and the hand includes the fan — so running
+  // a pointer along the fan to read one card sprang the whole hand open on top
+  // of the preview that was answering the question (Aaron, 2026-08-25). Two
+  // panels, one gesture, same patch of sand.
+  //
+  // Driven through the real control rather than by setting a class: a click is
+  // what a tap, a mouse and the Enter key all produce, which is the whole
+  // reason this is a `<button>` and not the `<span>` it was.
+  const plate = container.querySelector<HTMLButtonElement>(
+    '.field-hand-far .field-hand-label')
+  expect(plate?.tagName, 'the nameplate is a real control').toBe('BUTTON')
+  expect(plate?.getAttribute('aria-expanded')).toBe('false')
   expect(tray?.className).not.toContain('is-open')
-  tap(container.querySelector('.field-hand-far .field-hand-label') as Element)
+
+  // The fan is inside the hand and must not open it. Hovering a card there is
+  // the *other* question — what is this one card — and the preview answers it.
+  fireEvent.mouseEnter(
+    container.querySelector('.field-hand-far .field-hand-fan') as Element)
+  expect(container.querySelector('.field-hand-far .field-hand-tray')?.className,
+    'the fan is not the handle').not.toContain('is-open')
+
+  fireEvent.click(plate as Element)
   expect(container.querySelector('.field-hand-far .field-hand-tray')?.className)
     .toContain('is-open')
+  expect(plate?.getAttribute('aria-expanded')).toBe('true')
 })
 
 /** A board mid-combat, with a creature each side and one of them dead. */
