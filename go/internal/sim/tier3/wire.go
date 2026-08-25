@@ -31,6 +31,16 @@ import (
 //     result type. A remote match and a local one are the same thing to
 //     everything downstream, which is the point.
 //
+// **One thing crosses that is not defined here**, and it is deliberate:
+// [EventLog], the beats of one game, rides the match stream's `{"events": ...}`
+// line as itself. The rule this file enforces is *no drift between the two
+// ends*, and a struct both ends marshal directly cannot drift — there is no
+// second spelling to keep in step. [WireGame] exists because a game's row is
+// also pinned by a recorded corpus; nothing records a beat, and copying
+// [EventLog] into a `WireEvents` would buy a name and a maintenance burden
+// and no property at all. It is named here so that "every byte is accounted
+// for from this file" stays true when read literally.
+//
 // **Every struct here carries its fields in the recorded wire order**,
 // which is the
 // rule the job corpus bought: `encoding/json` sorts a map's keys, so a

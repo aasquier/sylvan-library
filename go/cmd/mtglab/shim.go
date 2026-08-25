@@ -228,6 +228,12 @@ type matchAsk struct {
 	Clock  int      `json:"clock"`
 	Seed   *big.Int `json:"seed"`
 	Stream bool     `json:"stream"`
+	// Narrate drops Forge's `-q`, so the subprocess tells the whole game and
+	// [tier3.EventParser] reads it. Asked for rather than assumed, and only
+	// ever on the streamed path: the beats are worth a hundred lines a game
+	// and they exist to be *watched*, so a caller that is not listening live
+	// has no use for them. `events.go` carries the measurement.
+	Narrate bool `json:"narrate"`
 }
 
 func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
@@ -239,7 +245,7 @@ func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
 	ask := matchAsk{Games: 1, Clock: 300}
 	for key, into := range map[string]any{
 		"games": &ask.Games, "clock": &ask.Clock,
-		"seed": &ask.Seed, "stream": &ask.Stream,
+		"seed": &ask.Seed, "stream": &ask.Stream, "narrate": &ask.Narrate,
 	} {
 		raw, ok := body[key]
 		if !ok || string(raw) == "null" {
@@ -276,14 +282,23 @@ func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
 //
 // A match takes minutes and a job on the far side wants to tick per game, so a
 // `{"stream": true}` request answers 200 up front and then speaks
-// newline-delimited JSON as the match runs: `{"game": n, "row": ...}` per
-// finished game, then exactly one of `{"result": ...}` or `{"error": ...}`.
+// newline-delimited JSON as the match runs: `{"events": ...}` and then
+// `{"game": n, "row": ...}` per finished game, then exactly one of
+// `{"result": ...}` or `{"error": ...}`.
 // The headers go out before the run does, which is why failure is a line
 // rather than a status code here — 200 was already spent buying the right to
 // speak early.
 //
-// A caller that never asks to stream gets the plain answer, so an app deployed
-// a few minutes apart from its worker keeps working in both directions.
+// **The beats come out before the row that closes their game**, which is not
+// an ordering worth guarding but is worth knowing: both readers ride one pass
+// over the subprocess (`tier3.spawn`), and the event parser is fed first. A
+// far side that stashes the beats and publishes them with the row therefore
+// never publishes a row whose game it has not already heard.
+//
+// A caller that never asks to stream gets the plain answer, and one that never
+// asks to narrate gets no `events` lines, so an app deployed a few minutes
+// apart from its worker keeps working in both directions and across both
+// flags.
 func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matchAsk) {
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.WriteHeader(http.StatusOK)
@@ -307,10 +322,16 @@ func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matc
 
 	// The row rides the tick (the match theater): the game the parser just
 	// completed crosses beside its count, in the same encoding the final
-	// result will carry it.
+	// result will carry it. The beats ride their own line, and only when the
+	// caller asked to hear them — an [tier3.EventLog] crosses as itself, for
+	// the reason `wire.go` gives.
 	run, err := s.forge.RunGames(decks, tier3.RunOptions{Games: ask.Games,
 		Clock: ask.Clock, Seed: ask.Seed,
-		Memory: s.forge.MemoryMB,
+		Memory:  s.forge.MemoryMB,
+		Narrate: ask.Narrate,
+		OnEvents: func(log tier3.EventLog) {
+			emit(map[string]any{"events": log})
+		},
 		OnGame: func(n int, g tier3.GameResult) {
 			emit(map[string]any{"game": n, "row": tier3.GameToWire(g)})
 		}})

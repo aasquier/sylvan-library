@@ -5627,6 +5627,203 @@ button:hover .tarot-fan-card {
   filter: brightness(0.95) saturate(0.97);
 }
 
+/* ---------------------------------------------------------------------------
+   The play-by-play: the inside of the game the Coliseum is watching.
+
+   A ledger, not a battlefield. Forge's log carries no counters, no tokens and
+   effectively no tapped state, so what it can honestly support is an account
+   of what happened — and an account wants the shape of a chronicle: a ruled
+   column, a brass rule where each turn begins, and a name against every line.
+
+   The palette is the anvil's, because this is the same forge the theater above
+   it is heated by; the column takes its own glow from the arena it is standing
+   in (`--arena-glow`, set inline by the stage) so a match in the drowned
+   coliseum reads cooler than one on Otaria's sand.
+   --------------------------------------------------------------------------- */
+
+.beats {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.beats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.beats-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* "live" is a state, so it is a lamp rather than a word alone: the dot
+   breathes while the forge is working and the label reads the same either way
+   for anybody the breathing is turned off for. */
+.beats-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--anvil-brass);
+}
+
+.beats-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--anvil-brass);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--anvil-brass) 60%, transparent);
+  animation: beats-pulse 1.9s ease-out infinite;
+}
+
+@keyframes beats-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--anvil-brass) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 7px color-mix(in oklab, var(--anvil-brass) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--anvil-brass) 0%, transparent); }
+}
+
+/* The column scrolls itself rather than growing the page: the arena beside it
+   is the thing to be looking at, and a panel that pushes the painting off
+   screen every time somebody casts a spell is a panel fighting its own room.
+   `min-height` and `flex: 1` above are what let it take the stage's height
+   instead of its content's. */
+.beats-scroll {
+  flex: 1;
+  min-height: 11rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 2px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  scrollbar-width: thin;
+}
+
+/* One beat. Two columns so every name stacks against the same edge and the
+   column reads as a ledger rather than as prose that happens to be short. */
+.beat {
+  display: grid;
+  /* Seven rem, measured rather than picked: `shortName` cuts a deck to its
+     general ("Gyome", "Arahbo") and those sit well inside it, but a deck named
+     for what it does keeps every word — "Mono-Green Fixture" ellipsised at the
+     5.5rem this started at, which is a name a person cannot read. The `title`
+     on the element is the rest of the answer for the ones that still do. */
+  grid-template-columns: minmax(0, 7rem) 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  animation: beat-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+
+.beat-who {
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A beat nobody acted in — a card resolving, a creature dying — starts in the
+   second column rather than leaving a hole where a name would be. */
+.beat > .beat-text:only-child { grid-column: 1 / -1; }
+
+.beat-text { min-width: 0; }
+
+/* The four beats worth a colour, and no more: a page where every line is
+   accented is a page with no accents. Damage and death are the ones a person
+   watching actually leans in for; the outcome is the point of the whole
+   column. */
+.beat[data-kind='damage'] { color: color-mix(in oklab, #d4713a 62%, var(--text-secondary)); }
+.beat[data-kind='dies']   { color: var(--text-muted); font-style: italic; }
+.beat[data-kind='life']   { color: color-mix(in oklab, var(--vine) 55%, var(--text-secondary)); }
+
+.beat[data-kind='outcome'] {
+  margin-top: 6px;
+  padding: 5px 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: color-mix(in oklab, var(--anvil-brass) 13%, transparent);
+  border-left: 2px solid var(--anvil-brass);
+  border-radius: 0 5px 5px 0;
+}
+
+/* A turn is the only structure Forge's log has, and without it a hundred lines
+   of casting and blocking is one wall. A rule across the column rather than
+   another line, because "turn 6" is not a beat anybody is watching for. */
+.beat-turn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0 3px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--arena-glow, var(--anvil-brass)) 70%, var(--text-muted));
+  animation: beat-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+
+.beat-turn::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--arena-glow, var(--anvil-brass)) 45%, transparent),
+    transparent);
+}
+
+.beat-turn-n { flex: none; }
+
+.beat-turn-who {
+  flex: none;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+@keyframes beat-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Narrow: the name stops being its own column. Five and a half rem of deck
+   name beside a phone-width sentence leaves the sentence three words wide. */
+@media (max-width: 640px) {
+  .beat { grid-template-columns: 1fr; gap: 0; }
+  .beat-who { white-space: normal; }
+  .beats-scroll { max-height: 16rem; }
+}
+
+/* The play-by-play's guard.
+ *
+ * The lamp stops pulsing and the lines stop sliding in; nothing is removed,
+ * because every one of these is a word somebody is reading rather than
+ * ceremony around one. A beat that simply *is* there is the honest reduced
+ * version of one that arrives. */
+@media (prefers-reduced-motion: reduce) {
+  .beats-live-dot { animation: none; }
+  .beat,
+  .beat-turn { animation: none; }
+}
+
 /* The guard. The banners and the crowd are **removed**, because a frozen
  * pennant is a smudge on somebody's painting — the forest layer's argument.
  * The two cameras are **stopped rather than removed**: they animate the

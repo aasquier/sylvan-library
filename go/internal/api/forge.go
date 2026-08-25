@@ -189,6 +189,88 @@ func newForgeRow(g tier3.GameResult, slug *string) forgeRow {
 	return row
 }
 
+// ForgeBeatsMax is how many beats of one game reach the browser.
+//
+// The parser's own [tier3.EventCap] is 10,000, which bounds a runaway game in
+// *memory*; this is the tighter bound on what crosses to a person, and it
+// exists because the job's `partial` is re-fetched every poll. A measured
+// nine-turn game raises about a hundred beats (`events.go` did the counting),
+// so four hundred is roughly four times the real thing and lands the partial
+// near 30KB in the worst case and near 8KB in the ordinary one — which, at the
+// client's poll interval, is the ~20KB/s a watched match costs. Stated rather
+// than left to be discovered, because it is the one number here that anybody
+// paying for bandwidth would want to know.
+//
+// The cut is announced, never silent: `truncated` says a game outran it, the
+// same way [tier3.EventLog] does one layer down.
+const ForgeBeatsMax = 400
+
+// forgeBeat is one beat of a game as the client renders it.
+//
+// **Seats become slugs here**, which is the one decision this shape makes:
+// [tier3.GameEvent] carries `seat` and `target_seat` because the parser reads
+// them off Forge's own lines, and every other thing this file hands a client
+// names a deck instead (`forgeRow.Winner` is a slug, not a seat). A browser
+// that had to map a seat number to a deck would be re-deriving something the
+// job already knows, and getting it wrong the first time two decks were
+// submitted in the other order.
+type forgeBeat struct {
+	Kind string `json:"kind"`
+	Turn int    `json:"turn,omitempty"`
+	// Who is the deck that acted, or that an outcome is about. Null when the
+	// line named no player, which is most of them — Forge usually names the
+	// card instead.
+	Who  *string `json:"who"`
+	Card string  `json:"card,omitempty"`
+	// Target is the card on the other end: blocked, or damaged.
+	Target string `json:"target,omitempty"`
+	// Against is the deck on the other end: attacked, or damaged.
+	Against *string `json:"against"`
+	Amount  int     `json:"amount,omitempty"`
+	Life    *int    `json:"life,omitempty"`
+	Note    string  `json:"note,omitempty"`
+}
+
+// forgeBeats is one game's beats, as the room watching them receives them.
+type forgeBeats struct {
+	Game  int         `json:"game"`
+	Beats []forgeBeat `json:"beats"`
+	// Truncated is set when the game outran [ForgeBeatsMax] or the parser's
+	// own cap. Either way the beats kept are the first ones, because a game's
+	// opening is what makes the rest of it legible.
+	Truncated bool `json:"truncated"`
+}
+
+// newForgeBeats shapes one game's log for the browser.
+//
+// `seats` is the seat-to-slug map the plan built from the deck order, which is
+// the same map [tier3.SimRun.Seats] holds — built by hand here because
+// narration happens *during* the run, when there is no run yet, exactly as the
+// CLI's `seatsOf` does for the same reason.
+func newForgeBeats(log tier3.EventLog, seats map[int]string) forgeBeats {
+	slug := func(seat int) *string {
+		if s, ok := seats[seat]; ok && seat != 0 {
+			return &s
+		}
+		return nil
+	}
+	events := log.Events
+	truncated := log.Truncated
+	if len(events) > ForgeBeatsMax {
+		events = events[:ForgeBeatsMax]
+		truncated = true
+	}
+	out := forgeBeats{Game: log.Game, Truncated: truncated,
+		Beats: make([]forgeBeat, 0, len(events))}
+	for _, e := range events {
+		out.Beats = append(out.Beats, forgeBeat{
+			Kind: string(e.Kind), Turn: e.Turn, Who: slug(e.Seat),
+			Card: e.Card, Target: e.Target, Against: slug(e.TargetSeat),
+			Amount: e.Amount, Life: e.Life, Note: e.Note})
+	}
+	return out
+}
+
 // forgeSeat is one deck's line in the result.
 type forgeSeat struct {
 	Slug    string `json:"slug"`
@@ -216,8 +298,23 @@ type forgeResult struct {
 }
 
 // forgePartial is what the job's `partial` carries while the match plays.
+//
+// `Beats` is **the most recent game's, and only that game's** — null until the
+// first game closes, and null for the whole match when nobody asked to
+// narrate. The reason it is one game rather than all of them: the partial is
+// re-sent on every poll, so carrying the match's whole narration would mean
+// re-sending a growing transcript two or three times a second to show beats a
+// person watched a minute ago. The room accumulates what it has been handed;
+// the job holds the newest thing it has to hand over.
+//
+// The consequence, stated because it is a real one: a game that finishes
+// inside one poll interval can have its beats replaced before anybody read
+// them. Games take seconds and polls take a fraction of one, so this is rare —
+// and the beats are the colour, never the record. `Rows` is the record, it is
+// cumulative, and it never drops a game.
 type forgePartial struct {
-	Rows []forgeRow `json:"rows"`
+	Rows  []forgeRow  `json:"rows"`
+	Beats *forgeBeats `json:"beats"`
 }
 
 // shapeForge shapes the finished match.
@@ -454,6 +551,12 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 	if err != nil {
 		return jobs.Plan{}, err
 	}
+	// Asked for, never assumed. Narrating is free in time and about a hundred
+	// beats a game in volume (`events.go` measured both), so the room that
+	// watches a match asks for it and the surfaces that only want the tally do
+	// not. Through `truthy` rather than a Go bool cast, because that is this
+	// package's recorded reading of a JSON value.
+	narrate := truthy(body["narrate"])
 
 	slugs := make([]string, 0, len(decks))
 	for _, d := range decks {
@@ -464,7 +567,24 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 		plural = ""
 	}
 	label := fmt.Sprintf("Forge: %s, %d game%s", strings.Join(slugs, " vs "), games, plural)
-	key := "forge|" + strings.Join(addresses, "|") + fmt.Sprintf("|%d|%s", games, seed)
+	// The dedupe key carries narration, because a silent match and a narrated
+	// one are not interchangeable answers: joining a running quiet job would
+	// hand the watching room a match with no beats in it, and the room would
+	// be mute for a reason nothing on screen could explain. Same decks, same
+	// seed, same count and same narration is still one match, which is the
+	// case dedupe was built for.
+	//
+	// **Appended only when narration was asked for**, and that is the frozen
+	// corpus rather than an aesthetic: `forge.json` records this key's exact
+	// text for silent asks, and a `|false` on the end would rewrite a golden.
+	// A narrated ask is a case the recording never held, so it is free to wear
+	// a suffix; a silent one comes out byte-identical to what was recorded,
+	// which `TestTheLabelAndKeyAreTheRecordedText` still proves.
+	key := "forge|" + strings.Join(addresses, "|") +
+		fmt.Sprintf("|%d|%s", games, seed)
+	if narrate {
+		key += "|narrated"
+	}
 
 	worker := a.forgeWorker()
 	recorder := a.matchLedger()
@@ -493,6 +613,17 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 				seats[i+1] = d.Slug
 			}
 			var rowsSoFar []forgeRow
+			// The beats of the game that just closed, waiting for the row
+			// that closes it. Both run paths hand over the beats *before* the
+			// row (one pass over Forge's output, the event parser fed first),
+			// so this is never stale by more than the few lines between them —
+			// and publishing them together is what stops the room seeing a
+			// game arrive with its narration one poll behind.
+			var pending *forgeBeats
+			hear := func(log tier3.EventLog) {
+				shaped := newForgeBeats(log, seats)
+				pending = &shaped
+			}
 			tick := func(finished int, game *tier3.GameResult) {
 				if game != nil {
 					var slug *string
@@ -504,7 +635,8 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 					rowsSoFar = append(rowsSoFar, newForgeRow(*game, slug))
 				}
 				rep.ReportPartial(min(finished, games), games,
-					forgePartial{Rows: append([]forgeRow{}, rowsSoFar...)})
+					forgePartial{Rows: append([]forgeRow{}, rowsSoFar...),
+						Beats: pending})
 			}
 
 			// Same match, two places it can run (ADR 35): the worker when the
@@ -515,10 +647,14 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			var run *tier3.SimRun
 			var runErr error
 			if hosted {
-				run, runErr = worker.RunMatch(ctx, decks, games, ForgeClock, seed, tick)
+				run, runErr = worker.RunMatch(ctx, decks, tier3.MatchAsk{
+					Games: games, Clock: ForgeClock, Seed: seed,
+					Narrate: narrate, OnGame: tick, OnEvents: hear,
+				})
 			} else {
 				run, runErr = a.forge.RunGames(decks, tier3.RunOptions{
 					Games: games, Clock: ForgeClock, Seed: seed,
+					Narrate: narrate, OnEvents: hear,
 					OnGame: func(finished int, game tier3.GameResult) {
 						tick(finished, &game)
 					},

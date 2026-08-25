@@ -592,6 +592,43 @@ export interface ForgeGameRow {
   timed_out: boolean
 }
 
+/** One beat of a game, as the Coliseum receives it.
+ *
+ * The server shapes these from Forge's own narration, and the shaping does one
+ * thing worth knowing about: **a beat names a deck, never a seat.** `who` is
+ * the slug of whoever acted and `against` the slug on the other end, both null
+ * when the line named no player — which is most of them, because Forge usually
+ * names the card instead.
+ *
+ * `kind` is a plain string rather than a union of the twelve the parser
+ * raises. That is deliberate: a Forge release that learns a thirteenth beat
+ * must not be a type error in a browser, and the room renders an unknown kind
+ * as its own plain words rather than refusing to render the game. */
+export interface ForgeBeat {
+  kind: string
+  turn?: number
+  who: string | null
+  card?: string
+  target?: string
+  against: string | null
+  amount?: number
+  life?: number
+  note?: string
+}
+
+/** One game's narration.
+ *
+ * Only ever the **most recent** game's: the job's partial is re-fetched on
+ * every poll, so it holds the newest thing it has to hand over rather than a
+ * growing transcript. The room accumulates. */
+export interface ForgeBeats {
+  game: number
+  beats: ForgeBeat[]
+  /** The game outran the ceiling on what crosses. The beats kept are the
+   *  first ones — a game's opening is what makes the rest of it legible. */
+  truncated: boolean
+}
+
 export interface ForgeResult {
   decks: ForgeDeckRow[]
   games: number
@@ -857,7 +894,8 @@ export interface Job {
    *  `unknown` rather than a union, for the same reason `result` is: the
    *  shape belongs to the job's `kind`, and the screen that submitted the job
    *  is the only thing that knows which. The Forge's is
-   *  `{ rows: ForgeGameRow[] }` — see `theaterRows`. */
+   *  `{ rows: ForgeGameRow[]; beats: ForgeBeats | null }` — see `theaterRows`
+   *  and `theaterBeats`. */
   partial: unknown
   error: string | null
   created_at: string
@@ -1207,6 +1245,31 @@ async function refuse(resp: Response, path: string): Promise<never> {
   throw new ApiError(detail, resp.status, retryAfterOf(resp))
 }
 
+/** The class names the Forge worker's door puts in front of a failure.
+ *
+ * `cmd/mtglab/shim.go`'s `failureText` renders every refusal as
+ * `<ClassName>: <sentence>` — `TimeoutExpired`, `RuntimeError` and four
+ * others, spellings inherited from the wire the Go rewrite had to keep
+ * answering (ADR 38). The class name is the half a maintainer wants: reading a
+ * failed match, "was Forge missing, did it time out, or were the results
+ * untrustworthy" is the first question. **It is also the half a user must
+ * never see** — commandment 10 lets exactly one technology be named on screen
+ * and it is Claude, not a Python exception class from a retired backend.
+ *
+ * So the prefix crosses the wire and is dropped at the last moment, which is
+ * the right seam: the recorded string stays recorded, the job row keeps its
+ * diagnosis, and the sentence a person reads is a sentence.
+ *
+ * **A closed list, not a pattern.** `/^\w+: /` would also eat "Deck not
+ * found: gyome" and every other honest message with a colon in it. These six
+ * are all of them — every one is emitted from `failureText` and the shim's
+ * one 400, and nothing else in the Go tree produces the shape.
+ */
+const FAILURE_CLASSES = [
+  'ForgeNotInstalled', 'CoverageFailed', 'ResultsUntrustworthy',
+  'TimeoutExpired', 'RuntimeError', 'ValueError',
+]
+
 /** The message to show for a caught value.
  *
  * Every `catch` in the app wanted this and each wrote `catch (e: any)` with
@@ -1219,9 +1282,24 @@ async function refuse(resp: Response, path: string): Promise<never> {
  * job poller rejects with one), so the narrowing is exact rather than
  * defensive; the `String` fallback is only there for what a third party might
  * throw.
+ *
+ * It is also where a machine's name is taken off the front of a failure — see
+ * [FAILURE_CLASSES]. Here rather than at each of the twenty `catch` sites,
+ * because this is already the one place every one of them goes through, and a
+ * rule applied in twenty places is a rule forgotten in the twenty-first.
  */
 export function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e)
+  const message = e instanceof Error ? e.message : String(e)
+  for (const name of FAILURE_CLASSES) {
+    if (message.startsWith(`${name}: `)) {
+      // The sentence, with its first letter left exactly as the server wrote
+      // it: these read "Forge reported problems that…" and "Command '…' timed
+      // out", which are already sentences. Capitalising would be this file
+      // rewriting somebody else's prose on a guess.
+      return message.slice(name.length + 2)
+    }
+  }
+  return message
 }
 
 /**

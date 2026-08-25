@@ -61,8 +61,14 @@ built or holding its place in line:
 
 1. **Simulate decks** — built: three tiers, cached and seeded (ADR 18).
 2. **Adversarial simulation** — next in line (Tier 2, above).
-3. **Real games against a real engine** — built: Forge, hosted worker,
-   match theater (ADR 35, ADR 36).
+3. **Real games against a real engine** — built: Forge, hosted worker, and
+   the Coliseum, which is now the only room that starts a match (ADR 35,
+   ADR 36). The Simulator kept the arithmetic; watching moved to the room
+   built for it, and the match narrates itself there — Forge's own beats,
+   paced for reading. **Open:** the board itself. Forge's event bus carries
+   tokens, counters, tapped state and every zone change; its *log* renders
+   none of them, so a battlefield needs a listener attached to the bus
+   rather than a parser pointed at the prose.
 4. **Shopping and swaps** — built: prices from Scryfall, swap boards, no
    checkout ever (out of scope by rule).
 5. **Five artifacts per deck** — built, generated only (ADR 8).

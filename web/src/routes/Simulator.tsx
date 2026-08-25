@@ -14,7 +14,7 @@ import goldfishMp4 from '../assets/simulator/goldfish-loop.mp4'
 import goldfishStill from '../assets/simulator/goldfish-still.webp'
 import goldfishWebm from '../assets/simulator/goldfish-loop.webm'
 import {
-  api, errorMessage, followJob, type DeckTile, type ForgeResult, type Job,
+  api, errorMessage, followJob, type DeckTile, type Job,
   type LandResult, type ManaResult, type PolicyResult, type ShelfResult,
   type ValidationReport,
 } from '../lib/api'
@@ -28,14 +28,24 @@ import {
   ByTurnChart, CommanderCurve, LandSweepChart, LandTradeoffChart, WastedManaChart,
 } from '../components/lazycharts'
 import { DataTable } from '../components/datatable'
-import { MatchTheater } from '../components/theater'
 import {
   ClosedForm, DeckCaution, DeckVerdict, ManaCurvePanel, PolicyReport,
 } from '../components/closedform'
-import { theaterRows } from '../lib/theater'
 import { HelpTip, Term } from '../components/term'
+import { Link } from 'react-router-dom'
 
-type Mode = 'mana' | 'lands' | 'shelf' | 'policy' | 'forge'
+/**
+ * The four simulations this screen runs, and they are all arithmetic.
+ *
+ * **Real games are not here, deliberately** (Aaron's call, 2026-08-25). Tier 3
+ * used to be a fifth option in this list, which made one screen answer two
+ * unlike questions: "what does ten thousand shuffles say about my mana" is a
+ * number you read, and "who wins" is a match you *watch*, for minutes. They
+ * wanted different rooms and one of them wanted a stage. The Forge moved
+ * whole to `/coliseum`, which was built to be where a match is watched; this
+ * screen kept the goldfish and got shorter.
+ */
+type Mode = 'mana' | 'lands' | 'shelf' | 'policy'
 
 /**
  * Every control and every figure on this screen, keyed to the served glossary.
@@ -105,14 +115,6 @@ export default function Simulator() {
   const [owner, setOwner] = useState(params.get('owner') ?? '')
   const [mode, setMode] = useState<Mode>('mana')
   const [games, setGames] = useState(20000)
-  // The Forge mode (ADR 35). The gate decides whether the mode exists at all
-  // — where Forge is not installed the option never renders, which is the
-  // Ask Claude rule: honestly absent, never greyed out with an excuse.
-  const [forgeReady, setForgeReady] = useState(false)
-  const [oppSlug, setOppSlug] = useState('')
-  const [oppOwner, setOppOwner] = useState('')
-  const [forgeGames, setForgeGames] = useState(10)
-  const [forge, setForge] = useState<ForgeResult | null>(null)
   const [minLands, setMinLands] = useState(2)
   const [maxLands, setMaxLands] = useState(5)
   const [minPieces, setMinPieces] = useState(3)
@@ -128,7 +130,7 @@ export default function Simulator() {
   const [shelf, setShelf] = useState<ShelfResult | null>(null)
   const [shelfBusy, setShelfBusy] = useState(false)
   const [policy, setPolicy] = useState<PolicyResult | null>(null)
-  // Its own control, like `forgeGames`, rather than sharing the mana run's
+  // Its own control rather than sharing the mana run's
   // twenty thousand and silently clamping it. A field reading 20,000 above a
   // report saying "2,000 games each" is a screen contradicting itself, and
   // the honest fix is a control that cannot be set to a number the run will
@@ -154,11 +156,14 @@ export default function Simulator() {
    * Submitted, and not yet a job (punch list item 6).
    *
    * `running` used to be `job.status`, which is only true once the POST has
-   * come back -- and a Forge match's POST is the slowest one here, because a
-   * JVM is starting behind it. So the Forge's own button stayed live and
-   * unchanged for seconds after it was pressed, with nothing on the screen
-   * saying the match had begun: the honest reading of which is that the click
-   * missed. This is the gap between the press and the job.
+   * come back. A button that stays live and unchanged for the length of a
+   * round trip has nothing on screen saying the run began, and the honest
+   * reading of that is that the click missed. This is the gap between the
+   * press and the job.
+   *
+   * The gap was worst on the Forge, whose POST had a JVM starting behind it —
+   * that mode lives in the Coliseum now and took its own word for the wait
+   * with it. The gap is smaller here and it is still real.
    */
   const [submitting, setSubmitting] = useState(false)
   const cancelRef = useRef<null | (() => void)>(null)
@@ -180,19 +185,7 @@ export default function Simulator() {
         // everybody else's, so first-match is the precedence a person wants.
         setOwner(d.find((deck) => deck.slug === slug)?.owner ?? '')
       }
-      // The opponent's seat starts occupied by the next deck along, because a
-      // control whose first state is invalid is a form that scolds before
-      // anybody has touched it.
-      const second = d[1] ?? first
-      if (second) {
-        setOppSlug(second.slug)
-        setOppOwner(second.owner)
-      }
     }).catch((e) => setError(errorMessage(e)))
-    // Asked once per mount, like `/api/claude`: a fact about the environment.
-    // A failed ask means the mode stays absent, which is the honest floor.
-    api.forgeStatus().then((s) => setForgeReady(s.available))
-      .catch(() => setForgeReady(false))
     // Cancel any in-flight poll when the screen unmounts.
     return () => cancelRef.current?.()
   }, [])                                     // eslint-disable-line react-hooks/exhaustive-deps
@@ -213,44 +206,37 @@ export default function Simulator() {
   /** A deck's address, which is owner and slug together (ADR 22). */
   const address = (s: string, o: string) => `${o}/${s}`
 
-  // Ask the gate about whichever decks are in the seats, and only when the
-  // shelf has already said there is something to ask about. Two seats in
-  // Forge; one everywhere else. Cached by address, because switching back and
-  // forth between two decks should not re-ask the same question, and because
-  // a run does not change the answer.
+  // Ask the gate about the deck in the seat, and only when the shelf has
+  // already said there is something to ask about. Cached by address, because
+  // switching back and forth between two decks should not re-ask the same
+  // question, and because a run does not change the answer.
   useEffect(() => {
-    const seats = mode === 'forge'
-      ? [[slug, owner], [oppSlug, oppOwner]]
-      : [[slug, owner]]
+    if (!slug) return
     let live = true
-    for (const [s, o] of seats) {
-      if (!s) continue
-      const key = address(s, o ?? '')
-      const tile = deckOf(s, o ?? '')
-      // `errors` is null when the pool was unavailable and the gate never
-      // ran, which is not a pass and must not render as one -- but it is
-      // also not something this screen can diagnose, so it asks nothing.
-      if (!tile || !tile.errors) continue
-      if (checks[key]) continue
+    const key = address(slug, owner)
+    const tile = deckOf(slug, owner)
+    // `errors` is null when the pool was unavailable and the gate never
+    // ran, which is not a pass and must not render as one -- but it is
+    // also not something this screen can diagnose, so it asks nothing.
+    if (tile?.errors && !checks[key]) {
       api.validate({ owner: tile.owner, slug: tile.slug })
         .then((report) => { if (live) setChecks((c) => ({ ...c, [key]: report })) })
         .catch(() => undefined)   // a caution nobody can fetch is not an error
     }
     return () => { live = false }
-  }, [slug, owner, oppSlug, oppOwner, mode, decks, checks])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [slug, owner, decks, checks])   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(withSeed = seed) {
     if (!slug) return
     cancelRef.current?.()
     setSubmitting(true)
     setError(null)
-    // The stage is struck before the next match rather than after the last
-    // one, so a second Forge run is "lighting" again instead of inheriting
-    // the finished job that made the first one stop saying so.
+    // Cleared before the next run rather than after the last one, so a
+    // second run reads as running instead of inheriting the finished job
+    // that made the first one stop saying so.
     setJob(null)
     setMana(null)
     setLands(null)
-    setForge(null)
     setShelf(null)
     setPolicy(null)
     const payload = {
@@ -284,8 +270,7 @@ export default function Simulator() {
           ? await api.simMana({ ...payload, turns: 12 })
           : mode === 'lands'
             ? await api.simLands({ ...payload, low, high, games: Math.min(games, 25000) })
-            : mode === 'policy'
-              ? await api.simPolicy({
+            : await api.simPolicy({
                   slug, owner, seed: withSeed,
                   // Its own field, capped at 2,000: this multiplies by the
                   // size of the grid, so the mana run's 20,000 would be
@@ -295,10 +280,6 @@ export default function Simulator() {
                   // would buy precision the answer throws away.
                   games: policyGames,
                 })
-              : await api.simForge({
-                  a_slug: slug, a_owner: owner, b_slug: oppSlug,
-                  b_owner: oppOwner, games: forgeGames, seed: withSeed,
-                })
       setJob(submitted)
       // The submitted job is handed on: results are cached server-side, so it
       // can already be `done` and there is nothing to poll for.
@@ -307,8 +288,7 @@ export default function Simulator() {
       const finished = await follower.promise
       if (mode === 'mana') setMana(finished.result as ManaResult)
       else if (mode === 'lands') setLands(finished.result as LandResult)
-      else if (mode === 'policy') setPolicy(finished.result as PolicyResult)
-      else setForge(finished.result as ForgeResult)
+      else setPolicy(finished.result as PolicyResult)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -329,9 +309,6 @@ export default function Simulator() {
 
   const running = submitting || shelfBusy
     || job?.status === 'queued' || job?.status === 'running'
-  /** Pressed, and the job has not reported back yet — the seconds a Forge
-   *  match spends starting a JVM, and where "did that click land?" lives. */
-  const lighting = submitting && !job
 
   return (
     <div className="space-y-6">
@@ -353,11 +330,10 @@ export default function Simulator() {
           <Term name="tier-1">Tier 1</Term> Monte Carlo: shuffle, draw, pay
           costs, repeat. It is a <Term name="goldfish">goldfish</Term> — nobody
           is playing against you — so it answers questions about mana and no
-          others.
-          {forgeReady && <>
-            {' '}Or hand the table to <Term name="tier-3">the Forge</Term>,
-            and real games get played — whole ones, with an opponent.
-          </>}
+          others. For an opponent who fights back,
+          {' '}<Term name="tier-3">the Forge</Term> plays real games in the
+          {' '}<Link to="/coliseum" className="underline decoration-dotted"
+                     style={{ color: 'var(--series-1)' }}>Coliseum</Link>.
         </p>
       </PageMasthead>
 
@@ -386,29 +362,8 @@ export default function Simulator() {
                   { value: 'lands', label: 'Land count sweep' },
                   { value: 'shelf', label: 'The closed form' },
                   { value: 'policy', label: 'Mulligan policy search' },
-                  // Only where the gate said so — absent, never greyed out.
-                  ...(forgeReady
-                    ? [{ value: 'forge', label: 'Real games (Forge)' }]
-                    : []),
                 ]} />
-        {mode === 'forge' ? (
-          <>
-            <Select label="Opponent"
-                    value={oppOwner ? `${oppOwner}/${oppSlug}` : oppSlug}
-                    onChange={(v) => {
-                      const cut = v.indexOf('/')
-                      setOppOwner(cut < 0 ? '' : v.slice(0, cut))
-                      setOppSlug(cut < 0 ? v : v.slice(cut + 1))
-                    }}
-                    options={decks.map((d) => ({
-                      value: `${d.owner}/${d.slug}`,
-                      label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
-                        + (d.pilot ? ` (${d.pilot})` : ''),
-                    }))} />
-            <NumberField label="Games" value={forgeGames} onChange={setForgeGames}
-                         min={1} max={20} help={help('sim.forge_games')} />
-          </>
-        ) : mode === 'policy' ? (
+        {mode === 'policy' ? (
           <NumberField label="Games per rule" value={policyGames}
                        onChange={setPolicyGames} min={200} max={2000} step={200}
                        help={help('sim.games')} />
@@ -449,16 +404,13 @@ export default function Simulator() {
         <NumberField label="Shuffle" value={seed} onChange={setSeed}
                      min={1} max={999999} help={help('sim.seed')} />
         {/* Pressed is a state the button has to be able to show, and until
-            now it could not: `running` came from the job, the job comes from
-            the POST, and a Forge POST is a JVM starting. So the slowest
-            action on the screen was the one whose button stayed live and
-            unchanged after it was clicked (punch list item 6). `lighting` is
-            that gap, and Forge gets its own word for it because Forge is
-            where the gap is long enough to read. */}
+            now it could not: `running` came from the job and the job comes
+            from the POST, so a button clicked stayed live and unchanged until
+            the round trip returned (punch list item 6). `submitting` closes
+            that gap from the click rather than from the job. */}
         <button onClick={() => run()} disabled={running || !slug}
                 className="btn btn-primary btn-accent-1">
-          {lighting && mode === 'forge' ? 'Lighting the forge…'
-            : running ? 'Running…' : 'Run simulation'}
+          {running ? 'Running…' : 'Run simulation'}
         </button>
         <button onClick={resample} disabled={running || !slug}
                 title="Run the same deck against a different shuffle"
@@ -468,40 +420,13 @@ export default function Simulator() {
         </button>
       </div>
 
-      {/* What a run will leave out, before it is paid for. Both seats in
-          Forge, where the bill is minutes of real games. */}
+      {/* What a run will leave out, before it is paid for. */}
       <DeckCaution report={checks[address(slug, owner)]}
                    name={deckOf(slug, owner)?.name ?? slug} />
-      {mode === 'forge' && address(oppSlug, oppOwner) !== address(slug, owner) && (
-        <DeckCaution report={checks[address(oppSlug, oppOwner)]}
-                     name={deckOf(oppSlug, oppOwner)?.name ?? oppSlug} />
-      )}
 
       {error && <ErrorNote>Simulation failed: {error}</ErrorNote>}
 
-      {/* A match gets a stage instead of a bar. It is one element across both
-          phases — fed from the job's `partial` while the games are landing and
-          from the result's own rows once they have all landed — so the pips
-          that lit one at a time are still lit when the match is over and the
-          win has somewhere to arrive.
-
-          Keyed on the job id, which is the only remount anybody wants: a
-          second match against the same two decks reuses the row numbers 1..n,
-          so without it React would match the new match's rows to the old
-          one's elements and the second run would play out with no strikes at
-          all. */}
-      {mode === 'forge' && job && (running || forge) && (
-        <MatchTheater
-          key={job.id}
-          a={deckOf(slug, owner)} b={deckOf(oppSlug, oppOwner)}
-          aSlug={slug} bSlug={oppSlug}
-          games={forge ? forge.games : (job.total || forgeGames)}
-          rows={forge ? forge.rows : theaterRows(job.partial)}
-          running={running}
-        />
-      )}
-
-      {running && job && mode !== 'forge' && (
+      {running && job && (
         <div className="card-surface space-y-2 rounded-xl p-4">
           <div className="flex items-center justify-between text-sm">
             <Spinner label={job.label || 'Running…'} />
@@ -702,63 +627,6 @@ export default function Simulator() {
         </div>
       )}
 
-      {forge && (
-        <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {forge.decks.map((d) => (
-              <StatTile key={d.address} label={`${d.name} wins`}
-                        value={d.wins.toString()}
-                        hint={`of ${forge.played} played`}
-                        help={help('stat.forge_wins')} />
-            ))}
-            <StatTile label="Draws" value={forge.draws.toString()}
-                      hint="finished with no winner" />
-            <StatTile label="Hit the clock" value={forge.timed_out.toString()}
-                      hint={`called off at ${forge.clock}s`}
-                      tone={forge.timed_out > 0 ? 'warning' : undefined}
-                      help={help('stat.forge_timed_out')} />
-            <StatTile label="Game length"
-                      value={forge.median_seconds != null
-                        ? `${forge.median_seconds}s` : '—'}
-                      hint={forge.max_seconds != null
-                        ? `median — longest ${forge.max_seconds}s` : undefined}
-                      help={help('stat.forge_length')} />
-          </div>
-
-          <section className="card-surface space-y-2 rounded-xl p-5">
-            <h3 className="text-sm font-semibold">Every game</h3>
-            <DataTable
-              columns={[
-                { key: 'game', label: 'Game' },
-                { key: 'winner', label: 'Winner' },
-                { key: 'turns', label: 'Turns' },
-                { key: 'seconds', label: 'Seconds' },
-                { key: 'outcome', label: 'Outcome' },
-              ]}
-              rows={forge.rows.map((r) => ({
-                game: r.game,
-                winner: forge.decks.find((d) => d.slug === r.winner)?.name
-                  ?? '—',
-                turns: r.turns ?? '—',
-                seconds: r.seconds,
-                outcome: r.timed_out ? 'hit the clock'
-                  : r.draw ? 'draw' : 'won',
-              }))}
-            />
-          </section>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs"
-               style={{ color: 'var(--text-secondary)' }}>
-            <Badge>shuffle {forge.seed}</Badge>
-            <span>
-              {forge.played} games in {Math.round(forge.wall_seconds)}s —
-              {' '}{Math.round(forge.startup_seconds)}s of that was lighting
-              the forge.
-            </span>
-          </div>
-          <Caveat>{forge.caveat}</Caveat>
-        </div>
-      )}
     </div>
   )
 }

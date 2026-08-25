@@ -41,6 +41,11 @@ type stubShim struct {
 	// errorLine ends the stream with an error instead of a result.
 	errorLine string
 	errorType string
+	// beats is one game's worth of narration, emitted before every game's row
+	// — and only when the ask said to narrate, which is what the real shim
+	// does. Nil means this stub has nothing to tell, which is also a shim too
+	// old to have been taught.
+	beats []tier3.GameEvent
 	// hold, when non-nil, blocks the stream after each game until the test
 	// lets it go. That is what makes the match theater observable: a finished
 	// job clears its `partial` (deliberately — the result is
@@ -66,6 +71,22 @@ type stubShim struct {
 	// while anything is in flight races the writer just as surely.
 	mu   sync.Mutex
 	seen []string
+	// asked is the last /match ask, so a test can assert what *crossed*
+	// rather than only what came back — a client that quietly stopped sending
+	// `narrate` would still look green against a stub that narrates anyway.
+	asked map[string]any
+}
+
+// askedFor is the last /match ask this stub received. A copy, for `seen`'s
+// reason.
+func (s *stubShim) askedFor() map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]any{}
+	for k, v := range s.asked {
+		out[k] = v
+	}
+	return out
 }
 
 // requests is what the stub has been asked, as of now. A copy, so the caller
@@ -94,7 +115,7 @@ func (s *stubShim) serve(t *testing.T) *httptest.Server {
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"reports": s.coverage})
 		case "/match":
-			s.match(w)
+			s.match(w, r)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -103,7 +124,13 @@ func (s *stubShim) serve(t *testing.T) *httptest.Server {
 	return srv
 }
 
-func (s *stubShim) match(w http.ResponseWriter) {
+func (s *stubShim) match(w http.ResponseWriter, r *http.Request) {
+	ask := map[string]any{}
+	_ = json.NewDecoder(r.Body).Decode(&ask)
+	s.mu.Lock()
+	s.asked = ask
+	s.mu.Unlock()
+
 	if !s.stream {
 		_ = json.NewEncoder(w).Encode(tier3.WireRun{Games: s.games,
 			Seats: map[int]string{1: "kaheera", 2: "mono-green"}, WallSeconds: 12.5})
@@ -119,7 +146,16 @@ func (s *stubShim) match(w http.ResponseWriter) {
 			flusher.Flush()
 		}
 	}
+	narrate, _ := ask["narrate"].(bool)
 	for i, g := range s.games {
+		// Beats first, then the row that closes their game: one pass over
+		// Forge's output feeds the event parser before the result parser, so
+		// this is the order the real shim emits in and the order the client
+		// is entitled to expect.
+		if narrate && s.beats != nil {
+			emit(map[string]any{"events": tier3.EventLog{
+				Game: i + 1, Events: s.beats}})
+		}
 		emit(map[string]any{"game": i + 1, "row": g})
 		if s.hold != nil {
 			<-s.hold
@@ -527,13 +563,14 @@ func TestAPreTheaterShimStillTicks(t *testing.T) {
 		Settings: tier3.Settings{WorkerURL: srv.URL},
 		Boot:     5 * time.Second, Sleep: func(time.Duration) {},
 	}
-	run, err := worker.RunMatch(t.Context(), nil, 2, 300, nil,
-		func(finished int, game *tier3.GameResult) {
+	run, err := worker.RunMatch(t.Context(), nil, tier3.MatchAsk{
+		Games: 2, Clock: 300,
+		OnGame: func(finished int, game *tier3.GameResult) {
 			ticks = append(ticks, finished)
 			if game != nil {
 				seatedRows++
 			}
-		})
+		}})
 	if err != nil {
 		t.Fatal(err)
 	}
