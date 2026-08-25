@@ -277,6 +277,46 @@ func TestTheTokensAreOnTheBoard(t *testing.T) {
 	}
 }
 
+// The account's vocabulary, held against a real match.
+//
+// **This test exists because a whole beat kind went missing and nothing
+// noticed.** `dies` never fired at all: Forge announces `Battlefield out`
+// before `Graveyard in`, so by the time the graveyard arrived the card's zone
+// was already `gone` and "did this come from the battlefield?" had no answer
+// left. Eighteen cards reached graveyards in this recording and the account
+// said none of them was destroyed — and every other test still passed, because
+// they all asked about the board and none asked what the room would *say*.
+//
+// So this asks the shape of the question that was missing: over two real games
+// of Commander, does each beat a person watching would expect actually get
+// raised? A kind that stops appearing is a kind that stopped working.
+func TestTheAccountKeepsItsWholeVocabulary(t *testing.T) {
+	t.Parallel()
+	logs, _ := scribed(t, true)
+
+	seen := map[tier3.EventKind]int{}
+	for _, log := range logs {
+		for _, e := range log.Events {
+			seen[e.Kind]++
+		}
+	}
+	// Every kind two fair Commander decks must produce between them. Blocks
+	// are deliberately not here — Forge's AI chump-blocked exactly once in
+	// these two games, and a gate that depends on an opponent's judgement is
+	// a gate that fails on a re-record.
+	for _, kind := range []tier3.EventKind{
+		tier3.EventTurn, tier3.EventLand, tier3.EventCast, tier3.EventEnters,
+		tier3.EventAttack, tier3.EventUnblocked, tier3.EventDamage,
+		tier3.EventLife, tier3.EventDies, tier3.EventOutcome,
+	} {
+		if seen[kind] == 0 {
+			t.Errorf("no %q beat was raised across two whole games; the room "+
+				"has gone quiet about something it used to say", kind)
+		}
+	}
+	t.Logf("the account said: %v", seen)
+}
+
 // Not watching costs nothing: the rows are the same and no board is built.
 func TestAMatchNobodyWatchesCarriesNoBoard(t *testing.T) {
 	t.Parallel()

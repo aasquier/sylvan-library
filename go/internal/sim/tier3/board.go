@@ -179,6 +179,16 @@ type board struct {
 	types     map[int]string
 	counters  map[int]map[string]int
 	life      map[int]int
+	// left is the last real zone a card was cleared out of.
+	//
+	// Needed because **Forge announces the leaving before the arriving**: a
+	// creature dying raises `Battlefield out` and then `Graveyard in`, so by
+	// the time the graveyard arrives the card's current zone is already
+	// [ZoneGone] and "did this come from the battlefield?" has no answer left.
+	// Without this the `dies` beat never fired at all — eighteen cards reached
+	// graveyards in the recorded match and the account never said one of them
+	// was destroyed.
+	left map[int]string
 
 	// pending is what has changed since the last beat, in the order the cards
 	// were first touched — deterministic, because a map's iteration order is
@@ -200,7 +210,8 @@ func newBoard() *board {
 		known: map[int]int{}, zone: map[int]string{}, seat: map[int]int{},
 		tapped: map[int]bool{}, power: map[int]int{}, toughness: map[int]int{},
 		types: map[int]string{}, counters: map[int]map[string]int{},
-		life: map[int]int{}, changing: map[int]*BoardChange{},
+		life: map[int]int{}, left: map[int]string{},
+		changing: map[int]*BoardChange{},
 	}
 }
 
@@ -297,6 +308,7 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		if b.zone[id] == ZoneGone {
 			return
 		}
+		b.left[id] = zone
 		b.zone[id] = ZoneGone
 		b.change(id).Zone = ZoneGone
 		return

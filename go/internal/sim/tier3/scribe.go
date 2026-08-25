@@ -225,6 +225,12 @@ func (p *ScribeParser) fold(l scribeLine) {
 			return
 		}
 		was := p.board.zone[l.ID]
+		if was == ZoneGone {
+			// Forge announces the leaving before the arriving, so the zone a
+			// card is *in* is already nothing by the time it lands somewhere.
+			// The zone it came *from* is what this asks about.
+			was = p.board.left[l.ID]
+		}
 		p.board.moved(l.ID, l.Zone, l.Mode, l.Seat)
 		p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
 		// A permanent leaving the battlefield for a graveyard is the one zone
@@ -308,21 +314,30 @@ func (p *ScribeParser) outcome(l scribeLine) {
 	if said == "" {
 		return
 	}
-	seat := 0
+	// **The name is cut off whether or not the seat is knowable.** Two seats
+	// sharing a name leave the *seat* ambiguous — a guess would be worse than
+	// a gap — but the sentence is the same sentence either way, and leaving
+	// the player's name on the front of it makes the reason unreadable
+	// ("Gyome — Food · Gyome — Food has won because…") and hides the verb the
+	// win flag is read from.
+	seat, matched, several := 0, "", false
 	for at, name := range p.seats {
 		if name == "" || !strings.HasPrefix(said, name) {
 			continue
 		}
+		if len(name) > len(matched) {
+			matched = name
+		}
 		if seat != 0 {
-			seat = 0
-			break
+			several = true
+			continue
 		}
 		seat = at
 	}
-	rest := said
-	if seat != 0 {
-		rest = strings.TrimSpace(strings.TrimPrefix(said, p.seats[seat]))
+	if several {
+		seat = 0
 	}
+	rest := strings.TrimSpace(strings.TrimPrefix(said, matched))
 	won := strings.HasPrefix(rest, "has won")
 	for _, verb := range []string{"has won ", "has lost "} {
 		if strings.HasPrefix(rest, verb) {
