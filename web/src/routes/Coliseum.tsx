@@ -53,13 +53,17 @@ import { useSearchParams } from 'react-router-dom'
 import {
   api, errorMessage, followJob,
   type Coliseum, type ColiseumArena, type ColiseumFact,
-  type DeckTile, type ForgeResult, type Job, type ValidationReport,
+  type DeckTile, type ForgeBeats, type ForgeResult, type Job,
+  type ValidationReport,
 } from '../lib/api'
 import { Badge, CardHover, Caveat, ErrorNote, NumberField, Select, StatTile }
   from '../components/ui'
 import { DeckCaution } from '../components/closedform'
 import { DataTable } from '../components/datatable'
-import { MatchBeats, MatchTheater, type StagedBeat } from '../components/theater'
+import { MatchBoard } from '../components/board'
+import { MatchBeats, MatchTheater } from '../components/theater'
+import { type Arriving, type Speed, type StagedBeat, useReel }
+  from '../lib/reel'
 import {
   beatLine, playerTurns, shortName, theaterBeats, theaterRows, turnsTaken,
 } from '../lib/theater'
@@ -72,14 +76,6 @@ const help = (key: string) => <HelpTip name={key} />
 /** The seed a match gets unless somebody asks for another. Matches the
  *  server's own default, so the app and the CLI describe the same shuffle. */
 const DEFAULT_SEED = 7
-
-/** The beats of the newest game, in words, or nothing yet.
- *
- * The pacing belongs to [MatchBeats], which is keyed on the job — so a second
- * match starts an empty room by remounting rather than by an effect that
- * resets six pieces of state. This room's job is the translation, because
- * turning a slug into a name needs the shelf and the shelf is this room's. */
-type Arriving = { game: number; beats: StagedBeat[]; truncated: boolean } | null
 
 /** How long a slide holds. Long, deliberately: see the note above. */
 const SLIDE_MS = 24_000
@@ -402,8 +398,33 @@ export default function ColiseumRoom() {
    *  Translated here rather than on the stage because turning a slug into a
    *  name needs the shelf, and the shelf is this room's. The stage renders
    *  what it is given. */
-  const arriving = useMemo((): Arriving => {
-    const heard = theaterBeats(job?.partial)
+  /** Every game the room can show: the live one while the match runs, and all
+   *  of them once it is over.
+   *
+   * The partial carries one game — the newest — and is cleared the moment the
+   * job finishes; the result carries the whole match. So a match is watched
+   * live one game at a time, and watched *back* a game at a time, which is
+   * when somebody actually has the time for it. */
+  const played = useMemo((): ForgeBeats[] => {
+    if (forge?.beats?.length) return forge.beats
+    const live = theaterBeats(job?.partial)
+    return live ? [live] : []
+  }, [forge, job?.partial])
+
+  // Which game is on the field. Null follows the match; a number is a choice,
+  // and it survives the match ending so a pick does not get yanked away by the
+  // last game landing.
+  const [pickedGame, pickGame] = useState<number | null>(null)
+  const watching = useMemo(() => {
+    if (pickedGame != null) {
+      const picked = played.find((g) => g.game === pickedGame)
+      if (picked) return picked
+    }
+    return played[played.length - 1]
+  }, [played, pickedGame])
+
+  const arriving = useMemo((): Arriving | null => {
+    const heard = watching ?? null
     if (!heard) return null
     const name = (slug: string) =>
       shortName(decks.find((d) => d.slug === slug)?.name ?? slug)
@@ -413,6 +434,9 @@ export default function ColiseumRoom() {
     return {
       game: heard.game,
       truncated: heard.truncated,
+      // The board rides with the beats it belongs to, so the picture and the
+      // sentences can never be about different games — see `lib/reel.ts`.
+      board: heard.board,
       beats: heard.beats.map((beat, i): StagedBeat => {
         const said = beatLine(beat, name)
         return {
@@ -427,7 +451,28 @@ export default function ColiseumRoom() {
         }
       }),
     }
-  }, [job?.partial, decks])
+  }, [watching, decks])
+
+  // **One clock for the room.** The reel drains the beats at reading speed and
+  // says how many it has told; the account renders those beats and the board
+  // is folded to exactly that many steps. The server builds one board step per
+  // beat, so a single count keeps the picture and the sentences describing the
+  // same moment — two components pacing themselves would drift within a turn.
+  // **How fast the room reads, which is not how fast the Forge plays.** The
+  // match runs flat out and lands its results when it lands them; this only
+  // governs the retelling. `Watch` is the natural pace — a game spread across
+  // the time the next one takes to arrive.
+  const [speed, setSpeed] = useState<Speed>('play')
+  // `seek` moves the reel's own mark, so pressing play after a scrub carries
+  // on from where the hand left off rather than snapping back.
+  const [reel, seek] = useReel(arriving, speed)
+
+  /** What the field calls a seat. The board carries slugs and Forge's own deck
+   *  titles; only the room has the shelf that turns either into a name. */
+  const seatName = useCallback((slug: string | null, fallback: string) =>
+    shortName(slug
+      ? (decks.find((d) => d.slug === slug)?.name ?? slug)
+      : fallback), [decks])
 
   // The play-by-play is offered from the moment a match starts and stays
   // offered after it ends, because the last game finishing is the moment
@@ -459,23 +504,42 @@ export default function ColiseumRoom() {
       {forgeReady && (
         <div className="card-surface mt-5 flex flex-wrap items-end gap-3
                         rounded-xl p-4">
-          {/* Bounded, and measured on the deployed room rather than guessed:
-              a `<select>` sizes to its widest option, and a deck named
-              "Goreclaw, Terror of Qal Sisma — Mono-Green Stompy — gyome"
-              made each of these 447px. Two of them ate a 992px bar and threw
-              the dial, the shuffle and the button onto two more rows — five
-              controls in three rows with half the bar empty. Capped, all five
-              sit on one; the browser ellipsises the name, and the theater
-              below carries it in full anyway. */}
+          {/* **A whole row each on a phone, and a capped share of one bar on a
+              laptop.** Both halves of that were bought by a bug.
+
+              The cap came first, measured on the deployed room: a `<select>`
+              sizes to its widest option, and a deck named "Goreclaw, Terror
+              of Qal Sisma — Mono-Green Stompy — gyome" made each of these
+              447px. Two of them ate a 992px bar and threw the dial, the
+              shuffle and the button onto two more rows — five controls in
+              three rows with half the bar empty. Capped, all five sit on one;
+              the browser ellipsises the name, and the theater below carries
+              it in full anyway.
+
+              But `flex-1` is `flex: 1 1 0%`, and with `min-w-0` these two
+              were the **only** items in the row that could shrink — the
+              number fields are a fixed `w-28` and the button holds its label.
+              So on a 375px phone they absorbed the entire deficit instead of
+              wrapping: measured at **18px wide inside a 1px label**, which
+              renders as the label text and the control collapsed into one
+              unreadable smear. Aaron found it on a phone, and no test could
+              have: every one of them asks the DOM what it says, and this is a
+              question about how wide it is.
+
+              `basis-full` is the fix and it is deliberately not a media query
+              of its own — the row already wraps, so giving each select a
+              full-width basis below `sm` makes it take its own line by the
+              rule that was already there. `min-w-0` stays, because the
+              ellipsis on a long deck name depends on it. */}
           <Select label="Champion" value={a} onChange={setA}
-                  className="min-w-0 max-w-[15rem] flex-1"
+                  className="min-w-0 basis-full sm:max-w-[15rem] sm:flex-1"
                   options={decks.map((d) => ({
                     value: `${d.owner}/${d.slug}`,
                     label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
                       + (d.pilot ? ` (${d.pilot})` : ''),
                   }))} />
           <Select label="Challenger" value={b} onChange={setB}
-                  className="min-w-0 max-w-[15rem] flex-1"
+                  className="min-w-0 basis-full sm:max-w-[15rem] sm:flex-1"
                   options={decks.map((d) => ({
                     value: `${d.owner}/${d.slug}`,
                     label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
@@ -492,7 +556,7 @@ export default function ColiseumRoom() {
               The honest reading of that is that the click missed. */}
           <button type="button" onClick={() => void sendThemIn()}
                   disabled={running || !a || !b}
-                  className="btn btn-primary btn-accent-1">
+                  className="btn btn-primary btn-accent-1 w-full sm:w-auto">
             {lighting ? 'Lighting the forge…'
               : running ? 'The match is on…' : 'Send them in'}
           </button>
@@ -527,6 +591,29 @@ export default function ColiseumRoom() {
             rows={rows}
             running={running}
           />
+        </div>
+      )}
+
+      {/* **The field, at full width, and that is the layout decision.** Two
+          Commander battlefields, two hands, two land rows and two graveyards
+          do not fit in a column beside a painting — a board squeezed into one
+          is a board of thumbnails, and a graveyard reduced to a number is the
+          thing this was built to stop being. So the arena's painting and the
+          house's facts move below it while a match is on, and the thing you
+          came to watch takes the room.
+
+          Keyed on the job for the same reason the theater is: a second match
+          begins on an empty field rather than on the last one's board. */}
+      {hasBeats && (
+        <div className="mt-6">
+          <MatchBoard key={`board-${job?.id}`} board={reel.board}
+                      shown={reel.told} game={reel.game}
+                      name={seatName} running={running}
+                      speed={speed} setSpeed={setSpeed}
+                      of={reel.shown.length + reel.queue.length}
+                      seek={seek}
+                      games={played.map((g) => g.game)}
+                      playing={reel.game} chooseGame={pickGame} />
         </div>
       )}
 
@@ -588,7 +675,7 @@ export default function ColiseumRoom() {
                           className={`strip-tab -mb-px border-b-2 px-3 py-1.5
                                       text-sm font-medium${
                             pane === 'game' ? ' is-active' : ''}`}>
-                    The game
+                    The account
                   </button>
                   <button role="tab" type="button"
                           aria-selected={pane === 'house'}
@@ -606,7 +693,8 @@ export default function ColiseumRoom() {
                 // every beat this stage is holding belongs to the match it was
                 // mounted for, and a remount is a cheaper and more honest reset
                 // than six setState calls in an effect.
-                <MatchBeats key={job?.id} arriving={arriving} running={running} />
+                <MatchBeats beats={reel.shown} game={reel.game}
+                            truncated={reel.truncated} running={running} />
               ) : (
                 <div className="flex flex-1 flex-col justify-between">
                   <div>

@@ -15,7 +15,8 @@
  * cleared.
  */
 
-import type { ForgeBeat, ForgeBeats, ForgeGameRow } from './api'
+import type { ForgeBeat, ForgeBeats, ForgeBoard, ForgeGameRow }
+  from './api'
 
 /** The Forge's `partial` payload, narrowed.
  *
@@ -59,10 +60,15 @@ export function theaterBeats(partial: unknown): ForgeBeats | null {
   if (!beats || typeof beats !== 'object') return null
   const { game, beats: list } = beats as { game?: unknown; beats?: unknown }
   if (typeof game !== 'number' || !Array.isArray(list)) return null
+  const board = (beats as { board?: unknown }).board
   return {
     game,
     beats: list as ForgeBeat[],
     truncated: (beats as { truncated?: unknown }).truncated === true,
+    // Null for a match played by a worker without the scribe, which is a room
+    // that draws the account alone — the same degrade every hop of this wire
+    // makes, and the reason this reader is total rather than trusting.
+    board: (board && typeof board === 'object') ? (board as ForgeBoard) : null,
   }
 }
 
@@ -169,16 +175,25 @@ export function playerTurns(beats: ForgeBeat[]): Map<number, number> {
 
 /** How many turns a finished game took, as a player would count them.
  *
- * The row carries Forge's per-player-turn count and no seats, so this is the
- * one place the halving cannot be avoided — `playerTurns` needs the beats and
- * a row has none. Exact for every game without an extra turn, and one high
- * for a game with one, which is the honest limit of what a row can say.
+ * **Which is what the row already says**, and this function used to halve it a
+ * second time. The correction, measured 2026-08-25 and proven three ways:
  *
- * `seats` is 2 for every match this app runs; it is a parameter rather than a
- * literal because the CLI plays pods, and a four-player game's turn 15 is
- * round four rather than round eight.
+ * - a recorded narration holds seventeen `Turn: Turn N` lines and one
+ *   `Game Outcome: Turn 9`;
+ * - Forge's own `GameLogFormatter` renders that line as
+ *   `Math.ceil(ev.lastTurnNumber() / 2.0)`, read out of the bytecode;
+ * - a live match reported 23 through the log against 46 raw on the bus.
+ *
+ * So Forge halves it itself. `ForgeGameRow.turns` is read off that line, has
+ * always been **rounds**, and halving it here rendered a nine-turn game as
+ * "T5" — the same mistake as the one this was written to fix, in the other
+ * direction. The row is now passed through.
+ *
+ * `ForgeBeat.turn` is different and still needs converting: a beat carries the
+ * `Turn: Turn N` number, which really is a player-turn, and `playerTurns`
+ * above counts those per seat. Two numbers, two meanings, one of them already
+ * done for us.
  */
-export function turnsTaken(turns: number | null, seats = 2): number | null {
-  if (turns == null || seats < 1) return turns
-  return Math.ceil(turns / seats)
+export function turnsTaken(turns: number | null): number | null {
+  return turns
 }

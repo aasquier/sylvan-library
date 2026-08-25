@@ -139,8 +139,10 @@ func TestTheShapedMatchIsTheRecordedBytes(t *testing.T) {
 				pair = append(pair, d)
 			}
 			run := tier3.RunFromWire(c.Run)
+			// No beats: every row in the frozen corpus is a silent match,
+			// and `omitempty` keeps the recorded bytes identical.
 			got, err := json.Marshal(shapeForge(pair, c.Addresses,
-				c.GamesAsked, big.NewInt(c.Seed), run))
+				c.GamesAsked, big.NewInt(c.Seed), run, nil))
 			if err != nil {
 				t.Fatal(err)
 			}

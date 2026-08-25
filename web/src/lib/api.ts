@@ -627,6 +627,81 @@ export interface ForgeBeats {
   /** The game outran the ceiling on what crosses. The beats kept are the
    *  first ones — a game's opening is what makes the rest of it legible. */
   truncated: boolean
+  /** The battlefield, or null.
+   *
+   * Null for a match played by a worker without the scribe — Forge's own game
+   * log has no category for a token or a counter, so a board built from it
+   * would be silently wrong on exactly the decks that most want one (ADR 42).
+   * A room handed no board draws the account alone, which is what every room
+   * did before there was one. */
+  board: ForgeBoard | null
+}
+
+/** One side of the table. The **only** place a seat number becomes a deck.
+ *
+ * Everything else in a board refers to a seat by its number, because a board
+ * is a place: two sides, laid out, needing a stable index. Threading a slug
+ * through three hundred changes would be the same fact three hundred times. */
+export interface ForgeBoardSeat {
+  seat: number
+  slug: string | null
+  /** What Forge called the player, which is the deck's own title — the
+   *  fallback for a seat whose slug the shelf has not answered yet. */
+  name: string
+  life: number
+}
+
+/** One card in one game, named and painted once.
+ *
+ * The dictionary is what makes a board small: every change below refers to a
+ * card by Forge's per-game instance id, and this is the only place the name
+ * and the painting are spelled out. */
+export interface ForgeBoardCard {
+  id: number
+  name: string
+  token?: boolean
+  types?: string
+  seat?: number
+  /** The whole card face, which is what a permanent looks like on a table. */
+  image?: string
+  /** The painting alone, for a card shown large. */
+  art?: string
+  /** Carried for tokens, whose printing is chosen rather than looked up. */
+  artist?: string
+}
+
+/** One card's change at one step. Everything is optional because almost
+ *  everything is usually unchanged — a land tapping is one field. */
+export interface ForgeBoardChange {
+  id: number
+  zone?: string
+  seat?: number
+  tapped?: boolean
+  power?: number
+  toughness?: number
+  types?: string
+  counters?: { kind: string; n: number }[]
+}
+
+/** The board's movement between one beat and the next.
+ *
+ * **Steps are parallel to `beats`, one for one**, which is the whole pacing
+ * design: the room drains the beats at reading speed, and the picture moves
+ * exactly when the sentence is spoken, from one clock. */
+export interface ForgeBoardStep {
+  /** Forge's own turn number, which counts each player's turn separately —
+   *  `playerTurns` in `lib/theater.ts` converts at the last moment. */
+  turn?: number
+  seat?: number
+  life?: { seat: number; life: number }[]
+  changes?: ForgeBoardChange[]
+}
+
+/** The battlefield, as the room receives it. */
+export interface ForgeBoard {
+  seats: ForgeBoardSeat[]
+  cards: ForgeBoardCard[]
+  steps: ForgeBoardStep[]
 }
 
 export interface ForgeResult {
@@ -643,6 +718,15 @@ export interface ForgeResult {
   seed: number
   rows: ForgeGameRow[]
   caveat: string
+  /** **Every** game's narration and board, in the order they were played.
+   *
+   * The job's `partial` carries one game — the newest — and the server clears
+   * it the moment the job finishes. So a short match could finish inside a
+   * single poll and leave the room with nothing to draw, and a long one left
+   * you stuck on whichever game happened to be current. A match is worth
+   * watching back, which is when somebody has the time for it. Empty for a
+   * match nobody asked to narrate. */
+  beats: ForgeBeats[]
 }
 
 export interface SuggestionCandidate {

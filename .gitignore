@@ -20,6 +20,16 @@
 # directory were repository content.
 /data/
 
+# The toolbox's own `data/`, which is the same tree one directory over.
+# `animist/fetch.py` writes originals to `data/cache/animist/...` relative to
+# where it runs, and it runs from `tools/` — its docstring has said
+# "Gitignored, resumable, and never committed" since the day it was written,
+# and that stopped being true the day the Python app retired and the picture
+# tooling moved out of the repository root. The anchored `/data/` above could
+# not reach it. Half a gigabyte of source photography in git is ADR 6's
+# mistake with a different file extension, so the claim gets a rule.
+/tools/data/
+
 # The WAL siblings at any depth, deliberately unanchored: a `-wal` alone can
 # contain committed rows, and a stray handle can open one outside `/data`.
 *.db-wal

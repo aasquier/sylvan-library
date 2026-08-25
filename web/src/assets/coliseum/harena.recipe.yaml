@@ -1,0 +1,80 @@
+# The arena floor.
+#
+# The Latin for sand is *harena*, and it is where the word "arena" comes
+# from: the floor of the Colosseum was sand, laid over the wooden deck to
+# drink what was spilled on it. So the surface a Tier 3 match is drawn on is
+# sand, and not a metaphor for sand.
+#
+# **Why a photograph and not a gradient.** The field already had a gradient
+# stack and it was fine -- warm, even, and completely uniform, which is the
+# one thing real sand never is. A photograph carries grain of three sizes at
+# once, a few pale grits, and the shadow every grain casts on the one beside
+# it. None of that can be written as a colour stop, and all of it is what
+# makes a surface read as a material rather than a fill (commandment 5, and
+# the parchment's argument one room over).
+#
+# **The crop is the flattest field on the plate.** The source is a close-up
+# of coarse sand with debris around its edges: straw at the top left, a rock
+# at the bottom left, a darker gravelly margin down the right. Cropping to
+# the middle keeps the grain and drops every object -- a board has forty
+# pieces of card art on it, and a stray rock behind them is one more thing
+# competing for an eye that is trying to read a battlefield.
+#
+# **`levels` and nothing else.** No duotone: the parchment learned that
+# lesson first, and mapping every pixel onto one hue ramp is exactly the
+# operation that deletes what a photograph of a natural material has that a
+# gradient does not. Lifting the floor keeps the ochres, the grey grits and
+# the paler quartz, and makes the darkest possible pixel a stated number
+# rather than a hope -- which matters here because a card's black border sits
+# directly on this, and a near-black speck under it would read as a hole.
+#
+# The plate is served whole under `background-size: cover`, not tiled. Sand
+# is more forgiving than parchment, but a mirrored tile is still a
+# kaleidoscope of one patch, and the eye finds the axis of symmetry
+# eventually. One floor, not a pattern.
+animist: 1
+
+why_committed: >
+  Two reasons, and the first is the licence. The floor under a match has to
+  be public domain end to end, and Wikimedia's Colosseum photography is
+  almost entirely CC BY-SA -- an attribution obligation a decoration must
+  not carry, which the gate refuses and is right to. This plate is public
+  domain outright. The second is that a battlefield must not go blank when
+  somebody else's CDN moves: the sand is the ground every card in the room
+  stands on, and forty pieces of hotlinked card art on a missing floor is a
+  worse page than no board at all.
+
+sources:
+  # Coarse builder's sand, photographed close. Chosen for what it is rather
+  # than for where it is: no Colosseum photograph on Commons is public
+  # domain and usable as a *surface* -- they are all pictures of a building.
+  # This is a picture of the material the building's floor was covered in,
+  # which is the thing the page actually needs.
+  sand:
+    provider: wikimedia
+    title: "Coarse yellow sand.jpg"
+    found_via: >
+      Commons Category:Sand textures, filtered to public domain and CC0
+      only, after Category:Colosseum and Category:Hypogeum of the Colosseum
+      returned nothing usable under those two licences
+    landing: https://commons.wikimedia.org/wiki/File:Coarse_yellow_sand.jpg
+    licence: Public domain
+
+outputs:
+  # **860 wide is `animist measure`'s knee**, and it was measured rather than
+  # picked: 700px costs 90.7 KB, 860 costs 125.4, and 1100 costs 176.7 for
+  # detail that is spent immediately -- this sits under `background-size:
+  # cover` beneath a vignette, two blend modes and forty pieces of card art.
+  # Quality 70 rather than the parchment's 84 for the same reason in the
+  # other direction: grain hides compression the way a flat field of skin
+  # cannot.
+  - file: harena.webp
+    from: sand
+    ops:
+      # The middle of the plate: straw out at the top left, the rock out at
+      # the bottom left, the gravelly margin out down the right.
+      - crop: {frac_box: [0.17, 0.09, 0.93, 0.93]}
+      - levels: {out_black: "#3a2c17"}
+      - resize: {width: 860}
+    encode: {format: webp, quality: 70}
+    expect: {width: 860, height: 713, budget_kb: 150, metadata: none}

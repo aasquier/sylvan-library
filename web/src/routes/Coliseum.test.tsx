@@ -83,7 +83,10 @@ function show(path = '/coliseum') {
 /** One game's narration, as the job's `partial` carries it. */
 function beats(over: Partial<ForgeBeats> = {}): ForgeBeats {
   return {
-    game: 1, truncated: false,
+    // No board: this fixture is about the *account*, and a match played by a
+    // worker without the scribe carries exactly this — which is the state
+    // worth having a fixture for anyway.
+    game: 1, truncated: false, board: null,
     beats: [
       { kind: 'turn', turn: 4, who: 'gyome', against: null },
       { kind: 'land', turn: 4, who: 'gyome', against: null,
@@ -106,6 +109,10 @@ function runningJob(partial: unknown): Job {
 }
 
 const RESULT: ForgeResult = {
+  // A silent match: nobody asked to narrate, so the result carries no beats
+  // and no board — which is also every match a worker without the scribe
+  // plays.
+  beats: [],
   decks: [
     { slug: 'gyome', name: 'Gyome Food', address: 'aaron/gyome', wins: 2 },
     { slug: 'arahbo', name: 'Arahbo Cats', address: 'aaron/arahbo', wins: 1 },
@@ -364,7 +371,9 @@ describe('the play-by-play', () => {
     vi.mocked(api.job).mockReturnValue(new Promise(() => {}))
     show()
     fireEvent.click(await screen.findByText('Send them in'))
-    return screen.findByRole('tab', { name: 'The game' })
+    // "The account", not "The game": the game itself is the board above,
+    // and this column is the words beside it.
+    return screen.findByRole('tab', { name: 'The account' })
   }
 
   it('tells the game in words, naming the decks rather than the seats',
