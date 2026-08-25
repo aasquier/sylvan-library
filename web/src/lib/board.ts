@@ -50,13 +50,30 @@ export interface BoardCard {
   counters: { kind: string; n: number }[]
 }
 
-/** One side of the table. */
+/**
+ * One side of the table, in the rows a Magic board actually has.
+ *
+ * **The battlefield is two rows, not one**, and which row a permanent sits in
+ * is the oldest layout convention the game has: creatures stand at the front,
+ * where combat happens, and everything else sits behind them. Every digital
+ * client does it and so does every kitchen table — you put your blockers where
+ * you can see what they are facing. Lands go furthest from the middle because
+ * they are the row you touch and nobody else does.
+ *
+ * So a side reads, from the middle of the table outward:
+ * **creatures · permanents · lands · hand** — and the two players' creature
+ * rows end up adjacent across the seam, which is where the game is.
+ */
 export interface BoardSide {
   seat: number
   slug: string | null
   name: string
   life: number
-  battlefield: BoardCard[]
+  /** The front line. */
+  creatures: BoardCard[]
+  /** Artifacts, enchantments, planeswalkers, battles — everything on the
+   *  battlefield that is not a creature and not a land. */
+  permanents: BoardCard[]
   land: BoardCard[]
   hand: BoardCard[]
   graveyard: BoardCard[]
@@ -66,8 +83,15 @@ export interface BoardSide {
 
 /** The board at one moment. */
 export interface BoardState {
-  /** Forge's own turn number — a player-turn, not a round. `playerTurns` in
-   *  `lib/theater.ts` is what turns it into the number a person says. */
+  /** The turn number **a player would say**, which is the active player's own
+   *  turn count — not Forge's.
+   *
+   * Forge increments once per *player*-turn and alternates seats, so its
+   * "turn 15" is one player's eighth. The seam used to print Forge's number
+   * straight, so a seventh turn read as 14 or 15. Counted per seat rather than
+   * halved, for `playerTurns`' reason in `lib/theater.ts`: Time Warp gives one
+   * player two turns in a row, and halving would credit the opponent with a
+   * turn they never took. */
   turn: number
   active: number
   sides: BoardSide[]
@@ -76,7 +100,8 @@ export interface BoardState {
 function emptySide(seat: ForgeBoardSeat): BoardSide {
   return {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
-    battlefield: [], land: [], hand: [], graveyard: [], exile: [], command: [],
+    creatures: [], permanents: [], land: [], hand: [], graveyard: [],
+    exile: [], command: [],
   }
 }
 
@@ -101,13 +126,19 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   const life = new Map<number, number>()
   for (const seat of board.seats) life.set(seat.seat, seat.life)
 
-  let turn = 0
   let active = 0
+  // Forge's number, and each seat's own count of its turns — see BoardState.
+  let forgeTurn = 0
+  const taken = new Map<number, number>()
   const upTo = Math.max(0, Math.min(steps, board.steps.length))
   for (let i = 0; i < upTo; i++) {
     const step = board.steps[i]
     if (!step) continue
-    if (step.turn) turn = step.turn
+    if (step.turn && step.turn !== forgeTurn) {
+      forgeTurn = step.turn
+      const whose = step.seat || active
+      if (whose) taken.set(whose, (taken.get(whose) ?? 0) + 1)
+    }
     if (step.seat) active = step.seat
     for (const moved of step.life ?? []) life.set(moved.seat, moved.life)
     for (const change of step.changes ?? []) {
@@ -151,11 +182,19 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     if (!side) continue
     // A zone the browser does not draw — `gone`, or a word a newer server
     // learned — simply takes the card off the table rather than throwing.
+    if (card.zone === 'battlefield') {
+      // The front line, or behind it. An animated land is on the battlefield
+      // *and* a creature, and it belongs at the front with the things that
+      // can be blocked.
+      const row = card.types.includes('Creature') ? 'creatures' : 'permanents'
+      side[row].push(card)
+      continue
+    }
     const into = (ZONES as readonly string[]).includes(card.zone)
       ? (card.zone as Zone) : null
-    if (into) side[into].push(card)
+    if (into && into !== 'battlefield') side[into].push(card)
   }
-  return { turn, active, sides }
+  return { turn: taken.get(active) ?? 0, active, sides }
 }
 
 /** A run of identical cards, drawn as one stack with a count on it. */

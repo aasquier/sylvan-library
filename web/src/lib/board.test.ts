@@ -47,15 +47,50 @@ describe('the board at a moment', () => {
 
     const one = foldBoard(b, 1)
     expect(one.sides[0]?.land.map((c) => c.name)).toEqual(['Forest'])
-    expect(one.sides[0]?.battlefield).toHaveLength(0)
+    expect(one.sides[0]?.creatures).toHaveLength(0)
 
     const all = foldBoard(b, 3)
-    expect(all.turn).toBe(2)
+    // **The active player's own turn count, not Forge's.** Forge increments
+    // once per player-turn and alternates seats, so its "turn 2" is seat 2's
+    // *first*. Printing Forge's number made a seventh turn read as 14 or 15.
+    expect(all.turn).toBe(1)
     expect(all.active).toBe(2)
-    expect(all.sides[0]?.battlefield.map((c) => c.name))
+    expect(all.sides[0]?.creatures.map((c) => c.name))
       .toEqual(['Gyome, Master Chef'])
-    expect(all.sides[1]?.battlefield.map((c) => c.name))
+    expect(all.sides[1]?.creatures.map((c) => c.name))
       .toEqual(['Dragonlord Atarka'])
+  })
+
+  it('counts each player their own turns, the way a player would', () => {
+    // Forge: 1,2,3,4 alternating seats. A player: "my second turn".
+    const b = board([
+      { turn: 1, seat: 1, changes: [] },
+      { turn: 2, seat: 2, changes: [] },
+      { turn: 3, seat: 1, changes: [] },
+      { turn: 4, seat: 2, changes: [] },
+      { turn: 5, seat: 1, changes: [] },
+    ])
+    expect(foldBoard(b, 1).turn).toBe(1)
+    expect(foldBoard(b, 2).turn).toBe(1)
+    expect(foldBoard(b, 3).turn).toBe(2)
+    expect(foldBoard(b, 4).turn).toBe(2)
+    // Forge's turn 5 is seat 1's third — not "turn 5", which is what the seam
+    // used to say and what Aaron caught.
+    expect(foldBoard(b, 5).turn).toBe(3)
+  })
+
+  it('counts an extra turn as a turn, rather than halving', () => {
+    // Time Warp: one player takes two in a row. Halving Forge's number would
+    // credit the opponent with a turn they never took; counting per seat is
+    // right in both cases.
+    const b = board([
+      { turn: 1, seat: 1, changes: [] },
+      { turn: 2, seat: 2, changes: [] },
+      { turn: 3, seat: 1, changes: [] },
+      { turn: 4, seat: 1, changes: [] },
+    ])
+    expect(foldBoard(b, 4).turn).toBe(3)
+    expect(foldBoard(b, 4).active).toBe(1)
   })
 
   it('never runs past the steps it was given', () => {
@@ -85,7 +120,7 @@ describe('the board at a moment', () => {
     const b = board([{ changes: [{ id: 11, zone: 'sideboard', seat: 1 }] }])
     const state = foldBoard(b, 1)
     expect(state.sides[0]?.land).toHaveLength(0)
-    expect(state.sides[0]?.battlefield).toHaveLength(0)
+    expect(state.sides[0]?.creatures).toHaveLength(0)
   })
 
   it('keeps a stable order, so a battlefield does not reshuffle on a tap', () => {
@@ -95,9 +130,11 @@ describe('the board at a moment', () => {
       // A tap is a change to the *first* card; it must not send it to the end.
       { changes: [{ id: 10, tapped: true }] },
     ])
-    expect(foldBoard(b, 3).sides[0]?.battlefield.map((c) => c.id))
-      .toEqual([10, 12])
-    expect(foldBoard(b, 3).sides[0]?.battlefield[0]?.tapped).toBe(true)
+    // Gyome is a creature and a Food token is not, so they sit in different
+    // rows now — the order that matters is within a row.
+    expect(foldBoard(b, 3).sides[0]?.creatures.map((c) => c.id)).toEqual([10])
+    expect(foldBoard(b, 3).sides[0]?.permanents.map((c) => c.id)).toEqual([12])
+    expect(foldBoard(b, 3).sides[0]?.creatures[0]?.tapped).toBe(true)
   })
 
   it('follows a permanent that changes seats', () => {
@@ -108,8 +145,8 @@ describe('the board at a moment', () => {
       { changes: [{ id: 10, seat: 2 }] },
     ])
     const state = foldBoard(b, 2)
-    expect(state.sides[0]?.battlefield).toHaveLength(0)
-    expect(state.sides[1]?.battlefield.map((c) => c.name))
+    expect(state.sides[0]?.creatures).toHaveLength(0)
+    expect(state.sides[1]?.creatures.map((c) => c.name))
       .toEqual(['Gyome, Master Chef'])
   })
 
@@ -122,7 +159,7 @@ describe('the board at a moment', () => {
       },
     ])
     const state = foldBoard(b, 2)
-    const gyome = state.sides[0]?.battlefield[0]
+    const gyome = state.sides[0]?.creatures[0]
     expect(gyome?.counters).toEqual([{ kind: '+1/+1', n: 1 }])
     expect(fightingStats(gyome!)).toBe('6/4')
     expect(state.sides[1]?.life).toBe(33)
@@ -134,7 +171,7 @@ describe('the board at a moment', () => {
     const b = board([
       { changes: [{ id: 12, zone: 'battlefield', seat: 1, power: 0, toughness: 0 }] },
     ])
-    const food = foldBoard(b, 1).sides[0]?.battlefield[0]
+    const food = foldBoard(b, 1).sides[0]?.permanents[0]
     expect(food?.token).toBe(true)
     expect(fightingStats(food!)).toBeNull()
   })
@@ -196,7 +233,7 @@ describe('the board at a moment', () => {
         { id: 20, zone: 'battlefield', seat: 1 },
       ] },
     ])
-    const bf = foldBoard(b, 1).sides[0]?.battlefield ?? []
+    const bf = foldBoard(b, 1).sides[0]?.creatures ?? []
     expect(stackRow(bf).every((s) => s.count === 1)).toBe(true)
   })
 

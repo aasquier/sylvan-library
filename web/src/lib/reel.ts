@@ -22,7 +22,7 @@
  * is not a component, and more than one file needs it.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { ForgeBoard } from './api'
 
@@ -34,6 +34,24 @@ export interface StagedBeat {
   kind: string
   who: string | null
   text: string
+}
+
+/** How fast the room is telling it, or whether it is telling it at all.
+ *
+ * **The Forge is never waited for and never slowed down.** It plays its games
+ * at whatever speed it plays them and the results land when they land; this
+ * governs only how fast the *room* reads them out. That separation is the
+ * whole point — a match is a measurement and watching it is a performance, and
+ * making the measurement slow to suit the performance would be the wrong trade
+ * in every direction.
+ */
+export type Speed = 'paused' | 'slow' | 'play' | 'fast'
+
+/** The multiplier each speed applies to the natural pace. Larger is slower. */
+const SPEEDS: Record<Exclude<Speed, 'paused'>, number> = {
+  slow: 2.5,
+  play: 1,
+  fast: 0.25,
 }
 
 /** What the room is holding: the beats already told, the ones still to tell,
@@ -62,13 +80,13 @@ const EMPTY: Reel = {
   shown: [], queue: [], game: 0, truncated: false, told: 0, board: null,
 }
 
-/** How many beats stay in the DOM.
+/** How many beats the play-by-play renders.
  *
- * The play-by-play is a feed, not a transcript: a twenty-game match raises two
- * thousand beats and nobody scrolls back through them. The **board** is not
- * capped by this — it is folded from `told`, which keeps counting after a beat
- * has scrolled out of the column, because a creature does not leave the
- * battlefield when the sentence about it leaves the screen. */
+ * The account is a feed, not a transcript: a twenty-game match raises two
+ * thousand beats and nobody scrolls back through them. **This is a rendering
+ * limit and not a memory one** — the reel keeps every beat it has told, so the
+ * scrubber can walk back through a whole game, and the column shows the tail.
+ * Cutting the model here is what would make going backwards impossible. */
 export const BEATS_KEPT = 80
 
 /** The slowest and the fastest a beat may be told, in milliseconds.
@@ -145,7 +163,8 @@ export interface Arriving {
  * room can be in, and the one Aaron found. A finished match empties its queue
  * at the floor.
  */
-export function useReel(arriving: Arriving | null, running: boolean): Reel {
+export function useReel(arriving: Arriving | null, running: boolean,
+  speed: Speed): [Reel, (to: number) => void] {
   // One piece of state rather than five, because every change moves two of
   // them together: a beat leaving the queue is a beat entering the shown list,
   // and a game arriving does both at once.
@@ -179,7 +198,7 @@ export function useReel(arriving: Arriving | null, running: boolean): Reel {
     // shown, and the room never falls behind what the pips already say. It is
     // a flurry at the moment a game ends, which is what a game ending is.
     setReel((r) => ({
-      shown: [...r.shown, ...r.queue].slice(-BEATS_KEPT),
+      shown: [...r.shown, ...r.queue],
       queue: arriving.beats,
       game: arriving.game,
       truncated: arriving.truncated,
@@ -193,21 +212,52 @@ export function useReel(arriving: Arriving | null, running: boolean): Reel {
   // what is left — so the pace is re-read after every beat rather than once a
   // game. A queue that empties simply stops scheduling.
   useEffect(() => {
+    if (speed === 'paused') return
     const next = reel.queue[0]
     if (!next) return
     const id = window.setTimeout(() => setReel((r) => ({
       ...r,
-      shown: [...r.shown, next].slice(-BEATS_KEPT),
+      shown: [...r.shown, next],
       queue: r.queue.slice(1),
       told: r.told + 1,
-    })), running
+    })), SPEEDS[speed] * (running
       ? pace(reel.queue.length,
           deadline.current == null ? null : deadline.current - Date.now())
       // Nothing left to stay ahead of: catch up to the result the room is
       // already showing above.
-      : FASTEST)
+      : FASTEST))
     return () => window.clearTimeout(id)
-  }, [reel.queue, running])
+  }, [reel.queue, running, speed])
 
-  return reel
+  // Moving the mark by hand. It sets the reel's own position rather than
+  // overlaying it, so pressing play afterwards carries on from where the hand
+  // left off instead of snapping back.
+  const seek = useCallback((to: number) => {
+    setReel((r) => seekReel(r, to))
+  }, [])
+
+  return [reel, seek]
+}
+
+/**
+ * Move the room to a beat by hand.
+ *
+ * Scrubbing is possible at all because the board is a **pure fold over a
+ * count** — `foldBoard(board, n)` is the board after n beats, with no state
+ * carried between calls — so going backwards is the same operation as going
+ * forwards and costs the same. That was true before anybody asked for it; the
+ * controls are just a second way to set the number.
+ *
+ * The whole game's beats are held either side of the mark, so a step back is a
+ * beat moving from `shown` to `queue` and a step forward is the reverse.
+ */
+export function seekReel(reel: Reel, to: number): Reel {
+  const all = [...reel.shown, ...reel.queue]
+  const at = Math.max(0, Math.min(to, all.length))
+  return {
+    ...reel,
+    shown: all.slice(0, at),
+    queue: all.slice(at),
+    told: at,
+  }
 }

@@ -48,7 +48,7 @@
 import { useEffect, useRef } from 'react'
 
 import type { DeckSummary, ForgeGameRow } from '../lib/api'
-import type { StagedBeat } from '../lib/reel'
+import { BEATS_KEPT, type StagedBeat } from '../lib/reel'
 import { shortName, turnsTaken } from '../lib/theater'
 
 /** How many games the stage keeps in view. The feed is the last few blows,
@@ -281,12 +281,15 @@ export function MatchBeats({ beats, game, truncated, running }: {
   // the newest beat is the one at the bottom and it is the one to be looking
   // at. Released when the match ends, so a finished game can be scrolled back
   // through without the page fighting for the scrollbar.
+  // The tail only. The reel holds the whole game so the scrubber can walk back
+  // through it; a column of two thousand lines is nobody's idea of a feed.
+  const feed = beats.slice(-BEATS_KEPT)
   const scroller = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!running) return
     const el = scroller.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [beats.length, running])
+  }, [feed.length, running])
 
   return (
     <section className="beats" aria-label="What is happening in the game">
@@ -307,14 +310,14 @@ export function MatchBeats({ beats, game, truncated, running }: {
           without every land drop interrupting whatever it was saying. */}
       <div className="beats-scroll" ref={scroller}
            aria-live="polite" aria-relevant="additions">
-        {beats.length === 0 ? (
+        {feed.length === 0 ? (
           <p className="theater-quiet">
             {running
               ? 'The first game is being played. There is a wait before the '
                 + 'first blow, and then it comes all at once.'
               : 'Nothing has happened yet.'}
           </p>
-        ) : beats.map((b) => (
+        ) : feed.map((b) => (
           b.kind === 'turn' ? (
             <div key={b.key} className="beat-turn">
               <span className="beat-turn-n">Turn {b.turn}</span>

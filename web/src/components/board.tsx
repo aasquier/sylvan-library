@@ -44,6 +44,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ForgeBoard } from '../lib/api'
 import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
   from '../lib/board'
+import type { Speed } from '../lib/reel'
 
 /** One card on the field.
  *
@@ -87,18 +88,23 @@ function FieldCard({ card, size, count }: {
           // been refreshed, and a match is worth watching either way.
           <span className="field-card-plate">{card.name}</span>
         )}
+        {/* The gold edge belongs to the card, so it turns with the card. */}
         {card.token && <span className="field-card-token" aria-hidden="true" />}
-        {stats && <span className="field-card-stats tabular">{stats}</span>}
-        {count > 1 && (
-          <span className="field-card-count tabular">{count}<span
-            className="field-card-times">×</span></span>
-        )}
-        {counters.length > 0 && (
-          <span className="field-card-counters tabular">
-            {counters.map((c) => c.n).reduce((a, b) => a + b, 0)}
-          </span>
-        )}
       </div>
+      {/* **Outside the part that turns.** A tapped permanent lies on its side
+          and its numbers must not: a sideways "19/19" is unreadable, and by
+          the late turns most of a board is tapped. These sit on the outer box,
+          which never rotates. */}
+      {stats && <span className="field-card-stats tabular">{stats}</span>}
+      {count > 1 && (
+        <span className="field-card-count tabular">{count}<span
+          className="field-card-times">×</span></span>
+      )}
+      {counters.length > 0 && (
+        <span className="field-card-counters tabular">
+          {counters.map((c) => c.n).reduce((a, b) => a + b, 0)}
+        </span>
+      )}
     </div>
   )
 }
@@ -158,25 +164,47 @@ function LifeTotal({ life }: { life: number }) {
   )
 }
 
-/** The stone rail one player's name and totals are carved into. */
+/**
+ * A closed zone drawn as the pile it is: the top card, with a count.
+ *
+ * The graveyard and exile were numbers on the rail, which is what a scoreboard
+ * does and not what a table does — you can see somebody's graveyard from
+ * across a table, and the *top* card of it is the one that matters, because
+ * that is the one everything in Magic reaches for. The command zone is here
+ * for the same reason: in Commander it is where the game's most important card
+ * waits, and a number cannot say which commander is home and which is out.
+ */
+function FieldPile({ label, cards, short }: {
+  label: string
+  cards: BoardCard[]
+  short: string
+}) {
+  const top = cards[cards.length - 1]
+  return (
+    <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`}
+         title={top ? `${label}: ${cards.length}, ${top.name} on top`
+                    : `${label}: empty`}
+         aria-label={`${label}: ${cards.length}`}>
+      {top && top.image ? (
+        <img className="field-pile-art" src={top.image} alt="" loading="lazy"
+             draggable={false} />
+      ) : null}
+      <span className="field-pile-label">{short}</span>
+      <span className="field-pile-n tabular">{cards.length}</span>
+    </div>
+  )
+}
+
+/** The stone rail one player's name, life and closed zones are carved into. */
 function FieldRail({ side, name }: { side: BoardSide; name: string }) {
   return (
     <div className="field-rail">
       <span className="field-rail-name" title={side.name}>{name}</span>
       <span className="field-rail-totals">
+        <FieldPile label="Command zone" short="CMD" cards={side.command} />
+        <FieldPile label="Graveyard" short="GY" cards={side.graveyard} />
+        <FieldPile label="Exile" short="EX" cards={side.exile} />
         <LifeTotal life={side.life} />
-        <span className="field-rail-tally tabular"
-              title={`${side.graveyard.length} in the graveyard`}>
-          <span className="field-rail-tally-label">GY</span>
-          {side.graveyard.length}
-        </span>
-        {side.exile.length > 0 && (
-          <span className="field-rail-tally tabular"
-                title={`${side.exile.length} exiled`}>
-            <span className="field-rail-tally-label">EX</span>
-            {side.exile.length}
-          </span>
-        )}
       </span>
     </div>
   )
@@ -195,32 +223,91 @@ function FieldSide({ side, name, facing }: {
   name: string
   facing: 'far' | 'near'
 }) {
-  const rows = (
-    <>
-      <FieldRow label="Hand" cards={side.hand} size="small"
-                empty="an empty hand" />
-      <FieldRow label="Lands" cards={side.land} size="small"
-                empty="no lands yet" />
-      <FieldRow label="Battlefield" cards={side.battlefield}
-                empty="nothing on the battlefield" />
-    </>
-  )
+  // Outermost first. The near player's side is the same list reversed, so the
+  // two creature rows finish up either side of the seam.
+  const rows = [
+    <FieldRow key="hand" label="Hand" cards={side.hand} size="small"
+              empty="an empty hand" />,
+    <FieldRow key="land" label="Lands" cards={side.land} size="small"
+              empty="no lands yet" />,
+    <FieldRow key="perm" label="Artifacts and enchantments"
+              cards={side.permanents} size="small" empty="—" />,
+    <FieldRow key="crea" label="Creatures" cards={side.creatures}
+              empty="no creatures" />,
+  ]
   return (
     <div className={`field-side field-side-${facing}`}>
       {facing === 'far' && <FieldRail side={side} name={name} />}
       <div className="field-rows">
-        {facing === 'far' ? rows : (
-          <>
-            <FieldRow label="Battlefield" cards={side.battlefield}
-                      empty="nothing on the battlefield" />
-            <FieldRow label="Lands" cards={side.land} size="small"
-                      empty="no lands yet" />
-            <FieldRow label="Hand" cards={side.hand} size="small"
-                      empty="an empty hand" />
-          </>
-        )}
+        {facing === 'far' ? rows : [...rows].reverse()}
       </div>
       {facing === 'near' && <FieldRail side={side} name={name} />}
+    </div>
+  )
+}
+
+/**
+ * The transport: watch it at a speed a person can follow, or walk it by hand.
+ *
+ * **The Forge is not slowed down for this and never waits for it.** It plays
+ * its games flat out and the results land when they land; these buttons govern
+ * only how fast the *room* reads them back. A match is a measurement and
+ * watching one is a performance, and pacing the measurement to suit the
+ * performance would be the wrong trade in both directions.
+ *
+ * Stepping and scrubbing are possible at all because the board is a **pure
+ * fold over a count** — the board after n beats needs nothing but n — so
+ * backwards costs exactly what forwards costs. The controls are a second way
+ * to set that number, not a second engine.
+ */
+function FieldTransport({ speed, setSpeed, at, of, seek }: {
+  speed: Speed
+  setSpeed: (s: Speed) => void
+  at: number
+  of: number
+  seek: (to: number) => void
+}) {
+  const playing = speed !== 'paused'
+  return (
+    <div className="field-transport">
+      <div className="field-transport-buttons">
+        <button type="button" className="btn btn-sm field-step"
+                onClick={() => { setSpeed('paused'); seek(at - 1) }}
+                disabled={at <= 0} aria-label="Back one beat">
+          <span aria-hidden="true">◀◀</span>
+        </button>
+        <button type="button"
+                className={`btn btn-sm${playing ? ' is-on' : ''}`}
+                onClick={() => setSpeed(playing ? 'paused' : 'play')}
+                aria-label={playing ? 'Pause' : 'Play'}>
+          <span aria-hidden="true">{playing ? '❙❙' : '▶'}</span>
+        </button>
+        <button type="button" className="btn btn-sm field-step"
+                onClick={() => { setSpeed('paused'); seek(at + 1) }}
+                disabled={at >= of} aria-label="Forward one beat">
+          <span aria-hidden="true">▶▶</span>
+        </button>
+      </div>
+
+      {/* Places rather than actions, so `.chip-toggle` rather than `.btn` —
+          a speed is a setting you are *in*, not a thing you do. */}
+      <div className="field-speeds" role="group" aria-label="Speed">
+        {(['slow', 'play', 'fast'] as const).map((s) => (
+          <button key={s} type="button"
+                  className={`chip-toggle field-speed${speed === s ? ' is-active' : ''}`}
+                  aria-pressed={speed === s}
+                  onClick={() => setSpeed(s)}>
+            {s === 'slow' ? 'Slow' : s === 'play' ? 'Watch' : 'Fast'}
+          </button>
+        ))}
+      </div>
+
+      <label className="field-scrub">
+        <span className="sr-only">Scrub through the game</span>
+        <input type="range" min={0} max={Math.max(of, 1)} value={at}
+               onChange={(e) => { setSpeed('paused'); seek(Number(e.target.value)) }} />
+      </label>
+      <span className="field-scrub-at tabular">{at}/{of}</span>
     </div>
   )
 }
@@ -233,7 +320,8 @@ function FieldSide({ side, name, facing }: {
  * picture moves when the sentence is spoken and there is one clock rather than
  * two to keep in step.
  */
-export function MatchBoard({ board, shown, game, name, running }: {
+export function MatchBoard({ board, shown, game, name, running,
+  speed, setSpeed, of, seek }: {
   board: ForgeBoard | null
   shown: number
   game: number
@@ -241,6 +329,11 @@ export function MatchBoard({ board, shown, game, name, running }: {
    *  because only the room has the shelf. */
   name: (slug: string | null, fallback: string) => string
   running: boolean
+  speed: Speed
+  setSpeed: (s: Speed) => void
+  /** How many beats this game has in total, told and untold. */
+  of: number
+  seek: (to: number) => void
 }) {
   const state = foldBoard(board, shown)
   const far = state.sides[0]
@@ -288,6 +381,9 @@ export function MatchBoard({ board, shown, game, name, running }: {
 
       <FieldSide side={near} facing="near"
                  name={name(near.slug, near.name)} />
+
+      <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
+                      seek={seek} />
     </section>
   )
 }

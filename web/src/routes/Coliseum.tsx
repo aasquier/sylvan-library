@@ -61,7 +61,8 @@ import { DeckCaution } from '../components/closedform'
 import { DataTable } from '../components/datatable'
 import { MatchBoard } from '../components/board'
 import { MatchBeats, MatchTheater } from '../components/theater'
-import { type Arriving, type StagedBeat, useReel } from '../lib/reel'
+import { type Arriving, type Speed, type StagedBeat, useReel }
+  from '../lib/reel'
 import {
   beatLine, playerTurns, shortName, theaterBeats, theaterRows, turnsTaken,
 } from '../lib/theater'
@@ -437,7 +438,14 @@ export default function ColiseumRoom() {
   // is folded to exactly that many steps. The server builds one board step per
   // beat, so a single count keeps the picture and the sentences describing the
   // same moment — two components pacing themselves would drift within a turn.
-  const reel = useReel(arriving, running)
+  // **How fast the room reads, which is not how fast the Forge plays.** The
+  // match runs flat out and lands its results when it lands them; this only
+  // governs the retelling. `Watch` is the natural pace — a game spread across
+  // the time the next one takes to arrive.
+  const [speed, setSpeed] = useState<Speed>('play')
+  // `seek` moves the reel's own mark, so pressing play after a scrub carries
+  // on from where the hand left off rather than snapping back.
+  const [reel, seek] = useReel(arriving, running, speed)
 
   /** What the field calls a seat. The board carries slugs and Forge's own deck
    *  titles; only the room has the shelf that turns either into a name. */
@@ -580,7 +588,10 @@ export default function ColiseumRoom() {
         <div className="mt-6">
           <MatchBoard key={`board-${job?.id}`} board={reel.board}
                       shown={reel.told} game={reel.game}
-                      name={seatName} running={running} />
+                      name={seatName} running={running}
+                      speed={speed} setSpeed={setSpeed}
+                      of={reel.shown.length + reel.queue.length}
+                      seek={seek} />
         </div>
       )}
 
