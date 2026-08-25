@@ -1,0 +1,585 @@
+{
+  "note": "The coliseum's arenas, their champions and the facts they rotate. Checked-in prose (CLAUDE.md): edited here, never generated. Every `card` and `champions` entry is a card name resolved through the pool at serve time; a name the pool cannot resolve is dropped and counted, never guessed. The backdrop is a **named printing** rather than whatever the pool holds: the pool returns the newest, which put Teenage Mutant Ninja Turtles art on the Grand Coliseum and Marvel art on Valor's Reach. A painting is chosen, credited, and hotlinked — never guessed at.",
+  "arenas": [
+    {
+      "key": "grand-coliseum",
+      "name": "The Grand Coliseum",
+      "card": "Grand Coliseum",
+      "plane": "Otaria",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/c/2/c2dc8061-a855-4a81-9eb7-350b355a9b3f.jpg?1783945028",
+        "artist": "Carl Critchlow",
+        "printing": "Onslaught"
+      },
+      "motion": "sand",
+      "palette": {
+        "ink": "#f3e2bd",
+        "glow": "#b5762c"
+      },
+      "champions": [
+        {
+          "card": "Jareth, Leonine Titan",
+          "role": "A lion of living sandstone whose only weapon is a shield. Nothing at all until he blocks, and then 11/14."
+        },
+        {
+          "card": "Kamahl, Pit Fighter",
+          "role": "The pits put their name on him. Strikes the same day he takes the sand."
+        },
+        {
+          "card": "Chainer, Dementia Master",
+          "role": "The lanista, who owns his stable rather than joins it — and buys it out of the graveyard three life at a time."
+        },
+        {
+          "card": "Visara the Dreadful",
+          "role": "One look ends the bout. She need not even be tapped for combat to do it."
+        },
+        {
+          "card": "Rorix Bladewing",
+          "role": "Arrives over the crowd and fights the same afternoon."
+        },
+        {
+          "card": "Silvos, Rogue Elemental",
+          "role": "Tramples through, and keeps getting back up."
+        }
+      ],
+      "facts": [
+        {
+          "kind": "roman",
+          "rome": "Rome's word for the arena was harena — the sand strewn across the floor to drink the blood and keep a fighter's footing. The building took its name from the thing they swept up afterward."
+        },
+        {
+          "kind": "paired",
+          "rome": "The sand was never decoration. It was there because the floor had to be walked on again tomorrow.",
+          "magic": "The Grand Coliseum still charges for the privilege: any colour of mana you like, and one damage to you for asking.",
+          "card": "Grand Coliseum"
+        },
+        {
+          "kind": "gladiator",
+          "rome": "Gladiators were classed by their equipment rather than their skill, and matched deliberately unlike — the net-and-trident retiarius against the armoured secutor, speed set against plate."
+        },
+        {
+          "kind": "gladiator",
+          "rome": "The retiarius fought as a fisherman: a weighted net, a trident, a dagger, an arm-guard called a manica and a shoulder-piece called a galerus. Almost no armour, and everything staked on reach."
+        },
+        {
+          "kind": "gladiator",
+          "rome": "His usual opponent, the secutor, wore fish-scale motifs on purpose. The crowd was watching a fisherman hunt a fish, and both men knew which one they were."
+        },
+        {
+          "kind": "gladiator",
+          "rome": "Gladiators were nicknamed hordearii — barley men — for how much grain they ate. The diet was heavily plant-based, and the legumes were the point: subcutaneous fat is armour a blade has to get through before it reaches anything that matters."
+        },
+        {
+          "kind": "paired",
+          "rome": "A fighter built on barley and beans was not built for power. He was built to survive being hit.",
+          "magic": "Jareth is a 4/7 — four power against seven toughness. He is not the hardest hitter on the sand; he is the hardest to finish.",
+          "card": "Jareth, Leonine Titan"
+        },
+        {
+          "kind": "magic",
+          "magic": "Jareth, Leonine Titan is canonically a pit-fighter, and fought in the Great Coliseum of Otaria. He is a lion of living sandstone whose only weapon is a shield — and his card does nothing at all until he blocks, then stands at 11/14.",
+          "card": "Jareth, Leonine Titan"
+        },
+        {
+          "kind": "magic",
+          "magic": "Grand Coliseum and Jareth, Leonine Titan were printed in the same set: Onslaught, October 2002. The arena and its champion came out of the same box.",
+          "card": "Grand Coliseum"
+        },
+        {
+          "kind": "paired",
+          "rome": "Rome's games were never only games. A man on his way to power paid for them, and what he bought was the crowd.",
+          "magic": "The Cabal ran the pits of Cabal City for exactly that — entertaining a continent while funding an attempt to seize it."
+        },
+        {
+          "kind": "magic",
+          "magic": "Magic named a legend Pit Fighter outright. Kamahl has haste: he takes the sand and fights the same afternoon, which is the one thing a newly bought gladiator never got to do.",
+          "card": "Kamahl, Pit Fighter"
+        },
+        {
+          "kind": "paired",
+          "rome": "Some bouts were advertised sine missione — without release. No reprieve was available to either man, whatever the crowd wanted.",
+          "magic": "Grand Melee is the same billing: all creatures attack each combat if able, and all creatures block each combat if able. Nobody sits this one out.",
+          "card": "Grand Melee"
+        },
+        {
+          "kind": "magic",
+          "magic": "Fight to the Death destroys all blocking creatures and all blocked creatures — everyone who engaged, regardless of who was winning. That is what sine missione actually meant.",
+          "card": "Fight to the Death"
+        }
+      ]
+    },
+    {
+      "key": "valors-reach",
+      "name": "Valor's Reach",
+      "card": "Luxury Suite",
+      "plane": "Kylem",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/8/1/81298b0b-9d47-4777-998e-0c17821ef536.jpg?1783934848",
+        "artist": "Jonas De Ro",
+        "printing": "Battlebond"
+      },
+      "motion": "banners",
+      "palette": {
+        "ink": "#ffe9b8",
+        "glow": "#d4a03a"
+      },
+      "champions": [
+        {
+          "card": "Archon of Valor's Reach",
+          "role": "The summa rudis. Names one thing barred from the sand, and barred it stays."
+        },
+        {
+          "card": "Aurora Champion",
+          "role": "Fights bonded, as Kylem insists: he only pins a foe while another warrior stands with him."
+        },
+        {
+          "card": "Decorated Champion",
+          "role": "The one the oddsmakers hate, because every fight is a foregone conclusion."
+        },
+        {
+          "card": "Arena Rector",
+          "role": "The patron in the stands who sees something in you, and pays to put it on the sand."
+        }
+      ],
+      "facts": [
+        {
+          "kind": "coliseum",
+          "rome": "The Colosseum held somewhere between fifty and eighty thousand people, and could fill or empty in under fifteen minutes through eighty numbered arches. Roman crowd engineering has not really been improved on."
+        },
+        {
+          "kind": "coliseum",
+          "rome": "Seating was the social order, drawn in stone. Senators and the Vestal Virgins sat lowest and closest; equestrians above them; ordinary citizens above those; women and the poor at the very top, furthest from the sand."
+        },
+        {
+          "kind": "roman",
+          "rome": "The emperor watched from the pulvinar, a cushioned box set level with the floor so that the crowd could watch him watching."
+        },
+        {
+          "kind": "paired",
+          "rome": "The best seat in Rome was the one everybody else could see.",
+          "magic": "Kylem sells the same view: “The view is rivaled only by the decadence of the deck.”",
+          "card": "Luxury Suite"
+        },
+        {
+          "kind": "roman",
+          "rome": "A full day's programme ran in three acts: the pompa, a procession of the sponsor, the fighters, musicians and officials; then the venatio, the beast hunt, through the morning; the executions at noon; and the gladiators in the afternoon, when the house was fullest."
+        },
+        {
+          "kind": "roman",
+          "rome": "Sparsiones were wooden balls flung into the stands, each redeemable for a prize. The sponsor was buying goodwill by the handful, mid-spectacle."
+        },
+        {
+          "kind": "gladiator",
+          "rome": "Matches were refereed. The summa rudis carried a staff and could caution fighters or separate them outright, and he was very often a retired gladiator — a man who had survived the sand ruling on people still standing in it."
+        },
+        {
+          "kind": "paired",
+          "rome": "The referee's word closed the question of what was allowed on the sand.",
+          "magic": "Archon of Valor's Reach names one card type as it arrives, and nobody may cast it — the summa rudis, ruling before the first blow.",
+          "card": "Archon of Valor's Reach"
+        },
+        {
+          "kind": "roman",
+          "rome": "Romans bet heavily on the games, which is why a fight everyone could call in advance was a fight nobody would wager on."
+        },
+        {
+          "kind": "magic",
+          "magic": "Decorated Champion says the quiet part: “The oddsmakers hate him because every fight is a foregone conclusion.”",
+          "card": "Decorated Champion"
+        },
+        {
+          "kind": "paired",
+          "rome": "A crowd does not merely watch a bout. It leans on it, and the fighters can feel which way.",
+          "magic": "Crowd's Favor has convoke — your creatures help pay for it. The crowd literally casts the spell.",
+          "card": "Crowd's Favor"
+        },
+        {
+          "kind": "magic",
+          "magic": "Kylem's arena reshapes itself between bouts: “Ancient magic reshapes the stage into a variety of landscapes.” Rome needed two storeys of machinery under the floor to manage the same trick.",
+          "card": "Morphic Pool"
+        }
+      ]
+    },
+    {
+      "key": "arena-of-the-ancients",
+      "name": "The Arena of the Ancients",
+      "card": "Arena of the Ancients",
+      "plane": "Dominaria",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/6/8/68ebdcc2-4449-4b10-82fb-51f5e14eab37.jpg?1783942193",
+        "artist": "Tom Wänerstrand",
+        "printing": "Masters Edition III"
+      },
+      "motion": "stone",
+      "palette": {
+        "ink": "#dfe7e3",
+        "glow": "#7f9c8f"
+      },
+      "champions": [
+        {
+          "card": "Arcades Sabboth",
+          "role": "An elder dragon who fights from behind the wall, not in front of it."
+        },
+        {
+          "card": "Chromium",
+          "role": "An elder dragon, and one of the first names this game ever wrote down."
+        },
+        {
+          "card": "Dakkon Blackblade",
+          "role": "As strong as the ground he holds, which is how a territory fighter should be measured."
+        },
+        {
+          "card": "Axelrod Gunnarson",
+          "role": "Takes life and gains it in the same blow — the crowd's favourite arithmetic."
+        }
+      ],
+      "facts": [
+        {
+          "kind": "gladiator",
+          "rome": "A free man who sold himself to a gladiator school swore the auctoramentum: uri, vinciri, verberari, ferroque necari — to be burned, to be chained, to be beaten, and to be killed by the sword. Having sworn it, he did not simply get to leave."
+        },
+        {
+          "kind": "paired",
+          "rome": "The oath was a contract, and its whole force was that it did not release you.",
+          "magic": "Arena of the Ancients: legendary creatures don't untap during their controllers' untap steps. Once the ancients take the sand, they do not rest.",
+          "card": "Arena of the Ancients"
+        },
+        {
+          "kind": "gladiator",
+          "rome": "Those sworn free men were the auctorati, and they kept their own names — the mark that separated them from slaves, who fought under a single stage name."
+        },
+        {
+          "kind": "paired",
+          "rome": "The arena's real hierarchy was not skill. It was whether the crowd knew what to call you.",
+          "magic": "Which is exactly what this arena binds. It taps every legend on the board — the ones with names — and lets none of them go.",
+          "card": "Arena of the Ancients"
+        },
+        {
+          "kind": "gladiator",
+          "rome": "A freed gladiator was given the rudis, a wooden sword, and with it his discharge. Some took it and taught; some took it and came back as very expensive freelancers."
+        },
+        {
+          "kind": "gladiator",
+          "rome": "Flamma was offered the rudis four separate times and refused it every time. He died in the arena in Sicily at thirty, still fighting, having declined freedom more often than most men are offered it once."
+        },
+        {
+          "kind": "roman",
+          "rome": "At Titus's inaugural games in AD 80, Priscus and Verus fought each other to a standstill. Both were declared victors, and the emperor gave both men the rudis on the spot — the arena's most famous ending is a draw."
+        },
+        {
+          "kind": "paired",
+          "rome": "Rome's most celebrated bout ended with nobody beaten.",
+          "magic": "Which is why a clocked-out game here counts for neither side. A match the clock ended is a measurement that stopped, not a fighter who lost."
+        },
+        {
+          "kind": "magic",
+          "magic": "Chromium and Arcades Sabboth are elder dragons from Legends, 1994 — among the first names this game ever wrote down. This arena taps them like anybody else.",
+          "card": "Chromium"
+        },
+        {
+          "kind": "magic",
+          "magic": "Dakkon Blackblade is as strong as the ground he holds, which is how a territory fighter ought to be measured.",
+          "card": "Dakkon Blackblade"
+        },
+        {
+          "kind": "paired",
+          "rome": "The colossal bronze that gave the Colosseum its name was not the building. It was a statue of Nero standing beside it, and the crowd named the amphitheatre after its neighbour.",
+          "magic": "Colossus of Sardia has the same problem this arena hands out: it does not untap on its own, and buying it back upright costs nine.",
+          "card": "Colossus of Sardia"
+        },
+        {
+          "kind": "magic",
+          "magic": "Axelrod Gunnarson takes life and gains it in the same blow — the crowd's favourite arithmetic, and the oldest reason to keep watching.",
+          "card": "Axelrod Gunnarson"
+        }
+      ]
+    },
+    {
+      "key": "ancient-amphitheater",
+      "name": "The Ancient Amphitheater",
+      "card": "Ancient Amphitheater",
+      "plane": "Lorwyn",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/2/f/2ff3a82d-e794-4c3b-994d-b28b8eb7eac4.jpg?1783942848",
+        "artist": "Rob Alexander",
+        "printing": "Lorwyn"
+      },
+      "motion": "wind",
+      "palette": {
+        "ink": "#fdf0d5",
+        "glow": "#c46a4a"
+      },
+      "champions": [
+        {
+          "card": "Brion Stoutarm",
+          "role": "The Games entire: he picks up something of yours and throws it at somebody."
+        },
+        {
+          "card": "Arbiter of Knollridge",
+          "role": "Calls the bout even. Every life total in the house becomes the highest one."
+        },
+        {
+          "card": "Cloudgoat Ranger",
+          "role": "Arrives with a retinue, the way a name-fighter never walks out alone."
+        },
+        {
+          "card": "Axegrinder Giant",
+          "role": "No trick and no title. Just the biggest thing they could find."
+        }
+      ],
+      "facts": [
+        {
+          "kind": "coliseum",
+          "rome": "Amphitheatrum is Greek for “theatre on both sides”. Romans built one by facing two half-bowls together, so there was no behind-the-stage and no bad angle — an audience with no back row."
+        },
+        {
+          "kind": "paired",
+          "rome": "An amphitheatre is a building whose entire argument is that everyone must be able to see.",
+          "magic": "The Ancient Amphitheater charges admission instead: reveal a Giant from your hand, or it enters tapped. You show your fighter to take the sand.",
+          "card": "Ancient Amphitheater"
+        },
+        {
+          "kind": "coliseum",
+          "rome": "Construction began under Vespasian in AD 72 and finished under his son Titus in AD 80. Two emperors, eight years, one building."
+        },
+        {
+          "kind": "coliseum",
+          "rome": "It was raised on the drained lake of Nero's Golden House. The tyrant's private pleasure garden was handed back to the public as a stadium, and the symbolism was entirely deliberate."
+        },
+        {
+          "kind": "coliseum",
+          "rome": "A dedicatory inscription records that it was built ex manubiis — from the spoils. The spoils were those of the Jewish War, which makes the Colosseum a monument to a conquest as much as to an entertainment."
+        },
+        {
+          "kind": "coliseum",
+          "rome": "The name has nothing to do with the building's size. It comes from the Colossus, a vast bronze of Nero that stood next door; the amphitheatre was called after its neighbour until the neighbour's name stuck."
+        },
+        {
+          "kind": "coliseum",
+          "rome": "A sail-like awning called the velarium shaded the crowd. It was rigged and worked by around a hundred sailors of the imperial fleet, stationed permanently at a landlocked stadium to run its roof like canvas."
+        },
+        {
+          "kind": "paired",
+          "rome": "Rome solved a roof by sending for the navy.",
+          "magic": "Lorwyn solves scale by sending for Giants. The Ancient Amphitheater is where they hold the Giant Games, and its own flavour asks who will flatten the competition."
+        },
+        {
+          "kind": "magic",
+          "magic": "Brion Stoutarm is the Giant Games entire: sacrifice another creature, and Brion throws it at somebody for its own power in damage.",
+          "card": "Brion Stoutarm"
+        },
+        {
+          "kind": "paired",
+          "rome": "Between bouts the arena had to be reset — bodies out, sand raked, the next act brought up.",
+          "magic": "Arbiter of Knollridge does the resetting here. Every life total in the house becomes the highest one, and the bout starts level.",
+          "card": "Arbiter of Knollridge"
+        },
+        {
+          "kind": "magic",
+          "magic": "Cloudgoat Ranger arrives with a retinue, which is how a name-fighter enters. Nobody who mattered walked out alone.",
+          "card": "Cloudgoat Ranger"
+        },
+        {
+          "kind": "magic",
+          "magic": "Axegrinder Giant has no trick and no title. It is simply the largest thing they could find, which was often the entire booking.",
+          "card": "Axegrinder Giant"
+        }
+      ]
+    },
+    {
+      "key": "phyrexian-arena",
+      "name": "The Phyrexian Arena",
+      "card": "Phyrexian Arena",
+      "plane": "New Phyrexia",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/8/4/84e19975-e3e1-453b-b902-a1b1fc1d8504.jpg?1783945347",
+        "artist": "Pete Venters",
+        "printing": "Apocalypse"
+      },
+      "motion": "oil",
+      "palette": {
+        "ink": "#f0d6d6",
+        "glow": "#8d1c22"
+      },
+      "champions": [
+        {
+          "card": "Elesh Norn, Grand Cenobite",
+          "role": "Makes her own stable larger and everyone else's smaller. The editor with her thumb already turned."
+        },
+        {
+          "card": "Jin-Gitaxias, Core Augur",
+          "role": "Studies the crowd rather than the fight, and is better fed for it."
+        },
+        {
+          "card": "Phyrexian Swarmlord",
+          "role": "Sends in numbers, which is what the sand is for."
+        },
+        {
+          "card": "Chained Throatseeker",
+          "role": "Chained until it is loosed, which is the oldest trick the hypogeum had."
+        }
+      ],
+      "facts": [
+        {
+          "kind": "coliseum",
+          "rome": "Beneath the arena floor ran the hypogeum: two storeys of corridors, cages, winches and hoists. Scenery and animals arrived through trapdoors, mid-spectacle, from below."
+        },
+        {
+          "kind": "paired",
+          "rome": "The best moment the Colosseum could sell was something enormous appearing where a moment ago there had been floor.",
+          "magic": "Hideaway is the same machinery: a card exiled face down beneath the board, waiting, released the moment your side is big enough to deserve it.",
+          "card": "Fight Rigging"
+        },
+        {
+          "kind": "magic",
+          "magic": "Fight Rigging is a hideaway enchantment, and its name is not an accident. The games were never as fair as the stands believed.",
+          "card": "Fight Rigging"
+        },
+        {
+          "kind": "roman",
+          "rome": "Titus opened the Colosseum with a hundred days of games. The killing was not an event; it was a season."
+        },
+        {
+          "kind": "paired",
+          "rome": "A hundred days is not a spectacle. It is an institution that has stopped asking whether anyone still wants it.",
+          "magic": "Phyrexian Arena draws you an extra card every upkeep and takes a life for it, forever, with no way to switch it off.",
+          "card": "Phyrexian Arena"
+        },
+        {
+          "kind": "magic",
+          "magic": "Phyrexian Arena's original Apocalypse flavour is the best sentence anyone has written about an audience: “An audience of one with the malice of thousands.”",
+          "card": "Phyrexian Arena"
+        },
+        {
+          "kind": "roman",
+          "rome": "The morning belonged to the venatio, the beast hunt — leopards, bears, lions, and hunters called venatores who were a different profession from gladiators entirely."
+        },
+        {
+          "kind": "paired",
+          "rome": "The hunt was not a duel. It was an execution with better staging.",
+          "magic": "Prey Upon is the whole venatio in one line: target creature you control fights target creature you don't.",
+          "card": "Prey Upon"
+        },
+        {
+          "kind": "roman",
+          "rome": "At noon came the meridiani — public executions, staged in the gap between the beasts and the gladiators, for whoever stayed in their seat through lunch."
+        },
+        {
+          "kind": "paired",
+          "rome": "The condemned were sent out to die on a schedule, every day, as a matter of programming.",
+          "magic": "Rite of the Raging Storm hands every player a 5/1 with haste and trample at every upkeep, and sacrifices it at the end of the turn. Sent out, spent, replaced tomorrow.",
+          "card": "Rite of the Raging Storm"
+        },
+        {
+          "kind": "magic",
+          "magic": "Elesh Norn makes her own side larger and everyone else's smaller. That is not a fighter; that is the editor, with her thumb already turned.",
+          "card": "Elesh Norn, Grand Cenobite"
+        },
+        {
+          "kind": "paired",
+          "rome": "A gladiator did not choose his opponent. The sponsor chose, and the pairing was the entertainment.",
+          "magic": "Bloodthirsty Blade goads: the equipped creature attacks each combat if able, and attacks somebody other than you. You are booking somebody else's fight.",
+          "card": "Bloodthirsty Blade"
+        }
+      ]
+    },
+    {
+      "key": "cephalid-coliseum",
+      "name": "The Cephalid Coliseum",
+      "card": "Cephalid Coliseum",
+      "plane": "Otaria",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/d/5/d5d74112-7244-4c3f-a5eb-b6be671aefe8.jpg?1783945199",
+        "artist": "John Avon",
+        "printing": "Odyssey"
+      },
+      "motion": "water",
+      "palette": {
+        "ink": "#d9f2ff",
+        "glow": "#2f7fa8"
+      },
+      "champions": [
+        {
+          "card": "Aboshan, Cephalid Emperor",
+          "role": "Holds the drowned court and taps whatever the tide is finished with."
+        },
+        {
+          "card": "Ambassador Laquatus",
+          "role": "Never fights. Arranges the fight, then drowns you in your own library."
+        },
+        {
+          "card": "Cephalid Aristocrat",
+          "role": "The noble in the water, who pays in someone else's blood."
+        },
+        {
+          "card": "Cephalid Illusionist",
+          "role": "Turns the blow aside and spills three cards doing it."
+        },
+        {
+          "card": "Cephalid Looter",
+          "role": "Loots the fallen, which was a job in Rome too."
+        }
+      ],
+      "facts": [
+        {
+          "kind": "roman",
+          "rome": "At the inaugural games of AD 80 the arena was flooded and fought over by ships. Cassius Dio describes horses and bulls performing in the water, and men fighting a sea-battle where the sand had been."
+        },
+        {
+          "kind": "coliseum",
+          "rome": "Then they dug the hypogeum. The machinery that made every other spectacle possible made the sea-battles impossible, and the Colosseum never staged a real one again."
+        },
+        {
+          "kind": "paired",
+          "rome": "The Colosseum could be an ocean exactly until it became a machine.",
+          "magic": "The Cephalid Coliseum is the arena that stayed flooded — and it charges the same toll in blood for its colour that the Grand Coliseum does.",
+          "card": "Cephalid Coliseum"
+        },
+        {
+          "kind": "roman",
+          "rome": "Scholars think the later “sea battles” were theatrical rather than real: shallow water, small boats, few fighters. A spectacle about a spectacle."
+        },
+        {
+          "kind": "paired",
+          "rome": "Flood the floor and only the things built for water are still standing.",
+          "magic": "Whelming Wave returns every creature to hand except Krakens, Leviathans, Octopuses and Serpents. That is a naumachia in one card.",
+          "card": "Whelming Wave"
+        },
+        {
+          "kind": "roman",
+          "rome": "The velarium was worked by sailors because nobody else in Rome could handle that much rigging. The navy was, in practice, part of the Colosseum's staff."
+        },
+        {
+          "kind": "magic",
+          "magic": "Aboshan, Cephalid Emperor holds the drowned court, and taps whatever the tide has finished with.",
+          "card": "Aboshan, Cephalid Emperor"
+        },
+        {
+          "kind": "magic",
+          "magic": "Ambassador Laquatus never fights. He arranges the fight, and drowns you in your own library — which is a very Roman way to win.",
+          "card": "Ambassador Laquatus"
+        },
+        {
+          "kind": "paired",
+          "rome": "Cephalid Coliseum is on Otaria, the same continent as the Grand Coliseum, and takes the same damage for its mana.",
+          "magic": "Two arenas, one continent, one toll. Otaria only ever knew the one business model.",
+          "card": "Cephalid Coliseum"
+        },
+        {
+          "kind": "gladiator",
+          "rome": "The retiarius fought with a fisherman's kit — net, trident, dagger — and was the only gladiator whose whole costume was an argument that the arena was water."
+        },
+        {
+          "kind": "magic",
+          "magic": "Cephalid Looter loots the fallen, which was a real job in Rome and a well-paid one.",
+          "card": "Cephalid Looter"
+        },
+        {
+          "kind": "magic",
+          "magic": "Cephalid Illusionist turns a blow aside and spills three cards doing it — a fighter who survives by never quite being where the blow lands.",
+          "card": "Cephalid Illusionist"
+        }
+      ]
+    }
+  ]
+}

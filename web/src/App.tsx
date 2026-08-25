@@ -19,6 +19,7 @@ import { api, onSessionLost, type AuthState, type Health } from './lib/api'
 const AboutClaude = lazy(() => import('./routes/AboutClaude'))
 const Admin = lazy(() => import('./routes/Admin'))
 const CardSearch = lazy(() => import('./routes/CardSearch'))
+const Coliseum = lazy(() => import('./routes/Coliseum'))
 const DeckDetail = lazy(() => import('./routes/DeckDetail'))
 const DeckRedirect = lazy(() => import('./routes/DeckRedirect'))
 const Import = lazy(() => import('./routes/Import'))
@@ -40,6 +41,11 @@ const NAV = [
   // `/new` and `/import` are spliced in after Library — see AUTHORING_NAV.
   { to: '/simulate', label: 'Simulator', end: false,
     hint: 'Goldfish a deck: opening hands, castability, land counts' },
+  // Next to the Simulator because it is where its longest runs are watched —
+  // a Forge match takes minutes — but its own room rather than a panel inside
+  // that page, because the six arenas are worth walking with no match running.
+  { to: '/coliseum', label: 'Coliseum', end: false,
+    hint: 'The six arenas real matches are played in, and what Rome did in each' },
   // The two reference screens, and they sit next to each other because the
   // pair *is* the boundary: Learn is the checked-in prose this repo writes
   // once and edits by hand, the Laboratory is the question that prose cannot
@@ -377,6 +383,7 @@ export default function App() {
           <Route path="/import" element={<Import />} />
           <Route path="/search" element={<CardSearch />} />
           <Route path="/simulate" element={<Simulator />} />
+          <Route path="/coliseum" element={<Coliseum />} />
           {/* No `:owner` and no `:slug`, and the absence is ADR 26 rather than
               an omission: this surface cannot reach a deck, so there is
               nothing for a path segment to name. */}

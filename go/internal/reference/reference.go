@@ -45,6 +45,9 @@ var modelFile []byte
 //go:embed data/shelves.json
 var shelvesFile []byte
 
+//go:embed data/coliseum.json
+var coliseumFile []byte
+
 // Color is one of the five, and what it wants.
 type Color struct {
 	Code  string `json:"code"`
@@ -73,6 +76,90 @@ type Era struct {
 type Champion struct {
 	Card string `json:"card"`
 	Role string `json:"role"`
+}
+
+// Palette is an arena's two colours: the ink its words are set in and the
+// glow its motion is lit by. Two rather than a full scheme, because the
+// backdrop is a painting somebody else made and the page's job is to agree
+// with it, not to repaint it.
+type Palette struct {
+	Ink  string `json:"ink"`
+	Glow string `json:"glow"`
+}
+
+// ColiseumFact is one slide of the arena's rotation.
+//
+// **One struct, five kinds**, because the variety is the point: a wait of
+// several minutes shown one shape of card over and over is a wait that reads
+// as a loop. `Kind` says which shape a slide is, and the two text fields are
+// filled to match:
+//
+//	roman      Rome's practice and custom      -> Rome
+//	gladiator  the fighters themselves         -> Rome
+//	coliseum   the building                    -> Rome
+//	magic      Magic's own lore and mechanics  -> Magic
+//	paired     a Roman fact and its Magic echo -> both
+//
+// A single struct rather than five, for the reason `GameEvent` is one struct:
+// they cross the same wire into the same list, and the alternative is a
+// discriminated union on the far side to buy nothing.
+//
+// All of it is checked-in prose. `Card` is optional and names the card the
+// slide is about; like every other name here it resolves through the pool and
+// is dropped when it does not.
+type ColiseumFact struct {
+	Kind  string `json:"kind"`
+	Rome  string `json:"rome,omitempty"`
+	Magic string `json:"magic,omitempty"`
+	Card  string `json:"card,omitempty"`
+}
+
+// FactKinds is every kind a [ColiseumFact] may be, which the data is checked
+// against at start so a typo in the JSON is a boot failure rather than a slide
+// the frontend silently cannot render.
+var FactKinds = map[string]bool{
+	"roman": true, "gladiator": true, "coliseum": true,
+	"magic": true, "paired": true,
+}
+
+// ArenaArt is the painting an arena is shown as, chosen rather than looked up.
+//
+// **A named printing, deliberately.** The pool answers a card name with its
+// *newest* printing, and for these six that meant Teenage Mutant Ninja Turtles
+// art on the Grand Coliseum and Marvel art on Valor's Reach — crossover
+// paintings on a room that is an homage to Magic's own arenas. Naming the
+// printing here is the same rule `PageMasthead` follows for every other page's
+// art, and it is what lets the painter be credited: this is somebody's
+// painting, and it is hotlinked rather than committed (rule 5, ADR 6).
+type ArenaArt struct {
+	URL      string `json:"url"`
+	Artist   string `json:"artist"`
+	Printing string `json:"printing"`
+}
+
+// Arena is one of the coliseum's six houses: a card whose art is the backdrop,
+// the champions who fight there, and the facts it rotates while a match warms
+// up.
+//
+// `Motion` names the animation the backdrop wears (`sand`, `banners`, `stone`,
+// `wind`, `oil`, `water`) and is a class name the frontend owns -- the prose
+// says which arena moves how, and the stylesheet says what that means.
+type Arena struct {
+	Key       string         `json:"key"`
+	Name      string         `json:"name"`
+	Card      string         `json:"card"`
+	Plane     string         `json:"plane"`
+	Art       ArenaArt       `json:"art"`
+	Motion    string         `json:"motion"`
+	Palette   Palette        `json:"palette"`
+	Champions []Champion     `json:"champions"`
+	Facts     []ColiseumFact `json:"facts"`
+}
+
+// Coliseum is `data/coliseum.json`: the six arenas and everything they hold.
+type Coliseum struct {
+	Note   string  `json:"note"`
+	Arenas []Arena `json:"arenas"`
 }
 
 // Combination is one of the 32. `Champions` and `Signature` are names; the
@@ -238,7 +325,9 @@ var (
 	tarot      TarotLore
 	model      Model
 	shelf      RuntimeShelves
+	coliseum   Coliseum
 	byKey      = map[string]*Combination{}
+	byArena    = map[string]*Arena{}
 )
 
 func init() {
@@ -249,6 +338,20 @@ func init() {
 	mustCompact("tarotlore.json", tarotloreFile, &tarot)
 	mustCompact("model.json", modelFile, &model)
 	mustCompact("shelves.json", shelvesFile, &shelf)
+	mustCompact("coliseum.json", coliseumFile, &coliseum)
+	for i := range coliseum.Arenas {
+		a := &coliseum.Arenas[i]
+		if _, dup := byArena[a.Key]; dup {
+			panic(fmt.Sprintf("reference: coliseum.json names %q twice", a.Key))
+		}
+		for _, f := range a.Facts {
+			if !FactKinds[f.Kind] {
+				panic(fmt.Sprintf("reference: coliseum.json arena %q has a fact of "+
+					"unknown kind %q", a.Key, f.Kind))
+			}
+		}
+		byArena[a.Key] = a
+	}
 	for i := range taxonomy.Combinations {
 		c := &taxonomy.Combinations[i]
 		if _, dup := byKey[c.Key]; dup {
@@ -303,6 +406,15 @@ func Deck() *Model { return &model }
 
 // Runtime is the runtime shelves' configuration. Read-only.
 func Runtime() *RuntimeShelves { return &shelf }
+
+// Arenas is the coliseum's six, in the order the file lists them.
+func Arenas() []Arena { return coliseum.Arenas }
+
+// ArenaByKey is one arena by its key.
+func ArenaByKey(key string) (*Arena, bool) {
+	a, ok := byArena[key]
+	return a, ok
+}
 
 // IsCategory is `category in model.CATEGORIES`.
 func IsCategory(word string) bool {

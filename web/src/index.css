@@ -5429,3 +5429,216 @@ button:hover .tarot-fan-card {
   .animate-spin { animation-duration: 2.4s; }
   .animate-pulse { animation: none; }
 }
+
+/* ------------------------------------------------------------- the Coliseum
+ *
+ * A Tier 3 match takes minutes, and this room is what those minutes are for.
+ *
+ * **The hero is the whole painting, at page width.** Not a cropped band —
+ * `art_crop` is 1.37:1 and a full-bleed strip keeps less than half of it,
+ * which is the lesson `PageMasthead` exists to enforce and which this project
+ * has learned four times. Spanning the page and *cropping* the page are
+ * different asks; this is the first.
+ *
+ * **The painting is not decorated.** Banners flying from the rim and a crowd
+ * filing through the gates were built here and taken out again: CSS draws
+ * rectangles, and rectangles skewed on a timer read as rectangles skewed on a
+ * timer, not as cloth. Worse, they were the wrong *kind* of thing — ADR 32
+ * bounds what may be done to Wizards' art to motion and parallax, never
+ * distortion, and adding objects to somebody's painting is not animating it.
+ *
+ * So the only thing that moves here is the camera: a slow breath, well under
+ * the threshold where anybody would notice it as an effect rather than as the
+ * room being alive. Real dimensionality is `cardmotion`'s depth-drift
+ * (ADR 32) — derived on a dev machine, cached on the volume, never committed.
+ */
+
+/* ---------------------------------------------------------------- the hero */
+
+.coliseum-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1rem;
+  aspect-ratio: 1.37 / 1;
+  max-height: 48vh;
+}
+
+.coliseum-hero-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  /* A slow push in and out. The painting is the one thing here that was made
+   * by a person, so it moves least: eighty seconds, and never more than three
+   * percent. */
+  animation: coliseum-breathe 80s ease-in-out infinite;
+}
+
+/* The sky end of the frame, so pennants read against something. */
+.coliseum-hero-sky {
+  position: absolute;
+  inset: 0 0 55% 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, #0a0d14 46%, transparent) 0%,
+    transparent 100%);
+}
+
+@keyframes coliseum-breathe {
+  0%, 100% { transform: scale(1.02) translate3d(0, 0, 0); }
+  50%      { transform: scale(1.05) translate3d(-1%, -0.8%, 0); }
+}
+
+/* The credit, as a footnote on the painting rather than a caption under it. */
+.coliseum-footnote {
+  position: absolute;
+  right: 0.9rem;
+  bottom: 0.7rem;
+  z-index: 4;
+  max-width: min(46ch, 70%);
+  text-align: right;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: color-mix(in oklab, #fff 78%, transparent);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
+}
+
+.coliseum-title {
+  position: absolute;
+  left: 1.25rem;
+  bottom: 1.1rem;
+  z-index: 4;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.85);
+}
+
+/* ------------------------------------------------- the per-arena stage ---
+ *
+ * The six arenas get a *camera* rather than particles: a slow drift across
+ * the painting and a light moving over it, tinted by the arena's own palette.
+ * It is the same argument as the hero at a quieter volume — the painting is
+ * the subject, so the effect is lighting, not confetti.
+ */
+
+.arena-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--arena-glow, #b5762c) 12%, transparent);
+}
+
+.arena-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.37 / 1;
+  object-fit: cover;
+  animation: arena-camera 46s ease-in-out infinite;
+}
+
+.arena-art-missing {
+  width: 100%;
+  aspect-ratio: 1.37 / 1;
+  background:
+    radial-gradient(ellipse at 50% 120%,
+      color-mix(in oklab, var(--arena-glow, #b5762c) 55%, transparent) 0%,
+      transparent 70%),
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--arena-ink, #f3e2bd) 8%, transparent), transparent);
+}
+
+.arena-motion {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* The light. One sweep, tinted by the house, at a pace per house — the
+ * Phyrexian Arena pulses because it is a machine, the Cephalid Coliseum
+ * wavers because it is underwater. */
+.arena-motion::after {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  background: linear-gradient(104deg, transparent 40%,
+    color-mix(in oklab, var(--arena-ink) 22%, transparent) 50%, transparent 60%);
+  will-change: transform;
+  animation: arena-sweep 17s ease-in-out infinite;
+}
+.arena-motion[data-motion='oil']::after {
+  background: radial-gradient(ellipse at 50% 60%,
+    color-mix(in oklab, var(--arena-glow) 34%, transparent) 0%, transparent 64%);
+  animation: arena-throb 5.5s ease-in-out infinite;
+}
+.arena-motion[data-motion='water']::after {
+  animation: arena-waver 13s ease-in-out infinite;
+}
+.arena-motion[data-motion='wind']::after { animation-duration: 8s; }
+.arena-motion[data-motion='stone']::after { animation-duration: 34s; }
+
+@keyframes arena-camera {
+  0%, 100% { transform: scale(1.03); }
+  50%      { transform: scale(1.09) translate3d(-1.5%, -1%, 0); }
+}
+@keyframes arena-sweep {
+  0%, 100% { transform: translate3d(-26%, 0, 0); }
+  50%      { transform: translate3d(26%, 0, 0); }
+}
+@keyframes arena-throb {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.9; }
+}
+@keyframes arena-waver {
+  0%, 100% { transform: translate3d(-8%, 0, 0) scale(1); }
+  50%      { transform: translate3d(8%, 2%, 0) scale(1.07); }
+}
+
+.arena-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, #000 16%, transparent) 0%,
+    transparent 36%,
+    color-mix(in oklab, #000 40%, transparent) 100%);
+}
+
+.arena-slide { animation: arena-slide-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes arena-slide-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Both themes, opposite treatment — the `.hero-art` rule, for its reason. */
+:root[data-theme='dark'] .arena-art,
+:root[data-theme='dark'] .coliseum-hero-art,
+:root:where(:not([data-theme='light'])) .arena-art,
+:root:where(:not([data-theme='light'])) .coliseum-hero-art {
+  filter: brightness(1.06) saturate(1.05);
+}
+:root[data-theme='light'] .arena-art,
+:root[data-theme='light'] .coliseum-hero-art {
+  filter: brightness(0.95) saturate(0.97);
+}
+
+/* The guard. The banners and the crowd are **removed**, because a frozen
+ * pennant is a smudge on somebody's painting — the forest layer's argument.
+ * The two cameras are **stopped rather than removed**: they animate the
+ * artwork itself, and deleting them would delete the paintings.
+ *
+ * Every animated selector above carries one of these classes deliberately.
+ * The bundle check (`cmd/mtglab/reducedmotion_test.go`) reaches a rule by the
+ * classes in its selector, so an attribute-only or element-only selector is
+ * invisible to it however well it is actually guarded. */
+@media (prefers-reduced-motion: reduce) {
+  .arena-motion { display: none; }
+  .arena-art,
+  .coliseum-hero-art { animation: none; }
+  .arena-slide { animation: none; }
+}
