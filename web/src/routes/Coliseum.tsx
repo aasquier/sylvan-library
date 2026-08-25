@@ -514,42 +514,45 @@ export default function ColiseumRoom() {
       {forgeReady && (
         <div className="card-surface mt-5 flex flex-wrap items-end gap-3
                         rounded-xl p-4">
-          {/* **A whole row each on a phone, and a capped share of one bar on a
-              laptop.** Both halves of that were bought by a bug.
+          {/* **The selects carry a floor, and that is the whole fix.**
+              Three rounds of this bug, and the first two treated a
+              *breakpoint* as if it knew how wide the room was.
 
-              The cap came first, measured on the deployed room: a `<select>`
-              sizes to its widest option, and a deck named "Goreclaw, Terror
-              of Qal Sisma — Mono-Green Stompy — gyome" made each of these
-              447px. Two of them ate a 992px bar and threw the dial, the
-              shuffle and the button onto two more rows — five controls in
-              three rows with half the bar empty. Capped, all five sit on one;
-              the browser ellipsises the name, and the theater below carries
-              it in full anyway.
+              `flex-1` is `flex: 1 1 0%`, and with `min-w-0` these two were
+              the only items on the row that could give: the number fields are
+              a fixed `w-28` and the button holds its label. So they absorbed
+              every deficit by shrinking toward nothing, and `flex-wrap` never
+              saved them — an item with `min-width: 0` always fits, so the row
+              has no reason to break. Measured on the deployed room with the
+              `sm:` branch live and the container at phone widths: 32px at
+              390, 19px at 520, 64px at 610, and one single row at every one
+              of them.
 
-              But `flex-1` is `flex: 1 1 0%`, and with `min-w-0` these two
-              were the **only** items in the row that could shrink — the
-              number fields are a fixed `w-28` and the button holds its label.
-              So on a 375px phone they absorbed the entire deficit instead of
-              wrapping: measured at **18px wide inside a 1px label**, which
-              renders as the label text and the control collapsed into one
-              unreadable smear. Aaron found it on a phone, and no test could
-              have: every one of them asks the DOM what it says, and this is a
-              question about how wide it is.
+              Round two hung the fix on `basis-full` below `sm`, which is
+              correct only while the breakpoint agrees with the device. Aaron's
+              phone reports a layout width at or above 640 — Safari's desktop
+              mode does exactly that, and it is sticky per site — so it took
+              the `sm:` branch at phone width and crushed, and the second fix
+              never applied to the person who reported it.
 
-              `basis-full` is the fix and it is deliberately not a media query
-              of its own — the row already wraps, so giving each select a
-              full-width basis below `sm` makes it take its own line by the
-              rule that was already there. `min-w-0` stays, because the
-              ellipsis on a long deck name depends on it. */}
+              A minimum width does not care what the device claims to be. At
+              `11rem` the pair cannot shrink into a smear; when the row runs
+              out of space they *wrap*, which is what `flex-wrap` was there to
+              do all along. `grow` rather than `flex-1` because grow leaves
+              the basis alone, and the basis is what makes them take their own
+              line on a real phone. The ellipsis on a long deck name survives:
+              a `<select>` truncates its own option text at any width. */}
           <Select label="Champion" value={a} onChange={setA}
-                  className="min-w-0 basis-full sm:max-w-[15rem] sm:flex-1"
+                  className="min-w-[11rem] grow basis-full
+                             sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map((d) => ({
                     value: `${d.owner}/${d.slug}`,
                     label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
                       + (d.pilot ? ` (${d.pilot})` : ''),
                   }))} />
           <Select label="Challenger" value={b} onChange={setB}
-                  className="min-w-0 basis-full sm:max-w-[15rem] sm:flex-1"
+                  className="min-w-[11rem] grow basis-full
+                             sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map((d) => ({
                     value: `${d.owner}/${d.slug}`,
                     label: (d.writable ? d.name : `${d.name} — ${d.owner}`)

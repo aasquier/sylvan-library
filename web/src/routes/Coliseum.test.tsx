@@ -471,6 +471,38 @@ describe('the tale of the tape', () => {
     }
   })
 
+  it('never lets the two deck pickers shrink below a usable width',
+     async () => {
+    // Three rounds of this bug. `flex-1` is `flex: 1 1 0%`, and with
+    // `min-w-0` the two selects were the only items on the row that could
+    // give — so they absorbed every deficit by shrinking, and `flex-wrap`
+    // never rescued them, because an item with `min-width: 0` always fits and
+    // the row therefore never has a reason to break. Measured on the deployed
+    // room with the `sm:` branch live: 32px at a 390px container, 19px at
+    // 520px, one row at every width.
+    //
+    // Rounds one and two both hung the fix on a *breakpoint*, which is only
+    // ever a guess about how wide the room is — and it guessed wrong for the
+    // person who reported it, whose phone reports a layout width at or above
+    // 640. jsdom has no layout and cannot measure a width, but it can hold
+    // the property that makes the crush impossible: a floor these two cannot
+    // shrink through. `min-w-0` here is the bug, by name.
+    show()
+    await screen.findByText(/harena/)
+
+    const pickers = ['Champion', 'Challenger'].map((label) =>
+      screen.getByRole('combobox', { name: new RegExp(label, 'i') }))
+    expect(pickers).toHaveLength(2)
+
+    for (const picker of pickers) {
+      const cls = picker.closest('label')?.className ?? ''
+      expect(cls, 'a deck picker may not be allowed to shrink to nothing')
+        .not.toMatch(/\bmin-w-0\b/)
+      expect(cls, 'a deck picker needs a floor it cannot shrink through')
+        .toMatch(/\bmin-w-\[/)
+    }
+  })
+
   it('keeps the title and the credit in one bar so they cannot collide',
      async () => {
     // Two absolutes both anchored to the bottom of the frame is how these
