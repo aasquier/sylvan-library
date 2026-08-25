@@ -280,6 +280,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/sets/upcoming", Handler: a.upcomingSets},
 		{Method: http.MethodGet, Pattern: "/api/colors", Handler: a.colors},
 		{Method: http.MethodGet, Pattern: "/api/glossary", Handler: a.glossary},
+		{Method: http.MethodGet, Pattern: "/api/coliseum", Handler: a.coliseum},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
 		// The Claude surface's two free corners:
 		// a checked-in roster of voices, and a seeded deal. Neither needs a

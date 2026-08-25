@@ -5429,3 +5429,253 @@ button:hover .tarot-fan-card {
   .animate-spin { animation-duration: 2.4s; }
   .animate-pulse { animation: none; }
 }
+
+/* ------------------------------------------------- the coliseum's six houses
+ *
+ * A Tier 3 match takes minutes, and this is what a person looks at for those
+ * minutes. Six arenas, each with its own weather.
+ *
+ * **The painting is shown whole.** `art_crop` is 1.37:1 and a full-bleed band
+ * keeps less than half of it — the lesson this project has learned four times
+ * and which `PageMasthead` exists to enforce. So the arena is a framed stage
+ * at its own ratio and the motion happens *over* it, rather than the art being
+ * stretched behind everything and mostly thrown away.
+ *
+ * **Nothing here is an asset.** Every particle is a repeating radial gradient
+ * on a layer that is translated, which is rule 5 (no committed imagery) and
+ * also the only version that stays cheap: `transform` composites, and
+ * `background-position` does not. Two layers per arena at different sizes and
+ * speeds is the whole parallax trick.
+ *
+ * The palette arrives inline from the served prose as `--arena-ink` and
+ * `--arena-glow`, because it belongs to the painting rather than to the theme.
+ * Everything a theme *does* own is below, in the two-selector dance.
+ */
+
+.arena-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--arena-glow, #b5762c) 12%, transparent);
+}
+
+/* The painting, at its own ratio. */
+.arena-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.37 / 1;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* An arena with no pool behind it: the palette alone, which is a legible
+ * state rather than a hole. */
+.arena-art-missing {
+  width: 100%;
+  aspect-ratio: 1.37 / 1;
+  background:
+    radial-gradient(ellipse at 50% 120%,
+      color-mix(in oklab, var(--arena-glow, #b5762c) 55%, transparent) 0%,
+      transparent 70%),
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--arena-ink, #f3e2bd) 8%, transparent),
+      transparent);
+}
+
+.arena-motion {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.arena-motion::before,
+.arena-motion::after {
+  content: '';
+  position: absolute;
+  inset: -60%;
+  background-repeat: repeat;
+  will-change: transform;
+}
+
+/* A vignette so the words on top always have something to sit against,
+ * whichever painting is behind them. */
+.arena-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, #000 18%, transparent) 0%,
+    transparent 34%,
+    color-mix(in oklab, #000 42%, transparent) 100%);
+}
+
+/* --- sand: the Grand Coliseum. Harena drifting, and the heat off it. ----- */
+.arena-motion[data-motion='sand']::before {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-ink) 62%, transparent) 1px, transparent 1.2px);
+  background-size: 46px 46px;
+  animation: arena-drift-right 34s linear infinite;
+}
+.arena-motion[data-motion='sand']::after {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-ink) 34%, transparent) 1.6px, transparent 1.8px);
+  background-size: 97px 83px;
+  animation: arena-drift-right 61s linear infinite reverse;
+}
+
+/* --- banners: Valor's Reach. The house lights and the sparks. ------------ */
+.arena-motion[data-motion='banners']::before {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-glow) 78%, transparent) 1.4px, transparent 1.6px);
+  background-size: 64px 64px;
+  animation: arena-rise 26s linear infinite;
+}
+.arena-motion[data-motion='banners']::after {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-ink) 46%, transparent) 1px, transparent 1.2px);
+  background-size: 118px 96px;
+  animation: arena-rise 44s linear infinite, arena-flicker 7s ease-in-out infinite;
+}
+
+/* --- stone: the Arena of the Ancients. Dust that has been falling for
+ *     two thousand years, and a cold light going across it. --------------- */
+.arena-motion[data-motion='stone']::before {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-ink) 40%, transparent) 1px, transparent 1.3px);
+  background-size: 72px 72px;
+  animation: arena-settle 78s linear infinite;
+}
+.arena-motion[data-motion='stone']::after {
+  background-image: linear-gradient(104deg, transparent 42%,
+    color-mix(in oklab, var(--arena-ink) 16%, transparent) 50%, transparent 58%);
+  background-size: 260% 100%;
+  animation: arena-sweep 19s ease-in-out infinite;
+}
+
+/* --- wind: the Ancient Amphitheater. Weather at Giant scale. ------------- */
+.arena-motion[data-motion='wind']::before {
+  background-image: linear-gradient(76deg, transparent 46%,
+    color-mix(in oklab, var(--arena-ink) 30%, transparent) 50%, transparent 54%);
+  background-size: 190px 190px;
+  animation: arena-drift-right 11s linear infinite;
+}
+.arena-motion[data-motion='wind']::after {
+  background-image: linear-gradient(76deg, transparent 44%,
+    color-mix(in oklab, var(--arena-glow) 20%, transparent) 50%, transparent 56%);
+  background-size: 340px 300px;
+  animation: arena-drift-right 23s linear infinite;
+}
+
+/* --- oil: the Phyrexian Arena. It runs downward, and it never stops. ----- */
+.arena-motion[data-motion='oil']::before {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-glow) 70%, transparent) 1.6px, transparent 1.9px);
+  background-size: 58px 132px;
+  animation: arena-fall 17s linear infinite;
+}
+.arena-motion[data-motion='oil']::after {
+  background-image: radial-gradient(ellipse at 50% 50%,
+    color-mix(in oklab, var(--arena-glow) 26%, transparent) 0%, transparent 62%);
+  background-size: 100% 100%;
+  animation: arena-pulse 5.5s ease-in-out infinite;
+}
+
+/* --- water: the Cephalid Coliseum. Caustics, and something breathing
+ *     under them. ------------------------------------------------------- */
+.arena-motion[data-motion='water']::before {
+  background-image: radial-gradient(ellipse 42px 12px,
+    color-mix(in oklab, var(--arena-ink) 30%, transparent) 0%, transparent 70%);
+  background-size: 150px 110px;
+  animation: arena-caustic 21s ease-in-out infinite;
+}
+.arena-motion[data-motion='water']::after {
+  background-image: radial-gradient(circle,
+    color-mix(in oklab, var(--arena-ink) 55%, transparent) 1.8px, transparent 2.1px);
+  background-size: 88px 160px;
+  animation: arena-rise 29s linear infinite;
+}
+
+@keyframes arena-drift-right {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(22%, -6%, 0); }
+}
+@keyframes arena-rise {
+  from { transform: translate3d(0, 12%, 0); }
+  to   { transform: translate3d(-4%, -18%, 0); }
+}
+@keyframes arena-fall {
+  from { transform: translate3d(0, -16%, 0); }
+  to   { transform: translate3d(2%, 14%, 0); }
+}
+@keyframes arena-settle {
+  from { transform: translate3d(-3%, -8%, 0); }
+  to   { transform: translate3d(3%, 10%, 0); }
+}
+@keyframes arena-sweep {
+  0%, 100% { transform: translate3d(-30%, 0, 0); }
+  50%      { transform: translate3d(30%, 0, 0); }
+}
+@keyframes arena-caustic {
+  0%, 100% { transform: translate3d(-4%, 0, 0) scale(1); }
+  50%      { transform: translate3d(4%, 3%, 0) scale(1.08); }
+}
+@keyframes arena-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 0.85; }
+}
+@keyframes arena-flicker {
+  0%, 100% { opacity: 0.55; }
+  42%      { opacity: 0.95; }
+  61%      { opacity: 0.42; }
+}
+
+/* A slide replaces the one before it rather than cross-fading over it: two
+ * paragraphs of prose on top of each other is unreadable for the half second
+ * it takes, and this one is being read rather than glanced at. */
+.arena-slide {
+  animation: arena-slide-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes arena-slide-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Both themes, opposite treatment — the `.hero-art` rule, for the same
+ * reason: a dark page wants the painting brought up, a light page wants it
+ * held back, and the weather over it has to follow the painting. */
+:root[data-theme='dark'] .arena-art,
+:root:where(:not([data-theme='light'])) .arena-art {
+  filter: brightness(1.06) saturate(1.05);
+}
+:root[data-theme='light'] .arena-art {
+  filter: brightness(0.94) saturate(0.96);
+}
+:root[data-theme='light'] .arena-veil {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, #000 10%, transparent) 0%,
+    transparent 38%,
+    color-mix(in oklab, #000 28%, transparent) 100%);
+}
+
+/* The guard. Every arena's weather is decoration over a painting, so it is
+ * **removed** rather than slowed: a frozen particle field is a smudge on
+ * somebody's artwork, which is the argument the forest layer already makes
+ * two hundred lines up. The painting itself stays, because the painting was
+ * never the moving part.
+ *
+ * Every animated selector above is written `.arena-motion[data-motion='x']`
+ * rather than `[data-motion='x']` for this block's benefit. The bundle check
+ * (`cmd/mtglab/reducedmotion_test.go`) reaches a rule by the **classes** in
+ * its selector, and an attribute-only selector carries none — so the weather
+ * was genuinely arrested by `display: none` on the parent while reading, to a
+ * static check, as twelve rules moving with nothing to stop them. Naming the
+ * class is cheaper than an entry in that file's excuse table, and it is true
+ * in the same place a reader is looking. */
+@media (prefers-reduced-motion: reduce) {
+  .arena-motion { display: none; }
+  .arena-slide { animation: none; }
+}

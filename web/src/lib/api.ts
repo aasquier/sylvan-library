@@ -1990,8 +1990,62 @@ export interface TarotReading {
   cards: TarotDrawn[]
 }
 
+/** One slide of an arena's rotation.
+ *
+ *  Five kinds, and the two text fields are filled to match: `roman`,
+ *  `gladiator` and `coliseum` carry `rome`; `magic` carries `magic`; `paired`
+ *  carries both. The Go side refuses an unknown kind at boot, so a slide that
+ *  arrives here is one this renderer has a branch for. */
+export interface ColiseumFact {
+  kind: 'roman' | 'gladiator' | 'coliseum' | 'magic' | 'paired'
+  rome?: string
+  magic?: string
+  card?: string
+}
+
+/** A champion of one arena: a card the pool resolved, and why they fight. */
+export interface ColiseumChampion {
+  role: string
+  name: string
+  mana_cost: string | null
+  type_line: string
+  oracle_text: string
+  color_identity: string[]
+  image: string | null
+  art_crop: string | null
+}
+
+/** One of the six houses a Tier 3 match is watched in.
+ *
+ *  `backdrop` is null when the pool has not been seeded — the prose still
+ *  answers whole and the arena renders on its palette alone, which is a
+ *  legible state rather than an error. */
+export interface ColiseumArena {
+  key: string
+  name: string
+  plane: string
+  motion: 'sand' | 'banners' | 'stone' | 'wind' | 'oil' | 'water'
+  palette: { ink: string; glow: string }
+  backdrop: ColiseumChampion | null
+  champions: ColiseumChampion[]
+  facts: ColiseumFact[]
+}
+
+export interface Coliseum {
+  arenas: ColiseumArena[]
+  /** Whether a card pool answered at all. */
+  pool: boolean
+  /** Names the pool could not resolve, dropped rather than guessed. */
+  dropped: number
+}
+
 export const api = {
   health: () => get<Health>('/api/health'),
+  // The coliseum's six arenas, their champions and the facts they rotate
+  // while a Forge match warms up. Checked-in prose with every card name
+  // resolved through the pool; answers before any match is asked for,
+  // because the arena has to be on screen while the worker is still waking.
+  coliseum: () => get<Coliseum>('/api/coliseum'),
   // Every deck this caller may see, across every owner (ADR 22) — their own
   // first, then the showcase, then everybody else's shared decks. The only
   // place a client learns the owner segment it needs to build any other deck
