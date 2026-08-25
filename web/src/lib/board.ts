@@ -8,13 +8,20 @@
  * drawable until the deltas up to a moment have been applied. This applies
  * them.
  *
- * **It decides nothing.** Every judgement about the game — which zone a card
- * is in, whether a land row or a battlefield row, what happens when a card
- * leaves a zone it had already left, that the stack is not a zone at all and
- * the library is never sent — was made in Go, against a recorded match, and is
- * argued in `go/internal/sim/tier3/board.go`. What is left here is arithmetic:
- * take the deltas, put the cards where they say. A browser that had to know
- * any Magic to draw this would be a second place for those rulings to drift.
+ * **It decides no Magic.** Every judgement about the *game* was made in Go,
+ * against a recorded match, and is argued in
+ * `go/internal/sim/tier3/board.go`: which zone a card is in, what happens when
+ * a card leaves a zone it had already left, that the stack is not a zone at
+ * all, that the library is never sent, and that a token leaving the
+ * battlefield ceases to exist rather than piling up in a graveyard.
+ *
+ * What is decided here is **furniture**: given the zone, which *row* of the
+ * battlefield a permanent stands in (`rowFor`). That is a layout convention
+ * rather than a rule — it is where a player puts their own cards, and it
+ * changes when Aaron says it should. The card facts it needs are still Go's:
+ * `types` and `mana` arrive answered, so nothing in this file reads rules text
+ * or decides what a card does. A browser that had to know any Magic to draw
+ * this would be a second place for those rulings to drift.
  *
  * Folded from the start on every call rather than kept incrementally. A game
  * is about a hundred and forty steps holding three hundred changes between
@@ -45,6 +52,9 @@ export interface BoardCard {
   zone: string
   seat: number
   tapped: boolean
+  /** Whether this card makes mana, from Scryfall's `produced_mana` by way of
+   *  Go. A card fact rather than a layout rule — see `rowFor`. */
+  mana: boolean
   power: number | null
   toughness: number | null
   counters: { kind: string; n: number }[]
@@ -60,18 +70,60 @@ export interface BoardCard {
 }
 
 /**
+ * Which row a permanent belongs in, once it is on the battlefield.
+ *
+ * **This is how a player lays out their own side of a table**, and it was one
+ * undifferentiated "permanents" row holding four unrelated kinds of card
+ * (Aaron, 2026-08-25: *"normally in Magic I would put artifacts, and
+ * enchantments, in their own special zones to stay organized"*). Sorting by
+ * type is not tidiness for its own sake — it is how you find the thing you are
+ * looking for without reading forty cards, and it is the layout every player
+ * already has in their hands.
+ *
+ * Four calls worth stating:
+ *
+ * - **Creatures first, always.** A card that is a creature is in the fight,
+ *   whatever else it also is — a crewed Vehicle, an animated Sage, a
+ *   Planeswalker that got Gideon'd. The front line is decided by what can be
+ *   blocked, not by what is printed first on the type line.
+ * - **Mana rocks stand with the lands** (*"mana producing artifacts could
+ *   really stay back with the lands"*), because those two rows together answer
+ *   one question — what can this deck pay for — and a Sol Ring answers it the
+ *   same way a Forest does. `mana` comes from Scryfall's `produced_mana`
+ *   through Go, so nothing here reads rules text.
+ * - **Battles sit with enchantments** (*"battles usually stay with
+ *   enchantments basically"*). They are neither, strictly, and there are
+ *   rarely more than one; a row of their own would be an empty row all game.
+ * - **Everything else keeps a row**, which today is planeswalkers and whatever
+ *   a future set invents. It draws only when it holds something.
+ */
+export type Row = 'creatures' | 'walkers' | 'artifacts' | 'enchantments'
+  | 'land'
+
+export function rowFor(card: BoardCard): Row {
+  const types = card.types
+  if (types.includes('Creature')) return 'creatures'
+  if (types.includes('Artifact')) return card.mana ? 'land' : 'artifacts'
+  if (types.includes('Enchantment') || types.includes('Battle')) {
+    return 'enchantments'
+  }
+  return 'walkers'
+}
+
+/**
  * One side of the table, in the rows a Magic board actually has.
  *
- * **The battlefield is two rows, not one**, and which row a permanent sits in
- * is the oldest layout convention the game has: creatures stand at the front,
- * where combat happens, and everything else sits behind them. Every digital
- * client does it and so does every kitchen table — you put your blockers where
- * you can see what they are facing. Lands go furthest from the middle because
- * they are the row you touch and nobody else does.
+ * **Which row a permanent sits in is the oldest layout convention the game
+ * has**: creatures stand at the front, where combat happens, and everything
+ * else sits behind them sorted by what it is. Every digital client does it and
+ * so does every kitchen table — you put your blockers where you can see what
+ * they are facing. Lands go furthest from the middle because they are the row
+ * you touch and nobody else does.
  *
  * So a side reads, from the middle of the table outward:
- * **creatures · permanents · lands · hand** — and the two players' creature
- * rows end up adjacent across the seam, which is where the game is.
+ * **creatures · planeswalkers · artifacts · enchantments · lands · hand** —
+ * and the two players' creature rows end up adjacent across the seam, which is
+ * where the game is. `rowFor` above argues the sorting.
  */
 export interface BoardSide {
   seat: number
@@ -80,9 +132,14 @@ export interface BoardSide {
   life: number
   /** The front line. */
   creatures: BoardCard[]
-  /** Artifacts, enchantments, planeswalkers, battles — everything on the
-   *  battlefield that is not a creature and not a land. */
-  permanents: BoardCard[]
+  /** Planeswalkers, and anything a future set invents that is none of the
+   *  below. Drawn only when it holds something. */
+  walkers: BoardCard[]
+  /** Artifacts that are not making mana — equipment, vehicles, the rest. */
+  artifacts: BoardCard[]
+  /** Enchantments, and battles alongside them. */
+  enchantments: BoardCard[]
+  /** Lands, and the mana rocks that stand with them. */
   land: BoardCard[]
   hand: BoardCard[]
   graveyard: BoardCard[]
@@ -117,8 +174,8 @@ export interface BoardState {
 function emptySide(seat: ForgeBoardSeat): BoardSide {
   return {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
-    creatures: [], permanents: [], land: [], hand: [], graveyard: [],
-    exile: [], command: [], commanders: [],
+    creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
+    hand: [], graveyard: [], exile: [], command: [], commanders: [],
   }
 }
 
@@ -171,6 +228,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           art: known?.art ?? '',
           artist: known?.artist ?? '',
           zone: 'gone', seat: known?.seat ?? 0, tapped: false,
+          mana: known?.mana ?? false,
           power: null, toughness: null, counters: [], casts: 0,
         }
         state.set(change.id, card)
@@ -210,11 +268,10 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     // A zone the browser does not draw — `gone`, or a word a newer server
     // learned — simply takes the card off the table rather than throwing.
     if (card.zone === 'battlefield') {
-      // The front line, or behind it. An animated land is on the battlefield
-      // *and* a creature, and it belongs at the front with the things that
-      // can be blocked.
-      const row = card.types.includes('Creature') ? 'creatures' : 'permanents'
-      side[row].push(card)
+      // Sorted the way a player sorts their own side of a table. `rowFor`
+      // argues every call in it; a mana rock answers 'land' from here, which
+      // is why this runs before the zone check below rather than after.
+      side[rowFor(card)].push(card)
       continue
     }
     const into = (ZONES as readonly string[]).includes(card.zone)

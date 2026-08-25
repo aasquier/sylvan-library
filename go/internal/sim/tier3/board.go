@@ -249,6 +249,15 @@ func (b *board) name(id int, card, types string, token bool, seat int) {
 	b.types[id] = types
 }
 
+// isToken is whether a card is a token, asked of the dictionary rather than of
+// the line — a `stats` or `counters` line carries the flag too, but a `zone`
+// line for a token Forge has already named does not have to, and the answer
+// must be the same either way.
+func (b *board) isToken(id int) bool {
+	at, seen := b.known[id]
+	return seen && b.cards[at].Token
+}
+
 // change is the pending change for a card, made on first touch this step.
 func (b *board) change(id int) *BoardChange {
 	if c, ok := b.changing[id]; ok {
@@ -312,6 +321,27 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		b.zone[id] = ZoneGone
 		b.change(id).Zone = ZoneGone
 		return
+	}
+	// **A token that leaves the battlefield ceases to exist.** Rule 111.7 and
+	// rule 704.5d, together: a token that would change zones does move — a
+	// dying token really is put into its owner's graveyard, which is why its
+	// death triggers and why the `dies` beat above is right to fire — and then
+	// a state-based action removes it from the game. It cannot move again.
+	//
+	// So it is never *in* a graveyard by the time anybody looks, and a board
+	// that piles tokens up in one is drawing a zone Magic does not have (Aaron,
+	// 2026-08-25: "they don't go to the graveyard, they go to the ether"). A
+	// deck like Trostani's ends a long game with thirty Saprolings in a
+	// graveyard that should hold none of them, burying the real cards under
+	// them.
+	//
+	// **Here rather than in the browser**, and only on the arrival: the beat is
+	// raised in `scribe.go` from the line, not from this, so silencing the zone
+	// costs nothing the account says. The `out` above is untouched because the
+	// zone being *left* is a real one — the battlefield — and rewriting it
+	// would break the match that clears it.
+	if b.isToken(id) && zone != ZoneBattlefield && zone != ZoneLand {
+		zone = ZoneGone
 	}
 	if b.zone[id] == zone && (seat == 0 || b.seat[id] == seat) {
 		return

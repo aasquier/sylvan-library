@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -57,6 +58,43 @@ func (r *CardRecord) HasColor(code string) bool {
 func (r *CardRecord) FrontTypeLine() string {
 	front, _, _ := strings.Cut(r.TypeLine, " // ")
 	return front
+}
+
+var (
+	// reminderText is anything in parentheses, which in Magic is always
+	// reminder text and never a rule.
+	reminderText = regexp.MustCompile(`\([^)]*\)`)
+	// manaAbility is a mana ability written in a card's own rules text. "Add"
+	// is the game's one verb for producing mana and is used for nothing else
+	// — counters are "put", cards are "draw" — so the word plus what it is
+	// adding is the whole test.
+	manaAbility = regexp.MustCompile(
+		`(?i)\badd\b\s*(\{|one mana|two mana|three mana|X mana|mana of|an amount)`)
+)
+
+// MakesMana is whether the card taps for mana **itself**.
+//
+// **Not `len(ProducedMana) > 0`, and the difference is not academic.**
+// Scryfall's `produced_mana` counts mana produced by *tokens the card makes*,
+// read out of the token's reminder text. So Nuka-Cola Vending Machine reports
+// five colours: it creates Food, sacrificing a Food creates a Treasure, and a
+// Treasure's reminder text says "Add one mana of any color". It is a Food
+// engine that has never made a mana in its life. Smothering Tithe reports five
+// for the same reason.
+//
+// That was found by looking at a real board — the Vending Machine standing in
+// the land row next to the Swamps, which is a claim about the deck's mana that
+// its card does not make.
+//
+// So the test is the card's own rules text with reminder text stripped, with
+// `produced_mana` kept as the cheap first pass: a card that produces no mana by
+// any reading cannot produce mana by this one.
+func (r *CardRecord) MakesMana() bool {
+	if len(r.ProducedMana) == 0 {
+		return false
+	}
+	return manaAbility.MatchString(
+		reminderText.ReplaceAllString(r.OracleText, " "))
 }
 
 // IsCreature reads the front face, matching `power`.

@@ -81,14 +81,24 @@ it('gives each hand its own place, on its own side of the seam', () => {
   expect(container.querySelector('.field-hands'),
     'there is no shared rail left to fall back to').toBeNull()
 
-  // And the sand still carries neither. A seat's rows are lands, the
-  // artifacts-and-enchantments row and creatures — three, not four.
+  // And the sand still carries neither hand. A seat's rows are the five a
+  // player sorts a table into — lands and mana, enchantments, artifacts,
+  // planeswalkers, creatures — and the ones holding nothing are not drawn at
+  // all, so this fixture (a Lion and a Forest) shows exactly two. That is the
+  // property: no row is a hand, and no row is invented.
+  const known = ['Lands and mana', 'Enchantments', 'Artifacts',
+    'Planeswalkers', 'Creatures']
   for (const side of container.querySelectorAll('.field-side')) {
     const labels = [...side.querySelectorAll('.field-row')]
-      .map((r) => r.getAttribute('aria-label') ?? '')
+      .map((r) => (r.getAttribute('aria-label') ?? '').replace(/: \d+$/, ''))
     expect(labels.some((l) => l.startsWith('Hand')),
       'a hand is not a row on the battlefield').toBe(false)
-    expect(labels).toHaveLength(3)
+    expect(labels.every((l) => known.includes(l)),
+      `every row is one of the five: ${labels}`).toBe(true)
+    expect(labels).toContain('Creatures')
+    expect(labels).toContain('Lands and mana')
+    expect(labels, 'a row with nothing in it is not drawn')
+      .not.toContain('Planeswalkers')
   }
 
   // The card that went to hand is drawn in its owner's hand, and counted.
