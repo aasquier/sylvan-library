@@ -87,9 +87,12 @@ function Stage({ arena }: { arena: ColiseumArena }) {
         '--arena-glow': arena.palette.glow,
       } as React.CSSProperties}
     >
-      {arena.backdrop?.art_crop
-        ? <img className="arena-art" src={arena.backdrop.art_crop}
-               alt={`${arena.name} — art from ${arena.backdrop.name}`}
+      {/* The named printing, never the pool's default — see `ArenaArt`. The
+          pool still answers for the card's *facts*; it just does not get to
+          choose the painting. */}
+      {arena.art.url
+        ? <img className="arena-art" src={arena.art.url}
+               alt={`${arena.name} — ${arena.art.printing} art by ${arena.art.artist}`}
                loading="lazy" />
         : <div className="arena-art-missing" role="img"
                aria-label={`${arena.name}, without its painting`} />}
@@ -167,26 +170,35 @@ export default function ColiseumRoom() {
         <>
           {/* Places rather than actions, so `.strip-tab` rather than `.btn`
               (commandment 17). */}
-          <nav aria-label="Arenas" className="mt-6 flex flex-wrap gap-1.5">
+          {/* Places rather than actions, so `.strip-tab` rather than `.btn`
+              (commandment 17). The class carries colour and transition only —
+              the border, padding and the `is-active` ink come from here, which
+              is the shape `Library` and `DeckDetail` already use. */}
+          <div role="tablist" aria-label="Arenas"
+               className="mt-6 flex flex-wrap border-b"
+               style={{ borderColor: 'var(--hairline)' }}>
             {data.arenas.map((a, i) => (
               <button
                 key={a.key}
-                type="button"
-                className="strip-tab"
-                aria-current={i === chosen ? 'true' : undefined}
+                role="tab"
+                aria-selected={i === chosen}
                 onClick={() => setChosen(i)}
+                className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${
+                  i === chosen ? ' is-active' : ''}`}
               >
                 {a.name}
               </button>
             ))}
-          </nav>
+          </div>
 
           <div className="mt-4 grid gap-6 lg:grid-cols-[1.15fr_1fr]">
             <div>
               <Stage arena={arena} />
+              {/* Somebody painted this. Name them. */}
               <p className="mt-2 text-[0.75rem] text-[var(--muted)]">
                 {arena.plane}
-                {arena.backdrop && <> · {arena.backdrop.name}</>}
+                {arena.backdrop && <> · <em>{arena.backdrop.name}</em></>}
+                {' · '}{arena.art.printing}, art by {arena.art.artist}
               </p>
             </div>
 

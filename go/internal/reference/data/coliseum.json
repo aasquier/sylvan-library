@@ -1,11 +1,16 @@
 {
-  "note": "The coliseum's arenas, their champions and the facts they rotate. Checked-in prose (CLAUDE.md): edited here, never generated. Every `card` and `champions` entry is a card name resolved through the pool at serve time; a name the pool cannot resolve is dropped and counted, never guessed.",
+  "note": "The coliseum's arenas, their champions and the facts they rotate. Checked-in prose (CLAUDE.md): edited here, never generated. Every `card` and `champions` entry is a card name resolved through the pool at serve time; a name the pool cannot resolve is dropped and counted, never guessed. The backdrop is a **named printing** rather than whatever the pool holds: the pool returns the newest, which put Teenage Mutant Ninja Turtles art on the Grand Coliseum and Marvel art on Valor's Reach. A painting is chosen, credited, and hotlinked — never guessed at.",
   "arenas": [
     {
       "key": "grand-coliseum",
       "name": "The Grand Coliseum",
       "card": "Grand Coliseum",
       "plane": "Otaria",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/c/2/c2dc8061-a855-4a81-9eb7-350b355a9b3f.jpg?1783945028",
+        "artist": "Carl Critchlow",
+        "printing": "Onslaught"
+      },
       "motion": "sand",
       "palette": {
         "ink": "#f3e2bd",
@@ -108,6 +113,11 @@
       "name": "Valor's Reach",
       "card": "Luxury Suite",
       "plane": "Kylem",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/8/1/81298b0b-9d47-4777-998e-0c17821ef536.jpg?1783934848",
+        "artist": "Jonas De Ro",
+        "printing": "Battlebond"
+      },
       "motion": "banners",
       "palette": {
         "ink": "#ffe9b8",
@@ -195,6 +205,11 @@
       "name": "The Arena of the Ancients",
       "card": "Arena of the Ancients",
       "plane": "Dominaria",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/6/8/68ebdcc2-4449-4b10-82fb-51f5e14eab37.jpg?1783942193",
+        "artist": "Tom Wänerstrand",
+        "printing": "Masters Edition III"
+      },
       "motion": "stone",
       "palette": {
         "ink": "#dfe7e3",
@@ -284,6 +299,11 @@
       "name": "The Ancient Amphitheater",
       "card": "Ancient Amphitheater",
       "plane": "Lorwyn",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/2/f/2ff3a82d-e794-4c3b-994d-b28b8eb7eac4.jpg?1783942848",
+        "artist": "Rob Alexander",
+        "printing": "Lorwyn"
+      },
       "motion": "wind",
       "palette": {
         "ink": "#fdf0d5",
@@ -371,6 +391,11 @@
       "name": "The Phyrexian Arena",
       "card": "Phyrexian Arena",
       "plane": "New Phyrexia",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/8/4/84e19975-e3e1-453b-b902-a1b1fc1d8504.jpg?1783945347",
+        "artist": "Pete Venters",
+        "printing": "Apocalypse"
+      },
       "motion": "oil",
       "palette": {
         "ink": "#f0d6d6",
@@ -463,6 +488,11 @@
       "name": "The Cephalid Coliseum",
       "card": "Cephalid Coliseum",
       "plane": "Otaria",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/d/5/d5d74112-7244-4c3f-a5eb-b6be671aefe8.jpg?1783945199",
+        "artist": "John Avon",
+        "printing": "Odyssey"
+      },
       "motion": "water",
       "palette": {
         "ink": "#d9f2ff",

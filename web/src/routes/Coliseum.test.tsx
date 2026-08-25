@@ -42,6 +42,8 @@ function champion(name: string, role: string): ColiseumChampion {
 function arena(over: Partial<ColiseumArena> & { key: string; name: string }): ColiseumArena {
   return {
     plane: 'Otaria', motion: 'sand',
+    art: { url: 'https://cards.scryfall.io/art_crop/arena.jpg',
+           artist: 'Carl Critchlow', printing: 'Onslaught' },
     palette: { ink: '#f3e2bd', glow: '#b5762c' },
     backdrop: champion(`${over.name} backdrop`, ''),
     champions: [champion('Jareth, Leonine Titan', 'Fights behind the shield alone.')],
@@ -103,6 +105,7 @@ describe('the Coliseum', () => {
       pool: false,
       arenas: [arena({
         key: 'a', name: 'A', backdrop: null, champions: [],
+        art: { url: '', artist: '', printing: '' },
         facts: [{ kind: 'coliseum', rome: 'Eighty numbered arches.' }],
       })],
     }))
@@ -133,7 +136,7 @@ describe('the Coliseum', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await screen.findByText('Second of the Coliseum.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'The Cephalid Coliseum' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'The Cephalid Coliseum' }))
     // Not "slide 2 of an arena that has one slide", and not a blank.
     await screen.findByText('First of the drowned one.')
   })
@@ -163,6 +166,28 @@ describe('the Coliseum', () => {
     await screen.findByText('Kamahl, Pit Fighter')
     // A dropped name is absent, never drawn from the name alone.
     expect(screen.queryByText('Jareth, Leonine Titan')).toBeNull()
+  })
+
+  it('shows the named printing and credits its painter', async () => {
+    // The pool answers a card name with its *newest* printing, which put
+    // Ninja Turtles art on the Grand Coliseum. The arena carries a chosen
+    // painting instead, and the painter is named on the page.
+    vi.mocked(api.coliseum).mockResolvedValue(room({
+      arenas: [arena({ key: 'a', name: 'A',
+        art: { url: 'https://cards.scryfall.io/art_crop/chosen.jpg',
+               artist: 'Carl Critchlow', printing: 'Onslaught' } })],
+    }))
+    const { container } = show()
+    await screen.findByText(/Carl Critchlow/)
+    const art = container.querySelector('img.arena-art')
+    expect(art?.getAttribute('src')).toContain('chosen.jpg')
+    // Scoped to the stage's own caption: the masthead credit names Onslaught
+    // too, and a bare query cannot tell the room's nameplate from the arena
+    // standing in front of you.
+    const stage = container.querySelector('.arena-stage')?.parentElement
+    expect(stage).toBeTruthy()
+    expect(within(stage as HTMLElement).getByText(/Onslaught/)).toBeTruthy()
+    expect(within(stage as HTMLElement).getByText(/Carl Critchlow/)).toBeTruthy()
   })
 
   it('says so when the doors do not answer', async () => {

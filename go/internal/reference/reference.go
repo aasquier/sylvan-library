@@ -122,6 +122,21 @@ var FactKinds = map[string]bool{
 	"magic": true, "paired": true,
 }
 
+// ArenaArt is the painting an arena is shown as, chosen rather than looked up.
+//
+// **A named printing, deliberately.** The pool answers a card name with its
+// *newest* printing, and for these six that meant Teenage Mutant Ninja Turtles
+// art on the Grand Coliseum and Marvel art on Valor's Reach — crossover
+// paintings on a room that is an homage to Magic's own arenas. Naming the
+// printing here is the same rule `PageMasthead` follows for every other page's
+// art, and it is what lets the painter be credited: this is somebody's
+// painting, and it is hotlinked rather than committed (rule 5, ADR 6).
+type ArenaArt struct {
+	URL      string `json:"url"`
+	Artist   string `json:"artist"`
+	Printing string `json:"printing"`
+}
+
 // Arena is one of the coliseum's six houses: a card whose art is the backdrop,
 // the champions who fight there, and the facts it rotates while a match warms
 // up.
@@ -134,6 +149,7 @@ type Arena struct {
 	Name      string         `json:"name"`
 	Card      string         `json:"card"`
 	Plane     string         `json:"plane"`
+	Art       ArenaArt       `json:"art"`
 	Motion    string         `json:"motion"`
 	Palette   Palette        `json:"palette"`
 	Champions []Champion     `json:"champions"`

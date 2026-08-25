@@ -29,6 +29,7 @@ func (a *API) coliseum(w http.ResponseWriter, r *http.Request) {
 		Key       string                   `json:"key"`
 		Name      string                   `json:"name"`
 		Plane     string                   `json:"plane"`
+		Art       reference.ArenaArt       `json:"art"`
 		Motion    string                   `json:"motion"`
 		Palette   reference.Palette        `json:"palette"`
 		Backdrop  *proseCard               `json:"backdrop"`
@@ -46,7 +47,8 @@ func (a *API) coliseum(w http.ResponseWriter, r *http.Request) {
 	for i := range source {
 		src := &source[i]
 		out.Arenas = append(out.Arenas, arena{
-			Key: src.Key, Name: src.Name, Plane: src.Plane, Motion: src.Motion,
+			Key: src.Key, Name: src.Name, Plane: src.Plane, Art: src.Art,
+			Motion:  src.Motion,
 			Palette: src.Palette, Champions: []champion{}, Facts: src.Facts})
 	}
 

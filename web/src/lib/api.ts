@@ -2020,10 +2020,21 @@ export interface ColiseumChampion {
  *  `backdrop` is null when the pool has not been seeded — the prose still
  *  answers whole and the arena renders on its palette alone, which is a
  *  legible state rather than an error. */
+/** The painting an arena is shown as — a **named printing**, not whatever the
+ *  pool holds. The pool answers with a card's newest printing, which for these
+ *  six meant Ninja Turtles art on the Grand Coliseum and Marvel art on Valor's
+ *  Reach. Chosen, credited, and hotlinked. */
+export interface ArenaArt {
+  url: string
+  artist: string
+  printing: string
+}
+
 export interface ColiseumArena {
   key: string
   name: string
   plane: string
+  art: ArenaArt
   motion: 'sand' | 'banners' | 'stone' | 'wind' | 'oil' | 'water'
   palette: { ink: string; glow: string }
   backdrop: ColiseumChampion | null
