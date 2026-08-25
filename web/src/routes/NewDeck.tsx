@@ -457,7 +457,7 @@ export default function NewDeck() {
               <ul className="mt-2 max-w-lg space-y-1">
                 {nameHits.map((card) => (
                   <li key={card.name}>
-                    <CardHover card={card} className="block">
+                    <CardHover tapOpens={false} card={card} className="block">
                     <button
                       onClick={() => {
                         // Straight past the colour step entirely: the
@@ -666,7 +666,7 @@ export default function NewDeck() {
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {currentLeaders.map((card) => (
-                      <CardHover key={card.name} card={card}>
+                      <CardHover tapOpens={false} key={card.name} card={card}>
                         <button
                           onClick={() => {
                             // Straight to the name step: picking a face of the
@@ -759,7 +759,7 @@ export default function NewDeck() {
               costs, what it does, or whether it is the one you meant. */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {commanders?.map((card) => (
-              <CardHover key={card.name} card={card} className="block">
+              <CardHover tapOpens={false} key={card.name} card={card} className="block">
                 <button onClick={() => pickCommander(card)}
                         className="card-surface block w-full overflow-hidden rounded-xl text-left transition hover:opacity-90">
                   {card.art_crop && (

@@ -507,7 +507,7 @@ function CommanderTile({ card, onPick }: {
   onPick: () => void
 }) {
   return (
-    <CardHover card={card} className="block">
+    <CardHover tapOpens={false} card={card} className="block">
       <button onClick={onPick}
               className="card-surface block w-full overflow-hidden rounded-xl text-left transition hover:opacity-90">
         {card.art_crop && (

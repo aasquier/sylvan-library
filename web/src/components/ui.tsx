@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText, symbolName } from '../lib/mtg'
 import { ManaGlyph, OfficialSymbol } from './manasymbol'
 import { hasGlyph } from '../lib/managlyphs'
@@ -594,21 +595,50 @@ export function CardArt({
 }
 
 /**
- * Full card image on hover, positioned near the cursor.
+ * Full card image on hover, positioned near the cursor — and on a tap,
+ * centred, for the half of the audience that has no cursor at all.
  *
  * `className` is for callers whose child is a block — a grid tile or a
  * full-width row. The wrapper is a `span` and therefore inline by default,
  * which silently collapses a `w-full` child to its content width; passing
  * `block` (or `contents`) is how a tile keeps its own layout.
+ *
+ * **The tap path, and why it is not the hover path.** This was
+ * `onMouseEnter` and nothing else, which meant that on a phone the card
+ * behind a 96x64 crop was simply unreachable — in twenty-three places,
+ * including card search, the deck page and the reading room. A hover-only
+ * mechanism locks out every touch user, and here it was the *only* way to
+ * answer "what is this card", which is the question a newcomer has most
+ * (commandment 2).
+ *
+ * A tap does not get the cursor treatment. There is no cursor to sit beside,
+ * a finger covers the point it would sit at, and near either edge the card
+ * would clip. So touch gets a centred sheet over a dimmed room — the same
+ * card, bigger, dismissed by tapping anywhere or pressing Escape.
+ *
+ * **`tapOpens` exists because four of the twenty-three wrap a real button** —
+ * the commander picker on the create flow, and the reading room's own tiles.
+ * There a tap already means *choose this*, and stealing it would break the
+ * newcomer's most important decision to show them a picture they did not ask
+ * for. Those four pass `false`; everywhere the tile is inert, the tile
+ * answers.
  */
 export function CardHover({
-  card, children, className = '',
+  card, children, className = '', tapOpens = true,
 }: {
   card: { name: string; image?: string | null }
   children: React.ReactNode
   className?: string
+  /** False where the child is itself a control and the tap is already spoken
+   *  for. See the note above. */
+  tapOpens?: boolean
 }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const [held, setHeld] = useState(false)
+  // Which kind of hand last touched this. Touch browsers fire mouseenter and
+  // mousemove *synthetically* after a tap, so without this a tap would open
+  // the sheet and then immediately arm the cursor preview behind it.
+  const coarse = useRef(false)
   const ref = useRef<HTMLSpanElement>(null)
 
   // The scroll listener exists to clear a preview the wheel scrolled out from
@@ -625,15 +655,40 @@ export function CardHover({
     return () => window.removeEventListener('scroll', clear, true)
   }, [showing])
 
+  // Escape closes the sheet, the way it closes every other held thing here.
+  useEffect(() => {
+    if (!held) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setHeld(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [held])
+
   return (
     <span
       ref={ref}
       className={className}
-      onMouseEnter={(e) => card.image && setPos({ x: e.clientX, y: e.clientY })}
-      onMouseMove={(e) => card.image && setPos({ x: e.clientX, y: e.clientY })}
+      onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
+      onPointerUp={(e) => {
+        if (e.pointerType === 'mouse' || !tapOpens || !card.image) return
+        setPos(null)
+        setHeld(true)
+      }}
+      onMouseEnter={(e) => !coarse.current && card.image
+        && setPos({ x: e.clientX, y: e.clientY })}
+      onMouseMove={(e) => !coarse.current && card.image
+        && setPos({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => setPos(null)}
     >
       {children}
+      {held && card.image && createPortal(
+        // Portalled to the body: a `position: fixed` sheet rendered inside the
+        // tile would be trapped by any ancestor carrying a transform, and this
+        // component is used inside several that do.
+        <span role="dialog" aria-modal="true" aria-label={card.name}
+              className="card-sheet" onClick={() => setHeld(false)}>
+          <img src={card.image} alt={card.name} className="card-sheet-art" />
+        </span>,
+        document.body)}
       {pos && card.image && (
         <span
           className="pointer-events-none fixed z-50 block"
