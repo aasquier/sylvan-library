@@ -87,6 +87,41 @@ RUN printf 'userDir=/opt/forge-profile\ncacheDir=/opt/forge-profile/cache\ncardP
       > /opt/forge/forge.profile.properties \
  && mkdir -p /opt/forge-profile/decks/commander /opt/forge-profile/cache
 
+# ------------------------------------------------------------------- scribe
+
+# The scribe (ADR 42): a listener on Forge's game event bus, compiled against
+# the very jar this image ships.
+#
+# **Its own stage, because the runtime has a JRE and no compiler** — and a JDK
+# is a few hundred megabytes nobody should carry around to play Magic. What
+# ships is the class files, which are a couple of hundred kilobytes.
+#
+# **Compiled here rather than committed, and against *this* Forge rather than
+# any Forge.** That is the point: a `FORGE_URL` bump that changed an event's
+# shape becomes a failed build instead of a listener that quietly stops
+# hearing something. It is also the only gate this code has in CI, since the
+# parity test needs a JVM and minutes of wall clock and therefore cannot run
+# there.
+#
+# Only the jar is copied in, not the whole 470MB distribution: this stage
+# needs something to compile against and nothing to play with.
+#
+# GPL-3.0, and the licence boundary is a process boundary — nothing Go links
+# these classes, the shim runs them as a subprocess. See scribe/README.md.
+FROM debian:trixie-slim AS scribe
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-21-jdk-headless \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=fetch /opt/forge/forge-gui-desktop-*.jar /jars/
+COPY scribe/src /scribe/src
+
+RUN set -eu \
+ && jar="$(ls /jars/forge-gui-desktop-*.jar)" \
+ && javac -Xlint:all -cp "$jar" -d /scribe/out /scribe/src/scribe/*.java \
+ && echo "scribe: built against $jar"
+
 # ------------------------------------------------------------------ builder
 
 FROM golang:1.26-trixie AS builder
@@ -171,6 +206,13 @@ RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin mtglab
 COPY --from=builder /out/mtglab /usr/local/bin/mtglab
 COPY --from=fetch --chown=10001:10001 /opt/forge /opt/forge
 COPY --from=fetch --chown=10001:10001 /opt/forge-profile /opt/forge-profile
+# The scribe's classes ride along at a fixed path, and **no environment
+# variable points at them yet** — nothing reads one. `configrecord_test.go`
+# holds `.env.example` equal to the names shipping code actually reads, in
+# both directions, and a variable declared here for a reader that does not
+# exist is the exact drift that gate was written for. The wiring adds the
+# name to both files at once, or to neither.
+COPY --from=scribe --chown=10001:10001 /scribe/out /opt/scribe
 
 ENV MTGLAB_FORGE_HOME=/opt/forge \
     MTGLAB_FORGE_PROFILE=/opt/forge-profile
