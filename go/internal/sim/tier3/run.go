@@ -362,26 +362,53 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 		return nil, err
 	}
 
-	argv := []string{
-		java, fmt.Sprintf("-Xmx%dm", opt.Memory),
-		"-Dio.netty.tryReflectionSetAccessible=true", "-Dfile.encoding=UTF-8",
-		"-jar", jar,
-		"sim", "-d",
-	}
-	argv = append(argv, names...)
-	argv = append(argv, "-f", "Commander",
-		"-n", strconv.Itoa(opt.Games), "-c", strconv.Itoa(opt.Clock))
-	// `-q` is Forge's own flag for "the game result, not the entire game
-	// log", read off its `sim -h`. Narrating is its absence rather than a
-	// flag of its own.
-	if !opt.Narrate {
-		argv = append(argv, "-q")
-	}
-	if opt.Seed != nil {
-		argv = append(argv, "-s", opt.Seed.String())
+	// **Two programs, one contract.** The scribe plays the match through
+	// Forge's own code with a listener on the game's event bus and prints
+	// typed JSON; `sim` plays it and prints prose. Everything below this line
+	// — the trustworthiness checks, the callbacks, the run that comes back —
+	// is identical, which is ADR 42's fifth decision: the board is a renderer,
+	// not a second pipeline.
+	//
+	// The choice is the presence of the classes, never a flag. A worker image
+	// built before the scribe existed, or one whose build stage failed, plays
+	// the match through `sim` and narrates from the log — a room with no board
+	// in it rather than a match that will not start.
+	var argv []string
+	var read telling
+	base := []string{java, fmt.Sprintf("-Xmx%dm", opt.Memory),
+		"-Dio.netty.tryReflectionSetAccessible=true", "-Dfile.encoding=UTF-8"}
+	if s.Scribed() {
+		// Positional and dumb, because this is the only place that builds it:
+		//   scribe.Main <clock> <games> <seed|-> <deck.dck> ...
+		seed := "-"
+		if opt.Seed != nil {
+			seed = opt.Seed.String()
+		}
+		argv = append(base,
+			"-cp", jar+string(os.PathListSeparator)+s.ScribeClasses,
+			"scribe.Main", strconv.Itoa(opt.Clock), strconv.Itoa(opt.Games), seed)
+		for _, name := range names {
+			argv = append(argv, filepath.Join(deckDir, name))
+		}
+		read = NewScribeParser(opt.Narrate)
+	} else {
+		argv = append(base, "-jar", jar, "sim", "-d")
+		argv = append(argv, names...)
+		argv = append(argv, "-f", "Commander",
+			"-n", strconv.Itoa(opt.Games), "-c", strconv.Itoa(opt.Clock))
+		// `-q` is Forge's own flag for "the game result, not the entire game
+		// log", read off its `sim -h`. Narrating is its absence rather than a
+		// flag of its own.
+		if !opt.Narrate {
+			argv = append(argv, "-q")
+		}
+		if opt.Seed != nil {
+			argv = append(argv, "-s", opt.Seed.String())
+		}
+		read = newProseTelling(opt.Narrate)
 	}
 
-	run, err := spawn(argv, home, opt)
+	run, err := spawn(argv, home, opt, read)
 	if err != nil {
 		return nil, err
 	}
@@ -412,6 +439,50 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 	return &run.SimRun, nil
 }
 
+// telling is whatever is reading the subprocess's output.
+//
+// Two of them, and they are interchangeable by construction rather than by
+// convention: [ScribeParser] over the scribe's typed JSON, and [proseTelling]
+// over Forge's own game log. [spawn] holds one and knows which it is only by
+// what it was handed — so the tick, the tally, the trustworthiness check and
+// the beats are one code path whichever program played the match.
+type telling interface {
+	// Feed takes one line and reports the beats and the row it completed.
+	// Beats first, because that is the order one pass produces them in and
+	// every consumer downstream relies on it.
+	Feed(line string) (*EventLog, *GameResult)
+	// Output is the tally, valid once the stream has ended.
+	Output() SimOutput
+}
+
+// proseTelling reads Forge's own narration: the parser this package has always
+// had, behind the interface the scribe also satisfies.
+type proseTelling struct {
+	games  *StreamParser
+	events *EventParser
+}
+
+func newProseTelling(narrate bool) *proseTelling {
+	t := &proseTelling{games: NewStreamParser()}
+	if narrate {
+		t.events = NewEventParser()
+	}
+	return t
+}
+
+func (t *proseTelling) Feed(line string) (*EventLog, *GameResult) {
+	// Both readers, one pass. A game's beats and the row that closes it can
+	// never come from different passes and disagree — the property
+	// [StreamParser] was folded into one machine for in the first place.
+	var log *EventLog
+	if t.events != nil {
+		log = t.events.Feed(line)
+	}
+	return log, t.games.Feed(line)
+}
+
+func (t *proseTelling) Output() SimOutput { return t.games.Output }
+
 // spawn is the subprocess half, split out so [RunGames] reads as the contract
 // it enforces rather than as process management.
 type spawned struct {
@@ -419,7 +490,7 @@ type spawned struct {
 	tail []string
 }
 
-func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
+func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, error) {
 	// Forge writes the card-database complaints to stderr and the results to
 	// stdout, but not reliably — the unsupported-card warning arrives on both.
 	// stderr is folded into stdout so one stream can be read live (the tick)
@@ -451,15 +522,6 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 		_ = cmd.Process.Kill()
 	})
 
-	parser := NewStreamParser()
-	// The second reader of the same pass. One read of the stream feeds both,
-	// so a game's beats and the row that closes it can never come from
-	// different passes and disagree — the property `StreamParser` was folded
-	// into one machine for in the first place.
-	var events *EventParser
-	if opt.Narrate {
-		events = NewEventParser()
-	}
 	var text []string
 	finished := 0
 	reader := bufio.NewReaderSize(stdout, 64*1024)
@@ -467,15 +529,14 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 		line, err := reader.ReadString('\n')
 		if line != "" {
 			text = append(text, strings.TrimRight(line, "\n"))
-			if events != nil {
-				if log := events.Feed(line); log != nil {
-					collected = append(collected, *log)
-					if opt.OnEvents != nil {
-						opt.OnEvents(*log)
-					}
+			log, game := read.Feed(line)
+			if log != nil {
+				collected = append(collected, *log)
+				if opt.OnEvents != nil {
+					opt.OnEvents(*log)
 				}
 			}
-			if game := parser.Feed(line); game != nil {
+			if game != nil {
 				finished++
 				if opt.OnGame != nil {
 					opt.OnGame(finished, *game)
@@ -506,7 +567,7 @@ func spawn(argv []string, home string, opt RunOptions) (*spawned, error) {
 	}
 
 	return &spawned{
-		SimRun: SimRun{Argv: argv, Output: parser.Output, WallSeconds: elapsed,
+		SimRun: SimRun{Argv: argv, Output: read.Output(), WallSeconds: elapsed,
 			Events: collected},
 		tail: text,
 	}, nil

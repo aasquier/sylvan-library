@@ -4,7 +4,11 @@
     {
       "name": "mtglab-ui",
       "runtimeExecutable": "./mtglab",
-      "runtimeArgs": ["ui", "--port", "8765"],
+      "runtimeArgs": [
+        "ui",
+        "--port",
+        "8765"
+      ],
       "port": 8765
     },
     {
@@ -35,6 +39,27 @@
       "port": 8768
     },
     {
+      "// mtglab-ui-scribe": [
+        "The API with the scribe wired in (ADR 42), which is what draws a",
+        "board in the Coliseum. `mtglab-ui` plays a match through Forge's",
+        "own `sim` and narrates from the log: an account and no",
+        "battlefield. This entry points MTGLAB_SCRIBE_CLASSES at the",
+        "checkout's compiled classes, so a local match reports zones,",
+        "tokens, counters and both hands.",
+        "",
+        "Run `scribe/build.sh <forge.jar>` first; without those classes",
+        "tier3.Settings.Scribed is false and this behaves exactly like",
+        "`mtglab-ui`, which is the degrade the worker image makes too."
+      ],
+      "name": "mtglab-ui-scribe",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "MTGLAB_SCRIBE_CLASSES=$(pwd)/scribe/out ./mtglab ui --port 8765"
+      ],
+      "port": 8765
+    },
+    {
       "// web-dev": [
         "Vite with HMR, for visual work. `vite.config.ts` proxies /api to",
         "127.0.0.1:8765, so `mtglab-ui` has to be running alongside it — this",
@@ -47,9 +72,11 @@
       ],
       "name": "web-dev",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-lc", "npm --prefix web run dev"],
+      "runtimeArgs": [
+        "-lc",
+        "npm --prefix web run dev"
+      ],
       "port": 5173
     }
   ]
 }
-

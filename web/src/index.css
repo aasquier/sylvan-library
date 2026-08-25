@@ -5839,3 +5839,424 @@ button:hover .tarot-fan-card {
   .coliseum-hero-art { animation: none; }
   .arena-slide { animation: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   The field: the Coliseum's board.
+   ─────────────────────────────────────────────────────────────────────────
+
+   Two Commander decks drawn on the floor of an arena. `components/board.tsx`
+   carries the layout argument; this is the material.
+
+   **The floor is sand, and the word is the point.** The Latin for sand is
+   *harena*, which is where "arena" comes from: the floor of the Colosseum
+   was sand, laid over the wooden deck to drink what was spilled on it. It is
+   also, by luck, the right surface for the job — warm, quiet, and low enough
+   in contrast to put forty pieces of card art on without the ground arguing
+   with any of them. Commandment 2 before commandment 6: a battlefield a
+   newcomer cannot read is not a battlefield.
+
+   **The rails are cut stone**, top and bottom, where a name and a life total
+   are carved. **The seam between the two seats is the hypogeum** — the
+   trench under the real arena where the lifts came up — and it is where the
+   turn is announced, because the middle of the table is where the game is.
+
+   Both themes, and they are the same room at two hours: light is the arena
+   under an open sky, dark is the same sand under torches. The floor is never
+   pale enough to fight a white card border in either.
+
+   The photograph the sand is made of is a public-domain plate of coarse
+   sand, committed through `animist` with its recipe and provenance beside
+   it (ADR 29) — `web/src/assets/coliseum/harena.recipe.yaml` argues the crop
+   and the licence. It is blended into the palette rather than laid on top of
+   it, so what it contributes is grain and what stays ours is the colour. */
+
+:root {
+  --field-sand: #b99a63;
+  --field-sand-deep: #8a6f42;
+  --field-sand-dark: #5c482a;
+  --field-stone: #cfc6b4;
+  --field-stone-deep: #9d9280;
+  --field-stone-ink: #2b2519;
+  --field-brass: #c9a227;
+  --field-trench: #2a2015;
+  --field-plate: rgba(43, 37, 25, 0.55);
+}
+
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --field-sand: #7c6440;
+    --field-sand-deep: #4f3f27;
+    --field-sand-dark: #2e2416;
+    --field-stone: #6e6555;
+    --field-stone-deep: #443e33;
+    --field-stone-ink: #efe7d5;
+    --field-brass: #d9b13a;
+    --field-trench: #16110b;
+    --field-plate: rgba(239, 231, 213, 0.14);
+  }
+}
+
+:root[data-theme="dark"] {
+  --field-sand: #7c6440;
+  --field-sand-deep: #4f3f27;
+  --field-sand-dark: #2e2416;
+  --field-stone: #6e6555;
+  --field-stone-deep: #443e33;
+  --field-stone-ink: #efe7d5;
+  --field-brass: #d9b13a;
+  --field-trench: #16110b;
+  --field-plate: rgba(239, 231, 213, 0.14);
+}
+
+.field {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  padding: 0;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.35);
+}
+
+/* The floor. Three layers doing three jobs: a warm base, a vignette that
+   pushes the light into the middle where the fighting is, and a fine grain
+   so the surface is a material rather than a fill. `background-blend-mode`
+   is what keeps the grain *in* the sand instead of sitting on top of it as a
+   grey haze. */
+.field-floor {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--field-sand);
+  background-image:
+    radial-gradient(120% 90% at 50% 50%,
+      rgba(255, 236, 190, 0.22) 0%,
+      rgba(0, 0, 0, 0) 45%,
+      rgba(0, 0, 0, 0.42) 100%),
+    url('./assets/coliseum/harena.webp'),
+    linear-gradient(180deg, var(--field-sand-deep) 0%,
+      var(--field-sand) 38%, var(--field-sand) 62%,
+      var(--field-sand-deep) 100%);
+  background-size: cover, cover, cover;
+  background-position: center, center, center;
+  /* `soft-light` on the plate rather than `normal`, and that is the whole
+     trick: the photograph is a bright yellow builder's sand, and dropped in
+     at full strength it would shout at every card on top of it. Blended into
+     the palette beneath, it contributes its *grain* — three sizes of it, and
+     the shadow each grain casts on the one beside it — while the colour
+     stays the room's. The tokens above are what make the two themes the same
+     floor at two hours; the plate is the same sand in both. */
+  background-blend-mode: overlay, soft-light, normal;
+}
+
+/* The dust. Three drifts at three speeds and three angles, because one is a
+   screensaver and three is weather. Wide, soft and slow enough that nothing
+   ever crosses in front of a card and asks to be looked at. */
+.field-dust {
+  position: absolute;
+  inset: -20% -30%;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  opacity: 0.5;
+}
+.field-dust-1 {
+  background-image: radial-gradient(38% 22% at 20% 30%,
+    rgba(255, 240, 205, 0.16) 0%, rgba(255, 240, 205, 0) 70%);
+  animation: field-drift-1 41s ease-in-out infinite;
+}
+.field-dust-2 {
+  background-image: radial-gradient(46% 18% at 70% 66%,
+    rgba(255, 232, 186, 0.13) 0%, rgba(255, 232, 186, 0) 72%);
+  animation: field-drift-2 67s ease-in-out infinite;
+}
+.field-dust-3 {
+  background-image: radial-gradient(30% 30% at 46% 12%,
+    rgba(120, 90, 44, 0.18) 0%, rgba(120, 90, 44, 0) 68%);
+  animation: field-drift-3 89s linear infinite;
+}
+@keyframes field-drift-1 {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(5%, 2%, 0); }
+}
+@keyframes field-drift-2 {
+  0%, 100% { transform: translate3d(2%, 1%, 0); }
+  50%      { transform: translate3d(-6%, -2%, 0); }
+}
+@keyframes field-drift-3 {
+  0%   { transform: translate3d(-4%, 0, 0); }
+  100% { transform: translate3d(6%, 1%, 0); }
+}
+
+/* One player's half. */
+.field-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.field-rows { display: flex; flex-direction: column; gap: 6px; }
+
+/* The rail: cut stone with a brass edge catching the light. */
+.field-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  color: var(--field-stone-ink);
+  background-image:
+    repeating-linear-gradient(93deg,
+      rgba(255, 255, 255, 0.05) 0 3px, rgba(0, 0, 0, 0.04) 3px 7px),
+    linear-gradient(180deg, var(--field-stone) 0%,
+      var(--field-stone-deep) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.32);
+  border-top: 1px solid color-mix(in srgb, var(--field-brass) 55%, transparent);
+}
+.field-rail-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.field-rail-totals { display: flex; align-items: center; gap: 12px; }
+
+/* Life: the one number everybody at a Commander table is tracking, so it is
+   the biggest thing on the rail and it is the thing that reacts. */
+.field-life {
+  font-size: 1.28rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 2.2ch;
+  text-align: right;
+  transition: color 200ms ease;
+}
+.field-life.is-down {
+  color: var(--status-critical);
+  animation: field-life-hit 640ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+.field-life.is-up {
+  color: var(--status-good);
+  animation: field-life-gain 640ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+@keyframes field-life-hit {
+  0%   { transform: none; }
+  22%  { transform: translateX(-3px) scale(1.14); }
+  44%  { transform: translateX(3px) scale(1.1); }
+  100% { transform: none; }
+}
+@keyframes field-life-gain {
+  0%   { transform: none; }
+  35%  { transform: translateY(-4px) scale(1.12); }
+  100% { transform: none; }
+}
+
+.field-rail-tally {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.field-rail-tally-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+}
+
+/* A row of cards. It scrolls itself rather than shrinking the cards: a
+   battlefield of thirty permanents is a real state, and stamps nobody can
+   see are worse than a scrollbar. */
+.field-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: 42px;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.field-row-empty {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: color-mix(in srgb, var(--field-stone-ink) 60%, transparent);
+  padding: 6px 2px;
+  white-space: nowrap;
+}
+
+/* One card. The outer box holds the space; the inner one turns, so a tapped
+   card leans on its neighbour the way it would on a table instead of
+   shoving the row sideways. */
+.field-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: 58px;
+  height: 81px;
+  animation: field-card-arrives 380ms cubic-bezier(0.18, 0.9, 0.28, 1.02);
+}
+.field-card-small { width: 42px; height: 59px; }
+
+.field-card-turn {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  overflow: hidden;
+  transform-origin: 50% 50%;
+  transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.3);
+  background: var(--field-plate);
+}
+.field-card.is-tapped .field-card-turn { transform: rotate(90deg); }
+
+.field-card-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.field-card-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 3px;
+  font-size: 0.52rem;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--field-stone-ink);
+}
+
+/* A token wears a thin gold edge — it is not a card, and on a board where
+   half the permanents may be Food that distinction is worth a pixel. */
+.field-card-token .field-card-turn,
+.field-card-token { pointer-events: none; }
+.field-card-token {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--field-brass) 78%, transparent);
+}
+
+.field-card-stats,
+.field-card-counters {
+  position: absolute;
+  bottom: 1px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1.5px 3px;
+  border-radius: 2px;
+  background: rgba(10, 8, 5, 0.82);
+  color: #f4ead2;
+}
+.field-card-stats { right: 1px; }
+.field-card-counters {
+  left: 1px;
+  background: var(--field-brass);
+  color: #1a1409;
+}
+
+@keyframes field-card-arrives {
+  0%   { opacity: 0; transform: translateY(-7px) scale(0.82); }
+  70%  { opacity: 1; transform: translateY(1px) scale(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* The seam: the hypogeum. A dark trench with a brass lip either side, and
+   the turn announced in the middle of it. */
+.field-seam {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 14px;
+  background:
+    linear-gradient(180deg,
+      rgba(0, 0, 0, 0.42) 0%, var(--field-trench) 45%,
+      var(--field-trench) 55%, rgba(0, 0, 0, 0.42) 100%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent);
+}
+.field-seam-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg,
+    rgba(201, 162, 39, 0) 0%,
+    color-mix(in srgb, var(--field-brass) 55%, transparent) 50%,
+    rgba(201, 162, 39, 0) 100%);
+}
+.field-seam-turn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+  white-space: nowrap;
+}
+.field-seam-game {
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  opacity: 0.65;
+  color: #e8dcc0;
+}
+
+/* An empty field still has a floor and something to say on it. */
+.field-quiet { min-height: 190px; display: grid; place-items: center; }
+.field-waiting {
+  max-width: 34rem;
+  margin: 0;
+  padding: 26px 20px;
+  text-align: center;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #efe4cb;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Narrow: the cards shrink one step and the rail's name gets the room. A
+   phone still shows two battlefields facing each other, which is the whole
+   point of the layout. */
+@media (max-width: 640px) {
+  .field-card { width: 46px; height: 64px; }
+  .field-card-small { width: 34px; height: 47px; }
+  .field-life { font-size: 1.1rem; }
+  .field-seam-turn { font-size: 0.66rem; letter-spacing: 0.1em; }
+  .field-seam-game { display: none; }
+}
+
+/* The field's guard.
+ *
+ * The dust is **removed**: a frozen drift is a smear of light sitting on the
+ * sand for no reason, and the floor beneath it is the whole material anyway.
+ * The card and life motions are **stopped rather than removed** — a card
+ * that simply *is* on the battlefield and a life total that simply *is* the
+ * new number are the honest reduced versions of ones that arrive. The tap
+ * keeps its ninety degrees and loses its transition: tapped is a state, not
+ * an animation, and hiding it would delete information.
+ *
+ * Every animated selector above carries one of these classes deliberately —
+ * the bundle check (`cmd/mtglab/reducedmotion_test.go`) reaches a rule by
+ * the classes in its selector. */
+@media (prefers-reduced-motion: reduce) {
+  /* All three drifts by name, not only the base class they share. The bundle
+     check reaches a rule by the classes in *its* selector, so guarding
+     `.field-dust` alone leaves `.field-dust-1` looking unguarded however
+     thoroughly the element it lands on is covered — and a guard nothing can
+     verify is the kind that rots. */
+  .field-dust,
+  .field-dust-1,
+  .field-dust-2,
+  .field-dust-3 { display: none; animation: none; }
+  .field-card { animation: none; }
+  .field-card-turn { transition: none; }
+  .field-life { animation: none; }
+}

@@ -1,14 +1,9 @@
 package tier3_test
 
 import (
-	"bufio"
-	"encoding/json"
-	"fmt"
 	"math/big"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -48,16 +43,6 @@ import (
 // would match on game one and diverge on game two, which is exactly the bug a
 // single game cannot see.
 
-// scribeResult is the scribe's own `{"t":"result"}` line.
-type scribeResult struct {
-	Kind     string `json:"t"`
-	Game     int    `json:"game"`
-	Seat     int    `json:"seat"`
-	Winner   string `json:"winner"`
-	Draw     bool   `json:"draw"`
-	TimedOut bool   `json:"timed_out"`
-}
-
 func TestTheScribePlaysTheSameMagicAsStockSim(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("MTGLAB_LIVE_FORGE") != "1" {
@@ -77,35 +62,71 @@ func TestTheScribePlaysTheSameMagicAsStockSim(t *testing.T) {
 	const games, clock = 2, 300
 	seed := big.NewInt(11)
 
-	// The stock path: exactly what the app runs today.
-	stock, err := forge.RunGames(decks, tier3.RunOptions{
+	// **Both paths through `RunGames`**, which is the whole point of driving
+	// it this way rather than building an argv by hand: the two runs differ in
+	// exactly one field of one struct, so anything that disagrees below is the
+	// scribe playing different Magic and not the harness asking differently.
+	//
+	// The stock settings are forced empty rather than merely left alone, so
+	// that a developer with `MTGLAB_SCRIBE_CLASSES` exported does not
+	// accidentally compare the scribe against itself and see a green gate.
+	stockSettings := forge
+	stockSettings.ScribeClasses = ""
+	if stockSettings.Scribed() {
+		t.Fatal("the stock path still reports a scribe; this gate would be " +
+			"comparing the scribe against itself")
+	}
+	stock, err := stockSettings.RunGames(decks, tier3.RunOptions{
 		Games: games, Clock: clock, Seed: seed})
 	if err != nil {
 		t.Fatalf("the stock run failed: %v", err)
 	}
-	if len(stock.Games()) != games {
-		t.Fatalf("stock played %d games, want %d", len(stock.Games()), games)
+
+	scribeSettings := forge
+	scribeSettings.ScribeClasses = classes
+	if !scribeSettings.Scribed() {
+		t.Fatalf("MTGLAB_SCRIBE_CLASSES=%s holds no compiled scribe", classes)
+	}
+	var boards int
+	told, err := scribeSettings.RunGames(decks, tier3.RunOptions{
+		Games: games, Clock: clock, Seed: seed, Narrate: true,
+		OnEvents: func(log tier3.EventLog) {
+			if log.Board != nil {
+				boards += len(log.Board.Steps)
+			}
+		}})
+	if err != nil {
+		t.Fatalf("the scribe run failed: %v", err)
 	}
 
-	told := runScribe(t, forge, decks, classes, games, clock, seed)
-	if len(told) != games {
-		t.Fatalf("the scribe reported %d games, want %d", len(told), games)
+	if len(stock.Games()) != games || len(told.Games()) != games {
+		t.Fatalf("stock played %d games and the scribe %d, want %d each",
+			len(stock.Games()), len(told.Games()), games)
 	}
 
 	for i, want := range stock.Games() {
-		got := told[i]
+		got := told.Games()[i]
 		t.Logf("game %d — stock: seat %v turns %v draw %v clock %v | "+
-			"scribe: seat %d draw %v clock %v",
+			"scribe: seat %v turns %v draw %v clock %v",
 			i+1, seatOf(want), turnsOf(want), want.Draw, want.TimedOut,
-			got.Seat, got.Draw, got.TimedOut)
+			seatOf(got), turnsOf(got), got.Draw, got.TimedOut)
 
 		// **The winner, by seat.** Two decks can share a name and never share
 		// a seat, and the seat is what `SimRun.Seats` and every shaping layer
 		// above it work in.
-		if seatOf(want) != got.Seat {
-			t.Errorf("game %d: stock says seat %v won, the scribe says seat %d "+
+		if seatOf(want) != seatOf(got) {
+			t.Errorf("game %d: stock says seat %v won, the scribe says seat %v "+
 				"— the two are not playing the same game",
-				i+1, seatOf(want), got.Seat)
+				i+1, seatOf(want), seatOf(got))
+		}
+		// **The turn count, which the two paths reach differently.** Stock
+		// reads Forge's `Game Outcome: Turn N` line; the scribe reads
+		// `GameEventGameOutcome.lastTurnNumber()`. Two answers to one question,
+		// and the match ledger records whichever it is handed — so they agree
+		// here or the ledger stops being comparable across a deploy.
+		if turnsOf(want) != turnsOf(got) {
+			t.Errorf("game %d: stock counted %v turns and the scribe %v",
+				i+1, turnsOf(want), turnsOf(got))
 		}
 		if want.TimedOut != got.TimedOut {
 			t.Errorf("game %d: stock clock-out %v, scribe %v",
@@ -113,11 +134,19 @@ func TestTheScribePlaysTheSameMagicAsStockSim(t *testing.T) {
 		}
 		// A real draw and a clock-out are different facts everywhere else in
 		// this package, so they are compared apart here too.
-		wantDraw := want.Draw && !want.TimedOut
-		if wantDraw != got.Draw {
-			t.Errorf("game %d: stock draw %v, scribe %v", i+1, wantDraw, got.Draw)
+		if want.Draw != got.Draw {
+			t.Errorf("game %d: stock draw %v, scribe %v", i+1, want.Draw, got.Draw)
 		}
 	}
+
+	// The gate is about parity, but a scribe that reported perfect results and
+	// no board would pass it while being useless — so the reason it exists is
+	// asserted here rather than assumed.
+	if boards == 0 {
+		t.Error("the scribe reported no board steps; there is no battlefield " +
+			"in this")
+	}
+	t.Logf("the scribe drew %d board steps across %d games", boards, games)
 }
 
 // parityDecks are the two fixtures every live test in this repo plays, so a
@@ -137,90 +166,6 @@ func parityDecks(t *testing.T) []*deck.Deck {
 		out = append(out, d)
 	}
 	return out
-}
-
-// runScribe plays the same match through the scribe and returns its result
-// lines in game order.
-//
-// The `.dck` files are written by the same [tier3.WriteDck] the stock path
-// uses, from the same coverage report — so a difference in what Forge was
-// handed cannot be mistaken for a difference in how it played.
-func runScribe(t *testing.T, forge tier3.Settings, decks []*deck.Deck,
-	classes string, games, clock int, seed *big.Int) []scribeResult {
-	t.Helper()
-
-	reports, err := forge.CheckCoverage(decks)
-	if err != nil {
-		t.Fatalf("the pre-flight failed: %v", err)
-	}
-	deckDir, err := forge.EnsureProfile()
-	if err != nil {
-		t.Fatal(err)
-	}
-	paths := make([]string, 0, len(decks))
-	for i, d := range decks {
-		path, err := tier3.WriteDck(d, deckDir, reports[i].Resolved)
-		if err != nil {
-			t.Fatal(err)
-		}
-		paths = append(paths, path)
-	}
-
-	java, err := forge.JavaBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
-	jar, err := forge.DesktopJar()
-	if err != nil {
-		t.Fatal(err)
-	}
-	argv := append([]string{
-		"-Xmx3072m", "-Dfile.encoding=UTF-8",
-		"-cp", jar + string(os.PathListSeparator) + classes,
-		"scribe.Main", fmt.Sprint(clock), fmt.Sprint(games), seed.String(),
-	}, paths...)
-
-	cmd := exec.Command(java, argv...) //nolint:gosec // an operator-chosen JVM and our own classes
-	cmd.Dir = forge.Home
-	cmd.Stderr = os.Stderr
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-
-	var results []scribeResult
-	kinds := map[string]int{}
-	scanner := bufio.NewScanner(out)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if !strings.HasPrefix(line, "{") {
-			continue
-		}
-		var r scribeResult
-		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			continue
-		}
-		kinds[r.Kind]++
-		if r.Kind == "result" {
-			results = append(results, r)
-		}
-	}
-	if err := cmd.Wait(); err != nil {
-		t.Fatalf("the scribe exited badly: %v", err)
-	}
-	t.Logf("the scribe said: %v", kinds)
-
-	// The gate is about parity, but a scribe that reported perfect results and
-	// no board would pass it while being useless — so the reason it exists is
-	// asserted here rather than assumed.
-	if kinds["zone"] == 0 {
-		t.Error("the scribe reported no zone changes; there is no board in this")
-	}
-	return results
 }
 
 func seatOf(g tier3.GameResult) int {

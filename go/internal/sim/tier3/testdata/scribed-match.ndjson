@@ -1,0 +1,1048 @@
+{"t":"game","game":1}
+{"t":"zone","game":1,"zone":"Command","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Command","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":101,"card":"Commander Effect","power":0,"toughness":0,"types":""}
+{"t":"zone","game":1,"zone":"Command","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Command","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":202,"card":"Commander Effect","power":0,"toughness":0,"types":""}
+{"t":"seat","game":1,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"seat","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"stats","game":1,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"stats","game":1,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":165,"card":"Welcome to . . .","power":0,"toughness":0,"types":"Enchantment - Saga"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":165,"card":"Welcome to . . .","power":0,"toughness":0,"types":"Enchantment - Saga"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":194,"card":"Zopandrel, Hunger Dominus","power":4,"toughness":6,"types":"Legendary Creature - Phyrexian Horror"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":194,"card":"Zopandrel, Hunger Dominus","power":4,"toughness":6,"types":"Legendary Creature - Phyrexian Horror"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":164,"card":"Thousand-Year Elixir","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":164,"card":"Thousand-Year Elixir","power":0,"toughness":0,"types":"Artifact"}
+{"t":"turn","game":1,"turn":1,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"turn","game":1,"turn":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"land","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"turn","game":1,"turn":3,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"tapped","game":1,"tapped":true,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"turn","game":1,"turn":4,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"tapped","game":1,"id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":167,"card":"Dragonlord Atarka","power":8,"toughness":8,"types":"Legendary Creature - Elder Dragon"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":167,"card":"Dragonlord Atarka","power":8,"toughness":8,"types":"Legendary Creature - Elder Dragon"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"land","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"turn","game":1,"turn":5,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Command","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"stats","game":1,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":211,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"turn","game":1,"turn":6,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":160,"card":"Elemental Bond","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":160,"card":"Elemental Bond","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"land","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"turn","game":1,"turn":7,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"tapped","game":1,"tapped":true,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":160,"card":"Elemental Bond","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":160,"card":"Elemental Bond","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":164,"card":"Thousand-Year Elixir","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":164,"card":"Thousand-Year Elixir","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":165,"card":"Welcome to . . .","power":0,"toughness":0,"types":"Enchantment - Saga"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":165,"card":"Welcome to . . .","power":0,"toughness":0,"types":"Enchantment - Saga"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":65,"card":"Torment of Hailfire","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"tapped","game":1,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":1,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":35}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"turn","game":1,"turn":8,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":35}
+{"t":"tapped","game":1,"id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":34}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":148,"card":"Arid Mesa","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"tapped","game":1,"tapped":true,"id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"tapped":true,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"tapped":true,"id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"cast","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":169,"card":"Marauding Raptor","power":2,"toughness":3,"types":"Creature - Dinosaur"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":169,"card":"Marauding Raptor","power":2,"toughness":3,"types":"Creature - Dinosaur"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":154,"card":"Swords to Plowshares","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":154,"card":"Swords to Plowshares","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":186,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":186,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":200,"card":"End-Raze Forerunners","power":7,"toughness":7,"types":"Creature - Boar"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":200,"card":"End-Raze Forerunners","power":7,"toughness":7,"types":"Creature - Boar"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":200,"card":"End-Raze Forerunners","power":7,"toughness":7,"types":"Creature - Boar"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":200,"card":"End-Raze Forerunners","power":7,"toughness":7,"types":"Creature - Boar"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":169,"card":"Marauding Raptor","power":2,"toughness":3,"types":"Creature - Dinosaur"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":169,"card":"Marauding Raptor","power":2,"toughness":3,"types":"Creature - Dinosaur"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":103,"card":"Smuggler's Surprise","power":0,"toughness":0,"types":"Instant"}
+{"t":"turn","game":1,"turn":9,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":1,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":29}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"tapped","game":1,"tapped":true,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"life","game":1,"seat":1,"who":"Gyome, Master Chef — Food","life":42}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"stats","game":1,"id":211,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":3,"toughness":4,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"stats","game":1,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"counters","game":1,"counter":"+1/+1","was":0,"now":1,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":165,"card":"Welcome to . . .","power":0,"toughness":0,"types":"Enchantment - Saga"}
+{"t":"zone","game":1,"zone":"Exile","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":165,"card":"Welcome to . . .","power":0,"toughness":0,"types":"Enchantment - Saga"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":224,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":224,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":227,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":227,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"turn","game":1,"turn":10,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":29}
+{"t":"tapped","game":1,"id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"land","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Command","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":1,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":1,"tapped":true,"id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"tapped":true,"id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"tapped":true,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"tapped":true,"id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"cast","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"turn","game":1,"turn":11,"seat":1,"who":"Gyome, Master Chef — Food","life":42}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"tapped","game":1,"tapped":true,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":164,"card":"Thousand-Year Elixir","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Exile","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":164,"card":"Thousand-Year Elixir","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":233,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":233,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":1,"amount":4,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"damage","game":1,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":20}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"tapped","game":1,"tapped":true,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":57,"card":"Experimental Confectioner","power":2,"toughness":3,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":241,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":241,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"counters","game":1,"counter":"+1/+1","was":0,"now":1,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":6,"card":"Fabled Passage","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"tapped","game":1,"tapped":true,"id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"stats","game":1,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"counters","game":1,"counter":"+1/+1","was":0,"now":1,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"tapped","game":1,"tapped":true,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"life","game":1,"seat":1,"who":"Gyome, Master Chef — Food","life":44}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":12,"card":"Nadier's Nightblade","power":1,"toughness":3,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"stats","game":1,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"counters","game":1,"counter":"+1/+1","was":0,"now":1,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":247,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":248,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":249,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":250,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":250,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":251,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":251,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":252,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":252,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":253,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":254,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":255,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"turn","game":1,"turn":12,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":20}
+{"t":"tapped","game":1,"id":175,"card":"Temple Garden","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"id":150,"card":"Lush Portico","power":0,"toughness":0,"types":"Land - Forest Plains"}
+{"t":"tapped","game":1,"id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":163,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":163,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":19}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":198,"card":"Windswept Heath","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":149,"card":"Sacred Foundry","power":0,"toughness":0,"types":"Land - Mountain Plains"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":149,"card":"Sacred Foundry","power":0,"toughness":0,"types":"Land - Mountain Plains"}
+{"t":"turn","game":1,"turn":13,"seat":1,"who":"Gyome, Master Chef — Food","life":44}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"tapped","game":1,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":19,"card":"Baleful Mastery","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":19,"card":"Baleful Mastery","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"tapped","game":1,"tapped":true,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"tapped":true,"id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":69,"card":"Overgrown Tomb","power":0,"toughness":0,"types":"Land - Swamp Forest"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":69,"card":"Overgrown Tomb","power":0,"toughness":0,"types":"Land - Swamp Forest"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":39,"card":"Three Visits","power":0,"toughness":0,"types":"Sorcery"}
+{"t":"tapped","game":1,"tapped":true,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"tapped","game":1,"tapped":true,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"tapped","game":1,"tapped":true,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":1,"tapped":true,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"tapped":true,"id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":277,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":160,"card":"Elemental Bond","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":1,"zone":"Exile","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":160,"card":"Elemental Bond","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":282,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":283,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":283,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":284,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"damage","game":1,"amount":4,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"damage","game":1,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":1,"amount":3,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"damage","game":1,"amount":2,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"damage","game":1,"amount":2,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":3}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":1,"tapped":true,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":1,"tapped":true,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"tapped","game":1,"tapped":true,"id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"cast","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"stats","game":1,"id":35,"card":"Dockside Chef","power":2,"toughness":3,"types":"Enchantment Creature - Human Citizen"}
+{"t":"counters","game":1,"counter":"+1/+1","was":0,"now":1,"id":35,"card":"Dockside Chef","power":2,"toughness":3,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":87,"card":"Undergrowth Stadium","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":87,"card":"Undergrowth Stadium","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":295,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":296,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":296,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":297,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"turn","game":1,"turn":14,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":3}
+{"t":"tapped","game":1,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":1,"id":149,"card":"Sacred Foundry","power":0,"toughness":0,"types":"Land - Mountain Plains"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"tapped","game":1,"tapped":true,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"tapped":true,"id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Exile","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":315,"card":"Spirit Token","token":true,"power":1,"toughness":1,"types":"Creature - Spirit"}
+{"t":"tapped","game":1,"tapped":true,"id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"life","game":1,"seat":1,"who":"Gyome, Master Chef — Food","life":46}
+{"t":"turn","game":1,"turn":15,"seat":1,"who":"Gyome, Master Chef — Food","life":46}
+{"t":"tapped","game":1,"id":79,"card":"Great Arashin City","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":24,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":53,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":1,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"id":52,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":54,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"tapped","game":1,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"tapped","game":1,"id":29,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":1,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"tapped","game":1,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"tapped","game":1,"id":51,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"id":69,"card":"Overgrown Tomb","power":0,"toughness":0,"types":"Land - Swamp Forest"}
+{"t":"tapped","game":1,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":1,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":48,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":48,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":48,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":48,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"land","game":1,"seat":1,"who":"Gyome, Master Chef — Food","id":48,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":1,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"tapped","game":1,"tapped":true,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"tapped","game":1,"tapped":true,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"tapped","game":1,"tapped":true,"id":35,"card":"Dockside Chef","power":2,"toughness":3,"types":"Enchantment Creature - Human Citizen"}
+{"t":"tapped","game":1,"tapped":true,"id":315,"card":"Spirit Token","token":true,"power":1,"toughness":1,"types":"Creature - Spirit"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":35,"card":"Dockside Chef","power":2,"toughness":3,"types":"Enchantment Creature - Human Citizen"}
+{"t":"attack","game":1,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":315,"card":"Spirit Token","token":true,"power":1,"toughness":1,"types":"Creature - Spirit"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"tapped","game":1,"tapped":true,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":1,"tapped":true,"id":185,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"tapped","game":1,"tapped":true,"id":187,"card":"Mountain","power":0,"toughness":0,"types":"Basic Land - Mountain"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":332,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":1,"zone":"Exile","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":337,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":338,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"stats","game":1,"id":338,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":1,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":339,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"block","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","target_id":57,"target":"Experimental Confectioner","id":332,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":35,"card":"Dockside Chef","power":2,"toughness":3,"types":"Enchantment Creature - Human Citizen"}
+{"t":"unblocked","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":315,"card":"Spirit Token","token":true,"power":1,"toughness":1,"types":"Creature - Spirit"}
+{"t":"zone","game":1,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"cast","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"stats","game":1,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":1,"id":277,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"stats","game":1,"id":332,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"zone","game":1,"zone":"Stack","mode":"out","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":1,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":111,"card":"Flawless Maneuver","power":0,"toughness":0,"types":"Instant"}
+{"t":"damage","game":1,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":1,"amount":4,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":45,"card":"Hazel's Brewmaster","power":4,"toughness":5,"types":"Creature - Squirrel Warlock"}
+{"t":"damage","game":1,"amount":3,"target_id":332,"target":"Egg Token","id":57,"card":"Experimental Confectioner","power":3,"toughness":4,"types":"Creature - Human Peasant"}
+{"t":"damage","game":1,"amount":2,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":42,"card":"Academy Manufactor","power":2,"toughness":4,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"damage","game":1,"amount":2,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":12,"card":"Nadier's Nightblade","power":2,"toughness":4,"types":"Creature - Elf Warrior"}
+{"t":"damage","game":1,"amount":2,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":35,"card":"Dockside Chef","power":2,"toughness":3,"types":"Enchantment Creature - Human Citizen"}
+{"t":"damage","game":1,"amount":1,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":315,"card":"Spirit Token","token":true,"power":1,"toughness":1,"types":"Creature - Spirit"}
+{"t":"life","game":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":-13}
+{"t":"outcome","game":1,"turn":15,"winner":"Gyome, Master Chef — Food","said":"Gyome, Master Chef — Food has won because all opponents have lost"}
+{"t":"outcome","game":1,"turn":15,"winner":"Gyome, Master Chef — Food","said":"Atla Palani, Nest Tender — Naya Dinosaurs has lost because life total reached 0"}
+{"t":"result","game":1,"ms":23787,"seat":1,"winner":"Gyome, Master Chef — Food"}
+{"t":"game","game":2}
+{"t":"zone","game":2,"zone":"Command","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Command","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":101,"card":"Commander Effect","power":0,"toughness":0,"types":""}
+{"t":"zone","game":2,"zone":"Command","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Command","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":202,"card":"Commander Effect","power":0,"toughness":0,"types":""}
+{"t":"seat","game":2,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"seat","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"stats","game":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":19,"card":"Baleful Mastery","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":19,"card":"Baleful Mastery","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":163,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":163,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"turn","game":2,"turn":1,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"land","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"turn","game":2,"turn":2,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"land","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"turn","game":2,"turn":3,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"land","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"turn","game":2,"turn":4,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"turn","game":2,"turn":5,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":197,"card":"Ghalta and Mavren","power":12,"toughness":12,"types":"Legendary Creature - Dinosaur Vampire"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":197,"card":"Ghalta and Mavren","power":12,"toughness":12,"types":"Legendary Creature - Dinosaur Vampire"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"tapped","game":2,"tapped":true,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"tapped":true,"id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":137,"card":"Garruk's Uprising","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"turn","game":2,"turn":6,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":2,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":58,"card":"Beast Within","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":58,"card":"Beast Within","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":2,"tapped":true,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"turn","game":2,"turn":7,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"tapped","game":2,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"id":108,"card":"Secluded Courtyard","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"tapped","game":2,"tapped":true,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"cast","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"turn","game":2,"turn":8,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":2,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":15,"card":"Golgari Signet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":15,"card":"Golgari Signet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"turn","game":2,"turn":9,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":40}
+{"t":"tapped","game":2,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":138,"card":"Gishath, Sun's Avatar","power":7,"toughness":6,"types":"Legendary Creature - Dinosaur Avatar"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":138,"card":"Gishath, Sun's Avatar","power":7,"toughness":6,"types":"Legendary Creature - Dinosaur Avatar"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"land","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":39}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":156,"card":"Wooded Foothills","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"tapped","game":2,"tapped":true,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"tapped":true,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":151,"card":"Worldspine Wurm","power":15,"toughness":15,"types":"Creature - Wurm"}
+{"t":"zone","game":2,"zone":"Library","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":151,"card":"Worldspine Wurm","power":15,"toughness":15,"types":"Creature - Wurm"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":117,"card":"Blightsteel Colossus","power":11,"toughness":11,"types":"Artifact Creature - Phyrexian Golem"}
+{"t":"zone","game":2,"zone":"Library","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":117,"card":"Blightsteel Colossus","power":11,"toughness":11,"types":"Artifact Creature - Phyrexian Golem"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":199,"card":"Emrakul, the Aeons Torn","power":15,"toughness":15,"types":"Legendary Creature - Eldrazi"}
+{"t":"zone","game":2,"zone":"Library","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":199,"card":"Emrakul, the Aeons Torn","power":15,"toughness":15,"types":"Legendary Creature - Eldrazi"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":173,"card":"Congregation at Dawn","power":0,"toughness":0,"types":"Instant"}
+{"t":"turn","game":2,"turn":10,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"tapped","game":2,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"tapped","game":2,"tapped":true,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":254,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"damage","game":2,"amount":3,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":36}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"tapped","game":2,"tapped":true,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"turn","game":2,"turn":11,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":36}
+{"t":"tapped","game":2,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":199,"card":"Emrakul, the Aeons Torn","power":15,"toughness":15,"types":"Legendary Creature - Eldrazi"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":199,"card":"Emrakul, the Aeons Torn","power":15,"toughness":15,"types":"Legendary Creature - Eldrazi"}
+{"t":"tapped","game":2,"tapped":true,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"attack","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","against":"Gyome, Master Chef — Food","against_seat":1,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"unblocked","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"damage","game":2,"amount":2,"combat":true,"against":"Gyome, Master Chef — Food","against_seat":1,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"life","game":2,"seat":1,"who":"Gyome, Master Chef — Food","life":38}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Command","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":2,"tapped":true,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"tapped":true,"id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"turn","game":2,"turn":12,"seat":1,"who":"Gyome, Master Chef — Food","life":38}
+{"t":"tapped","game":2,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"land","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":2,"tapped":true,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":292,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"damage","game":2,"amount":3,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":33}
+{"t":"zone","game":2,"zone":"Command","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"stats","game":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":2,"tapped":true,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":2,"tapped":true,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":304,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":59,"card":"The Great Henge","power":0,"toughness":0,"types":"Legendary Artifact"}
+{"t":"turn","game":2,"turn":13,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":33}
+{"t":"tapped","game":2,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"tapped","game":2,"id":125,"card":"Stomping Ground","power":0,"toughness":0,"types":"Land - Mountain Forest"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":117,"card":"Blightsteel Colossus","power":11,"toughness":11,"types":"Artifact Creature - Phyrexian Golem"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":117,"card":"Blightsteel Colossus","power":11,"toughness":11,"types":"Artifact Creature - Phyrexian Golem"}
+{"t":"turn","game":2,"turn":14,"seat":1,"who":"Gyome, Master Chef — Food","life":38}
+{"t":"tapped","game":2,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"land","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":2,"tapped":true,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":2,"tapped":true,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":339,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"stats","game":2,"id":339,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":342,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":2,"amount":3,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"damage","game":2,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":25}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"tapped","game":2,"tapped":true,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":40,"card":"Elanor Gardner","power":2,"toughness":4,"types":"Legendary Creature - Halfling Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"tapped","game":2,"tapped":true,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":351,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":355,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"turn","game":2,"turn":15,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":25}
+{"t":"tapped","game":2,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":180,"card":"Branchloft Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":151,"card":"Worldspine Wurm","power":15,"toughness":15,"types":"Creature - Wurm"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":151,"card":"Worldspine Wurm","power":15,"toughness":15,"types":"Creature - Wurm"}
+{"t":"turn","game":2,"turn":16,"seat":1,"who":"Gyome, Master Chef — Food","life":38}
+{"t":"tapped","game":2,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":2,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":2,"id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":2,"tapped":true,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":2,"tapped":true,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":2,"tapped":true,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":377,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"stats","game":2,"id":377,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":380,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":2,"amount":3,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"damage","game":2,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":17}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"tapped","game":2,"tapped":true,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":42,"card":"Academy Manufactor","power":1,"toughness":3,"types":"Artifact Creature - Assembly-Worker"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"tapped","game":2,"tapped":true,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":2,"tapped":true,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"tapped","game":2,"tapped":true,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":56,"card":"Reckoner's Bargain","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":56,"card":"Reckoner's Bargain","power":0,"toughness":0,"types":"Instant"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":395,"card":"Servo Token","token":true,"power":1,"toughness":1,"types":"Artifact Creature - Servo"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":402,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":403,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":404,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":405,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":406,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":407,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"turn","game":2,"turn":17,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":17}
+{"t":"tapped","game":2,"id":128,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"tapped","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":2,"tapped":true,"id":190,"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}
+{"t":"cast","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"turn","game":2,"turn":18,"seat":1,"who":"Gyome, Master Chef — Food","life":38}
+{"t":"tapped","game":2,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":2,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"tapped","game":2,"id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":43,"card":"Blood Artist","power":0,"toughness":1,"types":"Creature - Vampire"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":43,"card":"Blood Artist","power":0,"toughness":1,"types":"Creature - Vampire"}
+{"t":"tapped","game":2,"tapped":true,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"attack","game":2,"seat":1,"who":"Gyome, Master Chef — Food","against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"tapped","game":2,"tapped":true,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"tapped","game":2,"tapped":true,"id":118,"card":"Sol Ring","power":0,"toughness":0,"types":"Artifact"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"stats","game":2,"id":201,"card":"Atla Palani, Nest Tender","power":2,"toughness":3,"types":"Legendary Creature - Human Shaman"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":430,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"stats","game":2,"id":430,"card":"Egg Token","token":true,"power":0,"toughness":1,"types":"Creature - Egg"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":436,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":437,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":438,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"unblocked","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"damage","game":2,"amount":3,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":18,"card":"Savvy Hunter","power":3,"toughness":3,"types":"Creature - Human Warrior"}
+{"t":"damage","game":2,"amount":5,"combat":true,"against":"Atla Palani, Nest Tender — Naya Dinosaurs","against_seat":2,"id":100,"card":"Gyome, Master Chef","power":5,"toughness":3,"types":"Legendary Creature - Troll Warlock"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":9}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"tapped","game":2,"tapped":true,"id":25,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":26,"card":"Forest","power":0,"toughness":0,"types":"Basic Land - Forest"}
+{"t":"tapped","game":2,"tapped":true,"id":63,"card":"Darkbore Pathway","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":49,"card":"Swamp","power":0,"toughness":0,"types":"Basic Land - Swamp"}
+{"t":"tapped","game":2,"tapped":true,"id":46,"card":"Kishla Village","power":0,"toughness":0,"types":"Land"}
+{"t":"tapped","game":2,"tapped":true,"id":438,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":438,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":438,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":8}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":450,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":451,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":452,"card":"Clue Token","token":true,"power":0,"toughness":0,"types":"Artifact - Clue"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":453,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":454,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":455,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":456,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":457,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":458,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"tapped","game":2,"tapped":true,"id":458,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":458,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":458,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"tapped","game":2,"tapped":true,"id":457,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":457,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":457,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"tapped","game":2,"tapped":true,"id":68,"card":"Bag End Banquet","power":0,"toughness":0,"types":"Artifact"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":7}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":6}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":73,"card":"Phyrexian Arena","power":0,"toughness":0,"types":"Enchantment"}
+{"t":"tapped","game":2,"tapped":true,"id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":76,"card":"Idol of Oblivion","power":0,"toughness":0,"types":"Artifact"}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":78,"card":"Sakura-Tribe Elder","power":1,"toughness":1,"types":"Creature - Snake Shaman"}
+{"t":"zone","game":2,"zone":"Hand","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"tapped","game":2,"tapped":true,"id":456,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":456,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":456,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"cast","game":2,"seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":5}
+{"t":"zone","game":2,"zone":"Stack","mode":"out","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"tapped","game":2,"tapped":true,"id":407,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":407,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":407,"card":"Treasure Token","token":true,"power":0,"toughness":0,"types":"Artifact - Treasure"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":35,"card":"Dockside Chef","power":1,"toughness":2,"types":"Enchantment Creature - Human Citizen"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":4}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":3}
+{"t":"zone","game":2,"zone":"Library","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Hand","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":66,"card":"Castle Garenbrig","power":0,"toughness":0,"types":"Land"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":455,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":455,"card":"Food Token","token":true,"power":0,"toughness":0,"types":"Artifact - Food"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":9,"card":"Marionette Apprentice","power":1,"toughness":2,"types":"Creature - Human Artificer"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":2}
+{"t":"zone","game":2,"zone":"Graveyard","mode":"out","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Battlefield","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":1,"who":"Gyome, Master Chef — Food","id":44,"card":"Cauldron Familiar","power":1,"toughness":1,"types":"Creature - Cat"}
+{"t":"zone","game":2,"zone":"Stack","mode":"in","seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"stats","game":2,"id":146,"card":"Selvala, Heart of the Wilds","power":2,"toughness":3,"types":"Legendary Creature - Elf Scout"}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":1}
+{"t":"life","game":2,"seat":1,"who":"Gyome, Master Chef — Food","life":39}
+{"t":"life","game":2,"seat":2,"who":"Atla Palani, Nest Tender — Naya Dinosaurs","life":0}
+{"t":"life","game":2,"seat":1,"who":"Gyome, Master Chef — Food","life":40}
+{"t":"outcome","game":2,"turn":18,"winner":"Gyome, Master Chef — Food","said":"Gyome, Master Chef — Food has won because all opponents have lost"}
+{"t":"outcome","game":2,"turn":18,"winner":"Gyome, Master Chef — Food","said":"Atla Palani, Nest Tender — Naya Dinosaurs has lost because life total reached 0"}
+{"t":"result","game":2,"ms":16888,"seat":1,"winner":"Gyome, Master Chef — Food"}

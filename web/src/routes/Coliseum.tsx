@@ -59,7 +59,9 @@ import { Badge, CardHover, Caveat, ErrorNote, NumberField, Select, StatTile }
   from '../components/ui'
 import { DeckCaution } from '../components/closedform'
 import { DataTable } from '../components/datatable'
-import { MatchBeats, MatchTheater, type StagedBeat } from '../components/theater'
+import { MatchBoard } from '../components/board'
+import { MatchBeats, MatchTheater } from '../components/theater'
+import { type Arriving, type StagedBeat, useReel } from '../lib/reel'
 import {
   beatLine, playerTurns, shortName, theaterBeats, theaterRows, turnsTaken,
 } from '../lib/theater'
@@ -72,14 +74,6 @@ const help = (key: string) => <HelpTip name={key} />
 /** The seed a match gets unless somebody asks for another. Matches the
  *  server's own default, so the app and the CLI describe the same shuffle. */
 const DEFAULT_SEED = 7
-
-/** The beats of the newest game, in words, or nothing yet.
- *
- * The pacing belongs to [MatchBeats], which is keyed on the job — so a second
- * match starts an empty room by remounting rather than by an effect that
- * resets six pieces of state. This room's job is the translation, because
- * turning a slug into a name needs the shelf and the shelf is this room's. */
-type Arriving = { game: number; beats: StagedBeat[]; truncated: boolean } | null
 
 /** How long a slide holds. Long, deliberately: see the note above. */
 const SLIDE_MS = 24_000
@@ -402,7 +396,7 @@ export default function ColiseumRoom() {
    *  Translated here rather than on the stage because turning a slug into a
    *  name needs the shelf, and the shelf is this room's. The stage renders
    *  what it is given. */
-  const arriving = useMemo((): Arriving => {
+  const arriving = useMemo((): Arriving | null => {
     const heard = theaterBeats(job?.partial)
     if (!heard) return null
     const name = (slug: string) =>
@@ -413,6 +407,9 @@ export default function ColiseumRoom() {
     return {
       game: heard.game,
       truncated: heard.truncated,
+      // The board rides with the beats it belongs to, so the picture and the
+      // sentences can never be about different games — see `lib/reel.ts`.
+      board: heard.board,
       beats: heard.beats.map((beat, i): StagedBeat => {
         const said = beatLine(beat, name)
         return {
@@ -428,6 +425,20 @@ export default function ColiseumRoom() {
       }),
     }
   }, [job?.partial, decks])
+
+  // **One clock for the room.** The reel drains the beats at reading speed and
+  // says how many it has told; the account renders those beats and the board
+  // is folded to exactly that many steps. The server builds one board step per
+  // beat, so a single count keeps the picture and the sentences describing the
+  // same moment — two components pacing themselves would drift within a turn.
+  const reel = useReel(arriving)
+
+  /** What the field calls a seat. The board carries slugs and Forge's own deck
+   *  titles; only the room has the shelf that turns either into a name. */
+  const seatName = useCallback((slug: string | null, fallback: string) =>
+    shortName(slug
+      ? (decks.find((d) => d.slug === slug)?.name ?? slug)
+      : fallback), [decks])
 
   // The play-by-play is offered from the moment a match starts and stays
   // offered after it ends, because the last game finishing is the moment
@@ -530,6 +541,24 @@ export default function ColiseumRoom() {
         </div>
       )}
 
+      {/* **The field, at full width, and that is the layout decision.** Two
+          Commander battlefields, two hands, two land rows and two graveyards
+          do not fit in a column beside a painting — a board squeezed into one
+          is a board of thumbnails, and a graveyard reduced to a number is the
+          thing this was built to stop being. So the arena's painting and the
+          house's facts move below it while a match is on, and the thing you
+          came to watch takes the room.
+
+          Keyed on the job for the same reason the theater is: a second match
+          begins on an empty field rather than on the last one's board. */}
+      {hasBeats && (
+        <div className="mt-6">
+          <MatchBoard key={`board-${job?.id}`} board={reel.board}
+                      shown={reel.told} game={reel.game}
+                      name={seatName} running={running} />
+        </div>
+      )}
+
       {failed && (
         <p className="mt-8 text-[var(--muted)]">
           The coliseum is dark tonight — its doors did not answer.
@@ -588,7 +617,7 @@ export default function ColiseumRoom() {
                           className={`strip-tab -mb-px border-b-2 px-3 py-1.5
                                       text-sm font-medium${
                             pane === 'game' ? ' is-active' : ''}`}>
-                    The game
+                    The account
                   </button>
                   <button role="tab" type="button"
                           aria-selected={pane === 'house'}
@@ -606,7 +635,8 @@ export default function ColiseumRoom() {
                 // every beat this stage is holding belongs to the match it was
                 // mounted for, and a remount is a cheaper and more honest reset
                 // than six setState calls in an effect.
-                <MatchBeats key={job?.id} arriving={arriving} running={running} />
+                <MatchBeats beats={reel.shown} game={reel.game}
+                            truncated={reel.truncated} running={running} />
               ) : (
                 <div className="flex flex-1 flex-col justify-between">
                   <div>

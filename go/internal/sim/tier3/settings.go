@@ -94,6 +94,18 @@ type Settings struct {
 	FlyApp string
 	// Machine is MTGLAB_FORGE_MACHINE, the worker machine's name.
 	Machine string
+	// ScribeClasses is MTGLAB_SCRIBE_CLASSES: where the scribe's compiled
+	// classes are (ADR 42). Set, and a match is played through the scribe and
+	// the board is reported; unset, Forge's own `sim` plays it and the prose
+	// parser reads the log, which is all this package could do before.
+	//
+	// **A path rather than a dial**, deliberately. The classes are built into
+	// the worker image at `/opt/scribe` and there is nothing to switch on: a
+	// worker that has them runs them, and one deployed before they existed
+	// degrades to the log without being told to. That is decision 4 of ADR 42
+	// — the parser stays as the floor — expressed as the absence of a flag,
+	// because a flag would eventually be set on a machine with no scribe on it.
+	ScribeClasses string
 	// MemoryMB is MTGLAB_FORGE_MEMORY_MB, the JVM heap ceiling the shim gives
 	// a match.
 	//
@@ -172,7 +184,23 @@ func LoadSettings() Settings {
 		s.Machine = v
 	}
 	s.MemoryMB = envInt("MTGLAB_FORGE_MEMORY_MB", DefaultMemoryMB)
+	s.ScribeClasses = env("MTGLAB_SCRIBE_CLASSES")
 	return s
+}
+
+// Scribed reports whether a match here can be played through the scribe.
+//
+// The directory is checked rather than the variable trusted: a worker with
+// `MTGLAB_SCRIBE_CLASSES` pointing at nothing should play the match through
+// `sim` and narrate from the log, which is a room with no board in it rather
+// than a match that will not start. The same degrade-rather-than-fail rule
+// every hop of this wire already follows.
+func (s Settings) Scribed() bool {
+	if s.ScribeClasses == "" {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(s.ScribeClasses, "scribe", "Main.class"))
+	return err == nil && !info.IsDir()
 }
 
 // At is this configuration pointed at a different distribution.

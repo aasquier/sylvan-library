@@ -68,11 +68,29 @@ type EventKind string
 // browser; an integer enum would be smaller and unreadable in a payload
 // somebody is debugging.
 const (
-	EventTurn      EventKind = "turn"
-	EventMulligan  EventKind = "mulligan"
-	EventLand      EventKind = "land"
-	EventCast      EventKind = "cast"
-	EventResolve   EventKind = "resolve"
+	EventTurn     EventKind = "turn"
+	EventMulligan EventKind = "mulligan"
+	EventLand     EventKind = "land"
+	EventCast     EventKind = "cast"
+	EventResolve  EventKind = "resolve"
+	// EventEnters is a permanent arriving on the battlefield, and it is raised
+	// only by the scribe (`scribe.go`) — this file cannot see one, because
+	// Forge's log's own resolve line is a card with a type line, or a bare
+	// name, or the rules text of a trigger, and nothing separates the last two.
+	//
+	// **Magic's own words, and they are the right ones twice over.** A token
+	// does not "resolve", so [EventResolve] would be wrong for the Food and the
+	// Eggs this whole road was built for; and "enters the battlefield" is the
+	// phrase printed on the cards themselves, which is the phrase a person
+	// learning the game is already reading.
+	//
+	// A card arriving in the **land** row raises nothing: a land drop is
+	// already [EventLand], and a land fetched onto the battlefield is a land
+	// that will still be there at the next beat. Creatures are the ones that
+	// arrive and leave inside a single beat — `Sakura-Tribe Elder` sacrifices
+	// itself the moment it lands, and without this beat the board never showed
+	// it at all.
+	EventEnters    EventKind = "enters"
 	EventAttack    EventKind = "attack"
 	EventBlock     EventKind = "block"
 	EventUnblocked EventKind = "unblocked"
@@ -136,6 +154,18 @@ type EventLog struct {
 	// Truncated is set when the game outran [EventCap]. The events kept are
 	// the first ones, because a game's opening is what makes the rest legible.
 	Truncated bool `json:"truncated,omitempty"`
+	// Board is the battlefield as it moved, and it is **null on this path**:
+	// nothing in this file can produce one. Forge's game log has no category
+	// for a token or a counter at all (ADR 42 measured it — four Food-makers
+	// resolved, zero tokens in 453 lines), so a board reconstructed from prose
+	// would be right about lands and silently wrong about exactly the decks
+	// that most want a picture. `scribe.go` fills it; a worker without the
+	// scribe leaves it empty and the room draws the account alone.
+	//
+	// It rides [EventLog] rather than a wire type of its own for the reason
+	// `wire.go` gives about beats: a struct both ends marshal directly cannot
+	// drift, because there is no second spelling of it to keep in step.
+	Board *BoardReel `json:"board,omitempty"`
 }
 
 // The patterns. Each is anchored at both ends and reads the interesting half

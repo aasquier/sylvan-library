@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aasquier/sylvan-library/go/internal/pool"
+
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
@@ -239,6 +241,173 @@ type forgeBeats struct {
 	// own cap. Either way the beats kept are the first ones, because a game's
 	// opening is what makes the rest of it legible.
 	Truncated bool `json:"truncated"`
+	// Board is the battlefield, and it is null for a match played by a worker
+	// without the scribe (ADR 42's fourth decision: the parser stays as the
+	// floor). A room handed no board draws the account alone, which is what
+	// every room did before there was one.
+	Board *forgeBoard `json:"board"`
+}
+
+// forgeBoardSeat is one side of the table.
+//
+// The slug is here and nowhere else in the board, deliberately. Everything
+// below refers to a seat by its number, because a board is a *place* — a
+// browser lays out two sides and needs a stable index for them, and threading
+// a slug through three hundred changes would be the same fact three hundred
+// times. This is the one row that turns the number into a deck.
+type forgeBoardSeat struct {
+	Seat int     `json:"seat"`
+	Slug *string `json:"slug"`
+	// Name is what Forge called the player, which is the deck's own title. It
+	// is the fallback for a seat whose slug the room cannot resolve.
+	Name string `json:"name"`
+	Life int    `json:"life"`
+}
+
+// forgeBoardCard is one card, named and painted once.
+type forgeBoardCard struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Token bool   `json:"token,omitempty"`
+	Types string `json:"types,omitempty"`
+	Seat  int    `json:"seat,omitempty"`
+	// Image is the whole card face, which is what a permanent looks like lying
+	// on a table. Art is the painting alone, for the cards a room wants to
+	// show large. Either may be empty: a board draws a plate with no painting
+	// on it rather than refusing to draw.
+	Image string `json:"image,omitempty"`
+	Art   string `json:"art,omitempty"`
+	// Artist is carried for tokens, whose painting is chosen here rather than
+	// looked up — somebody painted it, and rule 9 says name them.
+	Artist string `json:"artist,omitempty"`
+}
+
+// forgeBoard is the battlefield as the room receives it.
+type forgeBoard struct {
+	Seats []forgeBoardSeat  `json:"seats"`
+	Cards []forgeBoardCard  `json:"cards"`
+	Steps []tier3.BoardStep `json:"steps"`
+}
+
+// boardArt is one card's painting, resolved once per match.
+type boardArt struct {
+	Image  string
+	Art    string
+	Artist string
+}
+
+// resolveBoardArt fills `known` with the paintings for any card in `cards` it
+// does not already hold.
+//
+// **Two lookups, because a token is not a card.** A real card is
+// [pool.Conn.GetCards], which answers out of `oracle_cards`; a token is
+// [pool.Conn.TokenArtFor], which answers out of `printings` with the card's
+// *earliest* printing rather than its newest. That distinction is the one this
+// project keeps relearning: `GetCards` answering with the newest is what put
+// Teenage Mutant Ninja Turtles art on the Grand Coliseum, and the newest Food
+// printing is a Secret Lair about Bilbo's second breakfast.
+//
+// `known` is the caller's, and it spans the whole match: two games of the same
+// pairing name almost the same hundred cards, so the second game costs one
+// round trip for its tokens and nothing else.
+//
+// **No pool is not an error here.** A match is worth watching without
+// paintings, and refusing to shape a board because the card pool has not been
+// refreshed would cost somebody a match they are already watching.
+func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
+	known map[string]boardArt) {
+	var wantCards, wantTokens []string
+	for _, card := range cards {
+		if _, seen := known[card.Name]; seen || card.Name == "" {
+			continue
+		}
+		// Marked so a name the pool cannot answer is asked about once per
+		// match rather than once per game.
+		known[card.Name] = boardArt{}
+		if card.Token {
+			wantTokens = append(wantTokens, pool.TokenName(card.Name))
+			continue
+		}
+		wantCards = append(wantCards, card.Name)
+	}
+	if len(wantCards) == 0 && len(wantTokens) == 0 {
+		return
+	}
+	_ = a.usePool(ctx, func(c *pool.Conn) error {
+		if len(wantCards) > 0 {
+			found, err := c.GetCards(ctx, wantCards)
+			if err != nil {
+				return err
+			}
+			for name, rec := range found {
+				art := boardArt{}
+				if rec.ImageNormal != nil {
+					art.Image = *rec.ImageNormal
+				}
+				if rec.ImageArtCrop != nil {
+					art.Art = *rec.ImageArtCrop
+				}
+				known[name] = art
+			}
+		}
+		if len(wantTokens) > 0 {
+			found, err := c.TokenArtFor(ctx, wantTokens)
+			if err != nil {
+				return err
+			}
+			// Back under Forge's spelling, which is the key every card in the
+			// dictionary is named by.
+			for _, card := range cards {
+				if !card.Token {
+					continue
+				}
+				if art, ok := found[strings.ToLower(pool.TokenName(card.Name))]; ok {
+					known[card.Name] = boardArt{Image: art.Image,
+						Art: art.Image, Artist: art.Artist}
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// newForgeBoard shapes one game's board for the room.
+//
+// `steps` is cut to `kept` — the number of beats that survived
+// [ForgeBeatsMax] — because a step and a beat are the same moment seen twice
+// and a room paces them together. Cutting them apart would drift the picture
+// away from the account by however many beats were dropped.
+func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
+	art map[string]boardArt, kept int) *forgeBoard {
+	if reel == nil {
+		return nil
+	}
+	out := &forgeBoard{
+		Seats: make([]forgeBoardSeat, 0, len(reel.Seats)),
+		Cards: make([]forgeBoardCard, 0, len(reel.Cards)),
+		Steps: reel.Steps,
+	}
+	if kept >= 0 && kept < len(out.Steps) {
+		out.Steps = out.Steps[:kept]
+	}
+	if out.Steps == nil {
+		out.Steps = []tier3.BoardStep{}
+	}
+	for _, seat := range reel.Seats {
+		row := forgeBoardSeat{Seat: seat.Seat, Name: seat.Name, Life: seat.Life}
+		if slug, ok := seats[seat.Seat]; ok {
+			row.Slug = &slug
+		}
+		out.Seats = append(out.Seats, row)
+	}
+	for _, card := range reel.Cards {
+		painted := art[card.Name]
+		out.Cards = append(out.Cards, forgeBoardCard{
+			ID: card.ID, Name: card.Name, Token: card.Token,
+			Types: card.Types, Seat: card.Seat,
+			Image: painted.Image, Art: painted.Art, Artist: painted.Artist})
+	}
+	return out
 }
 
 // newForgeBeats shapes one game's log for the browser.
@@ -247,7 +416,8 @@ type forgeBeats struct {
 // the same map [tier3.SimRun.Seats] holds — built by hand here because
 // narration happens *during* the run, when there is no run yet, exactly as the
 // CLI's `seatsOf` does for the same reason.
-func newForgeBeats(log tier3.EventLog, seats map[int]string) forgeBeats {
+func newForgeBeats(log tier3.EventLog, seats map[int]string,
+	art map[string]boardArt) forgeBeats {
 	slug := func(seat int) *string {
 		if s, ok := seats[seat]; ok && seat != 0 {
 			return &s
@@ -262,6 +432,7 @@ func newForgeBeats(log tier3.EventLog, seats map[int]string) forgeBeats {
 	}
 	out := forgeBeats{Game: log.Game, Truncated: truncated,
 		Beats: make([]forgeBeat, 0, len(events))}
+	out.Board = newForgeBoard(log.Board, seats, art, len(events))
 	for _, e := range events {
 		out.Beats = append(out.Beats, forgeBeat{
 			Kind: string(e.Kind), Turn: e.Turn, Who: slug(e.Seat),
@@ -620,8 +791,15 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			// and publishing them together is what stops the room seeing a
 			// game arrive with its narration one poll behind.
 			var pending *forgeBeats
+			// The paintings, resolved once for the whole match: two games of
+			// one pairing name almost the same hundred cards, so the second
+			// game costs a round trip for its tokens and nothing else.
+			painted := map[string]boardArt{}
 			hear := func(log tier3.EventLog) {
-				shaped := newForgeBeats(log, seats)
+				if log.Board != nil {
+					a.resolveBoardArt(ctx, log.Board.Cards, painted)
+				}
+				shaped := newForgeBeats(log, seats, painted)
 				pending = &shaped
 			}
 			tick := func(finished int, game *tier3.GameResult) {

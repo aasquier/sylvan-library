@@ -225,7 +225,7 @@ func TestTheBeatsAreCutAtTheCeilingAndSayThatTheyWere(t *testing.T) {
 	}
 	seats := map[int]string{1: "gyome", 2: "trostani"}
 
-	cut := newForgeBeats(tier3.EventLog{Game: 3, Events: long}, seats)
+	cut := newForgeBeats(tier3.EventLog{Game: 3, Events: long}, seats, nil)
 	if len(cut.Beats) != ForgeBeatsMax {
 		t.Errorf("%d beats crossed, want the ceiling of %d",
 			len(cut.Beats), ForgeBeatsMax)
@@ -241,13 +241,13 @@ func TestTheBeatsAreCutAtTheCeilingAndSayThatTheyWere(t *testing.T) {
 
 	// A game inside the ceiling is not marked, and a game the parser had
 	// already truncated stays marked whatever this does.
-	whole := newForgeBeats(tier3.EventLog{Game: 4, Events: long[:10]}, seats)
+	whole := newForgeBeats(tier3.EventLog{Game: 4, Events: long[:10]}, seats, nil)
 	if whole.Truncated || len(whole.Beats) != 10 {
 		t.Errorf("a ten-beat game came out as %d beats, truncated=%v",
 			len(whole.Beats), whole.Truncated)
 	}
 	already := newForgeBeats(
-		tier3.EventLog{Game: 5, Events: long[:10], Truncated: true}, seats)
+		tier3.EventLog{Game: 5, Events: long[:10], Truncated: true}, seats, nil)
 	if !already.Truncated {
 		t.Error("the parser's own cut was dropped on the way to the browser")
 	}
@@ -264,7 +264,7 @@ func TestTheBeatsAreCutAtTheCeilingAndSayThatTheyWere(t *testing.T) {
 func TestABeatOnTheWireNamesADeckAndCarriesNoSeat(t *testing.T) {
 	t.Parallel()
 	shaped := newForgeBeats(tier3.EventLog{Game: 1, Events: theBeats()},
-		map[int]string{1: "gyome", 2: "trostani"})
+		map[int]string{1: "gyome", 2: "trostani"}, nil)
 	raw, err := json.Marshal(shaped)
 	if err != nil {
 		t.Fatal(err)

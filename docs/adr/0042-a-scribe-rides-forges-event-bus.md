@@ -1,6 +1,6 @@
 # 42. A scribe rides Forge's event bus, and the board is a listener rather than a parser
 
-**Status:** Proposed · **Decided:** 2026-08-25 with Aaron · Rides on ADR 14
+**Status:** Accepted · **Decided and wired:** 2026-08-25 with Aaron · Rides on ADR 14
 (deterministic code decides, Claude advises), ADR 35 (the Forge and its
 worker) and ADR 36 (the match ledger records what played). Supersedes nothing;
 it opens a second, richer road beside the prose parser and does not close the
@@ -197,6 +197,52 @@ settled here:
 - **The winner crosses as the deck's name**, because that is what
   `createAiPlayer` was handed — the same string the prose parser reads off
   `Ai(1)-<name>`. Consistent, and still a name rather than a slug.
+
+## What the wiring settled
+
+Written the same day, after the Go runner, the board and the room were built
+on top of this. The two questions above are answered and a third was found.
+
+**The seat numbering is resolved at the source, not on the far side.** Both
+schemes were live in one stream — a zone event said seat 0 and the result line
+said seat 1 about the same player — which is a trap laid for whoever reads it
+next. The scribe now subscribes to `GameEventGameStarted`, learns Forge's own
+player order off `players()`, emits a `seat` line per player carrying the
+starting life, and reports one-based seats everywhere. `getId() + 1` remains
+the fallback for the handful of setup events Forge raises before the game
+announces it has started; both agree on every game observed.
+
+**`GameEventGameOutcome.lastTurnNumber()` is not the number the log prints,
+and that is the finding worth carrying forward.** `GameLogFormatter` renders
+the outcome line as `Math.ceil(ev.lastTurnNumber() / 2.0)` — read out of the
+bytecode — so Forge's own log has *two* turn numbers: `Turn: Turn N` is a
+player-turn and `Game Outcome: Turn N` is already a round. `GameResult.Turns`
+comes from the second and has therefore always been rounds. The parity gate
+caught this immediately (23 through the log against 46 raw on the bus) and the
+scribe path now applies the same halving, because matching Forge is the
+requirement rather than being right in general — a row that means rounds on
+one path and player-turns on the other poisons the ledger across a deploy. It
+also exposed a live bug in the room, which was halving the row a *second* time
+and rendering a nine-turn game as "T5".
+
+**The bus carries more than the board, and taking it changed the account.**
+The scribe as proposed emitted no combat at all, so swapping it in behind the
+same stream would have made the play-by-play *worse*. It now also reports
+`GameEventAttackersDeclared`, `GameEventBlockersDeclared`,
+`GameEventCardDamaged`, `GameEventPlayerDamaged`, `GameEventMulligan`,
+`GameEventSpellAbilityCast` and the outcome's own sentences — so the account
+is strictly better than the twelve regexes rather than merely different:
+`isSpell()` separates a cast from a trigger where the log offered three shapes
+of one sentence, and an outcome is Forge's sentence handed over whole where the
+regex had to be non-greedy to survive "has lost because an opponent has won by
+spell".
+
+One decoding is worth recording because both readings look identical in the
+data. `GameEventBlockersDeclared` carries an attacker mapped **to itself** when
+nobody blocked it, because `PhaseHandler` builds the multimap as
+`putAll(attacker, blockers.isEmpty() ? List.of(attacker) : blockers)`. Without
+that, fourteen of sixteen blocks in a measured game read as a creature blocking
+itself. The bytecode was checked rather than the pattern guessed.
 
 ## Consequences
 

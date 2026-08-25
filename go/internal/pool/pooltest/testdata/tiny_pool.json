@@ -1087,6 +1087,52 @@
    null,
    null,
    "Christopher Rush"
+  ],
+  [
+   "13e8f518-1c0d-4c01-a397-71481839d02b",
+   "a468338f-635e-4206-89d6-72d723071d45",
+   "Food",
+   "teld",
+   "Throne of Eldraine Tokens",
+   "16",
+   "common",
+   "2019-10-04",
+   false,
+   false,
+   [
+    "nonfoil",
+    "foil"
+   ],
+   "https://cards.scryfall.io/normal/front/1/3/13e8f518-1c0d-4c01-a397-71481839d02b.jpg?1783932478",
+   null,
+   null,
+   0.08,
+   null,
+   null,
+   "Randy Gallegos"
+  ],
+  [
+   "e4a685df-00dd-434a-baef-d04541ab4b9a",
+   "a468338f-635e-4206-89d6-72d723071d45",
+   "Food",
+   "sld",
+   "Secret Lair Drop",
+   "2546",
+   "common",
+   "2026-08-17",
+   false,
+   false,
+   [
+    "nonfoil",
+    "foil"
+   ],
+   "https://cards.scryfall.io/normal/front/e/4/e4a685df-00dd-434a-baef-d04541ab4b9a.jpg?1786586808",
+   null,
+   null,
+   null,
+   "707504",
+   "Bilbo was just then sitting down for a nice little second breakfast by the open window, when in walked Gandalf.",
+   "Ben Wootten"
   ]
  ]
 }

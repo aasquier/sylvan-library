@@ -45,9 +45,10 @@
  * keyframe that a media query can switch off should be switched off there.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import type { DeckSummary, ForgeGameRow } from '../lib/api'
+import type { StagedBeat } from '../lib/reel'
 import { shortName, turnsTaken } from '../lib/theater'
 
 /** How many games the stage keeps in view. The feed is the last few blows,
@@ -241,52 +242,6 @@ export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
   )
 }
 
-/** How fast the queue of beats drains, by how deep it is.
- *
- * A game is a handful of seconds and about a hundred beats, and they arrive
- * all at once when the game ends. Draining at one fixed rate is wrong in both
- * directions: fast enough to keep up is too fast to read, and slow enough to
- * read falls a game behind by the third one. So the pace is a function of the
- * backlog — a fresh game catches up quickly and then plays out at reading
- * speed, which is also how a game actually feels: a flurry, then a pause.
- *
- * Milliseconds, and the sort of number to change by watching rather than by
- * arguing.
- */
-function pace(queued: number): number {
-  if (queued > 80) return 45
-  if (queued > 40) return 90
-  if (queued > 12) return 200
-  return 420
-}
-
-/** How many beats stay in the DOM. The play-by-play is a feed, not a
- *  transcript: a twenty-game match raises two thousand beats and nobody
- *  scrolls back through them. */
-const BEATS_KEPT = 80
-
-/** One beat, already turned into words by `beatLine` and given an identity by
- *  whoever is pacing them. The stage renders; it does not translate. */
-export interface StagedBeat {
-  key: string
-  game: number
-  turn: number
-  kind: string
-  who: string | null
-  text: string
-}
-
-/** What the stage is holding: the beats already told, the ones still to tell,
- *  and which game they belong to. */
-interface Reel {
-  shown: StagedBeat[]
-  queue: StagedBeat[]
-  game: number
-  truncated: boolean
-}
-
-const EMPTY_REEL: Reel = { shown: [], queue: [], game: 0, truncated: false }
-
 /**
  * The play-by-play: what happened, in the order it happened.
  *
@@ -312,54 +267,16 @@ const EMPTY_REEL: Reel = { shown: [], queue: [], game: 0, truncated: false }
  * is the only structure the log has, and without it a hundred lines of casting
  * and blocking is one undifferentiated wall.
  */
-export function MatchBeats({ arriving, running }: {
-  /** The newest game's beats, handed over again on every poll — which is why
-   *  the game number is the identity. The same log arriving twenty times is
-   *  one game; only a new number is news. */
-  arriving: { game: number; beats: StagedBeat[]; truncated: boolean } | null
+export function MatchBeats({ beats, game, truncated, running }: {
+  /** The beats already told, paced by the room's own clock (`lib/reel.ts`).
+   *  This component owned that pacing until the board arrived; it does not
+   *  any more, because the board watches the same clock and two of them
+   *  would drift apart inside a turn. */
+  beats: StagedBeat[]
+  game: number
+  truncated: boolean
   running: boolean
 }) {
-  // One piece of state rather than four, because every change moves two of
-  // them together: a beat leaving the queue is a beat entering the shown list,
-  // and a game arriving does both at once. Split across four `useState`s that
-  // is four updates and a dependency cycle between the effects; here it is one
-  // functional update that needs nothing from the render it happens in.
-  const [reel, setReel] = useState<Reel>(EMPTY_REEL)
-  // The newest game already taken in. A ref rather than state so the guard
-  // below can read it without putting it in the effect's dependencies —
-  // and it never needs resetting, because a new match remounts this whole
-  // stage rather than clearing it.
-  const heard = useRef(0)
-
-  useEffect(() => {
-    if (!arriving || arriving.game <= heard.current) return
-    heard.current = arriving.game
-    // The game before this one is flushed rather than abandoned: every beat is
-    // shown, and the room never falls behind what the pips already say. It is
-    // a flurry at the moment a game ends, which is what a game ending is.
-    setReel((r) => ({
-      shown: [...r.shown, ...r.queue].slice(-BEATS_KEPT),
-      queue: arriving.beats,
-      game: arriving.game,
-      truncated: arriving.truncated,
-    }))
-  }, [arriving])
-
-  // One beat leaves the queue per tick, and the next tick is scheduled from
-  // what is left — so the pace is re-read after every beat rather than once a
-  // game. A queue that empties simply stops scheduling.
-  useEffect(() => {
-    const next = reel.queue[0]
-    if (!next) return
-    const id = window.setTimeout(() => setReel((r) => ({
-      ...r,
-      shown: [...r.shown, next].slice(-BEATS_KEPT),
-      queue: r.queue.slice(1),
-    })), pace(reel.queue.length))
-    return () => window.clearTimeout(id)
-  }, [reel.queue])
-
-  const { shown: beats, game, truncated } = reel
   // Pinned to the bottom while the match is live: a game reads downward, so
   // the newest beat is the one at the bottom and it is the one to be looking
   // at. Released when the match ends, so a finished game can be scrolled back

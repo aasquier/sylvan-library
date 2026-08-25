@@ -69,17 +69,17 @@ describe('the turn a player would name', () => {
 })
 
 describe('how long a finished game took', () => {
-  it('halves a heads-up game, because a row carries no seats', () => {
-    // The measured game: Forge said 15, the players took 8 and 7.
-    expect(turnsTaken(15)).toBe(8)
-    expect(turnsTaken(14)).toBe(7)
+  it('passes the row through, because Forge already halved it', () => {
+    // **This test used to assert the opposite**, and the correction is the
+    // point of keeping it. `ForgeGameRow.turns` is read off Forge's
+    // `Game Outcome: Turn N`, and Forge's own `GameLogFormatter` renders that
+    // line as `Math.ceil(ev.lastTurnNumber() / 2.0)` — so the halving has
+    // already happened by the time a row exists. Measured on a recorded
+    // narration: seventeen `Turn:` lines, `Game Outcome: Turn 9`. Halving here
+    // rendered that nine-turn game as "T5".
+    expect(turnsTaken(9)).toBe(9)
+    expect(turnsTaken(23)).toBe(23)
     expect(turnsTaken(1)).toBe(1)
-  })
-
-  it('divides a pod by its seats', () => {
-    // The CLI plays four-player pods, where turn 15 is round four.
-    expect(turnsTaken(15, 4)).toBe(4)
-    expect(turnsTaken(16, 4)).toBe(4)
   })
 
   it('passes a missing count through rather than inventing a zero', () => {

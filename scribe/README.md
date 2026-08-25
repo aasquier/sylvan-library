@@ -57,17 +57,38 @@ game (Gyome/Food against Atla/Eggs, seed 11, 2026-08-25):
 | `zone` | 268 | a card entering or leaving a zone: which zone, whose, id, name, whether it is a token, its type line and stats |
 | `tapped` | 131 | a card tapping or untapping |
 | `stats` | 23 | power, toughness or type actually changing |
-| `turn` | 15 | a turn beginning, and whose |
+| `attack` | 16 | an attacker, and the player or planeswalker it was sent at |
+| `damage` | 16 | damage: how much, from what, onto a card or a seat |
+| `unblocked` | 15 | an attacker nobody blocked |
+| `turn` | 15 | a turn beginning, whose, Forge's number for it, and their life |
 | `land` | 14 | a land played |
+| `cast` | 14 | a **spell** being cast — `isSpell()`, so never a trigger |
 | `life` | 10 | a life total after it changed |
 | `counters` | 5 | a counter kind, its old total and its new one |
-| `game`, `outcome`, `result` | 3 | the frame around a game |
+| `block` | 1 | a blocker, and the attacker it stopped |
+| `seat` | 2 | the roster at game start: seat, name, starting life |
+| `outcome` | 2 | one of Forge's own outcome sentences, with the last turn |
+| `mulligan` | — | a hand thrown back (neither player did, that game) |
+| `game`, `result` | 2 | the frame around a game |
 
-473 lines for a game the prose log told in 453 — but every line is typed, and
+534 lines for a game the prose log told in 453 — but every line is typed, and
 the board is in them. **The `stats` figure is the one to watch.** Before it
 was deduplicated that same game emitted 3,300 of them: `GameEventCardStatsChanged`
 fires on nearly every priority pass and re-sends the whole card whether
 anything moved or not. Only 23 were ever news.
+
+**Seats are one-based everywhere in this stream**, which they were not at
+first. `PlayerView.getId()` is zero-based for the first seat while
+`SimRun.Seats` and the result line below count from one, so both schemes were
+live in one stream and said different things about the same player. The scribe
+now learns Forge's own player order off `GameEventGameStarted.players()`, puts
+it in the stream as the `seat` lines, and reports one seat number.
+
+**An attacker mapped to itself means it was not blocked**, and that is Forge's
+encoding rather than a guess at one — `PhaseHandler` builds the multimap as
+`putAll(attacker, blockers.isEmpty() ? List.of(attacker) : blockers)`. Reading
+it as a block made fourteen of sixteen in a measured game read as a creature
+blocking itself. `Scribe.java` carries the bytecode.
 
 ## What is not here
 
@@ -109,6 +130,21 @@ cannot see. Run it after changing anything marked PARITY:
 MTGLAB_LIVE_FORGE=1 MTGLAB_SCRIBE_CLASSES=$(pwd)/scribe/out \
   go test ./internal/sim/tier3/ -run TestTheScribePlaysTheSameMagicAsStockSim -v
 ```
+
+**The gate drives both paths through `RunGames`**, which is stronger than
+building an argv by hand: the two runs differ in exactly one field of one
+struct (`Settings.ScribeClasses`), so anything that disagrees is the scribe
+playing different Magic and not the harness asking differently. It compares the
+winner by seat, the turn count, the draws and the clock-outs, and asserts a
+board was reported at all.
+
+The turn count is in that list for a reason it caught the first time it ran.
+`GameEventGameOutcome.lastTurnNumber()` is a *player-turn* count, and Forge's
+own `GameLogFormatter` renders the log's outcome line as
+`Math.ceil(lastTurnNumber() / 2.0)` — so the log has always reported **rounds**
+and the bus reports player-turns. The stock path said 23 and the scribe said
+46. The Go side now applies Forge's own halving, because matching Forge is the
+requirement rather than being right in general.
 
 It needs a JVM, a Forge distribution and about a minute, so it does not run in
 CI. What CI does prove is that the scribe still compiles against the jar the
