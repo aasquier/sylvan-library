@@ -6443,7 +6443,7 @@ button:hover .tarot-fan-card {
   gap: 6px;
   padding: 8px 10px;
 }
-.field-rows { display: flex; flex-direction: column; gap: 6px; }
+.field-rows { display: flex; flex-direction: column; gap: 10px; }
 
 /* ------------------------------------------------------- the hands, held
  *
@@ -6501,10 +6501,22 @@ button:hover .tarot-fan-card {
   background: linear-gradient(180deg,
     rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.16) 100%);
 }
+/* **The nameplate is the handle that opens the hand**, so it is a control and
+   has to answer the hand that reaches for it (commandment 17). It is a place
+   rather than an action — "show me the whole hand" — so it is carved into the
+   furniture rather than raised off it: brass warms and a hairline comes up
+   under the name, the way a brass plate catches the light when you lean in. */
 .field-hand-label {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  font: inherit;
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -6513,6 +6525,29 @@ button:hover .tarot-fan-card {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: inset 0 -1px 0 0 transparent;
+  transition: color 140ms ease, background-color 140ms ease,
+              box-shadow 140ms ease, transform 90ms ease;
+}
+.field-hand-label:hover:not(:disabled),
+.field-hand-label.is-open {
+  color: color-mix(in srgb, var(--field-brass) 92%, #fff);
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 -1px 0 0
+    color-mix(in srgb, var(--field-brass) 62%, transparent);
+}
+.field-hand-label:focus-visible {
+  outline: 2px solid var(--field-brass);
+  outline-offset: 1px;
+}
+.field-hand-label:active:not(:disabled) { transform: translateY(0.5px); }
+/* An empty hand has nothing to spread, so the plate stops being a control
+   rather than opening onto nothing. */
+.field-hand-label:disabled { cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .field-hand-label { transition: color 140ms ease, background-color 140ms ease; }
+  .field-hand-label:active:not(:disabled) { transform: none; }
 }
 .field-hand-n {
   font-weight: 700;
@@ -6555,20 +6590,22 @@ button:hover .tarot-fan-card {
   transform: translateY(7px) scale(0.97);
   transform-origin: bottom right;
 }
-.field-hand:hover .field-hand-tray,
-.field-hand:focus-within .field-hand-tray,
+/* **Only `is-open`, and no `:hover` group at all.** The hand's tray used to
+   open on `.field-hand:hover`, and the hand includes the fan — so reading one
+   card off the fan sprang the whole hand open on top of it. The nameplate is
+   the handle now and React holds the state, because the tray opens across a
+   gap and past the fan: any CSS hover group large enough to survive that
+   journey is the whole hand again, which is the bug. */
 .field-hand-tray.is-open {
   opacity: 1;
   visibility: visible;
   transform: none;
   transition-delay: 0s;
 }
-/* The label is the handle on touch, so it should not look like prose. */
-.field-hand-label { cursor: default; }
 
 /* Held, not played: a card in a hand lifts toward the person holding it when
  * the pointer finds it, so a tight fan can still be read one card at a time.
- * The peek that opens above it is `.field-card-peek`'s, unchanged. */
+ * The preview that opens beside it is `.field-peek`'s, placed by measurement. */
 .field-hand-fan .field-card {
   transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -6629,30 +6666,15 @@ button:hover .tarot-fan-card {
     transform: translateX(7px) scale(0.97);
     transform-origin: top right;
   }
-  .field-hand:hover .field-hand-tray,
-  .field-hand:focus-within .field-hand-tray,
   .field-hand-tray.is-open {
     transform: none;
   }
 
-  /* **A hand card's preview opens into the field**, not upward and not
-     centred on the card. The rail is about 112px and the preview is 208px, so
-     a centred one is cut in half by `.field`'s own `overflow: hidden` — the
-     one boundary still clipping anything here — and an upward one runs off
-     the top for the far player, who sits at the top. Sideways it has the
-     whole arena to open into. */
-  .field-hand-fan .field-card-peek {
-    bottom: auto;
-    top: 50%;
-    left: auto;
-    right: calc(100% + 10px);
-    transform: translateY(-50%) scale(0.94);
-    transform-origin: right center;
-  }
-  .field-hand-fan .field-card:hover .field-card-peek,
-  .field-hand-fan .field-card:focus-visible .field-card-peek {
-    transform: translateY(-50%) scale(1);
-  }
+  /* A hand card's preview used to need its own placement here — the rail is
+     about 112px and the preview was a centred child of the card, so it was cut
+     in half by the field's own `overflow: hidden`. It is portalled to the body
+     and clamped to the viewport now, so there is nothing left to say about it
+     at any breakpoint: `FieldPeek` measures the card and picks the side. */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6751,8 +6773,8 @@ button:hover .tarot-fan-card {
   right: 0;
   z-index: 8;
   width: max-content;
-  max-width: min(58vw, 430px);
-  max-height: 178px;
+  max-width: min(72vw, 560px);
+  max-height: 268px;
   /* Vertical only. The cards wrap, so there is never anything to scroll
      sideways to — and `overflow: auto` still reserved a horizontal bar and
      painted a scroll corner in the tray's bottom-right, which at this size
@@ -6813,11 +6835,26 @@ button:hover .tarot-fan-card {
   color: #1a1409;
   background: var(--field-brass);
 }
+/* **A tray is for reading, and the row it opened from is not.**
+ *
+ * The cards in here were the same 42x59 as a land on the sand, which is the
+ * right size out there — a row of nine has to fit — and the wrong size in a
+ * panel whose entire reason to exist is *what is in that pile* (Aaron,
+ * 2026-08-25: "I can't even make out the printing on the cards"). Forty-two
+ * pixels of a card is a colour and a shape.
+ *
+ * Seventy-six is a card you can recognise: the art reads, the frame's colour
+ * reads, a token's gold edge reads. Reading the rules text is still the
+ * preview's job — that is what `.field-peek` is for, and it now opens clear of
+ * this panel instead of inside it. */
 .field-tray-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
 }
+.field-tray-cards .field-card { width: 76px; height: 106px; }
+.field-tray-cards .field-card-lens { width: 26px; height: 26px; }
+.field-tray-cards .field-card-lens-pt { font-size: 0.6rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .field-tray,
@@ -6894,60 +6931,53 @@ button:hover .tarot-fan-card {
   background: color-mix(in srgb, var(--field-brass) 88%, transparent);
 }
 
-/* The card, readable. Forty pixels of painting is enough to tell a Forest
-   from a Dragon and nowhere near enough to read one, so hovering lifts the
-   whole face out — which is what every Magic client does, and what the rest of
-   this app does through `CardHover`.
+/* **The card, held up.** Fifty-eight pixels of painting is enough to tell a
+   Forest from a Dragon and nowhere near enough to read one, so hover and
+   keyboard focus lift the whole face out — which is what every Magic client
+   does, and what the rest of this app does through `CardHover`.
 
-   It is positioned against the card and the rows no longer clip — see
-   `.field-row`, which used to scroll and therefore cut this away entirely.
-   Previews open **toward the middle of the field**: the far player's downward,
-   the near player's upward, so neither runs off the field's own edge, which is
-   the one boundary still doing any clipping. Pointer-events off, so it can
-   never eat the hover that summoned it. */
-.field-card-peek {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  z-index: 40;
-  width: 208px;
-  transform: translateX(-50%) scale(0.94);
-  transform-origin: bottom center;
-  opacity: 0;
-  visibility: hidden;
+   **Fixed, in the body, and placed by measurement.** This used to be an
+   absolutely-positioned sibling of the card, centred on it in CSS, and that
+   shape had three faults at once: it was clipped by the field's own overflow
+   near the left edge, it was trapped inside the graveyard and hand trays that
+   scroll, and it could not be widened past the room it had. All three are the
+   same fact — a panel parented to the thing it describes inherits that
+   thing's boxes. `FieldPeek` measures the card and writes `left`/`top`/`width`
+   here, so it is clamped to the viewport rather than centred into a wall.
+
+   Three hundred pixels wide rather than two-oh-eight, because the ask was to
+   read the printing and the printing is the point. */
+.field-peek {
+  position: fixed;
+  z-index: 60;
+  display: block;
   pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
-  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.75));
+  filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.78));
+  animation: field-peek-in 130ms ease-out both;
 }
-.field-card-peek img {
+.field-peek img {
   display: block;
   width: 100%;
-  border-radius: 9px;
+  border-radius: 4.75% / 3.4%;
 }
-.field-card-peek-artist {
+.field-peek-artist {
   display: block;
   margin-top: 3px;
   text-align: center;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   color: #e8dcc0;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
-.field-card:hover .field-card-peek,
-.field-card:focus-visible .field-card-peek {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) scale(1);
+@keyframes field-peek-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-peek { animation: none; }
 }
 .field-card:focus-visible {
   outline: 2px solid var(--field-brass);
   outline-offset: 1px;
-}
-/* The far player's cards sit near the top of the field, so their preview
-   opens downward instead of off the top of it. */
-.field-side-far .field-card-peek {
-  bottom: auto;
-  top: calc(100% + 6px);
-  transform-origin: top center;
 }
 
 /* Which game. Only ever shown when there is more than one. */
@@ -7044,11 +7074,17 @@ button:hover .tarot-fan-card {
    against a row ending at 100, invisible in every case. A preview inside a
    scroller is the classic version of this trap, and the way out is not to be
    inside one. */
+/* **Half a turn leans further than a quarter turn does.** A 58x81 card turned
+   ninety degrees reaches 11.5px past each side of its slot and *shrinks*
+   vertically; turned forty-five it reaches 20px past each side and 8.6px past
+   top and bottom. Leaning on the neighbour is the intent — that is what a
+   tapped card does on a table — but a third of a card covered is not, and the
+   rows had three pixels between them to absorb it. */
 .field-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 3px;
+  gap: 7px;
   min-height: 42px;
   padding: 2px 0;
 }
@@ -7083,7 +7119,22 @@ button:hover .tarot-fan-card {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.3);
   background: var(--field-plate);
 }
-.field-card.is-tapped .field-card-turn { transform: rotate(90deg); }
+/* **Forty-five degrees, not ninety.**
+ *
+ * A quarter-turn is the literal gesture and it is expensive: a card turned
+ * ninety degrees is as wide as it was tall, so a row of tapped permanents is
+ * a row and a half, and on a board that runs to forty of them that is the
+ * difference between seeing the game and scrolling it. Half a turn is still
+ * unmistakably *turned* — nobody has ever failed to read a leaning card — and
+ * it stays much closer to its own slot (Aaron, 2026-08-25: "more compact use
+ * of space in general").
+ *
+ * The `--turn` variable is here so the arm carrying the corner furniture can
+ * turn by exactly the same amount and each chip on it turn back by exactly
+ * the same amount. Three places, one angle: change it here and the overlays
+ * follow, which is the failure mode the first draft of this had. */
+.field-card { --turn: 45deg; }
+.field-card.is-tapped .field-card-turn { transform: rotate(var(--turn)); }
 
 .field-card-art {
   width: 100%;
@@ -7133,9 +7184,51 @@ button:hover .tarot-fan-card {
 }
 /* The pile leans with the card when it turns, because it is the same pile. */
 .field-card.is-stacked.is-tapped .field-card-pile {
-  transform: rotate(90deg);
+  transform: rotate(var(--turn));
   transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
 }
+
+/* ------------------------------------------------------------- the arm
+ *
+ * **Everything written in a card's corners, riding the card's corners.**
+ *
+ * The count, the counters and the loupe are all anchored to a corner, and
+ * until now they were anchored to the corners of the *slot* — a box that
+ * never turns, holding a card that does. At ninety degrees that was nearly
+ * invisible, because a card turned a full quarter still reaches the corners
+ * of its own slot. At forty-five it is not: the card's corners swing about a
+ * fifth of its width clear, so the count floated over sand and the counters
+ * sat on the neighbouring permanent.
+ *
+ * So the arm turns with the card and each thing on it turns back by the same
+ * angle. The furniture rides the corner it belongs to and stays upright to be
+ * read — which is what a player does with a tapped card: turn the card, not
+ * your head.
+ *
+ * **Each chip pivots about its own anchor corner**, which is the part that
+ * makes it work: rotating a bottom-left chip about `0 100%` spins it in place
+ * and moves it nowhere, so the counter-rotation is purely a change of
+ * orientation. Pivot about the centre instead and every chip walks off its
+ * corner by half its own diagonal. */
+.field-card-arm {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  /* The arm is a frame, not a surface: it must not eat the hover that belongs
+     to the card, but the chips on it carry their own titles. */
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+.field-card.is-tapped .field-card-arm { transform: rotate(var(--turn)); }
+.field-card-arm > * { pointer-events: auto; }
+.field-card-arm > * {
+  transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+.field-card.is-tapped .field-card-arm > * { transform: rotate(calc(-1 * var(--turn))); }
+.field-card-count { transform-origin: 100% 0; }
+.field-card-counters { transform-origin: 0 100%; }
+.field-card-lens { transform-origin: 100% 100%; }
 
 .field-card-count {
   position: absolute;
@@ -7172,12 +7265,20 @@ button:hover .tarot-fan-card {
  * A magnifier is the right object because it is the *gesture* — you lean in
  * on the corner of a card to check what it is fighting at. So the glass sits
  * where a card's own power/toughness box sits, takes the painting under it up
- * to three-and-a-bit times, and carries the figures in crisp type on top. It
- * grows out of the corner it magnifies rather than fading in, which is the
- * difference between a lens being brought up and a tooltip appearing.
+ * to three-and-a-bit times, and carries the figures in crisp type on top.
  *
- * `is-open` is the tap: hover and focus are handled here, and a phone has
- * neither.
+ * **It is always there.** Hiding it until hover fixed the tab's fault by
+ * committing its opposite: a board of forty creatures with no numbers on it at
+ * all, and the only way to learn any of them one hover at a time (Aaron,
+ * 2026-08-25: "what I meant is that it always appeared"). Power and toughness
+ * are the two facts a board is read for — the question is not whether to show
+ * them, it is whether they cost the painting, and glass is how they stop
+ * costing it. Hover still does something: the lens comes up off the card, the
+ * way a real one does when you pick it up.
+ *
+ * It never turns. `.field-card-arm` above carries it round to the card's own
+ * stat corner and it rotates back to level, because the whole purpose of a
+ * magnifier is reading and a number at forty-five degrees is not read.
  */
 .field-card-lens {
   position: absolute;
@@ -7185,19 +7286,17 @@ button:hover .tarot-fan-card {
   bottom: 0;
   width: 26px;
   height: 26px;
-  z-index: 3;
-  opacity: 0;
-  transform: scale(0.55);
-  transform-origin: 82% 84%;
-  transition: opacity 130ms ease,
-              transform 190ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .field-card-small .field-card-lens { width: 20px; height: 20px; }
+/* Picked up. The lens lifts and grows a little under the pointer — the only
+   thing hover does here now that the glass no longer arrives with it. */
 .field-card:hover .field-card-lens,
-.field-card:focus-visible .field-card-lens,
-.field-card-lens.is-open {
-  opacity: 1;
-  transform: none;
+.field-card:focus-visible .field-card-lens {
+  transform: scale(1.18);
+}
+.field-card.is-tapped:hover .field-card-lens,
+.field-card.is-tapped:focus-visible .field-card-lens {
+  transform: rotate(calc(-1 * var(--turn))) scale(1.18);
 }
 
 .field-card-lens-glass {
@@ -7250,7 +7349,17 @@ button:hover .tarot-fan-card {
 .field-card-small .field-card-lens-pt { font-size: 0.5rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .field-card-lens { transition: opacity 120ms ease; transform: none; }
+  /* The lens no longer arrives, so there is nothing to soften — but the arm
+     still has to carry it round to the card's stat corner and back to level,
+     because that is placement rather than decoration. Instant, not absent. */
+  .field-card-arm,
+  .field-card-arm > * { transition: none; }
+  .field-card:hover .field-card-lens,
+  .field-card:focus-visible .field-card-lens { transform: none; }
+  .field-card.is-tapped:hover .field-card-lens,
+  .field-card.is-tapped:focus-visible .field-card-lens {
+    transform: rotate(calc(-1 * var(--turn)));
+  }
 }
 
 /* Counters, one chip each and stacked up the card's left edge.
@@ -7271,14 +7380,24 @@ button:hover .tarot-fan-card {
   align-items: flex-start;
   gap: 1px;
 }
+/* Eight pixels of type was the right size for a chip nobody was meant to read
+   and the wrong size for the two facts on a creature that most change what
+   happens next. The colours were always here and always correct — Forge names
+   an `M1M1` counter `-1/-1`, checked against the bytecode rather than guessed,
+   so `counterSign` has always read it as a subtraction — but a red chip nobody
+   can see is a red chip nobody has seen (Aaron, 2026-08-25: "still not sure I
+   see positive being green, and negative counters being red"). */
 .field-counter {
-  font-size: 0.5rem;
+  font-size: 0.58rem;
   font-weight: 700;
-  line-height: 1.35;
-  padding: 0 2.5px;
-  border-radius: 2px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  line-height: 1.3;
+  padding: 0.5px 3px;
+  border-radius: 2.5px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.35);
 }
+.field-card-small .field-counter { font-size: 0.52rem; }
 /* Both inks are near-black on a light chip: 10.9:1 on the green and 8.1:1 on
    the red, so the sign is legible before the hue is even read. */
 .field-counter.is-up {
