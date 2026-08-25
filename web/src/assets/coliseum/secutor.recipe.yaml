@@ -1,0 +1,99 @@
+# The man who walks out onto the sand.
+#
+# The room's own prose introduces him twice and had nothing to show: "the
+# net-and-trident retiarius against the armoured secutor, speed set against
+# plate", and one slide later, "his usual opponent, the secutor, wore
+# fish-scale motifs on purpose". A room that names a figure that specifically
+# and then draws nothing of him is a room describing a photograph nobody
+# brought.
+#
+# **Why a figure and not a weapon.** A gladius was the first idea and the Met's
+# open access does not have one — the Greek and Roman arms in the collection
+# are helmets, greaves and vessels, and the swords with public-domain plates
+# are all European and a millennium late. That was the better outcome. A sword
+# on its own is a prop; a man in armour standing still is the thing the room is
+# actually about, and this statuette is a *secutor* in particular rather than a
+# gladiator in general. Every diagnostic is on it: the smooth egg-shaped helmet
+# with the crest and the two small eyeholes — shaped so a net had nothing to
+# catch on, which is the whole reason the class existed — the manica ribbed
+# down the sword arm, the tall rectangular scutum held across the body, and the
+# single greave on the leading leg. Somebody who reads the slide and then looks
+# left can find all four.
+#
+# **The plate is why this one and not another, and it is also why there is a
+# new op.** `matte_backdrop` was the obvious tool and this is the plate it
+# cannot do. Its sweep is not one colour: measured, the ground runs 126 at the
+# top edge to 210 at the bottom, and the figure's lit shield sits at 208. No
+# distance from a single sampled backdrop separates those — the best setting
+# swept left a quarter of the ground standing, and one step wider walked the
+# flood up the cast shadow and ate the shield instead.
+#
+# What separates them is not brightness but whether they are a colour at all.
+# The sweep is photographed neutral, so it is grey to within a level or two at
+# every brightness the gradient passes through; fired clay is warm at all of
+# them. On this plate 79.5% of the pixels sit at a chroma of 0-5 and the figure
+# sits at 30-80, with six tenths of one percent in between. `matte_neutral`
+# reads that and cuts the plate in one pass. (It is the wrong op for a marble
+# or a silver coin, which are grey and would go with the ground; its docstring
+# says so, and a test pins it.)
+animist: 1
+
+why_committed: >
+  The licence is clean and the figure is small, but the real reason is that he
+  stands in a slot that is empty by construction. He fills the slack between a
+  short slide and the controls pinned under it — space that exists because the
+  painting beside him is tall, and that varies with every one of thirteen
+  slides. A decoration that is sometimes 224 pixels tall and sometimes 80 has
+  to be a local file: a figure that resolves from somebody else's CDN would
+  pop in at a different size on every slide, and the one place a reader's eye
+  is already moving is exactly where a late-arriving image is most obvious.
+
+sources:
+  # The Met's own, and public domain outright rather than by anybody's
+  # interpretation: `isPublicDomain` is true on object 248365.
+  secutor:
+    provider: met
+    identifier: "248365"
+    title: "Terracotta statuette of a gladiator, 1st-2nd century CE"
+    landing: https://www.metmuseum.org/art/collection/search/248365
+    found_via: >
+      the Met Open Access API, searching the Greek and Roman Art department
+      for `gladiator` -- the one figure in the results with a full studio
+      plate, an unambiguous secutor's helmet, and no second object in frame
+    licence: CC0-1.0
+
+outputs:
+  # **Height rather than width**, because height is the axis the layout
+  # controls: he is sized to the slack above the Back/Next row, which is
+  # `min-h-20` at its tightest and `max-h-56` at its widest. 448 is that
+  # ceiling at 2x, and it is the only number here that is not a taste call.
+  #
+  # Quality 82 rather than the floor's 70: the sand hides compression in its
+  # own grain and a fired-clay surface photographed under soft light does the
+  # opposite -- the gradients across the helmet and the shield are broad and
+  # smooth, which is exactly what a low quality setting bands.
+  - file: secutor.webp
+    from: secutor
+    ops:
+      # **The matte comes before the crop**, which is the opposite of the
+      # order that reads naturally and the one that matters. Cropping first
+      # was tried and it is what a connectivity matte would need; a chroma key
+      # needs nothing from the frame edge, and running it on the whole plate
+      # keeps the decision one measurement rather than one measurement per
+      # crop anybody later retunes.
+      #
+      # 14 and 16: transparent at a chroma of 14, opaque at 30 -- straddling
+      # the empty valley the plate's own histogram has between its ground and
+      # its clay. The cast shadow pooling to the lower left sits at 23, which
+      # is mid-ramp, so it *fades* instead of being kept as a grey wedge or
+      # cut as a hard scallop. JPEG's subsampled chroma fringe along the
+      # silhouette lands in the same band and is handled by the same ramp.
+      - matte_neutral: {tolerance: 14, soft: 16}
+      # The figure's own bounding box, found by that same chroma test rather
+      # than by eye, plus 26px of air so the ramp's soft edge is not clipped
+      # back to a hard one. The bottom keeps the plinth whole: it is the flat
+      # he stands on, and cropping into it leaves him hovering.
+      - crop: {frac_box: [0.3458, 0.0700, 0.7242, 0.9200]}
+      - resize: {height: 448}
+    encode: {format: webp, quality: 82}
+    expect: {width: 199, height: 448, budget_kb: 60, metadata: none}

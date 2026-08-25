@@ -69,6 +69,7 @@ import {
 } from '../lib/theater'
 import { CrossedSwordsGlyph } from '../components/glyphs'
 import { HelpTip, Term } from '../components/term'
+import secutorArt from '../assets/coliseum/secutor.webp'
 
 /** Every control and figure here, keyed to the served glossary — the same
  *  contract the Simulator's own controls use. */
@@ -512,8 +513,9 @@ export default function ColiseumRoom() {
           surfaces set and this inherits. The room itself is worth walking
           through either way, so nothing else on the page depends on it. */}
       {forgeReady && (
-        <div className="card-surface mt-5 flex flex-wrap items-end gap-3
-                        rounded-xl p-4">
+        <div data-open={running ? 'true' : 'false'}
+             className="card-surface gatehouse mt-5 flex flex-wrap items-end
+                        gap-3 rounded-xl p-4">
           {/* **The selects carry a floor, and that is the whole fix.**
               Three rounds of this bug, and the first two treated a
               *breakpoint* as if it knew how wide the room was.
@@ -715,9 +717,33 @@ export default function ColiseumRoom() {
                 <MatchBeats beats={reel.shown} game={reel.game}
                             truncated={reel.truncated} running={running} />
               ) : (
-                <div className="flex flex-1 flex-col justify-between">
+                <div className="flex min-h-0 flex-1 flex-col">
                   <div>
                     {facts[slide] && <Slide key={slide} fact={facts[slide]} />}
+                  </div>
+                  {/* **The slack, given a tenant.** The controls are pinned
+                      to the bottom of this column on purpose — the painting
+                      beside it is tall, the thirteen slides are not the same
+                      length, and controls that move as the prose changes are
+                      controls you have to find again every time. Measured on
+                      the deployed room, that leaves between 162 and 274
+                      pixels of nothing above them, which is a hole rather
+                      than breathing room.
+
+                      So the hole is where he stands, and it is *why* he can
+                      stand: he takes exactly the space the slide did not, up
+                      to a ceiling, and never less than his floor. On a phone
+                      the two columns stack and there is little slack left —
+                      the floor is what keeps him in the room there, and it
+                      is the reason he is not simply sized to the gap.
+
+                      Decorative, so `aria-hidden`: the facts beside him
+                      already say what a secutor was, and a screen reader
+                      reading a caption of the illustration of the thing it
+                      just described is noise. */}
+                  <div className="coliseum-yard">
+                    <img className="coliseum-secutor" src={secutorArt}
+                         alt="" aria-hidden="true" />
                   </div>
                   <div className="mt-4 flex items-center gap-2">
                     {/* `.btn` alone is a border-box with a transparent

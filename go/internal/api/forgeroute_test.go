@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -181,7 +183,17 @@ func won(index, ms, seat, turns int) tier3.WireGame {
 // job registry and a real app.db.
 func forgeAPI(t *testing.T, shim *stubShim) (*API, *jobs.Registry, string) {
 	t.Helper()
+	a, reg, dbPath, _ := forgeAPIIn(t, shim)
+	return a, reg, dbPath
+}
+
+// forgeAPIIn is forgeAPI plus the library's own directory, for a test that
+// has to put a deck in it that no fixture file can hold: adding one to
+// `gate/testdata` would add it to every API test's library at once.
+func forgeAPIIn(t *testing.T, shim *stubShim) (*API, *jobs.Registry, string, string) {
+	t.Helper()
 	dbPath := appDB(t)
+	dir := decksDir(t)
 	db, err := auth.Open(dbPath)
 	if err != nil {
 		t.Fatal(err)
@@ -205,11 +217,11 @@ func forgeAPI(t *testing.T, shim *stubShim) (*API, *jobs.Registry, string) {
 	}
 	worker := &tier3.Worker{Settings: forge, Boot: 5 * time.Second,
 		Sleep: func(time.Duration) {}}
-	a := New(Config{Logger: quiet, Pool: pooltest.Open(t), DecksDir: decksDir(t),
+	a := New(Config{Logger: quiet, Pool: pooltest.Open(t), DecksDir: dir,
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: writeDB,
 		Jobs: reg, ForgeWorker: worker, Forge: forge,
 		MatchLedger: matchledger.FromDB(writeDB, quiet)})
-	return a, reg, dbPath
+	return a, reg, dbPath, dir
 }
 
 func forgeServer(t *testing.T, a *API) *httptest.Server {
@@ -486,6 +498,66 @@ func TestADeckForgeCannotPlayIsA422ThatNamesTheCards(t *testing.T) {
 	for _, seen := range shim.requests() {
 		if seen == "POST /match" {
 			t.Error("a match ran against a deck Forge cannot play")
+		}
+	}
+}
+
+// TestADeckWithNoCardsIsRefusedWithoutWakingTheWorker is the empty seat.
+//
+// Found on the deployed instance, in the Coliseum, as a **2-0 win**: the room
+// offered `adrix-and-nev-twincasters` -- a draft with a commander, a name and
+// nought else -- in the Challenger picker, sent it to Forge, and reported two
+// clean wins to the other seat in 0.4 seconds. The account tab was the only
+// thing that gave it away, one line down: "trying to draw cards from empty
+// library", on turn one, twice.
+//
+// Coverage cannot catch this and it is not coverage's fault: it is a ratio,
+// and nought missing of nought checked is a perfect score. So the refusal is
+// its own, it counts what the deck *declares*, and it happens before the
+// pre-flight -- an empty deck should not cost a worker boot to turn away.
+func TestADeckWithNoCardsIsRefusedWithoutWakingTheWorker(t *testing.T) {
+	t.Parallel()
+	shim := &stubShim{stream: true, coverage: []tier3.WireReport{
+		{Slug: "kaheera", Checked: 100, Resolved: map[string]string{}, Missing: []string{}},
+	}}
+	a, _, _, dir := forgeAPIIn(t, shim)
+	srv := forgeServer(t, a)
+
+	// A deck the moment after it is created: named, with a commander chosen
+	// and not one card in it. `cards: []` rather than a missing key, because
+	// the empty list is what the app writes and the missing key is what a
+	// hand-rolled fixture writes.
+	empty := filepath.Join(dir, "twincasters")
+	if err := os.MkdirAll(empty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(empty, "deck.yaml"), []byte(
+		"slug: twincasters\nname: Twincasters\nstage: draft\n"+
+			"commander:\n  - Goreclaw, Terror of Qal Sisma\ncards: []\n"),
+		0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	status, payload := postForge(t, srv, `{"a_slug":"kaheera","b_slug":"twincasters"}`)
+	if status != 422 {
+		t.Fatalf("answered %d, want 422 (%v)", status, payload)
+	}
+	detail, _ := payload["detail"].(string)
+	// The address the caller asked with, so a two-deck refusal says which
+	// seat is empty, and the fix, because the message is the fix.
+	for _, want := range []string{"twincasters", "has no cards in it yet",
+		"no result would mean anything", "add its cards"} {
+		if !strings.Contains(detail, want) {
+			t.Errorf("the refusal did not say %q: %q", want, detail)
+		}
+	}
+	// No match, and no coverage either: the worker machine was never woken.
+	for _, seen := range shim.requests() {
+		if seen == "POST /match" {
+			t.Error("a match ran against a deck with no cards in it")
+		}
+		if seen == "POST /coverage" {
+			t.Error("the worker was woken to refuse a deck with no cards")
 		}
 	}
 }

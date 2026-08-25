@@ -172,6 +172,85 @@ def test_matte_backdrop_refusals() -> None:
         apply(plate(), "matte_backdrop", {"enclosed": "maybe"})
 
 
+def sweep_plate() -> Image.Image:
+    """The plate `matte_backdrop` cannot do: a neutral sweep running 126 at
+    the top to 210 at the bottom, with a WARM bar sitting on it whose
+    brightness is 208 — the same as the ground under it. This is the Met's
+    terracotta gladiator in miniature, and the numbers are measured from it."""
+    array = np.zeros((40, 40, 3))
+    for y in range(40):
+        array[y, :, :] = 126 + y * (84 / 39)      # 126 -> 210, neutral
+    array[14:30, 12:28, 0] = 208                  # the clay: warm, and no
+    array[14:30, 12:28, 1] = 176                  # brighter than the sweep's
+    array[14:30, 12:28, 2] = 151                  # own bottom edge
+    return rgb(array)
+
+
+def test_matte_neutral_cuts_the_plate_a_backdrop_key_cannot() -> None:
+    """The whole reason this op exists, asserted as a comparison.
+
+    A single sampled backdrop colour cannot span an 84-level sweep, so
+    `matte_backdrop` must either leave ground standing or eat the subject.
+    Chroma does not care how bright anything is."""
+    plate = sweep_plate()
+    backdrop = np.asarray(
+        apply(plate, "matte_backdrop", {"tolerance": 26, "border": 1})
+        .getchannel("A"))
+    # It keeps the subject, and pays for it by leaving the sweep's far end.
+    assert backdrop[16, 20] == 255, "the clay survives"
+    assert backdrop[39, 2] > 0, "and the bottom of the sweep is still there"
+
+    out = np.asarray(
+        apply(plate, "matte_neutral", {"tolerance": 14, "soft": 16})
+        .getchannel("A"))
+    assert out[16, 20] == 255, "the clay survives here too"
+    for y, x in ((0, 0), (20, 2), (39, 2), (39, 20), (5, 20)):
+        assert out[y, x] == 0, f"the sweep is gone at {(y, x)}"
+
+
+def test_matte_neutral_fades_a_shadow_that_caught_the_subject_colour() -> None:
+    """A cast shadow picks up bounce, so it is neither grey nor clay. It
+    lands mid-ramp and fades, rather than being kept whole or cut hard."""
+    array = np.full((10, 10, 3), 180.0)
+    array[:, 5:, 0] = 195      # a faintly warm shadow: chroma 23
+    array[:, 5:, 2] = 172
+    out = np.asarray(
+        apply(rgb(array), "matte_neutral", {"tolerance": 14, "soft": 16})
+        .getchannel("A"))
+    assert out[5, 1] == 0, "the neutral half goes"
+    assert 0 < out[5, 7] < 255, "the tinted half fades rather than jumping"
+
+
+def test_matte_neutral_erases_a_neutral_subject() -> None:
+    """The documented failure, pinned so it is a known edge and not a
+    surprise: marble and silver are grey, and a chroma key takes them."""
+    array = np.full((10, 10, 3), 200.0)
+    array[3:7, 3:7, :] = 40           # a neutral object on a neutral ground
+    out = np.asarray(
+        apply(rgb(array), "matte_neutral", {"tolerance": 14, "soft": 16})
+        .getchannel("A"))
+    assert out[5, 5] == 0, "a grey subject goes with the grey ground"
+
+
+def test_matte_neutral_composes_with_an_earlier_matte() -> None:
+    """Alpha is multiplied in, not written over, so two mattes intersect."""
+    array = np.zeros((6, 6, 3))
+    array[:, :, 0] = 200              # a fully saturated field: chroma 200
+    first = apply(rgb(array), "matte_neutral", {"tolerance": 14, "soft": 16})
+    first.putalpha(Image.fromarray(np.full((6, 6), 64, dtype=np.uint8), "L"))
+    out = np.asarray(
+        apply(first, "matte_neutral", {"tolerance": 14, "soft": 16})
+        .getchannel("A"))
+    assert out[3, 3] == 64, "the alpha already there survives untouched"
+
+
+def test_matte_neutral_refusals() -> None:
+    with pytest.raises(OpError, match="positive `tolerance`"):
+        apply(sweep_plate(), "matte_neutral", {"tolerance": 0})
+    with pytest.raises(OpError, match="cannot be negative"):
+        apply(sweep_plate(), "matte_neutral", {"soft": -1})
+
+
 def test_duotone_maps_luminance_onto_the_ramp() -> None:
     array = np.zeros((3, 1, 3))
     array[0] = 0        # black
