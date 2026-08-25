@@ -39,10 +39,11 @@
  * rules it turns off, the way the rest of this project does it.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
 
 import type { ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
+import { ThroneGlyph } from './glyphs'
 import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
   from '../lib/board'
 import type { Speed } from '../lib/reel'
@@ -54,6 +55,25 @@ import type { Speed } from '../lib/reel'
  * creature that dies has to be the same DOM node in the graveyard or the
  * animation has nothing to animate.
  */
+/**
+ * Which way a counter cuts.
+ *
+ * **The sign is on the kind, not on the number.** `n` is how many counters of
+ * that kind are on the card and it is a count — it is never negative. A single
+ * -1/-1 arrives as `{kind: '-1/-1', n: 1}`, and reading the sign off `n` drew
+ * it as a cheerful green `+1`, which is the exact opposite of the news.
+ *
+ * Three answers rather than two, because most counters are neither: charge,
+ * loyalty, quest and stun counters are not good or bad, they are just counters,
+ * and colouring them green would be the board having an opinion it has no
+ * basis for.
+ */
+function counterSign(kind: string): 'up' | 'down' | 'flat' {
+  if (kind.startsWith('-')) return 'down'
+  if (kind.startsWith('+')) return 'up'
+  return 'flat'
+}
+
 function FieldCard({ card, size, count }: {
   card: BoardCard
   size: 'normal' | 'small'
@@ -61,8 +81,14 @@ function FieldCard({ card, size, count }: {
   count: number
 }) {
   const [held, setHeld] = useState(false)
+  // The loupe, held open by a tap. Hover and focus open it in CSS; this is
+  // only for the pointer that has no hover to give.
+  const [peeking, setPeeking] = useState(false)
   const stats = fightingStats(card)
-  const counters = card.counters.filter((c) => c.n > 0)
+  // `!== 0` rather than `> 0`: a -1/-1 counter is a counter, and the pile of
+  // them on a creature that is about to die is exactly the thing somebody is
+  // reading the board to find.
+  const counters = card.counters.filter((c) => c.n !== 0)
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
@@ -127,14 +153,64 @@ function FieldCard({ card, size, count }: {
           and its numbers must not: a sideways "19/19" is unreadable, and by
           the late turns most of a board is tapped. These sit on the outer box,
           which never rotates. */}
-      {stats && <span className="field-card-stats tabular">{stats}</span>}
+      {/* **The loupe.** Power and toughness were a black tab printed over the
+          corner of the painting at all times — legible, and permanently in
+          the way of the one part of a card everybody already looks at. A
+          board holds forty of them, so forty little black tabs sat on forty
+          paintings whether anybody wanted a number or not (Aaron, 2026-08-25:
+          *"a magnifying glass effect instead when hovering in that corner"*).
+
+          So the numbers are behind glass. The lens sits where a card's own
+          power/toughness box sits, magnifies the painting under it, and puts
+          the *current* figures on the glass in crisp type — current rather
+          than printed, because a 2/2 with three +1/+1 counters is a 5/5 and
+          the printed box would be a lie told very clearly.
+
+          Hover, focus **and** tap all open it. A hover-only reading
+          affordance does not exist on a phone, which this room has now
+          learned twice. */}
+      {stats && (
+        <span className={`field-card-lens${peeking ? ' is-open' : ''}`}
+              aria-hidden="true"
+              style={card.image
+                ? ({ '--lens-art': `url(${card.image})` } as CSSProperties)
+                : undefined}
+              onPointerUp={(e) => {
+                // The corner is its own gesture: a tap here is *what are its
+                // numbers*, and a tap anywhere else on the card is still
+                // "hold it up", which is a different question.
+                if (e.pointerType === 'mouse') return
+                e.stopPropagation()
+                setPeeking((was) => !was)
+              }}>
+          <span className="field-card-lens-glass" />
+          <span className="field-card-lens-pt tabular">{stats}</span>
+        </span>
+      )}
       {count > 1 && (
         <span className="field-card-count tabular">{count}<span
           className="field-card-times">×</span></span>
       )}
+      {/* Counters, one chip each rather than one sum. A creature carrying
+          three +1/+1 and two -1/-1 was drawn as a "1", which is arithmetic
+          the board should not be doing on somebody's behalf — the two kinds
+          annihilate as a state-based action, and until they do they are two
+          different things on the card. Green for what is being added and red
+          for what is being taken away, which is the one colour convention
+          every player already has, and brass for the ones that are neither.
+          The count carries the sign in type as well, for anybody who does not
+          separate those two hues. */}
       {counters.length > 0 && (
-        <span className="field-card-counters tabular">
-          {counters.map((c) => c.n).reduce((a, b) => a + b, 0)}
+        <span className="field-card-counters">
+          {counters.map((c) => {
+            const way = counterSign(c.kind)
+            return (
+              <span key={c.kind} title={`${c.n} ${c.kind}`}
+                    className={`field-counter tabular is-${way}`}>
+                {way === 'down' ? '-' : way === 'up' ? '+' : ''}{c.n}
+              </span>
+            )
+          })}
         </span>
       )}
       {held && card.image && (
@@ -210,21 +286,30 @@ function LifeTotal({ life }: { life: number }) {
  * for the same reason: in Commander it is where the game's most important card
  * waits, and a number cannot say which commander is home and which is out.
  */
-function FieldPile({ label, cards, short }: {
+function FieldPile({ label, cards, short, throne }: {
   label: string
   cards: BoardCard[]
   short: string
+  /** The command zone, which is the one pile whose *emptiness* is news. */
+  throne?: boolean
 }) {
   const top = cards[cards.length - 1]
+  const seat = throne && !top
+  const title = top ? `${label}: ${cards.length}, ${top.name} on top`
+    : seat ? `${label}: empty — out on the battlefield`
+    : `${label}: empty`
   return (
-    <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`}
-         title={top ? `${label}: ${cards.length}, ${top.name} on top`
-                    : `${label}: empty`}
-         aria-label={`${label}: ${cards.length}`}>
+    <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
+                    + (seat ? ' is-throne' : '')}
+         title={title} aria-label={`${label}: ${cards.length}`}>
       {top && top.image ? (
         <img className="field-pile-art" src={top.image} alt="" loading="lazy"
              draggable={false} />
       ) : null}
+      {/* **An empty command zone means the commander is on the table**, which
+          is the opposite of an empty graveyard and was drawn the same way.
+          The chair says which: theirs, and nobody in it. */}
+      {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
       <span className="field-pile-label">{short}</span>
       <span className="field-pile-n tabular">{cards.length}</span>
     </div>
@@ -233,11 +318,27 @@ function FieldPile({ label, cards, short }: {
 
 /** The stone rail one player's name, life and closed zones are carved into. */
 function FieldRail({ side, name }: { side: BoardSide; name: string }) {
+  // Two generic for each previous cast from the zone. With partners this
+  // reports the dearer of the two: there is one pile and forty pixels of it,
+  // and the expensive commander is the one whose price changes a decision.
+  const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
   return (
     <div className="field-rail">
       <span className="field-rail-name" title={side.name}>{name}</span>
       <span className="field-rail-totals">
-        <FieldPile label="Command zone" short="CMD" cards={side.command} />
+        <FieldPile label="Command zone" short="CMD" cards={side.command}
+                   throne />
+        {/* **Beside the pile rather than on it.** Inside, the chip covered
+            the zone's own three-letter label — the first draft read "CI +4",
+            which is a worse pile than one with no tax on it at all. Twenty-six
+            pixels does not hold two facts, so the price stands next to the
+            thing it is the price of. */}
+        {tax > 0 && (
+          <span className="field-tax tabular"
+                title={`Commander tax: +${tax} to cast from the command zone`}>
+            +{tax}
+          </span>
+        )}
         <FieldPile label="Graveyard" short="GY" cards={side.graveyard} />
         <FieldPile label="Exile" short="EX" cards={side.exile} />
         <LifeTotal life={side.life} />
@@ -469,6 +570,18 @@ export function MatchBoard({ board, shown, game, name, running,
         <span className="field-dust field-dust-3" />
       </div>
 
+      {/* **A hand belongs to the player holding it, not to the furniture.**
+          Both used to live in one rail, which is right on a wide screen — the
+          rail runs the height of the table and each hand sits beside its own
+          seat. On a phone that rail has nowhere to go and becomes a strip at
+          the foot, and there both hands ended up under the near player's
+          half: the far player's cards stacked below the near player's own,
+          two seats away from the person holding them (Aaron, 2026-08-25, from
+          his phone). Now each hand is its own grid area and travels with its
+          seat at every width — above the far half, below the near one, which
+          is where the two players' hands actually are. */}
+      <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
+
       <FieldSide side={far} facing="far"
                  name={name(far.slug, far.name)} />
 
@@ -487,13 +600,9 @@ export function MatchBoard({ board, shown, game, name, running,
       <FieldSide side={near} facing="near"
                  name={name(near.slug, near.name)} />
 
-      {/* Both hands, held at the side of the table. Far above near, the same
-          way the seats are, so a hand stays with the person holding it. */}
-      <div className="field-hands">
-        <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
-        <FieldHand side={near} facing="near"
-                   name={name(near.slug, near.name)} />
-      </div>
+      <FieldHand side={near} facing="near"
+                 name={name(near.slug, near.name)} />
+
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
                       seek={seek} games={games} playing={playing}

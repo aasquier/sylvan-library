@@ -108,3 +108,37 @@ export function CrossedSwordsGlyph({ size = 17 }: { size?: number }) {
     </svg>
   )
 }
+
+/**
+ * An empty throne: the command zone with nobody home.
+ *
+ * A command zone that is empty because the commander is *out on the field* is
+ * a different fact from one that is empty because nothing has happened yet,
+ * and a blank slot says neither. A chair says both at once — it is theirs, and
+ * there is nobody in it.
+ *
+ * Hollow rather than filled, because the emptiness is the whole message: a
+ * solid silhouette at this size reads as a tombstone, which is the wrong news
+ * entirely in a room that is about to start using tombstones for something
+ * else. The back is crenellated rather than arched for the crossed swords'
+ * reason — at eighteen pixels an arch is two grey pixels and a rectangle, and
+ * the notches are the part that survives.
+ */
+export function ThroneGlyph({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      <g fill="none" stroke="currentColor" strokeWidth="1.4"
+         strokeLinejoin="round" strokeLinecap="round">
+        {/* The high back and its three merlons. */}
+        <path d="M6.6 11.6 V4.4 H8 V2.6 H9.3 V4.4 H10.7 V2.6 H12 V4.4
+                 H13.4 V11.6" />
+        {/* The seat, and the arms that end on it. */}
+        <path d="M4.6 11.6 H15.4 V14.2 H4.6 Z" />
+        {/* Planted, so it reads as furniture rather than a card. */}
+        <path d="M6 14.2 V17.2" />
+        <path d="M14 14.2 V17.2" />
+      </g>
+    </svg>
+  )
+}

@@ -6468,36 +6468,38 @@ button:hover .tarot-fan-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
+    'handsfar'
     'far'
     'seam'
     'near'
-    'hands'
+    'handsnear'
     'transport';
 }
 .field-side-far { grid-area: far; }
 .field-seam { grid-area: seam; }
 .field-side-near { grid-area: near; }
-.field-hands { grid-area: hands; }
 .field-transport { grid-area: transport; }
 
-/* The rail the hands are held over: darker than the sand and edged in the
- * same brass as the players' own rails, because it is furniture rather than
- * floor. Off the sand is the whole point. */
-.field-hands {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px 10px;
-  background: linear-gradient(180deg,
-    rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.16) 100%);
-  border-top: 1px solid
-    color-mix(in srgb, var(--field-brass) 26%, transparent);
-}
+/* **A hand travels with its seat.** One shared rail is right on a wide screen
+   and wrong on a narrow one: there the rail becomes a strip at the foot, and
+   the far player's hand ends up stacked under the near player's, two seats
+   from the person holding it. Two areas instead of one puts each hand against
+   its own half at every width — above the far player, below the near one. */
+.field-hand-far { grid-area: handsfar; }
+.field-hand-near { grid-area: handsnear; }
+
+/* The surface a hand is held over: darker than the sand and edged in the same
+ * brass as the players' own rails, because it is furniture rather than floor.
+ * Off the sand is the whole point. It sits on each hand now rather than on a
+ * container around both, since there is no longer a container around both. */
 .field-hand {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  padding: 6px 10px;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.16) 100%);
 }
 .field-hand-label {
   display: flex;
@@ -6553,19 +6555,23 @@ button:hover .tarot-fan-card {
   .field {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      'far   hands'
-      'seam  hands'
-      'near  hands'
+      'far   handsfar'
+      'seam  handsfar'
+      'near  handsnear'
       'transport transport';
   }
-  .field-hands {
-    justify-content: space-between;
-    border-top: 0;
+  /* Wide: the two hands are the right-hand column again, one beside each
+     half — which is what the single rail was already doing, now said by the
+     grid instead of by `space-between`. */
+  .field-hand {
+    justify-content: flex-start;
+    border: 0;
     border-left: 1px solid
       color-mix(in srgb, var(--field-brass) 26%, transparent);
     background: linear-gradient(90deg,
       rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.12) 100%);
   }
+  .field-hand-near { justify-content: flex-end; }
   .field-hand-fan {
     flex-direction: column;
     align-items: center;
@@ -6709,6 +6715,40 @@ button:hover .tarot-fan-card {
   color: #f0e6cf;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
+/* The empty chair, centred in the slot and drawn on the brass the rest of the
+   rail is carved in. `is-throne` lifts the pile back out of `is-empty`'s
+   dimming: an empty graveyard is nothing to look at, and an empty command
+   zone is somebody standing on the battlefield. */
+.field-pile.is-throne { opacity: 0.85; }
+.field-pile-throne {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 4px;
+  color: color-mix(in srgb, var(--field-brass) 78%, transparent);
+}
+
+/* The tax, standing next to the zone rather than on it: twenty-six pixels
+   holds one fact and the zone's own label is already using it. Brass on blood,
+   because this is a price rather than a total — and it is the only number on
+   the rail that goes up when things are going badly. */
+.field-tax {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: -6px;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--anvil-glint);
+  background: color-mix(in srgb, var(--arena-blood) 90%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 45%, transparent);
+}
+
 .field-pile-n {
   position: absolute;
   bottom: 0;
@@ -6990,21 +7030,137 @@ button:hover .tarot-fan-card {
   margin-left: 0.5px;
 }
 
-.field-card-stats,
+/* **The loupe**, where a black tab used to sit.
+ *
+ * Power and toughness were printed over the corner of the painting on every
+ * permanent, all the time: forty little black tabs on forty paintings whether
+ * anybody wanted a number or not. A number that is always there is a number
+ * nobody reads and a painting nobody sees whole.
+ *
+ * A magnifier is the right object because it is the *gesture* — you lean in
+ * on the corner of a card to check what it is fighting at. So the glass sits
+ * where a card's own power/toughness box sits, takes the painting under it up
+ * to three-and-a-bit times, and carries the figures in crisp type on top. It
+ * grows out of the corner it magnifies rather than fading in, which is the
+ * difference between a lens being brought up and a tooltip appearing.
+ *
+ * `is-open` is the tap: hover and focus are handled here, and a phone has
+ * neither.
+ */
+.field-card-lens {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  z-index: 3;
+  opacity: 0;
+  transform: scale(0.55);
+  transform-origin: 82% 84%;
+  transition: opacity 130ms ease,
+              transform 190ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.field-card-small .field-card-lens { width: 20px; height: 20px; }
+.field-card:hover .field-card-lens,
+.field-card:focus-visible .field-card-lens,
+.field-card-lens.is-open {
+  opacity: 1;
+  transform: none;
+}
+
+.field-card-lens-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* A scrim **over** the painting, not behind it. The corner being magnified
+     is the card's own printed stat box, so without one the glass shows a
+     second, blurrier "5/5" behind the real one and the whole thing reads as a
+     misprint. Under the scrim the art is texture — you can tell there is a
+     card under the lens, and the only thing you can read is the figure that
+     is actually true right now. */
+  background-image:
+    radial-gradient(circle at 50% 45%,
+      rgba(8, 6, 4, 0.52) 0%, rgba(8, 6, 4, 0.84) 100%),
+    var(--lens-art);
+  background-size: auto, 340% 340%;
+  /* The card's own stat box: bottom-right, a little in from the border. */
+  background-position: center, 86% 90%;
+  background-color: rgba(12, 9, 6, 0.9);
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--field-brass) 82%, transparent),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.55),
+    0 3px 7px rgba(0, 0, 0, 0.62);
+}
+/* The one highlight that makes a circle read as glass rather than a hole. */
+.field-card-lens-glass::after {
+  content: '';
+  position: absolute;
+  top: 11%;
+  left: 15%;
+  width: 44%;
+  height: 28%;
+  border-radius: 50%;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0) 100%);
+}
+.field-card-lens-pt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff4dc;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.85);
+}
+.field-card-small .field-card-lens-pt { font-size: 0.5rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .field-card-lens { transition: opacity 120ms ease; transform: none; }
+}
+
+/* Counters, one chip each and stacked up the card's left edge.
+ *
+ * They were a single summed number, which is arithmetic the board was doing
+ * on somebody's behalf and getting philosophically wrong: three +1/+1 and two
+ * -1/-1 is not "1", it is five counters of two kinds that have not annihilated
+ * yet. Green adds and red takes away — the one colour convention every player
+ * already owns, and the reason the sign is spelled out too, for anybody who
+ * does not separate those two hues. */
 .field-card-counters {
   position: absolute;
-  bottom: 1px;
-  font-size: 0.56rem;
-  font-weight: 700;
-  line-height: 1;
-  padding: 1.5px 3px;
-  border-radius: 2px;
-  background: rgba(10, 8, 5, 0.82);
-  color: #f4ead2;
-}
-.field-card-stats { right: 1px; }
-.field-card-counters {
   left: 1px;
+  bottom: 1px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 1px;
+}
+.field-counter {
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 0 2.5px;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+/* Both inks are near-black on a light chip: 10.9:1 on the green and 8.1:1 on
+   the red, so the sign is legible before the hue is even read. */
+.field-counter.is-up {
+  background: #8ad07a;
+  color: #08150a;
+}
+.field-counter.is-down {
+  background: #e2736a;
+  color: #1c0503;
+}
+/* Charge, loyalty, quest, stun: counters with no opinion attached. They keep
+   the rail's own brass, because painting them green would be the board taking
+   a view it has no basis for. */
+.field-counter.is-flat {
   background: var(--field-brass);
   color: #1a1409;
 }
