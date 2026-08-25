@@ -107,9 +107,16 @@ describe('the stage', () => {
     expect(bar.getAttribute('aria-valuemax')).toBe('8')
   })
 
-  it('says the forge is lighting before the first game lands', () => {
+  it('says the forge is being lit, without promising when', () => {
     stage([])
-    expect(screen.getByText(/forge is lighting/i)).toBeTruthy()
+    expect(screen.getByText(/forge is being lit/i)).toBeTruthy()
+    // **No estimate this wait can overrun.** The copy used to promise the
+    // first game "within half a minute", which was true of a forge already
+    // burning and false of the deployed one — it lights from cold, and the
+    // promise expired long before anything happened. A wait that outlives its
+    // own estimate reads as a broken page, so the words say "a minute or two,
+    // longer when cold" and nothing tighter.
+    expect(screen.queryByText(/half a minute/i)).toBeNull()
   })
 
   it('never flips a painting to make the two face each other', () => {
