@@ -123,3 +123,6 @@ htmlcov/
 # CI to a temp path; neither is ever in a working tree.
 go/mtglab
 /mtglab
+
+# The scribe compiles to class files; the sources are the artifact.
+scribe/out/

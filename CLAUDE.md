@@ -9,6 +9,9 @@ library — a checkout carries the engine, never the decks.
 Go 1.26 (CGO on — DuckDB) · React/TypeScript · `tools/` holds the project's
 Python: the local picture/video pipeline that makes the committed art. (The
 repo's only other `.py` is `.claude/hooks/guard-git.py`, a harness guard.)
+`scribe/` is the one piece of Java and the one piece of **GPL-3.0** in an
+otherwise MIT repo — a listener on Forge's event bus, kept behind a process
+boundary for exactly that reason (ADR 42).
 The binary and CLI are named `mtglab`; the repo is `sylvan-library`. That
 mismatch is intentional and not a bug to fix.
 
@@ -222,6 +225,9 @@ assets/tarot/             the 1909 Rider deck; PROVENANCE.md is not optional
 tools/                    Python media toolbox: animist (committed art) and
                           cardmotion (card-art motion); dev-Mac only, never
                           ships, never serves
+scribe/                   GPL-3.0 Java: a listener on Forge's event bus, for
+                          the board the game log cannot describe (ADR 42).
+                          Ships in the worker image; never linked, only run
 decks/<slug>/deck.yaml    the app's data dir, NOT in git (ADR 30); the
                           LIBRARY lives on the instance's volume
 Dockerfile                one Go binary; Dockerfile.forge adds the JVM+Forge
