@@ -691,6 +691,33 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		ownerIDs = append(ownerIDs, src.OwnerID())
 	}
 
+	// **A deck with nothing in it is refused here, and here is the only place
+	// that can.** Coverage is a ratio, and a deck of no cards passes it
+	// perfectly: nought of nought names are missing, so the pre-flight waves
+	// through the one deck Forge cannot make a game out of. Forge then deals
+	// it an empty library, it loses on turn one's draw, and the match reports
+	// a clean sweep to the other seat -- a *wrong answer wearing a result's
+	// clothes*, which is worse than an error because nothing about it looks
+	// like one.
+	//
+	// Tier 1 learned this against this exact deck and refuses it in
+	// `compile.Deck` (see `compile.NothingToSimulate`, which names it). The
+	// Forge path never compiles -- Forge resolves names itself, and there is
+	// no pool open here -- so the lesson never reached it and the guard had
+	// to be written a second time, against the declared count.
+	//
+	// Before the pre-flight rather than after, because the pre-flight wakes
+	// the worker machine: an empty deck should not cost a boot to refuse.
+	for i, d := range decks {
+		if d.TotalCards() > 0 {
+			continue
+		}
+		wire.Detail(w, http.StatusUnprocessableEntity, addresses[i]+
+			" has no cards in it yet, so no result would mean anything "+
+			"-- add its cards and send them in again")
+		return
+	}
+
 	// The pre-flight runs where the card scripts live: against the local zip,
 	// or on the worker machine (which this wakes — the one request-thread cost
 	// the hosted shape adds, bounded by the worker's boot budget so a machine

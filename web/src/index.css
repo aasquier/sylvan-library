@@ -5887,6 +5887,195 @@ button:hover .tarot-fan-card {
   filter: brightness(0.95) saturate(0.97);
 }
 
+/* ------------------------------------------------------------- the gatehouse
+ *
+ * The panel that starts a match was a bare `.card-surface` — the same neutral
+ * rectangle a settings box wears — while every control inside it had already
+ * been dressed: the reds, the crossed swords, the pickers' floor. A gate whose
+ * doorway is plainer than its handle is the wrong way round, and this panel is
+ * the room's gate. It is the thing you walk through to get a match.
+ *
+ * Three pieces of masonry and no more, because the controls are the subject
+ * and a gate that competes with them is a worse gate.
+ *
+ * - **The lintel** is the brass rule across the head: brightest at the middle
+ *   and fading to nothing before the jambs, which is both how a lit metal edge
+ *   falls and how it avoids poking out of a rounded corner. It sits at the top
+ *   because that is where a doorway carries its weight.
+ * - **The portcullis** is the vertical bars, at an opacity deliberately near
+ *   the threshold of visible — texture at a glance, a grate if you look. It is
+ *   masked away down the panel so the pickers are never inside a cage.
+ * - **The stone** is a warm lift down from the head, so the panel is lit from
+ *   above like everything else in this room instead of being a flat fill.
+ *
+ * And the gate *opens*: while the match is running the portcullis lifts and
+ * fades. It costs two declarations, it is the room's own metaphor rather than
+ * a decoration borrowed from somewhere else, and it means the slowest action
+ * in the app has one more thing besides the button saying it began.
+ */
+.gatehouse {
+  position: relative;
+  border-color: color-mix(in oklab, var(--anvil-brass) 26%, var(--hairline));
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--anvil-brass) 6%, transparent) 0%,
+      transparent 48%),
+    var(--surface-1);
+}
+
+.gatehouse::before {
+  content: '';
+  position: absolute;
+  inset: 0 14px auto 14px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--anvil-brass) 62%, transparent) 20%,
+    var(--anvil-glint) 50%,
+    color-mix(in oklab, var(--anvil-brass) 62%, transparent) 80%,
+    transparent 100%);
+}
+
+.gatehouse::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 42% 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(90deg,
+    color-mix(in oklab, var(--anvil-brass) 14%, transparent) 0 1px,
+    transparent 1px 14px);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  transition: opacity 700ms ease, transform 900ms ease;
+}
+
+/* The gate stands open while they are fighting. */
+.gatehouse[data-open='true']::after {
+  opacity: 0;
+  transform: translate3d(0, -70%, 0);
+  transition: opacity 900ms ease,
+              transform 1200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The controls sit on the masonry, never under it. */
+.gatehouse > * { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gatehouse::after,
+  .gatehouse[data-open='true']::after {
+    transition: opacity 200ms ease;
+    transform: none;
+  }
+}
+
+/* -------------------------------------------------------------- the secutor
+ *
+ * The man the room keeps describing. Two of the thirteen slides name him — the
+ * retiarius "against the armoured secutor", and one later, "his usual
+ * opponent, the secutor, wore fish-scale motifs on purpose" — and until now
+ * the room said that and drew nothing.
+ *
+ * **He is sized by the hole he stands in**, which is the point. The controls
+ * below him are pinned to the bottom of the column so they do not move as the
+ * prose changes length; that pinning is what leaves 162 to 274 pixels of
+ * nothing above them, measured across all thirteen slides of the deployed
+ * room. `height: 100%` of the yard hands him exactly that space, whatever it
+ * is on the slide you are reading.
+ *
+ * The floor and the ceiling are the two numbers that are not slack. The
+ * ceiling is the asset's own height at 2x, so he is never upscaled. The floor
+ * is what makes this work on a phone at all: below `lg` the columns stack, the
+ * slide gets narrower and taller, and the slack goes to nearly nothing — a
+ * figure sized purely by the gap would simply not exist on the device most
+ * likely to be holding this page.
+ *
+ * The drift is six pixels over thirty-eight seconds. It is under the threshold
+ * of anything you would call movement and over the threshold of a page that
+ * sits perfectly still (commandment 6), and it is a transform rather than a
+ * filter so the two themes can each light him their own way without fighting
+ * an animation for the same property.
+ */
+.coliseum-yard {
+  display: flex;
+  /* **`0%` rather than `auto`, and that is the whole mechanism.** On `auto`
+     the yard's base size is its content — the image — so it claims the
+     figure's height instead of the column's leftover, `height: 100%` below
+     has no definite parent to resolve against, and the figure comes out at
+     its ceiling on every slide while the column quietly overflows the
+     painting beside it. Measured that way it was 224 pixels tall whether the
+     slack was 274 or 162. A basis of zero makes the yard exactly the free
+     space and nothing else, which is what the figure is then a percentage
+     of. */
+  flex: 1 1 0%;
+  min-height: 5rem;
+  align-items: flex-end;
+  justify-content: flex-end;
+  /* The figure is taken out of flow inside here, and that is the second half
+     of the mechanism. A flex item with a basis of zero still contributes its
+     *content* to the container's intrinsic height, so an in-flow image fed
+     its own 224px back into the grid row, the row grew past the painting, and
+     the yard ended up creating height rather than absorbing it — measured as
+     a 443px row against a 404px painting, with the controls hanging below the
+     frame beside them. Absolutely positioned, he contributes nothing, the row
+     is the painting's height again, and the yard is honestly the leftover. */
+  position: relative;
+  overflow: hidden;
+  padding-top: 10px;
+  pointer-events: none;
+}
+
+.coliseum-secutor {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  max-height: 8rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: bottom right;
+  animation: secutor-drift 38s ease-in-out infinite;
+}
+
+/* **The ceiling is the layout's, not the device's.** 64rem is `lg:`, the
+   breakpoint at which the painting and this column stop being stacked and sit
+   side by side — which is also the moment the column starts being stretched to
+   the painting's height and acquires slack worth filling. Below it there is no
+   slack: the column is as tall as its own content, `height: 100%` has no
+   definite parent to resolve against, and he falls back to his ceiling on
+   every slide. A phone should not give a decoration 224 pixels of a 390-pixel
+   column, so the ceiling is lower there.
+
+   Keyed to the grid's own breakpoint rather than to a guess about the phone,
+   deliberately: the two can then never disagree about which shape the room is
+   in, which is the failure the pickers' floor was written to end. */
+@media (min-width: 64rem) {
+  .coliseum-secutor { max-height: 14rem; }
+}
+
+@keyframes secutor-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(-6px, 0, 0); }
+}
+
+/* Fired clay is pale, and the two grounds it stands on are opposites: a warm
+   drop-shadow carries him on the dark page, and on paper he needs to be taken
+   down rather than lifted or he washes into the sheet. */
+:root[data-theme='dark'] .coliseum-secutor,
+:root:where(:not([data-theme='light'])) .coliseum-secutor {
+  filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.5)) brightness(1.02);
+}
+:root[data-theme='light'] .coliseum-secutor {
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.24)) brightness(0.93)
+          saturate(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coliseum-secutor { animation: none; }
+}
+
 /* ---------------------------------------------------------------------------
    The play-by-play: the inside of the game the Coliseum is watching.
 

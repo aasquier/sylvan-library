@@ -260,6 +260,68 @@ def _matte_backdrop(image: Image, params: dict[str, Any]) -> Image:
     return rgba
 
 
+def _matte_neutral(image: Image, params: dict[str, Any]) -> Image:
+    """A neutral studio sweep to alpha, keyed on **colour** rather than on
+    brightness or on connectivity.
+
+    `matte_backdrop` is the general tool and this is the one plate it cannot
+    do. That op keys on distance from a single sampled backdrop colour, and a
+    studio sweep is not one colour: on the Met's terracotta gladiator the
+    ground runs 126 at the top edge to 210 at the bottom, and the figure's lit
+    shield sits at 208. There is no threshold anywhere in that range which
+    takes the whole ground and spares the shield -- measured, the best setting
+    still left a quarter of the sweep opaque, and one step wider walked the
+    flood up the cast shadow and ate the shield instead.
+
+    What separates them is not how bright they are but *whether they are a
+    colour at all*. A museum sweep is photographed neutral on purpose, so the
+    grey is grey to within a level or two at every brightness the gradient
+    passes through; fired clay is strongly warm at all of them. On that plate
+    79.5% of the pixels sit at a chroma of 0-5 and the figure sits at 30-80,
+    with six tenths of one percent in between. A key that reads chroma cuts it
+    in one pass and never once has to care what the lighting was doing.
+
+    Chroma is `max(R,G,B) - min(R,G,B)`: zero for any grey, black and white
+    included, and large for anything saturated. `tolerance` is the chroma at
+    which a pixel is fully transparent and `soft` is how far above that it
+    takes to become fully opaque. The ramp is not a nicety -- a cast shadow
+    picks up a little of the subject's colour by bounce (the gladiator's is
+    +23 against a ground of +1), so it lands mid-ramp and *fades*, which is
+    what a contact shadow should do, and JPEG's subsampled chroma fringes at
+    the silhouette land there too.
+
+    **This op is wrong for a neutral subject and it fails loudly rather than
+    subtly**: marble, silver, steel and bone are grey, so a chroma key erases
+    them along with the ground. Those plates want `matte_backdrop`, which asks
+    a different question -- what touches the frame edge -- and does not care
+    what colour the answer is.
+    """
+    import numpy as np
+    from PIL import Image as PILImage
+
+    tolerance = float(params.get("tolerance", 16.0))
+    soft = float(params.get("soft", 12.0))
+    if tolerance <= 0:
+        raise OpError("matte_neutral needs a positive `tolerance`")
+    if soft < 0:
+        raise OpError("matte_neutral `soft` cannot be negative")
+
+    rgba = image.convert("RGBA")
+    values = np.asarray(rgba.convert("RGB"), dtype=np.float32)
+    chroma = values.max(axis=2) - values.min(axis=2)
+    if soft > 0:
+        keep = np.clip((chroma - tolerance) / soft, 0.0, 1.0)
+    else:
+        keep = (chroma > tolerance).astype(np.float32)
+
+    # Multiplied into whatever alpha the image already carries, so this
+    # composes with an earlier matte instead of overwriting its work.
+    existing = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
+    alpha = (existing * keep * 255.0).astype(np.uint8)
+    rgba.putalpha(PILImage.fromarray(alpha, mode="L"))
+    return rgba
+
+
 def _duotone(image: Image, params: dict[str, Any]) -> Image:
     """Luminance mapped onto a three-stop colour ramp: `shadow`, `mid`,
     `light`, each a hex string.
@@ -415,6 +477,7 @@ OPS: dict[str, OpFn] = {
     "crop": _crop,
     "matte_green": _matte_green,
     "matte_backdrop": _matte_backdrop,
+    "matte_neutral": _matte_neutral,
     "duotone": _duotone,
     "levels": _levels,
     "mask_circle": _mask_circle,

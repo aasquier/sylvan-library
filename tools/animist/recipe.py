@@ -33,7 +33,8 @@ import yaml
 VERSION = 1
 
 #: The still transform vocabulary. Implementations live in `ops.py`.
-KNOWN_OPS = frozenset({"crop", "matte_green", "matte_backdrop", "duotone",
+KNOWN_OPS = frozenset({"crop", "matte_green", "matte_backdrop",
+                       "matte_neutral", "duotone",
                        "levels",
                        "mask_circle", "feather", "mirror_tile", "resize"})
 
