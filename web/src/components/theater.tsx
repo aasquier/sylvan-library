@@ -190,8 +190,14 @@ export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
         {feed.length === 0 ? (
           <p className="theater-quiet">
             {running
-              ? 'The forge is lighting. The first game usually reports within '
-                + 'half a minute.'
+              // **Not "half a minute."** That was true of a forge already
+              // burning and false of the deployed one, which lights its coals
+              // from cold before the first game — measured watching a real
+              // match on the instance, where the promise expired long before
+              // anything happened. A wait that overruns its own estimate
+              // reads as a broken page.
+              ? 'The forge is being lit. The first game can take a minute or '
+                + 'two, and longer when the coals have gone cold.'
               : 'No games yet.'}
           </p>
         ) : feed.map((r) => (
@@ -387,8 +393,8 @@ export function MatchBeats({ arriving, running }: {
         {beats.length === 0 ? (
           <p className="theater-quiet">
             {running
-              ? 'The first game is being played. Forge takes a moment to '
-                + 'shuffle up.'
+              ? 'The first game is being played. There is a wait before the '
+                + 'first blow, and then it comes all at once.'
               : 'Nothing has happened yet.'}
           </p>
         ) : beats.map((b) => (

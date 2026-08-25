@@ -459,13 +459,23 @@ export default function ColiseumRoom() {
       {forgeReady && (
         <div className="card-surface mt-5 flex flex-wrap items-end gap-3
                         rounded-xl p-4">
+          {/* Bounded, and measured on the deployed room rather than guessed:
+              a `<select>` sizes to its widest option, and a deck named
+              "Goreclaw, Terror of Qal Sisma — Mono-Green Stompy — gyome"
+              made each of these 447px. Two of them ate a 992px bar and threw
+              the dial, the shuffle and the button onto two more rows — five
+              controls in three rows with half the bar empty. Capped, all five
+              sit on one; the browser ellipsises the name, and the theater
+              below carries it in full anyway. */}
           <Select label="Champion" value={a} onChange={setA}
+                  className="min-w-0 max-w-[15rem] flex-1"
                   options={decks.map((d) => ({
                     value: `${d.owner}/${d.slug}`,
                     label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
                       + (d.pilot ? ` (${d.pilot})` : ''),
                   }))} />
           <Select label="Challenger" value={b} onChange={setB}
+                  className="min-w-0 max-w-[15rem] flex-1"
                   options={decks.map((d) => ({
                     value: `${d.owner}/${d.slug}`,
                     label: (d.writable ? d.name : `${d.name} — ${d.owner}`)
