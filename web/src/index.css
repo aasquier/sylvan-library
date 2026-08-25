@@ -6108,6 +6108,63 @@ button:hover .tarot-fan-card {
   background: color-mix(in srgb, var(--field-brass) 88%, transparent);
 }
 
+/* The card, readable. Forty pixels of painting is enough to tell a Forest
+   from a Dragon and nowhere near enough to read one, so hovering lifts the
+   whole face out — which is what every Magic client does, and what the rest of
+   this app does through `CardHover`.
+
+   `position: fixed` and a transform, so the preview escapes the row's own
+   `overflow-x: auto` instead of being clipped by it — the trap that makes
+   most hover previews inside scrollers useless. Pointer-events off, so it can
+   never eat the hover that summoned it. */
+.field-card-peek {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 40;
+  width: 208px;
+  transform: translateX(-50%) scale(0.94);
+  transform-origin: bottom center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
+  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.75));
+}
+.field-card-peek img {
+  display: block;
+  width: 100%;
+  border-radius: 9px;
+}
+.field-card-peek-artist {
+  display: block;
+  margin-top: 3px;
+  text-align: center;
+  font-size: 0.62rem;
+  color: #e8dcc0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.field-card:hover .field-card-peek,
+.field-card:focus-visible .field-card-peek {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) scale(1);
+}
+.field-card:focus-visible {
+  outline: 2px solid var(--field-brass);
+  outline-offset: 1px;
+}
+/* The far player's cards sit near the top of the field, so their preview
+   opens downward instead of off the top of it. */
+.field-side-far .field-card-peek {
+  bottom: auto;
+  top: calc(100% + 6px);
+  transform-origin: top center;
+}
+
+/* Which game. Only ever shown when there is more than one. */
+.field-games { display: flex; gap: 3px; flex-wrap: wrap; }
+
 /* The transport. The Forge is never slowed for this — it governs only how
    fast the room reads a match back. */
 .field-transport {
@@ -6129,7 +6186,49 @@ button:hover .tarot-fan-card {
 .field-step { font-size: 0.6rem; }
 
 .field-speeds { display: flex; gap: 3px; }
-.field-speed { font-size: 0.66rem; padding: 3px 8px; }
+
+/* **The transport's own chips**, because `.chip-toggle` is painted for the
+   page and these sit on sand under a dark wash — inherited, they came out the
+   same shade whether they were on or off, which is a control that cannot
+   answer the hand reaching for it. Brass when chosen, because brass is what
+   this room's edges are lit with. */
+.field-game,
+.field-speed {
+  font-size: 0.66rem;
+  padding: 3px 8px;
+  min-width: 1.7rem;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #d9cdb2;
+  background: rgba(10, 8, 5, 0.5);
+  border: 1px solid color-mix(in srgb, var(--field-brass) 26%, transparent);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.field-game:hover,
+.field-speed:hover {
+  color: #fff6e2;
+  border-color: color-mix(in srgb, var(--field-brass) 58%, transparent);
+  background: rgba(10, 8, 5, 0.7);
+}
+.field-game:focus-visible,
+.field-speed:focus-visible {
+  outline: 2px solid var(--field-brass);
+  outline-offset: 1px;
+}
+.field-game.is-active,
+.field-speed.is-active {
+  color: #1a1409;
+  background: var(--field-brass);
+  border-color: color-mix(in srgb, var(--field-brass) 100%, transparent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* The play button says which state it is in the same way. */
+.field-transport .btn.is-on {
+  color: #1a1409;
+  background: var(--field-brass);
+}
 
 .field-scrub { flex: 1 1 8rem; min-width: 6rem; display: flex; }
 .field-scrub input {

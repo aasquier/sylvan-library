@@ -47,13 +47,6 @@ export interface StagedBeat {
  */
 export type Speed = 'paused' | 'slow' | 'play' | 'fast'
 
-/** The multiplier each speed applies to the natural pace. Larger is slower. */
-const SPEEDS: Record<Exclude<Speed, 'paused'>, number> = {
-  slow: 2.5,
-  play: 1,
-  fast: 0.25,
-}
-
 /** What the room is holding: the beats already told, the ones still to tell,
  *  and which game they belong to. */
 interface Reel {
@@ -89,55 +82,34 @@ const EMPTY: Reel = {
  * Cutting the model here is what would make going backwards impossible. */
 export const BEATS_KEPT = 80
 
-/** The slowest and the fastest a beat may be told, in milliseconds.
- *
- * The floor is a real limit rather than a round number: below about twenty
- * milliseconds a beat is a flicker, the board's arrival animation cannot
- * finish, and nothing is being *watched* any more. The ceiling is reading
- * speed. */
-const SLOWEST = 420
-const FASTEST = 20
-
 /**
- * How long to wait before telling the next beat.
+ * How long a beat is held, in milliseconds, at each speed.
  *
- * **Paced to finish**, which is the correction that made the board usable.
- * The first version knew only its own backlog — fast when deep, slow when
- * shallow — and that was fine while the beats were the only thing watching,
- * because a column of sentences falling behind just scrolls. A *board* that
- * falls behind is worse than useless: it is reset to an empty field every
- * time the next game lands, so a ten-game match showed turn two of game one,
- * then turn two of game two, and never a game.
+ * **Absolute, and that is the correction.** The first version multiplied a
+ * *derived* pace — one that measured how long games were taking and spread the
+ * beats across that, and which collapsed to a 20ms catch-up floor the moment a
+ * match finished. So "Slow" on a finished match meant 50ms a beat, which is
+ * not slow, and Aaron was right that it was unwatchable at every setting.
  *
- * Measured on the fixture decks, which play a game in about five seconds: the
- * old curve took roughly sixteen seconds to drain one game's hundred and
- * thirty beats, so it never finished one.
+ * The Forge does not wait for these numbers and is not slowed by them: it
+ * plays flat out, its results land when they land, and every game of a
+ * finished match can be watched back at leisure. So the room has no reason to
+ * chase the engine, and a speed control that means a fixed thing is worth more
+ * than one that is clever about a race it does not need to win.
  *
- * So the room measures how long games actually take — the gap between one
- * game's beats arriving and the next's — and spreads this game's beats across
- * that. Slow decks get a leisurely board; the fixtures get a brisk one; and
- * either way a game finishes before the next begins.
- *
- * **`left` is the time remaining, not the whole budget**, and the difference
- * is the whole correctness of this. The first version divided the *game's*
- * budget by the *shrinking* queue, so each beat was slower than the last: at
- * 126 beats over 50 seconds it starts at 396ms and, by the time sixty are
- * left, asks for 793 — pinned at the ceiling, and a game that should have
- * taken fifty seconds took several minutes. Aaron watched a board crawl one
- * turn a minute. Time left over beats left is constant when it is keeping up
- * and self-correcting when it is not, which is what was wanted both times.
- *
- * `left` is null until a second game has arrived (the first gap is JVM boot
- * and means nothing), and until then the old backlog curve stands in.
+ * A game is about a hundred and thirty beats, so: Slow is a shade over two
+ * and a half minutes, Watch is about a minute, Fast is twenty seconds.
  */
-export function pace(queued: number, left: number | null): number {
-  if (left != null && queued > 0) {
-    return Math.max(FASTEST, Math.min(SLOWEST, left / queued))
-  }
-  if (queued > 80) return 45
-  if (queued > 40) return 90
-  if (queued > 12) return 200
-  return SLOWEST
+const SPEEDS: Record<Exclude<Speed, 'paused'>, number> = {
+  slow: 1200,
+  play: 480,
+  fast: 150,
+}
+
+/** How long a beat is held at a speed. Zero when paused, which is not a
+ *  delay — it is the absence of one, and the caller schedules nothing. */
+export function beatDelay(speed: Speed): number {
+  return speed === 'paused' ? 0 : SPEEDS[speed]
 }
 
 /** What a game hands over: its number, its beats, and whether it was cut. */
@@ -155,50 +127,40 @@ export interface Arriving {
  * is the identity: the same log arriving twenty times is one game, and only a
  * new number is news.
  *
- * **`running` is the other half of the pacing, and it is the one that matters
- * most for how this feels.** Reading speed is only worth anything while there
- * is something still to wait for. Once the match is over there is no next game
- * to stay ahead of, and holding the rest back means a viewer watches a board
- * inch through a game that finished minutes ago — the single worst state this
- * room can be in, and the one Aaron found. A finished match empties its queue
- * at the floor.
+ * **The room never chases the Forge.** It used to try — measuring how long
+ * games took and spreading each game's beats across that window — and the
+ * cleverness cost more than it bought: the pace collapsed to a catch-up floor
+ * the moment a match ended, so every speed setting meant roughly the same
+ * unwatchable thing. It does not need to keep up. A finished match carries
+ * every game with it, so falling behind is not falling behind; it is simply
+ * being somewhere else in a recording that is not going anywhere.
  */
-export function useReel(arriving: Arriving | null, running: boolean,
+export function useReel(arriving: Arriving | null,
   speed: Speed): [Reel, (to: number) => void] {
   // One piece of state rather than five, because every change moves two of
   // them together: a beat leaving the queue is a beat entering the shown list,
   // and a game arriving does both at once.
   const [reel, setReel] = useState<Reel>(EMPTY)
-  // The newest game already taken in. A ref rather than state so the guard
-  // below can read it without putting it in the effect's dependencies.
+  // The game currently loaded. A ref rather than state so the guard below can
+  // read it without putting it in the effect's dependencies.
+  //
+  // **Which game, not how far along.** It used to hold the highest game number
+  // seen and refuse anything lower, which was right while the only source was
+  // a match marching forwards — and wrong the moment somebody could pick a
+  // game to watch back. Loading game two after game five is not going
+  // backwards; it is choosing.
   const heard = useRef(0)
-  // When the last game's beats arrived, and when this game's should be told
-  // by. Refs because they steer the *next* timeout rather than the render — a
-  // measurement of the match, not a fact about the picture.
-  const arrivedAt = useRef(0)
-  const budget = useRef<number | null>(null)
-  const deadline = useRef<number | null>(null)
+
 
   useEffect(() => {
-    if (!arriving || arriving.game <= heard.current) return
+    if (!arriving || arriving.game === heard.current) return
     heard.current = arriving.game
-    // How long that game took, measured rather than assumed. The **first**
-    // gap is skipped deliberately: it holds the JVM's boot and the card
-    // database, which is fifteen seconds of no game at all and would set a
-    // budget three times too generous for every game after it.
-    const now = Date.now()
-    if (arrivedAt.current > 0) {
-      budget.current = now - arrivedAt.current
-    }
-    arrivedAt.current = now
-    // This game should be told by the time the next one is expected. A game
-    // that runs long simply gets flushed, which is what already happens.
-    deadline.current = budget.current == null ? null : now + budget.current
-    // The game before this one is flushed rather than abandoned: every beat is
-    // shown, and the room never falls behind what the pips already say. It is
-    // a flurry at the moment a game ends, which is what a game ending is.
-    setReel((r) => ({
-      shown: [...r.shown, ...r.queue],
+    // A new game starts clean. The previous one is not flushed into the column
+    // any more: every game of a finished match can be watched back on its own,
+    // so running two of them together in one feed reads as a mistake rather
+    // than as continuity.
+    setReel(() => ({
+      shown: [],
       queue: arriving.beats,
       game: arriving.game,
       truncated: arriving.truncated,
@@ -220,14 +182,9 @@ export function useReel(arriving: Arriving | null, running: boolean,
       shown: [...r.shown, next],
       queue: r.queue.slice(1),
       told: r.told + 1,
-    })), SPEEDS[speed] * (running
-      ? pace(reel.queue.length,
-          deadline.current == null ? null : deadline.current - Date.now())
-      // Nothing left to stay ahead of: catch up to the result the room is
-      // already showing above.
-      : FASTEST))
+    })), SPEEDS[speed])
     return () => window.clearTimeout(id)
-  }, [reel.queue, running, speed])
+  }, [reel.queue, speed])
 
   // Moving the mark by hand. It sets the reel's own position rather than
   // overlaying it, so pressing play afterwards carries on from where the hand

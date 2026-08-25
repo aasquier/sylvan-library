@@ -466,22 +466,40 @@ type forgeResult struct {
 	Seed           *big.Int      `json:"seed"`
 	Rows           []forgeRow    `json:"rows"`
 	Caveat         string        `json:"caveat"`
-	// Beats is the **last** game's narration and board, carried on the result
-	// so a match that is over still has a battlefield to show.
+	// Beats is **every** game's narration and board, in the order they were
+	// played, so a finished match can be watched back a game at a time.
 	//
-	// The job's `partial` is the live carrier and it is cleared the moment the
-	// job finishes, which is fine for a bar and fatal for a picture: a
-	// one-game match can finish inside a single poll interval, so the room
-	// polls once, sees a done job with no partial, and draws an **empty
-	// field** for a match that was played in full. That is worse than the
-	// account it replaced, and it is exactly the case somebody watching a
-	// short match hits every time.
+	// Two problems, one field. The job's `partial` carries one game — the
+	// newest — and is cleared the moment the job finishes: a short match can
+	// finish inside a single poll interval, so the room would draw an empty
+	// field for a match played in full, and a long one would show whichever
+	// game happened to be current when somebody last polled and no way back to
+	// the others. A match is worth watching *after* it is over, which is when
+	// somebody actually has the time.
 	//
-	// `omitempty` on a pointer, deliberately: a shaped match with no beats —
-	// which is every match nobody asked to narrate, and every row in the
-	// frozen corpus — comes out byte-identical to what was recorded.
-	Beats *forgeBeats `json:"beats,omitempty"`
+	// **The whole match, and the size is stated rather than discovered.** A
+	// game costs about 26KB shaped, so a five-game match is ~130KB and the
+	// twenty-game ceiling is ~520KB — sent once, at the end, on a request
+	// somebody made deliberately, against a partial that was re-sending 26KB
+	// two or three times a second while the match ran. [ForgeReplayGames]
+	// bounds it.
+	//
+	// `omitempty` on a slice, deliberately: a match nobody asked to narrate —
+	// which is every row in the frozen corpus — comes out byte-identical to
+	// what was recorded.
+	Beats []forgeBeats `json:"beats,omitempty"`
 }
+
+// ForgeReplayGames is how many games of a finished match can be watched back.
+//
+// The ceiling exists because the whole replay crosses in one response and a
+// twenty-game match would be half a megabyte of it. Ten is past the point
+// anybody watches — a match that long is a measurement, and the tale of the
+// tape below the board is what it is read from. The games kept are the
+// **first** ones, matching every other cut in this file: a match reads
+// forwards, and the game somebody stopped watching at is the one they want
+// back.
+const ForgeReplayGames = 10
 
 // forgePartial is what the job's `partial` carries while the match plays.
 //
@@ -516,7 +534,7 @@ type forgePartial struct {
 // `TestADeckPlayedAgainstItselfShowsTheCombinedWins`, because the guard beats
 // the fix for a wart nobody has hit.
 func shapeForge(decks []*deck.Deck, addresses []string, games int,
-	seed *big.Int, run *tier3.SimRun, beats *forgeBeats) forgeResult {
+	seed *big.Int, run *tier3.SimRun, beats []forgeBeats) forgeResult {
 	wins := map[string]int{}
 	for _, d := range decks {
 		wins[d.Slug] = 0
@@ -557,6 +575,9 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		Rows:           rows,
 		Caveat:         ForgeCaveat,
 		Beats:          beats,
+	}
+	if len(out.Beats) > ForgeReplayGames {
+		out.Beats = out.Beats[:ForgeReplayGames]
 	}
 	for i, d := range decks {
 		out.Decks = append(out.Decks, forgeSeat{Slug: d.Slug, Name: d.Name,
@@ -806,7 +827,12 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			// so this is never stale by more than the few lines between them —
 			// and publishing them together is what stops the room seeing a
 			// game arrive with its narration one poll behind.
+			// `pending` is the newest game, waiting for the row that closes
+			// it — that is what the live `partial` carries. `played` is every
+			// game, which is what the finished result carries so the match can
+			// be watched back.
 			var pending *forgeBeats
+			var played []forgeBeats
 			// The paintings, resolved once for the whole match: two games of
 			// one pairing name almost the same hundred cards, so the second
 			// game costs a round trip for its tokens and nothing else.
@@ -817,6 +843,9 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 				}
 				shaped := newForgeBeats(log, seats, painted)
 				pending = &shaped
+				if len(played) < ForgeReplayGames {
+					played = append(played, shaped)
+				}
 			}
 			tick := func(finished int, game *tier3.GameResult) {
 				if game != nil {
@@ -866,7 +895,7 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
 				Seed: seed, Clock: ForgeClock, GamesRequested: games,
 				Hosted: hosted, OwnerIDs: ownerIDs})
-			return shapeForge(decks, addresses, games, seed, run, pending), nil
+			return shapeForge(decks, addresses, games, seed, run, played), nil
 		},
 	}, nil
 }

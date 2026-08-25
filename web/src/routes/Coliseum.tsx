@@ -53,7 +53,8 @@ import { useSearchParams } from 'react-router-dom'
 import {
   api, errorMessage, followJob,
   type Coliseum, type ColiseumArena, type ColiseumFact,
-  type DeckTile, type ForgeResult, type Job, type ValidationReport,
+  type DeckTile, type ForgeBeats, type ForgeResult, type Job,
+  type ValidationReport,
 } from '../lib/api'
 import { Badge, CardHover, Caveat, ErrorNote, NumberField, Select, StatTile }
   from '../components/ui'
@@ -397,14 +398,33 @@ export default function ColiseumRoom() {
    *  Translated here rather than on the stage because turning a slug into a
    *  name needs the shelf, and the shelf is this room's. The stage renders
    *  what it is given. */
+  /** Every game the room can show: the live one while the match runs, and all
+   *  of them once it is over.
+   *
+   * The partial carries one game — the newest — and is cleared the moment the
+   * job finishes; the result carries the whole match. So a match is watched
+   * live one game at a time, and watched *back* a game at a time, which is
+   * when somebody actually has the time for it. */
+  const played = useMemo((): ForgeBeats[] => {
+    if (forge?.beats?.length) return forge.beats
+    const live = theaterBeats(job?.partial)
+    return live ? [live] : []
+  }, [forge, job?.partial])
+
+  // Which game is on the field. Null follows the match; a number is a choice,
+  // and it survives the match ending so a pick does not get yanked away by the
+  // last game landing.
+  const [pickedGame, pickGame] = useState<number | null>(null)
+  const watching = useMemo(() => {
+    if (pickedGame != null) {
+      const picked = played.find((g) => g.game === pickedGame)
+      if (picked) return picked
+    }
+    return played[played.length - 1]
+  }, [played, pickedGame])
+
   const arriving = useMemo((): Arriving | null => {
-    // The live partial while the match runs, and the **result** once it is
-    // over. Both matter: the partial is cleared the moment the job finishes,
-    // and a short match can finish inside one poll interval — so without the
-    // fallback the room draws an empty field for a match it never saw a frame
-    // of. The reel keys on the game number, so a game already told is ignored
-    // rather than replayed.
-    const heard = theaterBeats(job?.partial) ?? forge?.beats ?? null
+    const heard = watching ?? null
     if (!heard) return null
     const name = (slug: string) =>
       shortName(decks.find((d) => d.slug === slug)?.name ?? slug)
@@ -431,7 +451,7 @@ export default function ColiseumRoom() {
         }
       }),
     }
-  }, [job?.partial, forge, decks])
+  }, [watching, decks])
 
   // **One clock for the room.** The reel drains the beats at reading speed and
   // says how many it has told; the account renders those beats and the board
@@ -445,7 +465,7 @@ export default function ColiseumRoom() {
   const [speed, setSpeed] = useState<Speed>('play')
   // `seek` moves the reel's own mark, so pressing play after a scrub carries
   // on from where the hand left off rather than snapping back.
-  const [reel, seek] = useReel(arriving, running, speed)
+  const [reel, seek] = useReel(arriving, speed)
 
   /** What the field calls a seat. The board carries slugs and Forge's own deck
    *  titles; only the room has the shelf that turns either into a name. */
@@ -591,7 +611,9 @@ export default function ColiseumRoom() {
                       name={seatName} running={running}
                       speed={speed} setSpeed={setSpeed}
                       of={reel.shown.length + reel.queue.length}
-                      seek={seek} />
+                      seek={seek}
+                      games={played.map((g) => g.game)}
+                      playing={reel.game} chooseGame={pickGame} />
         </div>
       )}
 

@@ -74,7 +74,26 @@ function FieldCard({ card, size, count }: {
   return (
     <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
                     + (count > 1 ? ' is-stacked' : '')}
-         title={title}>
+         title={title} tabIndex={card.image ? 0 : -1}>
+      {/* **The card, readable.** A permanent on this board is forty pixels of
+          painting — enough to know a Forest from a Dragon and nowhere near
+          enough to read one. Hovering lifts the whole face out at a size a
+          person can actually read, which is what every Magic client does and
+          what the rest of this app already does through `CardHover`.
+
+          Drawn as a sibling rather than in a portal, and only on hover or
+          keyboard focus: a board holds forty of these, and forty always-mounted
+          previews is forty more images than the page needs. `tabIndex` is what
+          gives it to the keyboard — a hover-only affordance is one nobody
+          without a mouse ever gets. */}
+      {card.image && (
+        <span className="field-card-peek" aria-hidden="true">
+          <img src={card.image} alt="" loading="lazy" draggable={false} />
+          {card.artist && (
+            <span className="field-card-peek-artist">art by {card.artist}</span>
+          )}
+        </span>
+      )}
       {/* The pile behind it. Two leaves is enough to read as depth and few
           enough not to fatten the row — a real stack of nine Forests does not
           look nine cards thick from across a table either. */}
@@ -260,16 +279,39 @@ function FieldSide({ side, name, facing }: {
  * backwards costs exactly what forwards costs. The controls are a second way
  * to set that number, not a second engine.
  */
-function FieldTransport({ speed, setSpeed, at, of, seek }: {
+function FieldTransport({ speed, setSpeed, at, of, seek,
+  games, playing: onGame, chooseGame }: {
   speed: Speed
   setSpeed: (s: Speed) => void
   at: number
   of: number
   seek: (to: number) => void
+  /** Every game the match has finished, in order. One while it is still being
+   *  played; all of them once it is over. */
+  games: number[]
+  /** Which one is on the field. */
+  playing: number
+  chooseGame: (game: number) => void
 }) {
-  const playing = speed !== 'paused'
+  const running = speed !== 'paused'
   return (
     <div className="field-transport">
+      {/* Which game. A place rather than an action, so `.strip-tab`'s
+          relatives rather than `.btn` — and only once there is more than one
+          to choose between, because a lone tab labelled "Game 1" is a control
+          that cannot do anything. */}
+      {games.length > 1 && (
+        <div className="field-games" role="group" aria-label="Which game">
+          {games.map((n) => (
+            <button key={n} type="button"
+                    className={`chip-toggle field-game${n === onGame ? ' is-active' : ''}`}
+                    aria-pressed={n === onGame}
+                    onClick={() => chooseGame(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="field-transport-buttons">
         <button type="button" className="btn btn-sm field-step"
                 onClick={() => { setSpeed('paused'); seek(at - 1) }}
@@ -277,10 +319,10 @@ function FieldTransport({ speed, setSpeed, at, of, seek }: {
           <span aria-hidden="true">◀◀</span>
         </button>
         <button type="button"
-                className={`btn btn-sm${playing ? ' is-on' : ''}`}
-                onClick={() => setSpeed(playing ? 'paused' : 'play')}
-                aria-label={playing ? 'Pause' : 'Play'}>
-          <span aria-hidden="true">{playing ? '❙❙' : '▶'}</span>
+                className={`btn btn-sm${running ? ' is-on' : ''}`}
+                onClick={() => setSpeed(running ? 'paused' : 'play')}
+                aria-label={running ? 'Pause' : 'Play'}>
+          <span aria-hidden="true">{running ? '❙❙' : '▶'}</span>
         </button>
         <button type="button" className="btn btn-sm field-step"
                 onClick={() => { setSpeed('paused'); seek(at + 1) }}
@@ -321,7 +363,7 @@ function FieldTransport({ speed, setSpeed, at, of, seek }: {
  * two to keep in step.
  */
 export function MatchBoard({ board, shown, game, name, running,
-  speed, setSpeed, of, seek }: {
+  speed, setSpeed, of, seek, games, playing, chooseGame }: {
   board: ForgeBoard | null
   shown: number
   game: number
@@ -334,6 +376,9 @@ export function MatchBoard({ board, shown, game, name, running,
   /** How many beats this game has in total, told and untold. */
   of: number
   seek: (to: number) => void
+  games: number[]
+  playing: number
+  chooseGame: (game: number) => void
 }) {
   const state = foldBoard(board, shown)
   const far = state.sides[0]
@@ -383,7 +428,8 @@ export function MatchBoard({ board, shown, game, name, running,
                  name={name(near.slug, near.name)} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
-                      seek={seek} />
+                      seek={seek} games={games} playing={playing}
+                      chooseGame={chooseGame} />
     </section>
   )
 }

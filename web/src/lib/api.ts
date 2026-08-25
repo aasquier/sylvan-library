@@ -718,13 +718,15 @@ export interface ForgeResult {
   seed: number
   rows: ForgeGameRow[]
   caveat: string
-  /** The last game's narration and board, or null.
+  /** **Every** game's narration and board, in the order they were played.
    *
-   * The job's `partial` is the live carrier and the server clears it the
-   * moment the job finishes — fine for a progress bar, fatal for a picture. A
-   * one-game match can finish inside a single poll interval, so without this
-   * the room would draw an empty field for a match that was played in full. */
-  beats: ForgeBeats | null
+   * The job's `partial` carries one game — the newest — and the server clears
+   * it the moment the job finishes. So a short match could finish inside a
+   * single poll and leave the room with nothing to draw, and a long one left
+   * you stuck on whichever game happened to be current. A match is worth
+   * watching back, which is when somebody has the time for it. Empty for a
+   * match nobody asked to narrate. */
+  beats: ForgeBeats[]
 }
 
 export interface SuggestionCandidate {
