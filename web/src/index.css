@@ -6256,6 +6256,171 @@ button:hover .tarot-fan-card {
 }
 .field-rows { display: flex; flex-direction: column; gap: 6px; }
 
+/* ------------------------------------------------------- the hands, held
+ *
+ * **A hand is not on the battlefield.** It used to be drawn as though it
+ * were — a full-width row in the same stack as lands and creatures, one per
+ * seat — so two players cost eight rows, two of them cards nobody had played
+ * yet, and the sand was squeezed for the room (Aaron, 2026-08-25: "maybe it
+ * isn't in the field but is to the side to give more room for cards"). He is
+ * describing a real table. Your hand is in your hand, off to one side; the
+ * sand is for what has been committed to it.
+ *
+ * So the field becomes a grid with a rail down one edge, and the cards in a
+ * hand overlap the way cards in a hand overlap — each showing the strip that
+ * carries its name, which is the strip a player fans a hand to read. Seven
+ * cards cost one narrow column instead of a row across the arena.
+ *
+ * Below the wide breakpoint the column has nowhere to go, so the fan turns on
+ * its side into a strip along the foot of the field: the same gesture read
+ * across instead of down, and still off the sand.
+ */
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'far'
+    'seam'
+    'near'
+    'hands'
+    'transport';
+}
+.field-side-far { grid-area: far; }
+.field-seam { grid-area: seam; }
+.field-side-near { grid-area: near; }
+.field-hands { grid-area: hands; }
+.field-transport { grid-area: transport; }
+
+/* The rail the hands are held over: darker than the sand and edged in the
+ * same brass as the players' own rails, because it is furniture rather than
+ * floor. Off the sand is the whole point. */
+.field-hands {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.16) 100%);
+  border-top: 1px solid
+    color-mix(in srgb, var(--field-brass) 26%, transparent);
+}
+.field-hand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.field-hand-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-stone-ink) 66%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.field-hand-n {
+  font-weight: 700;
+  color: var(--field-brass);
+}
+.field-hand-empty {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: color-mix(in srgb, var(--field-stone-ink) 55%, transparent);
+  padding: 6px 2px;
+}
+
+/* The fan. Later cards paint over earlier ones, which is what makes it read
+ * as one hand rather than a row with a bug in it — and the overlap is set so
+ * the strip left showing is the card's *name*, which is what a player fans a
+ * hand to see. */
+.field-hand-fan {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 2px 0;
+  min-height: 42px;
+}
+.field-hand-fan > .field-card + .field-card { margin-left: -24px; }
+.field-hand-fan > .field-card { flex: 0 0 auto; }
+
+/* Held, not played: a card in a hand lifts toward the person holding it when
+ * the pointer finds it, so a tight fan can still be read one card at a time.
+ * The peek that opens above it is `.field-card-peek`'s, unchanged. */
+.field-hand-fan .field-card {
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.field-hand-fan .field-card:hover,
+.field-hand-fan .field-card:focus-visible {
+  transform: translateY(-7px);
+  z-index: 5;
+}
+
+@media (min-width: 62rem) {
+  .field {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'far   hands'
+      'seam  hands'
+      'near  hands'
+      'transport transport';
+  }
+  .field-hands {
+    justify-content: space-between;
+    border-top: 0;
+    border-left: 1px solid
+      color-mix(in srgb, var(--field-brass) 26%, transparent);
+    background: linear-gradient(90deg,
+      rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.12) 100%);
+  }
+  .field-hand-fan {
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+  }
+  .field-hand-fan > .field-card + .field-card {
+    margin-left: 0;
+    /* 27px of each card left showing: the strip that carries the name, which
+       is the strip a player fans a hand to read. Seven cards then cost 221px,
+       so two full hands still sit inside a field the battlefield rows set the
+       height of — the point was a shorter field, and a hand rail that made it
+       taller would have given the room back with one hand and taken it with
+       the other. */
+    margin-top: -32px;
+  }
+  .field-hand-fan .field-card:hover,
+  .field-hand-fan .field-card:focus-visible {
+    transform: translateX(-7px);
+  }
+
+  /* **A hand card's preview opens into the field**, not upward and not
+     centred on the card. The rail is about 112px and the preview is 208px, so
+     a centred one is cut in half by `.field`'s own `overflow: hidden` — the
+     one boundary still clipping anything here — and an upward one runs off
+     the top for the far player, who sits at the top. Sideways it has the
+     whole arena to open into. */
+  .field-hand-fan .field-card-peek {
+    bottom: auto;
+    top: 50%;
+    left: auto;
+    right: calc(100% + 10px);
+    transform: translateY(-50%) scale(0.94);
+    transform-origin: right center;
+  }
+  .field-hand-fan .field-card:hover .field-card-peek,
+  .field-hand-fan .field-card:focus-visible .field-card-peek {
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-hand-fan .field-card { transition: none; }
+}
+
 /* The rail: cut stone with a brass edge catching the light. */
 .field-rail {
   display: flex;
