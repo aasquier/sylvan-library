@@ -109,6 +109,10 @@ function runningJob(partial: unknown): Job {
 }
 
 const RESULT: ForgeResult = {
+  // A silent match: nobody asked to narrate, so the result carries no beats
+  // and no board — which is also every match a worker without the scribe
+  // plays.
+  beats: null,
   decks: [
     { slug: 'gyome', name: 'Gyome Food', address: 'aaron/gyome', wins: 2 },
     { slug: 'arahbo', name: 'Arahbo Cats', address: 'aaron/arahbo', wins: 1 },

@@ -98,13 +98,23 @@ const FASTEST = 20
  * So the room measures how long games actually take — the gap between one
  * game's beats arriving and the next's — and spreads this game's beats across
  * that. Slow decks get a leisurely board; the fixtures get a brisk one; and
- * either way a game finishes before the next begins. `budget` is null until a
- * second game has arrived (the first gap is JVM boot and means nothing), and
- * until then the old backlog curve stands in.
+ * either way a game finishes before the next begins.
+ *
+ * **`left` is the time remaining, not the whole budget**, and the difference
+ * is the whole correctness of this. The first version divided the *game's*
+ * budget by the *shrinking* queue, so each beat was slower than the last: at
+ * 126 beats over 50 seconds it starts at 396ms and, by the time sixty are
+ * left, asks for 793 — pinned at the ceiling, and a game that should have
+ * taken fifty seconds took several minutes. Aaron watched a board crawl one
+ * turn a minute. Time left over beats left is constant when it is keeping up
+ * and self-correcting when it is not, which is what was wanted both times.
+ *
+ * `left` is null until a second game has arrived (the first gap is JVM boot
+ * and means nothing), and until then the old backlog curve stands in.
  */
-export function pace(queued: number, budget: number | null): number {
-  if (budget != null && queued > 0) {
-    return Math.max(FASTEST, Math.min(SLOWEST, budget / queued))
+export function pace(queued: number, left: number | null): number {
+  if (left != null && queued > 0) {
+    return Math.max(FASTEST, Math.min(SLOWEST, left / queued))
   }
   if (queued > 80) return 45
   if (queued > 40) return 90
@@ -126,8 +136,16 @@ export interface Arriving {
  * `arriving` is handed over again on every poll, which is why the game number
  * is the identity: the same log arriving twenty times is one game, and only a
  * new number is news.
+ *
+ * **`running` is the other half of the pacing, and it is the one that matters
+ * most for how this feels.** Reading speed is only worth anything while there
+ * is something still to wait for. Once the match is over there is no next game
+ * to stay ahead of, and holding the rest back means a viewer watches a board
+ * inch through a game that finished minutes ago — the single worst state this
+ * room can be in, and the one Aaron found. A finished match empties its queue
+ * at the floor.
  */
-export function useReel(arriving: Arriving | null): Reel {
+export function useReel(arriving: Arriving | null, running: boolean): Reel {
   // One piece of state rather than five, because every change moves two of
   // them together: a beat leaving the queue is a beat entering the shown list,
   // and a game arriving does both at once.
@@ -135,11 +153,12 @@ export function useReel(arriving: Arriving | null): Reel {
   // The newest game already taken in. A ref rather than state so the guard
   // below can read it without putting it in the effect's dependencies.
   const heard = useRef(0)
-  // When the last game's beats arrived, and how long the gap before them was.
-  // Refs because they steer the *next* timeout rather than the render — a
+  // When the last game's beats arrived, and when this game's should be told
+  // by. Refs because they steer the *next* timeout rather than the render — a
   // measurement of the match, not a fact about the picture.
   const arrivedAt = useRef(0)
   const budget = useRef<number | null>(null)
+  const deadline = useRef<number | null>(null)
 
   useEffect(() => {
     if (!arriving || arriving.game <= heard.current) return
@@ -153,6 +172,9 @@ export function useReel(arriving: Arriving | null): Reel {
       budget.current = now - arrivedAt.current
     }
     arrivedAt.current = now
+    // This game should be told by the time the next one is expected. A game
+    // that runs long simply gets flushed, which is what already happens.
+    deadline.current = budget.current == null ? null : now + budget.current
     // The game before this one is flushed rather than abandoned: every beat is
     // shown, and the room never falls behind what the pips already say. It is
     // a flurry at the moment a game ends, which is what a game ending is.
@@ -178,9 +200,14 @@ export function useReel(arriving: Arriving | null): Reel {
       shown: [...r.shown, next].slice(-BEATS_KEPT),
       queue: r.queue.slice(1),
       told: r.told + 1,
-    })), pace(reel.queue.length, budget.current))
+    })), running
+      ? pace(reel.queue.length,
+          deadline.current == null ? null : deadline.current - Date.now())
+      // Nothing left to stay ahead of: catch up to the result the room is
+      // already showing above.
+      : FASTEST)
     return () => window.clearTimeout(id)
-  }, [reel.queue])
+  }, [reel.queue, running])
 
   return reel
 }

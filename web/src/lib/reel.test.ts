@@ -24,6 +24,29 @@ describe('how fast a beat is told', () => {
     expect(pace(130, 40_000)).toBeGreaterThan(pace(130, 5000))
   })
 
+  it('holds a steady rate as the queue drains', () => {
+    // **The bug this replaced.** The argument is the time *remaining*, not the
+    // game's whole budget, so a queue half drained with half its time left
+    // asks for the same rate it started at. Dividing the whole budget by the
+    // shrinking queue made every beat slower than the last: 126 beats over 50
+    // seconds started at 396ms and asked 793ms with sixty left — pinned at the
+    // ceiling, and a fifty-second game took minutes.
+    // 200 beats over 50 seconds is 250ms each; half the beats with half the
+    // time left, and five beats with 1250ms left, are both the same rate.
+    const started = pace(200, 50_000)
+    const halfway = pace(100, 25_000)
+    const nearlyDone = pace(5, 1250)
+    expect(halfway).toBeCloseTo(started, 5)
+    expect(nearlyDone).toBeCloseTo(started, 5)
+  })
+
+  it('hurries when it has fallen behind, rather than giving up', () => {
+    // Time left can go negative when a game outran its window. The floor is
+    // what stops that becoming an instant flush of two hundred beats.
+    expect(pace(80, -4000)).toBe(20)
+    expect(pace(80, 200)).toBe(20)
+  })
+
   it('never goes below a flicker or above reading speed', () => {
     // A game with a thousand beats in one second is not something to watch
     // at one millisecond a beat: the board's arrival animation cannot even

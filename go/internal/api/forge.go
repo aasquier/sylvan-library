@@ -466,6 +466,21 @@ type forgeResult struct {
 	Seed           *big.Int      `json:"seed"`
 	Rows           []forgeRow    `json:"rows"`
 	Caveat         string        `json:"caveat"`
+	// Beats is the **last** game's narration and board, carried on the result
+	// so a match that is over still has a battlefield to show.
+	//
+	// The job's `partial` is the live carrier and it is cleared the moment the
+	// job finishes, which is fine for a bar and fatal for a picture: a
+	// one-game match can finish inside a single poll interval, so the room
+	// polls once, sees a done job with no partial, and draws an **empty
+	// field** for a match that was played in full. That is worse than the
+	// account it replaced, and it is exactly the case somebody watching a
+	// short match hits every time.
+	//
+	// `omitempty` on a pointer, deliberately: a shaped match with no beats —
+	// which is every match nobody asked to narrate, and every row in the
+	// frozen corpus — comes out byte-identical to what was recorded.
+	Beats *forgeBeats `json:"beats,omitempty"`
 }
 
 // forgePartial is what the job's `partial` carries while the match plays.
@@ -501,7 +516,7 @@ type forgePartial struct {
 // `TestADeckPlayedAgainstItselfShowsTheCombinedWins`, because the guard beats
 // the fix for a wart nobody has hit.
 func shapeForge(decks []*deck.Deck, addresses []string, games int,
-	seed *big.Int, run *tier3.SimRun) forgeResult {
+	seed *big.Int, run *tier3.SimRun, beats *forgeBeats) forgeResult {
 	wins := map[string]int{}
 	for _, d := range decks {
 		wins[d.Slug] = 0
@@ -541,6 +556,7 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		Seed:           seed,
 		Rows:           rows,
 		Caveat:         ForgeCaveat,
+		Beats:          beats,
 	}
 	for i, d := range decks {
 		out.Decks = append(out.Decks, forgeSeat{Slug: d.Slug, Name: d.Name,
@@ -850,7 +866,7 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
 				Seed: seed, Clock: ForgeClock, GamesRequested: games,
 				Hosted: hosted, OwnerIDs: ownerIDs})
-			return shapeForge(decks, addresses, games, seed, run), nil
+			return shapeForge(decks, addresses, games, seed, run, pending), nil
 		},
 	}, nil
 }

@@ -397,7 +397,13 @@ export default function ColiseumRoom() {
    *  name needs the shelf, and the shelf is this room's. The stage renders
    *  what it is given. */
   const arriving = useMemo((): Arriving | null => {
-    const heard = theaterBeats(job?.partial)
+    // The live partial while the match runs, and the **result** once it is
+    // over. Both matter: the partial is cleared the moment the job finishes,
+    // and a short match can finish inside one poll interval — so without the
+    // fallback the room draws an empty field for a match it never saw a frame
+    // of. The reel keys on the game number, so a game already told is ignored
+    // rather than replayed.
+    const heard = theaterBeats(job?.partial) ?? forge?.beats ?? null
     if (!heard) return null
     const name = (slug: string) =>
       shortName(decks.find((d) => d.slug === slug)?.name ?? slug)
@@ -424,14 +430,14 @@ export default function ColiseumRoom() {
         }
       }),
     }
-  }, [job?.partial, decks])
+  }, [job?.partial, forge, decks])
 
   // **One clock for the room.** The reel drains the beats at reading speed and
   // says how many it has told; the account renders those beats and the board
   // is folded to exactly that many steps. The server builds one board step per
   // beat, so a single count keeps the picture and the sentences describing the
   // same moment — two components pacing themselves would drift within a turn.
-  const reel = useReel(arriving)
+  const reel = useReel(arriving, running)
 
   /** What the field calls a seat. The board carries slugs and Forge's own deck
    *  titles; only the room has the shelf that turns either into a name. */
