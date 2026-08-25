@@ -440,10 +440,11 @@ func TestAStreamedMatchTicksPerGameAndRebuildsTheRun(t *testing.T) {
 	var ticks []tick
 	seed := big.NewInt(42)
 	run, err := shim.worker(time.Second, "").RunMatch(context.Background(),
-		[]*deck.Deck{testDeck("gyome"), testDeck("trostani")}, 2, 300, seed,
-		func(finished int, g *GameResult) {
-			ticks = append(ticks, tick{finished, g != nil})
-		})
+		[]*deck.Deck{testDeck("gyome"), testDeck("trostani")},
+		MatchAsk{Games: 2, Clock: 300, Seed: seed,
+			OnGame: func(finished int, g *GameResult) {
+				ticks = append(ticks, tick{finished, g != nil})
+			}})
 	if err != nil {
 		t.Fatalf("the match failed: %v", err)
 	}
@@ -496,7 +497,8 @@ func TestAPreStreamingShimIsStillUnderstood(t *testing.T) {
 	})
 
 	run, err := shim.worker(time.Second, "").RunMatch(context.Background(),
-		[]*deck.Deck{testDeck("gyome")}, 1, 300, big.NewInt(1), nil)
+		[]*deck.Deck{testDeck("gyome")},
+		MatchAsk{Games: 1, Clock: 300, Seed: big.NewInt(1)})
 	if err != nil {
 		t.Fatalf("an old shim's answer was refused: %v", err)
 	}
@@ -520,7 +522,8 @@ func TestAnUnreadableFlatAnswerIsRefused(t *testing.T) {
 		_, _ = io.WriteString(w, `["not", "a", "run"]`)
 	})
 	_, err := shim.worker(time.Second, "").RunMatch(context.Background(),
-		[]*deck.Deck{testDeck("gyome")}, 1, 300, big.NewInt(1), nil)
+		[]*deck.Deck{testDeck("gyome")},
+		MatchAsk{Games: 1, Clock: 300, Seed: big.NewInt(1)})
 	if err == nil {
 		t.Fatal("a nonsense answer rebuilt into a run")
 	}
@@ -556,7 +559,8 @@ func TestTheMatchStreamsFailureModes(t *testing.T) {
 				_, _ = io.WriteString(w, tc.lines)
 			})
 			_, err := shim.worker(time.Second, "").RunMatch(context.Background(),
-				[]*deck.Deck{testDeck("gyome")}, 1, 300, big.NewInt(1), nil)
+				[]*deck.Deck{testDeck("gyome")},
+				MatchAsk{Games: 1, Clock: 300, Seed: big.NewInt(1)})
 			if err == nil {
 				t.Fatal("the stream's failure was not raised")
 			}
@@ -585,7 +589,7 @@ func TestAStreamThatGoesQuietIsCancelledRatherThanWaitedOnForever(t *testing.T) 
 	_, err := readStream(pr, 20*time.Millisecond, func() {
 		once.Do(func() { close(stalled) })
 		_ = pr.CloseWithError(errors.New("stalled"))
-	}, nil)
+	}, MatchAsk{})
 	if err == nil {
 		t.Fatal("a silent stream was waited on forever")
 	}
@@ -616,7 +620,7 @@ func TestTheStallBudgetIsPerReadRatherThanPerMatch(t *testing.T) {
 	ticks := 0
 	run, err := readStream(pr, 60*time.Millisecond, func() {
 		_ = pr.CloseWithError(errors.New("stalled"))
-	}, func(int, *GameResult) { ticks++ })
+	}, MatchAsk{OnGame: func(int, *GameResult) { ticks++ }})
 	if err != nil {
 		t.Fatalf("a chatty stream was cancelled: %v", err)
 	}

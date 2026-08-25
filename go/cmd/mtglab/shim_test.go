@@ -295,13 +295,20 @@ func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
 	var ticks []int
 	seated := 0
 	seed := int64(7)
-	run, err := worker.RunMatch(t.Context(), decks, 2, 300, bigOf(seed),
-		func(finished int, game *tier3.GameResult) {
+	// Narrated, because narration is the half of this path that nothing else
+	// can prove: the beats are parsed on the worker, from a JVM's own output,
+	// and cross a socket to be heard here. A stub can check the framing; only
+	// a real match can show that Forge said anything worth framing.
+	var told []tier3.EventLog
+	run, err := worker.RunMatch(t.Context(), decks, tier3.MatchAsk{
+		Games: 2, Clock: 300, Seed: bigOf(seed), Narrate: true,
+		OnEvents: func(log tier3.EventLog) { told = append(told, log) },
+		OnGame: func(finished int, game *tier3.GameResult) {
 			ticks = append(ticks, finished)
 			if game != nil {
 				seated++
 			}
-		})
+		}})
 	if err != nil {
 		t.Fatalf("the hosted match failed: %v", err)
 	}
@@ -327,6 +334,35 @@ func TestTheGoShimPlaysARealMatchForTheGoClient(t *testing.T) {
 	}
 	if run.ForgeVersion == "" {
 		t.Error("the worker reported no Forge version")
+	}
+
+	// The beats crossed: one log per game, numbered as the games finished,
+	// each of them a real game's worth rather than a stray line or two. The
+	// floor is deliberately low — a nine-turn game measured about a hundred
+	// beats, and a test that demanded a hundred would be asserting how Forge's
+	// AI happened to play rather than that the stream works.
+	if len(told) != 2 {
+		t.Fatalf("the worker narrated %d games, want 2", len(told))
+	}
+	for i, log := range told {
+		if log.Game != i+1 {
+			t.Errorf("log %d is numbered %d", i+1, log.Game)
+		}
+		if len(log.Events) < 10 {
+			t.Errorf("game %d crossed with %d beats, which is not a game",
+				log.Game, len(log.Events))
+		}
+		t.Logf("game %d: %d beats", log.Game, len(log.Events))
+	}
+	// A game ends with somebody winning or losing, and the beat that says so
+	// is the one a room needs most — it is the moment the match theater
+	// exists for.
+	last := told[0].Events[len(told[0].Events)-1]
+	if last.Kind != tier3.EventOutcome {
+		t.Errorf("game one's last beat is %q, want an outcome", last.Kind)
+	}
+	if last.Note == "" {
+		t.Error("the outcome crossed without its reason")
 	}
 }
 
@@ -411,13 +447,20 @@ func TestTheClientReadsTheRecordedShimWire(t *testing.T) {
 	var ticks []int
 	seated := 0
 	seed := int64(7)
-	run, err := worker.RunMatch(t.Context(), decks, 2, 300, bigOf(seed),
-		func(finished int, game *tier3.GameResult) {
+	// Narrated, because narration is the half of this path that nothing else
+	// can prove: the beats are parsed on the worker, from a JVM's own output,
+	// and cross a socket to be heard here. A stub can check the framing; only
+	// a real match can show that Forge said anything worth framing.
+	var told []tier3.EventLog
+	run, err := worker.RunMatch(t.Context(), decks, tier3.MatchAsk{
+		Games: 2, Clock: 300, Seed: bigOf(seed), Narrate: true,
+		OnEvents: func(log tier3.EventLog) { told = append(told, log) },
+		OnGame: func(finished int, game *tier3.GameResult) {
 			ticks = append(ticks, finished)
 			if game != nil {
 				seated++
 			}
-		})
+		}})
 	if err != nil {
 		t.Fatalf("the older shim's match did not cross: %v", err)
 	}

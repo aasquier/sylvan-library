@@ -21,15 +21,30 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Coliseum, ColiseumArena, ColiseumChampion, ColiseumFact } from '../lib/api'
+import type {
+  Coliseum, ColiseumArena, ColiseumChampion, ColiseumFact, DeckTile,
+  ForgeBeats, ForgeResult, Job,
+} from '../lib/api'
 import ColiseumRoom from './Coliseum'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
-  return { ...actual, api: { coliseum: vi.fn() } }
+  return {
+    ...actual,
+    api: { coliseum: vi.fn(), decks: vi.fn(), forgeStatus: vi.fn(),
+           simForge: vi.fn(), job: vi.fn(), glossary: vi.fn(),
+           validate: vi.fn() },
+  }
 })
 
 const { api } = await import('../lib/api')
+
+const DECKS = [
+  { slug: 'gyome', owner: 'aaron', name: 'Gyome, Master Chef — Food',
+    pilot: '', writable: true },
+  { slug: 'arahbo', owner: 'aaron', name: 'Arahbo, Roar of the World — Cats',
+    pilot: '', writable: true },
+] as unknown as DeckTile[]
 
 function champion(name: string, role: string): ColiseumChampion {
   return {
@@ -60,12 +75,74 @@ function room(over: Partial<Coliseum> = {}): Coliseum {
   }
 }
 
-function show() {
-  return render(<MemoryRouter><ColiseumRoom /></MemoryRouter>)
+function show(path = '/coliseum') {
+  return render(
+    <MemoryRouter initialEntries={[path]}><ColiseumRoom /></MemoryRouter>)
 }
 
-beforeEach(() => { vi.mocked(api.coliseum).mockReset() })
-afterEach(cleanup)
+/** One game's narration, as the job's `partial` carries it. */
+function beats(over: Partial<ForgeBeats> = {}): ForgeBeats {
+  return {
+    game: 1, truncated: false,
+    beats: [
+      { kind: 'turn', turn: 4, who: 'gyome', against: null },
+      { kind: 'land', turn: 4, who: 'gyome', against: null,
+        card: 'Bojuka Bog' },
+      { kind: 'attack', turn: 4, who: 'gyome', against: 'arahbo',
+        card: 'Gyome, Master Chef' },
+      { kind: 'outcome', turn: 4, who: 'arahbo', against: null,
+        note: 'has lost due to accumulation of 21 damage from generals' },
+    ],
+    ...over,
+  }
+}
+
+function runningJob(partial: unknown): Job {
+  return {
+    id: 'j1', kind: 'sim.forge', status: 'running', done: 1, total: 3,
+    percent: 33, label: '', result: null, partial, error: null,
+    created_at: '2026-08-25T00:00:00Z',
+  } as unknown as Job
+}
+
+const RESULT: ForgeResult = {
+  decks: [
+    { slug: 'gyome', name: 'Gyome Food', address: 'aaron/gyome', wins: 2 },
+    { slug: 'arahbo', name: 'Arahbo Cats', address: 'aaron/arahbo', wins: 1 },
+  ],
+  games: 3, played: 3, draws: 0, timed_out: 1,
+  median_seconds: 5.4, max_seconds: 37.8,
+  startup_seconds: 9.2, wall_seconds: 71.0,
+  clock: 300, seed: 7,
+  rows: [
+    { game: 1, winner: 'gyome', seconds: 5.4, turns: 9, draw: false,
+      timed_out: false },
+    { game: 2, winner: null, seconds: 300.0, turns: null, draw: false,
+      timed_out: true },
+    { game: 3, winner: 'gyome', seconds: 8.0, turns: 12, draw: false,
+      timed_out: false },
+  ],
+  caveat: 'server caveat text',
+}
+
+const DONE: Job = {
+  id: 'j1', kind: 'sim.forge', status: 'done', done: 3, total: 3,
+  percent: 100, label: '', result: RESULT, partial: null, error: null,
+  created_at: '2026-08-25T00:00:00Z',
+} as unknown as Job
+
+beforeEach(() => {
+  vi.mocked(api.coliseum).mockReset()
+  vi.mocked(api.decks).mockResolvedValue(DECKS)
+  vi.mocked(api.forgeStatus).mockResolvedValue({ available: true, why: null })
+  vi.mocked(api.glossary).mockResolvedValue(
+    { terms: [] } as unknown as Awaited<ReturnType<typeof api.glossary>>)
+})
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
 
 describe('the Coliseum', () => {
   it('renders each kind of fact with the halves that kind promises', async () => {
@@ -194,5 +271,162 @@ describe('the Coliseum', () => {
     vi.mocked(api.coliseum).mockRejectedValue(new Error('nope'))
     show()
     await waitFor(() => expect(screen.getByText(/did not answer/i)).toBeTruthy())
+  })
+})
+
+/**
+ * The gates: this room is the only one that starts a real match, and these are
+ * the properties a green backend suite cannot see from its side of the wire.
+ *
+ * They moved here from the Simulator with the Forge itself (Aaron's call,
+ * 2026-08-25), and one is new and load-bearing: **this room asks to be
+ * narrated.** Narration is free in time and about a hundred beats a game in
+ * volume, so it is asked for per run — and if this room ever stopped asking,
+ * the play-by-play would simply be empty with nothing on screen to explain it.
+ */
+describe('the gates', () => {
+  beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
+
+  it('sends both decks in, and asks to be told the game', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show()
+    await screen.findByText('Send them in')
+    fireEvent.click(screen.getByText('Send them in'))
+    await waitFor(() => expect(api.simForge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        a_slug: 'gyome', a_owner: 'aaron',
+        b_slug: 'arahbo', b_owner: 'aaron',
+        games: 10, narrate: true,
+      })))
+  })
+
+  it('seats both fighters from a link', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show('/coliseum?a=aaron/arahbo&b=aaron/gyome')
+    await screen.findByText('Send them in')
+    fireEvent.click(screen.getByText('Send them in'))
+    await waitFor(() => expect(api.simForge).toHaveBeenCalledWith(
+      expect.objectContaining({ a_slug: 'arahbo', b_slug: 'gyome' })))
+  })
+
+  it('does not open where Forge is not installed', async () => {
+    vi.mocked(api.forgeStatus).mockResolvedValue(
+      { available: false, why: 'no jar at /opt/forge' })
+    show()
+    await screen.findByText(/harena/)
+    await waitFor(() => expect(api.forgeStatus).toHaveBeenCalled())
+    // Absent, never greyed out with an excuse — and the maintainer-facing
+    // reason never renders (commandment 10).
+    expect(screen.queryByText('Send them in')).toBeNull()
+    expect(screen.queryByText(/no jar/)).toBeNull()
+    // The room is still worth walking through, which is why nothing else
+    // depends on the gate.
+    expect(screen.getByText(/harena/)).toBeTruthy()
+  })
+
+  it('treats a failed gate ask as absence, not as an error', async () => {
+    vi.mocked(api.forgeStatus).mockRejectedValue(new Error('boom'))
+    show()
+    await waitFor(() => expect(api.forgeStatus).toHaveBeenCalled())
+    expect(screen.queryByText('Send them in')).toBeNull()
+    expect(screen.queryByText(/The match failed/)).toBeNull()
+  })
+
+  it('says the forge is lighting from the click, not from the job', async () => {
+    // A submission that never comes back, which is the whole point: this is
+    // the gap where a JVM is starting on another machine and there is no job
+    // to read a status off yet.
+    vi.mocked(api.simForge).mockReturnValue(new Promise(() => {}))
+    show()
+    const button = await screen.findByText('Send them in') as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByText('Lighting the forge…')).toBeTruthy())
+    expect((screen.getByText('Lighting the forge…') as HTMLButtonElement)
+      .disabled).toBe(true)
+  })
+})
+
+/**
+ * The play-by-play. What it must do is *name decks* — the wire carries a slug
+ * and the room owns the shelf that turns one into a name — and what it must
+ * never do is fold Forge's own outcome sentence into something tidier: "has
+ * lost due to accumulation of 21 damage from generals" is the loss condition
+ * Commander is named for, and it only reads correctly if nothing improves it.
+ */
+describe('the play-by-play', () => {
+  beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
+
+  /** Start a match whose job is parked mid-stream holding `partial`. */
+  async function watching(partial: unknown) {
+    vi.mocked(api.simForge).mockResolvedValue(runningJob(partial))
+    vi.mocked(api.job).mockReturnValue(new Promise(() => {}))
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    return screen.findByRole('tab', { name: 'The game' })
+  }
+
+  it('tells the game in words, naming the decks rather than the seats',
+     async () => {
+    await watching({ rows: [], beats: beats() })
+    // Short names, because a beat is one line and a deck's full name is most
+    // of it — "Gyome, Master Chef — Food" is the shelf's name for it and
+    // "Gyome" is what anybody calls it out loud.
+    await waitFor(() => expect(screen.getAllByText('Gyome').length)
+      .toBeGreaterThan(0), { timeout: 3000 })
+    await waitFor(() => expect(screen.getByText('plays Bojuka Bog'))
+      .toBeTruthy(), { timeout: 3000 })
+    // No seat number reaches the page.
+    expect(screen.queryByText(/seat 1|seat 2/)).toBeNull()
+  })
+
+  it('keeps Forge’s own outcome sentence whole', async () => {
+    await watching({ rows: [], beats: beats() })
+    await waitFor(() => expect(screen.getByText(
+      'has lost due to accumulation of 21 damage from generals')).toBeTruthy(),
+    { timeout: 4000 })
+  })
+
+  it('says when a game outran what crosses', async () => {
+    await watching({ rows: [], beats: beats({ truncated: true }) })
+    await waitFor(() => expect(screen.getByText(/ran long/)).toBeTruthy(),
+                  { timeout: 3000 })
+  })
+
+  it('leaves the house within reach while a match plays', async () => {
+    await watching({ rows: [], beats: beats() })
+    // Both places are offered, and the facts are still one click away — the
+    // room existed before it could run anything and does not forget itself
+    // the moment it can.
+    fireEvent.click(screen.getByRole('tab', { name: 'The house' }))
+    await screen.findByText(/harena/)
+  })
+
+  it('is quiet, not broken, when nobody narrated', async () => {
+    await watching({ rows: [] })
+    // No beats on the wire is the shape of an older worker, or of a match
+    // nobody asked to narrate. The stage says so in its own words.
+    await waitFor(() => expect(screen.getByText(/being played/)).toBeTruthy())
+  })
+})
+
+describe('the tale of the tape', () => {
+  beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
+
+  it('keeps clock-outs apart from draws', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    await screen.findByText('Gyome Food wins')
+    expect(screen.getByText('Arahbo Cats wins')).toBeTruthy()
+    // The tile pair the distinction lives in — a game called off at the clock
+    // is the measurement giving up, not a game that ended level.
+    expect(screen.getByText('Hit the clock')).toBeTruthy()
+    expect(screen.getByText('Draws')).toBeTruthy()
+    // And per game: the clocked row is neither a draw nor a win.
+    expect(screen.getByText('hit the clock')).toBeTruthy()
+    // The wall-clock line speaks Magic, not machinery.
+    expect(screen.getByText(/lighting\s+the forge/)).toBeTruthy()
   })
 })

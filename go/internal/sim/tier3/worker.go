@@ -345,26 +345,58 @@ func errorField(body []byte) string {
 	return answer.Error
 }
 
+// MatchAsk is one match asked of the worker, and who hears it as it happens.
+//
+// A struct rather than a hand of positional arguments, because this is the
+// app's half of the shim's own `matchAsk` and the two grow together: a flag
+// added on one side is a field added on the other, and a call site that reads
+// `RunMatch(ctx, decks, 10, 300, seed, true, false, tick, nil)` tells nobody
+// which `true` was which.
+//
+// The two callbacks are optional and independent. [MatchAsk.OnEvents] is only
+// ever called when [MatchAsk.Narrate] asked for beats, and only by a shim new
+// enough to send them.
+type MatchAsk struct {
+	Games int
+	Clock int
+	Seed  *big.Int
+	// Narrate asks the far side to drop Forge's `-q` and tell the game. It
+	// costs nothing in time and about a hundred beats a game in volume, so it
+	// is asked for by whoever is watching and by nobody who is measuring —
+	// the argument is in `events.go`, where the measuring was done.
+	Narrate bool
+	// OnGame hears each game as it finishes, with the row the far side just
+	// parsed. The row is a pointer because a shim from before the match
+	// theater streams the count alone: the bar still ticks and the theater
+	// has nothing to seat, which is a legible state rather than a failure.
+	OnGame func(finished int, game *GameResult)
+	// OnEvents hears one game's beats, whole, at the moment the game closed.
+	OnEvents func(log EventLog)
+}
+
 // RunMatch plays one match on the worker and returns it as if it had run here.
 //
 // The ask carries `stream: true`, so a current shim answers in
-// newline-delimited JSON — `{"game": n, "row": ...}` as each game finishes
-// (handed to `onGame`, the same callback [RunGames] takes, so the API cannot
-// tell the two paths apart), then `{"result": ...}` or `{"error": ...}` as the
-// last line. A shim from before the flag ignores it and answers one plain JSON
+// newline-delimited JSON — `{"events": ...}` and then `{"game": n, "row": ...}`
+// as each game finishes (handed to [MatchAsk.OnEvents] and [MatchAsk.OnGame],
+// the same callbacks [RunGames] takes, so the API cannot tell the two paths
+// apart), then `{"result": ...}` or `{"error": ...}` as the last line. A shim
+// from before the flag ignores it and answers one plain JSON
 // body; the Content-Type is what says which conversation this is, and both are
 // accepted so a deploy that updates the app a few minutes before its worker
 // never breaks a match over it. The `row` is newer still (the match theater),
 // so it is optional the same way: a pre-theater shim sends the count alone and
-// `onGame` hears a nil row — the bar still ticks, the theater just has nothing
-// to seat.
+// `OnGame` hears a nil row — the bar still ticks, the theater just has nothing
+// to seat. `events` is newer again and degrades the same way: an older shim
+// simply never sends the line, and a room that was going to narrate shows the
+// rows it does have.
 //
 // The timeout is per read rather than per match, and `clock + 120` bounds
 // every wait this request can make: the JVM boot before the first line, and
 // one game before each line after it. The subprocess on the far side is
 // already bounded whole, so this is the belt over that suspenders.
-func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck, games, clock int,
-	seed *big.Int, onGame func(finished int, game *GameResult)) (*SimRun, error) {
+func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck,
+	ask MatchAsk) (*SimRun, error) {
 	base, err := w.Ready(ctx)
 	if err != nil {
 		return nil, err
@@ -373,8 +405,9 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck, games, clock 
 	if err != nil {
 		return nil, err
 	}
-	payload := map[string]any{"decks": texts, "games": games,
-		"clock": clock, "seed": seed, "stream": true}
+	payload := map[string]any{"decks": texts, "games": ask.Games,
+		"clock": ask.Clock, "seed": ask.Seed, "stream": true,
+		"narrate": ask.Narrate}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -423,21 +456,24 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck, games, clock 
 		return RunFromWire(run), nil
 	}
 
-	return readStream(resp.Body, time.Duration(clock+120)*time.Second, cancel, onGame)
+	return readStream(resp.Body, time.Duration(ask.Clock+120)*time.Second,
+		cancel, ask)
 }
 
 // streamLine is one newline-delimited line of the match stream. Exactly one of
-// the three keys is set on any given line.
+// `game`, `events`, `error` and `result` is set on any given line; `row` rides
+// with `game`.
 type streamLine struct {
 	Game   *int      `json:"game"`
 	Row    *WireGame `json:"row"`
+	Events *EventLog `json:"events"`
 	Error  *string   `json:"error"`
 	Type   string    `json:"type"`
 	Result *WireRun  `json:"result"`
 }
 
 func readStream(body io.Reader, perRead time.Duration, stall func(),
-	onGame func(int, *GameResult)) (*SimRun, error) {
+	ask MatchAsk) (*SimRun, error) {
 	// The stall timer: fired, it cancels the request, and the read below
 	// fails rather than blocking forever on a worker that died mid-match.
 	quiet := time.AfterFunc(perRead, stall)
@@ -454,13 +490,21 @@ func readStream(body io.Reader, perRead time.Duration, stall func(),
 			}
 			switch {
 			case line.Game != nil:
-				if onGame != nil {
+				if ask.OnGame != nil {
 					var game *GameResult
 					if line.Row != nil {
 						g := GameFromWire(*line.Row)
 						game = &g
 					}
-					onGame(*line.Game, game)
+					ask.OnGame(*line.Game, game)
+				}
+			case line.Events != nil:
+				// Before the `game` line that closes the same game, because
+				// that is the order one pass over Forge's output produces
+				// them in — so a listener that stashes beats and publishes
+				// them with the row never has a row waiting on beats.
+				if ask.OnEvents != nil {
+					ask.OnEvents(*line.Events)
 				}
 			case line.Error != nil:
 				if line.Type == "ForgeNotInstalled" {

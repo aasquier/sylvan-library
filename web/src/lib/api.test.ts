@@ -16,7 +16,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api, followJob, onSessionLost, type Job } from './api'
+import { ApiError, api, errorMessage, followJob, onSessionLost, type Job } from './api'
 
 function job(overrides: Partial<Job> = {}): Job {
   return {
@@ -544,5 +544,54 @@ describe('concurrent identical GETs', () => {
 
     await expect(api.health()).resolves.toEqual({ pool: true })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+/**
+ * A failure keeps its diagnosis on the wire and loses it on the way to a
+ * person (commandment 10).
+ *
+ * The Forge worker's door answers `<ClassName>: <sentence>` — spellings
+ * inherited from the wire the Go rewrite kept answering — and the class name
+ * is genuinely useful to whoever is reading a failed match. It is also the
+ * name of a technology, and exactly one of those may render: Claude.
+ */
+describe('a failure a person reads', () => {
+  it('drops the machine’s name and keeps the sentence', () => {
+    expect(errorMessage(new Error(
+      'RuntimeError: Forge reported problems that invalidate the run')))
+      .toBe('Forge reported problems that invalidate the run')
+    expect(errorMessage(new Error(
+      "TimeoutExpired: Command 'java …' timed out after 420 seconds")))
+      .toBe("Command 'java …' timed out after 420 seconds")
+    expect(errorMessage(new Error('ValueError: unreadable request')))
+      .toBe('unreadable request')
+  })
+
+  it('leaves an honest message with a colon in it alone', () => {
+    // The reason this is a closed list rather than `/^\w+: /`. Every one of
+    // these is a real message from somewhere else in the app, and all of them
+    // would lose their first word to a pattern.
+    for (const message of [
+      'Deck not found: gyome',
+      'Sol Rng: not in the card pool',
+      'HTTP Error 502: Bad Gateway',
+      'Forge: mono-green vs kaheera, 10 games',
+    ]) {
+      expect(errorMessage(new Error(message))).toBe(message)
+    }
+  })
+
+  it('strips a prefix only where it is the whole prefix', () => {
+    // A sentence that merely mentions a class name keeps it: the cut is
+    // anchored at the front and takes the colon and space with it.
+    expect(errorMessage(new Error('the shim said RuntimeError: no')))
+      .toBe('the shim said RuntimeError: no')
+    // And a bare class name with nothing after it is not a prefix at all.
+    expect(errorMessage(new Error('RuntimeError'))).toBe('RuntimeError')
+  })
+
+  it('still answers for what a third party might throw', () => {
+    expect(errorMessage('a string')).toBe('a string')
   })
 })
