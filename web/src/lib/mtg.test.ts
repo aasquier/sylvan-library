@@ -8,7 +8,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { identityName, manaSymbols, money, percent, splitManaText, symbolName } from './mtg'
+import { identityName, manaSymbols, money, percent, producedColors, producedName,
+  producedSymbol, splitManaText, symbolName } from './mtg'
 
 describe('identityName', () => {
   it('names the colourless and mono cases', () => {
@@ -204,5 +205,82 @@ describe('symbolName', () => {
 
   it('falls back to the symbol as written rather than inventing a name', () => {
     expect(symbolName('CHAOS')).toBe('CHAOS')
+  })
+})
+
+/** What a permanent taps for.
+ *
+ * The lookup table here has the same shape of risk `identityName` does, and a
+ * worse failure: a hybrid asked for in the wrong order is not a wrong answer,
+ * it is a 404 that falls back silently to a plain coloured disc. Nobody would
+ * ever see it go wrong. */
+describe('producedColors', () => {
+  it('dedupes, orders WUBRG then colourless, and drops what is not mana', () => {
+    expect(producedColors(['G', 'W'])).toEqual(['W', 'G'])
+    expect(producedColors(['g', 'G'])).toEqual(['G'])
+    expect(producedColors(['C', 'R', 'U'])).toEqual(['U', 'R', 'C'])
+    // `produced_mana` has never carried one of these, and drawing an unknown
+    // symbol is worse than drawing none.
+    expect(producedColors(['G', 'S', 'E'])).toEqual(['G'])
+    expect(producedColors([])).toEqual([])
+    expect(producedColors(undefined)).toEqual([])
+  })
+})
+
+describe('producedSymbol', () => {
+  it('is the colour itself when there is only one', () => {
+    expect(producedSymbol(['G'])).toBe('G')
+    expect(producedSymbol(['C'])).toBe('C')
+  })
+
+  it('spells every pair the way the official set does', () => {
+    // **All ten, both directions, because the order is not ours to pick.**
+    // The symbol route asks the official set for `GW`; `WG` is not a symbol
+    // that exists. Each pair is listed here in `producedColors` order, which
+    // is the only order a caller can hand over.
+    expect(producedSymbol(['W', 'U'])).toBe('W/U')
+    expect(producedSymbol(['U', 'B'])).toBe('U/B')
+    expect(producedSymbol(['B', 'R'])).toBe('B/R')
+    expect(producedSymbol(['R', 'G'])).toBe('R/G')
+    expect(producedSymbol(['W', 'G'])).toBe('G/W')
+    expect(producedSymbol(['W', 'B'])).toBe('W/B')
+    expect(producedSymbol(['U', 'R'])).toBe('U/R')
+    expect(producedSymbol(['B', 'G'])).toBe('B/G')
+    expect(producedSymbol(['W', 'R'])).toBe('R/W')
+    expect(producedSymbol(['U', 'G'])).toBe('G/U')
+  })
+
+  it('has nothing for a pair the set never drew, or for three', () => {
+    // No official symbol pairs a colour with colourless, and none means "any
+    // of these three". Null is the prism's cue.
+    expect(producedSymbol(['G', 'C'])).toBeNull()
+    expect(producedSymbol(['W', 'U', 'B'])).toBeNull()
+    expect(producedSymbol([])).toBeNull()
+  })
+})
+
+describe('producedName', () => {
+  it('says what a player would say', () => {
+    expect(producedName(['G'])).toBe('green mana')
+    expect(producedName(['C'])).toBe('colourless mana')
+    expect(producedName(['W', 'U', 'B', 'R', 'G'])).toBe('mana of any colour')
+    expect(producedName(['U', 'R', 'G'])).toBe('blue, red or green mana')
+    expect(producedName([])).toBe('')
+  })
+
+  it('reads the drawing rather than the list', () => {
+    // The mark is `{G/W}`, so the sentence beside it is "green or white" —
+    // WUBRG order would say "white or green" and the two would disagree about
+    // the same coin.
+    expect(producedName(['W', 'G'])).toBe('green or white mana')
+    expect(producedName(['W', 'R'])).toBe('red or white mana')
+    expect(producedName(['W', 'U'])).toBe('white or blue mana')
+  })
+
+  it('spells out five that include colourless rather than calling it any', () => {
+    // "Any colour" is a claim about the five, and a Nykthos that also makes
+    // colourless is not making that claim.
+    expect(producedName(['W', 'U', 'B', 'R', 'C']))
+      .toBe('white, blue, black, red or colourless mana')
   })
 })

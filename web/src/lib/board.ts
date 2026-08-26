@@ -81,6 +81,17 @@ export interface BoardCard {
   /** Whether this card makes mana, from Scryfall's `produced_mana` by way of
    *  Go. A card fact rather than a layout rule — see `rowFor`. */
   mana: boolean
+  /** Which mana this printing taps for, in Scryfall's spelling — `['G']`,
+   *  `['G','W']`, the five for a Birds of Paradise. Empty for everything that
+   *  does not tap for mana.
+   *
+   *  **A fact about the printing, and never about this activation.** Forge's
+   *  mana event carries a seat and a pool and no source; the tap event
+   *  carries a card and no mana. Nothing joins them, so a board that said
+   *  *this creature filled the pool* would be guessing (ADR 44). What it may
+   *  honestly say beside a tapped permanent is what that permanent taps
+   *  for. */
+  makes: string[]
   /** Scryfall's keywords for the card, unfiltered. `components/keywords.tsx`
    *  decides which of them the board has a sign for. */
   keywords: string[]
@@ -404,7 +415,8 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           art: known?.art ?? '',
           artist: known?.artist ?? '',
           zone: 'gone', seat: known?.seat ?? 0, tapped: false,
-          mana: known?.mana ?? false, keywords: known?.keywords ?? [],
+          mana: known?.mana ?? false, makes: known?.makes ?? [],
+          keywords: known?.keywords ?? [],
           leaving: null,
           power: null, toughness: null, counters: [], counterHistory: [],
           combat: '', attacking: 0, blocking: 0, casts: 0,

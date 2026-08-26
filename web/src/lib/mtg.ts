@@ -119,6 +119,72 @@ export function symbolName(sym: string): string {
   return sym
 }
 
+/* ------------------------------------------ what a permanent taps for */
+
+/** WUBRG, then colourless — Magic's own order, so two cards that tap for the
+ *  same mana always draw the same mark. */
+const MANA_ORDER = ['W', 'U', 'B', 'R', 'G', 'C']
+
+/**
+ * The ten official hybrid symbols, keyed on their pair in `MANA_ORDER`.
+ *
+ * Every two-colour pair has one — five allied, five enemy — and **the order
+ * inside each is not ours to pick**: the official set spells it `{G/W}`, so
+ * `GW` is a symbol and `WG` is a 404 wearing a fallback.
+ */
+const HYBRID: Record<string, string> = {
+  WU: 'W/U', UB: 'U/B', BR: 'B/R', RG: 'R/G', WG: 'G/W',
+  WB: 'W/B', UR: 'U/R', BG: 'B/G', WR: 'R/W', UG: 'G/U',
+}
+
+/**
+ * The colours a permanent taps for: deduped, in Magic's order, and with
+ * anything that is not a mana colour dropped rather than drawn.
+ */
+export function producedColors(makes: readonly string[] | undefined): string[] {
+  if (!makes?.length) return []
+  const seen = new Set(makes.map((m) => m.toUpperCase()))
+  return MANA_ORDER.filter((c) => seen.has(c))
+}
+
+/**
+ * The one symbol that says what a permanent taps for, or null when no single
+ * official symbol says it.
+ *
+ * **One mark, never a row of them — and that is a rules point, not a space
+ * one.** `{G}{W}` means two mana. A Temple Garden makes *one*, green or white,
+ * so two pips side by side would teach a beginner something false about the
+ * card in front of them (commandment 2). A pair becomes the official hybrid
+ * symbol, which is Magic's own way of writing "or"; anything wider has no
+ * official symbol at all and falls to the prism.
+ */
+export function producedSymbol(colors: readonly string[]): string | null {
+  if (colors.length === 1) return colors[0] ?? null
+  if (colors.length === 2) return HYBRID[colors.join('')] ?? null
+  return null
+}
+
+/**
+ * What a permanent taps for, in words — because the mark is a drawing, and a
+ * drawing is a thing you have to already know.
+ */
+export function producedName(colors: readonly string[]): string {
+  if (!colors.length) return ''
+  // What a player would actually say about a Birds of Paradise. Naming the
+  // five in a list is technically the same claim and nobody talks that way.
+  if (colors.length === 5 && !colors.includes('C')) return 'mana of any colour'
+  // **The sentence reads the drawing.** A pair is drawn as `{G/W}`, which the
+  // official set spells green-first, while `MANA_ORDER` would say "white or
+  // green" — and the words are how anybody not looking at a fifteen-pixel
+  // picture gets that picture. Two orders for one mark is one order too many.
+  const sym = producedSymbol(colors)
+  const said = sym?.includes('/') ? sym.split('/') : colors
+  const names = said.map((c) =>
+    c === 'C' ? 'colourless' : (COLOR_NAMES[c] ?? c).toLowerCase())
+  const last = names.pop() ?? ''
+  return names.length ? `${names.join(', ')} or ${last} mana` : `${last} mana`
+}
+
 /** Split "{2}{B}{G}" into ["2","B","G"] for pip rendering. */
 export function manaSymbols(cost?: string | null): string[] {
   if (!cost) return []
