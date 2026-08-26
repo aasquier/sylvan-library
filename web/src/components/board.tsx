@@ -525,11 +525,31 @@ function FieldRow({ label, cards, size = 'normal', empty }: {
   )
 }
 
-/** A life total that takes the hit visibly.
+/** Commander's starting life, which is what the ring below is a fraction of.
  *
- * The number is the fact and the flash is the news — a total that changed
- * silently is a total nobody notices changing, and life is the one number in
- * Commander everybody is actually tracking. */
+ *  A constant rather than a reading, because this room plays exactly one
+ *  format and the *starting* total is gone by the time a board is folded —
+ *  `BoardSide.life` is the current one. If the Coliseum ever runs a format
+ *  that starts anywhere else, this is the line that has to learn it. */
+const STARTING_LIFE = 40
+
+/** A life total, drawn as the thing everyone at the table is actually
+ *  watching.
+ *
+ * **It was a number in a stone bar** (Aaron, 2026-08-25: *"mega basic, like
+ * whiteclaw basic"*), and he is right twice over. Once on looks: 1.28rem of
+ * bold type is not a treatment, it is a default. And once on *information* —
+ * a bare "23" makes you do the arithmetic that matters, because what a player
+ * reads off a life total is not the integer, it is **how much is left**.
+ *
+ * So it is a ring that drains. The arc is life over forty, the figure sits in
+ * the middle, and the whole thing warms from brass to blood as it goes — three
+ * ways of saying one fact, for the same reason the counters carry a sign as
+ * well as a colour. You can see a player is in trouble from across the room
+ * without reading a digit.
+ *
+ * The flash on change stays: a total that changed silently is a total nobody
+ * notices changing. */
 function LifeTotal({ life }: { life: number }) {
   const previous = useRef(life)
   const [hit, setHit] = useState<'up' | 'down' | null>(null)
@@ -541,9 +561,22 @@ function LifeTotal({ life }: { life: number }) {
     const id = window.setTimeout(() => setHit(null), 700)
     return () => window.clearTimeout(id)
   }, [life])
+  // Clamped both ways: a player on a lifegain deck goes past forty and the
+  // ring simply reads full, and a dead player reads empty rather than negative.
+  const left = Math.max(0, Math.min(1, life / STARTING_LIFE))
+  // The mix is computed here rather than in CSS because a `calc()` inside
+  // `color-mix()`'s percentage is the one part of that function browsers still
+  // disagree about, and this is a colour nobody should have to debug.
+  const spent = `${Math.round((1 - left) * 100)}%`
   return (
-    <span className={`field-life tabular${hit ? ` is-${hit}` : ''}`}>
-      {life}
+    <span className={`field-life${hit ? ` is-${hit}` : ''}`}
+          style={{ '--life-left': left, '--life-spent': spent } as CSSProperties}
+          title={`${life} life`}>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle className="field-life-track" cx="24" cy="24" r="20" />
+        <circle className="field-life-arc" cx="24" cy="24" r="20" />
+      </svg>
+      <span className="field-life-n tabular">{life}</span>
     </span>
   )
 }
@@ -678,7 +711,7 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
 }
 
 /** The stone rail one player's name, life and closed zones are carved into. */
-function FieldRail({ side, name }: { side: BoardSide; name: string }) {
+function FieldRail({ side }: { side: BoardSide }) {
   // **Whose grave is about to receive the body.** The dying card is held on
   // the sand for the beat that announces it, so no graveyard can answer this
   // by looking at what it holds — it holds nothing yet. The side that is
@@ -695,8 +728,14 @@ function FieldRail({ side, name }: { side: BoardSide; name: string }) {
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
   return (
     <div className="field-rail">
-      <span className="field-rail-name" title={side.name}>{name}</span>
-      <span className="field-rail-totals">
+      {/* **The nameplate is gone, and the stone bar with it.** The name was
+          said twice — the hand beside this rail already carries it, and a
+          board that tells you the same thing in two places has spent the room
+          twice (Aaron, 2026-08-25). The bar it sat in was a grey strip with a
+          hatch on it, which is furniture pretending to be material: the sand
+          is the material, and three lit places standing on it is a table.
+          `title` keeps the full deck name reachable for anybody who wants it. */}
+      <span className="field-rail-totals" title={side.name}>
         <FieldPile label="Command zone" short="CMD" cards={side.command}
                    zone="command" throne />
         {/* **Beside the pile rather than on it.** Inside, the chip covered
@@ -834,9 +873,8 @@ function FieldHand({ side, name, facing }: {
  * other side of a real table. The hand is no longer among these rows — it is
  * held at the side (`FieldHand` above).
  */
-function FieldSide({ side, name, facing }: {
+function FieldSide({ side, facing }: {
   side: BoardSide
-  name: string
   facing: 'far' | 'near'
 }) {
   // **Outermost first**, and the near player's side is the same list reversed,
@@ -862,11 +900,11 @@ function FieldSide({ side, name, facing }: {
   ]
   return (
     <div className={`field-side field-side-${facing}`}>
-      {facing === 'far' && <FieldRail side={side} name={name} />}
+      {facing === 'far' && <FieldRail side={side} />}
       <div className="field-rows">
         {facing === 'far' ? rows : [...rows].reverse()}
       </div>
-      {facing === 'near' && <FieldRail side={side} name={name} />}
+      {facing === 'near' && <FieldRail side={side} />}
     </div>
   )
 }
@@ -1046,8 +1084,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           is where the two players' hands actually are. */}
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
 
-      <FieldSide side={far} facing="far"
-                 name={name(far.slug, far.name)} />
+      <FieldSide side={far} facing="far" />
 
       {/* The seam: in the real building, the trench the lifts came up through.
           Here it is where the turn is announced and where the two
@@ -1061,8 +1098,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         <span className="field-seam-rule" aria-hidden="true" />
       </div>
 
-      <FieldSide side={near} facing="near"
-                 name={name(near.slug, near.name)} />
+      <FieldSide side={near} facing="near" />
 
       <FieldHand side={near} facing="near"
                  name={name(near.slug, near.name)} />

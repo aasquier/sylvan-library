@@ -351,6 +351,71 @@ const DRESSING = [
            printing: 'Gatecrash' } },
 ]
 
+it('draws life as how much is left, not just as a number', () => {
+  // **A bare numeral is the wrong fact.** What a player reads off a life total
+  // is how much is *left*, and a "23" makes you do that arithmetic. The ring
+  // is the arithmetic done: the arc is life over forty and the figure sits in
+  // it, so trouble is visible without reading a digit.
+  const at = (life: number) => {
+    const board = {
+      seats: [{ seat: 1, slug: 'a', name: 'A', life: 40 },
+        { seat: 2, slug: 'b', name: 'B', life: 40 }],
+      cards: [{ id: 1, name: 'X', types: 'Creature', seat: 1 }],
+      steps: [{ life: [{ seat: 1, life }], changes: [] }],
+    } as unknown as ForgeBoard
+    const { container } = render(
+      <MatchBoard board={board} shown={1} game={1} running={false}
+                  name={(_s, f) => f} speed="play" setSpeed={vi.fn()}
+                  of={1} seek={vi.fn()} games={[1]} playing={1}
+                  chooseGame={vi.fn()} />)
+    const ring = container.querySelector('.field-side-far .field-life') as HTMLElement
+    return {
+      shown: ring?.querySelector('.field-life-n')?.textContent,
+      left: ring?.style.getPropertyValue('--life-left'),
+      spent: ring?.style.getPropertyValue('--life-spent'),
+    }
+  }
+
+  const full = at(40)
+  expect(full.shown).toBe('40')
+  expect(Number(full.left)).toBe(1)
+  expect(full.spent).toBe('0%')
+  cleanup()
+
+  const half = at(20)
+  expect(half.shown).toBe('20')
+  expect(Number(half.left)).toBeCloseTo(0.5, 5)
+  expect(half.spent).toBe('50%')
+  cleanup()
+
+  // Clamped both ways, because Commander does both: a lifegain deck goes past
+  // forty and the ring simply reads full, and a dead player reads empty rather
+  // than winding the arc backwards.
+  const gained = at(63)
+  expect(gained.shown, 'the figure is always the truth').toBe('63')
+  expect(Number(gained.left), 'the ring stops at full').toBe(1)
+  cleanup()
+
+  const dead = at(-3)
+  expect(dead.shown).toBe('-3')
+  expect(Number(dead.left)).toBe(0)
+  expect(dead.spent).toBe('100%')
+})
+
+it('says a deck name once, beside the hand that holds it', () => {
+  // The rail carried a nameplate and the hand beside it carries the same name.
+  // A board that says one thing twice has spent the room twice, and the room
+  // is the scarce thing here.
+  const { container } = show()
+  expect(container.querySelector('.field-rail-name'),
+    'the rail no longer repeats the hand').toBeNull()
+  // Still reachable for anyone who wants the full deck title.
+  expect(container.querySelector('.field-side-far .field-rail-totals')
+    ?.getAttribute('title')).toBeTruthy()
+  expect(container.querySelector('.field-hand-far .field-hand-label')
+    ?.textContent).toContain('Arahbo')
+})
+
 it('dresses each zone in its own painting, and names the painter', () => {
   // Three-letter labels on a 26px tile is what a scoreboard does; a player
   // knows these three places by sight. The painting says *which* zone.
