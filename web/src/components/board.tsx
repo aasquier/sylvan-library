@@ -1213,24 +1213,6 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         it belongs off the floor entirely. So the field keeps its own box at
         its own size, and the zones stand outside it in their own column. */}
     <div className="field-stage">
-    {/* **Two statues, flanking the sand, each facing in.**
-        A real amphitheatre puts figures around its floor, and this room had a
-        good one filling a hole in a slide — which is the wrong reason for a
-        figure to be anywhere. Here he is the thing he looks like: stone
-        standing at the edge of the arena, watching the fight.
-
-        They stand in the window's own margins first and take from the
-        battlefield only when the window has none to give. Below that they are
-        not drawn at all: a phone has no spare width, and a decoration that
-        costs the sand a column on a 390-pixel screen is a decoration that has
-        stopped decorating.
-
-        `aria-hidden`, and no alt: they are the same figure twice and say
-        nothing the room has not said. */}
-    <img className="field-secutor field-secutor-left" src={secutorArt}
-         alt="" aria-hidden="true" draggable={false} />
-    <img className="field-secutor field-secutor-right" src={secutorArt}
-         alt="" aria-hidden="true" draggable={false} />
     <section className="field" aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">
@@ -1238,6 +1220,30 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         <span className="field-dust field-dust-2" />
         <span className="field-dust field-dust-3" />
       </div>
+      {/* **Two statues at the edges of the sand, each facing in.**
+          A real amphitheatre puts figures around its floor, and this one had a
+          good one filling a hole in a fun-facts slide — the wrong reason for a
+          figure to be anywhere.
+
+          They stand *on* the arena rather than beside it, which is the whole
+          reason they can be any size at all: the flank outside the field is
+          only ever as wide as the window has going spare, and the plate is two
+          and a quarter times as tall as it is wide, so out there "taller" and
+          "wider" are the same request and the window keeps saying no. In here
+          there is no such budget.
+
+          **In front of the sand and behind the cards**, which is the ordering
+          that makes an overlap acceptable rather than a nuisance: they sit
+          after the floor and before every row, and a card is positioned with
+          an automatic z-index, so tree order paints the game over the top of
+          them. Nothing a player needs to read is ever underneath one.
+
+          `aria-hidden`, and no alt: the same figure twice, saying nothing the
+          room has not said. */}
+      <img className="field-secutor field-secutor-left" src={secutorArt}
+           alt="" aria-hidden="true" draggable={false} />
+      <img className="field-secutor field-secutor-right" src={secutorArt}
+           alt="" aria-hidden="true" draggable={false} />
 
       {/* **A hand belongs to the player holding it, not to the furniture.**
           Both used to live in one rail, which is right on a wide screen — the

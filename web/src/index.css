@@ -6500,8 +6500,16 @@ button:hover .tarot-fan-card {
   object-fit: contain;
   object-position: bottom;
   pointer-events: none;
-  /* Behind everything on the sand. The board is the point; he is the room. */
+  /* **Above the floor, below every card.** `.field-floor` is at -1 and a card
+     is positioned with an automatic z-index, so a plain 0 here lands the
+     statue between them and tree order does the rest — the statues are written
+     before any row. Raise this and the game starts happening behind a
+     decoration. */
   z-index: 0;
+  /* Stone at the edge of a lit floor, not a sticker on it. Enough that the
+     sand still reads through the ankles and a card crossing him is obviously
+     in front. */
+  opacity: 0.82;
   animation: secutor-drift 38s ease-in-out infinite;
 }
 /* **The mirror is a variable, because the animation owns `transform`.**
@@ -6517,31 +6525,38 @@ button:hover .tarot-fan-card {
   transform: scaleX(-1);
 }
 
-/* **The sand never pays for them.** A first cut took 7.25rem a side out of the
-   arena between 80rem and 96rem, on the offer that we could "shrink the sand a
-   tad" — and the tad was the first thing anybody noticed (Aaron, on the local
-   room: "That still shrunk the field"). The battlefield is the thing nobody
-   wants smaller; that rule has now been rediscovered three times in this file
-   and it holds here too.
+/* **Sized by height, because inside the arena height is the free axis.**
  *
- * So the width is exactly the free space beside the stage and nothing else:
- * `main` is `max-w-7xl px-6`, so its content box tops out at 1232px, and
- * `(100vw - 1232px) / 2` is what is genuinely going spare on each flank —
- * the window's own margin plus the 24px of page padding the arena does not
- * use. They take all of it, less a hairline gap, up to a ceiling.
+ * Two earlier cuts put them outside the field and both ran into the same wall.
+ * The flank is only ever as wide as the window has going spare; the plate is
+ * two and a quarter times as tall as it is wide with no croppable margin (the
+ * figure's own bounding box is x3..x195 of 199); so out there "taller" and
+ * "wider" are one request, and at 1440px the window's answer was 96 pixels.
+ * Taking the difference out of the sand was the first cut, and the shrunk
+ * field was the first thing anybody noticed.
  *
- * The gate is the same number said as a media query: below it the spare space
- * is too thin for a figure to read as one, so there is no figure. There is no
- * arrangement of a 199x448 plate that is both large and narrow — it is 2.25
- * times as tall as it is wide, so height *is* width here — and the honest
- * answer at a narrow window is nothing rather than a splinter. */
-@media (min-width: 87rem) {
+ * On the sand there is no budget to argue with. They take a share of the
+ * arena's own height and the width follows, and because they are painted
+ * under every card the overlap costs a reader nothing.
+ *
+ * `62rem` is the field's own breakpoint — the one where it stops stacking and
+ * the two halves sit side by side — rather than a guess about a device. Below
+ * it the arena is a narrow column and a figure at either edge is standing in
+ * the middle of the game. */
+@media (min-width: 62rem) {
   .field-secutor {
     display: block;
-    width: clamp(4.5rem, calc((100vw - 1232px) / 2 - 0.5rem), 16rem);
+    height: min(62%, 26rem);
+    width: auto;
+    /* A floor under the arena's own height: a short game with two empty rows
+       is a short field, and a figure scaled to 62% of nothing is a smudge. */
+    min-height: 11rem;
+    /* ...and a ceiling on how much of the floor a decoration may cover, for
+       the same reason the other way round. */
+    max-width: 18%;
   }
-  .field-secutor-left { right: 100%; margin-right: 0.5rem; }
-  .field-secutor-right { left: 100%; margin-left: 0.5rem; }
+  .field-secutor-left { left: 0; }
+  .field-secutor-right { right: 0; }
 }
 /* **A band under the arena, two seats side by side.**
  *
