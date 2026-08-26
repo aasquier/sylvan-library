@@ -569,7 +569,9 @@ func TestAPhantomRefusedOnceIsRefusedOnEveryLine(t *testing.T) {
 			`"card":"Commander Effect","power":0,"toughness":0,"types":""}`},
 		{"a tapped line", `{"t":"tapped","game":1,"tapped":true,"id":50,` +
 			`"card":"Commander Effect","power":0,"toughness":0,"types":""}`},
-		{"a counters line", counterLine(50, "+1/+1", 0, 1)},
+		{"a counters line", `{"t":"counters","game":1,"counter":"+1/+1",` +
+			`"was":0,"now":1,"id":50,"card":"Commander Effect","power":0,` +
+			`"toughness":0,"types":""}`},
 		{"an attach line", `{"t":"attach","game":1,"seat":1,"id":50,` +
 			`"card":"Commander Effect","target_id":10,` +
 			`"target":"Grizzly Bears","power":0,"toughness":0,"types":""}`},
