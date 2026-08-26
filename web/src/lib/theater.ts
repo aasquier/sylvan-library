@@ -86,6 +86,24 @@ export function theaterBeats(partial: unknown): ForgeBeats | null {
  * **An unrecognised kind is rendered, never dropped.** Forge is not an API and
  * a release that adds a beat should read as a plain sentence here rather than
  * as a gap in the game.
+ *
+ * **Every new beat kind needs a case here.** The default is a safety net, not
+ * a destination: it prints the kind's own name, which is the wire showing
+ * through to a user (commandment 10). `enters` and `attach` sat in it for as
+ * long as the scribe has existed. Anything the scribe learns to report next —
+ * mana, sacrifice, an ability resolving, populate — arrives in exactly the
+ * same state and needs a sentence added below before it is on screen.
+ *
+ * **Nothing renders these sentences today**, and that is worth knowing before
+ * spending an afternoon on the wording. #328 removed "The account", the panel
+ * that read them out; `beatLine` is still called for every beat of every game
+ * (`routes/Coliseum.tsx`, in `stage`) and its `text` and `who` are stored on
+ * `StagedBeat`, but the board reads only a beat's `kind`, `card` and `key`.
+ * So this is correct and unread rather than correct and rendered. It is kept
+ * because narration is expected back and because a reader that is wrong while
+ * nobody is looking is a reader that is wrong on the day somebody looks —
+ * whether it returns or `StagedBeat.text` goes with it is Aaron's call, and
+ * both halves should move together.
  */
 export function beatLine(beat: ForgeBeat, name: (slug: string) => string):
   { who: string | null; text: string } {
@@ -103,6 +121,24 @@ export function beatLine(beat: ForgeBeat, name: (slug: string) => string):
       return { who, text: `casts ${card}` }
     case 'resolve':
       return { who, text: `${card} resolves` }
+    // The two the scribe reports and this reader never had a case for. Both
+    // fire in every modern match, so without these every one of them fell to
+    // the default and read as its own kind followed by a card name — the wire
+    // showing through, which is exactly what commandment 10 forbids and what
+    // `lib/claudecopy.ts` exists to prevent one surface over.
+    //
+    // Cast and enters are two different moments and Magic says so: a spell is
+    // cast, and the permanent it becomes *enters*. A token or a land never had
+    // a cast at all, which is why folding this into `cast` would be wrong
+    // rather than merely redundant.
+    case 'enters':
+      return { who, text: `${card} enters the battlefield` }
+    // Aura or Equipment, and the board draws the same fact as gear on the
+    // permanent carrying it. "goes on" rather than "is attached to": attached
+    // is the rulebook's word, and this line is read by somebody watching their
+    // first game.
+    case 'attach':
+      return { who, text: `puts ${card} on ${beat.target || 'a permanent'}` }
     case 'attack':
       return { who, text: `attacks ${them ?? 'across the table'} with ${card}` }
     case 'block':
@@ -196,4 +232,52 @@ export function playerTurns(beats: ForgeBeat[]): Map<number, number> {
  */
 export function turnsTaken(turns: number | null): number | null {
   return turns
+}
+
+/** Where each of a bout's turns begins, as a count of beats **told**.
+ *
+ * `i + 1` rather than `i`, and that is the whole subtlety: `seek` takes a
+ * told-count, so landing on the marker's own index would stop the instant
+ * *before* the turn is announced. Landing one past it puts the announcement on
+ * the board as the last thing said, which is what "step to the turn" means to
+ * somebody watching.
+ *
+ * **These are player-turns.** Forge prints a turn line per seat and alternates
+ * them, so consecutive marks are one player's turn apart — the unit Aaron
+ * asked for ("a player's turn at a time, not a full two player turn") and the
+ * one [playerTurns] above already counts. Nothing is halved here; halving is
+ * the mistake `turnsTaken`'s comment records this project making once already.
+ *
+ * Structurally typed rather than taking `StagedBeat`, so `lib/reel.ts` does not
+ * have to be imported to ask a question about a list of beats. */
+export function turnMarks(beats: readonly { kind: string }[]): number[] {
+  const marks: number[] = []
+  beats.forEach((b, i) => { if (b.kind === 'turn') marks.push(i + 1) })
+  return marks
+}
+
+/**
+ * Where a turn step lands, given where the transport is now.
+ *
+ * One rule in each direction, and both are chosen so the control always does
+ * something rather than sometimes doing nothing:
+ *
+ *   - **Back** goes to the largest mark strictly before `at`. From the middle
+ *     of a turn that is the start of the turn you are in; pressed again it is
+ *     the one before. That is the media convention, it is a single rule, and
+ *     it means the first press always moves. Before the first turn there is
+ *     nowhere to go but the opening, which is a real place to stand.
+ *   - **Forward** goes to the smallest mark after `at`, and off the end it
+ *     goes to `of` — this bout's last beat. It does **not** run on into the
+ *     next bout: the room queues bouts and tells each to its end, and a turn
+ *     step that crossed a bout boundary would skip a whole fight.
+ */
+export function stepToTurn(
+  marks: readonly number[], at: number, of: number, dir: 'back' | 'on',
+): number {
+  if (dir === 'back') {
+    const before = marks.filter((m) => m < at)
+    return before[before.length - 1] ?? 0
+  }
+  return marks.find((m) => m > at) ?? of
 }

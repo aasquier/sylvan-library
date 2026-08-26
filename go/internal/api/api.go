@@ -281,6 +281,11 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/colors", Handler: a.colors},
 		{Method: http.MethodGet, Pattern: "/api/glossary", Handler: a.glossary},
 		{Method: http.MethodGet, Pattern: "/api/coliseum", Handler: a.coliseum},
+		// The room's memory: every recorded match, read back as boards
+		// (ADR 46). Deny-by-default like everything else outside
+		// `PublicPaths` -- the standings are scoped to the caller.
+		{Method: http.MethodGet, Pattern: "/api/coliseum/standings",
+			Handler: a.coliseumStandings},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
 		// The Claude surface's two free corners:
 		// a checked-in roster of voices, and a seeded deal. Neither needs a

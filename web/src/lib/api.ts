@@ -2309,6 +2309,79 @@ export interface Coliseum {
   dropped: number
 }
 
+/** One contestant's tally, with the interval that says how much to believe it.
+ *
+ *  `rate` is **null below the floor** and that is not an error case to paper
+ *  over — it is the answer. A surface that falls back to `wins / played` when
+ *  `rate` is null has reinstated exactly the two-game win rate the server
+ *  withheld on purpose. Render the counts instead; they are always right. */
+export interface ColiseumRecord {
+  played: number
+  wins: number
+  losses: number
+  draws: number
+  /** Bouts the clock ended. Counted for nobody, and reported apart so the
+   *  difference between this and `played` is visible rather than missing. */
+  timed_out: number
+  rate: number | null
+  /** The interval, and `lower` is the order every board is sorted in. */
+  lower: number
+  upper: number
+  /** Past the point where the board stops calling a record provisional. */
+  settled: boolean
+}
+
+export interface ColiseumDeckRecord {
+  owner_id: number | null
+  slug: string
+  commander: string[]
+  archetype: string
+  themes: string[]
+  matches: number
+  record: ColiseumRecord
+}
+
+export interface ColiseumClassRecord {
+  archetype: string
+  decks: number
+  record: ColiseumRecord
+}
+
+export interface ColiseumDeckRef {
+  owner_id: number | null
+  slug: string
+  commander: string[]
+}
+
+export interface ColiseumMeeting {
+  a: ColiseumDeckRef
+  b: ColiseumDeckRef
+  played: number
+  a_wins: number
+  b_wins: number
+  draws: number
+  matches: number
+  /** Read from `a`'s side, so `record.rate` is a's share of the pair. */
+  record: ColiseumRecord
+}
+
+export interface ColiseumStandings {
+  matches: number
+  /** Every bout run, clock-outs included. The records will sum to fewer. */
+  games: number
+  timed_out: number
+  since: string
+  until: string
+  decks: ColiseumDeckRecord[]
+  archetypes: ColiseumClassRecord[]
+  meetings: ColiseumMeeting[]
+  /** The fewest bouts that may be shown as a rate, and the point a record
+   *  stops being provisional. Both travel from the server so the copy says
+   *  the real number rather than hard-coding it in a second language. */
+  floor: number
+  proven: number
+}
+
 export const api = {
   health: () => get<Health>('/api/health'),
   // The coliseum's six arenas, their champions and the facts they rotate
@@ -2316,6 +2389,10 @@ export const api = {
   // resolved through the pool; answers before any match is asked for,
   // because the arena has to be on screen while the worker is still waking.
   coliseum: () => get<Coliseum>('/api/coliseum'),
+  // What the room remembers: every recorded bout read back as boards. Scoped
+  // to the caller — a match they were not in, and the house did not host, is
+  // simply not there.
+  coliseumStandings: () => get<ColiseumStandings>('/api/coliseum/standings'),
   // Every deck this caller may see, across every owner (ADR 22) — their own
   // first, then the showcase, then everybody else's shared decks. The only
   // place a client learns the owner segment it needs to build any other deck

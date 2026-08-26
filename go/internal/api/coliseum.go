@@ -4,8 +4,10 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/reference"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
@@ -109,4 +111,39 @@ func (a *API) coliseum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.JSON(w, http.StatusOK, out)
+}
+
+// `GET /api/coliseum/standings`: what the ledger has learned from the matches
+// it recorded (ADR 36, ADR 46).
+//
+// The room's memory. Every finished match has been written down since ADR 36,
+// and until now nothing read any of it back — the ledger had exactly one
+// reader, a CLI listing, and the accumulated games sat there answering nobody.
+// This is the board built out of them: how each deck has fared, how each class
+// has, and who has beaten whom.
+//
+// **Deterministic arithmetic on recorded rows** (ADR 14). No pool, no network,
+// no opinion: a win rate is a gate rather than a judgement, and it is computed
+// the same way twice. The interval beside it is arithmetic too — see
+// `ledger.Board` for why a board sorted on a rate is a board that lies about
+// small samples, which is the one real judgement anywhere in this path.
+//
+// **Scoped to the viewer**, and absent rather than forbidden (ADR 5): a match
+// the caller was not in and the house did not host is not on the board at all.
+// The rule is `ledger.Scope`'s to define; this handler only says who is asking.
+func (a *API) coliseumStandings(w http.ResponseWriter, r *http.Request) {
+	scope := auth.ScopeFrom(r.Context())
+	board, err := a.matchLedger().Board(r.Context(), ledger.Scope{
+		Viewer: scope.UserID,
+		// An unauthenticated caller cannot reach a non-public route while
+		// the door is locked -- the middleware refuses before routing --
+		// so reaching here unauthenticated *is* the open deployment: one
+		// person, and nobody to keep anything from.
+		Open: !scope.Authenticated,
+	})
+	if err != nil {
+		a.fail(w, "coliseum standings", err)
+		return
+	}
+	wire.JSON(w, http.StatusOK, board)
 }

@@ -7355,6 +7355,30 @@ button:hover .tarot-fan-card {
 }
 .field-step { font-size: 0.6rem; }
 
+/* **The turn step, and it is wider than the beat step on purpose.** Both walk
+   the game backwards and forwards, so the only thing telling them apart is how
+   far each goes — and a row of four identical arrows is a row nobody can read.
+   The word does that work, and the extra breadth makes the pair read as the
+   outer, longer stride before the label is even read.
+
+   The word is small caps rather than a second glyph because there is no glyph
+   for "a turn"; every candidate (a clock, a loop, a chevron) means something
+   else in a room full of Magic's own iconography, and inventing one here would
+   be exactly the clip art commandment 5 keeps out. */
+.field-turn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 7px;
+}
+
+.field-turn-word {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .field-speeds { display: flex; gap: 3px; }
 
 /* **The transport's own chips**, because `.chip-toggle` is painted for the
@@ -8793,4 +8817,309 @@ button:hover .tarot-fan-card {
   .field-seam-on { animation: none; }
   .field-side { transition: none; }
   .field-side-lit { transition: none; }
+}
+
+/* ------------------------------------------------------------------ the
+ * Coliseum's record: boards built out of the bouts the room remembers.
+ *
+ * The band is the whole idea (see `components/coliseumrecord.tsx` for why it
+ * is a band and not a bar). It wears the room's own metal: an unstruck record
+ * is faint brass, a settled one is solid with a glint along it, so "we know
+ * this now" is a material change rather than a caption. Brass is declared at
+ * `:root` and is the same in both themes, which is what lets one rule serve
+ * the light room and the night one.
+ */
+
+.record-sheet { margin-top: 1.25rem; }
+
+/* The house's own tally. A wrapping flex rather than a fixed grid: on a phone
+   these become two-up and then one-up on their own, and a grid with a column
+   count would have to guess the width to do it. */
+.record-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.6rem;
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--anvil-brass) 5%, transparent) 0%,
+      transparent 70%);
+}
+
+.record-stat { display: flex; align-items: baseline; gap: 0.4rem; }
+
+.record-stat-figure {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.record-stat-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* The honest note, and it sits above every board rather than under one. */
+.record-caution {
+  margin-top: 0.85rem;
+  max-width: 62ch;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.record-legend {
+  margin-top: 0.75rem;
+  max-width: 68ch;
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--hairline);
+  border-left: 2px solid color-mix(in oklab, var(--anvil-brass) 55%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--anvil-brass) 4%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.record-legend p + p { margin-top: 0.6rem; }
+.record-legend strong { color: var(--text-primary); font-weight: 600; }
+
+.record-board { display: flex; flex-direction: column; }
+
+/* One contestant. Three areas on a wide screen -- who, figures, band -- and
+   the band spans the full width beneath on a phone, where a 150px track is
+   too short to read a range off at all. */
+.record-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'who figures' 'band band';
+  align-items: baseline;
+  gap: 0.3rem 1rem;
+  padding: 0.7rem 0.15rem 0.85rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.record-row:last-child { border-bottom: 0; }
+
+.record-who { grid-area: who; display: flex; flex-direction: column; min-width: 0; }
+
+.record-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.record-under {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.record-figures {
+  grid-area: figures;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.9rem;
+  text-align: right;
+}
+
+.record-tally {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.record-tally-of { font-size: 0.72rem; color: var(--text-muted); }
+.record-tally-aside { font-size: 0.7rem; color: var(--text-muted); }
+
+/* **Brass, stepped for the light room, and measured rather than eyeballed.**
+   `--anvil-brass` is declared once for both themes on purpose — it is an
+   object on the surface, not the surface — and that is right for a ring
+   catching light on a button. It is wrong for *text*: #c69c4e on the light
+   page measures 2.41:1, and this is the single number the whole board exists
+   to show. AA wants 4.5:1 for type this size.
+
+   So the metal keeps its role and changes its value, which is what a darker
+   room does to brass anyway. The dark theme keeps the bright face; the light
+   one gets the same hue taken down until it reads. Measured in the browser at
+   both settings, not derived from a colour picker. */
+:root { --record-ink: #7a5a12; }
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) { --record-ink: var(--anvil-brass); }
+}
+
+:root[data-theme='dark'] { --record-ink: var(--anvil-brass); }
+
+.record-figure {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 3.2rem;
+  justify-content: flex-end;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--record-ink);
+  white-space: nowrap;
+}
+
+/* Not yet a reputation: the figure keeps its place in the column but gives up
+   the metal, so a scan down the column reads settled records first. */
+.record-figure.is-young { color: var(--text-secondary); font-weight: 500; }
+
+/* `--text-secondary` for `.record-figure.is-shy`'s reason: this qualifies the
+   headline number rather than captioning it, and at this size the muted token
+   measures 3.41:1 on the light page. A warning nobody can read is a number
+   presented without its warning. */
+.record-provisional {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* No rate at all. A sentence, not a dash -- a dash reads as missing data and
+   this is an answer. */
+/* `--text-secondary` rather than the `--text-muted` its neighbours wear, and
+   the difference is deliberate: this sentence is not a caption, it is what
+   stands *in place of* the number — the whole answer for a deck too new to
+   have one. Muted measures 3.41:1 on the light page, which is under the floor
+   for type this size, and quietening the one line that explains an absence is
+   how an absence gets read as a bug. */
+.record-figure.is-shy {
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--text-secondary);
+  white-space: normal;
+  text-align: right;
+}
+
+/* ---- the band */
+
+.record-band {
+  grid-area: band;
+  position: relative;
+  height: 13px;
+  margin-top: 0.4rem;
+}
+
+.record-band-track {
+  position: absolute;
+  inset: 4px 0;
+  border-radius: 999px;
+  background: var(--gridline);
+}
+
+/* An even break. The one question most readers are actually asking, so it is
+   drawn behind every band rather than in a legend only. */
+.record-band-even {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-0.5px);
+  background: var(--baseline);
+}
+
+/* Grown with a keyframe rather than a transition off a mounted flag, so the
+   width is true from the first paint and the motion is only decoration over
+   it — see `components/coliseumrecord.tsx` for why the information must not
+   sit behind an animation frame. `scaleX` from the left edge, so one rule
+   serves every width. */
+.record-band-span {
+  position: absolute;
+  inset-block: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--anvil-brass) 30%, transparent);
+  border: 1px solid color-mix(in oklab, var(--anvil-brass) 45%, transparent);
+  transform-origin: left center;
+  animation: record-band-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes record-band-in {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+/* Struck: the record is settled, and the metal says so. */
+.record-band-span.is-settled {
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--anvil-brass) 62%, transparent) 0%,
+    var(--anvil-glint) 50%,
+    color-mix(in oklab, var(--anvil-brass) 62%, transparent) 100%);
+  border-color: color-mix(in oklab, var(--anvil-brass) 85%, transparent);
+}
+
+/* The share won so far, sitting on the range it came from. */
+.record-band-mark {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: var(--anvil-glint);
+  border: 1.5px solid var(--anvil-iron);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--anvil-brass) 40%, transparent);
+  animation: record-mark-in 380ms ease 240ms both;
+}
+
+@keyframes record-mark-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ---- the room before anybody has fought in it */
+
+.record-empty {
+  margin-top: 1.25rem;
+  max-width: 60ch;
+  padding: 1.6rem 1.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.7rem;
+  background:
+    radial-gradient(120% 140% at 50% 0%,
+      color-mix(in oklab, var(--anvil-brass) 7%, transparent) 0%,
+      transparent 65%);
+}
+
+.record-empty-lead {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+.record-empty-body {
+  margin-top: 0.55rem;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+/* A band that grows is delight; a band that grows is also motion. Under a
+   reduced-motion promise it is simply already the width it means -- the
+   information is the width, it is set on the element itself, and switching
+   the growing off therefore loses nothing at all. That is what makes this the
+   honest reduced version rather than a hidden one, and it is why the mark
+   keeps its place here instead of being removed with its animation. */
+@media (prefers-reduced-motion: reduce) {
+  .record-band-span,
+  .record-band-mark { animation: none; }
 }

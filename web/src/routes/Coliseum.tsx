@@ -68,9 +68,10 @@ import { useSearchParams } from 'react-router-dom'
 import {
   api, errorMessage, followJob,
   type Coliseum, type ColiseumArena, type ColiseumFact,
-  type DeckTile, type ForgeBeats, type ForgeResult, type Job,
-  type ValidationReport,
+  type ColiseumStandings, type DeckTile, type ForgeBeats, type ForgeResult,
+  type Job, type ValidationReport,
 } from '../lib/api'
+import { ColiseumRecord } from '../components/coliseumrecord'
 import { CardHover, Caveat, ErrorNote, NumberField, Select, StatTile }
   from '../components/ui'
 import { DeckCaution } from '../components/closedform'
@@ -80,7 +81,8 @@ import { MatchTheater } from '../components/theater'
 import { type Arriving, type Speed, type StagedBeat, useReel }
   from '../lib/reel'
 import {
-  beatLine, playerTurns, shortName, theaterBeats, theaterRows, turnsTaken,
+  beatLine, playerTurns, shortName, theaterBeats, theaterRows,
+  turnMarks as turnMarksOf, turnsTaken,
 } from '../lib/theater'
 import { CrossedSwordsGlyph } from '../components/glyphs'
 import { reducedMotion, useCardMotion } from '../lib/motion'
@@ -385,6 +387,25 @@ export default function ColiseumRoom() {
   const [chosen, setChosen] = useState(0)
   const [slide, setSlide] = useState(0)
 
+  // **Two places in one room**, and the strip below picks between them: the
+  // sand, where a match is fought, and the record, where every match already
+  // fought is weighed. Component state rather than another query parameter —
+  // `?a=`, `?b=`, `?m=` and `?s=` all name a *fight*, and a link into this
+  // room should seat the fighters it names rather than open a ledger. The
+  // record is one click from anywhere and needs no address of its own.
+  //
+  // Nothing about a running match is torn down by switching: the job poll and
+  // the reel are both hooks on this component, so a match keeps going while
+  // the record is open and the field picks its replay back up where it was.
+  const [view, setView] = useState<'sand' | 'record'>('sand')
+  const onSand = view === 'sand'
+  // Read once, when the record is first opened, and kept afterwards. The
+  // board is a whole-history read and it does not change while somebody is
+  // looking at it -- except when a match they are watching finishes, which is
+  // what the dependency on a finished result is for.
+  const [board, setBoard] = useState<ColiseumStandings | null>(null)
+  const [boardFailed, setBoardFailed] = useState(false)
+
   // The two seats. Each is an address — an owner and a slug (ADR 22) — and
   // each arrives whole in one query parameter, so a link into this room seats
   // both fighters: `/coliseum?a=aaron/gyome&b=aaron/arahbo`.
@@ -455,6 +476,22 @@ export default function ColiseumRoom() {
     setSeen((cur) =>
       cur.some((g) => g.game === live.game) ? cur : [...cur, live])
   }, [])
+
+  // The record, fetched when somebody actually asks to see it — the same rule
+  // the deck page's tabs follow. It is a read across the whole history and
+  // most visits to this room never open it.
+  //
+  // Re-read when a match finishes while the record is the open place, because
+  // the bout that just ended is now part of what the board is counting and a
+  // stale board would be the room contradicting itself.
+  useEffect(() => {
+    if (view !== 'record') return
+    let alive = true
+    api.coliseumStandings()
+      .then((b) => { if (alive) { setBoard(b); setBoardFailed(false) } })
+      .catch(() => { if (alive) setBoardFailed(true) })
+    return () => { alive = false }
+  }, [view, forge])
 
   useEffect(() => {
     let alive = true
@@ -750,6 +787,28 @@ export default function ColiseumRoom() {
   // on from where the hand left off rather than snapping back.
   const [reel, seek, series] = useReel(job?.id ?? '', bouts, stage, speed)
 
+  /** Where each of this bout's turns begins, for the transport's turn step.
+   *
+   *  **A player's turn, which is the unit somebody studying a game wants**
+   *  (Aaron, 2026-08-26: "a player's turn at a time, not a full two player
+   *  turn"). Forge prints a turn line per seat and alternates them, so
+   *  consecutive `turn` beats are one player's turn apart and nothing has to
+   *  be halved — the halving is exactly the trap `lib/theater.ts` records this
+   *  project falling into once already.
+   *
+   *  Held as a count of beats *told* rather than an index into them, because
+   *  that is what `seek` takes: landing on `i + 1` puts the turn's own
+   *  announcement on the board as the last thing said, so stepping to a turn
+   *  shows the turn beginning rather than the instant before it.
+   *
+   *  Told and untold together, so the step reaches a turn the room has not
+   *  read out yet — that is the whole point of stepping rather than watching.
+   *  It stops at this bout's end either way: the next bout is a different
+   *  fight and the room tells each to its end. */
+  const turnMarks = useMemo(
+    () => turnMarksOf([...reel.shown, ...reel.queue]),
+    [reel.shown, reel.queue])
+
   /** What the field calls a seat. The board carries slugs and Forge's own deck
    *  titles; only the room has the shelf that turns either into a name. */
   const seatName = useCallback((slug: string | null, fallback: string) =>
@@ -780,11 +839,57 @@ export default function ColiseumRoom() {
         what those minutes are for.
       </p>
 
+      {/* **The room's two places.** Not the arena strip below — that one picks
+          which house a match is watched in, and it stays where it is. This one
+          picks between fighting and remembering.
+
+          `.strip-tab` rather than `.btn` for the reason the arena strip uses
+          it (commandment 17): these are places you go, not actions you take.
+          Same class, same `is-active` ink, same shape `Library` and
+          `DeckDetail` wear. */}
+      <div role="tablist" aria-label="The coliseum"
+           className="mt-6 flex flex-wrap border-b"
+           style={{ borderColor: 'var(--hairline)' }}>
+        <button type="button" role="tab" aria-selected={onSand}
+                onClick={() => setView('sand')}
+                className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm
+                            font-medium${onSand ? ' is-active' : ''}`}>
+          The sand
+        </button>
+        <button type="button" role="tab" aria-selected={!onSand}
+                onClick={() => setView('record')}
+                className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm
+                            font-medium${!onSand ? ' is-active' : ''}`}>
+          The record
+        </button>
+      </div>
+
+      {/* The record. A whole-history read, so it says so while it is coming
+          rather than flashing an empty room at somebody who has fought fifty
+          bouts — an empty state shown by mistake is a lie about their record,
+          and it is the one thing this surface must never get wrong. */}
+      {!onSand && (
+        <>
+          {boardFailed && (
+            <p className="mt-8 text-[var(--text-muted)]">
+              The record keeper is not at his desk — the room could not open
+              its books just now.
+            </p>
+          )}
+          {!boardFailed && !board && (
+            <p className="mt-8 text-[var(--text-muted)]">
+              Opening the books…
+            </p>
+          )}
+          {!boardFailed && board && <ColiseumRecord board={board} />}
+        </>
+      )}
+
       {/* The gates. Only where the gate said Forge is installed — absent,
           never greyed out with an excuse, which is the rule the Ask Claude
           surfaces set and this inherits. The room itself is worth walking
           through either way, so nothing else on the page depends on it. */}
-      {forgeReady && (
+      {onSand && forgeReady && (
         <div data-open={running ? 'true' : 'false'}
              className="card-surface gatehouse mt-5 flex flex-wrap items-end
                         gap-3 rounded-xl p-4">
@@ -847,12 +952,12 @@ export default function ColiseumRoom() {
       )}
 
       {/* What a match will leave out, before it is paid for — both seats. */}
-      <DeckCaution report={checks[a]} name={aDeck?.name ?? slugOf(a)} />
-      {b !== a && (
+      {onSand && <DeckCaution report={checks[a]} name={aDeck?.name ?? slugOf(a)} />}
+      {onSand && b !== a && (
         <DeckCaution report={checks[b]} name={bDeck?.name ?? slugOf(b)} />
       )}
 
-      {error && <ErrorNote>The match failed: {error}</ErrorNote>}
+      {onSand && error && <ErrorNote>The match failed: {error}</ErrorNote>}
 
       {/* A link that named a match the arena is no longer holding. Not an
           error: a match lives as long as the arena keeps it, an old link
@@ -861,7 +966,7 @@ export default function ColiseumRoom() {
           tell them apart — which is the point). So it is said the way a
           doorman says it, and the gates are standing open right there
           (commandment 2). */}
-      {lost && (
+      {onSand && lost && (
         <p className="mt-4 text-[0.9rem] text-[var(--text-muted)]">
           That bout has left the arena — the sand was raked and the gates
           closed behind it. Send them in again whenever you are ready.
@@ -878,7 +983,7 @@ export default function ColiseumRoom() {
           so without it React would match the new match's rows to the old
           one's elements and the second run would play out with no strikes at
           all. */}
-      {job && (running || forge) && (
+      {onSand && job && (running || forge) && (
         <div className="mt-6">
           <MatchTheater
             key={job.id}
@@ -901,7 +1006,7 @@ export default function ColiseumRoom() {
 
           Keyed on the job for the same reason the theater is: a second match
           begins on an empty field rather than on the last one's board. */}
-      {hasBeats && (
+      {onSand && hasBeats && (
         <div className="mt-6">
           {/* **What the room still owes you.** A series is told a bout at a
               time and the Forge raises them faster than anybody can watch
@@ -925,19 +1030,19 @@ export default function ColiseumRoom() {
                       beat={reel.shown[reel.shown.length - 1] ?? null}
                       speed={speed} setSpeed={setSpeed}
                       of={reel.shown.length + reel.queue.length}
-                      seek={seek}
+                      seek={seek} turns={turnMarks}
                       games={bouts}
                       playing={reel.game} chooseGame={series.pick} />
         </div>
       )}
 
-      {failed && (
+      {onSand && failed && (
         <p className="mt-8 text-[var(--text-muted)]">
           The coliseum is dark tonight — its doors did not answer.
         </p>
       )}
 
-      {data && arena && (
+      {onSand && data && arena && (
         <>
           {/* Places rather than actions, so `.strip-tab` rather than `.btn`
               (commandment 17). */}
