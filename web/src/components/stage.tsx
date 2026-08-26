@@ -18,8 +18,9 @@ import type { CSSProperties } from 'react'
 import mementoArt from '../assets/coliseum/memento.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
-import { faceFor, mannerOf, PLATE, type Staged, stageLife, useStaged }
-  from '../lib/stage'
+import { faceFor, mannerOf, PLATE, type Staged, stagedMana, stageLife,
+  type StagedMana, useStaged, useStagedMana } from '../lib/stage'
+import { ManaPip } from './manasymbol'
 
 /** The card itself, or the card set in type when there is no picture of it.
  *
@@ -79,6 +80,35 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
   )
 }
 
+/** **The mana that just arrived**, in the half of the arena it arrived for.
+ *
+ *  A row of pips coming up out of the sand: one per mana, because a pool
+ *  holding two green is two things you can spend — which is the opposite of
+ *  the rule for what a permanent *taps for*, where two colours are one mana
+ *  with a choice attached — which is why this is `ManaPip` and not the mark
+ *  that used to ride a turned card.
+ *
+ *  Staggered, and that is what makes three mana read as three. Landing
+ *  together they are one shape the eye has to stop and count; landing a
+ *  fraction apart they are counted on the way past, the way pips land on a
+ *  die. The index reaches the stylesheet as `--pip-i`, so the whole cascade is
+ *  one number per pip and no timers at all. */
+function StageMana({ item }: { item: StagedMana }) {
+  const life = { '--stage-life': `${item.life}ms` } as CSSProperties
+  return (
+    <span style={life} aria-hidden="true"
+          className={`stage-mana is-${item.facing}`}>
+      <span className="stage-mana-glow" aria-hidden="true" />
+      {item.pips.map((pip) => (
+        <span key={`${pip.symbol}-${pip.at}`} className="stage-mana-pip"
+              style={{ '--pip-i': pip.at } as CSSProperties}>
+          <ManaPip symbol={pip.symbol} size={22} />
+        </span>
+      ))}
+    </span>
+  )
+}
+
 /**
  * The middle of the arena, and what is happening in it.
  *
@@ -96,11 +126,24 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
  * beside it, read from the same beat — announcing them twice would be the room
  * talking over itself.
  */
-export function CenterStage({ board, beat, speed, game, dies, seat }: {
+export function CenterStage({ board, beat, speed, game, dies, seat, gained,
+  at }: {
   board: ForgeBoard | null
   beat: StagedBeat | null
   speed: Speed
   game: number
+  /** What each seat's pool *gained* on the beat being drawn, from the fold —
+   *  `''` for the seats and the beats where nothing arrived, which is most of
+   *  them. Two seats rather than one because an opponent can hold up mana on
+   *  somebody else's turn, and a room that only drew the active player's would
+   *  go quiet at exactly the moment a counterspell was being paid for. */
+  gained: { far: string; near: string }
+  /** How far into the game the room is showing, which is what a flash is keyed
+   *  on. **The step count and not the beat's own key**, because scrubbing the
+   *  timeline moves this while the beat under the pointer may not change at
+   *  all — and a person dragging back through a turn should see the mana move
+   *  again, not see it stuck on whatever it was when they grabbed it. */
+  at: number
   /** How long a death is watched for at this pace — the marks' own number,
    *  passed in rather than worked out a second time. One event, one clock. */
   dies: number | null
@@ -120,11 +163,21 @@ export function CenterStage({ board, beat, speed, game, dies, seat }: {
     }
     : null
   const { showing, parting } = useStaged(next, beat?.key ?? '', game)
-  if (!showing && !parting) return null
+  // Two seats, two slots, two hooks — never one slot chosen between them. Both
+  // pools can move on one beat, and a shared slot would make the second seat's
+  // mana silently delete the first's.
+  const key = `${at}`
+  const farMana = useStagedMana(
+    stagedMana(gained.far, 'far', key, speed), key, game)
+  const nearMana = useStagedMana(
+    stagedMana(gained.near, 'near', key, speed), key, game)
+  if (!showing && !parting && !farMana && !nearMana) return null
   return (
     <div className="stage" aria-hidden="true">
       {parting && <StageCard key={parting.key} item={parting} parting />}
       {showing && <StageCard key={showing.key} item={showing} />}
+      {farMana && <StageMana key={farMana.key} item={farMana} />}
+      {nearMana && <StageMana key={nearMana.key} item={nearMana} />}
     </div>
   )
 }

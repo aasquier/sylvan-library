@@ -16,7 +16,8 @@
  * has.
  */
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within }
+  from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import type { ForgeBoard } from '../lib/api'
@@ -1513,14 +1514,15 @@ it('prices each chair rather than the whole zone', () => {
     .toBe(seats[1])
 })
 
-/** A board of turned mana sources, one of each shape the mark has.
+/** A board of turned mana sources, and one turned for something else.
  *
- * **What the bead claims and what it must never claim.** A turned permanent
- * that taps for mana wears what it taps for — a fact about the printing, true
- * whether the card was turned to pay for something, to swing, or by an
- * opponent. It is not a claim that this activation filled anybody's pool, and
- * nothing on the wire could support one if it were: the mana event carries a
- * seat and a pool, the tap event carries a card, and no key joins the two. */
+ * **What the board may say about a turned permanent and what it must never
+ * say.** That a card taps for green is a fact about the *printing*, true
+ * whether it was turned to pay for something, to swing, or by an opponent —
+ * and it is said in the card's own words. That *this* activation filled
+ * somebody's pool is not said anywhere and could not be: the mana event
+ * carries a seat and a pool, the tap event carries a card, and no key joins
+ * the two (ADR 44). */
 const TAPPED: ForgeBoard = {
   seats: [
     { seat: 1, slug: 'green', name: 'Green', life: 40 },
@@ -1571,71 +1573,183 @@ function sand(container: HTMLElement, name: string) {
     .find((c) => c.getAttribute('title')?.startsWith(name)) as HTMLElement
 }
 
-it('shows a turned mana source what it taps for, and nothing else', () => {
+it('says what a turned permanent taps for without drawing it on the card', () => {
   const { container } = tapped()
 
-  // The ask (Aaron, 2026-08-26): a mana symbol on a turned mana creature.
+  // **The bead is gone and the sentence is not.** #337 drew a mana mark on the
+  // right edge of every turned mana source; #341 took it off, because the same
+  // fact is now told bigger in the middle of the arena at the moment the mana
+  // arrives — and because a bead sitting beside a live mana pool starts
+  // implying *this made that*, which is the one inference ADR 44 refuses.
+  expect(container.querySelectorAll('.field-card-bead'),
+    'no card wears a mana mark any more').toHaveLength(0)
+
+  // What the bead was *for* survives in words, which is where it was always
+  // the more useful of the two for anybody not looking at a fifteen-pixel
+  // picture. **"taps for", never "made"** — the second is a claim about this
+  // activation and no such claim exists anywhere on this wire.
   const elves = sand(container, 'Llanowar Elves')
   expect(elves, 'the fixture put the Elves on the sand').toBeTruthy()
-  expect(elves.querySelectorAll('.field-card-bead'),
-    'a turned dork wears one bead').toHaveLength(1)
-  // On the arm, so it rides the card round when it turns and comes back level
-  // — the loupe's reason, and the keyword marks'.
-  expect(elves.querySelector('.field-card-bead')
-    ?.closest('.field-card-arm')).toBeTruthy()
-  // The arm is `aria-hidden`, so the card's own title is how anybody not
-  // looking at fifteen-pixel pictures gets this. **"taps for", never "made"**
-  // — the second is a claim about this activation and no such claim exists.
   expect(elves.getAttribute('title')).toContain('taps for green mana')
   expect(elves.getAttribute('title')).not.toContain('made')
 
-  // **A turned permanent that taps for nothing wears nothing.** Craterhoof is
+  // A turned permanent that taps for nothing still says nothing. Craterhoof is
   // sideways because it swung, and the board has never suggested otherwise.
-  const hoof = sand(container, 'Craterhoof Behemoth')
-  expect(hoof.querySelectorAll('.field-card-bead')).toHaveLength(0)
+  expect(sand(container, 'Craterhoof Behemoth').getAttribute('title'))
+    .not.toContain('taps for')
 
-  // **Untapped is untapped**, even on a Forest. The bead is what a *turned*
-  // source is doing, and a standing one is doing nothing.
-  const forest = sand(container, 'Forest')
-  expect(forest, 'the fixture put a Forest in the land row').toBeTruthy()
-  expect(forest.querySelectorAll('.field-card-bead')).toHaveLength(0)
-  expect(forest.getAttribute('title')).not.toContain('taps for')
-
-  // Not in a hand — the same line `inPlay` draws for the loupe and the
-  // keyword marks. Nothing being held is turned for anything.
-  const held = container.querySelector('.field-hand-far .field-card')
-  expect(held, 'the fixture put a card in a hand').toBeTruthy()
-  expect(held?.querySelectorAll('.field-card-bead')).toHaveLength(0)
+  // **Untapped is untapped**, even on a Forest: the sentence is about what a
+  // *turned* source is doing, and a standing one is doing nothing.
+  expect(sand(container, 'Forest').getAttribute('title'))
+    .not.toContain('taps for')
 })
 
-it('draws one mark for a choice of mana, never a row of them', () => {
-  const { container } = tapped()
+/**
+ * A seat whose pool fills and drains inside one beat.
+ *
+ * **This is the shape the real wire has, copied off a recorded match** rather
+ * than the tidier one anybody would invent. Two things about it are the whole
+ * reason the room draws a movement instead of a value:
+ *
+ * - Forge raises **no beat at all** for a mana ability — it does not use the
+ *   stack — so every tap between two sentences arrives attached to whichever
+ *   beat comes next, which is very often the cast that spent it.
+ * - Forge **taps one land and spends that mana before tapping the next**, so
+ *   the sequence is `G, '', G, '', G, ''` and not `G, GG, GGG`. The pool is
+ *   never holding more than one mana, which is why `raised` is what arrived
+ *   across the beat and not the pool's high-water mark: the high-water mark
+ *   here is one, and one pip flickering three times says nothing.
+ *
+ * Three green are raised and all three are spent. Seat 1 is `sides[0]`, the
+ * **far** player; seat 2 does nothing at all, which is the other half of the
+ * test — a pool that did not move must not be animated, and a seat with no
+ * mana must still have somewhere to put it.
+ */
+const POOLS: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'green', name: 'Green', life: 40 },
+    { seat: 2, slug: 'other', name: 'Other', life: 40 },
+  ],
+  cards: [
+    { id: 60, name: 'Forest', types: 'Basic Land - Forest', seat: 1,
+      mana: true, makes: ['G'] },
+    { id: 61, name: 'Llanowar Elves', types: 'Creature - Elf Druid', seat: 1,
+      mana: true, makes: ['G'] },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 60, zone: 'land', seat: 1 },
+      { id: 61, zone: 'battlefield', seat: 1, power: 1, toughness: 1 },
+    ] },
+    { turn: 1, seat: 1, changes: [
+      { id: 60, zone: 'land', seat: 1, tapped: true },
+      { id: 61, zone: 'battlefield', seat: 1, tapped: true, power: 1,
+        toughness: 1 },
+    ], floating: [
+      { seat: 1, pool: 'G' }, { seat: 1, pool: '' },
+      { seat: 1, pool: 'G' }, { seat: 1, pool: '' },
+      { seat: 1, pool: 'G' }, { seat: 1, pool: '' },
+    ] },
+  ],
+} as unknown as ForgeBoard
 
-  // **`{G}{W}` means two mana and a Temple Garden makes one.** Two pips side
-  // by side would be the board teaching somebody something false about the
-  // card in front of them, so a pair is the official hybrid symbol — Magic's
-  // own way of writing "or" — and it is one mark.
-  const garden = sand(container, 'Temple Garden')
-  const gardenBead = garden.querySelector('.field-card-bead') as HTMLElement
-  expect(gardenBead, 'a turned dual wears a bead').toBeTruthy()
-  expect(gardenBead.querySelectorAll('img, svg'),
-    'one mark for one mana, whatever the choice attached to it')
-    .toHaveLength(1)
-  expect(gardenBead.querySelector('img')?.getAttribute('src'),
-    'the official hybrid, in the spelling the set uses')
-    .toBe('/api/symbols/GW.svg')
-  expect(garden.getAttribute('title')).toContain('taps for green or white mana')
+function pools(speed: Speed = 'play') {
+  return render(
+    <MatchBoard board={POOLS} shown={2} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed={speed} setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
 
-  // Five colours has no official symbol at all — nothing in the set means
-  // "any of these" — so it is the prism, a wedge per colour, and still one
-  // mark rather than five pips.
-  const birds = sand(container, 'Birds of Paradise')
-  const birdsBead = birds.querySelector('.field-card-bead') as HTMLElement
-  expect(birdsBead.querySelectorAll('img'),
-    'no official symbol is asked for, because none exists').toHaveLength(0)
-  expect(birdsBead.querySelectorAll('svg path'),
-    'a wedge for each colour it can make').toHaveLength(5)
-  // What a player would actually say, rather than a list of five.
-  expect(birds.getAttribute('title'))
-    .toContain('taps for mana of any colour')
+/** The pips standing in a seat's pool, and the ones on their way out of it. */
+function poolRow(container: HTMLElement, facing: 'far' | 'near') {
+  const pool = container
+    .querySelector(`.field-hand-${facing} .field-pool`) as HTMLElement
+  return {
+    pool,
+    held: pool.querySelectorAll('.field-pool-pip:not(.is-spent)'),
+    spent: pool.querySelectorAll('.field-pool-pip.is-spent'),
+  }
+}
+
+it('fills the pool beside a hand and then drains it', () => {
+  vi.useFakeTimers()
+  try {
+    const { container } = pools()
+
+    // **It fills to what was raised, not to what the pool held at any one
+    // instant.** Forge never had more than one green in the pool at a time,
+    // and three is the number that answers "what paid for that". Rendered on
+    // the first commit rather than from an effect, so the mana and the beat
+    // that spent it reach the screen together.
+    expect(poolRow(container, 'far').held,
+      'three mana were raised across the beat').toHaveLength(3)
+    expect(poolRow(container, 'far').spent).toHaveLength(0)
+
+    // **And then it drains, which is the ask.** All three go — and they are
+    // drawn on their way out rather than simply deleted, because watching it
+    // deplete is the entire point (Aaron, 2026-08-26).
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(poolRow(container, 'far').held,
+      'nothing is left floating').toHaveLength(0)
+    expect(poolRow(container, 'far').spent,
+      'the three that were spent are drawn leaving').toHaveLength(3)
+
+    // ...and then they are gone, and nothing is stranded. Mana sitting beside
+    // a hand that the game no longer has is the room lying about the one
+    // number a player is counting.
+    act(() => { vi.advanceTimersByTime(1200) })
+    expect(poolRow(container, 'far').held).toHaveLength(0)
+    expect(poolRow(container, 'far').spent,
+      'nothing is left draining forever').toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('gives a seat with no mana somewhere to put it', () => {
+  const { container } = pools()
+
+  // **The trough is drawn whether or not there is anything in it.** A row that
+  // appeared and vanished fifty times a match would shove the hand up and down
+  // the screen all game, and somebody at their first game needs to know where
+  // mana lives before there is any to see (commandment 2).
+  const other = poolRow(container, 'near')
+  expect(other.pool, 'the empty seat still has a pool').toBeTruthy()
+  expect(other.held, 'and nothing in it').toHaveLength(0)
+  expect(other.spent).toHaveLength(0)
+
+  // Said in words, because the pips are a drawing and a drawing is a thing you
+  // have to already know how to read. **The words are the resting truth, not
+  // the animation's current frame** — the far player raised three green and
+  // spent all three, so what a screen reader is told about their pool is that
+  // it is empty, which is the only thing about it that was ever a fact about
+  // the game. `poolSaid` is tested on its own for the filled spellings.
+  expect(other.pool.getAttribute('title')).toBe('Mana pool: empty')
+  expect(poolRow(container, 'far').pool.getAttribute('title'))
+    .toBe('Mana pool: empty')
+})
+
+it('flashes the mana that arrived, in the half it arrived for', () => {
+  const { container } = pools()
+
+  // The ask, in Aaron's own words (2026-08-26): *"I wanted the mana symbol to
+  // maybe just show in the middle like the cast cards do now."*
+  const flash = container.querySelector('.stage-mana') as HTMLElement
+  expect(flash, 'the mana that arrived is drawn on the sand').toBeTruthy()
+  expect(flash.querySelectorAll('.stage-mana-pip'),
+    'three arrived, so three are flashed — not the one that was left')
+    .toHaveLength(3)
+
+  // **In the gaining seat's own half**, which is what lets it share a beat
+  // with the card it paid for instead of fighting it for the middle. Seat 1 is
+  // the far player.
+  expect(flash.classList.contains('is-far')).toBe(true)
+  expect(container.querySelectorAll('.stage-mana.is-near'),
+    'the seat that gained nothing flashes nothing').toHaveLength(0)
+
+  // It says nothing to a screen reader and takes no pointer: the words are
+  // already in the play-by-play, and a flash that swallowed a drag would break
+  // the timeline at the moment it is most wanted.
+  expect(flash.getAttribute('aria-hidden')).toBe('true')
 })
