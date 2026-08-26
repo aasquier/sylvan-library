@@ -253,6 +253,7 @@ describe('the board at a moment', () => {
       mana: false, keywords: [], leaving: null, power: null,
       toughness: null, counters: [], counterHistory: [], combat: '',
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+      live: [], granted: [], fate: '', copiedBy: 0,
     })
     const stacks = stackRow([forest(1), forest(2), forest(3)])
     expect(stacks).toHaveLength(1)
@@ -272,6 +273,7 @@ describe('the board at a moment', () => {
       mana: false, keywords: [], leaving: null, power: null,
       toughness: null, counters: [], counterHistory: [], combat: '',
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+      live: [], granted: [], fate: '', copiedBy: 0,
     })
     const stacks = stackRow([
       forest(1, true), forest(2, false), forest(3, true), forest(4, false),
@@ -290,6 +292,7 @@ describe('the board at a moment', () => {
       tapped: false, mana: false, keywords: [], leaving: null, power: 1,
       toughness: 1, counters: [], counterHistory: [], combat: '',
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+      live: [], granted: [], fate: '', copiedBy: 0,
       ...over,
     })
     const stacks = stackRow([
@@ -314,7 +317,9 @@ describe('the board at a moment', () => {
   it('answers a match with no board at all', () => {
     // A worker without the scribe plays the match and reports no board. The
     // room draws the account alone rather than breaking.
-    expect(foldBoard(null, 5)).toEqual({ turn: 0, active: 0, sides: [] })
+    expect(foldBoard(null, 5)).toEqual({
+      turn: 0, active: 0, sides: [], abilities: [], floating: [],
+    })
   })
 })
 
@@ -685,6 +690,7 @@ describe('the fight', () => {
       tapped: false, mana: false, keywords: [], leaving: null, power: 1,
       toughness: 1, counters: [], counterHistory: [], combat,
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+      live: [], granted: [], fate: '', copiedBy: 0,
     })
     const stacks = stackRow([
       saproling(1, 'attacking'), saproling(2, ''),
@@ -692,5 +698,107 @@ describe('the fight', () => {
     ])
     expect(stacks.map((s) => [s.card.combat, s.count]))
       .toEqual([['attacking', 2], ['', 1], ['blocking', 1]])
+  })
+})
+
+describe('what a beat says beyond where the cards are', () => {
+  // The four things Forge's bus started saying in ADR 45. The rulings about
+  // the *game* are Go's and are tested there against a real recorded match;
+  // what is left here is the arithmetic of folding them.
+
+  it('keeps every value a mana pool took, and rests on the last', () => {
+    // A pool fills and empties several times between two beats, so the value a
+    // step *ends* on is almost always empty — measured on a real match at nine
+    // empty out of ten. The resting total is what a rail draws; the sequence
+    // is what an arrival animates, and both are the same field.
+    const b = board([
+      { floating: [
+        { seat: 1, pool: 'W' }, { seat: 1, pool: '' },
+        { seat: 1, pool: 'CC' }, { seat: 1, pool: 'C' },
+      ] },
+    ])
+    const state = foldBoard(b, 1)
+    expect(state.sides[0]?.pool).toBe('C')
+    expect(state.floating.map((m) => m.pool)).toEqual(['W', '', 'CC', 'C'])
+  })
+
+  it('drops the pool movement once the beat has passed', () => {
+    // `floating` belongs to the beat being drawn, not to the game so far —
+    // otherwise mana that was spent two turns ago goes on arriving forever.
+    const b = board([
+      { floating: [{ seat: 1, pool: 'GG' }] },
+      { changes: [{ id: 11, zone: 'land', seat: 1 }] },
+    ])
+    const state = foldBoard(b, 2)
+    expect(state.floating).toEqual([])
+    // The pool itself is state and stays where it was left.
+    expect(state.sides[0]?.pool).toBe('GG')
+  })
+
+  it('reads the abilities of the beat being drawn and no others', () => {
+    // Using an ability is a moment rather than a state, which is what makes an
+    // eminence trigger drawable at all: its commander never leaves the command
+    // zone, so nothing else in the stream says it acted.
+    const b = board([
+      { abilities: [{ id: 10, seat: 1, zone: 'Command', trigger: true }] },
+      { changes: [{ id: 11, zone: 'land', seat: 1 }] },
+    ])
+    expect(foldBoard(b, 1).abilities).toEqual([
+      { id: 10, seat: 1, zone: 'Command', trigger: true },
+    ])
+    expect(foldBoard(b, 2).abilities).toEqual([])
+  })
+
+  it('takes a granted keyword and an empty set as different answers', () => {
+    // An empty array means a creature has lost the last keyword something was
+    // giving it, and `undefined` means this step said nothing about keywords —
+    // the same distinction `counters` turns on, and the same bug if either is
+    // read as truthy.
+    const b = board([
+      { changes: [{ id: 10, zone: 'battlefield', seat: 1,
+        live: ['Vigilance'], granted: ['Vigilance'] }] },
+      { changes: [{ id: 10, tapped: true }] },
+      { changes: [{ id: 10, live: [], granted: [] }] },
+    ])
+    const gained = foldBoard(b, 1).sides[0]?.creatures[0]
+    expect(gained?.granted).toEqual(['Vigilance'])
+    // A step that says nothing about keywords leaves them alone.
+    expect(foldBoard(b, 2).sides[0]?.creatures[0]?.granted)
+      .toEqual(['Vigilance'])
+    // And the grant going away is published rather than left on the card.
+    expect(foldBoard(b, 3).sides[0]?.creatures[0]?.granted).toEqual([])
+  })
+
+  it('carries how a permanent left, when Forge said so', () => {
+    const b = board([
+      { changes: [{ id: 11, zone: 'land', seat: 1 }] },
+      { changes: [{ id: 11, zone: 'gone', fate: 'sacrificed' }] },
+    ])
+    // Held on the sand for the beat that says it is leaving, which is where a
+    // mark has something to land on.
+    expect(foldBoard(b, 2).sides[0]?.land[0]?.fate).toBe('sacrificed')
+  })
+
+  it('names the card whose ability made a token a copy', () => {
+    // Populate's whole signal: its presence is the copy. **Not** what the
+    // token was copied from — a Centaur Token populated by Growing Ranks names
+    // Growing Ranks, and the permanent it duplicated never crosses the wire.
+    const b: ForgeBoard = {
+      seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],
+      cards: [
+        { id: 158, name: 'Growing Ranks', types: 'Enchantment', seat: 1 },
+        { id: 212, name: 'Centaur Token', token: true, seat: 1,
+          types: 'Creature - Centaur', copied_by: 158 },
+        { id: 210, name: 'Centaur Token', token: true, seat: 1,
+          types: 'Creature - Centaur' },
+      ],
+      steps: [{ changes: [
+        { id: 212, zone: 'battlefield', seat: 1 },
+        { id: 210, zone: 'battlefield', seat: 1 },
+      ] }],
+    }
+    const creatures = foldBoard(b, 1).sides[0]!.creatures
+    expect(creatures.find((c) => c.id === 212)?.copiedBy).toBe(158)
+    expect(creatures.find((c) => c.id === 210)?.copiedBy).toBe(0)
   })
 })

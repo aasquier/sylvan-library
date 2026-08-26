@@ -110,7 +110,41 @@ const (
 	EventDamage    EventKind = "damage"
 	EventLife      EventKind = "life"
 	EventDies      EventKind = "dies"
-	EventOutcome   EventKind = "outcome"
+	// EventSacrificed is a permanent its controller sacrificed — a cost paid,
+	// not something that happened to it.
+	//
+	// **Deliberately not [EventDies], and the distinction is Magic's rather
+	// than ours.** Rule 700.4 gives "dies" to a creature or planeswalker put
+	// into a graveyard from the battlefield; a Treasure cracked for mana and a
+	// fetchland cracked for a land do neither, so `dies` was right to stay
+	// silent about them and the account simply had nothing to say instead
+	// (Aaron, 2026-08-26, on the Treasure that taps and then goes "into the
+	// ether"). A creature *sacrificed* raises both, which is correct: it was
+	// sacrificed and it did die.
+	//
+	// Raised only by the scribe, from `GameEventCardSacrificed`. Forge's log
+	// has no category for it either.
+	EventSacrificed EventKind = "sacrificed"
+	// EventAbility is an ability going on the stack — activated by a player, or
+	// triggered by the game. [GameEvent.Zone] says where its source was and
+	// [GameEvent.Trigger] says which of the two it is.
+	//
+	// **Abilities reached nothing at all before this**, because the scribe
+	// returned on anything that was not a spell, so eminence — a triggered
+	// ability whose source sits in the command zone and never moves — was
+	// invisible from end to end (Aaron, 2026-08-26: *"It should just visually
+	// indicate that an ability is being used"*).
+	//
+	// **This does not reopen the stack**, which is the fear it looks like it
+	// should raise. `board.go`'s first ruling drops Stack *zone* events because
+	// they never balance — 52 in against 14 out in one game — and that is
+	// untouched. This is a different event about a different subject: it fires
+	// once when an ability is put on the stack, nothing accumulates, and nothing
+	// waits for it to come off. Measured before it was added, as ADR 42 asks of
+	// any new listener on this bus: **ten in a forty-six-turn game**, against 46
+	// lands and 548 zone movements.
+	EventAbility EventKind = "ability"
+	EventOutcome EventKind = "outcome"
 )
 
 // GameEvent is one beat of a game.
@@ -134,6 +168,20 @@ type GameEvent struct {
 	// name, never Scryfall's combined `A // B` (docs/FORGE.md's fourth fact).
 	// A consumer resolving this to art must resolve a face.
 	Card string `json:"card,omitempty"`
+	// ID is that card's board id — the same per-game instance id
+	// [BoardCard.ID] uses, so a beat and the picture can be pointed at each
+	// other.
+	//
+	// **A name cannot answer "which one".** Two Egg Tokens are one string
+	// between them and so are two copies of a commander, so a room lighting up
+	// "the card this beat is about" from the name alone lights the wrong one
+	// as often as not. The board has always had ids and the account never did.
+	//
+	// **Zero on the prose path**, which has no ids to give: Forge's log writes
+	// `Forest (24)` and the regexes never took the number. A consumer must
+	// treat zero as "not said" rather than as a card, which is what
+	// `omitempty` is saying.
+	ID int `json:"id,omitempty"`
 	// Target is the card on the other end: blocked, or damaged.
 	Target string `json:"target,omitempty"`
 	// TargetSeat is the player on the other end: attacked, or damaged.
@@ -143,6 +191,18 @@ type GameEvent struct {
 	// Life is the life total *after* a life change. A pointer because zero
 	// life is a real and rather important total.
 	Life *int `json:"life,omitempty"`
+	// Zone is where an [EventAbility]'s source was standing, in Forge's own
+	// word — `Command` or `Battlefield`. Empty on every other kind.
+	//
+	// **It is the whole of what makes eminence legible.** A commander using an
+	// ability from the command zone never moves, so without this the beat is
+	// indistinguishable from the same commander doing something on the
+	// battlefield, and those are different abilities of different cards.
+	Zone string `json:"zone,omitempty"`
+	// Trigger is whether an [EventAbility] was raised by the game rather than
+	// activated by a player — the difference between "triggers" and "activates",
+	// which is the verb the sentence turns on.
+	Trigger bool `json:"trigger,omitempty"`
 	// Note is an outcome's reason in Forge's own words, kept whole and
 	// designed to follow the verb: "because life total reached 0", "trying to
 	// draw cards from empty library", "due to accumulation of 21 damage from

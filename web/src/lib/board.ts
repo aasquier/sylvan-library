@@ -125,6 +125,47 @@ export interface BoardCard {
    *  transitions itself; it is the server's count now, for ADR 14's reason —
    *  counting them is a reading of the game, and this file reads none. */
   casts: number
+  /** Every keyword this *instance* has right now, granted ones included —
+   *  where `keywords` above is what its printing carries and is identical for
+   *  every copy of the card. */
+  live: string[]
+  /** The keywords this instance has that its printing does not: the ones
+   *  something else is giving it.
+   *
+   *  **Answered on the server**, by subtracting the printing from the live
+   *  set — a reading of the game, which this file makes none of. A Beast
+   *  standing beside Kaheera has `['Vigilance']` here and nothing in its own
+   *  text that explains it.
+   *
+   *  **It says that a keyword was granted and never by what.** Forge carries
+   *  no source for a granted keyword at all, so the card to blame does not
+   *  exist on this wire — copy that renders this must not imply one. */
+  granted: string[]
+  /** How this permanent left, when Forge said so: `'sacrificed'`, or `''`.
+   *
+   *  Sacrifice is the only word available. A destruction is announced without
+   *  naming a card and a combat death is not announced at all, so the rest of
+   *  a permanent's departures say nothing rather than guessing a word. */
+  fate: string
+  /** The id of the card whose ability made this one a **copy**, or 0.
+   *
+   *  Its presence is the copy — populate's whole signal. **Not what it was
+   *  copied from**: a Centaur Token populated by Growing Ranks names Growing
+   *  Ranks, and the permanent it duplicated never crosses the wire. */
+  copiedBy: number
+}
+
+/** One ability going on the stack at one moment. */
+export interface BoardMoment {
+  /** The card using it. */
+  id: number
+  seat: number
+  /** Forge's own name for where the source was — `'Command'` for an eminence
+   *  trigger, `'Battlefield'` for most things. A commander using an ability
+   *  from the command zone never moves, so this is the only sign it acted. */
+  zone: string
+  /** Whether the game raised this rather than a player activating it. */
+  trigger: boolean
 }
 
 /**
@@ -241,6 +282,14 @@ export interface BoardSide {
    *  so a Kaheera in the zone read as a third commander and put a price on
    *  the rail for a card that has never been cast from anywhere. */
   commanders: BoardCard[]
+  /** This seat's **floating mana**, as the symbols a player would write:
+   *  `'GGW'` is two green and one white, and `''` is an empty pool.
+   *
+   *  Mana that exists right now and drains at the end of the step — not to be
+   *  confused with `BoardCard.mana`, which is whether a *printing* can make
+   *  mana at all. A pool is empty most of the time a person looks at it, which
+   *  is why `BoardState.floating` carries the movement as well. */
+  pool: string
 }
 
 /** The board at one moment. */
@@ -257,6 +306,23 @@ export interface BoardState {
   turn: number
   active: number
   sides: BoardSide[]
+  /** The abilities used at **the last beat applied**, and empty the rest of
+   *  the time.
+   *
+   *  A moment rather than a state: a room draws a flash on these cards and
+   *  the next beat clears it by simply not listing them. This is what makes an
+   *  eminence trigger visible at all — its commander never leaves the command
+   *  zone, so nothing else in the whole stream says it did anything. */
+  abilities: BoardMoment[]
+  /** Every value a mana pool took during **the last beat applied**, in order,
+   *  and empty the rest of the time.
+   *
+   *  `BoardSide.pool` is where each seat's pool came to rest; this is the
+   *  movement that got it there — mana arriving as permanents tap, and
+   *  draining as it is spent. It is a sequence because a pool fills and
+   *  empties several times between two beats, so the resting value alone is
+   *  almost always an empty pool and shows none of what happened. */
+  floating: { seat: number; pool: string }[]
 }
 
 function emptySide(seat: ForgeBoardSeat): BoardSide {
@@ -264,7 +330,7 @@ function emptySide(seat: ForgeBoardSeat): BoardSide {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
     creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
     hand: [], graveyard: [], exile: [], thrones: [], companion: null,
-    command: [], commanders: [],
+    command: [], commanders: [], pool: '',
   }
 }
 
@@ -276,7 +342,9 @@ function emptySide(seat: ForgeBoardSeat): BoardSide {
  * (`BoardStep` and `GameEvent` are built one for one) and relied on here.
  */
 export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
-  if (!board) return { turn: 0, active: 0, sides: [] }
+  if (!board) {
+    return { turn: 0, active: 0, sides: [], abilities: [], floating: [] }
+  }
 
   const named = new Map<number, ForgeBoardCard>()
   for (const card of board.cards) named.set(card.id, card)
@@ -288,6 +356,11 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   const order: number[] = []
   const life = new Map<number, number>()
   for (const seat of board.seats) life.set(seat.seat, seat.life)
+  // Each seat's floating mana, and the two transients that belong to the beat
+  // being drawn rather than to the game so far — see `BoardState`.
+  const pool = new Map<number, string>()
+  let floating: { seat: number; pool: string }[] = []
+  let abilities: BoardMoment[] = []
 
   let active = 0
   // Forge's number, and each seat's own count of its turns — see BoardState.
@@ -304,6 +377,20 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     }
     if (step.seat) active = step.seat
     for (const moved of step.life ?? []) life.set(moved.seat, moved.life)
+    // **The pool folds to its last value and the movement is kept only for the
+    // beat being drawn now.** A seat appears more than once in one step — mana
+    // arriving and being spent — so the last entry is where the pool came to
+    // rest, and the sequence itself is only worth anything at the moment it is
+    // happening. Both are `step.floating`; which one a room wants depends on
+    // whether it is drawing a pool or an arrival.
+    for (const moved of step.floating ?? []) pool.set(moved.seat, moved.pool)
+    if (i === upTo - 1) {
+      floating = step.floating ?? []
+      abilities = (step.abilities ?? []).map((used) => ({
+        id: used.id, seat: used.seat ?? 0, zone: used.zone ?? '',
+        trigger: used.trigger ?? false,
+      }))
+    }
     for (const change of step.changes ?? []) {
       let card = state.get(change.id)
       if (!card) {
@@ -322,6 +409,8 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           power: null, toughness: null, counters: [], counterHistory: [],
           combat: '', attacking: 0, blocking: 0, casts: 0,
           attachedTo: 0, attachments: [],
+          live: [], granted: [], fate: '',
+          copiedBy: known?.copied_by ?? 0,
         }
         state.set(change.id, card)
         order.push(change.id)
@@ -375,6 +464,13 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
       if (change.attacking != null) card.attacking = change.attacking
       if (change.blocking != null) card.blocking = change.blocking
       if (change.casts != null) card.casts = change.casts
+      // `!= null` for both, because an empty array is the answer that says a
+      // creature has lost the last keyword something was giving it — the same
+      // distinction `counters` below turns on, and the same bug if it is read
+      // as truthy.
+      if (change.live != null) card.live = change.live
+      if (change.granted != null) card.granted = change.granted
+      if (change.fate) card.fate = change.fate
       if (!held) {
         for (const move of change.counter_moves ?? []) {
           remember(card.counterHistory, move, taken.get(active) ?? 0)
@@ -421,6 +517,10 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   for (const [seat, total] of life) {
     const side = bySeat.get(seat)
     if (side) side.life = total
+  }
+  for (const [seat, held] of pool) {
+    const side = bySeat.get(seat)
+    if (side) side.pool = held
   }
   for (const id of order) {
     const card = state.get(id)
@@ -493,7 +593,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
       if (card) side.thrones.push(card)
     }
   }
-  return { turn: taken.get(active) ?? 0, active, sides }
+  return { turn: taken.get(active) ?? 0, active, sides, abilities, floating }
 }
 
 /**

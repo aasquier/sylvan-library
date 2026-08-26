@@ -72,6 +72,21 @@ type scribeLine struct {
 	Zone   string `json:"zone"`
 	Mode   string `json:"mode"`
 	Tapped bool   `json:"tapped"`
+	// Keywords is the card instance's **live** keyword set, comma-joined —
+	// granted ones included, which is the whole reason it is here. Scryfall's
+	// list one layer up is keyed by card name and says what a *printing* has;
+	// this says what this copy of it has right now.
+	Keywords string `json:"keywords"`
+	// CopiedBy is the board id of the card whose ability made this one a copy,
+	// and zero for everything else. **Not what it was copied from** — see
+	// [BoardCard.CopiedBy], which records why that reading is wrong.
+	CopiedBy int `json:"copied_by"`
+	// Pool is a seat's floating mana as symbols, `"GGW"`, and the empty string
+	// is a drained pool rather than a missing field.
+	Pool string `json:"pool"`
+	// Trigger is whether an `ability` line is one the game raised rather than
+	// one a player activated.
+	Trigger bool `json:"trigger"`
 
 	Counter string `json:"counter"`
 	// Was and Now are both totals rather than a delta, which is the scribe's
@@ -234,14 +249,28 @@ func (p *ScribeParser) fold(l scribeLine) {
 	// old check, so every effect in the match was carried to the browser as a
 	// card even when nothing ever moved it.
 	switch l.Kind {
-	case "zone", "attach", "detach", "tapped", "stats", "counters":
+	case "zone", "attach", "detach", "tapped", "stats", "counters",
+		"sacrificed", "ability":
 		if isForgeEffect(l.Zone, l.Card, l.Types) {
 			return
 		}
 	}
+	// **The keywords ride every line that names a card**, because the scribe
+	// puts them on every line that names a card — a creature that gains
+	// vigilance is usually re-announced by whatever gave it, and waiting for a
+	// `stats` line would miss a grant that changed no numbers.
+	//
+	// Here as well as in [ScribeParser.note] because the two cover different
+	// halves: this catches the kinds that never name a card of their own —
+	// `attack`, `block`, `damage` — and `note` catches the first sighting, where
+	// the card is not in the dictionary yet and this can do nothing. Both are
+	// idempotent, so the overlap costs a map lookup.
+	if l.ID != 0 {
+		p.board.keywords(l.ID, l.Keywords)
+	}
 	switch l.Kind {
 	case "zone":
-		p.board.name(l.ID, l.Card, l.Types, l.Token, l.Seat)
+		p.note(l, l.Seat)
 		was := p.board.zone[l.ID]
 		if was == ZoneGone {
 			// Forge announces the leaving before the arriving, so the zone a
@@ -286,17 +315,17 @@ func (p *ScribeParser) fold(l scribeLine) {
 			types := p.board.types[l.ID]
 			if strings.Contains(types, "Creature") ||
 				strings.Contains(types, "Planeswalker") {
-				p.raise(GameEvent{Kind: EventDies, Seat: l.Seat, Card: l.Card})
+				p.raise(GameEvent{Kind: EventDies, Seat: l.Seat, Card: l.Card, ID: l.ID})
 			}
 			return
 		}
 		// A permanent arriving. See [EventEnters] for why lands are excluded
 		// and why this is not called "resolves".
 		if p.board.zone[l.ID] == ZoneBattlefield && was != ZoneBattlefield {
-			p.raise(GameEvent{Kind: EventEnters, Seat: l.Seat, Card: l.Card})
+			p.raise(GameEvent{Kind: EventEnters, Seat: l.Seat, Card: l.Card, ID: l.ID})
 		}
 	case "attach", "detach":
-		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
+		p.note(l, 0)
 		// `TargetID` is present on an attach and absent on a detach, so the
 		// zero it leaves behind *is* the answer: attached to nothing. The
 		// scribe deliberately does not report the old host on a detach —
@@ -320,13 +349,13 @@ func (p *ScribeParser) fold(l scribeLine) {
 				Card: l.Card, Target: target})
 		}
 	case "tapped":
-		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
+		p.note(l, 0)
 		p.board.tap(l.ID, l.Tapped)
 	case "stats":
-		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
+		p.note(l, 0)
 		p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
 	case "counters":
-		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
+		p.note(l, 0)
 		p.board.counter(l.ID, l.Counter, l.Was, l.Now)
 	case "life":
 		if l.Life == nil {
@@ -335,10 +364,43 @@ func (p *ScribeParser) fold(l scribeLine) {
 		p.board.lives(l.Seat, *l.Life)
 		after := *l.Life
 		p.raise(GameEvent{Kind: EventLife, Seat: l.Seat, Life: &after})
+	case "mana":
+		// The floating pool, as it stands, for one seat. No beat: mana filling
+		// and draining is a picture rather than a sentence, and a room that
+		// narrated every tap would say nothing else all game.
+		p.board.floating(l.Seat, l.Pool)
+	case "sacrificed":
+		// **The word for how a permanent left**, which the board had no way to
+		// say. A Treasure or a fetchland cracked for value is not a death — rule
+		// 700.4 gives that word to creatures and planeswalkers — so `dies` was
+		// right to stay silent and there was nothing else to say instead.
+		//
+		// The fate is recorded before the zone change arrives, which is the
+		// order Forge announces them in: `sacrificed` then `Battlefield out`
+		// then `Graveyard in`, measured on a real match. All three land on the
+		// same step, so the card leaves and says why in one movement.
+		p.note(l, l.Seat)
+		p.board.fate(l.ID, FateSacrificed)
+		p.raise(GameEvent{Kind: EventSacrificed, Seat: l.Seat, Card: l.Card, ID: l.ID})
+	case "combat_end":
+		// Forge saying combat is over, rather than the next turn implying it.
+		// [board.combatEnded] argues why this is the event and why the turn
+		// boundary survives beneath it.
+		p.board.combatEnded()
+	case "ability":
+		// An ability going on the stack. **This is not the stack**: nothing is
+		// held, nothing waits to come off, and `Stack` zone events are still
+		// dropped whole — see ruling 1 in `board.go`. It is one moment on one
+		// step, which is why it rides [BoardStep.Abilities] rather than a card.
+		//
+		// Eminence is the ask, and it is why the zone travels: a commander using
+		// an ability from the command zone never moves, so there is no other
+		// signal anywhere in this stream that it did anything at all.
+		p.note(l, l.Seat)
+		p.board.usedAbility(l.ID, l.Seat, l.Zone, l.Trigger)
+		p.raise(GameEvent{Kind: EventAbility, Seat: l.Seat, Card: l.Card,
+			ID: l.ID, Zone: l.Zone, Trigger: l.Trigger})
 	case "turn":
-		// A turn beginning is where the last one's combat ends — the only
-		// boundary this stream has. [board.endCombat] argues it.
-		p.board.endCombat()
 		p.board.began(l.Turn, l.Seat)
 		if l.Life != nil {
 			p.board.lives(l.Seat, *l.Life)
@@ -347,9 +409,9 @@ func (p *ScribeParser) fold(l scribeLine) {
 	case "mulligan":
 		p.raise(GameEvent{Kind: EventMulligan, Seat: l.Seat})
 	case "land":
-		p.raise(GameEvent{Kind: EventLand, Seat: l.Seat, Card: l.Card})
+		p.raise(GameEvent{Kind: EventLand, Seat: l.Seat, Card: l.Card, ID: l.ID})
 	case "cast":
-		p.raise(GameEvent{Kind: EventCast, Seat: l.Seat, Card: l.Card})
+		p.raise(GameEvent{Kind: EventCast, Seat: l.Seat, Card: l.Card, ID: l.ID})
 	case "attack":
 		// **The board learns the fight too, not only the account.** An
 		// attacking creature and a sleeping one used to be the same picture,
@@ -358,7 +420,7 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// apart). `against_seat` is who is being attacked; `seat` is the
 		// attacker's own controller and is not it.
 		p.board.inCombat(l.ID, CombatAttacking, l.AgainstSeat, 0)
-		p.raise(GameEvent{Kind: EventAttack, Seat: l.Seat, Card: l.Card,
+		p.raise(GameEvent{Kind: EventAttack, Seat: l.Seat, Card: l.Card, ID: l.ID,
 			TargetSeat: l.AgainstSeat})
 	case "block":
 		// `target_id` is the **attacker** this creature stopped, and it is the
@@ -366,7 +428,7 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// and the account has nowhere to put an id. On the board a blocker
 		// points at the exact card it is facing.
 		p.board.inCombat(l.ID, CombatBlocking, 0, l.TargetID)
-		p.raise(GameEvent{Kind: EventBlock, Seat: l.Seat, Card: l.Card,
+		p.raise(GameEvent{Kind: EventBlock, Seat: l.Seat, Card: l.Card, ID: l.ID,
 			Target: l.Target})
 	case "unblocked":
 		// The seat is who declined to block, so the card is the *attacker* —
@@ -375,13 +437,28 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// by its own `attack` line, and this line's seat is the defender's, so
 		// folding it would name the wrong side of the table as the one under
 		// attack.
-		p.raise(GameEvent{Kind: EventUnblocked, Seat: l.Seat, Card: l.Card})
+		p.raise(GameEvent{Kind: EventUnblocked, Seat: l.Seat, Card: l.Card, ID: l.ID})
 	case "damage":
 		p.raise(GameEvent{Kind: EventDamage, Card: l.Card, Amount: l.Amount,
 			Target: l.Target, TargetSeat: l.AgainstSeat})
 	case "outcome":
 		p.outcome(l)
 	}
+}
+
+// note records a card the board is about to be told something about: its name,
+// and the two facts that ride every line naming it.
+//
+// **The order is the point.** `copiedBy` and `keywords` both need the card in
+// the dictionary, and on a card's *first* line it is not there until `name` has
+// run — so the prelude in [ScribeParser.fold], which cannot know whether a kind
+// names its card, silently did nothing for exactly the line that introduces a
+// populated token. Both are idempotent, so the prelude and this can overlap
+// without either having to know about the other.
+func (p *ScribeParser) note(l scribeLine, seat int) {
+	p.board.name(l.ID, l.Card, l.Types, l.Token, seat)
+	p.board.copiedBy(l.ID, l.CopiedBy)
+	p.board.keywords(l.ID, l.Keywords)
 }
 
 // outcome raises the beat for one of Forge's outcome sentences.
