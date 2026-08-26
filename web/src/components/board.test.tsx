@@ -402,30 +402,37 @@ it('draws life as how much is left, not just as a number', () => {
   expect(dead.spent).toBe('100%')
 })
 
-it('puts the hand on the left and the zones on the right, in that order', () => {
-  // **Which side a thing is on is a fact about tables**, and it is held as
-  // document order because that is what survives both breakpoints: the grid
-  // places these five areas differently at each width, and DOM order is the
-  // thing neither branch can quietly get wrong. A player's hand is on their
-  // left; the places they push cards into are on their right (Aaron,
-  // 2026-08-25). Stacked, the same order reads top to bottom.
+it('stands the zones off the sand, beside the arena rather than on it', () => {
+  // **The property, and it is the one that was got wrong twice.** The zones
+  // were briefly a column *inside* the field, which stood them on the
+  // battlefield's own sand and took their width out of it — so the arena came
+  // out scaled awkwardly (Aaron, 2026-08-25). A graveyard is not somewhere you
+  // stand; it is somewhere cards go, and it belongs off the floor.
+  //
+  // Held as containment rather than as geometry: the grid places these
+  // differently at each breakpoint, and "is it inside the arena" is the thing
+  // neither branch can quietly get wrong.
   const { container } = show()
-  const order = [...container.querySelectorAll(
-    '.field-hand-far, .field-side-far, .field-rail-far,'
-    + ' .field-rail-near, .field-side-near, .field-hand-near')]
-    .map((el) => ['field-hand-far', 'field-side-far', 'field-rail-far',
-      'field-rail-near', 'field-side-near', 'field-hand-near']
-      .find((c) => el.classList.contains(c)))
-  expect(order).toEqual([
-    'field-hand-far', 'field-side-far', 'field-rail-far',
-    'field-rail-near', 'field-side-near', 'field-hand-near',
-  ])
+  const field = container.querySelector('.field') as HTMLElement
+  expect(field).toBeTruthy()
+  expect(field.querySelector('.field-rail'),
+    'the zones are not on the sand').toBeNull()
+  expect(container.querySelector('.field-stage > .field-zones'),
+    'they stand beside the arena, in the stage').toBeTruthy()
 
-  // And the zones left the battlefield's own stack, which is what let them
-  // grow: a strip under the rows can only be as tall as the room it takes
-  // from the sand.
-  expect(container.querySelector('.field-side-far .field-pile'),
-    'the zones are their own column, not a bar inside the half').toBeNull()
+  // The hands stay in the arena, on the player's left, where a hand is held.
+  expect(field.querySelector('.field-hand-far')).toBeTruthy()
+  expect(field.querySelector('.field-hand-near')).toBeTruthy()
+
+  // And within the field, hand comes before the half it belongs to at every
+  // width — document order is what survives both breakpoints.
+  const order = [...field.children]
+    .map((el) => ['field-hand-far', 'field-side-far', 'field-seam',
+      'field-side-near', 'field-hand-near']
+      .find((c) => el.classList.contains(c)))
+    .filter(Boolean)
+  expect(order).toEqual(['field-hand-far', 'field-side-far', 'field-seam',
+    'field-side-near', 'field-hand-near'])
 })
 
 it('gives each zone its whole name, now there is room for one', () => {

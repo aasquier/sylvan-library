@@ -1066,6 +1066,14 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   return (
     <Dressing.Provider value={dressing}>
     <Struck.Provider value={struck}>
+    {/* **The stage: the arena, and the places beside it.**
+        The zones were a column *inside* the field, which put them on the sand
+        — and took their width out of the battlefield, so the arena came out
+        scaled awkwardly (Aaron, 2026-08-25). They are not part of the arena.
+        A graveyard is not somewhere you stand; it is somewhere cards go, and
+        it belongs off the floor entirely. So the field keeps its own box at
+        its own size, and the zones stand outside it in their own column. */}
+    <div className="field-stage">
     <section className="field" aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">
@@ -1087,7 +1095,6 @@ export function MatchBoard({ board, shown, game, name, running, beat,
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
 
       <FieldSide side={far} facing="far" />
-      <FieldRail side={far} facing="far" />
 
       {/* The seam: in the real building, the trench the lifts came up through.
           Here it is where the turn is announced and where the two
@@ -1101,7 +1108,6 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         <span className="field-seam-rule" aria-hidden="true" />
       </div>
 
-      <FieldRail side={near} facing="near" />
       <FieldSide side={near} facing="near" />
 
       <FieldHand side={near} facing="near"
@@ -1112,6 +1118,11 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                       seek={seek} games={games} playing={playing}
                       chooseGame={chooseGame} />
     </section>
+    <aside className="field-zones" aria-label="Zones off the battlefield">
+      <FieldRail side={far} facing="far" />
+      <FieldRail side={near} facing="near" />
+    </aside>
+    </div>
     </Struck.Provider>
     </Dressing.Provider>
   )
