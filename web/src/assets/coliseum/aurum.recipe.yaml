@@ -1,0 +1,88 @@
+# The gold a Treasure token is made of.
+#
+# Aaron asked for "a pot of gold" (2026-08-26), and the honest reading of that
+# is not a cauldron -- it is *a vessel that is made of gold*, which is a thing
+# museums hold by the hundred and cartoons do not. This one is a goblet an
+# Avar goldsmith raised in the 700s: a deep scale-chased bowl, a knopped stem,
+# a flared foot, and no ornament that matters at the size it renders.
+#
+# **What was rejected, and why each one lost.** The Met's Mycenaean gold cup
+# (255110) is the more famous object and it photographs dull -- at thirty
+# pixels it is a tan bowl, and tan is not treasure. The "Gold aurei of the
+# Twelve Caesars" (255252, 255253) are actual Roman gold coins and would have
+# been the literal answer, except that both plates show them *mounted in a
+# bracelet*: two neat rows of discs with garnet spacers, which reads as
+# jewellery and never as a hoard. The Avar Treasure's own group plate (700984)
+# has eight vessels in frame and three of them are silver; at thirty pixels
+# that is a grey smudge with some yellow in it.
+#
+# **A silhouette does the work and the lighting makes it a thing.** Bowl, stem,
+# foot is one of the few shapes a person reads instantly with no detail at all
+# -- it is the shape of a trophy, a chalice, a prize. And this plate is lit
+# from the upper left with the shadow falling right, so the cup is *round*
+# rather than a flat yellow outline, which is the difference the shield next
+# door had to be re-cut to learn.
+animist: 1
+
+why_committed: >
+  A board can hold a dozen Treasures at once and every one of them draws this
+  single file, so it belongs in the bundle rather than at the end of a dozen
+  requests to somebody else's CDN. It is drawn the instant a token arrives,
+  which is the worst possible moment for a picture to be late: a Treasure that
+  fades in after the beat has passed is not a Treasure, it is a flicker. At
+  ten kilobytes it is also cheaper to commit than to ask for.
+
+sources:
+  # `isPublicDomain` is true on object 464121, confirmed through the Met's own
+  # API rather than inferred from the Open Access programme's description.
+  aurum:
+    provider: met
+    identifier: "464121"
+    title: "Goblet, Avar, 700s, gold"
+    landing: https://www.metmuseum.org/art/collection/search/464121
+    found_via: >
+      the Met Open Access API, searching for gold coins, gold cups and gold
+      hoards and then keeping the plates where the object is alone, face-on
+      and lit from one side -- of the gold in the results this is the only one
+      that is both unmistakably a vessel and bright enough to read as gold
+      rather than as brass
+    licence: CC0-1.0
+
+outputs:
+  # 200 tall for an object drawn at about 37, which is 46% of a 81px card.
+  # Four times the render size sounds generous and is not: the board is drawn
+  # on retina laptops, and the sibling assets in this directory were all sized
+  # against the same ceiling.
+  #
+  # **The source is only 680 square**, which is the whole of what the Met
+  # publishes for this object -- there is no `original` larger than the plate
+  # above. That is fine at 200 and would not have been at 400, and it is the
+  # reason the crop is measured rather than generous: every pixel spent on
+  # studio grey is a pixel not spent on the cup.
+  #
+  # **`matte_neutral`, and `matte_backdrop` cannot do this plate.** Measured,
+  # the studio sweep runs 150 at the top left to 241 at the bottom right --
+  # a 90-level range that a single sampled backdrop colour has to span, which
+  # needs a tolerance of about 46. The cup's own lit rim sits at (240, 225,
+  # 175), a Chebyshev distance of 45 from the sweep's median. There is no
+  # setting that takes the ground and spares the highlight. Chroma settles it
+  # in one pass and never asks what the lighting was doing: 71.8% of this
+  # plate sits at chroma 0-8 and the gold sits at 40 and above, with 0.9% of
+  # the pixels anywhere in between. 16 with a 12-wide ramp cuts through that
+  # valley, and the ramp is what fades the cast shadow instead of leaving it
+  # as a grey wedge under the foot.
+  #
+  # The key runs *before* the crop here, unlike the sword next door. It can:
+  # a chroma key has no flood to bound and no tolerance that has to span a
+  # gradient, so there is nothing to gain by cropping first, and running it on
+  # the whole plate means the crop box can be read off the keyed alpha.
+  - file: aurum.webp
+    from: aurum
+    ops:
+      - matte_neutral: {tolerance: 16, soft: 12}
+      # The cup's own bounding box plus twelve pixels of air, measured by
+      # scanning for warm pixels rather than by eye.
+      - crop: {frac_box: [0.1853, 0.1059, 0.8176, 0.9676]}
+      - resize: {height: 200}
+    encode: {format: webp, quality: 84}
+    expect: {height: 200, budget_kb: 12, metadata: none}

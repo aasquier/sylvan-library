@@ -1,0 +1,82 @@
+# The glass a Clue token is read through.
+#
+# Aaron named this one exactly -- "magnifying glass for clue" -- and a
+# magnifying glass turns out to be a hard thing to find free. The Met's own
+# search for it returns 42 objects and twelve public-domain ones, and not a
+# single one is the object alone: a Rembrandt of a man holding one, a netsuke
+# of a monkey looking at a fly through one, a lorgnette, a chimera catalogued
+# together with one, and a whole silver toilet-set case that happens to
+# contain one. Commons has it, and Commons has it *as a Met plate*.
+#
+# **Why the file comes through Commons rather than through the Met.** The
+# filename says `MET ADA5941`, but the Met accession the uploader recorded no
+# longer resolves to this object -- the id in the neighbouring file's name is
+# now a terracotta amphora. So there is no Met record to ask, and the licence
+# has to be confirmed where the CC0 statement actually lives, which is the
+# Commons record. One hop, and the hop is to the institution that is making
+# the claim.
+#
+# **The lens is a hole, and that is the best thing about it.** `matte_neutral`
+# keys on chroma, so it erases anything neutral -- and glass is neutral. The
+# op's own docstring calls that its failure mode and warns you off marble,
+# silver and bone. Here it is exactly right: what comes out is a gold ring and
+# a gold handle with nothing in the middle, so the Clue on a board is a lens
+# you can see the card through. A Clue that magnifies is a Clue doing its job,
+# and no amount of drawn highlight would have said it as well.
+#
+# **The handle is cut short on purpose.** At full length the ring is 47% of
+# the object's height, so at the 45 pixels this renders at, the gold rim is
+# under a pixel and the whole thing reads as a spoon -- checked, at 1:1, on a
+# dark card, which is the only way that is checkable. Cropping to the ring
+# plus a little over half the handle puts the ring at 57%, which is two
+# pixels of rim and a circle a person recognises. The silhouette is still
+# circle-on-a-stick, which is the only thing a magnifying glass has ever had
+# to be.
+animist: 1
+
+why_committed: >
+  The same argument the gold beside it makes: a dozen tokens on one board draw
+  one file, and it is drawn the moment the token arrives rather than a request
+  later. There is a second reason particular to this one -- it is a
+  photograph of an object held by a museum, re-hosted by a third party, and
+  that is precisely the category where somebody else's copy quietly changes
+  licence or disappears. A copy checked once and committed is a copy whose
+  provenance stays true.
+
+sources:
+  # CC0 on the Commons record, confirmed through the Commons API at fetch
+  # time. The plate is a museum studio shot: the object alone, face-on, on an
+  # even warm-grey sweep.
+  lens:
+    provider: wikimedia
+    title: "Magnifying Glass MET ADA5941.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Magnifying_Glass_MET_ADA5941.jpg
+    found_via: >
+      Commons, searching magnifying glasses restricted to bitmaps -- an
+      unrestricted search returns almost nothing but scanned books -- and then
+      filtered to public domain and CC0 only, after the Met's own Open Access
+      API turned up no plate of a magnifier by itself
+    licence: CC0
+
+outputs:
+  # 210 tall for an object drawn at about 46, which is 57% of an 81px card.
+  #
+  # **Tolerance 44 with a 12-wide ramp, and both numbers were measured on this
+  # plate rather than borrowed from the goblet's.** This ground is *warm*, not
+  # neutral: its median chroma is 17 and its ninetieth percentile is 29, where
+  # the Met's grey sweep next door sits at 3. The goblet's tolerance of 16
+  # leaves everything from 16 to 28 part-opaque, which is a soft grey haze
+  # around the whole object -- invisible on a light card and obvious on a dark
+  # one, which is the exact failure a single-theme check would have shipped.
+  # 44 clears the ground outright; the gold sits at 82 (p95) and above, so
+  # there is a wide, empty valley between what goes and what stays.
+  - file: lens.webp
+    from: lens
+    ops:
+      - matte_neutral: {tolerance: 44, soft: 12}
+      # Left and right are the object's own measured bounds plus a margin;
+      # the bottom is the deliberate cut through the handle argued above.
+      - crop: {frac_box: [0.2529, 0.1482, 0.7842, 0.7410]}
+      - resize: {height: 210}
+    encode: {format: webp, quality: 84}
+    expect: {height: 210, budget_kb: 12, metadata: none}
