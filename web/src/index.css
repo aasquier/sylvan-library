@@ -7798,6 +7798,186 @@ button:hover .tarot-fan-card {
    card. Every chip on the arm does this; see `.field-card-count` above. */
 .field-card-crown { transform-origin: 50% 0; }
 
+/* ------------------------------------------ what a token is made of
+ *
+ * **Treasure, Food and Clue, and nothing else.** Counted in the pool this app
+ * ships against: 98 printings of Treasure, 63 of Food, 51 of Clue — and then a
+ * cliff, to Blood at 9 and Powerstone and Map at 2 apiece. `lib/tokens.ts`
+ * holds the list and argues the cut; what is here is the light.
+ *
+ * **The light is added, the painting is not touched.** Every one of these is
+ * an overlay on the gold edge — never a `filter` on `.field-card-art` — and
+ * that is a licence rule before it is a taste one: ADR 32 bounds this
+ * vocabulary to motion and light because Scryfall's imagery guidelines forbid
+ * distorting, blurring, desaturating or colour-shifting card imagery. It is
+ * also, conveniently, the cheap way: `transform` and `opacity` only, so a
+ * board holding a dozen Treasures composites them and never repaints.
+ *
+ * **They are in step within a material and out of step across the three**, and
+ * that is deliberate rather than lazy. One lamp hangs over one table, so when
+ * the light catches the gold it catches *all* the gold — six Treasures glinting
+ * at six random moments is six private suns, which reads as twinkling. What
+ * would read as a blink is all three materials pulsing as one, so the periods
+ * are 7.3s, 5.9s and 8.9s: prime numbers of tenths, so the three rhythms drift
+ * against each other and never line up twice in a sitting.
+ *
+ * The event is `.is-leaving` — the departure every sacrifice already raises
+ * (see `card-leaving` further down, whose 1200ms these flares deliberately
+ * share; a Treasure spent for mana and the card letting go are one event, and
+ * two clocks for one event is how they end up out of step). A Treasure is
+ * spent, a Food is eaten, a Clue is cracked, and each goes differently. */
+
+.field-card-token.is-treasure,
+.field-card-token.is-food,
+.field-card-token.is-clue { overflow: hidden; }
+
+.field-card-token.is-treasure::before,
+.field-card-token.is-food::before,
+.field-card-token.is-clue::before,
+.field-card-token.is-treasure::after,
+.field-card-token.is-food::after,
+.field-card-token.is-clue::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Gold: one streak of light walking the face, the angle the buttons use.
+   Off the card at both ends of the sweep, so the loop's return is invisible
+   and there is nothing to fade. */
+.field-card-token.is-treasure::before {
+  background: linear-gradient(
+    115deg,
+    transparent 34%,
+    rgba(255, 226, 168, 0.5) 47%,
+    rgba(255, 244, 214, 0.66) 51%,
+    rgba(255, 226, 168, 0.22) 57%,
+    transparent 68%
+  );
+  transform: translateX(-140%);
+  animation: token-treasure-glint 7.3s linear infinite;
+}
+@keyframes token-treasure-glint {
+  0%, 82%   { transform: translateX(-140%); }
+  94%, 100% { transform: translateX(140%); }
+}
+
+/* Warmth off a cooked thing, rising and settling. Anchored low because that
+   is where a plate is, and slow enough to read as heat rather than a flash. */
+.field-card-token.is-food::before {
+  background: radial-gradient(120% 78% at 50% 108%,
+    rgba(255, 194, 120, 0.5) 0%,
+    rgba(255, 162, 88, 0.2) 44%,
+    transparent 72%);
+  opacity: 0.25;
+  animation: token-food-warm 5.9s ease-in-out infinite;
+}
+@keyframes token-food-warm {
+  0%, 100% { opacity: 0.2; transform: translateY(1.5px); }
+  50%      { opacity: 0.58; transform: translateY(-1.5px); }
+}
+
+/* A question, not an answer: two short cold pulses and then a long wait,
+   which is a thing signalling rather than a thing breathing. */
+.field-card-token.is-clue::before {
+  background: radial-gradient(88% 68% at 34% 26%,
+    rgba(198, 238, 255, 0.62) 0%,
+    rgba(126, 196, 240, 0.24) 46%,
+    transparent 74%);
+  opacity: 0;
+  animation: token-clue-gleam 8.9s ease-in-out infinite;
+}
+@keyframes token-clue-gleam {
+  0%, 100%  { opacity: 0.12; }
+  6%        { opacity: 0.6; }
+  12%       { opacity: 0.14; }
+  18%       { opacity: 0.52; }
+  26%, 92%  { opacity: 0.12; }
+}
+
+/* --- spent, eaten, cracked ------------------------------------------------
+ *
+ * The `::after` is dark until the card leaves, so at rest it costs a layer
+ * and nothing else. */
+.field-card-token.is-treasure::after,
+.field-card-token.is-food::after,
+.field-card-token.is-clue::after { opacity: 0; }
+
+/* The ambient light stops when the card is going. A glint still walking the
+   face during the spend is two things asking to be watched at once. */
+.field-card.is-leaving .field-card-token::before { animation: none; }
+
+/* Gold cashed in: a bloom that opens and is gone, brightest at the middle of
+   the beat rather than the start — a coin turns before it goes. */
+.field-card.is-leaving .field-card-token.is-treasure::after {
+  background: radial-gradient(76% 64% at 50% 46%,
+    rgba(255, 248, 222, 0.92) 0%,
+    rgba(255, 208, 118, 0.6) 38%,
+    rgba(214, 150, 44, 0.16) 66%,
+    transparent 80%);
+  animation: token-spent 1200ms ease-out both;
+}
+@keyframes token-spent {
+  0%   { opacity: 0; transform: scale(0.86); }
+  26%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1.22); }
+}
+
+/* Eaten: the warmth swells and sinks out of the bottom of the card, which is
+   where it came from. */
+.field-card.is-leaving .field-card-token.is-food::after {
+  background: radial-gradient(96% 74% at 50% 62%,
+    rgba(255, 226, 178, 0.82) 0%,
+    rgba(246, 158, 74, 0.44) 42%,
+    transparent 76%);
+  animation: token-eaten 1200ms ease-in both;
+}
+@keyframes token-eaten {
+  0%   { opacity: 0; transform: translateY(0) scale(0.94); }
+  22%  { opacity: 0.95; transform: translateY(0) scale(1.02); }
+  100% { opacity: 0; transform: translateY(34%) scale(0.9); }
+}
+
+/* Cracked: the one that snaps. A hard, cold arrival on the first frames and a
+   long cold decay — the others open, this one breaks. */
+.field-card.is-leaving .field-card-token.is-clue::after {
+  background:
+    linear-gradient(114deg, transparent 46%,
+      rgba(226, 248, 255, 0.85) 49.4%, transparent 53%),
+    radial-gradient(84% 70% at 50% 50%,
+      rgba(186, 232, 255, 0.7) 0%,
+      rgba(96, 174, 226, 0.28) 48%,
+      transparent 78%);
+  animation: token-cracked 1200ms cubic-bezier(0.1, 0.8, 0.25, 1) both;
+}
+@keyframes token-cracked {
+  0%   { opacity: 0; transform: scale(1.14); }
+  9%   { opacity: 1; transform: scale(1); }
+  30%  { opacity: 0.6; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+
+/* Reduced motion keeps the *material* and loses the movement, the same ruling
+   the marks further down are held to: somebody who asked for a still board
+   still has to be able to tell a Treasure from a Clue at a glance, which is
+   the whole reason these three have a colour at all. So the ambient layer
+   stops where it is, at a legible strength, and the spend flares — which are
+   decoration on a departure the board already draws — do not run. */
+@media (prefers-reduced-motion: reduce) {
+  .field-card-token.is-treasure::before,
+  .field-card-token.is-food::before,
+  .field-card-token.is-clue::before { animation: none; }
+  .field-card-token.is-treasure::before { transform: none; opacity: 0.34; }
+  .field-card-token.is-food::before { opacity: 0.38; transform: none; }
+  .field-card-token.is-clue::before { opacity: 0.34; }
+  .field-card.is-leaving .field-card-token.is-treasure::after,
+  .field-card.is-leaving .field-card-token.is-food::after,
+  .field-card.is-leaving .field-card-token.is-clue::after {
+    animation: none;
+  }
+}
 /* ---------------------------------------------- a stack, and its fan
  *
  * **A stack of identical cards, made of the card it is a stack of.**
