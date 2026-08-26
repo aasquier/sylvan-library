@@ -58,6 +58,15 @@ export interface BoardCard {
   /** Scryfall's keywords for the card, unfiltered. `components/keywords.tsx`
    *  decides which of them the board has a sign for. */
   keywords: string[]
+  /** The id of the card this one is attached to, or 0 for attached to
+   *  nothing. Auras and Equipment only; everything else is 0 forever. */
+  attachedTo: number
+  /** What is attached to *this* card, in the order it was attached.
+   *
+   *  Filled at the end of the fold rather than as the changes are applied,
+   *  because a sword can arrive before the creature it ends up on and the
+   *  answer is only settled once every step has been read. */
+  attachments: BoardCard[]
   /** The drawn zone this card left **on the very last beat applied**, or null
    *  the rest of the time. See `foldBoard`'s note on holding the dead. */
   leaving: string | null
@@ -268,6 +277,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           mana: known?.mana ?? false, keywords: known?.keywords ?? [],
           leaving: null,
           power: null, toughness: null, counters: [], casts: 0,
+          attachedTo: 0, attachments: [],
         }
         state.set(change.id, card)
         order.push(change.id)
@@ -312,6 +322,10 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
       if (change.toughness != null) card.toughness = change.toughness
       if (change.types) card.types = change.types
       if (change.counters) card.counters = change.counters
+      // `!= null` rather than truthy: zero is the detach, and it is the half
+      // of this field that matters most — a sword that came off must stop
+      // being drawn on the bear.
+      if (change.attached_to != null) card.attachedTo = change.attached_to
     }
   }
 
@@ -344,6 +358,27 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     // been cast from it, so it is taken out here rather than priced.
     if (!isCompanion && (card.zone === 'command' || card.casts > 0)) {
       side.commanders.push(card)
+    }
+    // **An Aura or Equipment goes on its host, not in a row of its own.**
+    //
+    // That is where it goes at a real table: you slide the sword under the
+    // creature carrying it, because the two are one thing now and reading them
+    // apart is the reader's problem. A row of loose equipment is a list of
+    // objects nobody can match to the creatures across the seam — which is
+    // what the board drew before this, and it drew it for a format where
+    // Voltron is a whole way to win.
+    //
+    // **Only when the host is actually on the table**, which is a rendering
+    // rule rather than a claim about Magic. Forge fires the detach itself when
+    // an attachment changes zones — measured on a real game: a Hammer of
+    // Nazahn destroyed by Nature's Claim reported `graveyard` and
+    // `attached_to: 0` on the same step — so this should never fire. If it
+    // ever does, an attachment with nowhere to sit falls back to its own row,
+    // which is a card in the wrong place rather than a card that vanished.
+    const host = card.attachedTo ? state.get(card.attachedTo) : undefined
+    if (host && onTheTable(host) && onTheTable(card)) {
+      host.attachments.push(card)
+      continue
     }
     // Still standing, for this one beat, in the row it is standing in. It is
     // deliberately **not** also drawn in the zone it has gone to: a card in
@@ -397,6 +432,12 @@ function throned(board: ForgeBoard, card: BoardCard): boolean {
   return false
 }
 
+/** Whether a card is standing on the battlefield — either row of it, or held
+ *  there for the one beat that says it is leaving. */
+function onTheTable(card: BoardCard): boolean {
+  return card.zone === 'battlefield' || card.zone === 'land' || !!card.leaving
+}
+
 /** A run of identical cards, drawn as one stack with a count on it. */
 export interface BoardStack {
   /** The first of them, which is what gets drawn. */
@@ -439,6 +480,11 @@ export function stackRow(cards: BoardCard[]): BoardStack[] {
       card.leaving ?? '',
       card.power ?? '', card.toughness ?? '',
       card.counters.map((c) => `${c.kind}:${c.n}`).join('+'),
+      // A bear carrying a sword is not the same card as the bear beside it,
+      // and merging them would hide the sword *and* miscount the bears. Names
+      // rather than ids, so two identically equipped tokens still stack —
+      // which is the case this whole function exists for.
+      card.attachments.map((a) => a.name).join('+'),
     ].join('|')
     const already = at.get(key)
     if (already) {

@@ -702,6 +702,14 @@ export interface ForgeBoardChange {
   toughness?: number
   types?: string
   counters?: { kind: string; n: number }[]
+  /** The card this one is now attached to — an Aura on what it enchants, an
+   *  Equipment on what it is equipping.
+   *
+   *  **Zero is a real value here and `undefined` is not the same thing.**
+   *  Absent means this step did not touch the attachment, which is true of
+   *  almost every card almost every step; zero means attached to nothing now,
+   *  which a sword coming off a bear really is. */
+  attached_to?: number
 }
 
 /** The board's movement between one beat and the next.

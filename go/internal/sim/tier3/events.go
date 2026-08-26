@@ -90,7 +90,20 @@ const (
 	// arrive and leave inside a single beat — `Sakura-Tribe Elder` sacrifices
 	// itself the moment it lands, and without this beat the board never showed
 	// it at all.
-	EventEnters    EventKind = "enters"
+	EventEnters EventKind = "enters"
+	// EventAttach is an Aura, Equipment or Fortification finding a host — and
+	// **only ever finding one**. Coming off raises nothing: an unequip is a
+	// bookkeeping moment rather than a moment anybody at the table narrates,
+	// and every way of losing a host that a person *would* narrate already has
+	// a beat of its own — the host died, the Aura was destroyed, somebody
+	// bounced it. A second sentence for the same event is a room saying
+	// everything twice.
+	//
+	// Raised only by the scribe. Forge's log has no attachment line at all,
+	// which is the same hole ADR 42 was written about: `GameLogEntryType` has
+	// no category for it, so a Voltron deck could win a game through the log
+	// without a word about the sword that did it.
+	EventAttach    EventKind = "attach"
 	EventAttack    EventKind = "attack"
 	EventBlock     EventKind = "block"
 	EventUnblocked EventKind = "unblocked"

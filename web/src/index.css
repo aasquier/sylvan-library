@@ -7362,6 +7362,52 @@ button:hover .tarot-fan-card {
 }
 .field-card-small { width: 42px; height: 59px; }
 
+/* ------------------------------------------------ a permanent and its gear
+ *
+ * **An Aura or an Equipment belongs on the creature carrying it**, and until
+ * now it stood in the artifacts or enchantments row instead — a list of loose
+ * objects with no way to tell which creature across the seam was wearing
+ * which. In a format where suiting one creature up is a whole way to win a
+ * game, that is the row that mattered most and said least.
+ *
+ *  is how many are attached and  is which one, so the step is
+ * arithmetic rather than a rule per depth. The overhang is *reserved* as
+ * margin: a stack that lay over the next card in the row would be claiming
+ * the neighbour is part of it, and at 58px a stack of two already looks like
+ * one wide thing if you let it.
+ *
+ * The offset is down and to the right on purpose. Up-and-left is where #314
+ * put the keyword marks and where the loupe reads; the bottom-right corner of
+ * a Magic card is the one place nothing else on this board has claimed. */
+.field-geared {
+  position: relative;
+  flex: 0 0 auto;
+  margin-right: calc(var(--gear, 0) * 7px);
+  margin-bottom: calc(var(--gear, 0) * 7px);
+}
+.field-gear {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(calc(var(--i) * 7px), calc(var(--i) * 7px));
+}
+/* The corner that shows is a corner of a real card, so it gets the same edge
+   the card above it has — without it the steps read as a drop shadow that
+   somebody got wrong rather than as more cards. */
+.field-gear .field-card-turn {
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 34%, rgba(0, 0, 0, 0.5));
+}
+/* A tapped Equipment is still equipping; the lean is the *creature's* news and
+   a sword rotating out from under it is noise that reads as a bug. Forge taps
+   equipment for its own reasons and nobody at a table turns the sword. */
+.field-gear .field-card.is-tapped .field-card-turn { transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .field-gear .field-card { animation: none; }
+}
+
 .field-card-turn {
   position: relative;
   width: 100%;

@@ -252,6 +252,7 @@ describe('the board at a moment', () => {
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
       mana: false, keywords: [], leaving: null, power: null,
       toughness: null, counters: [], casts: 0,
+      attachedTo: 0, attachments: [],
     })
     const stacks = stackRow([forest(1), forest(2), forest(3)])
     expect(stacks).toHaveLength(1)
@@ -270,6 +271,7 @@ describe('the board at a moment', () => {
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
       mana: false, keywords: [], leaving: null, power: null,
       toughness: null, counters: [], casts: 0,
+      attachedTo: 0, attachments: [],
     })
     const stacks = stackRow([
       forest(1, true), forest(2, false), forest(3, true), forest(4, false),
@@ -286,7 +288,8 @@ describe('the board at a moment', () => {
       id, name: 'Cat Token', token: true, types: 'Creature - Cat',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
       tapped: false, mana: false, keywords: [], leaving: null, power: 1,
-      toughness: 1, counters: [], casts: 0, ...over,
+      toughness: 1, counters: [], casts: 0,
+      attachedTo: 0, attachments: [], ...over,
     })
     const stacks = stackRow([
       cat(1),
@@ -382,5 +385,84 @@ describe('the command zone as places', () => {
     expect(side?.companion).toBeNull()
     expect(side?.command.map((c) => c.name).sort())
       .toEqual(['Emblem', 'Kaheera, the Orphanguard', 'Thrasios, Triton Hero'])
+  })
+})
+
+describe('a permanent and what is attached to it', () => {
+  /** A bear, a sword, and a land with an Aura on it. */
+  const gear: ForgeBoard = {
+    seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],
+    cards: [
+      { id: 1, name: 'Ulvenwald Tracker', seat: 1, types: 'Creature - Bear' },
+      { id: 2, name: 'Lightning Greaves', seat: 1, types: 'Artifact - Equipment' },
+      { id: 3, name: 'Forest', seat: 1, types: 'Basic Land - Forest' },
+      { id: 4, name: 'Utopia Sprawl', seat: 1, types: 'Enchantment - Aura' },
+    ],
+    steps: [
+      { turn: 1, seat: 1, changes: [
+        { id: 1, zone: 'battlefield', seat: 1 },
+        { id: 2, zone: 'battlefield', seat: 1 },
+        { id: 3, zone: 'land', seat: 1 },
+        { id: 4, zone: 'battlefield', seat: 1 },
+      ] },
+      // Equipped, and the Aura lands on the Forest.
+      { turn: 2, seat: 1, changes: [
+        { id: 2, attached_to: 1 },
+        { id: 4, attached_to: 3 },
+      ] },
+      // The sword comes off. Forge sends this itself; see `board.go`.
+      { turn: 3, seat: 1, changes: [{ id: 2, attached_to: 0 }] },
+    ],
+  } as unknown as ForgeBoard
+
+  it('puts an attachment on its host instead of in a row of its own', () => {
+    const side = foldBoard(gear, 2).sides[0]
+    expect(side?.creatures.map((c) => c.name)).toEqual(['Ulvenwald Tracker'])
+    expect(side?.creatures[0]?.attachments.map((a) => a.name))
+      .toEqual(['Lightning Greaves'])
+    // And it is **not** also standing in the artifacts row. A card in two
+    // places is worse than a card in the wrong one.
+    expect(side?.artifacts).toHaveLength(0)
+  })
+
+  it('follows the host into whichever row the host is standing in', () => {
+    // An Aura on a land rides the land row. The attachment does not get a
+    // say in where it is drawn — it goes where its host goes, which is the
+    // whole point of it being attached.
+    const side = foldBoard(gear, 2).sides[0]
+    const forest = side?.land.find((c) => c.name === 'Forest')
+    expect(forest?.attachments.map((a) => a.name)).toEqual(['Utopia Sprawl'])
+    expect(side?.enchantments).toHaveLength(0)
+  })
+
+  it('gives a detached attachment its own row back', () => {
+    // **Zero is the detach and this is the half that matters.** Reading
+    // `attached_to` as truthy would leave the sword drawn on the bear forever,
+    // and the row it belongs in would stay empty — a card that is on the
+    // battlefield and nowhere on the board.
+    const side = foldBoard(gear, 3).sides[0]
+    expect(side?.creatures[0]?.attachments).toHaveLength(0)
+    expect(side?.artifacts.map((c) => c.name)).toEqual(['Lightning Greaves'])
+  })
+
+  it('does not merge an equipped creature with a bare one', () => {
+    // Two identical bears, one carrying a sword, are two piles. Merging them
+    // would hide the sword and miscount the bears in one stroke.
+    const twin: ForgeBoard = {
+      ...gear,
+      cards: [...gear.cards,
+        { id: 5, name: 'Ulvenwald Tracker', seat: 1, types: 'Creature - Bear' },
+      ],
+      steps: [gear.steps[0]!, {
+        turn: 2, seat: 1, changes: [
+          { id: 5, zone: 'battlefield', seat: 1 },
+          { id: 2, attached_to: 1 },
+        ],
+      }],
+    } as unknown as ForgeBoard
+    const side = foldBoard(twin, 2).sides[0]
+    const stacks = stackRow(side?.creatures ?? [])
+    expect(stacks).toHaveLength(2)
+    expect(stacks.map((s) => s.card.attachments.length)).toEqual([1, 0])
   })
 })
