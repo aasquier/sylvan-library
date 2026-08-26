@@ -1520,14 +1520,22 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
       </div>
 
       {/* Places rather than actions, so `.chip-toggle` rather than `.btn` —
-          a speed is a setting you are *in*, not a thing you do. */}
+          a speed is a setting you are *in*, not a thing you do.
+
+          **"Study", not "Slow".** The slow setting was twice too fast to
+          follow (Aaron: "it moves quicker than the mind can keep up with"),
+          and the fix took it to three seconds a beat — six and a half minutes
+          for a game. That is not a slower way of watching; it is reading the
+          game a line at a time, which is what somebody meeting their first
+          Commander match actually needs (commandment 2). A control whose name
+          undersells it by that much is a control nobody presses. */}
       <div className="field-speeds" role="group" aria-label="Speed">
-        {(['slow', 'play', 'fast'] as const).map((s) => (
+        {(['study', 'play', 'fast'] as const).map((s) => (
           <button key={s} type="button"
                   className={`chip-toggle field-speed${speed === s ? ' is-active' : ''}`}
                   aria-pressed={speed === s}
                   onClick={() => setSpeed(s)}>
-            {s === 'slow' ? 'Slow' : s === 'play' ? 'Watch' : 'Fast'}
+            {s === 'study' ? 'Study' : s === 'play' ? 'Watch' : 'Fast'}
           </button>
         ))}
       </div>
@@ -1617,7 +1625,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
               + 'cards are dealt when the first game begins.'
             : 'No battlefield was drawn for this match. It was played by a '
               + 'worker that reports the result but not the board, so the '
-              + 'account beside this is the whole of what it saw.'}
+              + 'tale of the tape below is the whole of what it saw.'}
         </p>
       </section>
     )

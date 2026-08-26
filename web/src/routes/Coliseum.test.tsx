@@ -23,7 +23,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   Coliseum, ColiseumArena, ColiseumChampion, ColiseumFact, DeckTile,
-  ForgeBeats, ForgeResult, Job,
+  ForgeBeats, ForgeBoard, ForgeResult, Job,
 } from '../lib/api'
 import ColiseumRoom from './Coliseum'
 
@@ -45,6 +45,11 @@ const DECKS = [
     pilot: '', writable: true },
   { slug: 'arahbo', owner: 'aaron', name: 'Arahbo, Roar of the World — Cats',
     pilot: '', writable: true },
+  // Somebody else's deck, with a pilot on it. Both of those used to be
+  // concatenated into the option's own label; this is the fixture that catches
+  // them coming back.
+  { slug: 'tivit', owner: 'mark', name: 'Tivit, Seller of Secrets — Artifacts',
+    pilot: "Mark's wife", writable: false },
 ] as unknown as DeckTile[]
 
 function champion(name: string, role: string): ColiseumChampion {
@@ -101,9 +106,9 @@ function show(path = '/coliseum') {
 /** One game's narration, as the job's `partial` carries it. */
 function beats(over: Partial<ForgeBeats> = {}): ForgeBeats {
   return {
-    // No board: this fixture is about the *account*, and a match played by a
-    // worker without the scribe carries exactly this — which is the state
-    // worth having a fixture for anyway.
+    // No board by default, because that is a state the wire really produces:
+    // a match played by a worker without the scribe reports its result and
+    // never its battlefield. Hand it `BOARD` for the tests about the field.
     game: 1, truncated: false, board: null,
     beats: [
       { kind: 'turn', turn: 4, who: 'gyome', against: null },
@@ -116,6 +121,24 @@ function beats(over: Partial<ForgeBeats> = {}): ForgeBeats {
     ],
     ...over,
   }
+}
+
+/** The barest battlefield that still draws: two seats, and a card apiece.
+ *
+ *  `board: null` is the other real case — a worker running without the scribe,
+ *  which reports the result but never the board — and the field says so in its
+ *  own words rather than drawing an empty one. */
+const BOARD: ForgeBoard = {
+  seats: [
+    { seat: 0, slug: 'gyome', name: 'Gyome, Master Chef', life: 40 },
+    { seat: 1, slug: 'arahbo', name: 'Arahbo, Roar of the World', life: 40 },
+  ],
+  cards: [
+    { id: 1, name: 'Bojuka Bog', seat: 0, types: 'Land' },
+    { id: 2, name: 'Gyome, Master Chef', seat: 0,
+      types: 'Legendary Creature' },
+  ],
+  steps: [],
 }
 
 function runningJob(partial: unknown): Job {
@@ -374,13 +397,145 @@ describe('the gates', () => {
 })
 
 /**
- * The play-by-play. What it must do is *name decks* — the wire carries a slug
- * and the room owns the shelf that turns one into a name — and what it must
- * never do is fold Forge's own outcome sentence into something tidier: "has
- * lost due to accumulation of 21 damage from generals" is the loss condition
- * Commander is named for, and it only reads correctly if nothing improves it.
+ * The shuffle, which stopped being the watcher's problem.
+ *
+ * It used to be a numbered field standing in the gate, defaulted to 7, which
+ * asked somebody who had come to watch two decks fight to first hold an opinion
+ * about an integer — and, left alone, dealt every match anybody ever ran in
+ * this room from the same shuffle. It is drawn now, and it is never shown.
+ *
+ * **What it is not is gone.** Determinism is contract here, so these guard both
+ * halves: a shuffle is still sent and still fixed, and no number reaches the
+ * page (commandment 10).
  */
-describe('the play-by-play', () => {
+describe('the shuffle', () => {
+  beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
+
+  it('does not ask anybody for a number', async () => {
+    show()
+    await screen.findByText('Send them in')
+    expect(screen.queryByRole('spinbutton', { name: /shuffle/i })).toBeNull()
+    // The one number the gate still asks for is how many games, which is a
+    // question about how long this will take and not about arithmetic.
+    expect(screen.getByRole('spinbutton', { name: /games/i })).toBeTruthy()
+  })
+
+  it('deals a fresh one rather than the same one every time', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show()
+    const dealt: number[] = []
+    for (let i = 0; i < 3; i++) {
+      fireEvent.click(await screen.findByText('Send them in'))
+      await waitFor(() =>
+        expect(vi.mocked(api.simForge).mock.calls).toHaveLength(i + 1))
+      const sent = vi.mocked(api.simForge).mock.calls[i]?.[0] as
+        { seed: number }
+      // Still sent, still a fixed number: the promise the recorded result
+      // rests on has not been softened, only hidden.
+      expect(Number.isInteger(sent.seed)).toBe(true)
+      expect(sent.seed).toBeGreaterThan(0)
+      dealt.push(sent.seed)
+    }
+    // Three draws from a million landing on one number is not something that
+    // happens; three matches sharing a shuffle was what happened every time.
+    expect(new Set(dealt).size).toBeGreaterThan(1)
+  })
+
+  it('honours the shuffle a link asked for, so a bout can be fought again',
+     async () => {
+    // The replay story, and the whole reason the number rides in the link:
+    // somebody else's link seats the same two decks *and* deals them the same
+    // way, so pressing the gate open plays out that same fight.
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show('/coliseum?a=aaron/gyome&b=aaron/arahbo&s=4242')
+    fireEvent.click(await screen.findByText('Send them in'))
+    await waitFor(() => expect(api.simForge).toHaveBeenCalledWith(
+      expect.objectContaining({ seed: 4242 })))
+  })
+
+  it('honours it once, and then deals freshly', async () => {
+    // A link pins one bout, not the room. Without this, every match anybody
+    // ran after opening a shared link would be the same fight over again —
+    // the exact trap the static default used to set.
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show('/coliseum?a=aaron/gyome&b=aaron/arahbo&s=4242')
+    fireEvent.click(await screen.findByText('Send them in'))
+    await waitFor(() =>
+      expect(vi.mocked(api.simForge).mock.calls).toHaveLength(1))
+    fireEvent.click(await screen.findByText('Send them in'))
+    await waitFor(() =>
+      expect(vi.mocked(api.simForge).mock.calls).toHaveLength(2))
+    const second = vi.mocked(api.simForge).mock.calls[1]?.[0] as
+      { seed: number }
+    expect(second.seed).not.toBe(4242)
+  })
+
+  it('never prints the shuffle as a number', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    await screen.findByText('Gyome Food wins')
+    // `RESULT.seed` is 7 and the badge that used to print it is gone. What a
+    // watcher gets instead is the thing the number was ever worth to them.
+    expect(screen.queryByText(/shuffle/i)).toBeNull()
+    expect(screen.getByText(/sealed into the link/i)).toBeTruthy()
+  })
+})
+
+/**
+ * A reload does not cost you the fight.
+ *
+ * The match is fought on another machine and the arena holds it either way;
+ * all a reload ever lost was this room's handle on it, which lived in memory
+ * (Aaron, 2026-08-26: "When I reload a page I lose the fight"). The handle
+ * rides in the link now. Three endings, and none of them may be a raw refusal.
+ */
+describe('walking back into a match', () => {
+  beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
+
+  it('re-joins a match that is still being fought', async () => {
+    vi.mocked(api.job).mockResolvedValue(
+      runningJob({ rows: [], beats: beats({ board: BOARD }) }))
+    show('/coliseum?a=aaron/gyome&b=aaron/arahbo&m=j1')
+    await waitFor(() => expect(api.job).toHaveBeenCalledWith('j1'))
+    // And it is *watching*: the field is on the page with nobody having
+    // pressed the gate open, and no second match was started to get there.
+    await waitFor(
+      () => expect(document.querySelector('.field-scrub')).toBeTruthy(),
+      { timeout: 3000 })
+    expect(api.simForge).not.toHaveBeenCalled()
+  })
+
+  it('shows the record when it finished while the page was away', async () => {
+    vi.mocked(api.job).mockResolvedValue(DONE)
+    show('/coliseum?a=aaron/gyome&b=aaron/arahbo&m=j1')
+    await screen.findByText('Gyome Food wins')
+  })
+
+  it('says so kindly when the arena no longer holds it', async () => {
+    // Evicted, never existed, or somebody else's — all 404 by design (ADR 5),
+    // all one thing from here, and the room cannot tell them apart.
+    vi.mocked(api.job).mockRejectedValue(new Error('no such job'))
+    show('/coliseum?m=ancient')
+    await waitFor(() =>
+      expect(screen.getByText(/left the arena/i)).toBeTruthy())
+    // Never a raw refusal, and never a dead end: the gates are open right
+    // there (commandment 2).
+    expect(screen.queryByText(/404|no such job/i)).toBeNull()
+    expect(screen.getByText('Send them in')).toBeTruthy()
+  })
+})
+
+/**
+ * The account is gone, and the room does not miss it.
+ *
+ * It was a column of sentences retelling the game the board above it was
+ * already showing, and Aaron asked for it to go (2026-08-26). The thing worth
+ * guarding is the distinction its name got wrong: **it was never a log of the
+ * machinery** — it was the narration, the same typed beats the board is folded
+ * from. So deleting the panel must not have cost the room the beats.
+ */
+describe('the account', () => {
   beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
 
   /** Start a match whose job is parked mid-stream holding `partial`. */
@@ -389,52 +544,52 @@ describe('the play-by-play', () => {
     vi.mocked(api.job).mockReturnValue(new Promise(() => {}))
     show()
     fireEvent.click(await screen.findByText('Send them in'))
-    // "The account", not "The game": the game itself is the board above,
-    // and this column is the words beside it.
-    return screen.findByRole('tab', { name: 'The account' })
+    await screen.findByText(/harena/)
   }
 
-  it('tells the game in words, naming the decks rather than the seats',
-     async () => {
+  it('is not offered, and takes no tab strip down with it', async () => {
     await watching({ rows: [], beats: beats() })
-    // Short names, because a beat is one line and a deck's full name is most
-    // of it — "Gyome, Master Chef — Food" is the shelf's name for it and
-    // "Gyome" is what anybody calls it out loud.
-    await waitFor(() => expect(screen.getAllByText('Gyome').length)
-      .toBeGreaterThan(0), { timeout: 3000 })
-    await waitFor(() => expect(screen.getByText('plays Bojuka Bog'))
-      .toBeTruthy(), { timeout: 3000 })
-    // No seat number reaches the page.
-    expect(screen.queryByText(/seat 1|seat 2/)).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'The account' })).toBeNull()
+    // And "The house" is not left as a lone tab that cannot do anything: it
+    // is a heading now, which is what a column that is simply itself wears.
+    expect(screen.queryByRole('tab', { name: 'The house' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'The house' })).toBeTruthy()
   })
 
-  it('keeps Forge’s own outcome sentence whole', async () => {
+  it('keeps the house on the page while a match plays', async () => {
     await watching({ rows: [], beats: beats() })
-    await waitFor(() => expect(screen.getByText(
-      'has lost due to accumulation of 21 damage from generals')).toBeTruthy(),
-    { timeout: 4000 })
+    // The facts are the reason this room existed before it could run
+    // anything, and they no longer cost a click to get back to.
+    expect(screen.getByText(/harena/)).toBeTruthy()
   })
 
-  it('says when a game outran what crosses', async () => {
-    await watching({ rows: [], beats: beats({ truncated: true }) })
-    await waitFor(() => expect(screen.getByText(/ran long/)).toBeTruthy(),
-                  { timeout: 3000 })
+  it('does not point a reader at the panel that is gone', async () => {
+    // The one place the deletion could leave a lie. A worker without the
+    // scribe reports a result and no battlefield, so the field has nothing to
+    // draw and says so — and what it used to say was "the account beside this
+    // is the whole of what it saw", pointing at a column that is now gone.
+    // A *finished* match, because that is the branch the sentence lives in.
+    vi.mocked(api.simForge).mockResolvedValue({
+      ...DONE, result: { ...RESULT, beats: [beats()] },
+    } as unknown as Job)
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    await waitFor(
+      () => expect(screen.getByText(/No battlefield was drawn/)).toBeTruthy())
+    expect(screen.queryByText(/account beside this/i)).toBeNull()
   })
 
-  it('leaves the house within reach while a match plays', async () => {
-    await watching({ rows: [], beats: beats() })
-    // Both places are offered, and the facts are still one click away — the
-    // room existed before it could run anything and does not forget itself
-    // the moment it can.
-    fireEvent.click(screen.getByRole('tab', { name: 'The house' }))
-    await screen.findByText(/harena/)
-  })
-
-  it('is quiet, not broken, when nobody narrated', async () => {
-    await watching({ rows: [] })
-    // No beats on the wire is the shape of an older worker, or of a match
-    // nobody asked to narrate. The stage says so in its own words.
-    await waitFor(() => expect(screen.getByText(/being played/)).toBeTruthy())
+  it('still hands the board every beat of the narration', async () => {
+    // The property the deletion must not break. The beats reach the field —
+    // which is folded to the count the room has told — rather than reaching
+    // a column of prose that no longer exists.
+    await watching({ rows: [], beats: beats({ board: BOARD }) })
+    await waitFor(
+      () => expect(document.querySelector('.field-scrub')).toBeTruthy(),
+      { timeout: 3000 })
+    const scrub = document.querySelector('.field-scrub input')
+    // Four beats crossed on the wire, so there are four to walk through.
+    expect(scrub?.getAttribute('max')).toBe('4')
   })
 })
 
@@ -485,6 +640,41 @@ describe('the tale of the tape', () => {
       const answers = [...button.classList].filter((c) => VOICES.includes(c))
       expect(answers, `${name} wears no voice from index.css`)
         .not.toHaveLength(0)
+    }
+  })
+
+  it('offers a lean phrase in the pickers rather than a crammed one',
+     async () => {
+    // Three things used to be concatenated into one option — the deck's name,
+    // its owner and its pilot — inside a control that is eleven rem wide on a
+    // phone, so every option ended in an ellipsis (Aaron, 2026-08-26: "those
+    // should be leaner to pick and look at so the whole phrase fits").
+    //
+    // jsdom cannot measure a width, but the crammed phrase is not a width
+    // problem in the first place: it is a *content* problem, and the content
+    // is checkable. What has to be in the option is the commander and what
+    // the deck does, which together are how anybody names a deck out loud.
+    show()
+    const picker = await screen.findByRole('combobox', { name: /champion/i })
+    const labels = [...picker.querySelectorAll('option')]
+      .map((o) => o.textContent ?? '')
+
+    expect(labels).toContain('Gyome — Food')
+    expect(labels).toContain('Arahbo — Cats')
+    // The owner is not dropped — it is spent only where the ambiguity really
+    // lives, on a deck that is not yours, and with a mark that cannot be read
+    // as part of the deck's own name.
+    expect(labels).toContain('Tivit — Artifacts · mark')
+
+    for (const label of labels) {
+      // The epithet is flavour and it is most of the length.
+      expect(label, `an epithet survives in "${label}"`)
+        .not.toMatch(/Master Chef|Roar of the World|Seller of Secrets/)
+      // The pilot is a person's name and was never how anybody picked a deck.
+      expect(label, `the pilot survives in "${label}"`)
+        .not.toMatch(/Mark's wife/)
+      expect(label.length, `"${label}" is still a crammed phrase`)
+        .toBeLessThanOrEqual(30)
     }
   })
 

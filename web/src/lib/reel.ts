@@ -1,5 +1,5 @@
 /**
- * The reel: one clock for the room.
+ * The reel: one clock for the room, and one running order.
  *
  * Forge plays a game of Commander in about twenty seconds and nobody can watch
  * twenty seconds of Commander, so the beats arrive whole — one game at a time,
@@ -7,22 +7,31 @@
  * can follow. That draining used to live inside the play-by-play component,
  * which was fine while the play-by-play was the only thing watching.
  *
- * It is not any more. The board and the account are the same game seen twice,
- * and the server builds them to be paced together: `BoardStep` and `GameEvent`
- * are one-for-one, so the board after *n* steps is the board at beat *n*. That
- * property is only worth having if one clock drives both — two components each
- * pacing themselves would drift apart within a turn, and the picture would be
- * describing a sentence nobody had read yet.
+ * It is not any more. The board is folded to exactly the count this hook has
+ * told: the server builds `BoardStep` and `GameEvent` one-for-one, so the board
+ * after *n* steps is the board at beat *n*. That property is only worth having
+ * if one clock drives it — a component pacing itself beside another would drift
+ * within a turn, and the picture would be describing a sentence nobody had read
+ * yet.
  *
- * So the pacing is here, the room owns it, and both views are handed the same
- * count.
+ * So the pacing is here, the room owns it, and the field is handed the count.
+ *
+ * **And the running order is here too.** A match is a series, not a game: the
+ * second bout lands while the first is still being told, and it used to *clip*
+ * it — the arriving game replaced the reel wholesale and whatever was left of
+ * the last one was simply never seen (Aaron, 2026-08-26: "the next game in the
+ * series clips the previous, can we pin the first one until it ends and queue
+ * the remaining?"). It does not any more. A bout is told to its end, the room
+ * takes a breath, and the next one begins. Every bout the match has raised is
+ * reachable at any time, so nobody is held behind a slow retelling of game one
+ * while game four is being fought.
  *
  * A hook rather than a component, in `lib/` for the reason `lib/motion.ts`
  * gives at the top of its own file: oxlint's fast-refresh rule is right, this
  * is not a component, and more than one file needs it.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { ForgeBoard } from './api'
 
@@ -37,9 +46,9 @@ export interface StagedBeat {
   /** The card this beat is about, in Forge's own spelling, carried past the
    *  sentence so the *board* can find it too.
    *
-   *  The account only ever needed `text`; a mark on the battlefield needs to
-   *  know which permanent the sentence was about, and re-parsing English to
-   *  get back a name it already had would be a fine way to introduce a bug. */
+   *  A mark on the battlefield needs to know which permanent the sentence was
+   *  about, and re-parsing English to get back a name it already had would be
+   *  a fine way to introduce a bug. */
   card?: string
   /** The card on the other end — the attacker a blocker stepped in front of. */
   target?: string
@@ -53,8 +62,11 @@ export interface StagedBeat {
  * whole point — a match is a measurement and watching it is a performance, and
  * making the measurement slow to suit the performance would be the wrong trade
  * in every direction.
+ *
+ * `study` rather than `slow`, because the pace it now names is not a slower
+ * version of watching — it is a different intention. See `SPEEDS`.
  */
-export type Speed = 'paused' | 'slow' | 'play' | 'fast'
+export type Speed = 'paused' | 'study' | 'play' | 'fast'
 
 /** What the room is holding: the beats already told, the ones still to tell,
  *  and which game they belong to. */
@@ -76,29 +88,36 @@ interface Reel {
    * game two. Carried together, the picture and the sentences cannot be about
    * different games. */
   board: ForgeBoard | null
+  /** Which match these beats belong to.
+   *
+   * The room outlives a match — the hook is not remounted between them — so
+   * without this a second match would show the first one's board for as long
+   * as it took its own opening bout to arrive. The mark carries the match it
+   * was made in, so a mark belonging to a finished match simply does not
+   * apply to this one and the field opens empty. Nothing has to be raced out
+   * of a stale frame, because the stale frame is never derived. */
+  match: string
 }
-
-const EMPTY: Reel = {
-  shown: [], queue: [], game: 0, truncated: false, told: 0, board: null,
-}
-
-/** How many beats the play-by-play renders.
- *
- * The account is a feed, not a transcript: a twenty-game match raises two
- * thousand beats and nobody scrolls back through them. **This is a rendering
- * limit and not a memory one** — the reel keeps every beat it has told, so the
- * scrubber can walk back through a whole game, and the column shows the tail.
- * Cutting the model here is what would make going backwards impossible. */
-export const BEATS_KEPT = 80
 
 /**
  * How long a beat is held, in milliseconds, at each speed.
  *
- * **Absolute, and that is the correction.** The first version multiplied a
- * *derived* pace — one that measured how long games were taking and spread the
- * beats across that, and which collapsed to a 20ms catch-up floor the moment a
- * match finished. So "Slow" on a finished match meant 50ms a beat, which is
- * not slow, and Aaron was right that it was unwatchable at every setting.
+ * **Absolute, and that is the first correction.** The first version multiplied
+ * a *derived* pace — one that measured how long games were taking and spread
+ * the beats across that, and which collapsed to a 20ms catch-up floor the
+ * moment a match finished. So "Slow" on a finished match meant 50ms a beat,
+ * which is not slow, and Aaron was right that it was unwatchable at every
+ * setting.
+ *
+ * **And the slow one is a study pace, which is the second.** 1200ms was still
+ * too fast to follow — twice, in Aaron's words: "it moves quicker than the mind
+ * can keep up with", and then "not slow enough, lets slow it down by another
+ * 20-30%". Doubling and then taking the deeper end of that range lands on
+ * three seconds a beat. That is not a slower way of watching; it is reading a
+ * game, one line at a time, which is why the control no longer calls itself
+ * Slow. A newcomer meeting their first Commander game needs the beat to still
+ * be on screen while they work out what it meant (commandment 2), and three
+ * seconds is that.
  *
  * The Forge does not wait for these numbers and is not slowed by them: it
  * plays flat out, its results land when they land, and every game of a
@@ -106,14 +125,23 @@ export const BEATS_KEPT = 80
  * chase the engine, and a speed control that means a fixed thing is worth more
  * than one that is clever about a race it does not need to win.
  *
- * A game is about a hundred and thirty beats, so: Slow is a shade over two
- * and a half minutes, Watch is about a minute, Fast is twenty seconds.
+ * A game is about a hundred and thirty beats, so: Study is about six and a half
+ * minutes, Watch is about a minute, Fast is twenty seconds.
  */
 const SPEEDS: Record<Exclude<Speed, 'paused'>, number> = {
-  slow: 1200,
+  study: 3000,
   play: 480,
   fast: 150,
 }
+
+/** The breath between two bouts.
+ *
+ * A game's last beat is its outcome — "has lost due to accumulation of 21
+ * damage from generals" — and advancing the moment the queue empties would put
+ * the next bout's opening hand on screen before anybody had read how the last
+ * one ended. Long enough to land that sentence, short enough that a series
+ * still feels like one thing rather than a slideshow. */
+export const BETWEEN_BOUTS = 2500
 
 /** How long a beat is held at a speed. Zero when paused, which is not a
  *  delay — it is the absence of one, and the caller schedules nothing. */
@@ -129,12 +157,26 @@ export interface Arriving {
   board: ForgeBoard | null
 }
 
+/** The running order, as the transport needs to see it. */
+export interface Series {
+  /** How many bouts are still ahead of the one on the field. What the room
+   *  owes the watcher, and the reason it is said out loud rather than left to
+   *  be inferred from a row of numbered chips. */
+  waiting: number
+  /** Watch this one instead, now. Nobody is held behind a slow retelling of
+   *  the opening bout while the fourth is being fought. */
+  pick: (game: number) => void
+}
+
 /**
- * Drain a game's beats at reading speed, and say how many have been told.
+ * Tell a match, one bout at a time, at reading speed.
  *
- * `arriving` is handed over again on every poll, which is why the game number
- * is the identity: the same log arriving twenty times is one game, and only a
- * new number is news.
+ * `match` identifies the match itself — beats from a previous one are not this
+ * one's, and the room is not remounted between them. `games` is every bout the
+ * match has raised so far, in order, and `stage` turns one of those numbers
+ * into its beats. Handing over a *resolver* rather than the beats themselves is
+ * what keeps this bounded: only the bout being told is ever held as staged
+ * beats, however far behind the room has fallen.
  *
  * **The room never chases the Forge.** It used to try — measuring how long
  * games took and spreading each game's beats across that window — and the
@@ -143,87 +185,116 @@ export interface Arriving {
  * unwatchable thing. It does not need to keep up. A finished match carries
  * every game with it, so falling behind is not falling behind; it is simply
  * being somewhere else in a recording that is not going anywhere.
+ *
+ * **And it never skips.** The room walks forward through the bouts: when one
+ * ends and the match has another, that one begins. Pausing holds it there, and
+ * picking a bout by hand starts the walk from that bout instead.
  */
-export function useReel(arriving: Arriving | null,
-  speed: Speed): [Reel, (to: number) => void] {
-  // One piece of state rather than five, because every change moves two of
-  // them together: a beat leaving the queue is a beat entering the shown list,
-  // and a game arriving does both at once.
-  const [reel, setReel] = useState<Reel>(EMPTY)
-  // The game currently loaded. A ref rather than state so the guard below can
-  // read it without putting it in the effect's dependencies.
+export function useReel(match: string, games: number[],
+  stage: (game: number) => Arriving | null,
+  speed: Speed): [Reel, (to: number) => void, Series] {
+  // **One piece of state, and it is a position rather than a copy.** The reel
+  // used to hold the beats twice over — a `shown` list and a `queue` — and
+  // move them across a mark, which meant every arrival had to be *loaded* into
+  // it by an effect. That shape is why this file kept needing a ref to
+  // remember what it had already loaded, and why React rightly complained
+  // about a `setState` running straight out of an effect.
   //
-  // **Which game, not how far along.** It used to hold the highest game number
-  // seen and refuse anything lower, which was right while the only source was
-  // a match marching forwards — and wrong the moment somebody could pick a
-  // game to watch back. Loading game two after game five is not going
-  // backwards; it is choosing.
-  const heard = useRef(0)
+  // Where the mark is says everything. The two lists are a slice of one array
+  // at that number, taken during render, and a bout that has not been reached
+  // yet needs no loading because nothing was ever copied out of it.
+  const [mark, setMark] = useState<{ match: string; game: number; told: number }>(
+    { match: '', game: 0, told: 0 })
+  // The bout somebody asked for, and the match they asked for it in. Carrying
+  // the match with it is what makes a pick expire on its own: a choice made
+  // during the last match is not a choice about this one, and a bare number
+  // would send the room hunting for a bout that this match may never raise.
+  const [asked, setAsked] = useState<{ match: string; game: number }>(
+    { match: '', game: 0 })
 
+  // Which bout the room should be telling. What was asked for while this match
+  // is the one asking, and otherwise simply the first bout there is.
+  const wanted = asked.match === match ? asked.game : 0
+  const target = wanted || games[0] || 0
 
-  useEffect(() => {
-    if (!arriving || arriving.game === heard.current) return
-    heard.current = arriving.game
-    // A new game starts clean. The previous one is not flushed into the column
-    // any more: every game of a finished match can be watched back on its own,
-    // so running two of them together in one feed reads as a mistake rather
-    // than as continuity.
-    setReel(() => ({
-      shown: [],
-      queue: arriving.beats,
-      game: arriving.game,
-      truncated: arriving.truncated,
-      // A new game is a new board, so both start over together.
-      told: 0,
-      board: arriving.board,
-    }))
-  }, [arriving])
+  // The bout in words. Resolved once per *bout* rather than once per beat:
+  // `stage` walks a game's worth of beats, and doing that on every tick of the
+  // clock would be a hundred and thirty translations a second.
+  const bout = useMemo(() => (target === 0 ? null : stage(target)),
+    [stage, target])
+
+  // How far into *this* bout of *this* match the mark has got. A mark left
+  // behind by another bout — or by a match that is over — is not this one's,
+  // and the room opens at the first beat rather than somewhere in the middle
+  // of a fight it has never shown. This is the whole of what used to need a
+  // ref, an `EMPTY` sentinel and a loading effect to arrange.
+  const told = (mark.match === match && mark.game === target)
+    ? Math.min(mark.told, bout?.beats.length ?? 0)
+    : 0
+
+  const beats = bout?.beats
+  const queued = (beats?.length ?? 0) - told
+
+  const reel: Reel = {
+    shown: beats ? beats.slice(0, told) : [],
+    queue: beats ? beats.slice(told) : [],
+    game: bout?.game ?? 0,
+    truncated: bout?.truncated ?? false,
+    told,
+    board: bout?.board ?? null,
+    match,
+  }
 
   // One beat leaves the queue per tick, and the next tick is scheduled from
   // what is left — so the pace is re-read after every beat rather than once a
   // game. A queue that empties simply stops scheduling.
   useEffect(() => {
-    if (speed === 'paused') return
-    const next = reel.queue[0]
-    if (!next) return
-    const id = window.setTimeout(() => setReel((r) => ({
-      ...r,
-      shown: [...r.shown, next],
-      queue: r.queue.slice(1),
-      told: r.told + 1,
-    })), SPEEDS[speed])
+    if (speed === 'paused' || queued <= 0) return
+    const id = window.setTimeout(
+      () => setMark({ match, game: target, told: told + 1 }), SPEEDS[speed])
     return () => window.clearTimeout(id)
-  }, [reel.queue, speed])
+  }, [speed, queued, match, target, told])
+
+  /** The next bout after the one being told, or zero. A number rather than the
+   *  list, so the breath below is not restarted every time a bout lands. */
+  const nextUp = useMemo(
+    () => games.find((g) => g > reel.game) ?? 0, [games, reel.game])
+
+  // The walk forward. A bout whose queue has run dry hands over to the next
+  // one the match has raised — after a breath, so its last sentence is read
+  // rather than glimpsed. Paused holds it: a room somebody has stopped does
+  // not wander on to the next fight without them.
+  useEffect(() => {
+    if (speed === 'paused' || !bout || nextUp === 0 || queued > 0) return
+    const id = window.setTimeout(
+      () => setAsked({ match, game: nextUp }), BETWEEN_BOUTS)
+    return () => window.clearTimeout(id)
+  }, [speed, bout, nextUp, match, queued])
 
   // Moving the mark by hand. It sets the reel's own position rather than
   // overlaying it, so pressing play afterwards carries on from where the hand
   // left off instead of snapping back.
+  //
+  // Scrubbing is possible at all because the board is a **pure fold over a
+  // count** — `foldBoard(board, n)` is the board after n beats, with no state
+  // carried between calls — so going backwards is the same operation as going
+  // forwards and costs the same. The controls are a second way to set the
+  // number, not a second engine.
+  const total = beats?.length ?? 0
   const seek = useCallback((to: number) => {
-    setReel((r) => seekReel(r, to))
-  }, [])
+    setMark({ match, game: target, told: Math.max(0, Math.min(to, total)) })
+  }, [match, target, total])
 
-  return [reel, seek]
-}
+  const pick = useCallback(
+    (game: number) => setAsked({ match, game }), [match])
 
-/**
- * Move the room to a beat by hand.
- *
- * Scrubbing is possible at all because the board is a **pure fold over a
- * count** — `foldBoard(board, n)` is the board after n beats, with no state
- * carried between calls — so going backwards is the same operation as going
- * forwards and costs the same. That was true before anybody asked for it; the
- * controls are just a second way to set the number.
- *
- * The whole game's beats are held either side of the mark, so a step back is a
- * beat moving from `shown` to `queue` and a step forward is the reverse.
- */
-export function seekReel(reel: Reel, to: number): Reel {
-  const all = [...reel.shown, ...reel.queue]
-  const at = Math.max(0, Math.min(to, all.length))
-  return {
-    ...reel,
-    shown: all.slice(0, at),
-    queue: all.slice(at),
-    told: at,
-  }
+  const series = useMemo((): Series => ({
+    // The bouts still ahead of the one on the field. Not simply "the others":
+    // a match watched back from the middle has bouts behind it too, and those
+    // are not waiting for anybody — they have already been told.
+    waiting: games.filter((g) => g > reel.game).length,
+    pick,
+  }), [games, reel.game, pick])
+
+  return [reel, seek, series]
 }

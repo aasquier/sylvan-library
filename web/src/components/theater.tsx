@@ -9,10 +9,19 @@
  * played out, taking minutes. Watching a number climb from 3 to 4 is not
  * watching a match.
  *
- * Both stages here belong to the Coliseum (`routes/Coliseum.tsx`), which is
- * the only room that starts a match. [MatchTheater] is the score — two
- * commanders across an anvil, games landing between them — and [MatchBeats] is
- * the inside of the game currently being played.
+ * The stage here belongs to the Coliseum (`routes/Coliseum.tsx`), which is the
+ * only room that starts a match: [MatchTheater] is the score — two commanders
+ * across an anvil, games landing between them.
+ *
+ * **It used to have a twin.** `MatchBeats` rendered the same beats as a column
+ * of sentences beside the board, and it is gone (Aaron, 2026-08-26: "we still
+ * have 'The Account' ... I don't think that is useful at all anymore"). Worth
+ * being exact about what left, because the name it went by invited the wrong
+ * reading: it was never a log of the machinery — it was the *narration*, the
+ * same typed beats that drive the board. The board still tells the game blow by
+ * blow, marks the permanent each beat is about, and walks a beat at a time
+ * under the hand. What went was a second telling of it in words, not the
+ * telling itself.
  *
  * Three decisions worth keeping.
  *
@@ -45,10 +54,7 @@
  * keyframe that a media query can switch off should be switched off there.
  */
 
-import { useEffect, useRef } from 'react'
-
 import type { DeckSummary, ForgeGameRow } from '../lib/api'
-import { BEATS_KEPT, type StagedBeat } from '../lib/reel'
 import { shortName, turnsTaken } from '../lib/theater'
 
 /** How many games the stage keeps in view. The feed is the last few blows,
@@ -236,110 +242,6 @@ export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
           Whole games of Commander, one at a time — a typical game takes a few
           seconds, and a wide board can take two minutes while the pilot
           thinks.
-        </p>
-      )}
-    </section>
-  )
-}
-
-/**
- * The play-by-play: what happened, in the order it happened.
- *
- * The theater above this counts games. This is the inside of one — the beats
- * Forge raises while it plays, which until now reached a terminal and nowhere
- * else. Three decisions worth keeping.
- *
- * **It is an account, not a board.** Forge's log carries no counters, no token
- * creation and effectively no tapped state (`events.go` counted: five mentions
- * in seven hundred lines), so a reconstructed battlefield would be quietly
- * wrong on exactly the token and counter decks that most want one. A record of
- * what *happened* is something the log can honestly support; a picture of what
- * *is* is not, and the difference matters more than the picture would have
- * been worth.
- *
- * **Newest last, and the list scrolls itself.** A feed that grows upward reads
- * like a chat log and makes a turn's beats run backwards; a game reads down
- * the page. The scroll is pinned to the bottom while the match is live, which
- * is why this takes `running` at all.
- *
- * **A turn is a rule across the column**, not another line. Forge announces
- * turns constantly and "turn 6" is not a beat anybody is watching for — but it
- * is the only structure the log has, and without it a hundred lines of casting
- * and blocking is one undifferentiated wall.
- */
-export function MatchBeats({ beats, game, truncated, running }: {
-  /** The beats already told, paced by the room's own clock (`lib/reel.ts`).
-   *  This component owned that pacing until the board arrived; it does not
-   *  any more, because the board watches the same clock and two of them
-   *  would drift apart inside a turn. */
-  beats: StagedBeat[]
-  game: number
-  truncated: boolean
-  running: boolean
-}) {
-  // Pinned to the bottom while the match is live: a game reads downward, so
-  // the newest beat is the one at the bottom and it is the one to be looking
-  // at. Released when the match ends, so a finished game can be scrolled back
-  // through without the page fighting for the scrollbar.
-  // The tail only. The reel holds the whole game so the scrubber can walk back
-  // through it; a column of two thousand lines is nobody's idea of a feed.
-  const feed = beats.slice(-BEATS_KEPT)
-  const scroller = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!running) return
-    const el = scroller.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [feed.length, running])
-
-  return (
-    <section className="beats" aria-label="What is happening in the game">
-      <header className="beats-head">
-        <span className="beats-title">
-          {game > 0 ? `Game ${game}` : 'The game'}
-        </span>
-        {running && (
-          <span className="beats-live" aria-hidden="true">
-            <span className="beats-live-dot" />
-            live
-          </span>
-        )}
-      </header>
-
-      {/* `aria-live` polite rather than assertive, and on the list rather than
-          on each line: a screen reader should be able to follow the game
-          without every land drop interrupting whatever it was saying. */}
-      <div className="beats-scroll" ref={scroller}
-           aria-live="polite" aria-relevant="additions">
-        {feed.length === 0 ? (
-          <p className="theater-quiet">
-            {running
-              ? 'The first game is being played. There is a wait before the '
-                + 'first blow, and then it comes all at once.'
-              : 'Nothing has happened yet.'}
-          </p>
-        ) : feed.map((b) => (
-          b.kind === 'turn' ? (
-            <div key={b.key} className="beat-turn">
-              <span className="beat-turn-n">Turn {b.turn}</span>
-              {b.who && <span className="beat-turn-who">{b.who}</span>}
-            </div>
-          ) : (
-            <div key={b.key} className="beat" data-kind={b.kind}>
-              {/* `title` for the long ones: the column ellipsises rather than
-                  wrapping, because a name on two lines breaks the ledger the
-                  whole column reads as. */}
-              {b.who && (
-                <span className="beat-who" title={b.who}>{b.who}</span>
-              )}
-              <span className="beat-text">{b.text}</span>
-            </div>
-          )
-        ))}
-      </div>
-
-      {truncated && (
-        <p className="theater-quiet" style={{ marginTop: '8px' }}>
-          This one ran long — the opening is shown and the rest was left out.
         </p>
       )}
     </section>
