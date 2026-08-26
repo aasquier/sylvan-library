@@ -46,13 +46,14 @@
  */
 
 import {
-  type CSSProperties, createContext, useContext, useEffect, useRef, useState,
+  type CSSProperties, type ReactNode, createContext, useContext, useEffect,
+  useRef, useState,
 } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
-import { HornGlyph, ThroneGlyph } from './glyphs'
+import { CrownGlyph, HandFanGlyph, HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
@@ -291,13 +292,58 @@ const Dressing = createContext<Record<string, ColiseumZone>>({})
  *  exists, because the placement below decides where to put it rather than
  *  putting it somewhere and correcting. */
 const PEEK_W = 300
-/** The narrowest a held-up card is allowed to be. Narrower than the smallest
- *  phone this room supports, so it only ever binds on a viewport that is
- *  lying — see the floor's argument in `FieldPeek`. */
+/** The narrowest a preview is worth *stepping aside* for.
+ *
+ *  **A floor on the decision, not on the panel.** It used to be a floor on the
+ *  width itself — "never draw one narrower than this" — which is a rule that
+ *  can only be kept by hanging the panel off the edge of the screen, and on a
+ *  narrow window it did exactly that. What is actually being decided is which
+ *  is the lesser evil when an open tray leaves no room beside it: a whole card
+ *  drawn on top of the tray, or a legible one next to it. Wider than this,
+ *  beside; narrower, on top. Twice the size of the cards inside a tray, so
+ *  "beside" always means *bigger than what you were already looking at*. */
 const PEEK_MIN_W = 160
 const PEEK_RATIO = 680 / 488
 const PEEK_GAP = 10
 const PEEK_EDGE = 8
+
+/** A rectangle of free space, in viewport coordinates. */
+interface Clear { x0: number; x1: number; y0: number; y1: number }
+
+/** What a card is to the deck that brought it, when it is anything special. */
+type Leads = 'commander' | 'companion'
+
+/**
+ * Which cards on the sand lead the deck they came from.
+ *
+ * **The command zone can only say a commander is *home*.** Once it is cast it
+ * stands in the creature row like any other body, and until now nothing said
+ * which of forty permanents was the one the whole deck is built around (Aaron,
+ * 2026-08-26). In Commander that is the single most load-bearing card on the
+ * table: it is what the removal is pointed at, what the tax is counted for,
+ * and what the other player is playing around.
+ *
+ * A context rather than a prop, for `Struck`'s reason — `FieldCard` is drawn
+ * in five rows through two wrappers, and threading one boolean down all of
+ * them would be the same fact written five times. Provided by `FieldSide`, so
+ * it covers **the battlefield and nothing else**: a crown in a hand fan would
+ * be a mark drawn on the neighbouring card, which is the fault `inPlay`
+ * already documents one field down.
+ *
+ * The answer comes from Go — `forgeBoardSeat.Commanders` and `.Companion`,
+ * matched to board ids on the server and read off `BoardSide` here. A browser
+ * that decided which card was the commander would be a second place for the
+ * companion rules to rot.
+ */
+const Crowned = createContext<ReadonlyMap<number, Leads>>(new Map())
+
+/** Every card on one side that wears a mark, by board id. */
+function crownedOn(side: BoardSide): ReadonlyMap<number, Leads> {
+  const out = new Map<number, Leads>()
+  for (const c of side.thrones) out.set(c.id, 'commander')
+  if (side.companion) out.set(side.companion.id, 'companion')
+  return out
+}
 
 /**
  * The one card held up off the board, drawn in the body rather than in the row.
@@ -340,41 +386,74 @@ function FieldPeek({ card, at, avoid }: {
    *  what picking a card out of a pile looks like. */
   avoid: DOMRect | null
 }) {
-  const room = document.documentElement
-  // **A floor, because a viewport can measure zero.** A background or hidden
-  // tab reports `clientWidth: 0` — the whole document does, `vw` included —
-  // and the shrink-to-fit above then hands back a *negative* width, which is a
-  // card drawn inside out. Nobody is looking at a hidden tab, but they are
-  // looking the instant it comes back, and the preview must not be the thing
-  // that arrives broken.
-  const width = Math.max(PEEK_MIN_W,
-    Math.min(PEEK_W, room.clientWidth - 2 * PEEK_EDGE))
-  const height = width * PEEK_RATIO + (card.artist ? 18 : 0)
-  const fits = (x: number) => x >= PEEK_EDGE
-    && x + width <= room.clientWidth - PEEK_EDGE
-  const clamp = (v: number, max: number) =>
-    Math.min(Math.max(v, PEEK_EDGE), Math.max(max, PEEK_EDGE))
+  const doc = document.documentElement
+  // **A hidden tab measures zero and every sum below inherits the lie.** A
+  // background tab reports `clientWidth: 0` — the whole document does, `vw`
+  // included — and a panel sized against that comes out negative, which is a
+  // card drawn inside out. Nobody is looking at a hidden tab; they are looking
+  // the instant it comes back, and the preview must not be the thing that
+  // arrives broken. So a zero reads as "the room the panel wants" rather than
+  // as a room with nothing in it.
+  const wide = doc.clientWidth > 0 ? doc.clientWidth : PEEK_W + 2 * PEEK_EDGE
+  const tall = doc.clientHeight > 0 ? doc.clientHeight
+    : PEEK_W * PEEK_RATIO + 2 * PEEK_EDGE
+  // The artist line under the painting is part of what has to fit.
+  const chrome = card.artist ? 18 : 0
+  const whole: Clear = { x0: PEEK_EDGE, x1: wide - PEEK_EDGE,
+    y0: PEEK_EDGE, y1: tall - PEEK_EDGE }
+  /** The widest panel a clearing can hold — capped at the size it wants, and
+   *  bounded by the *height* as well, which is the half the old placement
+   *  never asked. A card is taller than it is wide, so a short clearing is a
+   *  narrower panel and not a clipped one. */
+  const fit = (c: Clear) => Math.max(0, Math.min(PEEK_W, c.x1 - c.x0,
+    (c.y1 - c.y0 - chrome) / PEEK_RATIO))
 
-  // Beside the panel when there is one and either flank has room; otherwise
-  // the ordinary placement, which will land on top of it — better a covered
-  // tray than a preview half off the screen.
-  const beside = avoid
-    ? [avoid.right + PEEK_GAP, avoid.left - PEEK_GAP - width].find(fits)
-    : undefined
-  if (beside !== undefined) {
-    return draw(beside,
-      clamp(at.top + at.height / 2 - height / 2,
-        room.clientHeight - height - PEEK_EDGE))
-  }
-  // Above the card by preference, below it when there is no room above —
-  // which is most of the far player's half, and every tray that opened
-  // downward.
+  // **Four ways round an open tray, not two.**
+  //
+  // The old rule tried the right flank, then the left, and gave up — so a tray
+  // whose left edge was under about 318px offered neither, and the preview
+  // fell through to the ordinary placement and landed *on the tray it came out
+  // of*. On a phone that is every tray there is, and the hands sit in the left
+  // column at every width above 62rem, which is why Aaron only ever saw it on
+  // the left (2026-08-26: "full hand previews look clipped when they are on
+  // the lefthand side").
+  //
+  // Above and below are the two that were missing, and on a narrow viewport
+  // they are the only two: a 375px screen has no flank wide enough for
+  // anything, and plenty of page over and under a 268px panel.
+  const rooms: Clear[] = avoid ? [
+    { ...whole, x0: avoid.right + PEEK_GAP },
+    { ...whole, x1: avoid.left - PEEK_GAP },
+    { ...whole, y0: avoid.bottom + PEEK_GAP },
+    { ...whole, y1: avoid.top - PEEK_GAP },
+  ] : []
+  // The side with the most room, ties going to the earlier one — which puts
+  // the right flank first, then the left, then under, then over. That order is
+  // the reading order for a panel that opens downward.
+  let best: Clear | undefined
+  for (const c of rooms) if (!best || fit(c) > fit(best)) best = c
+  // **A sliver beside the tray is worse than a whole card over it.** Below the
+  // floor there is no placement worth having, and the honest answer is the one
+  // this has always given in that corner: cover the tray rather than hang the
+  // panel off the screen.
+  const clear = best && fit(best) >= PEEK_MIN_W ? best : whole
+  const width = Math.max(1, fit(clear))
+  const height = width * PEEK_RATIO + chrome
+  /** Centred on the card, then pushed inside the clearing. `Math.max` on the
+   *  far edge rather than a bare subtraction, so a clearing smaller than the
+   *  panel still starts at its own near edge instead of before it. */
+  const into = (lo: number, hi: number, want: number, size: number) =>
+    Math.min(Math.max(want, lo), Math.max(lo, hi - size))
+  const x = into(clear.x0, clear.x1, at.left + at.width / 2 - width / 2, width)
+  if (clear !== whole) return draw(x, into(clear.y0, clear.y1,
+    at.top + at.height / 2 - height / 2, height))
+  // Nothing to step around: above the card by preference, below it when there
+  // is no room above — which is most of the far player's half, and every tray
+  // that opened downward. Never *on* the card, which is the one place the
+  // answer is already showing.
   const above = at.top - PEEK_GAP - height
-  return draw(
-    clamp(at.left + at.width / 2 - width / 2,
-      room.clientWidth - width - PEEK_EDGE),
-    above >= PEEK_EDGE ? above
-      : clamp(at.bottom + PEEK_GAP, room.clientHeight - height - PEEK_EDGE))
+  return draw(x, above >= clear.y0 ? above
+    : into(clear.y0, clear.y1, at.bottom + PEEK_GAP, height))
 
   function draw(left: number, top: number) {
     return createPortal(
@@ -389,9 +468,26 @@ function FieldPeek({ card, at, avoid }: {
   }
 }
 
-function FieldCard({ card, size, count, inPlay = false }: {
+/**
+ * One card, at the one size this board draws cards.
+ *
+ * **There used to be two, and the small one was unreadable.** Lands,
+ * artifacts, enchantments and planeswalkers were drawn at 42x59 and only
+ * creatures at 58x81, and the board draws the *whole card face* rather than an
+ * art crop — so at forty-two pixels the printed type under the painting was a
+ * grey smear that reads as a rendering fault rather than as small text (Aaron,
+ * 2026-08-26: *"creatures up front are big enough their visible text isn't
+ * distracting... all cards should be at least the size we have been using on
+ * creatures so the text doesn't look funny"*).
+ *
+ * It cost four rows per seat about twenty-two pixels each, which is real on a
+ * phone and is the trade he asked for. Nothing else had to move: identical
+ * cards already collapse into one stack (`stackRow`), so the rows that hold
+ * many of one thing — lands, a dozen Treasures — were never the rows paying
+ * for the width.
+ */
+function FieldCard({ card, count, inPlay = false }: {
   card: BoardCard
-  size: 'normal' | 'small'
   /** How many identical cards this one stands for. See `stackRow`. */
   count: number
   /** Whether this card is standing on the battlefield, as opposed to being
@@ -447,6 +543,10 @@ function FieldCard({ card, size, count, inPlay = false }: {
     return () => window.removeEventListener('scroll', clear, true)
   }, [showing])
   const stats = inPlay ? fightingStats(card) : null
+  // Only on the sand: see `Crowned`. A commander waiting at home already has a
+  // throne of its own, and a card in a fan is overlapped to a 27px strip that
+  // belongs to the card in front of it.
+  const leads = useContext(Crowned).get(card.id) ?? null
   const struck = useContext(Struck)
   // Matched on Forge's own spelling, which is what both ends of this carry.
   // Two copies of one name is a token or a basic; marking both is a better
@@ -460,6 +560,10 @@ function FieldCard({ card, size, count, inPlay = false }: {
   // original), so the painter is worth naming where a person can find them.
   const title = [
     count > 1 ? `${count} × ${card.name}` : card.name,
+    // Said in words as well as drawn, because the crown is a picture and a
+    // picture is a thing you have to already know (commandment 2).
+    inPlay && leads === 'commander' ? 'the commander'
+      : inPlay && leads === 'companion' ? 'the companion' : '',
     stats,
     counters.map((c) => `${c.n} ${c.kind}`).join(', '),
     card.tapped ? 'tapped' : '',
@@ -468,8 +572,9 @@ function FieldCard({ card, size, count, inPlay = false }: {
   ].filter(Boolean).join(' · ')
 
   return (
-    <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
+    <div className={`field-card${card.tapped ? ' is-tapped' : ''}`
                     + (count > 1 ? ' is-stacked' : '')
+                    + (inPlay && leads ? ` is-${leads}` : '')
                     // Still standing, but only for this beat. Every way of
                     // leaving play gets it — died, bounced, exiled, ceased to
                     // exist — because what it draws is *departure*. Which
@@ -496,10 +601,41 @@ function FieldCard({ card, size, count, inPlay = false }: {
          // where it goes and why it is not drawn here.
          onMouseEnter={show} onMouseLeave={hide}
          onFocus={show} onBlur={hide}>
-      {/* The pile behind it. Two leaves is enough to read as depth and few
-          enough not to fatten the row — a real stack of nine Forests does not
-          look nine cards thick from across a table either. */}
-      {count > 1 && <span className="field-card-pile" aria-hidden="true" />}
+      {/* **The pile behind it, and it is made of the card it is a pile of.**
+
+          It used to be two blank grey leaves offset up and to the left, which
+          says *something is behind this* and nothing about what — and what is
+          behind it is the whole reason a stack exists (Aaron, 2026-08-26:
+          *"stacks of cards... should look stacked on the deck with some
+          effect, but they should also have a stacked effect on hover, or a
+          fanned hand look"*). Every card in a stack is identical by
+          construction — `stackRow` merges only what is indistinguishable in
+          play — so a leaf wearing the same painting is not a decoration
+          standing in for the pile, it is a truthful picture of the next card
+          down.
+
+          At rest they sit a couple of degrees out of true, the way a pile
+          somebody has been drawing off does. Hover or focus fans them, which
+          is what a thumb does to a pile you are counting.
+
+          **The arc is fixed and the density is what grows.** Two leaves for a
+          pair, four for a pile of four or more — and both fans reach exactly
+          as far, because the outermost leaf is what the arena's wall measures
+          against (`.field-card-leaf` does that arithmetic). A dozen Treasures
+          fanned twelve deep would cover the rest of the row to say a number
+          that is already written on the card; four edges in the same sweep is
+          what a thicker pile looks like under a thumb anyway. */}
+      {count > 1 && (
+        <span className="field-card-pile" aria-hidden="true"
+              style={card.image
+                ? ({ '--leaf-art': `url(${card.image})` } as CSSProperties)
+                : undefined}>
+          {(count >= 4 ? [-1, -0.42, 0.42, 1] : [-1, 1]).map((leaf) => (
+            <span key={leaf} className="field-card-leaf"
+                  style={{ '--leaf': leaf } as CSSProperties} />
+          ))}
+        </span>
+      )}
       <div className="field-card-turn">
         {card.image ? (
           <img className="field-card-art" src={card.image} alt={card.name}
@@ -540,6 +676,32 @@ function FieldCard({ card, size, count, inPlay = false }: {
             Only on the battlefield, for `inPlay`'s reason one field up: these
             are facts about a fight, and a card in a hand is not in one. */}
         {inPlay && <KeywordMarks keywords={card.keywords} />}
+        {/* **The crown, sitting on the top edge of the painting.**
+
+            Aaron offered three: oversized, a golden aura, or a crown touching
+            the top of the art. It is the last two together and deliberately
+            not the first — every card on this board is now one size (see
+            above), and the one exception to that would land on the row that
+            can least afford it while saying, in the same gesture, something
+            about the card's *stature* rather than its role. A Llanowar Elves
+            commander is not a bigger card.
+
+            So: a standing gold rim on the card, and a crown on its brow. Both
+            are steady, and that is what keeps them clear of the attack, block
+            and death marks a beat away — those flash and are gone, this is
+            simply true for as long as the card is standing there. Panache and
+            martial prowess: the metal is the same brass the rest of this room
+            is trimmed in, and the mark is a drawn one rather than a photograph
+            at fourteen pixels.
+
+            A companion gets the horn it already wears in the command zone,
+            in the vine green that zone gives it — the same two signs in the
+            same two colours, wherever the card happens to be standing. */}
+        {inPlay && leads && (
+          <span className={`field-card-crown is-${leads}`}>
+            {leads === 'commander' ? <CrownGlyph /> : <HornGlyph size={14} />}
+          </span>
+        )}
         {/* **The loupe.** Power and toughness were a black tab printed over
             the corner of the painting at all times — legible, and permanently
             in the way of the one part of a card everybody already looks at.
@@ -617,8 +779,12 @@ function FieldCard({ card, size, count, inPlay = false }: {
         <FieldPeek card={card} at={at.card} avoid={at.tray} />
       )}
       {held && card.image && (
-        <CardSheet name={card.name} image={card.image}
-                   onClose={() => setHeld(false)} />
+        // **The count travels with the card into the sheet**, because the fan
+        // behind a stack is a hover and a phone has no hover to give. The
+        // sheet is the whole of what a touch user gets from a card, so it is
+        // the one place "there are twelve of these" has to be sayable there.
+        <CardSheet name={count > 1 ? `${count} × ${card.name}` : card.name}
+                   image={card.image} onClose={() => setHeld(false)} />
       )}
     </div>
   )
@@ -637,10 +803,9 @@ function FieldCard({ card, size, count, inPlay = false }: {
  * grows keeps its element, so its count animates instead of the row rebuilding
  * itself every time a land comes down.
  */
-function FieldRow({ label, cards, size = 'normal', empty }: {
+function FieldRow({ label, cards, empty }: {
   label: string
   cards: BoardCard[]
-  size?: 'normal' | 'small'
   /** What to say when the row is empty — and **whether to draw it at all**.
    *
    *  Without one the row simply is not there. Splitting the old single
@@ -663,7 +828,7 @@ function FieldRow({ label, cards, size = 'normal', empty }: {
         // The only four rows a permanent actually stands in: creatures,
         // artifacts and enchantments, and lands. Everything else that draws a
         // `FieldCard` is a card somebody is holding or has already lost.
-        <FieldGeared key={stack.card.id} stack={stack} size={size} />
+        <FieldGeared key={stack.card.id} stack={stack} />
       ))}
     </div>
   )
@@ -736,7 +901,7 @@ function LifeTotal({ life }: { life: number }) {
  * waits, and a number cannot say which commander is home and which is out.
  */
 function FieldPile({ label, cards, short, zone, seat: kind, solo,
-                    receiving }: {
+                    badge, receiving }: {
   label: string
   cards: BoardCard[]
   short: string
@@ -757,6 +922,13 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
    *  empty chair is worse: the chair has already said it. A graveyard's count
    *  is the whole point of a graveyard and keeps it. */
   solo?: boolean
+  /** A chip pinned to this tile's bottom-right corner, where a Magic card
+   *  keeps the number that says what it is worth right now.
+   *
+   *  Only the command zone uses it, for the commander tax — but it is a
+   *  general corner rather than a tax-shaped hole, because it is the *card's*
+   *  corner and the loupe one row up already proves what belongs there. */
+  badge?: ReactNode
   /** The beat's key when *this* seat's grave is the one receiving a death, and
    *  null otherwise.
    *
@@ -793,11 +965,34 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
   // Keyed on the beat so a second death raises a second ghost rather than
   // reusing a finished animation — `Struck`'s own trick, one level out.
   const arriving = receiving ?? null
+  // **A seat says what it is, in words a first game can follow.**
+  //
+  // The command zone was the one place on this board saying things nobody
+  // could act on. Aaron, 2026-08-26: *"hovering on the command zone pops up
+  // some things I don't understand, like 'Olinda the Oblivious (99)'s effect?
+  // I don't get that."* Two separate faults met there — a Forge EFFECT card
+  // leaking past a filter on the server, which is being fixed where it is
+  // made, and this: a zone drawn as a *pile* answers "how many, what is on
+  // top", and neither question is one anybody asks the command zone.
+  //
+  // His ruling settles what it may say at all: *"at most it should just be two
+  // slots for partners, one for a singular commander, or a second companion
+  // devoted slot for Kaheera, et al. Those are the only combinations possible
+  // in that zone."* So a seat names its occupant and where that occupant is,
+  // and that is the whole vocabulary. The zone's own catch-all is drawn only
+  // when the server named no seats at all, and even then it counts rather than
+  // naming — the pile it is standing in for is exactly the pile whose contents
+  // could not be trusted.
+  const seated = kind
+    ? `${label} — the ${kind === 'throne' ? 'commander' : 'companion'}, `
+    : ''
   const title = [
-    top && solo ? label
+    top && kind ? `${seated}waiting in the command zone`
+      : empty === 'throne' ? `${seated}out on the battlefield`
+      : empty === 'companion' ? `${seated}already called into hand`
+      : top && solo ? label
+      : zone === 'command' ? `${label}: ${cards.length}`
       : top ? `${label}: ${cards.length}, ${top.name} on top`
-      : empty === 'throne' ? `${label} — out on the battlefield`
-      : empty === 'companion' ? `${label} — called out of the command zone`
       : `${label}: empty`,
     // Named because somebody painted it, and because rule 9 says so.
     dressed ? `${dressed.card}, art by ${dressed.art.artist}` : '',
@@ -843,6 +1038,7 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
         </span>
       )}
       <span className="field-pile-label">{short}</span>
+      {badge}
       {!solo && <span className="field-pile-n tabular">{cards.length}</span>}
     </div>
     {/* **The pile, opened out.** A closed zone drawn as its top card answers
@@ -867,7 +1063,7 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
         </span>
         <div className="field-tray-cards">
           {cards.map((c) => (
-            <FieldCard key={c.id} card={c} size="small" count={1} />
+            <FieldCard key={c.id} card={c} count={1} />
           ))}
         </div>
       </div>
@@ -898,13 +1094,12 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
  * the next card in the row. A stack that overlapped its neighbour would be
  * saying the neighbour is part of it.
  */
-function FieldGeared({ stack, size }: {
+function FieldGeared({ stack }: {
   stack: BoardStack
-  size: 'normal' | 'small'
 }) {
   const { card, count } = stack
   if (card.attachments.length === 0) {
-    return <FieldCard card={card} size={size} count={count} inPlay />
+    return <FieldCard card={card} count={count} inPlay />
   }
   const worn = card.attachments.map((a) => a.name).join(', ')
   return (
@@ -919,10 +1114,10 @@ function FieldGeared({ stack, size }: {
       {card.attachments.map((a, i) => (
         <span className="field-gear" key={a.id}
               style={{ '--i': i + 1 } as CSSProperties}>
-          <FieldCard card={a} size={size} count={1} inPlay />
+          <FieldCard card={a} count={1} inPlay />
         </span>
       ))}
-      <FieldCard card={card} size={size} count={count} inPlay />
+      <FieldCard card={card} count={count} inPlay />
     </div>
   )
 }
@@ -946,24 +1141,51 @@ function FieldRail({ side, facing, name }: {
   const holding = struck?.mark === 'dies' && [side.creatures, side.walkers,
     side.artifacts, side.enchantments, side.land].some((row) =>
     row.some((c) => c.leaving && sameCard(c.name, struck.card)))
-  // Two generic for each previous cast from the zone. With partners this
-  // reports the dearer of the two: there is one pile and forty pixels of it,
-  // and the expensive commander is the one whose price changes a decision.
+  // **Two generic for each previous cast from the zone, per chair.**
+  //
+  // This used to be one number for the whole zone — the dearer of a pairing's
+  // two — because there was one pile forty pixels wide and no way to say which
+  // commander the price belonged to. There are chairs now, and a price on the
+  // chair is both truer and shorter: Thrasios costs nothing to recast and
+  // Tymna costs four, which is two facts a pairing's pilot actually uses and
+  // one number could never carry.
+  //
+  // A companion is never priced, and now it structurally cannot be: the badge
+  // rides its own seat, and the companion's seat is not one of these. That was
+  // a real bug once — a Kaheera bought into a hand read as a commander being
+  // cast — and this is the shape that stops it recurring.
+  const taxOn = (c: BoardCard) => 2 * c.casts
+  // The zone-wide figure, for the fallback pile below and nothing else.
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
+  const price = (n: number) => n > 0 ? (
+    <span className="field-tax tabular"
+          title={`Commander tax: it costs ${n} more to cast this from the `
+            + 'command zone'}>
+      +{n}
+    </span>
+  ) : null
+  // **Nothing stands in this zone that is not a seat.**
+  //
+  // The catch-all pile used to draw alongside the seats whenever the zone was
+  // holding anything else, and what it actually drew was a Forge EFFECT card —
+  // an internal object with a name like "X's effect" that means nothing to
+  // anybody at the table (Aaron, 2026-08-26). The server is closing that leak
+  // at its source; this is the other half, and it is a design ruling rather
+  // than a patch: *"at most it should just be two slots for partners, one for
+  // a singular commander, or a second companion devoted slot for Kaheera, et
+  // al. Those are the only combinations possible in that zone."*
+  //
+  // So the pile survives only as the fallback for a board whose seats the
+  // server never named — a mid-deploy skew, or an older worker — where it is
+  // the only thing that can say the zone is occupied at all.
+  const unseated = side.thrones.length === 0
   // How many shares of the rail the command zone takes: one per seat, and
   // never fewer than one, so a board with no seats named still draws a tile
   // the size the old single pile was.
-  const seats = Math.max(1, side.thrones.length + (side.companion ? 1 : 0)
-    + (side.thrones.length === 0 || side.command.length > 0 ? 1 : 0))
+  const seats = Math.max(1,
+    side.thrones.length + (side.companion ? 1 : 0) + (unseated ? 1 : 0))
   return (
     <div className={`field-rail field-rail-${facing}`}>
-      {/* **The stone bar is gone; the name came back as a heading.** It was a
-          label floating on a grey strip, which is furniture pretending to be
-          material. Now the two seats' zones stand side by side in a band of
-          their own, and a band holding two players' places needs to say whose
-          is whose — so each panel is headed by its deck. `title` keeps the
-          full name for anybody who wants it. */}
-      <span className="field-rail-name" title={side.name}>{name}</span>
       <span className="field-rail-totals">
         {/* **The command zone is a row of seats, not a pile.**
             A pile answers "how many", and the command zone is never asked
@@ -980,47 +1202,57 @@ function FieldRail({ side, facing, name }: {
             pairing does not squeeze the graveyard to make room. */}
         <span className="field-command"
               style={{ '--seats': seats } as CSSProperties}>
+          {/* The label is the card's own name now rather than a sentence
+              about the zone — the seat phrases the rest of it, because the
+              seat is the thing that knows whether its occupant is home. */}
           {side.thrones.map((c) => (
-            <FieldPile key={c.id} label={`Command zone — ${c.name}`}
+            <FieldPile key={c.id} label={c.name}
                        short={calledBy(c.name)} zone="command"
                        cards={c.zone === 'command' ? [c] : []}
+                       badge={price(taxOn(c))}
                        seat="throne" solo />
           ))}
           {side.companion && (
             <FieldPile key={side.companion.id} zone="command"
-                       label={`Companion — ${side.companion.name}`}
+                       label={side.companion.name}
                        short={calledBy(side.companion.name)}
                        cards={side.companion.zone === 'command'
                          ? [side.companion] : []}
                        seat="companion" solo />
           )}
-          {/* Everything else the zone is holding. Usually nothing — an
-              emblem, or a card an effect put there — and it is the whole
-              zone for a board shaped before the server named the seats,
-              which is what a mid-deploy skew looks like. */}
-          {(side.thrones.length === 0 || side.command.length > 0) && (
+          {/* The whole zone, for a board shaped before the server named the
+              seats — the one case left where nothing knows which commander a
+              price belongs to, so it carries the dearer of them. See
+              `unseated` above. */}
+          {unseated && (
             <FieldPile label="Command zone" short="Command Zone"
-                       cards={side.command} zone="command"
-                       seat={side.thrones.length === 0 ? 'throne' : undefined} />
+                       cards={side.command} zone="command" seat="throne"
+                       badge={price(tax)} />
           )}
         </span>
-        {/* **Beside the pile rather than on it.** Inside, the chip covered
-            the zone's own three-letter label — the first draft read "CI +4",
-            which is a worse pile than one with no tax on it at all. Twenty-six
-            pixels does not hold two facts, so the price stands next to the
-            thing it is the price of. */}
-        {tax > 0 && (
-          <span className="field-tax tabular"
-                title={`Commander tax: +${tax} to cast from the command zone`}>
-            +{tax}
-          </span>
-        )}
         <FieldPile label="Graveyard" short="Graveyard" cards={side.graveyard}
                    zone="graveyard"
                    receiving={holding && struck ? struck.key : null} />
         <FieldPile label="Exile" short="Exile" cards={side.exile}
                    zone="exile" />
-        <LifeTotal life={side.life} />
+        {/* **Whose places these are, over the number everybody is watching.**
+
+            The name was a heading on a line of its own across the top of the
+            panel, and a line holding one short string and nothing else reads
+            as a border somebody put a word in (Aaron, 2026-08-26: *"it would
+            be a better use of space if the commander name was stacked above
+            the life total, then the zones in general would not have a weird
+            top border with only the commander name"*). He is right about the
+            space and righter about the pairing: a player's name and a player's
+            life are one fact — *how this player is doing* — and they belong in
+            one column, at the end of the row, where a scoreboard puts them.
+
+            `title` keeps the deck's full name for anybody who wants it, which
+            is what the heading was doing for the names too long to draw. */}
+        <span className="field-rail-who">
+          <span className="field-rail-name" title={side.name}>{name}</span>
+          <LifeTotal life={side.life} />
+        </span>
       </span>
     </div>
   )
@@ -1102,6 +1334,24 @@ function FieldHand({ side, name, facing }: {
               onMouseEnter={enter} onMouseLeave={leave}
               onFocus={enter} onBlur={leave}
               onClick={() => setSpread((was) => !was)}>
+        {/* **The sign says which pile of cards this is.**
+
+            Four plates on this board open four different things, and this one
+            was a deck's name over a row of card backs with nothing to say that
+            what it holds is a *hand* (Aaron, 2026-08-26: *"we need a hand icon
+            to show that is what we are showing people with the cards in
+            hand — maybe a stylized fanned out set of cards like a magic or
+            poker hand?"*). The mark was already drawn, for the tarot table's
+            own hand of cards; it had simply never been asked to work here.
+
+            It fans wider while the hand is open, which is commandment 17 in
+            its smallest possible form: the control answers the hand that
+            reaches for it, and it answers by doing the thing it is a picture
+            of. Beside a label rather than instead of one — an icon-only
+            control asks a newcomer to already know the app. */}
+        <span className="field-hand-mark" aria-hidden="true">
+          <HandFanGlyph size={13} open={open} />
+        </span>
         {name}<span className="field-hand-n tabular">{side.hand.length}</span>
       </button>
       {side.hand.length > 0 && (
@@ -1114,7 +1364,7 @@ function FieldHand({ side, name, facing }: {
           </span>
           <div className="field-tray-cards">
             {side.hand.map((card) => (
-              <FieldCard key={card.id} card={card} size="small" count={1} />
+              <FieldCard key={card.id} card={card} count={1} />
             ))}
           </div>
         </div>
@@ -1124,7 +1374,7 @@ function FieldHand({ side, name, facing }: {
         {side.hand.length === 0 ? (
           <span className="field-hand-empty">an empty hand</span>
         ) : side.hand.map((card) => (
-          <FieldCard key={card.id} card={card} size="small" count={1} />
+          <FieldCard key={card.id} card={card} count={1} />
         ))}
       </div>
     </div>
@@ -1158,18 +1408,21 @@ function FieldSide({ side, facing, active }: {
   // is furniture that costs a phone a third of its board. Creatures and lands
   // always draw — those two are the spine, and an empty one early is news.
   const rows = [
-    <FieldRow key="land" label="Lands and mana" cards={side.land} size="small"
+    <FieldRow key="land" label="Lands and mana" cards={side.land}
               empty="no lands yet" />,
-    <FieldRow key="ench" label="Enchantments" cards={side.enchantments}
-              size="small" />,
-    <FieldRow key="arti" label="Artifacts" cards={side.artifacts}
-              size="small" />,
-    <FieldRow key="walk" label="Planeswalkers" cards={side.walkers}
-              size="small" />,
+    <FieldRow key="ench" label="Enchantments" cards={side.enchantments} />,
+    <FieldRow key="arti" label="Artifacts" cards={side.artifacts} />,
+    <FieldRow key="walk" label="Planeswalkers" cards={side.walkers} />,
     <FieldRow key="crea" label="Creatures" cards={side.creatures}
               empty="no creatures" />,
   ]
   return (
+    // **The crowns are provided here and nowhere higher**, because a card is
+    // only this side's commander — the same context around both seats would
+    // mark one player's Tymna in the other player's row. This is also the
+    // narrowest scope that covers the battlefield and no hand or tray, which
+    // is the scope the mark is for. See `Crowned`.
+    <Crowned.Provider value={crownedOn(side)}>
     <div className={`field-side field-side-${facing}${active ? ' is-active' : ''}`}>
       {/* **Whose turn it is, as light rather than as a border.**
           A Magic table is lit from wherever the game currently is, and the
@@ -1191,6 +1444,7 @@ function FieldSide({ side, facing, active }: {
         {facing === 'far' ? rows : [...rows].reverse()}
       </div>
     </div>
+    </Crowned.Provider>
   )
 }
 

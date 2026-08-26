@@ -626,6 +626,92 @@ it('steps a preview beside the pile it was opened from, never onto it', () => {
   expect(left + width).toBeLessThanOrEqual(1200 - 8)
 })
 
+/** Where a preview ended up, and what it hit. jsdom measures nothing, so the
+ *  rectangles are the ones the test hands out — which is no worse than the
+ *  truth: this placement is only ever as good as the numbers it is given. */
+function placed(tray: DOMRect | { left: number; right: number; top: number
+  bottom: number }) {
+  const peek = document.querySelector('.field-peek') as HTMLElement
+  const left = Number.parseFloat(peek.style.left)
+  const top = Number.parseFloat(peek.style.top)
+  const width = Number.parseFloat(peek.style.width)
+  // 680/488 plus the artist line, which this fixture's cards do not carry.
+  const height = width * (680 / 488)
+  return {
+    left, top, width, right: left + width, bottom: top + height,
+    clear: left >= tray.right || left + width <= tray.left
+      || top >= tray.bottom || top + height <= tray.top,
+  }
+}
+
+it('steps a preview over or under a tray no flank can hold', () => {
+  // **The case the two-flank rule could not answer.** It tried the right side
+  // of the tray, then the left, and gave up — so a tray with under 318px
+  // beside it fell through to the ordinary placement and landed *on the panel
+  // somebody had just opened in order to read it*. On a phone that is every
+  // tray there is, and the hands live in the left-hand column at every width
+  // above 62rem, which is exactly where Aaron kept seeing it (2026-08-26:
+  // "full hand previews look clipped when they are on the lefthand side").
+  viewport(375, 812)
+  const { container } = show()
+  fireEvent.click(container.querySelector(
+    '.field-hand-far .field-hand-label') as Element)
+  const tray = container.querySelector(
+    '.field-hand-far .field-hand-tray') as Element
+  // A hand tray on a phone: nearly the full width, hung under the plate.
+  const box = { left: 96, right: 366, top: 133, bottom: 382 }
+  standing(tray, { ...box, width: 270, height: 249 })
+  const card = tray.querySelector('.field-card') as Element
+  standing(card, { left: 104, top: 157, right: 180, bottom: 263,
+    width: 76, height: 106 })
+  fireEvent.mouseEnter(card)
+
+  const at = placed(box)
+  // Neither flank can hold anything — 96 on the left, 9 on the right — so it
+  // goes *under*, which is the room a phone actually has.
+  expect(at.clear, 'never on top of the tray it came out of').toBe(true)
+  expect(at.top, 'below the tray').toBeGreaterThanOrEqual(box.bottom)
+  // And inside the glass, which the old `PEEK_MIN_W` floor could not promise:
+  // it forbade anything under 160px, so on a narrow viewport the only way to
+  // obey it was to hang off the edge.
+  expect(at.left).toBeGreaterThanOrEqual(8)
+  expect(at.right).toBeLessThanOrEqual(375 - 8)
+  expect(at.bottom, 'and inside it top to bottom').toBeLessThanOrEqual(812 - 8)
+  // Shrunk to fit the room under the tray rather than clipped to it. Still
+  // far bigger than the 76px cards in the tray, which is the whole point of
+  // stepping aside rather than covering.
+  expect(at.width).toBeLessThan(300)
+  expect(at.width).toBeGreaterThan(160)
+})
+
+it('covers a tray rather than drawing a sliver beside it', () => {
+  // The other end of the same decision. When no clearing round the tray can
+  // hold a *legible* card, the honest answer is the one this has always
+  // given in that corner: cover the tray. A 40px preview beside it would be
+  // smaller than the cards already in it.
+  viewport(360, 300)
+  const { container } = show()
+  fireEvent.click(container.querySelector(
+    '.field-hand-far .field-hand-label') as Element)
+  const tray = container.querySelector(
+    '.field-hand-far .field-hand-tray') as Element
+  const box = { left: 30, right: 330, top: 30, bottom: 270 }
+  standing(tray, { ...box, width: 300, height: 240 })
+  const card = tray.querySelector('.field-card') as Element
+  standing(card, { left: 40, top: 60, right: 116, bottom: 166,
+    width: 76, height: 106 })
+  fireEvent.mouseEnter(card)
+
+  const at = placed(box)
+  expect(at.clear, 'there was nowhere to step to').toBe(false)
+  // Covering is allowed; leaving the glass is not, and that is the invariant
+  // that has to hold at *every* width.
+  expect(at.left).toBeGreaterThanOrEqual(8)
+  expect(at.right).toBeLessThanOrEqual(360 - 8)
+  expect(at.top).toBeGreaterThanOrEqual(8)
+  expect(at.bottom).toBeLessThanOrEqual(300 - 8)
+})
+
 it('opens the hand from its nameplate, and never from the fan', () => {
   const { container } = render(
     <MatchBoard board={ZONES} shown={1} game={1} running={false}
@@ -1073,4 +1159,244 @@ it('charges no commander tax for a companion leaving the command zone', () => {
   expect(vacant, 'Tymna is out and Kaheera has been called').toHaveLength(2)
   expect(vacant[0]?.className).not.toContain('field-seat-companion')
   expect(vacant[1]?.className).toContain('field-seat-companion')
+})
+
+/** A board thick with copies of one thing: six Forests, four Treasures and a
+ *  pair of Bears, which is what a real board looks like by turn eight. */
+const PILES: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'gyome', name: 'Gyome — Food', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    ...[1, 2, 3, 4, 5, 6].map((id) => ({ id, name: 'Forest',
+      types: 'Basic Land - Forest', seat: 1,
+      image: 'https://example.test/forest.jpg' })),
+    ...[7, 8, 9, 10].map((id) => ({ id, name: 'Treasure',
+      types: 'Artifact - Treasure', seat: 1, token: true,
+      image: 'https://example.test/treasure.jpg' })),
+    ...[11, 12].map((id) => ({ id, name: 'Grizzly Bears',
+      types: 'Creature - Bear', seat: 1,
+      image: 'https://example.test/bear.jpg' })),
+    // The singleton, and it is load-bearing: without one card standing on its
+    // own, "a lone card grows no pile" is a question asked of nothing.
+    { id: 13, name: 'Llanowar Elves', types: 'Creature - Elf Druid', seat: 1,
+      image: 'https://example.test/elves.jpg' },
+  ],
+  steps: [
+    { turn: 8, seat: 1, changes: [
+      ...[1, 2, 3, 4, 5, 6].map((id) => ({ id, zone: 'land', seat: 1 })),
+      ...[7, 8, 9, 10].map((id) => ({ id, zone: 'battlefield', seat: 1 })),
+      ...[11, 12].map((id) => ({ id, zone: 'battlefield', seat: 1,
+        power: 2, toughness: 2 })),
+      { id: 13, zone: 'battlefield', seat: 1, power: 1, toughness: 1 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function piles() {
+  return render(
+    <MatchBoard board={PILES} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('makes a stack out of the card it is a stack of', () => {
+  const { container } = piles()
+
+  const stacks = [...container.querySelectorAll(
+    '.field-side-far .field-card.is-stacked')]
+  // Six Forests, four Treasures, two Bears — three piles, not twelve cards.
+  expect(stacks.map((s) => s.querySelector('.field-card-count')?.textContent))
+    .toEqual(['6×', '4×', '2×'])
+
+  // **The leaves wear the painting of the card they are leaves of.** They used
+  // to be blank grey plates, which say *something is behind this* and nothing
+  // about what — and what is behind it is the entire reason a stack exists.
+  // Every card in a stack is identical in play by construction (`stackRow`),
+  // so the same painting is a truthful picture of the next card down rather
+  // than a stand-in for it.
+  const forest = stacks[0] as HTMLElement
+  const pile = forest.querySelector('.field-card-pile') as HTMLElement
+  expect(pile.style.getPropertyValue('--leaf-art'))
+    .toBe('url(https://example.test/forest.jpg)')
+
+  // **The arc is fixed; the density is what grows.** Four or more gets four
+  // leaves and a pair gets two, and both fans reach exactly as far — the
+  // outermost leaf is at |--leaf| == 1 in both, which is the value the arena
+  // wall was measured against. A fan that widened with the count would take
+  // the leftmost stack in a row through the field's own clip; that was the
+  // first draft, and it lost thirteen pixels of leaf to the wall.
+  const leaves = (s: Element) => [...s.querySelectorAll('.field-card-leaf')]
+    .map((l) => Number((l as HTMLElement).style.getPropertyValue('--leaf')))
+  expect(leaves(forest)).toHaveLength(4)
+  expect(leaves(stacks[1] as Element), 'four Treasures fan the same')
+    .toHaveLength(4)
+  expect(leaves(stacks[2] as Element), 'a pair gets two').toHaveLength(2)
+  for (const s of stacks) {
+    expect(Math.max(...leaves(s).map(Math.abs)),
+      'no fan reaches further than another').toBe(1)
+  }
+
+  // A lone card is not a stack and grows nothing.
+  const lone = container.querySelector(
+    '.field-side-far .field-card:not(.is-stacked)')
+  expect(lone?.getAttribute('title'), 'the Elf stands alone')
+    .toContain('Llanowar Elves')
+  expect(lone?.querySelector('.field-card-pile'),
+    'one card has nothing behind it').toBeNull()
+})
+
+it('carries a stack’s count into the sheet a phone opens', () => {
+  // **The fan is the pleasure and the count is the fact.** Hover does not
+  // exist on a touch screen, and this project has shipped hover-only reading
+  // affordances twice. Nothing about a stack is learnable only by fanning it:
+  // the count chip draws at every width on every device, and a tap opens the
+  // sheet — so the sheet is where "there are six of these" has to be sayable.
+  const { container } = piles()
+  tap(container.querySelector(
+    '.field-side-far .field-card.is-stacked') as Element)
+  expect(screen.getByRole('dialog', { name: '6 × Forest' })).toBeTruthy()
+})
+
+it('draws every card at one size, and never below it', () => {
+  // **Two sizes, and the smaller one was unreadable.** Lands, artifacts,
+  // enchantments and planeswalkers were 42x59 while creatures were 58x81 —
+  // and this board draws the whole card face, not an art crop, so at
+  // forty-two pixels the printed type became a grey vibration that reads as a
+  // rendering fault (Aaron, 2026-08-26: "all cards should be at least the size
+  // we have been using on creatures so the text doesn't look funny").
+  //
+  // Held as the absence of a class rather than as a measurement, because
+  // jsdom has no layout engine and could not see a size if it tried. The
+  // class is what carried the second size; nothing may reintroduce it.
+  const { container } = piles()
+  expect(container.querySelectorAll('.field-card').length).toBeGreaterThan(0)
+  expect(container.querySelector('.field-card-small'),
+    'the small card is retired; a land is drawn like a creature').toBeNull()
+})
+
+it('crowns the commander standing on the sand, and only there', () => {
+  // The command zone can say a commander is *home*. Once it is cast it stands
+  // in the creature row like any other body, and nothing said which of forty
+  // permanents the whole deck was built around (Aaron, 2026-08-26).
+  //
+  // `pairing(2)` is the fixture for it: Tymna has gone to the battlefield,
+  // Thrasios is still home, and Kaheera has been bought into a hand.
+  const { container } = pairing(2)
+  const crowned = [...container.querySelectorAll('.field-card.is-commander')]
+  expect(crowned, 'Tymna is out; Thrasios is home in a seat').toHaveLength(1)
+  expect(crowned[0]?.getAttribute('title')).toContain('Tymna the Weaver')
+  // Said in words as well as drawn: a picture is a thing you have to already
+  // know, and this room is for people playing their first game.
+  expect(crowned[0]?.getAttribute('title')).toContain('the commander')
+  expect(crowned[0]?.querySelector('.field-card-crown'),
+    'the mark rides the card').toBeTruthy()
+  // On the arm, which is what carries a card's corner furniture round when the
+  // card leans. A crown pinned to the slot sits on the neighbour the moment
+  // its card is tapped, and no rendered angle in jsdom would say so.
+  expect(crowned[0]?.querySelector('.field-card-crown')
+    ?.closest('.field-card-arm')).toBeTruthy()
+
+  // **A companion is not a commander, and both are in the data.** Kaheera is
+  // in a hand here, and a hand is a fan overlapped to a 27px strip — a mark
+  // pinned there is drawn on the *next card's* painting. So the crowns cover
+  // the battlefield and nothing else, which is the scope `FieldSide` provides
+  // them at.
+  expect(container.querySelectorAll('.field-card.is-companion'),
+    'the companion is in a hand, and a hand wears no marks').toHaveLength(0)
+  const hand = container.querySelector('.field-hand-far') as HTMLElement
+  expect(hand.querySelectorAll('.field-card-crown'),
+    'nothing in a hand is crowned').toHaveLength(0)
+})
+
+it('puts a hand under its own sign', () => {
+  // Four plates on this board open four different things, and the hand's was
+  // a deck name over a row of card backs with nothing to say what it held
+  // (Aaron, 2026-08-26: "we need a hand icon to show that is what we are
+  // showing people with the cards in hand"). Beside the label, never instead
+  // of it — an icon-only control asks a newcomer to already know the app.
+  const { container } = render(
+    <MatchBoard board={ZONES} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  const plate = container.querySelector(
+    '.field-hand-far .field-hand-label') as HTMLElement
+  expect(plate.querySelector('.field-hand-mark svg'),
+    'the plate carries the fanned hand').toBeTruthy()
+  expect(plate.textContent, 'and still says whose hand it is')
+    .toContain('Arahbo')
+  // The mark is decoration on a control that already names itself, so it is
+  // hidden from anybody being read to rather than announced twice.
+  expect(plate.querySelector('.field-hand-mark')
+    ?.getAttribute('aria-hidden')).toBe('true')
+
+  // It answers the hand that reaches for it (commandment 17): the fan opens
+  // when the hand does. Driven through the real control, because a click is
+  // what a tap, a mouse and the Enter key all produce.
+  const angle = () =>
+    plate.querySelector('.glyph-fan')?.getAttribute('transform')
+  const shut = angle()
+  fireEvent.click(plate)
+  expect(angle(), 'the fan spreads while the hand is open').not.toBe(shut)
+})
+
+it('lets the command zone say only what a command zone can say', () => {
+  // **Aaron, 2026-08-26:** *"hovering on the command zone pops up some things
+  // I don't understand, like 'Olinda the Oblivious (99)'s effect? I don't get
+  // that."* Two faults met there. A Forge EFFECT card was leaking past a
+  // server-side filter — fixed where it is made — and the zone was drawn as a
+  // *pile*, which answers "how many, what is on top", and neither question is
+  // one anybody asks the command zone.
+  //
+  // His ruling fixes the vocabulary: *"at most it should just be two slots for
+  // partners, one for a singular commander, or a second companion devoted slot
+  // for Kaheera, et al. Those are the only combinations possible in that
+  // zone."*
+  const { container } = pairing(2)
+  const rail = container.querySelector('.field-rail-far') as HTMLElement
+  const seats = [...rail.querySelectorAll('.field-command .field-pile')]
+  // Three places and no fourth: the catch-all pile that drew whatever else
+  // the zone was holding is exactly the surface the effect card arrived on,
+  // and with the seats named there is nothing left for it to say.
+  expect(seats, 'two chairs and a companion, and nothing else').toHaveLength(3)
+  expect(seats.map((s) => s.getAttribute('title'))).toEqual([
+    'Thrasios, Triton Hero — the commander, waiting in the command zone',
+    'Tymna the Weaver — the commander, out on the battlefield',
+    'Kaheera, the Orphanguard — the companion, already called into hand',
+  ])
+  // None of them counts, and none of them names a top card. A seat holds one
+  // named place; "1" beside a commander is a number nobody asked for and
+  // "X's effect on top" is a sentence nobody can act on.
+  for (const s of seats) {
+    expect(s.getAttribute('title')).not.toContain('on top')
+    expect(s.getAttribute('title')).not.toMatch(/: \d+$/)
+  }
+})
+
+it('prices each chair rather than the whole zone', () => {
+  // **The tax rode outside the group** — a red chip in the gap between the
+  // command zone and the graveyard, belonging to neither (Aaron, 2026-08-26:
+  // "it is outside the perimeter of the command zone and it makes for awkward
+  // styling"). It is on the tile now, in the bottom-right corner a Magic card
+  // keeps for the number saying what it is worth at this moment.
+  //
+  // And it is per chair, which one pile could never be. Thrasios has never
+  // been cast and says nothing; Tymna has, and costs two more.
+  const { container } = pairing(2)
+  const rail = container.querySelector('.field-rail-far') as HTMLElement
+  const seats = [...rail.querySelectorAll('.field-command .field-pile')]
+  expect(seats.map((s) => s.querySelector('.field-tax')?.textContent?.trim()))
+    .toEqual([undefined, '+2', undefined])
+  // **Structurally out of the companion's reach**, which is the half that
+  // matters. Kaheera has never been cast from anywhere and owes nothing; a
+  // badge anchored to the group's own corner would have landed on her tile,
+  // and this board has told that lie once already.
+  expect(seats[2]?.querySelector('.field-tax'),
+    'a companion is never taxed').toBeNull()
+  // Inside the tile it prices, rather than beside the zone.
+  expect(rail.querySelector('.field-tax')?.closest('.field-pile'))
+    .toBe(seats[1])
 })

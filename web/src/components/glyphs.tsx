@@ -31,22 +31,57 @@ export function ReplayGlyph({ size = 14 }: { size?: number }) {
   )
 }
 
-/** A hand of cards, fanned: three outlines pivoting from one wrist. */
-export function HandFanGlyph({ size = 14 }: { size?: number }) {
+/**
+ * A hand of cards, fanned: three outlines pivoting from one wrist.
+ *
+ * **The fill is a variable now, because this mark left the page.** It was
+ * drawn only on the tarot table, where `var(--page)` is exactly the ground
+ * behind it; the Coliseum's hand plate is a dark wash over sand at both
+ * themes, so a light-theme `--page` painted three white cards onto black.
+ * `--glyph-ground` lets a surface say what its own ground is, and falls back
+ * to the page for every caller that never had to think about it.
+ *
+ * **And it opens.** The mark sits on a control that spreads a hand, so it
+ * spreads too when the hand reaches for it (commandment 17) — the angle is a
+ * prop rather than a hover rule, because the control is already holding that
+ * state for the tray and two sources for one gesture is how they drift apart.
+ * The base angle is unchanged, so every caller that does not ask for the wider
+ * fan is drawn exactly as it always was.
+ */
+export function HandFanGlyph({ size = 14, open = false }: {
+  size?: number
+  /** Spread wider: the fan being opened, rather than held. */
+  open?: boolean
+}) {
   const card = (
     <rect x="-2.7" y="-9.5" width="5.4" height="8" rx="0.9"
-          fill="var(--page)" stroke="currentColor" strokeWidth="1.5" />
+          fill="var(--glyph-ground, var(--page))" stroke="currentColor"
+          strokeWidth="1.5" />
+  )
+  // Thirty-six rather than anything wider: the outermost corner of a card at
+  // that angle lands 1.3 units inside the viewBox, stroke included, and an SVG
+  // root clips to its own box — a fan that opened any further would be a fan
+  // with its corners cut off.
+  const turn = open ? 36 : 24
+  // The rotation stays a presentation attribute rather than moving into CSS,
+  // and that is the whole reason this is a prop. An attribute transform pivots
+  // about the element's own local origin — the wrist — where a CSS `transform`
+  // would pivot about the viewBox corner unless `transform-box` and
+  // `transform-origin` were both restated, which is three chances to move a
+  // mark that two other screens already draw correctly.
+  const at = (deg: number) => (
+    <g className="glyph-fan" transform={`rotate(${deg})`}>{card}</g>
   )
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
          focusable="false" style={{ display: 'block' }}>
       {/* Painted back-to-front so each card overlaps the one before it the
-          way a fan actually stacks; the page-colour fill is what keeps the
+          way a fan actually stacks; the ground-colour fill is what keeps the
           outlines from reading as one pretzel where they cross. */}
       <g transform="translate(10 17)">
-        <g transform="rotate(-24)">{card}</g>
-        <g transform="rotate(24)">{card}</g>
-        <g>{card}</g>
+        {at(-turn)}
+        {at(turn)}
+        {at(0)}
       </g>
     </svg>
   )
@@ -169,6 +204,42 @@ export function HornGlyph({ size = 18 }: { size?: number }) {
         {/* The rim, so the wide end reads as an opening. */}
         <path d="M16 4.2 L15.1 10.4" />
       </g>
+    </svg>
+  )
+}
+
+/**
+ * A crown: the commander, out on the battlefield.
+ *
+ * The command zone can say a commander is *home*; nothing on the sand said
+ * which of forty permanents was the one the whole deck is built around (Aaron,
+ * 2026-08-26). This is that card's mark, and it rides the top edge of the
+ * painting the way a crown sits on a head.
+ *
+ * **Filled, where the throne and the horn are hollow, and the difference is
+ * the message.** Those two are drawn for a seat with *nobody in it* — an
+ * outline is an absence. A crown is an object that is present, on a card that
+ * is present, and at fourteen pixels over an arbitrary photograph a hollow one
+ * is four grey hairlines. Solid metal is what survives.
+ *
+ * Two pieces with a gap between them — the points and the circlet — because
+ * that gap is the entire difference between a crown and a spiky blob at this
+ * size. The three finials are what keep the points from reading as a saw.
+ */
+export function CrownGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      {/* The points, rising from a base that the circlet sits under. */}
+      <path d="M3.4 12.4 L2.4 4.8 L7 8.8 L10 3.2 L13 8.8 L17.6 4.8
+               L16.6 12.4 Z" fill="currentColor" />
+      {/* Finials, so each point ends in something rather than stopping. */}
+      <circle cx="2.4" cy="4.4" r="1.35" fill="currentColor" />
+      <circle cx="10" cy="2.8" r="1.5" fill="currentColor" />
+      <circle cx="17.6" cy="4.4" r="1.35" fill="currentColor" />
+      {/* The circlet, a hair below the points so the gap reads. */}
+      <rect x="3.1" y="13.5" width="13.8" height="3.4" rx="1.2"
+            fill="currentColor" />
     </svg>
   )
 }
