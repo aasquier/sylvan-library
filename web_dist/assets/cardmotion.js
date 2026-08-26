@@ -1,4 +1,4 @@
-import{o as e}from"./rolldown-runtime.js";import{_ as t,h as n}from"./mtg.js";import{A as r,D as i,O as a,j as o,k as s}from"./app.js";var c=e(t(),1),l=n(),u=`
+import{o as e}from"./rolldown-runtime.js";import{g as t,m as n}from"./mtg.js";import{A as r,D as i,O as a,j as o,k as s}from"./app.js";var c=e(t(),1),l=n(),u=`
 attribute vec2 pos;
 varying vec2 uv;
 void main() {

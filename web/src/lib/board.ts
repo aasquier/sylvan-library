@@ -31,6 +31,7 @@
  */
 
 import type { ForgeBoard, ForgeBoardCard, ForgeBoardSeat } from './api'
+import { poolGained, poolRaised } from './mana'
 
 /** Where a card can be. The names are the server's; `gone` means it has left
  *  every zone the board draws — shuffled back into the library, most often. */
@@ -301,6 +302,34 @@ export interface BoardSide {
    *  mana at all. A pool is empty most of the time a person looks at it, which
    *  is why `BoardState.floating` carries the movement as well. */
   pool: string
+  /** **The mana this seat had to spend during the last beat applied** — what
+   *  it carried in plus everything that arrived — and `pool` itself the rest
+   *  of the time.
+   *
+   *  This is what a pool drawn beside a hand fills *to* before it drains to
+   *  `pool`. A sum rather than the pool's high-water mark, and that is a
+   *  measurement rather than a preference: Forge taps one land and spends that
+   *  mana before tapping the next, so the instantaneous peak is one for every
+   *  spell in the game. `lib/mana.ts`'s `poolRaised` has the recorded
+   *  sequence.
+   *
+   *  Computed here rather than in a room, because **this fold is the only
+   *  place that knows what the pool held going into the beat.** `pool` is
+   *  where it came to rest and `BoardState.floating` is the movement inside
+   *  the beat; the value it started from is the previous beat's rest, which
+   *  the fold has and nothing downstream does. */
+  raised: string
+  /** **The mana that arrived** in this seat's pool during the last beat
+   *  applied, and empty the rest of the time.
+   *
+   *  Every rise across the beat's movement added up, so a beat that tapped two
+   *  lands, spent them on a ritual, and tapped a third is credited with all
+   *  three rather than with the difference between its ends. See `poolGained`.
+   *
+   *  **It says mana arrived. It never says what made it** — Forge's mana event
+   *  carries a seat and a pool and no source, and ADR 44 is why the board says
+   *  the first and refuses the second. */
+  gained: string
 }
 
 /** The board at one moment. */
@@ -341,7 +370,7 @@ function emptySide(seat: ForgeBoardSeat): BoardSide {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
     creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
     hand: [], graveyard: [], exile: [], thrones: [], companion: null,
-    command: [], commanders: [], pool: '',
+    command: [], commanders: [], pool: '', raised: '', gained: '',
   }
 }
 
@@ -370,6 +399,9 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   // Each seat's floating mana, and the two transients that belong to the beat
   // being drawn rather than to the game so far — see `BoardState`.
   const pool = new Map<number, string>()
+  // What each seat's pool held *before* the beat being drawn — see the note at
+  // the capture below, and `BoardSide.peak`.
+  const entering = new Map<number, string>()
   let floating: { seat: number; pool: string }[] = []
   let abilities: BoardMoment[] = []
 
@@ -394,6 +426,18 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     // rest, and the sequence itself is only worth anything at the moment it is
     // happening. Both are `step.floating`; which one a room wants depends on
     // whether it is drawing a pool or an arrival.
+    // **What the pool held going *into* the last beat, captured before the
+    // beat is applied over it.** This is the whole reason `peak` and `gained`
+    // are settled here and not in a room: a pool that carried two green into
+    // the beat and came out with five did not gain five, and nothing
+    // downstream of this loop can tell the difference — `BoardSide.pool` is
+    // the resting value and the previous rest is gone the moment this line
+    // runs. Cheap, and only on the beat being drawn.
+    if (i === upTo - 1) {
+      for (const moved of step.floating ?? []) {
+        entering.set(moved.seat, pool.get(moved.seat) ?? '')
+      }
+    }
     for (const moved of step.floating ?? []) pool.set(moved.seat, moved.pool)
     if (i === upTo - 1) {
       floating = step.floating ?? []
@@ -532,7 +576,26 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   }
   for (const [seat, held] of pool) {
     const side = bySeat.get(seat)
-    if (side) side.pool = held
+    if (!side) continue
+    side.pool = held
+    // **A pool that did not move this beat has only what it is holding**, so a
+    // seat carrying mana across beats draws a standing row rather than filling
+    // to nothing. Overwritten below for the seats that did move.
+    side.raised = held
+  }
+  // **The beat's movement, read twice and for two different questions.** The
+  // arena flashes what arrived; the pool beside the hand fills to what stood
+  // there and drains to what is left. `lib/mana.ts` carries both arguments.
+  //
+  // Only the seats that moved: a seat whose pool did nothing this beat rests
+  // at its own `pool` with no peak above it and nothing gained, which is what
+  // `emptySide` already says and what a room reading a still pool wants.
+  for (const [seat, was] of entering) {
+    const side = bySeat.get(seat)
+    if (!side) continue
+    const moved = floating.filter((m) => m.seat === seat).map((m) => m.pool)
+    side.raised = poolRaised(was, moved)
+    side.gained = poolGained(was, moved)
   }
   for (const id of order) {
     const card = state.get(id)

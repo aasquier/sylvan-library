@@ -6605,6 +6605,136 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .glyph-fan { transition: none; }
 }
+/* ------------------------------------------------- the mana pool, at a hand
+ *
+ * **The one number a player is actually counting, where their eye already is.**
+ * Aaron, 2026-08-26: *"by that players hand the symbols should appear as
+ * available mana to cast if that is possible, and then should be depleted on
+ * the cast itself."* The depleting is the ask — a resting pool is empty nine
+ * times in ten, so what is worth drawing is the *movement*, and the stylesheet
+ * owns almost all of it. `components/board.tsx`'s `FieldPool` decides what the
+ * two ends are; `lib/mana.ts` decides how long the journey takes.
+ *
+ * **The trough is always here, full or empty.** Fifty appearances and
+ * disappearances a match would shove the hand up and down the screen all game,
+ * and a beginner needs somewhere to look *before* there is anything to see
+ * there. A basin with its name on it teaches where mana lives; a gap teaches
+ * nothing (commandment 2).
+ *
+ * A place rather than a control, so it takes no press state and no focus ring
+ * — commandment 17's own distinction, the one `.chip-toggle` and `.strip-tab`
+ * sit on the other side of. It answers a pointer with its title and with a
+ * lift on the rim, which is as much as a thing you cannot click should say. */
+/* **One mana, as a pip.** The house shape for a single mana that *exists* —
+ * a pool beside a hand, a flash in the middle of the arena — as against the
+ * mark for what a permanent *taps for*, which is one mark however many colours
+ * are attached to it. `components/manasymbol.tsx` argues the difference.
+ *
+ * The coloured disc is painted here and the official symbol lands on top of
+ * it, which is why the disc must be clipped: the fetched art is the entire
+ * symbol including its own circle, and a square pixel of it escaping a round
+ * background is the one artefact anybody would notice. */
+.mana-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.field-pool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  /* Sunk rather than raised: an inset shadow and a darker floor make a shallow
+     basin out of a rounded rectangle, which is the difference between a pool
+     mana collects in and a badge with mana printed on it. */
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.14) 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 18%, transparent);
+  transition: box-shadow 200ms ease;
+}
+.field-pool:hover {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 40%, transparent);
+}
+/* Its name, small and quiet and always there. Magic's own word, which is the
+   whole of commandment 3 in five letters — and it is a label rather than a
+   count, so it never moves when the pool does. */
+.field-pool-word {
+  flex: 0 0 auto;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-brass) 62%, transparent);
+}
+/* The mana itself. Wraps rather than scrolls: a Cabal Coffers turn really can
+   put nine mana in a pool, and nine pips in a 112px rail is two rows and not a
+   scrollbar in a gutter. */
+.field-pool-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+/* **Mana arriving.** Up out of the basin, one pip after another, so three mana
+   reads as three on the way past instead of being a shape that has to be
+   stopped at and counted. The stagger is the index the row already knows,
+   handed over as `--pip-i` — no timers, one custom property. */
+.field-pool-pip {
+  display: block;
+  line-height: 0;
+  animation: field-pool-wells var(--pool-fill, 420ms)
+    cubic-bezier(0.18, 0.9, 0.28, 1.06) backwards;
+  animation-delay: calc(var(--pip-i, 0) * 46ms);
+}
+/* **...and mana being spent**, which is the half Aaron asked for. It leaves
+   the way a coin leaves a hand: it lifts, it pales, it is not there. `both`
+   rather than `backwards`, because this element is removed on a timer and the
+   last frame has to hold until it goes — the alternative is a pip snapping
+   back to full opacity for one frame before it disappears. */
+.field-pool-pip.is-spent {
+  animation: field-pool-spends var(--pool-drain, 320ms)
+    cubic-bezier(0.4, 0, 0.7, 0.2) both;
+  animation-delay: calc(var(--pip-i, 0) * 34ms);
+  pointer-events: none;
+}
+@keyframes field-pool-wells {
+  from { opacity: 0; transform: translateY(5px) scale(0.4); }
+  64% { opacity: 1; transform: translateY(-1px) scale(1.14); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes field-pool-spends {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-7px) scale(0.62); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* **The pool is information, so it still fills and still drains** — what
+     goes is the travel. A pip that only fades is still a pip arriving and a
+     pip leaving, which is the fact; the rising and the shrinking are the
+     flourish, and they are what a vestibular system objects to. */
+  .field-pool-pip {
+    animation-name: field-pool-appears;
+    animation-timing-function: ease;
+  }
+  .field-pool-pip.is-spent {
+    animation-name: field-pool-fades;
+    animation-timing-function: ease;
+  }
+  .field-pool { transition: none; }
+}
+@keyframes field-pool-appears { from { opacity: 0; } to { opacity: 1; } }
+@keyframes field-pool-fades { from { opacity: 1; } to { opacity: 0; } }
+
 .field-hand-empty {
   font-size: 0.72rem;
   font-style: italic;
@@ -8317,10 +8447,6 @@ button:hover .tarot-fan-card {
 .field-card-counters { transform-origin: 0 100%; }
 .field-card-lens { transform-origin: 100% 100%; }
 .field-keywords { transform-origin: 0 0; }
-/* Anchored to the right edge and offset from the top, so its own top-right
-   corner is the corner that must not move. */
-.field-card-bead { transform-origin: 100% 0; }
-
 /* ------------------------------------------------- what the card can do
  *
  * **The upper-left corner, which was the one this board had left.** Count
@@ -8546,91 +8672,6 @@ button:hover .tarot-fan-card {
 .field-counter.is-down {
   background: #e2736a;
   color: #1c0503;
-}
-
-/* ------------------------------------------------ the bead of mana
- *
- * **A turned permanent is the most legible state on this table and the least
- * informative one.** Forty cards on the sand, eight of them lying sideways, and
- * nothing saying why any of them is — turned is turned, whether it swung,
- * blocked, or paid for the thing that just resolved (Aaron, 2026-08-26: *"I
- * would like a mana symbol to appear in mana dorks tapped for mana"*).
- *
- * So a bead of mana rides a turned permanent that taps for mana, and it says
- * **what the card taps for** — never that this turn's pool came from it.
- * `board.tsx` argues that distinction where the mark is built and
- * `BoardCard.makes` argues why the honest sentence is the only one available:
- * the source of a mana is gone before this board ever sees it.
- *
- * **Placement makes a system out of the last free edge.** The left edge is what
- * the card does in a fight — the keyword marks run down it. The right edge is
- * what it pays for. Nineteen pixels down clears the count above it at any
- * count, and the loupe below it starts at fifty-five, so the two never meet on
- * a card carrying both.
- *
- * It is drawn only while the card is turned, which means it is only ever drawn
- * inside `.field-card-arm`'s rotation — carried round to the card's own right
- * edge and turned back to level, for the loupe's reason: a symbol at forty-five
- * degrees is a symbol somebody has to tilt their head at. */
-.field-card-bead {
-  position: absolute;
-  right: 1px;
-  top: 19px;
-  z-index: 2;
-  line-height: 0;
-}
-/* The coin. It wells up out of the card once and then simply stays, which is
-   what makes it safe on a scrub: the element exists exactly while the fold
-   says the card is turned, so there is nothing to expire and nothing to pile
-   up when six lands tap in one beat.
- *
- * `backwards` rather than `both` on purpose — under `both` the animation's end
- * state keeps owning `transform` forever and the hover below silently does
- * nothing. */
-.field-card-bead-mark {
-  position: relative;
-  display: block;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.62);
-  animation: field-bead-wells 480ms cubic-bezier(0.18, 0.9, 0.28, 1.06)
-    backwards;
-  transition: transform 200ms cubic-bezier(0.2, 0.85, 0.3, 1);
-}
-/* The mana around it, breathing. Its own layer with only `opacity` and
-   `transform` moving, because forty of these animating a `box-shadow` is forty
-   repaints a frame and this room already asks a lot of a laptop. */
-.field-card-bead-mark::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: radial-gradient(circle,
-    var(--bead-glow, var(--field-brass)) 0%, transparent 68%);
-  pointer-events: none;
-  animation: field-bead-breathes 3.6s ease-in-out infinite;
-}
-/* Answers the hand, like the loupe beside it. */
-.field-card:hover .field-card-bead-mark,
-.field-card:focus-visible .field-card-bead-mark {
-  transform: scale(1.18);
-}
-@keyframes field-bead-wells {
-  from { opacity: 0; transform: translateY(4px) scale(0.35); }
-  62% { opacity: 1; transform: translateY(-1px) scale(1.12); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes field-bead-breathes {
-  0%, 100% { opacity: 0.34; transform: scale(0.9); }
-  50% { opacity: 0.66; transform: scale(1.14); }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* The bead is information, so it stays; only the welling and the breath go.
-     The aura settles at the middle of its own range rather than at either end,
-     which is where it spends most of its time anyway. */
-  .field-card-bead-mark { animation: none; }
-  .field-card-bead-mark::before { animation: none; opacity: 0.5; }
-  .field-card:hover .field-card-bead-mark,
-  .field-card:focus-visible .field-card-bead-mark { transform: none; }
 }
 
 /* ------------------------------------------------- what the beat just did
@@ -10552,4 +10593,142 @@ button:hover .tarot-fan-card {
   }
   .card-sheet-step:hover:not(:disabled),
   .card-sheet-step:active:not(:disabled) { transform: none; }
+}
+
+/* --- mana, in the same middle ------------------------------------------- */
+
+/* **The mana that just arrived**, flashed on the sand.
+ *
+ * Aaron, 2026-08-26, having looked at the bead that shipped an hour earlier:
+ * *"I wanted the mana symbol to maybe just show in the middle like the cast
+ * cards do now."* So it is here, in the arena, at the moment the mana lands —
+ * and `components/stage.tsx` and `lib/stage.ts` carry the rest of the
+ * argument, including the one that decides this block's geometry.
+ *
+ * **Not dead centre, and that is the whole trick.** Mana and the spell it paid
+ * for arrive on the *same beat* — Forge raises no beat at all for a mana
+ * ability, so the fill and the drain reach the browser attached to the cast
+ * itself. A flash in the middle would therefore spend the entire match
+ * fighting the card in the middle. Drawn in the half of the arena belonging to
+ * the seat that gained it, it clears the card's frame at every size *and* says
+ * whose mana it is, which the centre could not have said at any price.
+ *
+ * **Ten per cent from its own edge, and that number was measured rather than
+ * chosen.** It started at twenty-eight — a comfortable-looking place inside
+ * each half — and a real match showed why that is wrong. Taken off a live
+ * board at 1280 wide, as a share of the field's height: the stage card's frame
+ * runs 39–71 and its plate 75–79, so twenty-eight per cent puts a row of pips
+ * squarely across the rules text of the card they paid for. At ten the flash
+ * sits at 10–15 in the far half and 85–90 in the near one — clear of the card
+ * at both ends, clear of the seam in the middle and of the transport at the
+ * foot, and on the lip of the sand, which is where mana ought to be coming up
+ * from anyway. The phone is a different stack and gets its own two numbers at
+ * the bottom of this block. */
+.stage-mana {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  /* A shallow dark lens under the pips, so they read against sand, against a
+     card's art, and against the cast card's own veil — all three of which are
+     underneath this at one time or another. Small enough to stay a caption on
+     the arena rather than becoming a second panel over it. */
+  background: radial-gradient(ellipse 70% 130% at 50% 50%,
+    rgba(8, 6, 4, 0.72) 0%, rgba(8, 6, 4, 0.5) 58%, rgba(8, 6, 4, 0) 100%);
+  animation: stage-mana-in var(--stage-life, 760ms) ease-out both;
+}
+.stage-mana.is-far { top: 10%; }
+.stage-mana.is-near { bottom: 10%; }
+/* The light it comes up in. Its own layer with nothing but opacity and
+   transform moving, for the reason every glow in this room has its own layer:
+   a filter or a box-shadow animating behind fifty of these is fifty repaints
+   a frame on a laptop that is already drawing a battlefield. */
+.stage-mana-glow {
+  position: absolute;
+  inset: -60% -18%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%,
+    color-mix(in srgb, var(--field-sun) 34%, transparent) 0%,
+    transparent 68%);
+  animation: stage-mana-glows var(--stage-life, 760ms) ease-out both;
+}
+/* Each pip, arriving a fraction after the one before it — the same stagger the
+   pool beside the hand uses, so one mana looks like the same event in both
+   places. The two are drawn a beat apart and a reader should recognise the
+   second from the first. */
+.stage-mana-pip {
+  display: block;
+  line-height: 0;
+  animation: stage-mana-pip-up var(--stage-life, 760ms)
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--pip-i, 0) * 52ms);
+}
+@keyframes stage-mana-in {
+  0% { opacity: 0; }
+  14% { opacity: 1; }
+  74% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes stage-mana-glows {
+  0% { opacity: 0; transform: scale(0.6); }
+  22% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+@keyframes stage-mana-pip-up {
+  0% { opacity: 0; transform: translateY(13px) scale(0.35); }
+  20% { opacity: 1; transform: translateY(-2px) scale(1.16); }
+  32% { transform: none; }
+  78% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-9px) scale(0.9); }
+}
+/* **The movement goes; the mana does not** — the same answer, in the same
+   words, as the stillness block that governs the card in the middle. Somebody
+   who has asked their machine to stop moving things still has to be able to
+   learn that mana arrived and how much of it: that is the whole feature, and
+   drawing nothing would take it away from exactly the person most likely to
+   need it (commandment 2).
+
+   So no rising, no swelling, no cascade. Every one of these fades up, holds for
+   its full length and fades away — which is what `stage-mana-in` already was,
+   because the row's own animation never moved anything in the first place. The
+   duration is still `--stage-life`, so nothing here can fall out of step with
+   the clock the element is actually taken down on, and the stagger is zeroed so
+   eight pips arrive as one fact rather than as eight small events.
+
+   The glow is the one part that goes altogether, on the same reasoning
+   `.stage-frame::before` goes above: it is a swelling halo and nothing else,
+   and the dark lens the pips sit on belongs to `.stage-mana` itself, so the
+   contrast that makes them legible on sand does not depend on it. */
+@media (prefers-reduced-motion: reduce) {
+  .stage-mana,
+  .stage-mana-pip {
+    animation: stage-mana-in var(--stage-life, 760ms) linear both;
+    animation-delay: 0s;
+  }
+  .stage-mana-glow { animation: none; opacity: 0; }
+}
+/* **On a phone the arena is a tall stack and these two numbers stop agreeing.**
+   Measured on a real match at 375×812, as a share of the field's height: the
+   hands are grid areas *inside* the field there, so the far hand takes the top
+   sixteen per cent and the near hand takes seventy-one to eighty-seven — and
+   ten per cent from either lip lands the flash in somebody's hand rather than
+   on the sand.
+
+   The two numbers differ because the stage card is not symmetrical: its frame
+   sits at 44–60 and its plate hangs below it at 62–65, so the near half's free
+   band is only 65–71 while the far half has everything from 16 up to 44. Hence
+   twenty from the top and thirty from the foot — both of which put the pips on
+   open sand in the right player's half, at the one width where guessing would
+   have put them on a card. Smaller, too: a narrow arena has less of everything
+   and this must stay a caption rather than become the board. */
+@media (max-width: 46rem) {
+  .stage-mana { gap: 5px; padding: 4px 8px; }
+  .stage-mana.is-far { top: 20%; }
+  .stage-mana.is-near { bottom: 30%; }
 }

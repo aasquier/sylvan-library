@@ -61,21 +61,31 @@ them as separate steps on purpose, so a type error reports as a type error.
   is two colours no single glyph states. A drawn pip carries `role="img"` and
   the colour's name, because a drawing contributes nothing to the
   accessibility tree on its own.
-- **A cost is a row of pips; what a permanent *taps for* is one mark**
-  (`ManaProduced` in the same file, `producedSymbol` in `lib/mtg.ts`). `{G}{W}`
-  means two mana and a Temple Garden makes one, so a pair is drawn as the
-  official hybrid — Magic's own glyph for "or" — and three or more as a prism,
-  a disc cut into a wedge per colour, because no official symbol means "any of
-  these". The pair's spelling is the set's (`{G/W}`, never `{W/G}`): the symbol
-  route asks the official set by code, so a reversed pair is a 404 that falls
-  back to a plain disc and nobody ever sees it go wrong. Whatever the mark, the
-  sentence beside it reads the mark rather than the list.
-- **A tapped permanent wears what it taps for, never what it produced.** The
-  bead on the Coliseum's cards (`FieldCard`, `.field-card-bead`) is a fact
-  about the printing — true whether the card was turned to pay for something or
-  to swing. Nothing on that wire can say more: the mana event carries a seat
-  and a pool, the tap event carries a card, and no key joins them, so an
-  attribution would be the guess ADR 44 forbids.
+- **A cost is a row of pips, and so is a pool; what a permanent *taps for*
+  would be one mark.** `ManaPip` (`components/manasymbol.tsx`) is one mana that
+  *exists* — a pool beside a hand, a flash on the sand — and a pool holding a
+  green and a white is two things you can spend, so it is two pips. The mark
+  for what a printing taps for is the opposite claim: `{G}{W}` means two mana
+  and a Temple Garden makes *one*, which is why that was a single hybrid glyph
+  and never a pair of pips. It had one caller, the bead on a turned permanent,
+  and #341 took the bead off the card — so `ManaProduced` went with it rather
+  than staying exported and unused. `producedSymbol`/`producedName` in
+  `lib/mtg.ts` still say the same thing in words, which is what the card's
+  own `title` carries.
+- **The board says mana arrived. It never says what made it.** Forge's mana
+  event carries a seat and a pool, the tap event carries a card, and no key
+  joins them, so an attribution would be the guess ADR 44 forbids. What the
+  Coliseum draws instead is the pool itself, which is per-seat and needs no
+  attribution at all: `BoardSide.pool` is where it came to rest,
+  `BoardSide.raised` is what there was to spend across the beat, and
+  `BoardSide.gained` is what arrived (`lib/board.ts`'s fold, `lib/mana.ts`'s
+  arithmetic). `FieldPool` fills and drains beside each hand; `StageMana`
+  flashes the arrival on the sand.
+- **Forge taps one land and spends it before tapping the next.** Measured on a
+  real match: a five-mana turn crosses as `G, '', G, '', G, '', G, '', G, ''`,
+  so a pool's *instantaneous* peak is one mana for every spell in the game.
+  Anything drawn from that peak strobes. `poolRaised` sums the rises instead,
+  which is why the row shows five pips and not one pip five times.
 - **Glossary keys are pinned to the served table.** A `Term` or `HelpTip` name
   must exist in `go/internal/reference/data/glossary.json`, which the app
   fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip

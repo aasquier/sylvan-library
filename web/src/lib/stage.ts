@@ -46,6 +46,7 @@ import { useEffect, useState } from 'react'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
 import { sameCard } from './board'
+import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
 
 /**
@@ -306,4 +307,126 @@ export function useStaged(next: Staged | null, key: string, game: number):
     return () => { window.clearTimeout(gone) }
   }, [parting])
   return { showing, parting }
+}
+
+/* ------------------------------------------------ mana, in the same middle */
+
+/**
+ * **The mana that arrived**, flashed in the middle of the arena.
+ *
+ * This is the extension the top of this file left room for, arriving from the
+ * one direction that comment did not predict: not another *card*, but another
+ * kind of event entirely. Aaron, 2026-08-26, having watched the first attempt
+ * put a bead on the tapped card instead: *"I wanted the mana symbol to maybe
+ * just show in the middle like the cast cards do now."*
+ *
+ * Three things make it a different object from a staged card rather than a
+ * variant of one, and all three are the reason it has its own hook:
+ *
+ * - **It is small and it is short.** A game holds fifty-odd pool movements
+ *   against sixty-odd casts, and a card-sized reveal for every tapped Forest
+ *   would be exhausting long before turn six. A row of pips at a fifth of a
+ *   card's height, for two thirds of a cast's time, is a glance rather than a
+ *   halt.
+ * - **It shares the beat with the thing it paid for.** Mana arriving and the
+ *   spell it was spent on land on *the same beat* — Forge raises no beat for a
+ *   mana ability at all (it does not use the stack), so the whole fill and
+ *   drain reaches the browser attached to the cast itself. If this took the
+ *   card's slot the commonest mana in the game would evict the commonest card
+ *   in the game, and the two would flicker over each other all match. It gets
+ *   its own slot and its own place on the sand, and the two read as one
+ *   sentence: this much mana, and what it bought.
+ * - **It belongs to a player.** A cast card is centred because a spell happens
+ *   to the table; mana happens to a *person*, so this is drawn in the half of
+ *   the arena belonging to the seat that gained it. That costs nothing and
+ *   says something the centre could not.
+ *
+ * **It never claims a source.** Pips, and no card behind them — Forge's mana
+ * event carries a seat and a pool and nothing else, and ADR 44 is why nothing
+ * here draws a line from a turned permanent to a mana.
+ */
+export interface StagedMana {
+  /** The beat's own identity, so the same mana arriving twice plays twice
+   *  rather than reconciling onto a finished animation. */
+  key: string
+  /** Whose mana, as the edge of the table they sit at — which is where this is
+   *  drawn. */
+  facing: 'far' | 'near'
+  pips: Pip[]
+  /** Both the CSS duration and the element's life, handed over as one number
+   *  for `STAGE_LIFE`'s reason: two places writing down one length is two
+   *  places for them to drift apart. */
+  life: number
+}
+
+/** How long a mana flash is watched for, before any pace applies.
+ *
+ *  Two thirds of a cast, which is the ratio that came out of asking what each
+ *  one is for: a card is *read* — a name, an art, a plate — and a row of pips
+ *  is *counted*, and counting three of anything is quicker than reading a
+ *  title. Long enough to see how many and what colour; gone before it is in
+ *  the way of the spell it paid for. */
+const MANA_LIFE = 760
+/** The most beats a flash may outlive its own, and the floor under it. The
+ *  same pair, and the same argument, as `STAGE_BEATS` and `STAGE_FLOOR`:
+ *  tighter at the top because mana is the commoner event, and floored because
+ *  a fifth of a fade is worse than no fade at all. */
+const MANA_BEATS = 2
+const MANA_FLOOR = 420
+
+/** How long this flash is watched for, at this pace. */
+export function manaLife(speed: Speed): number {
+  const beat = beatDelay(speed)
+  if (beat === 0) return MANA_LIFE
+  return Math.max(MANA_FLOOR, Math.min(MANA_LIFE, beat * MANA_BEATS))
+}
+
+/**
+ * What arrived in the middle, if anything did.
+ *
+ * A pure reading of the fold's own answer — `gained` is settled in
+ * `lib/board.ts`, which is the only place that knows what each pool held going
+ * *into* the beat. Null for a beat where no mana arrived, which is most of
+ * them.
+ */
+export function stagedMana(gained: string, facing: 'far' | 'near', key: string,
+  speed: Speed): StagedMana | null {
+  const pips = poolPips(gained)
+  if (!pips.length) return null
+  return { key: `${key}:${facing}`, facing, pips, life: manaLife(speed) }
+}
+
+/**
+ * Hold one seat's mana flash for its own life.
+ *
+ * A slimmer `useStaged`: one slot and no parting, because two mana flashes in a
+ * row are two counts of the same thing and shoving the first one aside would
+ * be ceremony for something that is over. It keeps the two rules that matter —
+ * it can never strand a flash (every timeout is cleared by the effect that set
+ * it) and it never carries one across a game — and it raises the flash during
+ * the render for `useStaged`'s reason: mana that appeared a commit after the
+ * beat that spent it would read as the wrong order of events.
+ */
+export function useStagedMana(next: StagedMana | null, key: string,
+  game: number): StagedMana | null {
+  const [showing, setShowing] = useState<StagedMana | null>(null)
+  const [wasGame, setWasGame] = useState(game)
+  const [wasKey, setWasKey] = useState<string | null>(null)
+  if (game !== wasGame) {
+    setWasGame(game)
+    setWasKey(key)
+    setShowing(next)
+  } else if (key !== wasKey) {
+    setWasKey(key)
+    // A beat with no mana leaves the last flash alone to finish its own life,
+    // exactly as a beat with no card leaves the stage alone.
+    if (next) setShowing(next)
+  }
+  useEffect(() => {
+    if (!showing) return
+    const done = window.setTimeout(() => setShowing(null),
+      showing.life + STAGE_TAIL)
+    return () => { window.clearTimeout(done) }
+  }, [showing])
+  return showing
 }

@@ -55,14 +55,15 @@ import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { CrownGlyph, HandFanGlyph, HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
-import { ManaProduced } from './manasymbol'
-import { COLOR_VAR, producedColors, producedName } from '../lib/mtg'
+import { ManaPip } from './manasymbol'
+import { producedColors, producedName } from '../lib/mtg'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import ensisArt from '../assets/coliseum/ensis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, sameCard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
+import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
@@ -739,47 +740,35 @@ function FieldCard({ card, count, inPlay = false }: {
             <span className="field-card-lens-pt tabular">{stats}</span>
           </span>
         )}
-        {/* **The bead: what this turned permanent taps for.**
+        {/* **The bead that used to be here is gone, and the sentence it
+            drew is not.**
 
-            A board of forty cards showed a Llanowar Elves lying sideways and
-            said nothing about why (Aaron, 2026-08-26: *"I would like a mana
-            symbol to appear in mana dorks tapped for mana"*). A tapped card is
-            the most legible state on this table and the least informative one:
-            turned is turned, whether it swung, blocked or paid for something.
+            #337 put a mana mark on the right edge of every turned permanent,
+            for the honest reason that a tapped card is the most legible state
+            on this table and the least informative one. Aaron looked at it an
+            hour later and said it was not what he had asked for: *"We didn't
+            quite get the land tapping for mana symbol part right. I wanted the
+            mana symbol to maybe just show in the middle like the cast cards do
+            now"* — so the mark moved to the middle of the arena, where it is
+            twenty-two pixels instead of fifteen and arrives at the moment the
+            mana does. `components/stage.tsx` draws it.
 
-            **What it claims, exactly.** This permanent is turned, and this
-            permanent taps for {'{'}G{'}'}. It does *not* claim this activation
-            filled anybody's pool — nothing on the wire can say that, and ADR
-            44 is clear that the board holds state and never a guess. The
-            source of a mana is erased before the board ever sees it: the mana
-            event carries a seat and a pool, the tap event carries a card, and
-            no key joins them. So the honest sentence is the one about the
-            printing, which is true whatever the card was turned for — and on
-            a real board a turned mana creature nearly always did just tap for
-            it, which is why the mark is worth drawing at all.
+            Two further reasons it should not stay here as well as there. The
+            first is space: this card is 58×81 and its edges now carry a count,
+            a loupe, a crown and the keyword marks, and the bead was the fifth
+            thing competing for the same corner. The second is the one that
+            settles it — **with a real pool on the screen the bead starts
+            claiming something it never said.** A green bead on a turned Forest
+            beside a pool that just gained green reads as *this made that*, and
+            that is precisely the inference ADR 44 refuses: Forge's mana event
+            carries a seat and no source, and no key joins it to a tap. The
+            bead was careful never to say it. Next to the pool it would imply
+            it, which is worse, because an implication cannot be qualified.
 
-            The right edge, because it is the only side of a 58px card that is
-            still free, and because it makes a system out of what was going to
-            be a leftover: **the left edge is what the card does in a fight**
-            (the keyword marks), **the right edge is what it pays for.** Clear
-            of the count above it and the loupe below it, at every count of
-            both. */}
-        {makes.length > 0 && (
-          <span className="field-card-bead"
-                title={`taps for ${producedName(makes)}`}
-                // The aura takes the mana's own colour when there is one to
-                // take. Three or more has no colour to be, so it falls to the
-                // brass this room is trimmed in rather than picking a winner
-                // out of five. A custom property and not a `style` on the glow
-                // itself, so the `:hover` and the breath can still reach it.
-                style={makes.length <= 2 && makes[0]
-                  ? ({ '--bead-glow': COLOR_VAR[makes[0]] } as CSSProperties)
-                  : undefined}>
-            <span className="field-card-bead-mark">
-              <ManaProduced colors={makes} size={15} />
-            </span>
-          </span>
-        )}
+            What the bead was *for* survives in words: `title` still reads
+            "taps for green mana" on a turned permanent, so the fact is a
+            hover and a screen reader away and nothing is lost but the pixel.
+            `BoardCard.makes` is still on the wire and still read, just above. */}
         {count > 1 && (
           <span className="field-card-count tabular">{count}<span
             className="field-card-times">×</span></span>
@@ -1481,10 +1470,98 @@ function FieldRail({ side, facing, name }: {
  * battlefield stacking nine Forests into one is a mercy; here it would be a
  * lie about how many cards somebody is holding.
  */
-function FieldHand({ side, name, facing }: {
+/**
+ * **The mana this player has to spend, beside the cards they would spend it
+ * on.**
+ *
+ * Aaron, 2026-08-26: *"by that players hand the symbols should appear as
+ * available mana to cast if that is possible, and then should be depleted on
+ * the cast itself."* Which is two asks and the second is the one that makes it
+ * real — a resting pool is empty nearly every time anybody looks at it (Go's
+ * `board.floating` measured nine of ten), so a row that only ever drew
+ * `BoardSide.pool` would be a permanently empty trough that told the truth and
+ * said nothing. What a person wants to see is the *movement*: mana arriving as
+ * lands turn, standing there a moment, and going when the spell is cast.
+ *
+ * So the row fills to `raised` — everything this seat had to spend during the
+ * beat — and then drains to `pool`, which is what was left. `usePoolFlow` is
+ * the clock; `lib/mana.ts` argues both, including the measurement that settled
+ * why this is not the pool's high-water mark. **Forge taps one land and spends
+ * that mana before tapping the next**, so the instant-by-instant peak is one
+ * mana for every spell in the game, and a row drawn from it would flicker a
+ * single pip five times inside one beat instead of showing the five mana that
+ * paid for the spell.
+ *
+ * **Beside the hand and not on the battlefield**, which is where a player's
+ * eye already is when they are working out what they can cast — and it is also
+ * the only honest place for it, because the pool is a fact about a *seat*.
+ * Nothing on this wire could put it on a card: Forge's mana event carries a
+ * player and a pool and no source at all (ADR 44).
+ *
+ * The trough is drawn whether or not there is anything in it. A row that
+ * appeared and vanished fifty times a match would shove the hand up and down
+ * the screen all game, and a beginner needs somewhere to *look* before there
+ * is anything to see there — an empty basin with its name on it teaches where
+ * mana lives; a gap teaches nothing.
+ */
+function FieldPool({ side, speed, at }: {
+  side: BoardSide
+  speed: Speed
+  /** The step count being shown. Keyed on this rather than on a beat, so
+   *  dragging the scrubber back through a turn plays the mana again instead of
+   *  leaving it stuck wherever the pointer took it. */
+  at: number
+}) {
+  const beat = beatDelay(speed)
+  const { held, spent } = usePoolFlow(side.raised, side.pool, beat,
+    `${side.seat}:${at}`)
+  const timing = {
+    '--pool-fill': `${poolFill(beat)}ms`,
+    '--pool-drain': `${poolDrain(beat)}ms`,
+  } as CSSProperties
+  // Said in words for anybody not looking at fourteen-pixel pictures, and the
+  // words are the resting truth rather than the animation's current frame — a
+  // screen reader being told about a pool mid-drain would be told a number
+  // that was never a fact about the game. `aria-live` is deliberately absent:
+  // this changes on most beats, and a room that announced every one of them
+  // would talk over the play-by-play it sits beside.
+  const said = `Mana pool: ${poolSaid(side.pool)}`
+  return (
+    <div className="field-pool" style={timing} title={said}>
+      <span className="field-pool-word" aria-hidden="true">Mana</span>
+      <span className="field-pool-row" aria-hidden="true">
+        {held.map((pip) => (
+          <span key={`held-${pip.symbol}-${pip.at}`} className="field-pool-pip"
+                style={{ '--pip-i': pip.at } as CSSProperties}>
+            <ManaPip symbol={pip.symbol} size={14} />
+          </span>
+        ))}
+        {/* The mana that was just spent, on its way out. Rendered *after* the
+            mana that is left, so what drains is the end of the row — which is
+            what paying for something looks like when you do it with coins. A
+            separate list rather than a flag on the same one, so a pip is in
+            exactly one of them and nothing is ever drawn twice. */}
+        {spent.map((pip) => (
+          <span key={`spent-${pip.symbol}-${pip.at}`}
+                className="field-pool-pip is-spent"
+                style={{ '--pip-i': pip.at } as CSSProperties}>
+            <ManaPip symbol={pip.symbol} size={14} />
+          </span>
+        ))}
+      </span>
+      <span className="sr-only">{said}</span>
+    </div>
+  )
+}
+
+function FieldHand({ side, name, facing, speed, at }: {
   side: BoardSide
   name: string
   facing: 'far' | 'near'
+  /** Passed through to the pool below the nameplate, which is paced from the
+   *  same clock as everything else in this room. */
+  speed: Speed
+  at: number
 }) {
   // **The nameplate is the handle, and the fan is not.**
   //
@@ -1555,6 +1632,12 @@ function FieldHand({ side, name, facing }: {
         </span>
         {name}<span className="field-hand-n tabular">{side.hand.length}</span>
       </button>
+      {/* **Between the name and the cards, which is the order a player thinks
+          in**: this is me, this is what I can pay, these are the things I
+          might pay for. Above the fan at both widths, because the fan is the
+          thing that grows and the pool must not be pushed somewhere new every
+          time somebody draws a card. */}
+      <FieldPool side={side} speed={speed} at={at} />
       {side.hand.length > 0 && (
         <div className={`field-tray field-hand-tray${open ? ' is-open' : ''}`}
              role="group" aria-label={`Hand, all ${side.hand.length}`}
@@ -1927,7 +2010,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           his phone). Now each hand is its own grid area and travels with its
           seat at every width — above the far half, below the near one, which
           is where the two players' hands actually are. */}
-      <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
+      <FieldHand side={far} facing="far" name={name(far.slug, far.name)}
+                 speed={speed} at={shown} />
 
       <FieldSide side={far} facing="far" active={lit === 'far'} />
 
@@ -1958,7 +2042,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
 
       <FieldSide side={near} facing="near" active={lit === 'near'} />
 
-      <FieldHand side={near} facing="near" name={nearName} />
+      <FieldHand side={near} facing="near" name={nearName}
+                 speed={speed} at={shown} />
 
       {/* **Everything that is cast, and everything that dies.** The board can
           only draw what stays, and half of Commander never stays — an instant
@@ -1973,7 +2058,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           `--mark-life-dies` from `.field-stage`, which is how a death drawn
           here and the skull on the card in its row stay one event. */}
       <CenterStage board={board} beat={beat ?? null} speed={speed} game={game}
-                   dies={markLife('dies', speed)} seat={casting} />
+                   dies={markLife('dies', speed)} seat={casting} at={shown}
+                   gained={{ far: far.gained, near: near.gained }} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
                       seek={seek} turns={turns} games={games} playing={playing}
