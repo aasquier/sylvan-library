@@ -185,7 +185,7 @@ it('changes card on a swipe, on the arrow keys, and on a click', () => {
   fireEvent.click(screen.getByRole('button', { name: 'The card after this one' }))
   expect(front()).toBe(SWORD.name)
   // And straight to a card, which is what the pips are for.
-  fireEvent.click(screen.getByRole('button', { name: AURA.name }))
+  fireEvent.click(screen.getByRole('button', { name: `${AURA.name}, 3 of 3` }))
   expect(front()).toBe(AURA.name)
 })
 
@@ -215,7 +215,9 @@ it('says where you are, and stops at both ends rather than wrapping', () => {
   const on = screen.getByRole('button', { name: 'The card after this one' })
 
   expect(document.querySelectorAll('.card-sheet-pip')).toHaveLength(3)
-  expect(screen.getByRole('button', { name: CARD.name })
+  // Where you are, for somebody who cannot see which pip is lit: the position
+  // rides the pip's name, so a reader hears it without walking the row.
+  expect(screen.getByRole('button', { name: `${CARD.name}, 1 of 3` })
     .getAttribute('aria-current')).toBe('true')
   // An ordered assemblage, not a ring: a dead end you can see is kinder to a
   // newcomer than a loop that silently returns them to the creature.

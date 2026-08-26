@@ -790,10 +790,15 @@ export function CardSheet({ name, image, onClose, worn = NOTHING }: {
             <Chevron back />
           </button>
           <span className="card-sheet-pips">
+            {/* The position is in the name rather than drawn as "2 of 3"
+                beside them. A sighted person already has it — the lit pip is
+                second of three — and a second copy in words is clutter. A
+                reader has no pips, so without this the only way to find out
+                where you are is to walk all of them. */}
             {cards.map((c, n) => (
               <button key={`${n}-${c.name}`} type="button"
                       className={`card-sheet-pip${n === at ? ' is-on' : ''}`}
-                      aria-label={c.name}
+                      aria-label={`${c.name}, ${n + 1} of ${cards.length}`}
                       aria-current={n === at ? true : undefined}
                       onClick={() => setWant(n)} />
             ))}
