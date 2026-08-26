@@ -499,6 +499,107 @@ describe('a permanent and what is attached to it', () => {
     expect(stacks).toHaveLength(2)
     expect(stacks.map((s) => s.card.attachments.length)).toEqual([1, 0])
   })
+
+  /** Two Beast tokens and whatever the steps hang on them. Tokens because
+   *  Commander is singleton: they are the only cards that ever repeat, so a
+   *  stack of more than one is a thing only tokens can be. */
+  const beasts = (steps: unknown[], extra: unknown[] = []): ForgeBoard => ({
+    seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],
+    cards: [
+      { id: 1, name: 'Beast Token', token: true, seat: 1, types: 'Creature - Beast' },
+      { id: 2, name: 'Beast Token', token: true, seat: 1, types: 'Creature - Beast' },
+      ...extra,
+    ],
+    steps: [
+      { turn: 1, seat: 1, changes: [
+        { id: 1, zone: 'battlefield', seat: 1, power: 3, toughness: 3 },
+        { id: 2, zone: 'battlefield', seat: 1, power: 3, toughness: 3 },
+      ] },
+      ...steps,
+    ],
+  } as unknown as ForgeBoard)
+
+  it('gives an equipped token its own pile', () => {
+    // Aaron, 2026-08-26: *"equipment on a token should put it in its own
+    // pile"*. A 3/3 Beast holding a sword is a different object from the 3/3
+    // beside it — different power, different behaviour — and a player has to
+    // be able to see which is which.
+    const b = beasts([
+      { turn: 2, seat: 1, changes: [{ id: 3, attached_to: 1 }] },
+    ], [{ id: 3, name: 'Bonesplitter', seat: 1, types: 'Artifact - Equipment' }])
+    ;(b.steps[0]!.changes as unknown[]).push(
+      { id: 3, zone: 'battlefield', seat: 1 })
+    const stacks = stackRow(foldBoard(b, 2).sides[0]?.creatures ?? [])
+    expect(stacks.map((s) => [s.count, s.card.attachments.length]))
+      .toEqual([[1, 1], [1, 0]])
+  })
+
+  it('splits an equipped token off even when the sword has no name', () => {
+    // **The bug, and it is a bug about the key rather than about equipment.**
+    // A card the server never put in the dictionary folds with an empty name,
+    // and a key built from names alone renders that as the empty string —
+    // which is exactly what a card carrying *nothing* contributes. So the two
+    // piles collided, and the survivor drew one sword above a count of two.
+    //
+    // Only tokens could ever show it: a stack of one is a stack whose key was
+    // never tested. Hence a token here, and hence the count in the key.
+    const b = beasts([
+      // No dictionary entry for id 3 at all — the case `foldBoard`'s
+      // `known?.name ?? ''` has always allowed for.
+      { turn: 2, seat: 1, changes: [{ id: 3, attached_to: 1 }] },
+    ])
+    ;(b.steps[0]!.changes as unknown[]).push(
+      { id: 3, zone: 'battlefield', seat: 1 })
+    const stacks = stackRow(foldBoard(b, 2).sides[0]?.creatures ?? [])
+    expect(stacks.map((s) => [s.count, s.card.attachments.length]))
+      .toEqual([[1, 1], [1, 0]])
+  })
+
+  it('still stacks two tokens carrying the same thing', () => {
+    // The other half of the ruling, and the half a naive fix breaks: two Bears
+    // each holding their own Bonesplitter are the same as each other. Keying
+    // on the instance id would split them and hand back the row of loose
+    // objects this whole function exists to fold up.
+    const b = beasts([
+      { turn: 2, seat: 1, changes: [
+        { id: 3, attached_to: 1 }, { id: 4, attached_to: 2 },
+      ] },
+    ], [
+      { id: 3, name: 'Bonesplitter', seat: 1, types: 'Artifact - Equipment' },
+      { id: 4, name: 'Bonesplitter', seat: 1, types: 'Artifact - Equipment' },
+    ])
+    ;(b.steps[0]!.changes as unknown[]).push(
+      { id: 3, zone: 'battlefield', seat: 1 },
+      { id: 4, zone: 'battlefield', seat: 1 })
+    const stacks = stackRow(foldBoard(b, 2).sides[0]?.creatures ?? [])
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0]?.count).toBe(2)
+  })
+
+  it('does not mind which order two creatures picked the same gear up in', () => {
+    // The tuck shows a corner per attachment: how many, never which came
+    // first. Two creatures wearing the same two things are one pile, and the
+    // sort in the key is what makes the attach order stop mattering.
+    const b = beasts([
+      { turn: 2, seat: 1, changes: [
+        { id: 3, attached_to: 1 }, { id: 4, attached_to: 1 },
+        { id: 5, attached_to: 2 }, { id: 6, attached_to: 2 },
+      ] },
+    ], [
+      { id: 3, name: 'Rancor', seat: 1, types: 'Enchantment - Aura' },
+      { id: 4, name: 'Bonesplitter', seat: 1, types: 'Artifact - Equipment' },
+      { id: 5, name: 'Bonesplitter', seat: 1, types: 'Artifact - Equipment' },
+      { id: 6, name: 'Rancor', seat: 1, types: 'Enchantment - Aura' },
+    ])
+    ;(b.steps[0]!.changes as unknown[]).push(
+      { id: 3, zone: 'battlefield', seat: 1 },
+      { id: 4, zone: 'battlefield', seat: 1 },
+      { id: 5, zone: 'battlefield', seat: 1 },
+      { id: 6, zone: 'battlefield', seat: 1 })
+    const stacks = stackRow(foldBoard(b, 2).sides[0]?.creatures ?? [])
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0]?.count).toBe(2)
+  })
 })
 
 describe('counters, and the account of how they got there', () => {

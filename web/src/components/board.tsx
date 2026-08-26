@@ -1000,7 +1000,12 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
     dressed ? `${dressed.card}, art by ${dressed.art.artist}` : '',
   ].filter(Boolean).join(' · ')
   return (
-    <div className="field-pile-wrap">
+    // The seat travels out to the wrapper as well as the tile, because how
+    // much of the zone a place takes is a property of its *slot* — and the
+    // slot is the flex item. A commander's chair takes a full share; the
+    // companion's takes less than one, which is what "off to the side" is
+    // in a row of flex items.
+    <div className={`field-pile-wrap${kind ? ` field-seat-wrap-${kind}` : ''}`}>
     <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
                     + (empty ? ' is-vacant' : '')
                     + (kind ? ` field-seat field-seat-${kind}` : '')}
@@ -1124,6 +1129,21 @@ function FieldGeared({ stack }: {
   )
 }
 
+/**
+ * How wide the companion's slot is, against a commander's chair at one.
+ *
+ * Under one because the companion is not one of them, and far enough under to
+ * be read as a side rather than as a fourth chair — but not so far that the
+ * horn stops being legible on a phone, where the whole rail gives its tiles
+ * about 55px and this slot gets two thirds of one.
+ *
+ * Handed to the stylesheet as `--aside` rather than written down in both
+ * places: the group's total share is arithmetic here and the slot's share is a
+ * flex rule there, and the two have to be the same number or the zone's frame
+ * fits its contents at exactly one commander count.
+ */
+const COMPANION_SHARE = 0.72
+
 /** The stone rail one player's name, life and closed zones are carved into. */
 function FieldRail({ side, facing, name }: {
   side: BoardSide
@@ -1181,11 +1201,19 @@ function FieldRail({ side, facing, name }: {
   // server never named — a mid-deploy skew, or an older worker — where it is
   // the only thing that can say the zone is occupied at all.
   const unseated = side.thrones.length === 0
-  // How many shares of the rail the command zone takes: one per seat, and
+  // How many shares of the rail the command zone takes: one per chair, and
   // never fewer than one, so a board with no seats named still draws a tile
   // the size the old single pile was.
-  const seats = Math.max(1,
-    side.thrones.length + (side.companion ? 1 : 0) + (unseated ? 1 : 0))
+  //
+  // **The companion is not a chair and no longer takes a chair's share.** It
+  // had an equal tile beside the thrones, edged in its own colour, and an
+  // equal box beside a box is a second zone however it is labelled (Aaron,
+  // 2026-08-26: *"companions shouldn't be in their own mini zone, they should
+  // just be in the main command zone to the side"*). It is in this zone — it
+  // really does sit there — so it belongs inside the zone's own frame, at the
+  // side, in a slot narrower than the places the commanders keep.
+  const chairs = Math.max(1, side.thrones.length + (unseated ? 1 : 0))
+  const seats = chairs + (side.companion ? COMPANION_SHARE : 0)
   return (
     <div className={`field-rail field-rail-${facing}`}>
       <span className="field-rail-totals">
@@ -1196,14 +1224,21 @@ function FieldRail({ side, facing, name }: {
             top one and hid the other, and the one you could not see was as
             likely as not the one that mattered. So each commander gets a
             chair of its own, in the order `deck.yaml` names them, and a
-            companion gets a seat beside them that is not a chair — it sits
-            in this zone, and it is not one of them.
+            companion gets a narrower slot at the side of the same zone — it
+            sits in here, and it is not one of them.
 
-            The group takes a share of the rail per seat it holds, so a deck
+            The group takes a share of the rail per chair it holds, so a deck
             with one commander is drawn exactly as it was before this and a
-            pairing does not squeeze the graveyard to make room. */}
+            pairing does not squeeze the graveyard to make room.
+
+            **And the group is the zone.** The frame is here now rather than
+            on each tile, so what a player sees is one command zone with
+            places inside it — the chairs, and the companion at the side —
+            instead of two or three separate boxes that have to be read as
+            belonging together. */}
         <span className="field-command"
-              style={{ '--seats': seats } as CSSProperties}>
+              style={{ '--seats': seats,
+                       '--aside': COMPANION_SHARE } as CSSProperties}>
           {/* The label is the card's own name now rather than a sentence
               about the zone — the seat phrases the rest of it, because the
               seat is the thing that knows whether its occupant is home. */}
