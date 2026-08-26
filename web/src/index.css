@@ -6489,36 +6489,47 @@ button:hover .tarot-fan-card {
  * drawn at all. A phone has no spare width, and a decoration that takes a
  * column out of a 390-pixel screen has stopped decorating.
  *
- * `object-position: bottom` and `bottom: 0` so both stand on the same line as
- * each other whatever height they end up: a pair of statues at different
- * heights reads as a mistake, not as perspective. */
+ * `bottom: 0` on both, so they stand on the same line as each other whatever
+ * height they end up at: a pair of statues at different heights reads as a
+ * mistake rather than as perspective. */
 .field-secutor {
   display: none;
   position: absolute;
   bottom: 0;
-  height: auto;
-  object-fit: contain;
-  object-position: bottom;
   pointer-events: none;
   z-index: 0;
-  /* **Cover, not contain, and this is the whole trick.** The box is only ever
-     as wide as the page's margin allows, and at 1440px that margin is about a
-     hundred pixels against a figure that wants a hundred and eighty. `contain`
-     would answer by shrinking him until he fitted — which is the small statue
-     we already rejected — and `cover` answers by keeping the height and
-     letting the box crop the width instead.
-     It crops *only* the width, and that is arithmetic rather than luck: the
-     scale factor is the larger of the two ratios, the box is never wider than
-     the plate's own ratio allows (see the `min()` below), so the height ratio
-     always wins and the crop is horizontal every time. His head and his feet
-     are never in danger. */
+  /* **Cover, not contain, and that is the whole trick.** The box is only ever
+     as wide as the page's margin allows, and at 1440px that margin is a
+     hundred and four pixels against a figure that wants a hundred and
+     thirty-four. `contain` would answer by shrinking him until he fitted,
+     which is the small statue this started from; `cover` answers by keeping
+     the height and letting the box take the width off his back.
+
+     It crops the width and never the height, and that is arithmetic rather
+     than luck: cover scales by the larger of the two ratios, and the `min()`
+     in the sizing block below keeps the box from ever being wider than the
+     plate's own ratio allows — so the height ratio always wins. His head and
+     his feet are never in danger. */
   object-fit: cover;
   /* Keep the plate's left-hand portion, which is the side he faces. On the
      right-hand statue that lands his front against the arena; on the left-hand
      one the mirror puts the same portion on the inner edge. So both crops take
-     the shoulder that is turned away, and the face, shield and leading leg are
-     what survive at the page's edge. */
+     the shoulder that is turned away, and the face, the shield and the leading
+     leg are what survive at the page's edge. */
   object-position: 0% 50%;
+  /* **The outer edge is feathered, not cut.** Where the margin is narrower
+     than he is the box has to end somewhere, and a hard vertical line down a
+     man's back reads as a mistake. Faded into the page he reads as a figure
+     standing at the edge of the light, which is what a statue at the mouth of
+     an arena looks like anyway.
+
+     One gradient serves both, because it is written in the element's own
+     coordinates: the outer edge is the box's right-hand side on the right-hand
+     statue, and the mirror on the left-hand one puts *its* box-right on the
+     screen's left. So `to right` means "outward" for both, and neither ever
+     fades the side that faces the game. */
+  -webkit-mask-image: linear-gradient(to right, #000 58%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 58%, transparent 100%);
   animation: secutor-drift 38s ease-in-out infinite;
 }
 /* **The mirror is a variable, because the animation owns `transform`.**
@@ -6555,17 +6566,26 @@ button:hover .tarot-fan-card {
  * margin is wider than he needs and the second term wins, so he is drawn whole
  * with black to spare.
  *
- * At 1440: 26rem tall, 104px of margin against a natural 185px, so roughly the
- * outer two-fifths of his back is out of frame — which is the trade the size
- * was worth. Below 86rem there is not enough margin for a figure to read as
- * one, so there is no figure; a phone has none at all. */
+ * **The height is the dial, and 1440 is where it is set.** At that width the
+ * page has 104 pixels of black per side and that is the whole of it: the field
+ * is 1232, the window is 1440, and there is no other arrangement of the two.
+ * A figure tall enough to want 185 of those pixels loses half of himself —
+ * measured, and Aaron saw it immediately ("I only see about 50% of them on the
+ * laptop") — and one narrow enough to fit whole is 216 tall, which is the
+ * small statue this started from. 21vw lands between them: about three hundred
+ * tall, with a bit over seven tenths of his width in frame and the last of it
+ * feathered rather than cut. Past about 1620px the margin is wider than he
+ * needs and he is drawn whole.
+ *
+ * Below 86rem there is not enough margin for a figure to read as one, so there
+ * is no figure; a phone has none at all. */
 @media (min-width: 86rem) {
   .field-secutor {
     display: block;
-    height: clamp(14rem, 30vw, 26rem);
+    height: clamp(13rem, 21vw, 23rem);
     width: min(
       calc((100vw - 1232px) / 2 - 0.5rem),
-      calc(clamp(14rem, 30vw, 26rem) * 0.4442)
+      calc(clamp(13rem, 21vw, 23rem) * 0.4442)
     );
   }
   .field-secutor-left { right: 100%; }
