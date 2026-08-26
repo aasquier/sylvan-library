@@ -842,8 +842,16 @@ function FieldCard({ card, count, inPlay = false }: {
         // behind a stack is a hover and a phone has no hover to give. The
         // sheet is the whole of what a touch user gets from a card, so it is
         // the one place "there are twelve of these" has to be sayable there.
+        //
+        // **And so does what the card is carrying.** `FieldGeared` tucks a
+        // creature's swords and Auras under it as corners, which says *that*
+        // it is carrying something and never *what* — the reading is a hover,
+        // and a phone has none. So the sheet takes the whole assemblage and
+        // riffles through it, the creature first. A card with nothing on it
+        // passes an empty list and the sheet stays exactly one card.
         <CardSheet name={count > 1 ? `${count} × ${card.name}` : card.name}
-                   image={card.image} onClose={() => setHeld(false)} />
+                   image={card.image} worn={card.attachments}
+                   onClose={() => setHeld(false)} />
       )}
     </div>
   )
