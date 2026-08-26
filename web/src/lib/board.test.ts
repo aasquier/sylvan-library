@@ -251,8 +251,8 @@ describe('the board at a moment', () => {
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
       mana: false, keywords: [], leaving: null, power: null,
-      toughness: null, counters: [], casts: 0,
-      attachedTo: 0, attachments: [],
+      toughness: null, counters: [], counterHistory: [], combat: '',
+      attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
     })
     const stacks = stackRow([forest(1), forest(2), forest(3)])
     expect(stacks).toHaveLength(1)
@@ -270,8 +270,8 @@ describe('the board at a moment', () => {
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
       mana: false, keywords: [], leaving: null, power: null,
-      toughness: null, counters: [], casts: 0,
-      attachedTo: 0, attachments: [],
+      toughness: null, counters: [], counterHistory: [], combat: '',
+      attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
     })
     const stacks = stackRow([
       forest(1, true), forest(2, false), forest(3, true), forest(4, false),
@@ -288,8 +288,9 @@ describe('the board at a moment', () => {
       id, name: 'Cat Token', token: true, types: 'Creature - Cat',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
       tapped: false, mana: false, keywords: [], leaving: null, power: 1,
-      toughness: 1, counters: [], casts: 0,
-      attachedTo: 0, attachments: [], ...over,
+      toughness: 1, counters: [], counterHistory: [], combat: '',
+      attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+      ...over,
     })
     const stacks = stackRow([
       cat(1),
@@ -340,7 +341,13 @@ describe('the command zone as places', () => {
         { id: 3, zone: 'command', seat: 1 },
         { id: 4, zone: 'command', seat: 1 },
       ] },
-      { turn: 2, seat: 1, changes: [{ id: 2, zone: 'battlefield', seat: 1 }] },
+      // The cast, and its price. `casts` is the server's count of the times
+      // this card has left the command zone; the browser used to derive it by
+      // watching the same transition, which was a reading of the game made in
+      // the one file that makes none.
+      { turn: 2, seat: 1, changes: [
+        { id: 2, zone: 'battlefield', seat: 1, casts: 1 },
+      ] },
     ],
   } as unknown as ForgeBoard
 
@@ -364,6 +371,28 @@ describe('the command zone as places', () => {
     // never been cast from anywhere.
     expect(side?.commanders.map((c) => c.name))
       .not.toContain('Kaheera, the Orphanguard')
+  })
+
+  it('takes the tax from the server rather than counting it here', () => {
+    // Tymna has been cast once, and the count that says so is the server's.
+    const side = foldBoard(zone, 2).sides[0]
+    expect(side?.commanders.find((c) => c.name === 'Tymna the Weaver')?.casts)
+      .toBe(1)
+
+    // **And it really is read, not derived.** The same board with the count
+    // taken off the wire prices her at nothing: the transition is still there
+    // to watch, and nothing here watches it. That is the point — Forge reports
+    // no tax, so counting the transitions is a reading of the game, and every
+    // reading belongs on the other side of the wire (ADR 14).
+    const silent = {
+      ...zone,
+      steps: [zone.steps[0]!, {
+        turn: 2, seat: 1,
+        changes: [{ id: 2, zone: 'battlefield', seat: 1 }],
+      }],
+    } as unknown as ForgeBoard
+    const quiet = foldBoard(silent, 2).sides[0]
+    expect(quiet?.commanders.map((c) => c.casts) ?? []).not.toContain(1)
   })
 
   it('leaves whatever else is in the zone as a pile', () => {
@@ -464,5 +493,204 @@ describe('a permanent and what is attached to it', () => {
     const stacks = stackRow(side?.creatures ?? [])
     expect(stacks).toHaveLength(2)
     expect(stacks.map((s) => s.card.attachments.length)).toEqual([1, 0])
+  })
+})
+
+describe('counters, and the account of how they got there', () => {
+  it('takes the counters off a card that has left the battlefield', () => {
+    // **Aaron's bug, 2026-08-26:** *"counters are following things into exile,
+    // the graveyard, and the command zone, they fall off a creature when they
+    // move to any of those zones"* — which is rule 400.7, and the object that
+    // arrives in the graveyard is not the one that had them.
+    //
+    // The shedding is decided on the server, where every reading of the game
+    // is. What was wrong on this side is the *reading*: an empty set was taken
+    // for "nothing changed" and the old counters survived it. Read two beats
+    // after the death, because the beat of the death itself is the hold below.
+    const b = board([
+      { turn: 1, seat: 1, changes: [{ id: 10, zone: 'battlefield', seat: 1 }] },
+      { turn: 1, seat: 1, changes: [{ id: 10, counters: [{ kind: '+1/+1', n: 2 }] }] },
+      { turn: 2, seat: 2, changes: [{ id: 10, zone: 'graveyard', counters: [] }] },
+      { turn: 2, seat: 2, changes: [] },
+    ])
+    expect(foldBoard(b, 2).sides[0]?.creatures[0]?.counters)
+      .toEqual([{ kind: '+1/+1', n: 2 }])
+    const dead = foldBoard(b, 4).sides[0]?.graveyard[0]
+    expect(dead?.name).toBe('Gyome, Master Chef')
+    expect(dead?.counters, 'a new object arrives with nothing on it')
+      .toEqual([])
+  })
+
+  it('keeps them for the one beat the creature is drawn dying', () => {
+    // The board deliberately stands a dead creature back up for the beat that
+    // says it died, so the skull has a card to land on rather than a hole. In
+    // that instant somebody is looking straight at the creature — and it is
+    // the creature as it died, counters and all. Stripping them on the same
+    // beat would be a beat early, and the whole reason for the hold is that a
+    // beat matters.
+    const b = board([
+      { turn: 1, seat: 1, changes: [{ id: 10, zone: 'battlefield', seat: 1 }] },
+      { turn: 1, seat: 1, changes: [{ id: 10, counters: [{ kind: '+1/+1', n: 2 }] }] },
+      { turn: 2, seat: 2, changes: [{ id: 10, zone: 'graveyard', counters: [] }] },
+      { turn: 2, seat: 2, changes: [] },
+    ])
+    const dying = foldBoard(b, 3).sides[0]?.creatures[0]
+    expect(dying?.leaving, 'held on the sand for this beat').toBe('battlefield')
+    expect(dying?.counters).toEqual([{ kind: '+1/+1', n: 2 }])
+  })
+
+  it('remembers when each counter arrived, and on whose turn', () => {
+    // The hover's account. A set of `+1/+1: 3` cannot say when the three
+    // arrived, because by then the arithmetic has scrolled past.
+    const b = board([
+      { turn: 1, seat: 1, changes: [{ id: 10, zone: 'battlefield', seat: 1 }] },
+      {
+        turn: 1,
+        seat: 1,
+        changes: [{
+          id: 10,
+          counters: [{ kind: '+1/+1', n: 2 }],
+          counter_moves: [{ kind: '+1/+1', was: 0, now: 2 }],
+        }],
+      },
+      { turn: 3, seat: 1, changes: [] },
+      {
+        turn: 3,
+        seat: 1,
+        changes: [{
+          id: 10,
+          counters: [{ kind: '+1/+1', n: 3 }],
+          counter_moves: [{ kind: '+1/+1', was: 2, now: 3 }],
+        }],
+      },
+    ])
+    const gyome = foldBoard(b, 4).sides[0]?.creatures[0]
+    // The turn is the one a player would say — this seat's own count, not
+    // Forge's, which counts each player's turn separately. Forge's 1 and 3 are
+    // seat one's first and second.
+    expect(gyome?.counterHistory).toEqual([
+      { kind: '+1/+1', was: 0, now: 2, turn: 1 },
+      { kind: '+1/+1', was: 2, now: 3, turn: 2 },
+    ])
+  })
+
+  it('folds a run of counters on one turn into one moment', () => {
+    // Three separate +1/+1 counters on one turn is one thing that happened,
+    // and it is what a person would say happened. Three lines is a log, not an
+    // account — and it is what bounds the history, which the fold rebuilds
+    // from step zero on every render.
+    const b = board([
+      { turn: 1, seat: 1, changes: [{ id: 10, zone: 'battlefield', seat: 1 }] },
+      ...[1, 2, 3].map((n) => ({
+        turn: 1,
+        seat: 1,
+        changes: [{
+          id: 10,
+          counters: [{ kind: '+1/+1', n }],
+          counter_moves: [{ kind: '+1/+1', was: n - 1, now: n }],
+        }],
+      })),
+    ])
+    expect(foldBoard(b, 4).sides[0]?.creatures[0]?.counterHistory)
+      .toEqual([{ kind: '+1/+1', was: 0, now: 3, turn: 1 }])
+  })
+
+  it('drops the account when the counters are gone', () => {
+    // A card with nothing on it has nothing to explain. It is also what keeps
+    // a history from outliving the object it describes: the same empty set the
+    // server sends when a creature changes zones clears the story too, so a
+    // creature that dies and comes back starts a new one.
+    const b = board([
+      { turn: 1, seat: 1, changes: [{ id: 10, zone: 'battlefield', seat: 1 }] },
+      {
+        turn: 1,
+        seat: 1,
+        changes: [{
+          id: 10,
+          counters: [{ kind: '+1/+1', n: 1 }],
+          counter_moves: [{ kind: '+1/+1', was: 0, now: 1 }],
+        }],
+      },
+      { turn: 2, seat: 1, changes: [{ id: 10, counters: [] }] },
+    ])
+    const gyome = foldBoard(b, 3).sides[0]?.creatures[0]
+    expect(gyome?.counters).toEqual([])
+    expect(gyome?.counterHistory).toEqual([])
+  })
+})
+
+describe('the fight', () => {
+  /** Gyome swinging at seat 2, and an Egg thrown in front of him. */
+  const combat: ForgeBoard = {
+    seats: [
+      { seat: 1, slug: 'gyome', name: 'Gyome — Food', life: 40 },
+      { seat: 2, slug: 'atla', name: 'Atla — Eggs', life: 40 },
+    ],
+    cards: [
+      { id: 10, name: 'Gyome, Master Chef', seat: 1,
+        types: 'Legendary Creature - Troll Warlock' },
+      { id: 21, name: 'Egg Token', token: true, seat: 2,
+        types: 'Creature - Egg' },
+    ],
+    steps: [
+      { turn: 3, seat: 1, changes: [
+        { id: 10, zone: 'battlefield', seat: 1 },
+        { id: 21, zone: 'battlefield', seat: 2 },
+      ] },
+      { turn: 3, seat: 1, changes: [
+        { id: 10, combat: 'attacking', attacking: 2 },
+        { id: 21, combat: 'blocking', blocking: 10 },
+      ] },
+      { turn: 4, seat: 2, changes: [
+        { id: 10, combat: '', attacking: 0 },
+        { id: 21, combat: '', blocking: 0 },
+      ] },
+    ],
+  } as unknown as ForgeBoard
+
+  it('says who is swinging and who is in the way', () => {
+    // The board could not draw a fight at all: `attack` and `block` were beats
+    // and nothing else, so the account said who was swinging and the picture
+    // never did.
+    const state = foldBoard(combat, 2)
+    const attacker = state.sides[0]?.creatures[0]
+    expect(attacker?.combat).toBe('attacking')
+    expect(attacker?.attacking, 'the seat under attack').toBe(2)
+    const blocker = state.sides[1]?.creatures[0]
+    expect(blocker?.combat).toBe('blocking')
+    // **By id, not by name.** Two Egg Tokens are one name between them, and a
+    // blocker paired to "the attacker called Egg Token" is paired to whichever
+    // one is drawn first.
+    expect(blocker?.blocking).toBe(10)
+  })
+
+  it('takes them out of the fight when the turn turns over', () => {
+    // The empty string is a real value and `undefined` is not the same thing:
+    // read as "nothing changed", a sword mark would stay on a creature for the
+    // rest of the game.
+    const state = foldBoard(combat, 3)
+    expect(state.sides[0]?.creatures[0]?.combat).toBe('')
+    expect(state.sides[0]?.creatures[0]?.attacking).toBe(0)
+    expect(state.sides[1]?.creatures[0]?.blocking).toBe(0)
+  })
+
+  it('stacks an attacking token pile apart from a blocking one', () => {
+    // Aaron, 2026-08-26: *"make sure when it comes to tokens that blocking and
+    // attacking token piles are separated visually"*. Twelve Saprolings of
+    // which five are swinging is the one fact anybody across the seam wants,
+    // and a single stack of twelve deletes it.
+    const saproling = (id: number, combat: string): BoardCard => ({
+      id, name: 'Saproling Token', token: true, types: 'Creature - Saproling',
+      image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
+      tapped: false, mana: false, keywords: [], leaving: null, power: 1,
+      toughness: 1, counters: [], counterHistory: [], combat,
+      attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+    })
+    const stacks = stackRow([
+      saproling(1, 'attacking'), saproling(2, ''),
+      saproling(3, 'attacking'), saproling(4, 'blocking'),
+    ])
+    expect(stacks.map((s) => [s.card.combat, s.count]))
+      .toEqual([['attacking', 2], ['', 1], ['blocking', 1]])
   })
 })

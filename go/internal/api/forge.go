@@ -277,6 +277,30 @@ type forgeBoardSeat struct {
 	// on ids and a name it would have to match twice: once against Forge's
 	// spelling and once against a front face.
 	Commanders []int `json:"commanders,omitempty"`
+	// Shape is what this seat's command zone *is* — [commandSolo] or
+	// [commandPartners] — and it is empty for a board shaped before any deck
+	// was known.
+	//
+	// **The zone has exactly three legal shapes and a list of ids names none
+	// of them** (Aaron, 2026-08-26: *"at most it should just be two slots for
+	// partners, one for a singular commander, or a second companion devoted
+	// slot… those are the only combinations possible in that zone"*). Two ids
+	// in [forgeBoardSeat.Commanders] and one commander that happens to have
+	// been cloned read alike from a browser, and a room that wants to say
+	// "partners" out loud — which commandment 3 wants — had no word to say it
+	// with.
+	//
+	// Read off `deck.yaml`'s own declaration rather than worked out from the
+	// cards: `internal/gate` has already refused a deck whose pairing is not
+	// legal (`CheckPair`) and whose companion is not one (`CheckCompanion`),
+	// so the deck's list of commanders is a validated answer and re-deriving
+	// it here would be a second place for the rules to live. Counted from the
+	// declared *names*, not from the ids resolved below, so a pairing whose
+	// second half Forge could not implement is still a pairing.
+	//
+	// The companion is beside this rather than in it, because it can come with
+	// either shape and is not part of what leads the deck.
+	Shape string `json:"shape,omitempty"`
 	// Companion is this seat's companion by board id, or zero for the decks
 	// that brought none.
 	//
@@ -297,6 +321,17 @@ type forgeBoardSeat struct {
 // carry `isCommander()`, but reaching it means another field on every zone
 // line and another worker image, to learn something `deck.yaml` already
 // states outright.
+// The shapes a command zone can have — [forgeBoardSeat.Shape].
+//
+// Two, not three: a companion is a card *beside* whatever leads the deck, so
+// it rides its own field and pairs with either of these. Words rather than a
+// count, because "two" is not the fact — "partners" is, and a browser drawing
+// two chairs should not have to know that two is what partners means.
+const (
+	commandSolo     = "commander"
+	commandPartners = "partners"
+)
+
 type forgeCommandZone struct {
 	// Commanders in the deck's own order. `deck.Deck.Commander` is a list
 	// because a pairing is two cards, and this keeps that order.
@@ -487,6 +522,15 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 			if id := boardIDOf(name, held[seat.Seat]); id != 0 {
 				row.Commanders = append(row.Commanders, id)
 			}
+		}
+		switch len(zone.Commanders) {
+		case 0:
+			// No deck behind this seat. The zone goes back to being a pile,
+			// which is what every board drew before it was named at all.
+		case 1:
+			row.Shape = commandSolo
+		default:
+			row.Shape = commandPartners
 		}
 		row.Companion = boardIDOf(zone.Companion, held[seat.Seat])
 		out.Seats = append(out.Seats, row)

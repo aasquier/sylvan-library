@@ -53,6 +53,15 @@ they differ.
 | [37](0037-the-archetype-is-a-reading-of-the-themes.md) | The archetype is a reading of the themes, not a second declaration | Accepted — supersedes the labelling half of 36 |
 | [38](0038-the-served-backend-is-rewritten-in-go.md) | The served backend is rewritten in Go, and the bench stays Python | Accepted |
 | [39](0039-configuration-is-a-value-and-tests-run-in-parallel.md) | Configuration is a value, resolved once and passed, and tests run in parallel | Accepted — supersedes the "read at call time" reasoning in [`internal/config`](../../go/internal/config/config.go) |
+| [40](0040-the-second-injection-reaches-the-command-tree.md) | The second injection reaches the command tree | Accepted |
+| [42](0042-a-scribe-rides-forges-event-bus.md) | A scribe rides Forge's event bus, and the board is a listener rather than a parser | Accepted |
+| [43](0043-a-generated-banner-is-a-shelf-entry-and-never-a-commit.md) | A generated banner is a shelf entry, and never a commit | Accepted — widens the effect vocabulary of [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) |
+| [44](0044-the-board-holds-state-and-never-holds-a-guess.md) | The board holds the state the events do not, and never holds a guess | Accepted |
+
+**A note on the numbering.** There is no 41, and this table does not know why
+— the number was never used. The hole stays: renumbering would move a number
+somebody may already have cited, which is the one thing an immutable record
+must not do.
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the

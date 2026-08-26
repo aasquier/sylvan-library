@@ -42,7 +42,20 @@ import "strings"
 //     has already arrived somewhere. Measured on the same match: the ordering
 //     holds for hand-to-battlefield and does not for every path.
 //
-// A fifth thing is a choice rather than a finding: **lands sit in their own
+//  5. **A permanent that changes zones is a new object, and it arrives with
+//     nothing on it.** Rule 400.7: the object that leaves a zone and the one
+//     that arrives in the next are not the same object, so counters do not
+//     travel with it and it is not attacking anything any more. Forge raises
+//     no event saying so — `GameEventCardCounters` fires when a counter is
+//     put on or taken off, never when the card carrying them stops existing —
+//     so the board sheds them itself, on the zone change (Aaron, 2026-08-26:
+//     *"counters are following things into exile, the graveyard, and the
+//     command zone"*). `shed` is the rule and `magicZone` is the care it
+//     needs: the [ZoneLand] split below is this package's furniture rather
+//     than a zone of Magic's, so an animated Dryad Arbor changing rows has
+//     changed nothing and keeps everything.
+//
+// A sixth thing is a choice rather than a finding: **lands sit in their own
 // zone**. That is Aaron's ask and it is right — a battlefield where six
 // Forests are shuffled in among the creatures is a battlefield nobody can
 // read. The split is on the type line, so a creature-land that animates moves
@@ -95,6 +108,43 @@ type BoardCounter struct {
 	N    int    `json:"n"`
 }
 
+// BoardCounterMove is one counter event: which kind moved, and from what to
+// what.
+//
+// **The set says what a card has; this says how it got there** (Aaron,
+// 2026-08-26: *"keep a history of why a creature has all of the counters it
+// does"*). A hover wants the account — two counters on turn four, one more on
+// turn six — and a current set of `+1/+1: 3` cannot produce it, because by
+// then the arithmetic that made the three has scrolled past.
+//
+// **It says how, and it does not say who.** Forge's `GameEventCardCounters`
+// carries the card the counters landed on and nothing about the source
+// (`docs/adr/0042-a-scribe-rides-forges-event-bus.md` records the gap), so
+// there is no honest way to name the card that put them there. Blaming the
+// spell cast most recently would be inference wearing a fact's clothes, and
+// ADR 14 is explicit that deterministic code says only what it knows. So the
+// truthful half ships and the attributed half does not exist.
+//
+// `Was` is Forge's own `oldValue()` rather than this board's previous total.
+// They agree in every ordinary case; where they could not, Forge is the game
+// and this is a reader of it.
+type BoardCounterMove struct {
+	Kind string `json:"kind"`
+	Was  int    `json:"was"`
+	Now  int    `json:"now"`
+}
+
+// What a creature is doing in the combat happening now — [BoardChange.Combat].
+//
+// Words rather than flags, for [ZoneBattlefield]'s reason: a person reading a
+// payload should not need a table. The empty string is the third value and it
+// is a real one — a creature that has stopped attacking — which is why the
+// field is a pointer.
+const (
+	CombatAttacking = "attacking"
+	CombatBlocking  = "blocking"
+)
+
 // BoardChange is one card, as much of it as changed at one step.
 //
 // Everything is optional because almost everything is usually unchanged: a
@@ -106,12 +156,68 @@ type BoardChange struct {
 	Zone string `json:"zone,omitempty"`
 	// Seat is whose zone it moved into, when that changed — a permanent
 	// changing controller is a seat change with no zone change.
-	Seat      int            `json:"seat,omitempty"`
-	Tapped    *bool          `json:"tapped,omitempty"`
-	Power     *int           `json:"power,omitempty"`
-	Toughness *int           `json:"toughness,omitempty"`
-	Types     string         `json:"types,omitempty"`
-	Counters  []BoardCounter `json:"counters,omitempty"`
+	Seat      int    `json:"seat,omitempty"`
+	Tapped    *bool  `json:"tapped,omitempty"`
+	Power     *int   `json:"power,omitempty"`
+	Toughness *int   `json:"toughness,omitempty"`
+	Types     string `json:"types,omitempty"`
+	// Counters is the card's whole counter set, whenever any of it moved. The
+	// whole set rather than the part that changed, because a browser holding a
+	// partial one has no way to know a kind went to zero.
+	//
+	// **A pointer, so that "none" can be said out loud.** An empty slice and an
+	// absent field are the same bytes under `omitempty`, and the two states are
+	// not the same fact at all: absent is "nothing about counters changed this
+	// step", which is true of nearly every card nearly every step, and empty is
+	// "this card has none", which is what a creature that just died has. Sent
+	// as a plain slice, the last counter coming off a card never reached the
+	// browser and the card kept wearing it.
+	Counters *[]BoardCounter `json:"counters,omitempty"`
+	// CounterMoves is every counter event this card raised at this step, in
+	// order. See [BoardCounterMove] — this is the history a hover reads, and
+	// the browser accumulates it rather than the server holding one.
+	//
+	// **A delta rather than a running list**, which is the whole reason it is
+	// affordable: a board is folded from the first step on every render, so a
+	// per-card history carried in full would be re-sent and re-walked on every
+	// one of a hundred and thirty steps. One entry per event is the same volume
+	// the stream already has.
+	CounterMoves []BoardCounterMove `json:"counter_moves,omitempty"`
+	// Combat is this creature's part in the combat happening now:
+	// [CombatAttacking], [CombatBlocking], or the empty string for one standing
+	// out of it.
+	//
+	// A pointer for [BoardChange.AttachedTo]'s reason — the empty string is the
+	// value that says a creature has *stopped* — and it exists at all because
+	// the board could not draw a fight. `attack` and `block` arrive as beats,
+	// so the account said who was swinging and the picture never did: a wall of
+	// tokens looked the same whether it was attacking, blocking or asleep.
+	Combat *string `json:"combat,omitempty"`
+	// Attacking is the seat this creature is attacking, and zero for a creature
+	// that is not. A pointer for the same reason as [BoardChange.Combat].
+	Attacking *int `json:"attacking,omitempty"`
+	// Blocking is the **board id** of the attacker this creature is blocking,
+	// and zero for a creature that is not blocking.
+	//
+	// The id rather than the name, because the name cannot answer the question:
+	// two Egg Tokens across the seam are the same string, and pairing a blocker
+	// to "the attacker called Egg Token" pairs it to whichever one is drawn
+	// first. Forge sends `target_id` on every block line and this reader used to
+	// drop it.
+	Blocking *int `json:"blocking,omitempty"`
+	// Casts is how many times this card has **left the command zone**, which is
+	// what commander tax is counted from — two generic for each previous cast.
+	//
+	// Here rather than in the browser, which used to count the same zone
+	// transitions itself. Forge reports no tax and `CardView.isCommander()` is
+	// deliberately not carried (`go/internal/api/forge.go` argues that), so the
+	// count is the only answer available — and counting is a reading of the
+	// game, which ADR 14 puts on this side of the wire. The browser deciding it
+	// was a second place for the rule to drift.
+	//
+	// Every card is counted, not only commanders: this layer does not know
+	// which cards a deck named, and `forgeBoardSeat` one layer up does.
+	Casts *int `json:"casts,omitempty"`
 	// AttachedTo is the card this one is attached to: an Aura on what it
 	// enchants, an Equipment on what it is equipping.
 	//
@@ -198,7 +304,21 @@ type board struct {
 	// are the same thing here — nothing — because a board only ever asks the
 	// question about a card it is already drawing.
 	attached map[int]int
-	life     map[int]int
+	// combat, attacking and blocking are the fight as it stands: what each
+	// creature is doing, the seat an attacker is attacking, and the board id of
+	// the attacker a blocker stopped.
+	combat    map[int]string
+	attacking map[int]int
+	blocking  map[int]int
+	// fighting is who is in the combat, in the order they joined it.
+	//
+	// A slice beside the map for `pending`'s reason: combat ends for everybody
+	// at once, and clearing it by walking a map would order the changes
+	// randomly and make a recorded golden flap between runs.
+	fighting []int
+	// casts is how many times each card has left the command zone.
+	casts map[int]int
+	life  map[int]int
 	// left is the last real zone a card was cleared out of.
 	//
 	// Needed because **Forge announces the leaving before the arriving**: a
@@ -231,7 +351,9 @@ func newBoard() *board {
 		tapped: map[int]bool{}, power: map[int]int{}, toughness: map[int]int{},
 		types: map[int]string{}, counters: map[int]map[string]int{},
 		attached: map[int]int{},
-		life:     map[int]int{}, left: map[int]string{},
+		combat:   map[int]string{}, attacking: map[int]int{},
+		blocking: map[int]int{}, casts: map[int]int{},
+		life: map[int]int{}, left: map[int]string{},
 		changing: map[int]*BoardChange{},
 	}
 }
@@ -321,6 +443,21 @@ func drawnZone(forge, types string) (string, bool) {
 	}
 }
 
+// magicZone is a drawn zone as Magic has it.
+//
+// [ZoneLand] is this package's own furniture — the row a player puts their
+// lands in — and not a zone of the game, so a Dryad Arbor animating and a
+// creature-land going back to being a land have not changed zones at all.
+// Everything that turns on a zone *change* asks this rather than comparing the
+// drawn names, or an animated land would shed its counters every time it woke
+// up.
+func magicZone(drawn string) string {
+	if drawn == ZoneLand {
+		return ZoneBattlefield
+	}
+	return drawn
+}
+
 // moved folds one zone event.
 //
 // `mode` is the scribe's, "in" or "out". An `out` clears only the zone the
@@ -341,6 +478,7 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		b.left[id] = zone
 		b.zone[id] = ZoneGone
 		b.change(id).Zone = ZoneGone
+		b.became(id, zone, ZoneGone)
 		return
 	}
 	// **A token that leaves the battlefield ceases to exist.** Rule 111.7 and
@@ -367,6 +505,7 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 	if b.zone[id] == zone && (seat == 0 || b.seat[id] == seat) {
 		return
 	}
+	was := b.zone[id]
 	b.zone[id] = zone
 	c := b.change(id)
 	c.Zone = zone
@@ -374,6 +513,7 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		b.seat[id] = seat
 		c.Seat = seat
 	}
+	b.became(id, was, zone)
 	// A card arriving somewhere is a card nobody has tapped yet. Forge agrees
 	// — it raises no untap event for a permanent that leaves the battlefield —
 	// and without this a creature that dies tapped comes back tapped.
@@ -382,6 +522,109 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		no := false
 		c.Tapped = &no
 	}
+}
+
+// became folds what a zone change means beyond the zone itself — ruling 5.
+//
+// **A permanent that changes zones is a new object** (rule 400.7), so three
+// things are true of it the instant it lands and none of them is announced:
+// it has no counters, it is not in combat, and — if it came from a command
+// zone — somebody paid for it.
+//
+// Asked in terms of [magicZone] rather than the drawn one, so that a
+// creature-land waking up keeps everything it had. A card arriving for the
+// first time has no previous zone at all, which differs from every real one
+// and costs nothing: there is nothing on a card nobody has seen yet.
+func (b *board) became(id int, was, now string) {
+	if magicZone(was) == magicZone(now) {
+		return
+	}
+	b.shed(id)
+	b.inCombat(id, "", 0, 0)
+	// **Leaving the command zone is the cast**, and it is the only signal
+	// there is: Forge reports no tax, and a commander that gets countered goes
+	// command → stack → graveyard, so narrowing this to "arrived on the
+	// battlefield" would stop charging for exactly the casts that failed. What
+	// it over-counts is a commander *moved* out of the zone without being cast,
+	// which Forge's AI does not do.
+	if magicZone(was) == ZoneCommand {
+		b.casts[id]++
+		total := b.casts[id]
+		b.change(id).Casts = &total
+	}
+}
+
+// shed drops every counter a card is carrying, and says so out loud.
+//
+// Silent when there is nothing to shed, which is almost every card almost
+// every time: a step that announced "this land still has no counters" for
+// every land that moved would be most of the payload.
+func (b *board) shed(id int) {
+	if len(b.counters[id]) == 0 {
+		return
+	}
+	delete(b.counters, id)
+	none := []BoardCounter{}
+	b.change(id).Counters = &none
+}
+
+// inCombat records what a creature is doing in the fight happening now.
+//
+// `attacking` is the seat under attack and `blocking` is the board id of the
+// attacker stopped; each is zero for the other role and both are zero for a
+// creature standing out of combat. Every field is emitted only when it moved,
+// for `attach`'s reason: Forge re-announces a combat it has already announced
+// — the recorded match raises the same attacker twice — and a change published
+// for a fact that did not move is a step saying something happened when
+// nothing did.
+func (b *board) inCombat(id int, role string, attacking, blocking int) {
+	if id == 0 {
+		return
+	}
+	if b.combat[id] != role {
+		if b.combat[id] == "" {
+			b.fighting = append(b.fighting, id)
+		}
+		if role == "" {
+			delete(b.combat, id)
+		} else {
+			b.combat[id] = role
+		}
+		value := role
+		b.change(id).Combat = &value
+	}
+	if b.attacking[id] != attacking {
+		b.attacking[id] = attacking
+		value := attacking
+		b.change(id).Attacking = &value
+	}
+	if b.blocking[id] != blocking {
+		b.blocking[id] = blocking
+		value := blocking
+		b.change(id).Blocking = &value
+	}
+}
+
+// endCombat takes everybody out of the fight.
+//
+// **Called when a turn begins, because that is the only boundary the stream
+// has.** Forge's bus has no end-of-combat event the scribe listens for, so the
+// honest reading is "this combat lasts until the next turn starts" — which is
+// right about the picture for the whole of combat and a phase late afterwards,
+// where a creature keeps a sword mark through a second main phase it is no
+// longer attacking in. The one case it reads wrong is an extra combat inside
+// one turn, where the first combat's attackers stay marked alongside the
+// second's; that is rare, and a mark left on for too long is a smaller lie
+// than an attacker the board never drew at all. A creature that leaves the
+// battlefield is taken out of combat immediately, by [board.became].
+func (b *board) endCombat() {
+	for _, id := range b.fighting {
+		if b.combat[id] == "" {
+			continue
+		}
+		b.inCombat(id, "", 0, 0)
+	}
+	b.fighting = b.fighting[:0]
 }
 
 // attach folds an attachment, and a `host` of zero folds it coming off.
@@ -453,8 +696,11 @@ func (b *board) stats(id, power, toughness int, types string) {
 
 // counter folds a counter event. The whole set for that card crosses whenever
 // any of it changes, because a browser holding a partial set has no way to
-// know a kind went to zero.
-func (b *board) counter(id int, kind string, now int) {
+// know a kind went to zero — and the move that changed it crosses beside the
+// set, because a set of three tells nobody how it got to three.
+//
+// `was` is Forge's own previous total, carried through rather than recomputed.
+func (b *board) counter(id int, kind string, was, now int) {
 	if kind == "" {
 		return
 	}
@@ -471,7 +717,17 @@ func (b *board) counter(id int, kind string, now int) {
 	} else {
 		on[kind] = now
 	}
-	b.change(id).Counters = sortedCounters(on)
+	c := b.change(id)
+	c.CounterMoves = append(c.CounterMoves,
+		BoardCounterMove{Kind: kind, Was: was, Now: now})
+	set := sortedCounters(on)
+	c.Counters = &set
+	// A card holding nothing holds no map either. Housekeeping rather than
+	// behaviour — `shed` reads the length and an empty map is a card the board
+	// would otherwise remember forever.
+	if len(on) == 0 {
+		delete(b.counters, id)
+	}
 }
 
 // lives folds a life total.

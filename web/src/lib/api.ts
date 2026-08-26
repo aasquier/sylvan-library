@@ -657,6 +657,16 @@ export interface ForgeBoardSeat {
    *  only `deck.yaml` knows which is which. Absent for a board shaped before
    *  a deck was known. */
   commanders?: number[]
+  /** What this seat's command zone **is** — `'commander'` for one, or
+   *  `'partners'` for a pairing — and absent for a board shaped before any
+   *  deck was known.
+   *
+   *  The zone has only three legal shapes, and a list of ids names none of
+   *  them: two ids and one commander that happened to get cloned read alike.
+   *  Decided on the server off `deck.yaml`'s own declaration, which the gate
+   *  has already refused if the pairing is not a legal one. The companion is
+   *  beside this rather than in it, because it can come with either shape. */
+  shape?: string
   /** This seat's companion by board id, or absent.
    *
    *  A companion really does sit in the command zone — Forge moves it there
@@ -701,7 +711,43 @@ export interface ForgeBoardChange {
   power?: number
   toughness?: number
   types?: string
+  /** The card's whole counter set, whenever any of it moved.
+   *
+   *  **An empty array is a real answer and `undefined` is not the same
+   *  thing.** Absent means nothing about counters changed this step; empty
+   *  means the card has none, which is what a creature that has just died or
+   *  had its last counter removed really is. */
   counters?: { kind: string; n: number }[]
+  /** Every counter event this card raised at this step — which kind moved,
+   *  and from what to what.
+   *
+   *  A delta rather than a running list, because the board is folded from the
+   *  first step on every render and a full history re-sent on each of a
+   *  hundred and thirty steps would be paid for a hundred and thirty times.
+   *  `foldBoard` accumulates it into `BoardCard.counterHistory`. */
+  counter_moves?: { kind: string; was: number; now: number }[]
+  /** What this creature is doing in the combat happening now —
+   *  `'attacking'`, `'blocking'`, or `''` for one standing out of it.
+   *
+   *  The empty string is the value that says a creature has *stopped*, so
+   *  absent and empty are different facts here too. */
+  combat?: string
+  /** The seat this creature is attacking, or 0 for one that is not. */
+  attacking?: number
+  /** The **board id** of the attacker this creature is blocking, or 0 for one
+   *  that is not blocking.
+   *
+   *  The id rather than the name, because two Egg Tokens are one name and
+   *  pairing a blocker to "the attacker called Egg Token" pairs it to
+   *  whichever is drawn first. */
+  blocking?: number
+  /** How many times this card has left the command zone, which is what
+   *  commander tax is counted from.
+   *
+   *  Counted on the server. The browser used to count the same zone
+   *  transitions itself, which put a reading of the game in the one file
+   *  that decides none. */
+  casts?: number
   /** The card this one is now attached to — an Aura on what it enchants, an
    *  Equipment on what it is equipping.
    *
