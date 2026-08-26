@@ -6730,14 +6730,15 @@ button:hover .tarot-fan-card {
     transform: translateX(-7px) scale(0.97);
     transform-origin: top left;
   }
-  .field-rail-far .field-tray,
-  .field-rail-near .field-tray {
-    top: 0;
-    bottom: auto;
-    right: calc(100% + 8px);
-    transform: translateX(7px) scale(0.97);
-    transform-origin: top right;
-  }
+  /* **The rails' trays are no longer special-cased here, and that is the
+     fix.** This block swung them sideways on the reasoning quoted above —
+     "the zones are the right column, so theirs swing left" — which was true
+     when the zones *were* a standing column on the right. #316 made them a
+     band of two panels under the arena, and the rule stayed: on a wide screen
+     the left panel's tray swung left off the page, and on a narrow one the
+     right panel's swung up over the battlefield. Two faults, one stale
+     sentence, and neither visible from the diff that caused them.
+     The base rule above drops the tray under its own panel at every width. */
   .field-hand-tray.is-open {
     transform: none;
   }
@@ -6772,6 +6773,13 @@ button:hover .tarot-fan-card {
  * room is trimmed in, over the page's own dark. */
 /* One seat's places: a heading, and the three zones under it. */
 .field-rail {
+  /* **The containing block for its trays**, which is what lets one span the
+     panel while still living inside its own pile's wrapper. The wrapper has to
+     stay the hover target — a panel the pointer must leave the pile to reach
+     is a panel nobody can reach — but it does not have to be the thing the
+     tray is measured against, and a 26-pixel tile is the wrong ruler for a
+     graveyard. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -6938,7 +6946,9 @@ button:hover .tarot-fan-card {
    suite reads an empty stylesheet, so nothing in 734 green tests could have
    seen it; Aaron opening the page saw it immediately. */
 .field-pile-wrap {
-  position: relative;
+  /* Deliberately **not** positioned: its tray measures itself against the rail
+     above, so that a graveyard opened from the narrowest tile still gets the
+     whole panel to lay its cards out in. Nothing else in here is absolute. */
   flex: 1 1 0;
   min-width: 0;
 }
@@ -6970,21 +6980,39 @@ button:hover .tarot-fan-card {
               transform 210ms cubic-bezier(0.16, 1, 0.3, 1),
               visibility 0s linear 140ms;
 }
-/* **A tray opens toward the sand, because the sand is the only room there
-   is.** Stacked, the zones are a row across the field and the only way out is
-   up or down — down from the far seat's row and up from the near seat's, since
-   those are the directions each has anything but edge in front of it. */
-.field-rail-far .field-tray {
+/* **Both trays open downward, and the seat they belong to no longer decides.**
+ *
+ * It used to, and the rule was right for a layout that no longer exists: when
+ * the zones were a row *across the field*, the far seat's rail sat at the top
+ * of the sand and the near seat's at the bottom, so each opened toward the
+ * middle because the middle was the only room either had. #316 moved them into
+ * a band under the arena, side by side — and the rule came along unchanged, so
+ * the right-hand panel went on throwing its tray *upward into the
+ * battlefield*.
+ *
+ * That is wrong twice over. It lands the tray over the board, which is the
+ * thing you opened the tray to compare against; and above the band is the
+ * arena rather than page, so there is nothing under it to read the cards
+ * against. Below the band is empty page, which grows.
+ *
+ * So: down, both of them, and no rule keyed on which seat it is. There is no
+ * longer any difference between the two to key on — they sit at the same
+ * height in the same band, which is the whole point of putting them there. */
+.field-rail .field-tray {
   top: calc(100% + 6px);
+  /* **Pinned to the panel, not to the tile.** A tray anchored to one 26-pixel
+     pile and allowed to grow to 560px has to grow *somewhere*, and whichever
+     edge it grows toward is a page edge for one of the two panels — which is
+     the same fault the card preview was rebuilt to stop making. Spanning the
+     panel it belongs to, it is on screen by construction at every width, and
+     it says whose zone it is by sitting under that player's own panel. The
+     cards inside already wrap. */
+  left: 0;
   right: 0;
+  width: auto;
+  max-width: none;
   transform: translateY(-7px) scale(0.97);
-  transform-origin: top right;
-}
-.field-rail-near .field-tray {
-  bottom: calc(100% + 6px);
-  right: 0;
-  transform: translateY(7px) scale(0.97);
-  transform-origin: bottom right;
+  transform-origin: top center;
 }
 .field-pile-wrap:hover .field-tray,
 .field-pile-wrap:focus-within .field-tray,
