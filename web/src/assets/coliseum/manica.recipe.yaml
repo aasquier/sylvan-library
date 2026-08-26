@@ -1,0 +1,79 @@
+# What is left of the deck that lost the match.
+#
+# The wreath needed an opposite, and the opposite of a crown is not a frown or
+# a broken sword -- it is the thing left lying on the sand after somebody has
+# gone. This is a right-hand gauntlet from Tannenberg castle, which was
+# destroyed in 1399, and it has been in the ground for most of the time since:
+# rust-eaten, split down the knuckles, its cuff torn open and jagged.
+#
+# **Genuinely broken armour is close to unobtainable**, and it is worth
+# writing down why, because the next session will look for it too. Museums
+# collect intact objects; a shattered helm is a fragment nobody accessioned
+# and nobody photographed on a sweep. The way around it is not to search
+# harder but to change the question -- from *damaged* to *abandoned*. An empty
+# gauntlet does the emotional work of a broken one without needing damage at
+# all, because a hand-shaped object with no hand in it is already the whole
+# sentence. That this particular one is also corroded and torn is luck on top
+# of the idea.
+#
+# **It is not a Roman manica**, which is what the filename says, and that is a
+# knowing borrowing rather than a mistake. A *manica* is the segmented arm
+# guard a gladiator wore, and the Met's open access holds no photographed
+# example that could be cut out; this is German and about 1380. The name is
+# for the shelf it sits on -- `harena`, `secutor`, `aegis`, `memento`, and now
+# `corona` and `manica` -- and the object is what it is, recorded here and in
+# the provenance file under its own accession number. The aegis one directory
+# over made the same trade for the same reason and said so.
+animist: 1
+
+why_committed: >
+  It appears in the same breath as the wreath, at the end of a match, and the
+  two are read against each other -- so a gauntlet that arrives from somebody
+  else's CDN a beat after the crown has landed does not merely appear late, it
+  breaks the comparison the panel exists to make. The licence argument is the
+  skull's: a photograph of an ancient object is exactly the category where a
+  third-party file quietly changes terms or moves, and a copy checked once and
+  committed is a copy whose provenance stays true.
+
+sources:
+  # `isPublicDomain` is true on object 23158, confirmed through the Met's API.
+  manica:
+    provider: met
+    identifier: "23158"
+    title: "Gauntlet for the Right Hand, from Tannenberg Castle, German, ca. 1380"
+    landing: https://www.metmuseum.org/art/collection/search/23158
+    found_via: >
+      the Met Open Access API, after searching for broken and fragmentary arms
+      and armour returned essentially nothing usable -- the search that worked
+      asked for pieces recovered from destroyed sites rather than for damage,
+      which is where the objects that look defeated actually are
+    licence: CC0-1.0
+
+outputs:
+  # 440 wide for something drawn at roughly 160-200 in the verdict panel.
+  #
+  # **`matte_neutral`, and it is the right op for a reason that is easy to get
+  # backwards.** The plate's ground is a studio sweep running from about 140
+  # at the top left to 235 along the bottom -- a spread far too wide for
+  # `matte_backdrop`, whose tolerance would have to be around sixty to cover
+  # it, and sixty from a median of 197 reaches straight into the object. What
+  # separates them here is not brightness but colour: the sweep is
+  # photographed neutral, and this gauntlet is *rust*, which is strongly warm
+  # everywhere. Measured, 83.5% of the plate sits at a chroma of 0-5 and the
+  # object at well above 14, with 1.6% in between -- the same bimodal split
+  # the secutor's terracotta gave, and the same op reads it. A chroma key also
+  # does not care what the lighting was doing, which is how it follows a
+  # gradient no fixed threshold could.
+  #
+  # Quality 78 rather than the shield's 82, for the sand's reason: corrosion
+  # is grain, and grain hides compression where a smooth surface cannot.
+  - file: manica.webp
+    from: manica
+    ops:
+      - matte_neutral: {tolerance: 13, soft: 10}
+      # The object's own bounding box, read off the matte's alpha rather than
+      # by eye, plus eight pixels of margin.
+      - crop: {frac_box: [0.2400, 0.2591, 0.7755, 0.8068]}
+      - resize: {width: 440}
+    encode: {format: webp, quality: 78}
+    expect: {width: 440, height: 373, budget_kb: 88, metadata: none}

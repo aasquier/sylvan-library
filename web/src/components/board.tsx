@@ -56,6 +56,7 @@ import { CardSheet } from './ui'
 import { CrownGlyph, HandFanGlyph, HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
 import aegisArt from '../assets/coliseum/aegis.webp'
+import ensisArt from '../assets/coliseum/ensis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, stackRow } from '../lib/board'
@@ -764,15 +765,21 @@ function FieldCard({ card, count, inPlay = false }: {
           plays twice — without it React keeps the element and the animation,
           having already run, never runs again.
 
-          Attacking is light and motion rather than an object, and that is a
-          choice about *frequency*: a creature is declared an attacker several
-          times a turn, and hanging a photograph on the most common beat in the
-          game would turn the board into a slideshow. The rare, decisive beats
-          get the objects — the shield when something steps in front, the
-          Pompeii skull when something dies. */}
+          All three beats carry a real object now. Attacking used to be light
+          and motion alone, on the argument that it is the most frequent event
+          in the game and a photograph on it would make a slideshow of the
+          board; what that actually produced was a shield for the creature that
+          stepped in front and a coloured glow for the one that swung, which
+          reads as the block being the decisive half. The sword answers the
+          frequency worry by being fast rather than by being absent — it falls
+          across the card and is gone. The stylesheet's marks block carries the
+          argument in full. */}
       {mark && (
         <span key={mark.key} aria-hidden="true"
               className={`field-mark field-mark-${mark.mark}`}>
+          {mark.mark === 'attacks' && (
+            <img src={ensisArt} alt="" draggable={false} />
+          )}
           {mark.mark === 'blocks' && (
             <img src={aegisArt} alt="" draggable={false} />
           )}

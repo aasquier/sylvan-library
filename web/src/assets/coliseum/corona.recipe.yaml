@@ -1,0 +1,80 @@
+# What is given to the deck that won the match.
+#
+# The Coliseum could tell you who won and it could not *crown* anybody. The
+# result arrived as tiles and a table -- correct, complete, and with no moment
+# in it. A bout in an arena ends with something happening to the winner, and
+# the thing that happens is a wreath.
+#
+# **The object itself, not a picture of victory.** This is a real Roman
+# wreath in gold, oak leaves and acorns worked in sheet metal on wire stems,
+# and the whole argument for it is commandment 5: the alternative to a
+# photograph of the actual thing is a vector laurel, and a vector laurel is
+# clip art no matter how carefully it is drawn. The Met's own title for it is
+# *funerary* wreath, which is what most surviving gold wreaths are -- they
+# were made for the grave rather than the parade, because a wreath somebody
+# actually wore was leaves and did not survive. That is worth being straight
+# about rather than quietly calling it a victor's crown. Oak is the leaf of
+# the Roman civic crown, the one awarded for saving a citizen's life, and it
+# is the right leaf for this room; but this object is not that award and the
+# recipe should not imply it is.
+#
+# **The shape is why this plate and not the wider one.** It is an arc opening
+# downward -- a horseshoe, not a ring -- so it sits *over* something the way a
+# crown sits over a head. The alternate candidate (17.190.1714) is flatter and
+# wider and reads as a band lying on a table. This one has somewhere to put a
+# name.
+animist: 1
+
+why_committed: >
+  It is the largest thing on the screen at the moment it appears and it
+  appears exactly once, at the end of a match a user has just spent minutes
+  watching. An image that resolves late from somebody else's CDN would pop in
+  after the sentence it is illustrating, which is worse here than anywhere
+  else on the board -- everywhere else a late picture is a decoration
+  arriving, and here it is the punchline arriving after the joke. The licence
+  is also a photograph of an ancient work, which is the category where a
+  third-party file most quietly changes terms.
+
+sources:
+  # `isPublicDomain` is true on object 254968, confirmed through the Met's API.
+  # The plate is a studio shot on a dead-flat ground -- measured, every corner
+  # and both mid-edges read 235,235,235 with a chroma of zero, which is as
+  # clean as a matte target gets in this directory.
+  corona:
+    provider: met
+    identifier: "254968"
+    title: "Gold funerary wreath, Roman, 1st-2nd century CE"
+    landing: https://www.metmuseum.org/art/collection/search/254968
+    found_via: >
+      the Met Open Access API, searching the Greek and Roman department for
+      gold wreaths and keeping the ones photographed whole on a plain ground,
+      then choosing between them on silhouette -- an arc that opens downward
+      can crown something, and a flat band cannot
+    licence: CC0-1.0
+
+outputs:
+  # 720 wide: this is the one asset in the directory that is allowed to be
+  # big, because it is drawn big -- roughly 300-360 across in the verdict
+  # panel, which is 720 on a retina screen and nothing beyond that.
+  #
+  # **`enclosed: drop`, and this is the plate that needs it.** A wreath is
+  # openwork: the gaps between the leaves and the whole area inside the arc
+  # are studio ground, and most of it the flood reaches from the frame edge
+  # perfectly well. The pockets it cannot reach -- ground fully enclosed by
+  # leaves and stems -- are the ones that would survive as pale flecks
+  # scattered through the gold, which on a dark panel read as holes punched
+  # in the object. Dropping them is safe here in a way it would not be on a
+  # subject with pale passages of its own: this wreath has no white in it.
+  - file: corona.webp
+    from: corona
+    ops:
+      # The wreath's own bounding box read off the matte's alpha, plus a
+      # margin so the soft edge is not clipped back to a hard one. The crop
+      # runs before the key rather than after it because the flood's cost is
+      # the frame's diameter in passes over the frame's area, and cropping
+      # first is the difference between seconds and several minutes.
+      - crop: {frac_box: [0.118, 0.168, 0.849, 0.851]}
+      - resize: {width: 720}
+      - matte_backdrop: {tolerance: 18, soft: 10, border: 3, enclosed: drop}
+    encode: {format: webp, quality: 80}
+    expect: {width: 720, height: 504, budget_kb: 56, metadata: none}

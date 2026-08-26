@@ -8238,12 +8238,19 @@ button:hover .tarot-fan-card {
  * fall back to a default, it drops the whole `animation` and leaves the mark
  * frozen on screen at full strength.
  *
- * **The frequent beat gets light; the decisive ones get objects.** A creature
- * is declared an attacker several times a turn, so attacking is a red lamp and
- * a lunge and no photograph at all — hanging a picture on the commonest event
- * in Magic would turn a battlefield into a slideshow. Blocking and dying
- * happen once each and settle something, so they get the real things: a Met
- * shield and the Pompeii memento mori.
+ * **Every beat gets an object now, and the frequent one gets a fast object.**
+ * This block used to argue the opposite — that attacking is declared several
+ * times a turn, so it should be light and motion and no photograph, because
+ * hanging a picture on the commonest event in Magic would turn a battlefield
+ * into a slideshow. The risk was real and the conclusion was not: what it
+ * actually produced was a board where stepping in front of a creature got a
+ * museum object and swinging at somebody got a coloured glow, which reads as
+ * the block being the important half of a combat. It is not. The answer to a
+ * beat that happens often is to make its mark *quick* — a blade that falls
+ * across the card and is gone — rather than to make it nothing.
+ *
+ * So: a Met sword when something attacks, a Met shield when something blocks,
+ * and the Pompeii memento mori when something dies.
  */
 .field-mark {
   position: absolute;
@@ -8254,11 +8261,21 @@ button:hover .tarot-fan-card {
   pointer-events: none;
 }
 
-/* --- declared an attacker: the lamp and the lunge ---------------------- */
+/* --- declared an attacker: the sword, over the lamp and the lunge ------- */
 
 /* Red from the gate's own blood rather than a fresh one — the control that
-   starts a fight and the mark that shows one are the same red. */
-.field-mark-attacks {
+   starts a fight and the mark that shows one are the same red.
+
+   **The lamp is a pseudo-element and not the container**, which is the whole
+   reason this rule looks the way it does. `mark-lamp` animates opacity, and
+   opacity on the container applies to everything inside it — so the moment
+   the sword became a child of this element, the lamp's fade curve started
+   governing the blade as well and the two could never be timed apart. Moving
+   the light onto `::before` gives the steel its own clock. */
+.field-mark-attacks::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   border-radius: 4px;
   background: radial-gradient(ellipse at 50% 55%,
     color-mix(in srgb, var(--arena-blood-lit) 62%, transparent) 0%,
@@ -8278,6 +8295,63 @@ button:hover .tarot-fan-card {
   30%  { opacity: 0.9; }
   74%  { opacity: 0.82; }
   100% { opacity: 0; }
+}
+
+/* **The blade is taller than the card and it is meant to be.** A shield reads
+   at this size because a disc is legible as a circle; a sword is legible as a
+   line with a crossbar, and a line needs length. Laid down the diagonal it
+   gets about ninety pixels where the card is fifty-eight wide, and the tips
+   overhang — which is correct, and is why `.field-card` has no `overflow`
+   clip on this axis: a blade contained inside the card would be a sticker,
+   and one that crosses it is a strike. `.is-attacks` already lifts the card's
+   z-index, so the overhang falls over its neighbours rather than under them.
+
+   Two animations rather than one, because they are two different facts: where
+   the sword is, and what the light is doing to it. Folding the glint into the
+   transform keyframes would mean restating the drop-shadow in every step. */
+.field-mark-attacks img {
+  /* **Sized by width, and it has to be.** The obvious spelling is
+     `height: 118%; width: auto`, and in a browser it produces a 257-pixel
+     sword on an 81-pixel card: `.field-mark` is a grid whose row is sized
+     from its own item, so a percentage *height* is cyclic and resolves
+     against something that is not the card. A percentage width has no such
+     problem — `.field-mark-blocks img` has always used one — so the blade is
+     stated as a fraction of the card's width and takes its length from the
+     asset's 80x300. 44% of 58 is 25.5 wide and 95.6 long, which is the
+     118% of the card's height that was wanted in the first place.
+     Measured in a real browser; jsdom has no layout and reports neither. */
+  width: 44%;
+  height: auto;
+  /* The resting shadow, stated here as well as in the glint's last frame:
+     `mark-glint` owns `filter` while it runs, but under reduced motion it
+     never runs at all, and a blade with no shadow sits *in* the card art
+     instead of over it. */
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.76));
+  animation:
+    mark-strike 1000ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    mark-glint 1000ms ease-out both;
+}
+/* It arrives already moving, from up and to the left, and swings *past* its
+   resting angle before settling back onto it — a cut has follow-through, and
+   a blade that eases gently into place is a diagram of a sword rather than a
+   swing of one. */
+@keyframes mark-strike {
+  0%   { opacity: 0; transform: translate(-34%, -26%) rotate(-24deg) scale(1.2); }
+  16%  { opacity: 1; }
+  32%  { opacity: 1; transform: translate(0, 0) rotate(42deg) scale(1); }
+  44%  { transform: rotate(30deg); }
+  56%  { transform: rotate(34deg); }
+  80%  { opacity: 1; transform: rotate(34deg); }
+  100% { opacity: 0; transform: rotate(34deg) scale(0.98); }
+}
+/* Steel catching the light at the bottom of the swing. Brief on purpose: a
+   glint that lingers is a lamp, and this one is supposed to be the moment the
+   edge turns over. */
+@keyframes mark-glint {
+  0%   { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7)) brightness(0.82); }
+  30%  { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7)) brightness(2.05) contrast(1.12); }
+  46%  { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.76)) brightness(1); }
+  100% { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.76)) brightness(1); }
 }
 
 /* The lunge goes *toward the seam*, which is where the other player is: the
@@ -8323,23 +8397,37 @@ button:hover .tarot-fan-card {
  * the viewer is a symbol, and the same disc turned eleven degrees out of the
  * plane is an object somebody is holding. Nothing about the picture changed.
  *
- * The photograph is still a flat, evenly-lit plate, and lighting is the half
- * this cannot fix — a rim along the top edge and the sun below are doing what
- * they can, and a shield shot with a real key light would do the rest. */
+ * The plate itself was the other half, and it has since been replaced: the
+ * grey steel disc is now a gold-damascened one (see `aegis.recipe.yaml`, which
+ * argues the swap). So the lighting here no longer has to invent warmth that
+ * the photograph lacks — it only has to say where the sun is. */
 .field-mark-blocks { perspective: 300px; }
+/* **As wide as the card, up from 78%.** At 78% the disc floated in the middle
+   of the art like a wax seal stamped on it. At full width it *covers* the
+   creature, which is what blocking is. */
 .field-mark-blocks img {
-  width: 80%;
+  width: 100%;
   height: auto;
-  /* **Lighting the plate, since the plate has none.** The Met photograph is a
-     flat, even studio shot of grey steel — which is why it reads as a token
-     rather than as a thing in a room. Three filters put a sun on it: `sepia`
-     and `saturate` take the grey into warm metal, `contrast` deepens the
-     engraving so the boss and the rivets survive at forty pixels, and the two
-     drop-shadows are the light and the ground — a hard warm rim along the top
-     edge where the low sun is, and a soft dark one under it so the shield
-     stands off the card instead of being printed on it. */
+  /* **Chroma for the plate, shadows for the light — and in that order.**
+     `filter` applies its functions in sequence, so this is not a cosmetic
+     ordering: chroma first means the three drop-shadows below are laid on the
+     finished metal and keep the colours they are given. Written the other way
+     round, the saturate/contrast/brightness would also act on the shadows and
+     wash the warm rim out of the very edge it exists to draw.
+
+     The chroma is small on purpose. Fifty-eight pixels of a gold-damascened
+     battle scene averages down into olive-grey — the relief becomes noise and
+     the noise has no colour — so saturation and contrast go back up to recover
+     the *material*, not the scene. It is deliberately not the older, heavier
+     `sepia`/`hue-rotate` correction: that existed to turn grey steel into warm
+     metal, and on a plate that is already gold it cooks.
+
+     The three shadows are the light and the ground: a tight dark seat, a hard
+     warm rim along the top edge where the low sun is, and a soft one beneath so
+     the shield stands off the card instead of being printed on it. The rim is
+     what sells the tilt the choreography holds at the end. */
   filter:
-    sepia(0.58) saturate(1.9) hue-rotate(-14deg) contrast(1.34) brightness(0.97)
+    saturate(1.45) contrast(1.14) brightness(1.08)
     drop-shadow(0 0 1.5px rgba(10, 6, 2, 0.9))
     drop-shadow(0 -1px 1.2px color-mix(in srgb, var(--field-sun) 95%, transparent))
     drop-shadow(0 4px 8px rgba(0, 0, 0, 0.8));
@@ -8521,10 +8609,26 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .field-card.is-attacks,
   .field-card.is-blocks { animation: none; }
-  .field-mark-attacks {
+  /* **The glint moved onto a `::before`, and it kept its own lifetime.** The
+     selector is the sword's (it has a blade and a glint, and only the glint
+     stops); the duration is the mark's own `--mark-life-*`. Grouping all three
+     marks under a single rule — which is how these two changes met — would
+     have handed the sword and the shield the *dies* timing, and a mark that
+     does not name its own lifetime is the one thing this block must not
+     produce. Three marks, three variables, on purpose. */
+  .field-mark-attacks::before {
     animation: mark-lamp var(--mark-life-attacks, 1250ms) steps(2, end) both;
   }
   .field-card.is-leaving { animation: none; }
+  /* The sword still appears and still goes — it just does not swing, and the
+     glint does not fire. A mark that cannot show up at all is a beat with no
+     mark, which is a worse answer to "reduce motion" than a still picture. It
+     keeps its resting angle, because a sword lying along the diagonal is the
+     picture; upright it would read as a card in a slot. */
+  .field-mark-attacks img {
+    transform: rotate(34deg);
+    animation: mark-still var(--mark-life-attacks, 1250ms) ease-out both;
+  }
   .field-mark-blocks { perspective: none; }
   .field-mark-blocks::before { animation: none; opacity: 0; }
   .field-mark-blocks img {
@@ -9122,4 +9226,213 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .record-band-span,
   .record-band-mark { animation: none; }
+}
+
+/* ----------------------------------------------------------- the verdict
+ *
+ * A bout ends with something happening to the winner. Until now the Coliseum
+ * could tell you who won and could not *crown* anybody: the result arrived as
+ * tiles and a table, correct and complete and with no moment in it.
+ *
+ * Two real objects, both Met Open Access and both cut in `assets/coliseum`
+ * (`corona.recipe.yaml`, `manica.recipe.yaml`): a Roman gold wreath for the
+ * deck that took the match, and a rust-eaten gauntlet from a castle destroyed
+ * in 1399 for the one that did not. The argument for photographs rather than
+ * drawn icons is commandment 5 — the alternative to the object is a vector
+ * laurel, and a vector laurel is clip art however carefully it is drawn.
+ *
+ * **It sits in the page rather than over the board**, which is the layout
+ * decision worth writing down. The board keeps its scrubber after a match so
+ * the games can be watched back; anything drawn on top of it is a thing
+ * between a person and the game they just watched, and would have to be
+ * dismissed before the board worked again. `components/verdict.tsx` carries
+ * the rest of the reasoning. */
+.verdict {
+  position: relative;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--field-brass) 34%, transparent);
+  background:
+    radial-gradient(ellipse at 50% 0%,
+      color-mix(in srgb, var(--field-brass) 11%, transparent) 0%,
+      transparent 62%),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--field-sand-dark) 22%, var(--surface-1)) 0%,
+      var(--surface-1) 78%);
+  overflow: hidden;
+}
+
+.verdict-field {
+  display: grid;
+  gap: 0.5rem;
+  align-items: center;
+}
+/* **A rule between them, because the two halves cannot align and should not
+   pretend to.** The wreath hangs above its name and the gauntlet lies below
+   its own, which is the whole point — a crown goes on a head and a dropped
+   gauntlet goes at somebody's feet — so the two names sit at different
+   heights however the columns are aligned. Side by side with nothing between
+   them that reads as a misalignment; with a hairline between them it reads as
+   two places, which is what it is. */
+@media (min-width: 40rem) {
+  .verdict:not(.is-drawn) .verdict-side + .verdict-side {
+    border-left: 1px solid color-mix(in srgb, var(--field-brass) 22%, transparent);
+  }
+}
+/* 40rem rather than a guess about a handset: it is the width at which two
+   columns each still have room for a name that is not an ellipsis. Below it
+   the two stack, which is the shape a phone gets and the one that has to be
+   right first. */
+@media (min-width: 40rem) {
+  .verdict:not(.is-drawn) .verdict-field { grid-template-columns: 1fr 1fr; }
+}
+
+.verdict-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  min-height: 100%;
+}
+
+/* The wreath and the name occupy the same grid cell, so the text sits *inside*
+   the arc rather than under it. The plate was chosen for exactly this: it is a
+   horseshoe opening downward, so it has somewhere to put a name. */
+.verdict-crown {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  /* Smaller on a phone and larger where there is room. A verdict that costs
+     most of a screen's height to scroll past is a verdict in the way. */
+  max-width: 15.5rem;
+}
+@media (min-width: 40rem) {
+  .verdict-crown { max-width: 20rem; }
+  .verdict-gauntlet { max-width: 13rem; }
+}
+.verdict-crown > * { grid-area: 1 / 1; }
+.verdict-wreath {
+  width: 100%;
+  height: auto;
+  animation:
+    verdict-descend 1500ms cubic-bezier(0.22, 1, 0.32, 1) both,
+    verdict-gild 7s ease-in-out 1500ms infinite;
+}
+/* **Positioned from the top with a percentage padding, not centred.** The name
+   has to land in the arc's *opening*, and centring it in the wreath's box puts
+   it across the leaves — which is where it was, and which made a deck name
+   unreadable against gold on a phone. Percentages here resolve against the
+   container's width, which is definite (`max-width` above), so this is a
+   stable anchor where a percentage height or a margin folded into centring is
+   not. 41% of the width puts the text's first line just below the crown of an
+   arc whose height is 70% of its width. */
+.verdict-crowned {
+  align-self: start;
+  /* 15% at the sides rather than 20%: the arc is wider than the text at this
+     height, and the tighter padding was wrapping ordinary commander names
+     ("Gyome, Master Chef") onto two lines for no reason. A long one still
+     wraps, which is the right failure — it stays inside the opening. */
+  padding: 41% 15% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+
+.verdict-fall { display: flex; flex-direction: column; align-items: center; }
+.verdict-fallen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+.verdict-gauntlet {
+  width: 100%;
+  max-width: 9.5rem;
+  height: auto;
+  margin-top: 0.5rem;
+  animation: verdict-drop 1200ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+
+.verdict-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-brass) 78%, var(--text-secondary));
+}
+.verdict-name {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.verdict-tally { font-size: 0.72rem; color: var(--text-muted); }
+.verdict-drawn-line {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.verdict-foot { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+
+/* It comes down and settles, the way a wreath put on a head does — it does not
+   fade up in place, which is what a decal does. */
+@keyframes verdict-descend {
+  0%   { opacity: 0; transform: translateY(-46%) scale(1.1); }
+  55%  { opacity: 1; transform: translateY(2%) scale(0.99); }
+  78%  { transform: translateY(-1%) scale(1); }
+  100% { opacity: 1; transform: none; }
+}
+/* Gold does not sit still under light. A seven-second breath, well under the
+   threshold where movement becomes something you watch rather than something
+   the room simply has. */
+/* **The theme rides in on a custom property, and it has to.** `verdict-gild`
+   is `infinite`, so it owns `filter` on this element forever — a
+   `:root[data-theme='light'] .verdict-wreath { filter: ... }` rule underneath
+   would lose the cascade to a running animation every time and would never
+   once apply. A variable the keyframes read is the version that works. */
+@keyframes verdict-gild {
+  0%, 100% {
+    filter: drop-shadow(0 4px 16px rgb(0 0 0 / 0.34))
+            brightness(var(--gild-lit, 1)) saturate(var(--gild-sat, 1));
+  }
+  50% {
+    filter: drop-shadow(0 4px 22px rgb(201 162 39 / 0.34))
+            brightness(calc(var(--gild-lit, 1) * 1.07))
+            saturate(var(--gild-sat, 1));
+  }
+}
+/* It falls, hits, and rocks once. The overshoot in the timing function is the
+   landing; a gauntlet dropped on sand does not ease into place. */
+@keyframes verdict-drop {
+  0%   { opacity: 0; transform: translateY(-38px) rotate(-13deg); }
+  46%  { opacity: 1; }
+  62%  { transform: translateY(0) rotate(3deg); }
+  80%  { transform: translateY(0) rotate(-1.5deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* Fired steel and gold on two opposite grounds, the secutor's problem again.
+   The rust is dark and sinks into a dark page, so it is lifted; the gold is
+   brilliant and flares against paper, so it is taken down. */
+:root[data-theme='dark'] .verdict-gauntlet,
+:root:where(:not([data-theme='light'])) .verdict-gauntlet {
+  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.55)) brightness(1.16)
+          saturate(1.06);
+}
+:root[data-theme='light'] .verdict-gauntlet {
+  filter: drop-shadow(0 7px 13px rgb(0 0 0 / 0.3)) brightness(0.99);
+}
+:root[data-theme='light'] .verdict-wreath { --gild-lit: 0.95; --gild-sat: 1.04; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Both objects still arrive — they simply do not travel, and the gold stops
+     breathing. A verdict that cannot render at all is worse than a still one. */
+  .verdict-wreath,
+  .verdict-gauntlet { animation: none; }
 }
