@@ -20,7 +20,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, it, vi } from 'vitest'
 
 import type { ForgeBoard } from '../lib/api'
-import type { StagedBeat } from '../lib/reel'
+import type { Speed, StagedBeat } from '../lib/reel'
 import { MatchBoard } from './board'
 
 afterEach(cleanup)
@@ -815,6 +815,162 @@ it('marks a transforming creature, whose two names are spelled differently', () 
   const card = container.querySelector(
     'img[alt="Kazandu Mammoth // Kazandu Valley"]')?.closest('.field-card')
   expect(card?.className).toContain('is-attacks')
+})
+
+/** The same board, drawn again with a different beat — which is the mechanism
+ *  the linger is *made of*, so the tests below drive it rather than a proxy.
+ *  Nothing here is about pixels: whether a mark is on the page at all is
+ *  structure, and it is the half of this that a suite with no layout engine
+ *  can still hold honestly. */
+function replay(first: StagedBeat | null,
+  opts: { speed?: Speed; game?: number; shown?: number } = {}) {
+  const props = (beat: StagedBeat | null, over: typeof opts = {}) => ({
+    board: COMBAT, shown: over.shown ?? opts.shown ?? 1,
+    game: over.game ?? opts.game ?? 1, running: false, beat,
+    name: (_slug: string | null, fallback: string) => fallback,
+    speed: over.speed ?? opts.speed ?? ('play' as Speed), setSpeed: vi.fn(),
+    of: 2, seek: vi.fn(), games: [1], playing: 1, chooseGame: vi.fn(),
+  })
+  const view = render(<MatchBoard {...props(first)} />)
+  return {
+    ...view,
+    then: (next: StagedBeat | null, over: typeof opts = {}) =>
+      view.rerender(<MatchBoard {...props(next, over)} />),
+  }
+}
+
+it('holds a mark past the beat that raised it, while beats are draining', () => {
+  // **The bug this is here for was invisible from the stylesheet.** A mark used
+  // to be a pure function of the beat, so it was torn down the moment the next
+  // sentence landed — 480ms at watching pace, against a shield animation of a
+  // second. Every mark was being cut off before it was half told, and making
+  // the CSS longer did nothing at all, because the CSS was never what ended it.
+  const { container, then } = replay(
+    said({ kind: 'block', card: 'Regal Caracal', key: 'b1' }))
+  const shield = () => container.querySelector('.field-mark-blocks img')
+  expect(shield(), 'the block raises a shield').toBeTruthy()
+
+  // The next beat says something the board has no mark for. Before this change
+  // that alone took the shield down.
+  then(said({ kind: 'life', card: undefined, key: 'b2' }))
+  expect(shield(), 'a silent beat leaves the mark alone').toBeTruthy()
+
+  // And so does the one after it, and the one after that.
+  then(said({ kind: 'draw', card: undefined, key: 'b3' }))
+  then(said({ kind: 'cast', card: undefined, key: 'b4' }))
+  expect(shield(), 'and so does every beat with nothing of its own to say')
+    .toBeTruthy()
+})
+
+it('lets a new mark replace the held one rather than joining it', () => {
+  // The invariant that survived the change: **one mark at a time.** Two marks a
+  // beat apart on two different cards is a board asking to be read in two
+  // places at once, and a hold that accumulated would produce exactly that.
+  const { container, then } = replay(
+    said({ kind: 'block', card: 'Regal Caracal', key: 'c1' }))
+  then(said({ kind: 'attack', card: 'Fleecemane Lion', key: 'c2' }))
+
+  expect(container.querySelectorAll('.field-mark'), 'one mark, not two')
+    .toHaveLength(1)
+  expect(container.querySelector('.field-mark-blocks'),
+    'and it is the new one').toBeNull()
+  const lion = container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card')
+  expect(lion?.querySelector('.field-mark-attacks')).toBeTruthy()
+})
+
+it('gives the mark back to its beat while the transport is paused', () => {
+  // Stepping and scrubbing both pause first, and that is exactly where holding
+  // a mark past its beat would be wrong: a scrub has to land on the board its
+  // beat describes and never on the one before it. Paused, nothing is
+  // draining, so there is nothing for a mark to outlive.
+  const { container, then } = replay(
+    said({ kind: 'block', card: 'Regal Caracal', key: 'p1' }),
+    { speed: 'paused' })
+  expect(container.querySelector('.field-mark-blocks')).toBeTruthy()
+
+  then(said({ kind: 'life', card: undefined, key: 'p2' }), { speed: 'paused' })
+  expect(container.querySelectorAll('.field-mark'),
+    'scrubbed off the beat, the mark goes with it').toHaveLength(0)
+})
+
+it('drops a held mark at a game boundary rather than carrying it over', () => {
+  // Choosing another game of the same match keeps this component mounted, so a
+  // shield held over from game one could land on a same-named creature in game
+  // two. Both games here have a Regal Caracal, which is what makes the mistake
+  // possible and invisible.
+  const { container, then } = replay(
+    said({ kind: 'block', card: 'Regal Caracal', key: 'g1' }))
+  expect(container.querySelector('.field-mark-blocks')).toBeTruthy()
+
+  then(said({ kind: 'life', card: undefined, key: 'g2', game: 2 }), { game: 2 })
+  expect(container.querySelectorAll('.field-mark'),
+    'a new game starts with nothing marked').toHaveLength(0)
+})
+
+it('hands the stylesheet the length a mark is actually watched for', () => {
+  // **Rendering the value audits it.** The animation's duration and the
+  // element's lifetime are one number, and the only way they stay one number is
+  // if the stylesheet is *told* rather than asked to remember. So this reads
+  // what a browser would read, which is the question a test about a duration
+  // can honestly ask without a layout engine.
+  const read = (el: Element | null) => ({
+    attacks: (el as HTMLElement | null)?.style.getPropertyValue('--mark-life-attacks'),
+    blocks: (el as HTMLElement | null)?.style.getPropertyValue('--mark-life-blocks'),
+    dies: (el as HTMLElement | null)?.style.getPropertyValue('--mark-life-dies'),
+  })
+
+  const watch = replay(null)
+  expect(read(watch.container.querySelector('.field-stage')))
+    .toEqual({ attacks: '1250ms', blocks: '1800ms', dies: '2000ms' })
+  cleanup()
+
+  // Fast is 150ms a beat, and the cap is what stops a skull sitting on a board
+  // that moved on thirteen beats ago: five beats, floored so no pace can clip a
+  // mark to a flicker.
+  const skim = replay(null, { speed: 'fast' })
+  expect(read(skim.container.querySelector('.field-stage')))
+    .toEqual({ attacks: '750ms', blocks: '750ms', dies: '750ms' })
+  cleanup()
+
+  // Paused is not a slow pace, it is the absence of one: nothing is draining,
+  // so there is nothing to cap a mark against and each keeps its full length.
+  const still = replay(null, { speed: 'paused' })
+  expect(read(still.container.querySelector('.field-stage')))
+    .toEqual({ attacks: '1250ms', blocks: '1800ms', dies: '2000ms' })
+})
+
+it('lights the half of the table whose turn it is, and only that half', () => {
+  // Forge has always said whose turn it is — its turn event names the seat and
+  // `foldBoard` carries it — and the board never drew it. Both of COMBAT's
+  // steps belong to seat 1, which is the far seat.
+  const { container } = replay(null)
+  const far = container.querySelector('.field-side-far')
+  const near = container.querySelector('.field-side-near')
+
+  expect(far?.className, 'seat one is on turn').toContain('is-active')
+  expect(near?.className, 'and the other half is not').not.toContain('is-active')
+  // The trench points at the same half. Two signals rather than one, because a
+  // warm wash on sand is a soft thing to have to learn to read.
+  expect(container.querySelector('.field')?.className).toContain('is-far-on')
+  // Each half carries the light itself, so it can lie on the floor under the
+  // cards rather than as a scrim over them.
+  expect(far?.querySelector(':scope > .field-side-lit')).toBeTruthy()
+  expect(near?.querySelector(':scope > .field-side-lit')).toBeTruthy()
+  // And the whole fact, in words, for anyone who is not looking at the sand.
+  expect(container.querySelector('.field-seam')?.textContent)
+    .toContain('Arahbo — Cats is on turn')
+})
+
+it('lights neither half before the first turn has begun', () => {
+  // `active` is zero until a turn event names a seat, and that is a true thing
+  // to say about that moment rather than a hole to fill with a guess.
+  const { container } = replay(null, { shown: 0 })
+  expect(container.querySelectorAll('.field-side.is-active')).toHaveLength(0)
+  expect(container.querySelector('.field')?.className)
+    .not.toContain('-on')
+  expect(container.querySelector('.field-seam')?.textContent)
+    .not.toContain('is on turn')
 })
 
 /** A board where one seat ran a partner pair *and* a companion — the whole

@@ -7377,7 +7377,7 @@ button:hover .tarot-fan-card {
   flex: 0 0 auto;
   width: 58px;
   height: 81px;
-  animation: field-card-arrives 380ms cubic-bezier(0.18, 0.9, 0.28, 1.02);
+  animation: field-card-arrives 460ms cubic-bezier(0.18, 0.9, 0.28, 1.02);
 }
 .field-card-small { width: 42px; height: 59px; }
 
@@ -7787,11 +7787,23 @@ button:hover .tarot-fan-card {
 }
 /* ------------------------------------------------- what the beat just did
  *
- * Three marks, drawn on the card the sentence is about, for exactly as long as
- * that sentence is the one being read. The room drains beats at reading pace
- * and folds the board to the same count, so these ride a clock that already
- * exists: the beat being spoken is the beat being drawn, and when the next one
- * lands this one is over. Nothing accumulates and nothing needs timing out.
+ * Three marks, drawn on the card the sentence is about. The room drains beats
+ * at reading pace and folds the board to the same count, so a mark is *raised*
+ * on the clock that already exists: the beat being spoken is the beat being
+ * drawn.
+ *
+ * **It is no longer taken away on that clock, and every duration below depends
+ * on that.** A beat at watching pace is 480ms, so a mark that ended when its
+ * beat did was cut off before it was half told — and lengthening anything here
+ * did nothing at all, because none of it was what ended the mark. Each one now
+ * names its own length in `board.tsx` (`MARK_LIFE`), which arrives here as
+ * `--mark-life-attacks`, `--mark-life-blocks` and `--mark-life-dies` on
+ * `.field-stage`. **Every animation on a mark takes its duration from one of
+ * those**, so the number a person watches and the number the element lives for
+ * are one number. A fallback stands in each `var()` for the same reason the
+ * rest of this file carries them: a duration that fails to resolve does not
+ * fall back to a default, it drops the whole `animation` and leaves the mark
+ * frozen on screen at full strength.
  *
  * **The frequent beat gets light; the decisive ones get objects.** A creature
  * is declared an attacker several times a turn, so attacking is a red lamp and
@@ -7822,12 +7834,16 @@ button:hover .tarot-fan-card {
   box-shadow:
     0 0 13px 3px color-mix(in srgb, var(--arena-blood-lit) 55%, transparent),
     inset 0 0 11px color-mix(in srgb, #ff6a52 46%, transparent);
-  animation: mark-lamp 900ms ease-out both;
+  animation: mark-lamp var(--mark-life-attacks, 1250ms) ease-out both;
 }
+/* The hold is most of it now. Up in a tenth of its life, steady for two
+   thirds, and only then away — a lamp that is on, rather than a flash that
+   happened. */
 @keyframes mark-lamp {
   0%   { opacity: 0; }
-  12%  { opacity: 1; }
-  55%  { opacity: 0.75; }
+  7%   { opacity: 1; }
+  30%  { opacity: 0.9; }
+  74%  { opacity: 0.82; }
   100% { opacity: 0; }
 }
 
@@ -7838,39 +7854,131 @@ button:hover .tarot-fan-card {
 .field-card.is-attacks { z-index: 6; }
 .field-side-far .field-card.is-attacks { --lunge: 9px; }
 .field-side-near .field-card.is-attacks { --lunge: -9px; }
-.field-card.is-attacks { animation: card-lunge 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* **The lunge keeps its own speed inside a longer mark.** The lamp got longer
+   and the lunge did not, because a lunge that takes a second is not a lunge —
+   it is drifting. The percentages move instead of the duration: the whole
+   commitment happens in the first third and the card holds where it landed,
+   which is what a creature that has been declared an attacker is doing. */
+.field-card.is-attacks {
+  animation: card-lunge var(--mark-life-attacks, 1250ms)
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @keyframes card-lunge {
   0%   { transform: none; }
-  20%  { transform: translateY(calc(var(--lunge, 0px) * -0.45)); }
-  48%  { transform: translateY(var(--lunge, 0px)) scale(1.05); }
+  9%   { transform: translateY(calc(var(--lunge, 0px) * -0.45)); }
+  22%  { transform: translateY(var(--lunge, 0px)) scale(1.05); }
+  36%  { transform: translateY(calc(var(--lunge, 0px) * 0.7)) scale(1.02); }
+  76%  { transform: translateY(calc(var(--lunge, 0px) * 0.55)); }
   100% { transform: none; }
 }
 
 /* --- blocked: the shield comes up -------------------------------------- */
 
+/* **A shield that is raised, not a shield that appears.**
+ *
+ * The first version swung in from *big* — scale 2.2 down to 0.93 — which reads
+ * as a stamp coming down on the card rather than as somebody stepping in front
+ * of somebody else. And the disc is photographed flat, straight down onto a
+ * museum plate, so held square to the screen it is a coin: a circle with a boss
+ * in it (Aaron, 2026-08-26: "looks more like an emblem or symbol than an actual
+ * shield").
+ *
+ * Both are fixed by giving it a *depth to move in*. The mark takes a
+ * perspective, and the shield comes up from below the card lying almost
+ * edge-on, turns its face to meet what is coming, takes the blow, and then
+ * **holds at a tilt**. That last part is the one that matters: a disc square to
+ * the viewer is a symbol, and the same disc turned eleven degrees out of the
+ * plane is an object somebody is holding. Nothing about the picture changed.
+ *
+ * The photograph is still a flat, evenly-lit plate, and lighting is the half
+ * this cannot fix — a rim along the top edge and the sun below are doing what
+ * they can, and a shield shot with a real key light would do the rest. */
+.field-mark-blocks { perspective: 300px; }
 .field-mark-blocks img {
-  width: 78%;
+  width: 80%;
   height: auto;
-  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.72));
-  animation: mark-guard 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* **Lighting the plate, since the plate has none.** The Met photograph is a
+     flat, even studio shot of grey steel — which is why it reads as a token
+     rather than as a thing in a room. Three filters put a sun on it: `sepia`
+     and `saturate` take the grey into warm metal, `contrast` deepens the
+     engraving so the boss and the rivets survive at forty pixels, and the two
+     drop-shadows are the light and the ground — a hard warm rim along the top
+     edge where the low sun is, and a soft dark one under it so the shield
+     stands off the card instead of being printed on it. */
+  filter:
+    sepia(0.58) saturate(1.9) hue-rotate(-14deg) contrast(1.34) brightness(0.97)
+    drop-shadow(0 0 1.5px rgba(10, 6, 2, 0.9))
+    drop-shadow(0 -1px 1.2px color-mix(in srgb, var(--field-sun) 95%, transparent))
+    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.8));
+  animation: mark-guard var(--mark-life-blocks, 1800ms)
+    cubic-bezier(0.17, 0.92, 0.24, 1) both;
 }
-/* Big and turned at the start, so it arrives from *somewhere* rather than
-   fading up in place — a shield that appears is a decal, and a shield that is
-   swung into the way is a block. The overshoot at 26% and the settle at 38%
-   are the impact. */
 @keyframes mark-guard {
-  0%   { opacity: 0; transform: scale(2.2) rotate(-17deg); }
-  26%  { opacity: 1; transform: scale(0.93) rotate(3deg); }
-  38%  { opacity: 1; transform: scale(1.04) rotate(-1deg); }
-  72%  { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: none; }
+  /* Low, small and lying back — under the card and out of the fight. */
+  0%   { opacity: 0;
+         transform: translateY(38%) scale(0.58) rotateX(62deg) rotateZ(-26deg); }
+  /* Swung up into the way, near and over-large: the interception. */
+  11%  { opacity: 1;
+         transform: translateY(-2%) scale(1.18) rotateX(10deg) rotateZ(5deg); }
+  /* The blow lands and drives it back. */
+  17%  { transform: translateY(0) scale(0.9) rotateX(3deg) rotateZ(-4deg); }
+  24%  { transform: scale(1.06) rotateX(9deg) rotateZ(2deg); }
+  32%  { transform: scale(0.99) rotateX(12deg) rotateZ(0deg); }
+  /* Held, and **held tilted** — the one frame that decides whether this is a
+     shield or a coin. Square to the screen a disc is a symbol; turned twenty
+     degrees out of the plane it is an object somebody is holding up, and this
+     is the frame a person spends most of the mark looking at. */
+  40%  { opacity: 1; transform: scale(1) rotateX(20deg) rotateZ(-1deg); }
+  80%  { opacity: 1; transform: scale(1) rotateX(20deg) rotateZ(-1deg); }
+  100% { opacity: 0; transform: translateY(-9%) scale(0.97) rotateX(28deg); }
 }
-.field-card.is-blocks { animation: card-braced 1000ms ease-out both; }
+
+/* **The sun on it** (Aaron: "it could also have a colour flash, light sunlight
+   coloured maybe"). A low warm burst at the instant of the block, bright at the
+   moment of contact and mostly gone a third of a second later — a flash that
+   lingers is a filter.
+ *
+ * **Not `mix-blend-mode`, and that cost an hour.** Screening it over the card
+ * art is what this obviously wants, and it does nothing at all: `.field-mark`
+ * carries `z-index: 6`, which makes it a stacking context, and a blend mode
+ * only ever reaches the backdrop *inside* its own. So the flash was blending
+ * with the empty box it sits in and the card underneath never saw it, on a
+ * board where every screenshot looked plausible. Real alpha instead, which
+ * needs no backdrop and behaves the same in both themes. */
+.field-mark-blocks::before {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 46%,
+    color-mix(in srgb, var(--field-sun) 92%, transparent) 0%,
+    color-mix(in srgb, var(--field-sun) 58%, transparent) 26%,
+    color-mix(in srgb, var(--field-sun) 22%, transparent) 48%,
+    color-mix(in srgb, var(--field-sun) 6%, transparent) 66%,
+    transparent 78%);
+  animation: mark-sunlit var(--mark-life-blocks, 1800ms) ease-out both;
+}
+@keyframes mark-sunlit {
+  0%   { opacity: 0; transform: scale(0.4); }
+  10%  { opacity: 0.92; transform: scale(1.12); }
+  20%  { opacity: 0.44; transform: scale(1); }
+  46%  { opacity: 0.2; transform: scale(0.99); }
+  100% { opacity: 0; transform: scale(0.96); }
+}
+
+/* The brace is the impact and nothing after it, so it stays where it was in
+   wall-clock terms while the mark around it got longer — the percentages come
+   down instead of the shudder slowing to a wobble. */
+.field-card.is-blocks {
+  animation: card-braced var(--mark-life-blocks, 1800ms) ease-out both;
+}
 @keyframes card-braced {
   0%, 100% { transform: none; }
-  26%      { transform: translateX(-2px); }
-  32%      { transform: translateX(2px); }
-  40%      { transform: translateX(-1px); }
+  10%      { transform: translateX(-2px); }
+  14%      { transform: translateX(2px); }
+  18%      { transform: translateX(-1px); }
+  22%      { transform: none; }
 }
 
 /* --- died: the stone goes down ----------------------------------------- */
@@ -7882,15 +7990,18 @@ button:hover .tarot-fan-card {
   box-shadow:
     0 3px 9px rgba(0, 0, 0, 0.8),
     0 0 0 1px color-mix(in srgb, var(--field-brass) 40%, transparent);
-  animation: mark-buried 1500ms ease-out both;
+  animation: mark-buried var(--mark-life-dies, 2000ms) ease-out both;
 }
 /* It drops and stops, rather than drifting: a headstone is set down. The long
    hold before it goes is deliberate — this is the one beat in a game somebody
-   might want a second to register. */
+   might want a second to register, and now it gets one. The settle at 16% is
+   the weight: a stone set down does not arrive and stay perfectly still. */
 @keyframes mark-buried {
   0%   { opacity: 0; transform: translateY(-10px) scale(1.14); }
-  18%  { opacity: 1; transform: translateY(0) scale(1); }
-  74%  { opacity: 1; }
+  11%  { opacity: 1; transform: translateY(0) scale(1); }
+  16%  { transform: translateY(-1.5px) scale(1.01); }
+  22%  { transform: translateY(0) scale(1); }
+  82%  { opacity: 1; }
   100% { opacity: 0; transform: translateY(2px) scale(0.98); }
 }
 /* Whatever it lands on goes cold under it. */
@@ -7922,17 +8033,22 @@ button:hover .tarot-fan-card {
   width: 84%;
   height: auto;
   border-radius: 2px;
-  animation: grave-ghost 1500ms ease-out both;
+  /* The same death times both: the skull on the card and the ghost off the
+     grave are one event drawn in two places, and two clocks for one event is
+     how they end up out of step. */
+  animation: grave-ghost var(--mark-life-dies, 2000ms) ease-out both;
   filter: saturate(0.6) brightness(1.25) contrast(1.05);
 }
 @keyframes grave-ghost {
   0%   { opacity: 0; transform: translateY(5px) scale(0.9); }
-  22%  { opacity: 0.95; transform: translateY(0) scale(1); }
-  70%  { opacity: 0.8; }
+  15%  { opacity: 0.95; transform: translateY(0) scale(1); }
+  62%  { opacity: 0.85; transform: translateY(-2px) scale(1.01); }
   100% { opacity: 0; transform: translateY(-7px) scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .field-pile-ghost img { animation: mark-still 1200ms ease-out both; }
+  .field-pile-ghost img {
+    animation: mark-still var(--mark-life-dies, 2000ms) ease-out both;
+  }
 }
 
 /* --- leaving play: held where it stood, for one beat -------------------
@@ -7950,7 +8066,10 @@ button:hover .tarot-fan-card {
  * seen to go. What kind of going it was is `.is-dies` and its relatives on
  * top. So the motion here is only what every leaving has in common — the card
  * lifts a little off the sand and starts to let go. */
-.field-card.is-leaving { animation: card-leaving 900ms ease-out both; }
+/* Not a mark, so not on a mark's clock: a departure is a *fold* property and
+   lasts exactly the beat that says so. What it gets is the same 30% the marks
+   got, so a card lets go at the pace the rest of the board moved to. */
+.field-card.is-leaving { animation: card-leaving 1200ms ease-out both; }
 .field-card.is-leaving .field-card-turn {
   box-shadow:
     0 6px 14px rgba(0, 0, 0, 0.62),
@@ -7961,18 +8080,29 @@ button:hover .tarot-fan-card {
   100% { transform: translateY(-3px); opacity: 0.88; }
 }
 
+/* Reduced motion takes the *movement* away, never the mark: somebody who has
+   asked for a still board still has to be able to tell an attacker from a
+   blocker from a corpse. So each one keeps its full length — the same custom
+   properties, so nothing here can fall out of step with the clock the marks
+   are actually torn down on — and loses only the travel. */
 @media (prefers-reduced-motion: reduce) {
   .field-card.is-attacks,
   .field-card.is-blocks { animation: none; }
-  .field-mark-attacks { animation: mark-lamp 900ms steps(2, end) both; }
+  .field-mark-attacks {
+    animation: mark-lamp var(--mark-life-attacks, 1250ms) steps(2, end) both;
+  }
   .field-card.is-leaving { animation: none; }
-  .field-mark-blocks img,
+  .field-mark-blocks { perspective: none; }
+  .field-mark-blocks::before { animation: none; opacity: 0; }
+  .field-mark-blocks img {
+    animation: mark-still var(--mark-life-blocks, 1800ms) ease-out both;
+  }
   .field-mark-dies img {
-    animation: mark-still 1200ms ease-out both;
+    animation: mark-still var(--mark-life-dies, 2000ms) ease-out both;
   }
   @keyframes mark-still {
     0%, 100% { opacity: 0; }
-    12%, 76% { opacity: 1; }
+    9%, 84%  { opacity: 1; }
   }
 }
 
@@ -7984,6 +8114,12 @@ button:hover .tarot-fan-card {
   color: #1a1409;
 }
 
+/* **A mount, not a mark, and deliberately short of the marks' scale.** Every
+   card on the board runs this — a turn that lands six tokens runs it six times
+   — so it is the one number here that was not simply given a third more. 460ms
+   is enough to see a card *arrive* rather than blink into existence; half a
+   second on every permanent all game would be a board that is always still
+   settling. */
 @keyframes field-card-arrives {
   0%   { opacity: 0; transform: translateY(-7px) scale(0.82); }
   70%  { opacity: 1; transform: translateY(1px) scale(1.03); }
@@ -8090,4 +8226,160 @@ button:hover .tarot-fan-card {
   .field-card-turn,
   .field-card-pile { transition: none; }
   .field-life { animation: none; }
+}
+
+/* ======================================================================
+ * WHOSE TURN IT IS — the table, lit from the side the game is on
+ *
+ * Forge has always said this: its turn event names the seat, the board carries
+ * it as `active`, and it crossed the wire into `foldBoard` and was never
+ * drawn. The board announced *Turn 7* and left "seven of whose?" to whoever
+ * was watching to work out from what moved (Aaron, 2026-08-26: "we should have
+ * an effect to highlight the players side who's turn it actively is").
+ *
+ * **Light rather than a border, and a state rather than an entrance.** Two
+ * people playing Magic at a table are lit from wherever the game currently is;
+ * the half that is not on turn is a little further from the torches. So the
+ * active side gets a low sun coming across the sand from the seam, and the
+ * other side sits in shadow. A match is about a hundred and thirty beats and
+ * the turn changes constantly — an entrance animation that restarted every
+ * turn would be a strobe by turn six and exhausting by turn twenty. What moves
+ * here is a seven-and-a-half second swell and a warm pool drifting slower than
+ * anything else on this board, so it is felt rather than watched.
+ *
+ * **It lies on the floor, under every card.** `.field-side-lit` is at
+ * `z-index: -1` inside `.field`'s isolated stacking context, which puts it
+ * directly on top of the sand and below every permanent standing on it. A
+ * scrim laid *over* the cards would dim the art on the half a person is most
+ * likely to be reading, which is the exact opposite of the point — and the
+ * shadow on the quiet side is an inset shadow on the half itself, which paints
+ * in the same place for the same reason.
+ *
+ * It must not compete with the marks, and the two are kept apart by *rate*
+ * rather than by strength: an attack, a block and a death all happen inside
+ * two seconds and this takes seven and a half to breathe once.
+ * ---------------------------------------------------------------------- */
+
+/* The low sun. Its own token rather than a reach for `--arena-glow`, which is
+   set per match from the deck's own colours and would make whose-turn-it-is
+   mean something different in every match. Both themes, because the same
+   arena at two hours is still lit from the same side — warmer and deeper
+   under torches, hotter and paler under an open sky. */
+:root { --field-sun: #f0bf5e; }
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) { --field-sun: #ffc463; }
+}
+:root[data-theme="dark"] { --field-sun: #ffc463; }
+
+.field-side {
+  position: relative;
+  /* Everyone is a step back from the torches until it is their turn. A spread
+     large enough to flood the padding box, on the half itself so it falls on
+     the *sand* and never on a card standing on it. Before the first turn
+     begins neither side is active and both sit in it, which is a true thing to
+     say about that moment. */
+  box-shadow: inset 0 0 0 999px rgba(8, 5, 2, 0.16);
+  transition: box-shadow 900ms ease;
+}
+.field-side.is-active { box-shadow: inset 0 0 0 999px rgba(8, 5, 2, 0); }
+
+.field-side-lit {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background-repeat: no-repeat;
+  transition: opacity 800ms ease;
+}
+.field-side.is-active > .field-side-lit {
+  opacity: 1;
+  animation: side-lit 7.5s ease-in-out infinite;
+}
+
+/* Two layers. A hot rule right along the seam edge — the brass lip of the
+   trench, catching it — softening into a wash that dies out about three
+   quarters of the way up the half; and behind that a broad warm pool that
+   drifts from one end of the seat to the other and back.
+
+   `to top` for the far seat and `to bottom` for the near one, because the
+   seam is the far seat's bottom edge and the near seat's top, and the light
+   comes from where the game is. */
+.field-side-far > .field-side-lit {
+  background-image:
+    linear-gradient(to top,
+      color-mix(in srgb, var(--field-sun) 68%, transparent) 0,
+      color-mix(in srgb, var(--field-sun) 68%, transparent) 2px,
+      color-mix(in srgb, var(--field-sun) 34%, transparent) 2px,
+      color-mix(in srgb, var(--field-sun) 17%, transparent) 30%,
+      transparent 76%),
+    radial-gradient(closest-side at 50% 100%,
+      color-mix(in srgb, var(--field-sun) 30%, transparent) 0%,
+      transparent 100%);
+  background-size: auto, 64% 190%;
+  transform-origin: 50% 100%;
+}
+.field-side-near > .field-side-lit {
+  background-image:
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--field-sun) 68%, transparent) 0,
+      color-mix(in srgb, var(--field-sun) 68%, transparent) 2px,
+      color-mix(in srgb, var(--field-sun) 34%, transparent) 2px,
+      color-mix(in srgb, var(--field-sun) 17%, transparent) 30%,
+      transparent 76%),
+    radial-gradient(closest-side at 50% 0%,
+      color-mix(in srgb, var(--field-sun) 30%, transparent) 0%,
+      transparent 100%);
+  background-size: auto, 64% 190%;
+  transform-origin: 50% 0%;
+}
+
+/* One animation carrying both moves, because two animations on one element
+   fight over `background-position` and `transform` in whichever order they
+   were declared. The swell grows *away from the seam* — the origin above is
+   the seam edge — so the light rises up the half and settles back rather than
+   spilling across the trench into the other player's seat. */
+@keyframes side-lit {
+  0%, 100% { transform: scale(1);     background-position: 0 0, 6% 50%; }
+  50%      { transform: scale(1.035); background-position: 0 0, 94% 50%; }
+}
+
+/* The trench's own lip, on the side that is live. The seam already carries a
+   thin brass edge top and bottom; the active one is simply the one catching
+   the light. */
+.field.is-far-on .field-seam {
+  box-shadow:
+    inset 0 2px 0 color-mix(in srgb, var(--field-sun) 82%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--field-brass) 26%, transparent);
+}
+.field.is-near-on .field-seam {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--field-brass) 26%, transparent),
+    inset 0 -2px 0 color-mix(in srgb, var(--field-sun) 82%, transparent);
+}
+
+/* And the pointer, for anybody who should not have to learn to read a wash to
+   find out whose turn it is (commandment 2). A mark rather than a name: a deck
+   name in the seam is an overflow on a phone, and each seat is named beside
+   its own hand already. */
+.field-seam-on {
+  font-size: 0.6rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--field-sun) 90%, #fff);
+  text-shadow: 0 0 7px color-mix(in srgb, var(--field-sun) 55%, transparent);
+  animation: seam-on-lit 7.5s ease-in-out infinite;
+}
+@keyframes seam-on-lit {
+  0%, 100% { opacity: 0.72; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The light stays — it is the answer to a question, not decoration. What
+     goes is the breathing, which is the part that is motion for its own sake
+     and the part somebody who asked for stillness is asking about. */
+  .field-side.is-active > .field-side-lit,
+  .field-seam-on { animation: none; }
+  .field-side { transition: none; }
+  .field-side-lit { transition: none; }
 }

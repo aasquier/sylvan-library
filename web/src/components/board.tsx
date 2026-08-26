@@ -59,7 +59,7 @@ import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
-import type { Speed, StagedBeat } from '../lib/reel'
+import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 
 /** One card on the field.
  *
@@ -93,11 +93,11 @@ function counterSign(kind: string): 'up' | 'down' | 'flat' {
  * **One mark at a time, and it is the sentence's own.** The room drains beats
  * at reading pace and the board is folded to exactly the same count, so the
  * picture moves when the sentence is spoken — the marks ride that clock rather
- * than inventing a second one. The beat being read is the beat being drawn,
- * and when the next one arrives this one is over. Nothing accumulates, nothing
- * has to be timed out, and a scrub backwards is a mark that simply was not
- * there, because the mark is a *function of the beat* and not a thing that
- * happened once.
+ * than inventing a second one. The beat being read is the beat being drawn.
+ * Nothing accumulates and nothing piles up, because there is only ever one
+ * mark: a new one replaces the old one on the spot.
+ *
+ * What a mark no longer does is *end* when its beat does. See [MARK_LIFE].
  */
 type Mark = 'attacks' | 'blocks' | 'dies'
 
@@ -140,6 +140,132 @@ function markOf(kind: string): Mark | null {
     : null
 }
 
+/**
+ * How long a mark is *seen*, in milliseconds.
+ *
+ * **A mark is timed by the mark, and it used to be timed by the beat.** That
+ * is the whole of this fix. Every mark was a pure function of the beat —
+ * raised when the sentence was spoken, gone the instant the next one landed —
+ * which is a lovely property and had one consequence nobody could read off the
+ * stylesheet. A beat at watching pace is 480ms, so a 900ms animation was being
+ * cut off *before it was half told*: what a person saw was a shield swinging
+ * in and then disappearing, never the block landing, never the settle, never
+ * the skull's long hold. Lengthening the CSS changed nothing at all, because
+ * the CSS was never what ended it (Aaron, 2026-08-26: the marks "need to
+ * linger at least 30% longer").
+ *
+ * So each mark names its own length, and this number is both the animation's
+ * duration and the element's lifetime. It reaches the stylesheet as a custom
+ * property on the stage rather than being written down twice, so the two can
+ * never drift: whatever is here is what a person watches.
+ *
+ * The invariant that is kept is **one mark at a time**. A new mark still
+ * replaces the old one immediately — two marks a beat apart on two cards is a
+ * board asking to be read in two places at once. All that has changed is that
+ * a *silent* beat no longer takes a mark down with it.
+ */
+const MARK_LIFE: Record<Mark, number> = {
+  /* 900 -> 1250. The commonest beat in the game, so it stays the shortest of
+     the three even after the lift; a red lamp that outstays the others turns a
+     combat into a traffic light. */
+  attacks: 1250,
+  /* 1000 -> 1800, the largest lift of the three and the one Aaron named twice:
+     the shield is an interception, and an interception that is over in a
+     second was never seen to intercept anything. */
+  blocks: 1800,
+  /* 1500 -> 2000. The one beat in a game somebody might want a moment to
+     register, which was already the argument for its hold; it now gets the
+     hold it was written for. */
+  dies: 2000,
+}
+
+/** The most beats a mark may outlive its own.
+ *
+ *  A cap rather than a scale, because the pace is a reading speed and a mark
+ *  is a fact about the game: slowing the room down is not a reason to hold a
+ *  skull for six seconds, and speeding it up is not a reason to make one
+ *  invisible. At watching pace and slower this never binds — five beats at
+ *  480ms is longer than the longest mark — and it exists for the fast end,
+ *  where 150ms a beat would otherwise leave a skull sitting on a board that
+ *  moved on thirteen beats ago. */
+const MARK_BEATS = 5
+/** ...and the floor under it, so no pace can clip a mark to a flicker. */
+const MARK_FLOOR = 640
+/** A breath past the animation, so the element is taken away *after* it has
+ *  faded out rather than popping from under its own last frame. */
+const MARK_TAIL = 90
+
+function markLife(mark: Mark, speed: Speed): number {
+  const beat = beatDelay(speed)
+  // Paused is not a slow pace, it is the absence of one: nothing is draining,
+  // so there is nothing for the mark to outlive and nothing to cap it against.
+  if (beat === 0) return MARK_LIFE[mark]
+  return Math.max(MARK_FLOOR, Math.min(MARK_LIFE[mark], beat * MARK_BEATS))
+}
+
+/** A mark on a card: what happened to it, and which beat said so. */
+interface Struckdown { card: string; mark: Mark; key: string }
+
+/**
+ * Hold a mark for its own length rather than for its beat's.
+ *
+ * Three things this must not do, and each is a line of it:
+ *
+ * - **It must not pile marks up.** It holds one value, so it cannot. A mark
+ *   that arrives while another is up replaces it, on the spot.
+ * - **It must not leak a timer.** Every timeout is cleared by the effect that
+ *   set it — on the next beat, on a speed change, and on unmount.
+ * - **It must not carry a mark across a game.** Choosing another game of the
+ *   same match keeps this component mounted, and a shield held over from game
+ *   one could land on a same-named creature in game two. The hold is dropped
+ *   at the boundary rather than left to time out across it.
+ *
+ * And one thing the caller must do, which is why this takes no decision about
+ * it: while the transport is **paused** nothing is draining, so there is
+ * nothing to outlive. `MatchBoard` reads the beat's own mark there instead, so
+ * a scrub lands on the board its beat describes and never on the one before —
+ * which is the property the pure-function version had, kept exactly where it
+ * still matters.
+ *
+ * **The mark is chosen during the render, and only the taking-away is a
+ * timer.** Raising it from an effect would draw it one commit *after* the
+ * sentence that raised it, and half a frame of drift between the words and the
+ * picture is the one thing this room has been careful about from the start.
+ * React re-runs a render that sets its own state before it commits anything,
+ * so the beat and its mark still reach the screen together.
+ */
+function useHeldMark(card: string | null, mark: Mark | null, key: string,
+  speed: Speed, game: number): Struckdown | null {
+  const [held, setHeld] = useState<Struckdown | null>(null)
+  const [wasGame, setWasGame] = useState(game)
+  // Null rather than `key`, and never the empty string: a board that mounts
+  // with a beat already in hand — every scrub, every game chosen from the
+  // tabs, every reload of a finished match — has to raise that beat's mark
+  // rather than wait for the next one. `''` is a key `beat?.key ?? ''` can
+  // really produce, so the sentinel has to be something a key cannot be.
+  const [wasKey, setWasKey] = useState<string | null>(null)
+  const raised = card && mark ? { card, mark, key } : null
+  if (game !== wasGame) {
+    setWasGame(game)
+    setWasKey(key)
+    setHeld(raised)
+  } else if (key !== wasKey) {
+    setWasKey(key)
+    // A beat with nothing to mark leaves whatever is up alone — that silence
+    // is the whole of what changed here.
+    if (raised) setHeld(raised)
+  }
+  useEffect(() => {
+    if (!held) return
+    // Changing pace part-way through a mark re-times it from that moment,
+    // which is the answer somebody asking for a different pace wants.
+    const done = window.setTimeout(() => setHeld(null),
+      markLife(held.mark, speed) + MARK_TAIL)
+    return () => { window.clearTimeout(done) }
+  }, [held, speed])
+  return held
+}
+
 /** The card the current beat is about, and what happened to it.
  *
  *  A context rather than four more props: `FieldCard` is drawn in the rows, in
@@ -147,8 +273,7 @@ function markOf(kind: string): Mark | null {
  *  reach all of them would be the same fact written four times. `key` is the
  *  beat's own identity, and it is what makes the second attack by the same
  *  creature animate again rather than sitting there already-animated. */
-const Struck = createContext<{ card: string; mark: Mark; key: string } | null>(
-  null)
+const Struck = createContext<Struckdown | null>(null)
 
 /** The paintings the board's own zones are dressed in, by zone key.
  *
@@ -1015,9 +1140,13 @@ function FieldHand({ side, name, facing }: {
  * other side of a real table. The hand is no longer among these rows — it is
  * held at the side (`FieldHand` above).
  */
-function FieldSide({ side, facing }: {
+function FieldSide({ side, facing, active }: {
   side: BoardSide
   facing: 'far' | 'near'
+  /** Whether it is this seat's turn. Neither half is lit before the first
+   *  turn has begun, which is a true thing to say about that moment rather
+   *  than a gap to fill. */
+  active: boolean
 }) {
   // **Outermost first**, and the near player's side is the same list reversed,
   // so the two creature rows finish up either side of the seam.
@@ -1041,7 +1170,23 @@ function FieldSide({ side, facing }: {
               empty="no creatures" />,
   ]
   return (
-    <div className={`field-side field-side-${facing}`}>
+    <div className={`field-side field-side-${facing}${active ? ' is-active' : ''}`}>
+      {/* **Whose turn it is, as light rather than as a border.**
+          A Magic table is lit from wherever the game currently is, and the
+          half that is not on turn is simply a little further from the torches
+          — so the active side gets a low sun coming across the sand from the
+          seam, and the other side goes quietly into shadow. The light lies on
+          the *floor*, under every card: a scrim over the cards would dim the
+          art on the half a person is most likely to be reading, which is the
+          exact opposite of the point.
+
+          It is a state and not an entrance. A match is about a hundred and
+          thirty beats and the turn changes constantly; an animation that
+          restarted at every turn would be a strobe by turn six. What moves is
+          a seven-second swell and a warm pool drifting across the sand —
+          slower than anything else on the board, so it is felt rather than
+          watched. */}
+      <span className="field-side-lit" aria-hidden="true" />
       <div className="field-rows">
         {facing === 'far' ? rows : [...rows].reverse()}
       </div>
@@ -1181,9 +1326,27 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // on `beat.key`, so a fresh object with the same key reconciles onto the
   // same element and does *not* restart an animation that is already running.
   const mark = beat ? markOf(beat.kind) : null
-  const struck = mark && beat?.card
+  const live = mark && beat?.card
     ? { card: beat.card, mark, key: beat.key }
     : null
+  const held = useHeldMark(live?.card ?? null, live ? mark : null,
+    beat?.key ?? '', speed, game)
+  // **Paused, the mark is the beat's again.** Nothing is draining, so there is
+  // nothing for a mark to outlive — and stepping or scrubbing pauses first
+  // (both controls call `setSpeed('paused')`), which is exactly where holding
+  // a mark past its beat would be wrong: a scrub must land on the board its
+  // beat describes and not on the one before it. See `useHeldMark`.
+  const struck = speed === 'paused' ? live : held
+
+  // How long each mark is watched, handed to the stylesheet rather than
+  // written down there a second time. It rides `.field-stage` because that is
+  // the one box containing both the arena and the zones beside it, and the
+  // ghost rising off a graveyard is timed by the same death that put it there.
+  const lives = {
+    '--mark-life-attacks': `${markLife('attacks', speed)}ms`,
+    '--mark-life-blocks': `${markLife('blocks', speed)}ms`,
+    '--mark-life-dies': `${markLife('dies', speed)}ms`,
+  } as CSSProperties
 
   if (!board || !far || !near) {
     return (
@@ -1201,6 +1364,17 @@ export function MatchBoard({ board, shown, game, name, running, beat,
     )
   }
 
+  // **Whose turn it is was already on the wire.** Forge's turn event names the
+  // seat and `foldBoard` carries it as `active`; it was simply never drawn.
+  // Zero until the first turn begins, and then neither half is lit — which is
+  // the truth about that moment rather than a hole to fill.
+  const lit = far.seat === state.active ? 'far'
+    : near.seat === state.active ? 'near'
+    : null
+  const onTurn = lit === 'far' ? name(far.slug, far.name)
+    : lit === 'near' ? name(near.slug, near.name)
+    : null
+
   return (
     <Dressing.Provider value={dressing}>
     <Struck.Provider value={struck}>
@@ -1211,8 +1385,9 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         A graveyard is not somewhere you stand; it is somewhere cards go, and
         it belongs off the floor entirely. So the field keeps its own box at
         its own size, and the zones stand outside it in their own column. */}
-    <div className="field-stage">
-    <section className="field" aria-label="The battlefield">
+    <div className="field-stage" style={lives}>
+    <section className={`field${lit ? ` is-${lit}-on` : ''}`}
+             aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">
         <span className="field-dust field-dust-1" />
@@ -1232,7 +1407,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           is where the two players' hands actually are. */}
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
 
-      <FieldSide side={far} facing="far" />
+      <FieldSide side={far} facing="far" active={lit === 'far'} />
 
       {/* The seam: in the real building, the trench the lifts came up through.
           Here it is where the turn is announced and where the two
@@ -1240,13 +1415,26 @@ export function MatchBoard({ board, shown, game, name, running, beat,
       <div className="field-seam">
         <span className="field-seam-rule" aria-hidden="true" />
         <span className="field-seam-turn tabular">
+          {/* **The light says which half; this says it in a second way.**
+              A warm wash on sand is a beautiful signal and a soft one, and
+              somebody at their first game should not have to learn to read it
+              — so the trench also points, up or down, at whoever is on turn.
+              A mark rather than a name: a deck name in here is an overflow on
+              a phone, and the name is right beside each seat already. The
+              whole fact goes to a screen reader below. */}
+          {lit && (
+            <span className={`field-seam-on is-${lit}`} aria-hidden="true">
+              {lit === 'far' ? '▲' : '▼'}
+            </span>
+          )}
           {state.turn > 0 ? `Turn ${state.turn}` : 'Before the first turn'}
           {game > 0 && <span className="field-seam-game">Game {game}</span>}
+          {onTurn && <span className="sr-only">, {onTurn} is on turn</span>}
         </span>
         <span className="field-seam-rule" aria-hidden="true" />
       </div>
 
-      <FieldSide side={near} facing="near" />
+      <FieldSide side={near} facing="near" active={lit === 'near'} />
 
       <FieldHand side={near} facing="near"
                  name={name(near.slug, near.name)} />
