@@ -472,11 +472,36 @@ type streamLine struct {
 	Result *WireRun  `json:"result"`
 }
 
+// stallTimer is the part of *time.Timer [readStream] needs: armed once,
+// re-armed after every read, stopped at the end.
+type stallTimer interface {
+	Reset(time.Duration) bool
+	Stop() bool
+}
+
 func readStream(body io.Reader, perRead time.Duration, stall func(),
 	ask MatchAsk) (*SimRun, error) {
+	return readStreamOn(body, perRead, stall, ask,
+		func(d time.Duration, f func()) stallTimer { return time.AfterFunc(d, f) })
+}
+
+// readStreamOn is [readStream] with the stall timer supplied rather than
+// built, so a test about the *budget* can be about the budget.
+//
+// **A duration compared against real elapsed time is an assertion about the
+// machine.** The property here is that the deadline is re-armed on every read,
+// and the only way to show it with `time.AfterFunc` is to let more wall clock
+// pass in total than the budget allows while no single gap does — which stops
+// being true the moment a loaded machine stretches one of those gaps. That is
+// not a hypothetical: pacing five lines with 15ms sleeps against a 60ms budget
+// failed 6 runs in 20 under load, reporting a chatty stream as a cancelled
+// one. Handing the timer in lets the test turn the clock by hand and assert
+// the reset exactly, on any machine, without sleeping at all.
+func readStreamOn(body io.Reader, perRead time.Duration, stall func(),
+	ask MatchAsk, arm func(time.Duration, func()) stallTimer) (*SimRun, error) {
 	// The stall timer: fired, it cancels the request, and the read below
 	// fails rather than blocking forever on a worker that died mid-match.
-	quiet := time.AfterFunc(perRead, stall)
+	quiet := arm(perRead, stall)
 	defer quiet.Stop()
 
 	reader := bufio.NewReaderSize(body, 64*1024)
