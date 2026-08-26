@@ -60,6 +60,7 @@ import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
+import { tokenSigil } from '../lib/tokens'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 
 /** One card on the field.
@@ -645,8 +646,12 @@ function FieldCard({ card, count, inPlay = false }: {
           // been refreshed, and a match is worth watching either way.
           <span className="field-card-plate">{card.name}</span>
         )}
-        {/* The gold edge belongs to the card, so it turns with the card. */}
-        {card.token && <span className="field-card-token" aria-hidden="true" />}
+        {/* The gold edge belongs to the card, so it turns with the card — and
+            so does the material on it, for the same reason: light lies on gold
+            at whatever angle the gold is sitting. `lib/tokens.ts` decides
+            which material, or none. */}
+        {card.token && <span className={tokenSigil(card.name, card.types)}
+                             aria-hidden="true" />}
       </div>
       {/* **The arm: everything written in the card's corners.**
 
