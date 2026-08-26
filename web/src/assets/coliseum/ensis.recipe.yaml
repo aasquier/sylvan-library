@@ -1,0 +1,87 @@
+# The sword that falls across whatever is attacking.
+#
+# The shield next door had a partner missing. Forge's stream says `attack` and
+# names the creature, and the board answered with a red lamp and a lunge --
+# light and motion, no object. That was a deliberate choice once, and the
+# comment in `board.tsx` still carries its reasoning: a creature is declared an
+# attacker several times a turn, and hanging a photograph on the most common
+# beat in the game turns the board into a slideshow. Aaron asked for the sword
+# anyway, and he is right: **the answer to "it happens often" is to make it
+# fast, not to make it nothing.** A blocker gets an object and an attacker got
+# a colour, which read as the block being the important half of a combat. It
+# is not.
+#
+# **Why the polished blade and not the pitted one.** The first choice was the
+# Met's two-handed sword of ca. 1400-1450 (2023.580.1), which is the more
+# moving object by a distance -- corroded, ancient, a thing pulled out of a
+# barrow. Measured, it cannot be used: its steel sits about 28 levels from its
+# own backdrop and the plate is vignetted, so no key separates them, and the
+# whole sword is one dark value. **A mark has to survive two themes**, and a
+# dark grey sword on a dark board is an absence. This one carries its own
+# contrast: a near-black leather grip, a bright steel blade, a lit pommel. It
+# never fully disappears on either ground because it is never one value.
+#
+# **A sword is a silhouette that needs length.** At the size a mark renders,
+# almost nothing photographic reads -- the shield beside it works because a
+# disc is legible as a circle. A sword is legible as a *line with a crossbar*,
+# and a line needs room, so this is drawn down the card's diagonal rather than
+# upright: the diagonal of a permanent is about seventy pixels where its width
+# is forty, and the diagonal is also the direction a sword actually travels.
+# The rotation is CSS, not baked in -- a rotated PNG would carry its own
+# transparent corners and its own resampling, and the browser does it better.
+animist: 1
+
+why_committed: >
+  The same argument the shield and the skull already make, with one addition
+  that is specific to this beat. It is drawn on the most frequent event in a
+  match and it lives for about a second, so a mark that arrives from somebody
+  else's CDN after the beat has passed is not late -- it is wrong, landing on
+  whatever the board has moved on to. At five kilobytes it is also cheaper to
+  commit than to request.
+
+sources:
+  # `isPublicDomain` is true on object 35888, confirmed through the Met's own
+  # API rather than inferred from the Open Access programme's description.
+  ensis:
+    provider: met
+    identifier: "35888"
+    title: "Hand-and-a-Half Sword, European or possibly British, 15th century"
+    landing: https://www.metmuseum.org/art/collection/search/35888
+    found_via: >
+      the Met Open Access API, looking for a full-length studio plate of a
+      medieval sword shot vertically on an even ground -- of the two that
+      qualify, this is the one whose steel is polished rather than corroded,
+      which is what a mark drawn over card art at sixty pixels needs
+    licence: CC0-1.0
+
+outputs:
+  # 300 tall for a mark that renders at roughly 60-80 along the diagonal: the
+  # ceiling is a retina card at its largest, and there is no surface that
+  # draws this big.
+  #
+  # **The crop comes first and it is doing real work**, which is the
+  # difference from the shield's recipe. `matte_backdrop` floods inward from
+  # the frame edge and compares every step against one sampled backdrop
+  # colour, so its tolerance has to span however far the studio sweep wanders.
+  # On the whole plate that is 150 to 182; cropped to the blade it is a much
+  # narrower band, and a narrower band is a tolerance that can be tight enough
+  # to spare the steel. The resize before the matte is not a shortcut either:
+  # keying at working resolution and never at 8 megapixels is what keeps the
+  # flood's worst case in seconds rather than minutes.
+  - file: ensis.webp
+    from: ensis
+    ops:
+      - crop: {frac_box: [0.29, 0.040, 0.78, 0.955]}
+      - resize: {height: 620}
+      # **Tolerance 32 with a narrow ramp, and both numbers were measured.**
+      # At 16 the plate's cast shadow survives as a grey cloud around the
+      # pommel, which is obvious on a dark board and invisible on a light one
+      # -- the exact failure a single-theme check would have shipped. At 26 the
+      # shadow is gone but a wide `soft` band lets the flood walk up the blade
+      # and leaves it half-transparent over the sand. 32 clears the shadow;
+      # the ramp cut back to 7 is what keeps the blade opaque, because the
+      # blade's duller facet lives inside the band a wider ramp would fade.
+      - matte_backdrop: {tolerance: 32, soft: 7, border: 3, enclosed: keep}
+      - resize: {height: 300}
+    encode: {format: webp, quality: 84}
+    expect: {width: 80, height: 300, budget_kb: 12, metadata: none}

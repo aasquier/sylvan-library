@@ -35,18 +35,17 @@ Why committed rather than hotlinked: The licence is clean and the figure is smal
 <!-- animist:begin aegis -->
 ## aegis.webp
 
-- **Source**: "Shield, Turkish or Mamluk, late 15th century", <https://www.metmuseum.org/art/collection/search/24296>, found via the Met Open Access API, searching `shield`, `buckler` and `scutum` and keeping only the public-domain results whose objectName is actually a shield -- nine of them, of which this is the one that is a clean circle on an even ground
+- **Source**: "Round Shield with the Surrender of the Elector of Saxony at Mühlberg, Milan, ca. 1560-70", <https://www.metmuseum.org/art/collection/search/24688>, found via the Met Open Access API, searching the Arms and Armor department for round shields with a full studio plate, then keeping the ones lit with a raking light rather than flat -- volume is the whole requirement, and it is a fact about the photograph rather than about the object
 .
-- **Licence**: CC0. Confirmed through met at fetch time (2026-08-25).
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-26).
 - **Transformations** (Pillow, scripted -- `animist build aegis.recipe.yaml`):
-  - `matte_backdrop`: tolerance=20, soft=10, border=2, enclosed='keep'.
-  - `crop`: frac_box=[0.1933, 0.0889, 0.8067, 0.8933].
-  - `resize`: width=220.
-  - Encoded WEBP, quality 84.
+  - `crop`: frac_box=[0.0941, 0.1843, 0.9039, 0.7453].
+  - `resize`: width=260, height=260.
+  - `mask_circle`: cx=0.5, cy=0.5, r=0.497, feather=1.5.
+  - Encoded WEBP, quality 82.
 
 Why committed rather than hotlinked: It is drawn at the moment a beat lands and lives for about a second, which makes it the worst possible thing to fetch from somebody else's CDN: a mark that arrives after the sentence it belongs to has been read is not a mark, it is a flicker on an unrelated card. It is also small enough that committing it costs less than the request would.
 <!-- animist:end aegis -->
-
 <!-- animist:begin memento -->
 ## memento.webp
 
@@ -60,3 +59,49 @@ Why committed rather than hotlinked: It is drawn at the moment a beat lands and 
 
 Why committed rather than hotlinked: The same reason as the shield beside it: this is drawn on the beat that says a creature died and it is gone about a second later, so it has to be in the bundle rather than a request away. There is a second reason here, though — the licence is a *photograph of an ancient work*, and that is exactly the category where somebody else's file can quietly change licence or vanish. A copy checked once and committed is a copy whose provenance stays true.
 <!-- animist:end memento -->
+
+<!-- animist:begin ensis -->
+## ensis.webp
+
+- **Source**: "Hand-and-a-Half Sword, European or possibly British, 15th century", <https://www.metmuseum.org/art/collection/search/35888>, found via the Met Open Access API, looking for a full-length studio plate of a medieval sword shot vertically on an even ground -- of the two that qualify, this is the one whose steel is polished rather than corroded, which is what a mark drawn over card art at sixty pixels needs
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build ensis.recipe.yaml`):
+  - `crop`: frac_box=[0.29, 0.04, 0.78, 0.955].
+  - `resize`: height=620.
+  - `matte_backdrop`: tolerance=32, soft=7, border=3, enclosed='keep'.
+  - `resize`: height=300.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: The same argument the shield and the skull already make, with one addition that is specific to this beat. It is drawn on the most frequent event in a match and it lives for about a second, so a mark that arrives from somebody else's CDN after the beat has passed is not late -- it is wrong, landing on whatever the board has moved on to. At five kilobytes it is also cheaper to commit than to request.
+<!-- animist:end ensis -->
+
+<!-- animist:begin manica -->
+## manica.webp
+
+- **Source**: "Gauntlet for the Right Hand, from Tannenberg Castle, German, ca. 1380", <https://www.metmuseum.org/art/collection/search/23158>, found via the Met Open Access API, after searching for broken and fragmentary arms and armour returned essentially nothing usable -- the search that worked asked for pieces recovered from destroyed sites rather than for damage, which is where the objects that look defeated actually are
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build manica.recipe.yaml`):
+  - `matte_neutral`: tolerance=13, soft=10.
+  - `crop`: frac_box=[0.24, 0.2591, 0.7755, 0.8068].
+  - `resize`: width=440.
+  - Encoded WEBP, quality 78.
+
+Why committed rather than hotlinked: It appears in the same breath as the wreath, at the end of a match, and the two are read against each other -- so a gauntlet that arrives from somebody else's CDN a beat after the crown has landed does not merely appear late, it breaks the comparison the panel exists to make. The licence argument is the skull's: a photograph of an ancient object is exactly the category where a third-party file quietly changes terms or moves, and a copy checked once and committed is a copy whose provenance stays true.
+<!-- animist:end manica -->
+
+<!-- animist:begin corona -->
+## corona.webp
+
+- **Source**: "Gold funerary wreath, Roman, 1st-2nd century CE", <https://www.metmuseum.org/art/collection/search/254968>, found via the Met Open Access API, searching the Greek and Roman department for gold wreaths and keeping the ones photographed whole on a plain ground, then choosing between them on silhouette -- an arc that opens downward can crown something, and a flat band cannot
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build corona.recipe.yaml`):
+  - `crop`: frac_box=[0.118, 0.168, 0.849, 0.851].
+  - `resize`: width=720.
+  - `matte_backdrop`: tolerance=18, soft=10, border=3, enclosed='drop'.
+  - Encoded WEBP, quality 80.
+
+Why committed rather than hotlinked: It is the largest thing on the screen at the moment it appears and it appears exactly once, at the end of a match a user has just spent minutes watching. An image that resolves late from somebody else's CDN would pop in after the sentence it is illustrating, which is worse here than anywhere else on the board -- everywhere else a late picture is a decoration arriving, and here it is the punchline arriving after the joke. The licence is also a photograph of an ancient work, which is the category where a third-party file most quietly changes terms.
+<!-- animist:end corona -->

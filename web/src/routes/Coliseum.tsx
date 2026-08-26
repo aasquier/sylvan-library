@@ -77,6 +77,7 @@ import { CardHover, Caveat, ErrorNote, NumberField, Select, StatTile }
 import { DeckCaution } from '../components/closedform'
 import { DataTable } from '../components/datatable'
 import { MatchBoard } from '../components/board'
+import { MatchVerdict } from '../components/verdict'
 import { MatchTheater } from '../components/theater'
 import { type Arriving, type Speed, type StagedBeat, useReel }
   from '../lib/reel'
@@ -1193,6 +1194,9 @@ export default function ColiseumRoom() {
               measurement giving up rather than a game that ended level. */}
           {forge && (
             <section aria-label="The result" className="mt-10 space-y-6">
+              {/* Keyed on the job so a second match crowns again rather than
+                  reusing the element the last one was dismissed from. */}
+              <MatchVerdict key={`verdict-${job?.id ?? 'x'}`} result={forge} />
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {forge.decks.map((d) => (
                   <StatTile key={d.address} label={`${d.name} wins`}
