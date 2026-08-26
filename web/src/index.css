@@ -6592,6 +6592,12 @@ button:hover .tarot-fan-card {
   /* One at a time on a phone: two panels of three big tiles in 380 pixels is
      six small tiles, which is where this started. */
   .field-zones { grid-template-columns: minmax(0, 1fr); }
+  /* The narrow band's *other* rules are not here, and that is deliberate.
+     `.field-pile-label` and `.field-rail-who` are both declared further down
+     this file, so an override written at this line loses to them at every
+     width — a media query buys no specificity. See the block beside
+     `.field-pile-label`, and the dead `flex-direction` rule above for what
+     this looks like when nobody notices. */
 }
 .field-side-far { grid-area: far; }
 .field-seam { grid-area: seam; }
@@ -6626,7 +6632,7 @@ button:hover .tarot-fan-card {
    under the name, the way a brass plate catches the light when you lean in. */
 .field-hand-label {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   align-self: flex-start;
   max-width: 100%;
@@ -6671,6 +6677,41 @@ button:hover .tarot-fan-card {
   font-weight: 700;
   color: var(--field-brass);
 }
+/* **The sign that says which pile of cards this is.**
+ *
+ * Four plates on this board open four different things, and this one was a
+ * deck's name over a row of card backs with nothing to say that what it holds
+ * is a *hand* (Aaron, 2026-08-26: "we need a hand icon to show that is what we
+ * are showing people with the cards in hand"). `HandFanGlyph` had been drawn
+ * for the tarot table and never asked to work here.
+ *
+ * `--glyph-ground` is the mark's own fill, and it has to be said out loud
+ * here: the glyph defaults it to `var(--page)`, which is the right ground on a
+ * page and the wrong one on a plate that is a dark wash over sand in *both*
+ * themes. Left alone, a light theme painted three white cards onto black.
+ *
+ * The fan itself opens when the hand does — that is a prop on the mark rather
+ * than a rule here, because the button already holds that state for its tray
+ * and two sources for one gesture is how they drift apart. This is only the
+ * transition that makes it a movement instead of a jump. */
+.field-hand-mark {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: color-mix(in srgb, var(--field-brass) 80%, transparent);
+  --glyph-ground: #16110b;
+  transition: color 140ms ease;
+}
+.field-hand-label:hover:not(:disabled) .field-hand-mark,
+.field-hand-label.is-open .field-hand-mark,
+.field-hand-label:focus-visible .field-hand-mark {
+  color: color-mix(in srgb, var(--field-brass) 100%, #fff);
+}
+.field-hand-label:disabled .field-hand-mark { opacity: 0.5; }
+.glyph-fan { transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .glyph-fan { transition: none; }
+}
 .field-hand-empty {
   font-size: 0.72rem;
   font-style: italic;
@@ -6689,7 +6730,13 @@ button:hover .tarot-fan-card {
   padding: 2px 0;
   min-height: 42px;
 }
-.field-hand-fan > .field-card + .field-card { margin-left: -24px; }
+/* **The overlap is a distance, not a fraction, so it moved when the card
+   did.** It was -24px against a 42px card, which left 18px of each one
+   showing. The cards are 58px now (see `.field-card`), and the same -24 would
+   have left 34px each — a hand of seven running 262px across a phone that has
+   357. Thirty-six keeps the strip at 22px, which is a shade more of each card
+   than before and a hand of seven at 190px. */
+.field-hand-fan > .field-card + .field-card { margin-left: -36px; }
 .field-hand-fan > .field-card { flex: 0 0 auto; }
 
 /* The hand's own tray, on the same rails as the piles'. It opens away from
@@ -6742,17 +6789,21 @@ button:hover .tarot-fan-card {
       'handsnear near'
       'transport transport';
   }
-  /* Wide: the zones become a standing column on the right, and each seat's
-     three places read top to bottom under its life. A column is what let them
-     grow at all — a strip under the rows can only be as tall as the space it
-     takes from the battlefield, and that is why they were 26 pixels. */
-  .field-rail-totals {
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-  }
+  /* **A rule for a layout that has not existed since #316, and it never fired
+     anyway.** This turned `.field-rail-totals` into a column, back when the
+     zones were a standing column on the right-hand side of the arena. #316
+     made them a band of two panels *under* the arena — where a column of
+     zones is exactly wrong — and the rule stayed, the way the trays' did
+     until #321 caught them.
 
-  /* Wide: the two hands are the left-hand column, one beside each half —
+     What kept it from ever being seen is worse than the staleness: it sits
+     *earlier in this file* than the `.field-rail-totals` rule it was meant to
+     override, at the same specificity, so the later one won at every width.
+     A dead rule describing a dead layout, and neither half visible from the
+     diff that left it here. Both are gone; the row below is what has actually
+     been drawing all along.
+
+     Wide: the two hands are the left-hand column, one beside each half,
      which is the side a player's hand is actually on. */
   .field-hand {
     justify-content: flex-start;
@@ -6771,12 +6822,18 @@ button:hover .tarot-fan-card {
   .field-hand-fan > .field-card + .field-card {
     margin-left: 0;
     /* 27px of each card left showing: the strip that carries the name, which
-       is the strip a player fans a hand to read. Seven cards then cost 221px,
+       is the strip a player fans a hand to read. Seven cards then cost 243px,
        so two full hands still sit inside a field the battlefield rows set the
        height of — the point was a shorter field, and a hand rail that made it
        taller would have given the room back with one hand and taken it with
-       the other. */
-    margin-top: -32px;
+       the other.
+
+       **The strip is the constant; the number under it is arithmetic.** It was
+       -32 against a 59px card and is -54 against an 81px one, because what has
+       to stay 27px is the part of the card left showing. Copying the old
+       number forward would have left 49px of each card showing and made a hand
+       of seven 375px tall — taller than the battlefield beside it. */
+    margin-top: -54px;
   }
   .field-hand-fan .field-card:hover,
   .field-hand-fan .field-card:focus-visible {
@@ -6861,13 +6918,38 @@ button:hover .tarot-fan-card {
     inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 22%, transparent),
     0 3px 14px rgba(0, 0, 0, 0.42);
 }
-/* Whose places these are. It used to float on a grey strip; a band holding two
-   players needs to say which half is whose, and a heading over the thing it
-   names is what that looks like. */
+/* **Whose places these are, stacked over the number everybody is watching.**
+ *
+ * The name was a heading on a line of its own across the whole panel, and a
+ * line carrying one short string and nothing else does not read as a heading —
+ * it reads as a border somebody put a word in (Aaron, 2026-08-26: "it would be
+ * a better use of space if the commander name was stacked above the life
+ * total, then the zones in general would not have a weird top border with only
+ * the commander name").
+ *
+ * He is right about the space and righter about the pairing. A player's name
+ * and a player's life are one fact — *how this player is doing* — and a
+ * scoreboard has always put them in one column. The panel gets its whole
+ * height back, and the life total stops being an unlabelled ring at the end of
+ * a row of zones. */
+.field-rail-who {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  /* Wide enough for the ring under it and no wider, so a long deck name
+     ellipsises rather than pushing the zones about. */
+  max-width: 7.5rem;
+}
 .field-rail-name {
-  font-size: 0.78rem;
+  max-width: 100%;
+  text-align: center;
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
   color: color-mix(in srgb, var(--field-brass) 88%, #fff);
   white-space: nowrap;
   overflow: hidden;
@@ -7166,6 +7248,15 @@ button:hover .tarot-fan-card {
    abbreviation is just a word nobody spelled (Aaron, 2026-08-25). The plate is
    dark and full-width so the name reads over whatever the painting is doing
    underneath it. */
+/* **A name that does not fit is not a name.** "GRAVEYARD" wants 67px of
+   tracked capitals and a phone's tile is about 55, so it was drawn as
+   "GRAVEYAI" — hard-clipped mid-letter, with no ellipsis to say a word had
+   been cut. That is a worse tile than one with no label at all: a truncation
+   you cannot see is a truncation you read as a spelling.
+
+   So it always ellipsises, and on the narrow band it gives up its tracking
+   first — letter-spacing is what a title is wearing for effect, and the word
+   is what it is for. */
 .field-pile-label {
   position: absolute;
   top: 0;
@@ -7177,10 +7268,41 @@ button:hover .tarot-fan-card {
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: #f4ecd8;
   background: linear-gradient(180deg,
     rgba(6, 5, 4, 0.86) 0%, rgba(6, 5, 4, 0) 100%);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+/* **The narrow band, written *here* rather than up beside `.field-zones`.**
+ *
+ * A media query buys no specificity. Both of these rules override selectors
+ * declared further down this file than the `@media (max-width: 46rem)` block
+ * that holds the rest of the band's narrow layout, so written there they lose
+ * at every width — which is precisely how the dead `.field-rail-totals` column
+ * rule survived unnoticed for two redesigns. Measured before it was believed:
+ * the label came back computing 0.58rem inside a matching media query.
+ *
+ * On a phone the zone tiles are about 55px rather than the 96 a laptop gives
+ * them, so the label sheds its tracking first — letter-spacing is what a title
+ * wears for effect, and the word is what it is for. And the name over the life
+ * ring gives its slack back to the tiles: the ring is 58px, so everything past
+ * that was the deck's name spending room the zones needed. It wraps to two
+ * lines rather than ellipsising, because half a deck name is not a deck
+ * name — `title` still carries the whole of it either way. */
+@media (max-width: 46rem) {
+  .field-pile-label { letter-spacing: 0.005em; font-size: 0.5rem; }
+  .field-rail-who { max-width: 4.6rem; }
+  .field-rail-name {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 0.64rem;
+  }
 }
 /* ------------------------------------------------ the command zone's seats
  *
@@ -7248,23 +7370,48 @@ button:hover .tarot-fan-card {
   color: color-mix(in srgb, var(--field-brass) 78%, transparent);
 }
 
-/* The tax, standing next to the zone rather than on it: twenty-six pixels
-   holds one fact and the zone's own label is already using it. Brass on blood,
-   because this is a price rather than a total — and it is the only number on
-   the rail that goes up when things are going badly. */
+/* **The tax, in the corner a card keeps for exactly this.**
+ *
+ * It stood *outside* the group — a red chip floating in the gap between the
+ * command zone and the graveyard, belonging to neither, and the styling around
+ * it was awkward because there was nothing for it to be next to (Aaron,
+ * 2026-08-26: "the commander tax red badge should be in the lower right of the
+ * card art or something like a power/toughness icon; right now it is outside
+ * the perimeter of the command zone and it makes for awkward styling").
+ *
+ * It was put there when a zone was a 26-pixel tile whose own three-letter
+ * label already used the only line it had. The tiles wear paintings now, and a
+ * Magic card has always had a corner for the number that says what this card
+ * is worth at this moment: the bottom right. So the price sits there, on the
+ * zone it is the price of, cut like the loupe that carries power and toughness
+ * in the same corner one row up.
+ *
+ * **On the chair rather than on the zone**, which is the half that could not
+ * be done before. One number for the whole command zone was a space
+ * compromise: a pairing has two prices and one 26px tile, so it showed the
+ * dearer. With a chair each, Thrasios says nothing and Tymna says +4, which
+ * is what the pilot of that deck is actually counting. It also puts the badge
+ * structurally out of reach of the companion's seat — a companion has never
+ * owed a penny, and a red chip sitting on Kaheera's corner would have said it
+ * did.
+ *
+ * Brass on blood: this is a price rather than a total, and the only number in
+ * this band that goes up when things are going badly. */
 .field-tax {
-  flex: 0 0 auto;
-  align-self: center;
-  margin-left: -6px;
-  padding: 1px 3px;
-  border-radius: 2px;
-  font-size: 0.56rem;
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  z-index: 2;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.6rem;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--anvil-glint);
-  background: color-mix(in srgb, var(--arena-blood) 90%, transparent);
+  background: color-mix(in srgb, var(--arena-blood) 92%, transparent);
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 45%, transparent);
+    0 1px 4px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 55%, transparent);
 }
 
 .field-pile-n {
@@ -7448,7 +7595,20 @@ button:hover .tarot-fan-card {
 
 /* One card. The outer box holds the space; the inner one turns, so a tapped
    card leans on its neighbour the way it would on a table instead of
-   shoving the row sideways. */
+   shoving the row sideways.
+
+   **One size, where there were two.** Lands, artifacts, enchantments and
+   planeswalkers were 42x59 and only creatures were this — and what the board
+   draws is the *whole card face*, not an art crop, so at forty-two pixels the
+   printed type under the painting became a grey vibration that reads as a
+   rendering fault rather than as small text (Aaron, 2026-08-26: "all cards
+   should be at least the size we have been using on creatures so the text
+   doesn't look funny").
+
+   The width was never what those rows were paying for anyway: identical cards
+   collapse into one stack before they are drawn, so a row of nine Forests was
+   already one card wide. What it costs is height — about twenty-two pixels a
+   row, four rows a seat — and that is the trade he asked for. */
 .field-card {
   position: relative;
   flex: 0 0 auto;
@@ -7456,7 +7616,6 @@ button:hover .tarot-fan-card {
   height: 81px;
   animation: field-card-arrives 460ms cubic-bezier(0.18, 0.9, 0.28, 1.02);
 }
-.field-card-small { width: 42px; height: 59px; }
 
 /* ------------------------------------------------ a permanent and its gear
  *
@@ -7561,27 +7720,174 @@ button:hover .tarot-fan-card {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--field-brass) 78%, transparent);
 }
 
-/* A stack of identical cards: two leaves of pile behind the face, and the
-   count on it. Nine Forests is one pile with a nine on it, which is how they
-   sit on a real table — and the only way a row of them fits on a phone.
+/* --------------------------------------------- the commander, standing
+ *
+ * **The command zone can only say a commander is *home*.** Once it is cast it
+ * stands in the creature row like any other body, and nothing said which of
+ * forty permanents the whole deck is built around (Aaron, 2026-08-26: "when
+ * the Commander is on the board it would be nice if they had something to
+ * indicate that — oversized, a golden aura, a crown touching the top of the
+ * card art maybe?").
+ *
+ * Two of his three, and the third on purpose left out. **Not oversized**: this
+ * board just spent four rows' worth of height making every card one size, and
+ * the one exception would land on the row that can least afford it — while
+ * saying something about the card's *stature* rather than its role. A Llanowar
+ * Elves commander is not a bigger card.
+ *
+ * So: the aura, and the crown. The aura is a standing rim of the same brass
+ * this whole room is trimmed in, over a soft bloom that lifts the card off the
+ * sand; the crown sits on the top edge of the painting the way a crown sits on
+ * a head.
+ *
+ * **Both are steady, and that is what keeps them clear of the marks.** An
+ * attack, a block and a death flash for one beat and are gone. This is simply
+ * true for as long as the card is standing there, which is a different kind of
+ * statement drawn a different way — no motion, no photograph, no red.
+ *
+ * A companion wears the horn and the vine green it already wears in the
+ * command zone. Same two signs, same two colours, wherever the card is
+ * standing. */
+.field-card.is-commander .field-card-turn {
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    0 0 0 1.5px color-mix(in srgb, var(--field-brass) 92%, #fff),
+    0 0 11px -1px color-mix(in srgb, var(--field-brass) 62%, transparent);
+}
+.field-card.is-companion .field-card-turn {
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    0 0 0 1.5px color-mix(in srgb, var(--vine) 82%, #e8f2dc),
+    0 0 11px -1px color-mix(in srgb, var(--vine) 55%, transparent);
+}
+/* Top centre, half off the card's own edge — the corner nothing else on this
+   board has claimed. Keywords sit at 1px from the left and end at 14; the
+   count starts about 44; the crown runs 18 to 40 on a 58px card, so it lands
+   between them at every count and every keyword.
 
-   The pile is drawn *behind* and offset up-left rather than fanned sideways,
-   so a stack occupies exactly one card's width in the row. A fan would read
-   more like cards and would put the row back where it started. */
+   Placed with a margin rather than a `translateX`, deliberately: the arm
+   counter-rotates every child of it with a blanket `transform`, so anything
+   that needed a transform of its own to sit where it sits would be knocked off
+   its corner the moment its card was tapped. */
+.field-card-crown {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 22px;
+  margin-left: -11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px 1px;
+  border-radius: 3px;
+  /* A drawn mark on an arbitrary photograph is invisible about a third of the
+     time — the keyword chips argue this at length. The chip is the constant
+     ground; the metal is the ink. */
+  background: rgba(8, 6, 4, 0.86);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--field-brass) 45%, transparent);
+  color: color-mix(in srgb, var(--field-brass) 94%, #fff);
+}
+.field-card-crown.is-companion {
+  color: color-mix(in srgb, var(--vine) 72%, #eaf4de);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--vine) 50%, transparent);
+}
+/* It pivots about its own anchor — the top edge it rides — so the arm's
+   counter-rotation spins it upright in place rather than walking it off the
+   card. Every chip on the arm does this; see `.field-card-count` above. */
+.field-card-crown { transform-origin: 50% 0; }
+
+/* ---------------------------------------------- a stack, and its fan
+ *
+ * **A stack of identical cards, made of the card it is a stack of.**
+ *
+ * It used to be two blank grey leaves stepped up and to the left — which says
+ * *something is behind this* and nothing whatever about what, and what is
+ * behind it is the entire reason the stack exists (Aaron, 2026-08-26: "stacks
+ * of cards, like the same land stacked, should look stacked on the deck with
+ * some effect, but they should also have a stacked effect on hover, or a
+ * fanned hand look, or something. Same deal for stacks of tokens").
+ *
+ * Every card in a stack is identical *in play* — `stackRow` merges only what
+ * nothing visible tells apart — so a leaf wearing the same painting is not a
+ * stand-in for the pile. It is a truthful picture of the next card down.
+ *
+ * **At rest it is a pile; hovered, it is a hand.** A couple of degrees out of
+ * true is what a pile somebody has been drawing off actually looks like, and a
+ * thumb through it is what you do to count one. Two leaves for a pair and four
+ * for a pile of four or more, capped there: the fan is a texture of depth and
+ * the count in the corner is the tally, so twelve Treasures fanned twelve deep
+ * would cover the neighbouring rows to say a number already written on the
+ * card.
+ *
+ * **Eight degrees at the outermost leaf, and the number is measured rather
+ * than chosen.** A leaf pivots about the card's bottom edge, so its top corner
+ * swings out by 29cos(a) + 81sin(a) — and the row begins about eleven pixels
+ * inside a field that clips its own overflow. Solve that for eleven and the
+ * answer is eight degrees; at nine the leftmost stack in a row loses thirteen
+ * pixels of its outside leaf to the wall, which was the first draft and was
+ * measured in a browser before it was believed.
+ *
+ * So the fan's *width* is fixed and its *density* is what grows: a pile of
+ * four or more gets four leaves inside the same arc rather than a wider one.
+ * That is also what a thicker pile actually looks like under a thumb — more
+ * edges in the same sweep, not a bigger sweep.
+ *
+ * The count is the fact and the fan is the pleasure, which matters because
+ * **hover does not exist on a phone**. Nothing here is the only way to learn
+ * anything: the count chip is drawn at every width on every device, and a tap
+ * opens the card sheet with the count in its title. */
 .field-card-pile {
   position: absolute;
   inset: 0;
-  border-radius: 3px;
-  background: var(--field-plate);
-  box-shadow:
-    -2px -2px 0 0 color-mix(in srgb, var(--field-stone-deep) 70%, transparent),
-    -4px -4px 0 0 color-mix(in srgb, var(--field-stone-deep) 45%, transparent),
-    -5px -5px 6px rgba(0, 0, 0, 0.4);
+  transform-origin: 50% 50%;
+  transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
 }
-/* The pile leans with the card when it turns, because it is the same pile. */
+/* The pile leans with the card when it turns, because it is the same pile.
+   The lean is on the group and the fan is on each leaf, so the two compose
+   instead of one overwriting the other. */
 .field-card.is-stacked.is-tapped .field-card-pile {
   transform: rotate(var(--turn));
-  transition: transform 280ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+.field-card-leaf {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background-color: var(--field-plate);
+  /* The same painting as the card in front of it. `none` is a legible state:
+     a pool that never gave this card an image gets the plate colour, which is
+     what the old leaves were made of. */
+  background-image: var(--leaf-art, none);
+  background-size: cover;
+  background-position: center;
+  /* Darker the further back it stands, so the fan has depth rather than being
+     four flat copies. `abs()` is not universal yet; squaring the step is the
+     same curve and arrives everywhere. */
+  filter: brightness(calc(0.72 - 0.09 * var(--leaf) * var(--leaf)));
+  transform-origin: 50% 100%;
+  transform: rotate(calc(var(--leaf) * 2.2deg));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+              filter 260ms ease;
+}
+.field-card.is-stacked:hover .field-card-leaf,
+.field-card.is-stacked:focus-visible .field-card-leaf {
+  transform: rotate(calc(var(--leaf) * 8deg)) translateY(-3px);
+  filter: brightness(calc(0.95 - 0.07 * var(--leaf) * var(--leaf)));
+}
+/* A fan that opened under its neighbours would be a fan nobody can see. Five
+   rather than six: an attacking card is the one thing on this board allowed
+   to stand over everything (`.field-card.is-attacks`). */
+.field-card.is-stacked:hover,
+.field-card.is-stacked:focus-visible { z-index: 5; }
+@media (prefers-reduced-motion: reduce) {
+  /* The pile keeps its lean and its depth and loses the journey. A stack that
+     simply *is* fanned when the pointer is on it is the honest reduced version
+     of one that opens. */
+  .field-card-pile,
+  .field-card-leaf { transition: none; }
 }
 
 /* ------------------------------------------------------------- the arm
@@ -7677,12 +7983,6 @@ button:hover .tarot-fan-card {
   line-height: 1;
   letter-spacing: -0.02em;
 }
-/* A small card is a land or a permanent behind the line, and those rarely have
-   a keyword at all — but when one does (a manland that woke up), the marks
-   come down with the card rather than covering a third of it. */
-.field-card-small .field-keyword { width: 11px; height: 11px; }
-.field-card-small .field-keyword svg { width: 8.5px; height: 8.5px; }
-.field-card-small .field-keyword-more { font-size: 0.44rem; }
 
 .field-card-count {
   position: absolute;
@@ -7741,7 +8041,6 @@ button:hover .tarot-fan-card {
   width: 26px;
   height: 26px;
 }
-.field-card-small .field-card-lens { width: 20px; height: 20px; }
 /* Picked up. The lens lifts and grows a little under the pointer — the only
    thing hover does here now that the glass no longer arrives with it. */
 .field-card:hover .field-card-lens,
@@ -7800,7 +8099,6 @@ button:hover .tarot-fan-card {
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.85);
 }
-.field-card-small .field-card-lens-pt { font-size: 0.5rem; }
 
 @media (prefers-reduced-motion: reduce) {
   /* The lens no longer arrives, so there is nothing to soften — but the arm
@@ -7851,7 +8149,6 @@ button:hover .tarot-fan-card {
     0 1px 2px rgba(0, 0, 0, 0.6),
     inset 0 0 0 0.5px rgba(0, 0, 0, 0.35);
 }
-.field-card-small .field-counter { font-size: 0.52rem; }
 /* Both inks are near-black on a light chip: 10.9:1 on the green and 8.1:1 on
    the red, so the sign is legible before the hue is even read. */
 .field-counter.is-up {
@@ -8256,20 +8553,22 @@ button:hover .tarot-fan-card {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
-/* Narrow: the cards shrink one step and the rail's name gets the room. A
-   phone still shows two battlefields facing each other, which is the whole
-   point of the layout. */
+/* Narrow: everything except the cards.
+ *
+ * **The cards used to shrink here and no longer do.** A phone dropped them to
+ * 46x64, and the smaller row to 34x47 — a third of a card's width, at which
+ * the printed face this board draws is not small type but a texture. Aaron's
+ * ruling is a floor rather than a preference (2026-08-26): nothing below the
+ * size creatures have always been drawn at, on any screen. A phone pays for it
+ * in scrolling, which is a cost a phone can pay; it was paying in cards nobody
+ * could read, which is not.
+ *
+ * A phone still shows two battlefields facing each other, which is the whole
+ * point of the layout. */
 @media (max-width: 640px) {
-  .field-card { width: 46px; height: 64px; }
-  .field-card-small { width: 34px; height: 47px; }
   .field-life { font-size: 1.1rem; }
   .field-seam-turn { font-size: 0.66rem; letter-spacing: 0.1em; }
   .field-seam-game { display: none; }
-  /* The zones shrink with the cards, not below them. Twenty-two pixels was
-     right when a pile was a brass tile with three letters on it; now it wears
-     a painting, and a painting at 22px is the mistake this room has made
-     before. Thirty-four matches `.field-card-small`, which is the narrowest
-     anything on this board is allowed to be. */
   /* The scrubber takes its own line rather than squeezing the buttons into
      tap targets nobody can hit. */
   .field-scrub { flex-basis: 100%; order: 3; }
