@@ -34,8 +34,15 @@ import "strings"
 //     `Commander Effect` for each player (ids 101 and 202 in the recorded
 //     match), one per companion, and one for every activated ability that
 //     needs somewhere to hang. They are invisible in any real game and
-//     drawing one puts a blank card beside somebody's commander. The rule and
-//     the three bytecode facts under it are `isForgeEffect` in `scribe.go`.
+//     drawing one puts a blank card beside somebody's commander. Neither half
+//     of that description holds always — a real board produced one carrying a
+//     type line and one outside a command zone — so a fourth fact stands
+//     beside the three bytecode ones: an effect an ability built writes its
+//     own source into its name. `isForgeEffect` in `scribe.go` is the rule and
+//     carries all four; `ScribeParser.refused` is why the answer is asked once
+//     per card rather than again on every line, and `board.change` is the
+//     other side of the same coin — the board says nothing about a card the
+//     dictionary has not named.
 //  4. **`out` only clears a zone the card is actually in.** Forge does not
 //     promise that a card's `out` of its old zone precedes its `in` to the
 //     new one, and an unconditional clear on a late `out` blanks a card that
@@ -548,7 +555,31 @@ func (b *board) isToken(id int) bool {
 }
 
 // change is the pending change for a card, made on first touch this step.
+//
+// **Only for a card the dictionary holds**, which is ADR 44's rule read the
+// strict way: the board may only say things about objects it has named. A
+// change against an id with no entry in `b.cards` is a change nothing can
+// render — the browser folds it into a card whose name is the empty string,
+// and an empty name is not a gap a reader can see. It is a blank card tucked
+// under a creature, and it was worse than blank before `stackRow` learned to
+// count attachments: an empty name joins to the empty string, which is
+// byte-for-byte the key of a card carrying nothing at all, so an equipped
+// token merged into the unequipped pile beside it and the pile drew one sword
+// above a count of two.
+//
+// [board.keywords] has always said this for itself, in as many words, and
+// nothing else said it for anybody — so an `attach` line naming an id the
+// dictionary had refused put a nameless card on somebody's battlefield. Said
+// here now, once, for every fold: the dictionary and the changes cannot
+// disagree about which cards exist if only one of them decides.
+//
+// The refused change goes into a scratch [BoardChange] rather than a nil, so
+// that every caller keeps writing the same three lines and none of them has to
+// ask first. Nothing reads it, and it never joins `pending`.
 func (b *board) change(id int) *BoardChange {
+	if _, drawn := b.known[id]; !drawn {
+		return &BoardChange{ID: id}
+	}
 	if c, ok := b.changing[id]; ok {
 		return c
 	}

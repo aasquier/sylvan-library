@@ -515,3 +515,142 @@ func TestAnAbilitysEffectIsDroppedWhateverItWears(t *testing.T) {
 		})
 	}
 }
+
+// inTheDictionary is whether the payload named a card at all.
+func inTheDictionary(log tier3.EventLog, id int) bool {
+	for _, card := range log.Board.Cards {
+		if card.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// touched is whether any step carried a change against a card id.
+//
+// Deliberately not "did it move" — an empty change is still a change, and a
+// change against a card nothing named is exactly the thing that reaches a
+// browser as a card with no name.
+func touched(log tier3.EventLog, id int) bool {
+	for _, step := range log.Board.Steps {
+		for _, change := range step.Changes {
+			if change.ID == id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Ruling 3, widened again: a phantom refused once is refused on every line.
+//
+// The rule reads two things off a card — whether it is in a command zone and
+// whether it has a type line — and **only a `zone` line carries a zone**. So
+// asking it again on each line meant a `Commander Effect` refused on the line
+// that created it walked back in through the next `stats`, `tapped` or
+// `attach` line about it, was named into the dictionary, and folded a change
+// against. Widening the rule to every card-shaped line had moved the
+// name-shape half of it and could not move this half.
+//
+// Each line below is one Forge writes about a card and carries no zone on, so
+// each is a line that cannot answer the question and must not be allowed to
+// try.
+func TestAPhantomRefusedOnceIsRefusedOnEveryLine(t *testing.T) {
+	t.Parallel()
+	// The arrival Forge announces when it builds the thing: untyped, in a
+	// command zone, and named nothing like a host card — so the name shape has
+	// nothing to catch and the zone is the only fact that refuses it.
+	arrival := zoneLine(50, "Commander Effect", "", "Command", "in", 1)
+	for _, later := range []struct {
+		name string
+		line string
+	}{
+		{"a stats line", `{"t":"stats","game":1,"id":50,` +
+			`"card":"Commander Effect","power":0,"toughness":0,"types":""}`},
+		{"a tapped line", `{"t":"tapped","game":1,"tapped":true,"id":50,` +
+			`"card":"Commander Effect","power":0,"toughness":0,"types":""}`},
+		{"a counters line", `{"t":"counters","game":1,"counter":"+1/+1",` +
+			`"was":0,"now":1,"id":50,"card":"Commander Effect","power":0,` +
+			`"toughness":0,"types":""}`},
+		{"an attach line", `{"t":"attach","game":1,"seat":1,"id":50,` +
+			`"card":"Commander Effect","target_id":10,` +
+			`"target":"Grizzly Bears","power":0,"toughness":0,"types":""}`},
+		{"a sacrificed line", `{"t":"sacrificed","game":1,"seat":1,"id":50,` +
+			`"card":"Commander Effect","power":0,"toughness":0,"types":""}`},
+	} {
+		t.Run(later.name, func(t *testing.T) {
+			t.Parallel()
+			logs := played(t, openGame, seatOne, seatTwo, arrival, later.line,
+				turnLine(1, 1), endGame)
+			if len(logs) != 1 {
+				t.Fatalf("%d games closed, want 1", len(logs))
+			}
+			if inTheDictionary(logs[0], 50) {
+				t.Errorf("%s put Forge's `Commander Effect` back in the card "+
+					"dictionary after its arrival was refused — the same "+
+					"phantom, one line later", later.name)
+			}
+			if touched(logs[0], 50) {
+				t.Errorf("%s folded a change against a card the dictionary "+
+					"does not hold, which a browser draws as a card with no "+
+					"name", later.name)
+			}
+		})
+	}
+}
+
+// A change is never folded against a card the dictionary does not hold.
+//
+// The board and the card dictionary were deciding separately which cards
+// exist, and two deciders is one disagreement away from a blank card: an
+// `attach` line naming an id nothing had named folded an attachment with no
+// name onto a real creature, which `FieldGeared` tucks under it like any other
+// sword. The browser survives one now — `stackRow` counts attachments as well
+// as naming them, so the equipped token stopped merging into the bare pile
+// beside it — but it should never have been sent one.
+//
+// Both halves of the disagreement are driven here: a card the dictionary
+// refused *by name* (the scribe writes an empty one for a card it cannot see)
+// and a card it never heard of at all.
+func TestAnAttachmentTheDictionaryNeverNamedIsNotDrawn(t *testing.T) {
+	t.Parallel()
+	bear := zoneLine(10, "Grizzly Bears", "Creature - Bear", "Battlefield",
+		"in", 1)
+	for _, ghost := range []struct {
+		name  string
+		lines []string
+		id    int
+	}{
+		{"a card whose name the dictionary refused", []string{
+			zoneLine(77, "", "", "Battlefield", "in", 1),
+			`{"t":"attach","game":1,"seat":1,"id":77,"card":"",` +
+				`"target_id":10,"target":"Grizzly Bears"}`,
+		}, 77},
+		{"a card nothing ever named", []string{
+			`{"t":"attach","game":1,"seat":1,"id":88,"card":"",` +
+				`"target_id":10,"target":"Grizzly Bears"}`,
+		}, 88},
+	} {
+		t.Run(ghost.name, func(t *testing.T) {
+			t.Parallel()
+			lines := append([]string{openGame, seatOne, seatTwo, bear},
+				ghost.lines...)
+			lines = append(lines, turnLine(1, 1), endGame)
+			logs := played(t, lines...)
+			if len(logs) != 1 {
+				t.Fatalf("%d games closed, want 1", len(logs))
+			}
+			if touched(logs[0], ghost.id) {
+				t.Errorf("card %d reached the board with no name in the "+
+					"dictionary — a blank card tucked under a creature",
+					ghost.id)
+			}
+			// The bear is untouched by any of this: refusing a phantom must
+			// not cost the real card standing beside it.
+			if !inTheDictionary(logs[0], 10) || last(logs[0], 10) == "" {
+				t.Error("the creature the ghost reached for stopped being " +
+					"drawn, which is a wider cut than the one being made")
+			}
+		})
+	}
+}
