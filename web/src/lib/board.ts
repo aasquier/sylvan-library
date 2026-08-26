@@ -150,14 +150,44 @@ export interface BoardSide {
   hand: BoardCard[]
   graveyard: BoardCard[]
   exile: BoardCard[]
+  /** **One seat per commander, in the deck's own order** — one for most decks
+   *  and two for a pairing.
+   *
+   *  A throne is a *place*, so it is drawn whether or not anybody is sitting
+   *  in it: the commander is here when it is home and the seat stands empty
+   *  when it is out on the sand, which is the one fact the command zone
+   *  exists to tell. That is why this holds the card wherever it is standing
+   *  rather than only the ones currently in the zone.
+   *
+   *  The order is the server's, from `deck.yaml`, so a pairing's two thrones
+   *  do not swap sides between games. */
+  thrones: BoardCard[]
+  /** The companion, wherever it is standing, or null for the decks that
+   *  brought none.
+   *
+   *  **It is not a commander and it does not sit on a throne.** It really is
+   *  in the command zone — Forge puts it there at setup — but it is a card
+   *  waiting to be bought into a hand for {3}, not a card that leads the
+   *  deck, and it has never owed a penny of commander tax. */
+  companion: BoardCard | null
+  /** Whatever else is standing in the command zone: an emblem, or a card an
+   *  effect put there. Usually empty, drawn as a pile when it is not.
+   *
+   *  The thrones and the companion above are taken out of it, because those
+   *  have places of their own. */
   command: BoardCard[]
   /** This seat's commanders, **wherever they are standing.**
    *
-   *  `command` is the zone and holds only the ones currently home, which is
-   *  the wrong list for the one question the zone is asked: what would it cost
-   *  to get them back out. A commander on the battlefield still has a tax, and
-   *  it is the tax that made the last cast expensive. Nothing but a commander
-   *  begins in the command zone, so having-been-there is the whole test. */
+   *  Not the same list as `thrones`, and the difference is the point: this is
+   *  what the *tax* is read off, so it counts a card by having-been-in-the-zone
+   *  rather than by the deck naming it. A commander on the battlefield still
+   *  has a tax, and it is the tax that made the last cast expensive.
+   *
+   *  **The companion is excluded, and that is a fix rather than a detail.**
+   *  The old rule here was "nothing but a commander begins in the command
+   *  zone", which is false for exactly the decks that brought a companion —
+   *  so a Kaheera in the zone read as a third commander and put a price on
+   *  the rail for a card that has never been cast from anywhere. */
   commanders: BoardCard[]
 }
 
@@ -181,7 +211,8 @@ function emptySide(seat: ForgeBoardSeat): BoardSide {
   return {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
     creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
-    hand: [], graveyard: [], exile: [], command: [], commanders: [],
+    hand: [], graveyard: [], exile: [], thrones: [], companion: null,
+    command: [], commanders: [],
   }
 }
 
@@ -286,6 +317,18 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
 
   const sides = board.seats.map(emptySide)
   const bySeat = new Map(sides.map((side) => [side.seat, side]))
+  // **The command zone's own furniture, named by the server.**
+  //
+  // Everything that begins in a command zone looks alike from here — a
+  // commander, a partner and a companion all arrive as a card in `command` on
+  // step zero — so which is which is decided in Go against `deck.yaml` and
+  // arrives as board ids. This is the browser reading that answer, not making
+  // one: a room that had to tell a companion from a commander would need to
+  // know the companion rules, and `lib/board.ts` decides no Magic.
+  const companionOf = new Map<number, number>()
+  for (const seat of board.seats) {
+    if (seat.companion) companionOf.set(seat.seat, seat.companion)
+  }
   for (const [seat, total] of life) {
     const side = bySeat.get(seat)
     if (side) side.life = total
@@ -295,7 +338,13 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     if (!card) continue
     const side = bySeat.get(card.seat)
     if (!side) continue
-    if (card.zone === 'command' || card.casts > 0) side.commanders.push(card)
+    const isCompanion = companionOf.get(card.seat) === card.id
+    if (isCompanion) side.companion = card
+    // The tax list. A companion sits in the command zone without ever having
+    // been cast from it, so it is taken out here rather than priced.
+    if (!isCompanion && (card.zone === 'command' || card.casts > 0)) {
+      side.commanders.push(card)
+    }
     // Still standing, for this one beat, in the row it is standing in. It is
     // deliberately **not** also drawn in the zone it has gone to: a card in
     // two places is a worse answer than a card a beat behind, and next beat it
@@ -316,9 +365,36 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     }
     const into = (ZONES as readonly string[]).includes(card.zone)
       ? (card.zone as Zone) : null
+    // The command zone is drawn as places rather than as a pile, so the two
+    // cards that have places of their own are kept out of it. What is left is
+    // an emblem or whatever an effect put there, and that is still a pile.
+    if (into === 'command' && (isCompanion || throned(board, card))) continue
     if (into && into !== 'battlefield') side[into].push(card)
   }
+  // **The thrones, in the deck's order rather than the board's.** Filled last
+  // and from `state` rather than from a zone, because a throne is drawn for a
+  // commander that is out on the battlefield exactly as it is for one sitting
+  // at home — standing empty is the whole thing it has to say.
+  for (const seat of board.seats) {
+    const side = bySeat.get(seat.seat)
+    if (!side) continue
+    for (const id of seat.commanders ?? []) {
+      const card = state.get(id)
+      if (card) side.thrones.push(card)
+    }
+  }
   return { turn: taken.get(active) ?? 0, active, sides }
+}
+
+/** Whether this card has a throne of its own, and so is not part of the pile
+ *  of everything else in the command zone. */
+function throned(board: ForgeBoard, card: BoardCard): boolean {
+  for (const seat of board.seats) {
+    if (seat.seat === card.seat) {
+      return (seat.commanders ?? []).includes(card.id)
+    }
+  }
+  return false
 }
 
 /** A run of identical cards, drawn as one stack with a count on it. */

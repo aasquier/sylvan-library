@@ -52,7 +52,7 @@ import { createPortal } from 'react-dom'
 
 import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
-import { ThroneGlyph } from './glyphs'
+import { HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
@@ -111,6 +111,26 @@ type Mark = 'attacks' | 'blocks' | 'dies'
  *  on the decks that play them. Comparing the front face costs one split. */
 function sameCard(onBoard: string, inBeat: string): boolean {
   return onBoard === inBeat || onBoard.split(' // ')[0] === inBeat
+}
+
+/** A legend's name as a player says it: the part before the title.
+ *
+ *  "Thrasios, Triton Hero" is *Thrasios* at a table, and on a tile this size
+ *  it has to be — the whole string is either three-point type or an ellipsis
+ *  that eats the half doing the work. The full name stays in the `title` and
+ *  in the accessible label, so nothing is lost, only folded.
+ *
+ *  Magic writes a legend's title two ways and this reads both:
+ *  `Kaheera, the Orphanguard` cuts at the comma, and `Tymna the Weaver` cuts
+ *  at "the" — but **only when "the" follows the first word**, which is the
+ *  whole guard. `Jhoira of the Ghitu` also contains " the " and cutting on it
+ *  would leave "Jhoira of", so the pattern is anchored rather than searched.
+ *  Anything else is drawn whole, which is right: a name with no title in it
+ *  is already short. */
+function calledBy(name: string): string {
+  const [head] = name.split(',')
+  const short = head?.trim() || name
+  return /^\S+ the /.exec(short) ? short.split(' ')[0] ?? short : short
 }
 
 function markOf(kind: string): Mark | null {
@@ -591,15 +611,28 @@ function LifeTotal({ life }: { life: number }) {
  * for the same reason: in Commander it is where the game's most important card
  * waits, and a number cannot say which commander is home and which is out.
  */
-function FieldPile({ label, cards, short, zone, throne, receiving }: {
+function FieldPile({ label, cards, short, zone, seat: kind, solo,
+                    receiving }: {
   label: string
   cards: BoardCard[]
   short: string
   /** Which of the board's own zones this is, which is how it finds its
    *  painting in `Dressing`. */
   zone: 'command' | 'graveyard' | 'exile'
-  /** The command zone, which is the one pile whose *emptiness* is news. */
-  throne?: boolean
+  /** Which seat of the command zone this is, when it is one of them.
+   *
+   *  **The command zone is the one region whose *emptiness* is news**, and
+   *  there are two ways for one of its seats to be empty. A commander is out
+   *  on the sand, and its chair says so. A companion has been bought into a
+   *  hand for {3} — a departure no other card in the zone can make — and a
+   *  horn says that instead. A blank tile would say neither. */
+  seat?: 'throne' | 'companion'
+  /** A seat holds one named card, so it does not carry a count.
+   *
+   *  "1" beside a commander is a number nobody asked for, and "0" beside an
+   *  empty chair is worse: the chair has already said it. A graveyard's count
+   *  is the whole point of a graveyard and keeps it. */
+  solo?: boolean
   /** The beat's key when *this* seat's grave is the one receiving a death, and
    *  null otherwise.
    *
@@ -621,7 +654,7 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
   // card in its own row for the length of its beat now, so the skull lands on
   // the card, which is where Aaron asked for it and where it belongs.
   const top = cards[cards.length - 1]
-  const seat = throne && !top
+  const empty = kind && !top ? kind : null
   // **The zone, dressed.** These three were three-letter labels on a 26px
   // tile, which is what a scoreboard does and not what a table does — a player
   // knows the graveyard, exile and the command zone by sight (Aaron,
@@ -637,8 +670,10 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
   // reusing a finished animation — `Struck`'s own trick, one level out.
   const arriving = receiving ?? null
   const title = [
-    top ? `${label}: ${cards.length}, ${top.name} on top`
-      : seat ? `${label}: empty — out on the battlefield`
+    top && solo ? label
+      : top ? `${label}: ${cards.length}, ${top.name} on top`
+      : empty === 'throne' ? `${label} — out on the battlefield`
+      : empty === 'companion' ? `${label} — called out of the command zone`
       : `${label}: empty`,
     // Named because somebody painted it, and because rule 9 says so.
     dressed ? `${dressed.card}, art by ${dressed.art.artist}` : '',
@@ -646,8 +681,10 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
   return (
     <div className="field-pile-wrap">
     <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
-                    + (seat ? ' is-throne' : '')}
-         title={title} aria-label={`${label}: ${cards.length}`}
+                    + (empty ? ' is-vacant' : '')
+                    + (kind ? ` field-seat field-seat-${kind}` : '')}
+         title={title}
+         aria-label={solo ? title : `${label}: ${cards.length}`}
          tabIndex={cards.length > 0 ? 0 : -1}
          onPointerUp={(e) => {
            if (e.pointerType === 'mouse' || cards.length === 0) return
@@ -661,10 +698,15 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
         <img className="field-pile-art" src={top.image} alt="" loading="lazy"
              draggable={false} />
       ) : null}
-      {/* **An empty command zone means the commander is on the table**, which
+      {/* **An empty command zone means the card is somewhere else**, which
           is the opposite of an empty graveyard and was drawn the same way.
-          The chair says which: theirs, and nobody in it. */}
-      {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
+          The mark says which seat it is and where its occupant went: a chair
+          with nobody in it, or a horn that has been blown. */}
+      {empty && (
+        <span className="field-pile-throne">
+          {empty === 'throne' ? <ThroneGlyph /> : <HornGlyph />}
+        </span>
+      )}
       {/* **The ghost, rising off the grave.** Two beats, two pictures: the
           skull lands on the creature *as it dies*, held on the sand for that
           beat, and this rises from the zone that received it. Magic's own
@@ -677,7 +719,7 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
         </span>
       )}
       <span className="field-pile-label">{short}</span>
-      <span className="field-pile-n tabular">{cards.length}</span>
+      {!solo && <span className="field-pile-n tabular">{cards.length}</span>}
     </div>
     {/* **The pile, opened out.** A closed zone drawn as its top card answers
         one question — what is on top — and a graveyard is asked a different
@@ -733,6 +775,11 @@ function FieldRail({ side, facing, name }: {
   // reports the dearer of the two: there is one pile and forty pixels of it,
   // and the expensive commander is the one whose price changes a decision.
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
+  // How many shares of the rail the command zone takes: one per seat, and
+  // never fewer than one, so a board with no seats named still draws a tile
+  // the size the old single pile was.
+  const seats = Math.max(1, side.thrones.length + (side.companion ? 1 : 0)
+    + (side.thrones.length === 0 || side.command.length > 0 ? 1 : 0))
   return (
     <div className={`field-rail field-rail-${facing}`}>
       {/* **The stone bar is gone; the name came back as a heading.** It was a
@@ -743,8 +790,45 @@ function FieldRail({ side, facing, name }: {
           full name for anybody who wants it. */}
       <span className="field-rail-name" title={side.name}>{name}</span>
       <span className="field-rail-totals">
-        <FieldPile label="Command zone" short="Command Zone"
-                   cards={side.command} zone="command" throne />
+        {/* **The command zone is a row of seats, not a pile.**
+            A pile answers "how many", and the command zone is never asked
+            that — it is asked *who is home*. One pile could not say it for a
+            pairing at all: two commanders stacked into one tile showed the
+            top one and hid the other, and the one you could not see was as
+            likely as not the one that mattered. So each commander gets a
+            chair of its own, in the order `deck.yaml` names them, and a
+            companion gets a seat beside them that is not a chair — it sits
+            in this zone, and it is not one of them.
+
+            The group takes a share of the rail per seat it holds, so a deck
+            with one commander is drawn exactly as it was before this and a
+            pairing does not squeeze the graveyard to make room. */}
+        <span className="field-command"
+              style={{ '--seats': seats } as CSSProperties}>
+          {side.thrones.map((c) => (
+            <FieldPile key={c.id} label={`Command zone — ${c.name}`}
+                       short={calledBy(c.name)} zone="command"
+                       cards={c.zone === 'command' ? [c] : []}
+                       seat="throne" solo />
+          ))}
+          {side.companion && (
+            <FieldPile key={side.companion.id} zone="command"
+                       label={`Companion — ${side.companion.name}`}
+                       short={calledBy(side.companion.name)}
+                       cards={side.companion.zone === 'command'
+                         ? [side.companion] : []}
+                       seat="companion" solo />
+          )}
+          {/* Everything else the zone is holding. Usually nothing — an
+              emblem, or a card an effect put there — and it is the whole
+              zone for a board shaped before the server named the seats,
+              which is what a mid-deploy skew looks like. */}
+          {(side.thrones.length === 0 || side.command.length > 0) && (
+            <FieldPile label="Command zone" short="Command Zone"
+                       cards={side.command} zone="command"
+                       seat={side.thrones.length === 0 ? 'throne' : undefined} />
+          )}
+        </span>
         {/* **Beside the pile rather than on it.** Inside, the chip covered
             the zone's own three-letter label — the first draft read "CI +4",
             which is a worse pile than one with no tax on it at all. Twenty-six

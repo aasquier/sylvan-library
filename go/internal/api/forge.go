@@ -262,6 +262,49 @@ type forgeBoardSeat struct {
 	// is the fallback for a seat whose slug the room cannot resolve.
 	Name string `json:"name"`
 	Life int    `json:"life"`
+	// Commanders is this seat's commanders **by board id, in the deck's own
+	// order** — one for most decks and two for a pairing.
+	//
+	// It is here rather than derived in the browser because the browser cannot
+	// derive it. Everything that begins in a command zone looks alike from the
+	// stream: a commander, a partner, a background, and a *companion* all
+	// arrive as a card in the `command` zone on step zero, and only the deck
+	// knows which is which. The order matters too — a pairing's two thrones
+	// keep the order `deck.yaml` lists them in, so the same commander is on
+	// the same side of the rail every game.
+	//
+	// Ids rather than names, because the browser is holding a dictionary keyed
+	// on ids and a name it would have to match twice: once against Forge's
+	// spelling and once against a front face.
+	Commanders []int `json:"commanders,omitempty"`
+	// Companion is this seat's companion by board id, or zero for the decks
+	// that brought none.
+	//
+	// **It is not a commander and it must not be counted as one.** A companion
+	// really does sit in the command zone — `Player.assignCompanion` moves it
+	// there at setup, checked in Forge's own bytecode — so the rule the board
+	// used to identify commanders by ("nothing but a commander begins in the
+	// command zone") is false for exactly these decks, and it was charging
+	// commander tax for a card that has never had any.
+	Companion int `json:"companion,omitempty"`
+}
+
+// forgeCommandZone is what a seat's command zone holds before a card has
+// moved, read off the deck rather than off the game.
+//
+// The deck is the only honest source. Forge announces a card arriving in the
+// command zone and says nothing about *why* it is there — `CardView` does
+// carry `isCommander()`, but reaching it means another field on every zone
+// line and another worker image, to learn something `deck.yaml` already
+// states outright.
+type forgeCommandZone struct {
+	// Commanders in the deck's own order. `deck.Deck.Commander` is a list
+	// because a pairing is two cards, and this keeps that order.
+	Commanders []string
+	// Companion, or empty. `deck.Deck.Companion` is a pointer for the same
+	// reason; flattened here because "no companion" and "the empty name" are
+	// the same thing to a lookup.
+	Companion string
 }
 
 // forgeBoardCard is one card, named and painted once.
@@ -400,9 +443,28 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 // and a room paces them together. Cutting them apart would drift the picture
 // away from the account by however many beats were dropped.
 func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
-	art map[string]boardArt, kept int) *forgeBoard {
+	command map[int]forgeCommandZone, art map[string]boardArt,
+	kept int) *forgeBoard {
 	if reel == nil {
 		return nil
+	}
+	// One index per seat, so a name is resolved against that player's own
+	// cards. Two decks in one match can run the same commander, and a board id
+	// belongs to exactly one of them.
+	held := map[int]map[string]int{}
+	for _, card := range reel.Cards {
+		by, ok := held[card.Seat]
+		if !ok {
+			by = map[string]int{}
+			held[card.Seat] = by
+		}
+		// First seen wins: a clone of somebody's commander is a second card
+		// with the same name, and the throne belongs to the original. Forge
+		// numbers cards as it makes them and the dictionary is in first-seen
+		// order, so the original is the one already here.
+		if _, seen := by[card.Name]; !seen {
+			by[card.Name] = card.ID
+		}
 	}
 	out := &forgeBoard{
 		Seats: make([]forgeBoardSeat, 0, len(reel.Seats)),
@@ -420,6 +482,13 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 		if slug, ok := seats[seat.Seat]; ok {
 			row.Slug = &slug
 		}
+		zone := command[seat.Seat]
+		for _, name := range zone.Commanders {
+			if id := boardIDOf(name, held[seat.Seat]); id != 0 {
+				row.Commanders = append(row.Commanders, id)
+			}
+		}
+		row.Companion = boardIDOf(zone.Companion, held[seat.Seat])
 		out.Seats = append(out.Seats, row)
 	}
 	for _, card := range reel.Cards {
@@ -433,6 +502,33 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 	return out
 }
 
+// boardIDOf is the board id of a card this seat holds, by its `deck.yaml`
+// name, or zero when the game has no such card.
+//
+// **Zero is a real answer, not a failure.** The pre-flight drops a card Forge
+// does not implement, so a commander can be absent from a match that ran
+// anyway; a throne that is simply not drawn says that more honestly than a
+// throne holding nothing would.
+//
+// The two spellings are reconciled through [tier3.Resolve], which is the same
+// function that decided what to write into the `.dck` in the first place —
+// Scryfall's combined `A // B` never appears in Forge's index, so a
+// double-faced commander is on the board under one of its faces. Reusing the
+// exporter's own answer is what keeps the two from drifting apart.
+func boardIDOf(name string, held map[string]int) int {
+	if name == "" || len(held) == 0 {
+		return 0
+	}
+	if id, ok := held[name]; ok {
+		return id
+	}
+	index := make(map[string]bool, len(held))
+	for card := range held {
+		index[card] = true
+	}
+	return held[tier3.Resolve(name, index)]
+}
+
 // newForgeBeats shapes one game's log for the browser.
 //
 // `seats` is the seat-to-slug map the plan built from the deck order, which is
@@ -440,7 +536,7 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 // narration happens *during* the run, when there is no run yet, exactly as the
 // CLI's `seatsOf` does for the same reason.
 func newForgeBeats(log tier3.EventLog, seats map[int]string,
-	art map[string]boardArt) forgeBeats {
+	command map[int]forgeCommandZone, art map[string]boardArt) forgeBeats {
 	slug := func(seat int) *string {
 		if s, ok := seats[seat]; ok && seat != 0 {
 			return &s
@@ -455,7 +551,7 @@ func newForgeBeats(log tier3.EventLog, seats map[int]string,
 	}
 	out := forgeBeats{Game: log.Game, Truncated: truncated,
 		Beats: make([]forgeBeat, 0, len(events))}
-	out.Board = newForgeBoard(log.Board, seats, art, len(events))
+	out.Board = newForgeBoard(log.Board, seats, command, art, len(events))
 	for _, e := range events {
 		out.Beats = append(out.Beats, forgeBeat{
 			Kind: string(e.Kind), Turn: e.Turn, Who: slug(e.Seat),
@@ -867,8 +963,18 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 			// counts without rows; the bar still moves and `partial` simply
 			// stays sparse.
 			seats := map[int]string{}
+			// What each seat's command zone holds before a card has moved.
+			// Built here beside the slug map and for the same reason: seat
+			// order is the deck order on both run paths, so the deck at a
+			// seat is known before the run that fills it exists.
+			command := map[int]forgeCommandZone{}
 			for i, d := range decks {
 				seats[i+1] = d.Slug
+				zone := forgeCommandZone{Commanders: d.Commander}
+				if d.Companion != nil {
+					zone.Companion = *d.Companion
+				}
+				command[i+1] = zone
 			}
 			var rowsSoFar []forgeRow
 			// The beats of the game that just closed, waiting for the row
@@ -891,7 +997,7 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 				if log.Board != nil {
 					a.resolveBoardArt(ctx, log.Board.Cards, painted)
 				}
-				shaped := newForgeBeats(log, seats, painted)
+				shaped := newForgeBeats(log, seats, command, painted)
 				pending = &shaped
 				if len(played) < ForgeReplayGames {
 					played = append(played, shaped)

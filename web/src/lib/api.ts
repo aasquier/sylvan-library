@@ -649,6 +649,19 @@ export interface ForgeBoardSeat {
    *  fallback for a seat whose slug the shelf has not answered yet. */
   name: string
   life: number
+  /** This seat's commanders by board id, **in the deck's own order** — one
+   *  for most decks and two for a pairing.
+   *
+   *  Sent because the browser cannot work it out: a commander, a partner and
+   *  a companion all arrive as a card in the `command` zone on step zero, and
+   *  only `deck.yaml` knows which is which. Absent for a board shaped before
+   *  a deck was known. */
+  commanders?: number[]
+  /** This seat's companion by board id, or absent.
+   *
+   *  A companion really does sit in the command zone — Forge moves it there
+   *  at setup — but it is not a commander and owes no tax. */
+  companion?: number
 }
 
 /** One card in one game, named and painted once.

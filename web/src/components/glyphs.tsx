@@ -142,3 +142,33 @@ export function ThroneGlyph({ size = 18 }: { size?: number }) {
     </svg>
   )
 }
+
+/**
+ * A hunting horn: the companion, called away.
+ *
+ * The command zone's other empty seat. A companion begins in the zone beside
+ * the commander and leaves it in the one way nothing else does — its owner
+ * pays {3} and it goes to their *hand*, which is not a departure any other
+ * card in that zone can make. So the mark is not a chair with nobody in it,
+ * it is the thing you blow to call somebody who then comes.
+ *
+ * Hollow and stroked to match [ThroneGlyph], and one closed shape because two
+ * would be two grey smudges: the horn narrows to a mouthpiece at the bottom
+ * left and flares to a bell at the top right, which is the whole silhouette
+ * and survives being eighteen pixels tall. The bell's rim is the one extra
+ * stroke, because without it the shape reads as a claw.
+ */
+export function HornGlyph({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      <g fill="none" stroke="currentColor" strokeWidth="1.4"
+         strokeLinejoin="round" strokeLinecap="round">
+        <path d="M4.6 15.8 C3.9 9.8 8.4 4.6 16 4.2 L15.1 10.4
+                 C10.7 10.9 8.1 13.2 7.1 16.6 Z" />
+        {/* The rim, so the wide end reads as an opening. */}
+        <path d="M16 4.2 L15.1 10.4" />
+      </g>
+    </svg>
+  )
+}

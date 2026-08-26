@@ -110,7 +110,8 @@ it('gives each hand its own place, on its own side of the seam', () => {
  *  and a creature carries counters of both signs at once. */
 const THRONE: ForgeBoard = {
   seats: [
-    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40,
+      commanders: [30] },
     { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
   ],
   cards: [
@@ -156,7 +157,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
     c.querySelector('.field-rail-far') as HTMLElement
 
   const home = throne(4)
-  expect(railOf(home.container).querySelector('.field-pile.is-throne'),
+  expect(railOf(home.container).querySelector('.field-pile.is-vacant'),
     'a zone with the commander in it is not an empty chair').toBeNull()
   expect(railOf(home.container).querySelector('.field-tax')?.textContent?.trim())
     .toBe('+2')
@@ -164,7 +165,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
 
   // Out again: the chair is empty and the price has gone up.
   const away = throne(5)
-  expect(railOf(away.container).querySelectorAll('.field-pile.is-throne'),
+  expect(railOf(away.container).querySelectorAll('.field-pile.is-vacant'),
     'the commander is on the battlefield, so the seat is empty').toHaveLength(1)
   expect(railOf(away.container).querySelector('.field-tax')?.textContent?.trim())
     .toBe('+4')
@@ -814,4 +815,93 @@ it('marks a transforming creature, whose two names are spelled differently', () 
   const card = container.querySelector(
     'img[alt="Kazandu Mammoth // Kazandu Valley"]')?.closest('.field-card')
   expect(card?.className).toContain('is-attacks')
+})
+
+/** A board where one seat ran a partner pair *and* a companion — the whole
+ *  reason the command zone stopped being one pile.
+ *
+ *  Kaheera really does begin in the command zone beside the two commanders:
+ *  Forge moves it there at setup, and that is exactly what made it
+ *  indistinguishable from them. The server names it, so the room does not
+ *  have to know the companion rules to draw it. */
+const PAIRING: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'pair', name: 'Thrasios and Tymna', life: 40,
+      commanders: [40, 41], companion: 42 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 40, name: 'Thrasios, Triton Hero',
+      types: 'Legendary Creature - Merfolk Wizard', seat: 1 },
+    { id: 41, name: 'Tymna the Weaver',
+      types: 'Legendary Creature - Human Cleric', seat: 1 },
+    { id: 42, name: 'Kaheera, the Orphanguard',
+      types: 'Legendary Creature - Cat Beast', seat: 1 },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 40, zone: 'command', seat: 1 },
+      { id: 41, zone: 'command', seat: 1 },
+      { id: 42, zone: 'command', seat: 1 },
+    ] },
+    // Tymna goes to the sand; Kaheera is bought into a hand for {3}.
+    { turn: 2, seat: 1, changes: [
+      { id: 41, zone: 'battlefield', seat: 1 },
+      { id: 42, zone: 'hand', seat: 1 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function pairing(shown: number) {
+  return render(
+    <MatchBoard board={PAIRING} shown={shown} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('gives a pairing two seats and the companion one of its own', () => {
+  const railOf = (c: HTMLElement) =>
+    c.querySelector('.field-rail-far') as HTMLElement
+  const { container } = pairing(1)
+  const rail = railOf(container)
+  const seats = [...rail.querySelectorAll('.field-command .field-pile')]
+  // Two thrones and a companion, and **nothing else**: a fourth tile would be
+  // the old catch-all pile drawing the same three cards a second time.
+  expect(seats, 'two commanders and a companion are three places')
+    .toHaveLength(3)
+  // Order is the deck's, which is the server's. Tymna has the higher id and
+  // arrives second in the payload, so a room sorting by the board would put
+  // her first and the same commander would change sides between games.
+  expect(seats.map((s) => s.querySelector('.field-pile-label')?.textContent))
+    .toEqual(['Thrasios', 'Tymna', 'Kaheera'])
+  // The companion's seat is marked as one — it is in this zone and it is not
+  // one of them.
+  expect(seats[2]?.className).toContain('field-seat-companion')
+  expect(seats[0]?.className).not.toContain('field-seat-companion')
+  // A seat holds one named card, so it carries no count. "1" beside a
+  // commander is a number nobody asked for.
+  expect(rail.querySelectorAll('.field-command .field-pile-n')).toHaveLength(0)
+  // Everybody is home, so no seat is vacant.
+  expect(rail.querySelectorAll('.field-pile.is-vacant')).toHaveLength(0)
+})
+
+it('charges no commander tax for a companion leaving the command zone', () => {
+  const railOf = (c: HTMLElement) =>
+    c.querySelector('.field-rail-far') as HTMLElement
+  const { container } = pairing(2)
+  const rail = railOf(container)
+  // **The bug this whole split exists to kill.** A companion sits in the
+  // command zone and leaves it for a hand, and the board's old rule —
+  // "nothing but a commander begins in the command zone" — read that as a
+  // commander being cast. Kaheera has never been cast from anywhere and owes
+  // nothing; Tymna went to the battlefield and owes two.
+  expect(rail.querySelector('.field-tax')?.textContent?.trim()).toBe('+2')
+  // Both empty seats are drawn, and they do not say the same thing: a chair
+  // with nobody in it is a commander out on the sand, and a horn is a
+  // companion already bought into a hand.
+  const vacant = [...rail.querySelectorAll('.field-pile.is-vacant')]
+  expect(vacant, 'Tymna is out and Kaheera has been called').toHaveLength(2)
+  expect(vacant[0]?.className).not.toContain('field-seat-companion')
+  expect(vacant[1]?.className).toContain('field-seat-companion')
 })
