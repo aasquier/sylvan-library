@@ -295,6 +295,118 @@ it('opens a closed zone into something you can look through', () => {
     "the near seat's exile is empty, so it does not open").toBeNull()
 })
 
+/** A whole tap — pressed and lifted.
+ *
+ *  `tap` above lifts without ever pressing, which is all a handler listening
+ *  on the way *up* needs and not enough for the dismissal, which listens on
+ *  the way down so a tray gets out of the way before the thing underneath it
+ *  is touched. */
+function press(el: Element) {
+  for (const type of ['pointerdown', 'pointerup']) {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'pointerType', { value: 'touch' })
+    fireEvent(el, ev)
+  }
+}
+
+/** The zones of one seat's rail, by the label on the tile. */
+function zone(container: HTMLElement, rail: 'far' | 'near', label: string) {
+  const wrap = container.querySelector(`.field-rail-${rail} .field-pile-wrap`
+    + `:has([aria-label^="${label}"])`) as HTMLElement
+  return { wrap, pile: wrap?.querySelector('.field-pile') as HTMLElement,
+    tray: wrap?.querySelector('.field-tray') as HTMLElement }
+}
+
+function zones() {
+  return render(
+    <MatchBoard board={ZONES} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+/* **What these four cannot see, and where it was seen instead.**
+ *
+ * Half of this behaviour is a stylesheet — `:hover` gated on `(hover: hover)`
+ * so a phone never latches it, and `:focus-visible` in place of
+ * `:focus-within` so a click stops pinning the panel open. jsdom has no
+ * layout and this suite reads `index.css` as an empty string, so a guard
+ * written here against either would read nothing and cheerfully report no
+ * problem. Both halves were driven in a real browser instead: Chrome at
+ * 1280x900 for the click, and an emulated phone at 375x812 with `hover: none`
+ * and trusted touch events for the tap.
+ *
+ * What is left is the half that *is* structure — which class this component
+ * puts on the tray, and when — and that is exactly what these hold. */
+
+it('shuts the tray when you tap the same zone a second time', () => {
+  const { container } = zones()
+  const grave = zone(container, 'far', 'Graveyard')
+
+  // The thing you opened is the thing that closes it. Nothing used to: the
+  // second tap did clear this class, and a `:hover` latched by the first tap
+  // went on holding the panel up, so the zone had no way to shut.
+  press(grave.pile)
+  expect(grave.tray.className, 'the first tap opens it').toContain('is-open')
+
+  press(grave.pile)
+  expect(grave.tray.className, 'the second tap shuts it')
+    .not.toContain('is-open')
+  // **Shut on purpose, which is a different state from never-opened.** Only
+  // this one outranks a hover the browser has not let go of yet.
+  expect(grave.tray.className).toContain('is-shut')
+})
+
+it('shuts a tray from outside it, but never from inside it', () => {
+  const { container } = zones()
+  const grave = zone(container, 'far', 'Graveyard')
+  press(grave.pile)
+  expect(grave.tray.className).toContain('is-open')
+
+  // **The trap.** A dismissal that only asks "was this tap somewhere else"
+  // shuts the graveyard the instant somebody reaches for a card in the
+  // graveyard — which is the one thing they opened it to do.
+  press(grave.tray.querySelector('.field-card') as Element)
+  expect(grave.tray.className, 'reaching into the pile is not a dismissal')
+    .toContain('is-open')
+
+  press(container.querySelector('.field-rail-near') as Element)
+  expect(grave.tray.className, 'a tap anywhere else puts it away')
+    .toContain('is-shut')
+})
+
+it('lets Escape out of an open tray', () => {
+  const { container } = zones()
+  const grave = zone(container, 'far', 'Graveyard')
+  press(grave.pile)
+  expect(grave.tray.className).toContain('is-open')
+
+  // From the document, not from the tile: a tap opens this tray without
+  // focusing anything, so the key is pressed with the focus still on nothing
+  // in particular.
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(grave.tray.className, 'Escape is the way out everywhere else')
+    .toContain('is-shut')
+})
+
+it('spreads one zone at a time', () => {
+  const { container } = zones()
+  const grave = zone(container, 'far', 'Graveyard')
+  const exile = zone(container, 'far', 'Exile')
+
+  press(grave.pile)
+  expect(grave.tray.className).toContain('is-open')
+
+  // Two piles spread at once is two panels answering one question, and the
+  // second one lands over the sand the first was there to be compared
+  // against. It costs nothing to arrange: opening the exile is a press
+  // *outside* the graveyard, so the graveyard puts itself away on the way
+  // past and no zone has to know that any other zone exists.
+  press(exile.pile)
+  expect(exile.tray.className, 'the one you just asked for').toContain('is-open')
+  expect(grave.tray.className, 'the one you had open').toContain('is-shut')
+})
+
 it('says what a creature does in the one corner that was free', () => {
   // A painting at fifty-eight pixels tells you this is a Dragon. Whether the
   // Dragon *flies* is the question when the other side has ground blockers,

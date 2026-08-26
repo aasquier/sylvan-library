@@ -6980,7 +6980,9 @@ button:hover .tarot-fan-card {
    opens off it. That is the whole trick: a panel anchored to a 26px pile which
    the pointer has to leave the pile to reach is a panel nobody can reach, and
    keeping both inside one hover group means the pointer never crosses a gap.
-   `focus-within` gives the keyboard the same thing for free. */
+   The keyboard is served beside it rather than by it — see the opening rules
+   below, which read the tile's `:focus-visible` and the tray's own, because
+   `:focus-within` here could not tell a keyboard apart from a click. */
 /* **The wrap is the flex child, so the wrap is what flexes.** This carried
    `flex: 0 0 auto` while the pile inside it carried `flex: 1 1 0` with no
    width — so the wrap sized itself to its content, the content wanted to grow
@@ -7057,13 +7059,54 @@ button:hover .tarot-fan-card {
   transform: translateY(-7px) scale(0.97);
   transform-origin: top center;
 }
-.field-pile-wrap:hover .field-tray,
-.field-pile-wrap:focus-within .field-tray,
+/* **A tray opens three ways, and every one of them stands down for `is-shut`.**
+ *
+ * It used to open two ways and shut only one, which is the whole of the bug
+ * Aaron reported from the live site (2026-08-26): *"when I click in a
+ * graveyard or command zone and it expands, it is awkward to get it to
+ * collapse again."* Both of the old openers latch, and neither latch is
+ * anything the browser lets go of on its own:
+ *
+ * - `:focus-within` — the tile carries `tabindex="0"`, so **clicking** it
+ *   focuses it, and focus stays put until something else takes it. Measured
+ *   in Chrome on a real board: mouse parked at the far corner of the page,
+ *   `:hover` false, no `is-open` class, and the panel still standing. That is
+ *   a panel with no way to close short of hunting for something else to
+ *   click.
+ * - `:hover` — on a touch screen there is no pointer to move away, so a tap
+ *   latches the hover state onto the tile and holds it there until the next
+ *   tap lands somewhere else. So the second tap on the same zone cleared the
+ *   `is-open` class and *nothing happened*, which is exactly what "awkward to
+ *   collapse" feels like from the other end.
+ *
+ * Three changes, one per fault. Hover is gated on `(hover: hover)`, so the
+ * hand that has no pointer never arms the latch in the first place — the same
+ * gate, for the same reason, as the tarot legend two thousand lines up.
+ * `:focus-within` becomes `:focus-visible`, which is the one selector that
+ * tells a keyboard's focus from a click's: a pointer click on this tile does
+ * not match it (measured, not assumed), so the keyboard keeps its opener and
+ * the mouse stops pinning the panel. And `is-shut` — set when somebody taps
+ * the zone again, taps outside it, or presses Escape — outranks all three, so
+ * a deliberate close beats a latch that has not let go yet.
+ *
+ * The `~` reaches the tray from the tile because the tray is the tile's next
+ * sibling; `.field-tray:has(:focus-visible)` is what keeps it open once focus
+ * has *moved into* it, which is what tabbing through a graveyard does. */
+.field-pile:focus-visible ~ .field-tray:not(.is-shut),
+.field-pile-wrap .field-tray:has(:focus-visible):not(.is-shut),
 .field-tray.is-open {
   opacity: 1;
   visibility: visible;
   transform: none;
   transition-delay: 0s;
+}
+@media (hover: hover) {
+  .field-pile-wrap:hover .field-tray:not(.is-shut) {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+  }
 }
 
 .field-tray-head {
