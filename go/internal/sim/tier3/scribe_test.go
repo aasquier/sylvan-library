@@ -552,3 +552,145 @@ func TestTheBoardsSizeIsStated(t *testing.T) {
 		}
 	}
 }
+
+// Ruling 3, the half that was missing: a *companion*'s phantom is not a card
+// either.
+//
+// **This is a fabricated stream, and it has to be.** The recording is
+// `gyome-food` against `atla-palani-dinos` and neither deck has a companion,
+// so the case it exercises simply is not in there — and the recording is a
+// frozen golden that is never regenerated to reach a new case. The five lines
+// below are not invented, though: they are what Forge produces, decoded with
+// `javap -c` against 2.0.14 rather than guessed at.
+//
+//   - `Player.assignCompanion` ends in
+//     `GameAction.moveTo(ZoneType.Command, companion, ...)`, so the companion
+//     really does sit in the command zone. It is not a commander and has no
+//     tax; it is a card waiting to be bought into a hand for {3}.
+//   - `Player.createCompanionEffect` then puts a `DetachedCardEffect` in
+//     beside it, named `Lang.getPossesive(name) + " Companion Effect"`.
+//   - That effect's type line is **empty**, exactly like `Commander Effect`'s,
+//     and this is the one part worth stating because the two are built by
+//     different constructors. The companion's is handed the companion's own
+//     `IPaperCard` — but `Card`'s constructor builds a blank `CardState` and
+//     reads nothing off the paper card but foil and marked colours, so no
+//     types come with it.
+//
+// Before this, a deck with a companion drew a blank card in its command zone,
+// on every board, forever.
+func TestACompanionsPhantomIsNotDrawnEither(t *testing.T) {
+	t.Parallel()
+	const who = `"seat":1,"who":"Kaheera Fixture"`
+	lines := []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,` + who + `,"life":40}`,
+		// The commander, the companion, and one phantom for each of them.
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + who +
+			`,"id":100,"card":"Goreclaw, Terror of Qal Sisma","power":4,` +
+			`"toughness":5,"types":"Legendary Creature - Bear"}`,
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + who +
+			`,"id":101,"card":"Commander Effect","power":0,"toughness":0,` +
+			`"types":""}`,
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + who +
+			`,"id":102,"card":"Kaheera, the Orphanguard","power":3,` +
+			`"toughness":3,"types":"Legendary Creature - Cat Beast"}`,
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + who +
+			`,"id":103,"card":"Kaheera, the Orphanguard's Companion Effect",` +
+			`"power":0,"toughness":0,"types":""}`,
+		// An activated ability's effect, which is the one that proved naming
+		// them one at a time could never hold: a real match raised
+		// `Rogue's Passage (123)'s Effect` after both of the above were
+		// already being dropped.
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + who +
+			`,"id":104,"card":"Rogue's Passage (123)'s Effect","power":0,` +
+			`"toughness":0,"types":""}`,
+		// An emblem is untyped too and is **not** one of these. Forge's own
+		// `createEffect` branches on this prefix, and a player in a real game
+		// can see their emblem sitting in the command zone.
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + who +
+			`,"id":105,"card":"Emblem - Elspeth, Knight-Errant","power":0,` +
+			`"toughness":0,"types":""}`,
+		`{"t":"turn","game":1,"turn":1,` + who + `,"life":40}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Kaheera Fixture"}`,
+	}
+	p := tier3.NewScribeParser(true)
+	var log *tier3.EventLog
+	for _, line := range lines {
+		if got, _ := p.Feed(line); got != nil {
+			log = got
+		}
+	}
+	if log == nil || log.Board == nil {
+		t.Fatal("the stream produced no board")
+	}
+	moved := map[int]bool{}
+	for _, step := range log.Board.Steps {
+		for _, change := range step.Changes {
+			moved[change.ID] = true
+		}
+	}
+	// The commander, the companion and the emblem all stand in the zone.
+	for _, want := range []int{100, 102, 105} {
+		if !moved[want] {
+			t.Errorf("card %d never reached the command zone", want)
+		}
+	}
+	// None of the effects does — the companion's and the ability's are the
+	// two that used to.
+	for _, id := range []int{101, 103, 104} {
+		if moved[id] {
+			var name string
+			for _, card := range log.Board.Cards {
+				if card.ID == id {
+					name = card.Name
+				}
+			}
+			t.Errorf("Forge's %q phantom (id %d) was drawn onto the board",
+				name, id)
+		}
+	}
+}
+
+// An untyped card that is **not** in a command zone is still drawn.
+//
+// The rule swallows a card whole, so it is worth pinning what it will not
+// swallow. Forge puts every effect in the command zone, so an untyped card
+// reported anywhere else is not one of them — it is either a card whose types
+// this reader failed to hear or a Forge doing something new, and both of those
+// are news. Dropping it would hide the news and leave a hole in the picture
+// with nothing to say a hole was made.
+func TestAnUntypedCardOffTheCommandZoneIsStillDrawn(t *testing.T) {
+	t.Parallel()
+	const who = `"seat":1,"who":"Fixture"`
+	lines := []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,` + who + `,"life":40}`,
+		`{"t":"zone","game":1,"zone":"Battlefield","mode":"in",` + who +
+			`,"id":7,"card":"Somebody's Effect","power":1,"toughness":1,` +
+			`"types":""}`,
+		`{"t":"turn","game":1,"turn":1,` + who + `,"life":40}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Fixture"}`,
+	}
+	p := tier3.NewScribeParser(true)
+	var log *tier3.EventLog
+	for _, line := range lines {
+		if got, _ := p.Feed(line); got != nil {
+			log = got
+		}
+	}
+	if log == nil || log.Board == nil {
+		t.Fatal("the stream produced no board")
+	}
+	drawn := false
+	for _, step := range log.Board.Steps {
+		for _, change := range step.Changes {
+			if change.ID == 7 {
+				drawn = true
+			}
+		}
+	}
+	if !drawn {
+		t.Error("an untyped card on the battlefield was dropped as one of " +
+			"Forge's command-zone effects, which is not where they live")
+	}
+}

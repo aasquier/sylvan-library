@@ -218,10 +218,11 @@ func (p *ScribeParser) fold(l scribeLine) {
 	switch l.Kind {
 	case "zone":
 		p.board.name(l.ID, l.Card, l.Types, l.Token, l.Seat)
-		// **The phantom.** Forge keeps a `Commander Effect` in each command
-		// zone: a real id, a real name, and an empty type line. It is the
-		// commander-tax bookkeeping and it is invisible in any real game.
-		if l.Types == "" && l.Card == "Commander Effect" {
+		// **The phantoms.** Forge keeps bookkeeping cards in the command
+		// zone: a real id, a real name, and an empty type line. They are
+		// invisible in any real game and drawing one puts a blank card beside
+		// somebody's commander.
+		if isForgeEffect(l.Zone, l.Card, l.Types) {
 			return
 		}
 		was := p.board.zone[l.ID]
@@ -452,4 +453,46 @@ func (p *ScribeParser) finishGame(l scribeLine) (*EventLog, *GameResult) {
 	p.board = newBoard()
 	p.turn, p.outcomeTurn = 0, 0
 	return log, &game
+}
+
+// isForgeEffect is whether a card arriving in a command zone is Forge's own
+// bookkeeping rather than a card anybody put there.
+//
+// **Three facts from `javap -c` against Forge 2.0.14, and the rule is their
+// intersection.** Guessing at any one of them would have been wrong: the
+// first version of this dropped one effect by name and a real match then
+// produced two more.
+//
+//  1. **An effect has no type line.** `SpellAbilityEffect.createEffect` builds
+//     a bare `Card(id, game)` — no paper card — sets a name on it and marks it
+//     `GamePieceType.EFFECT`; nothing ever gives it types. `Commander Effect`
+//     and a companion's effect go through `DetachedCardEffect` instead, and
+//     that one *is* handed a paper card — but `Card`'s constructor makes a
+//     blank `CardState` and reads nothing off the paper card but foil and
+//     marked colours, so it has no types either. A real card always has some.
+//  2. **An effect is in the command zone.** `createEffect`'s caller ends in
+//     `GameAction.moveToCommand`, and `Player.assignCompanion` and
+//     `createCommanderEffect` both put theirs in the command zone by hand.
+//     Nothing else is dropped anywhere: an untyped card the *battlefield*
+//     somehow reported is news, and news is not something to swallow quietly.
+//  3. **An emblem is not one of these**, even though it is built by the same
+//     function and is equally untyped. `createEffect` branches on
+//     `name.startsWith("Emblem")` and marks it, so the name is Forge's own
+//     discriminator rather than a pattern read off one match. An emblem is a
+//     real object in a real command zone and a player wants to see it.
+//
+// Three of these were live in one recorded match: `Commander Effect` for each
+// player, `Kaheera, the Orphanguard's Companion Effect`, and
+// `Rogue's Passage (123)'s Effect` — the last from an activated ability, which
+// is why naming them one at a time was never going to hold.
+//
+// The exact discriminator is `GamePieceType.EFFECT`, which the scribe does not
+// carry. It could: the cost is a field on every card line and a worker image.
+// It is not obviously worth it while the shape above is this clean, and the
+// fallback would have to exist anyway for a worker deployed before the field.
+func isForgeEffect(zone, name, types string) bool {
+	if zone != "Command" || types != "" {
+		return false
+	}
+	return !strings.HasPrefix(name, "Emblem")
 }

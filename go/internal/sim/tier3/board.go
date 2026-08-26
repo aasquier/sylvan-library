@@ -29,11 +29,13 @@ import "strings"
 //     show the top of anyone's deck. Showing a hand is a broadcast; showing
 //     the library is showing the answers. It is discarded *here*, in Go, so
 //     that it cannot reach a browser by being forgotten about later.
-//  3. **`Commander Effect` is not a card.** Forge puts a phantom in each
-//     command zone (ids 101 and 202 in the recorded match) with a real name,
-//     a real id and an *empty type line*. It is the commander-tax bookkeeping,
-//     it is invisible in any real game, and drawing it would put a blank card
-//     beside every commander.
+//  3. **A Forge "effect" is not a card.** Forge keeps bookkeeping cards in
+//     the command zone with a real name, a real id and an *empty type line* —
+//     `Commander Effect` for each player (ids 101 and 202 in the recorded
+//     match), one per companion, and one for every activated ability that
+//     needs somewhere to hang. They are invisible in any real game and
+//     drawing one puts a blank card beside somebody's commander. The rule and
+//     the three bytecode facts under it are `isForgeEffect` in `scribe.go`.
 //  4. **`out` only clears a zone the card is actually in.** Forge does not
 //     promise that a card's `out` of its old zone precedes its `in` to the
 //     new one, and an unconditional clear on a late `out` blanks a card that

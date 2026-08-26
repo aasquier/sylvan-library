@@ -7086,11 +7086,62 @@ button:hover .tarot-fan-card {
     rgba(6, 5, 4, 0.86) 0%, rgba(6, 5, 4, 0) 100%);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
+/* ------------------------------------------------ the command zone's seats
+ *
+ * **The zone is a row of places, and it takes a share of the rail per place.**
+ * Every tile on this rail is `flex: 1 1 0`, so dropping a pairing's second
+ * throne in beside the graveyard would have made all five tiles smaller — the
+ * command zone would have grown by shrinking everything, which is the one
+ * outcome nobody asked for. Instead the seats live in a group that claims
+ * `--seats` shares of the same space, so one commander is drawn at exactly the
+ * width the single pile always was, and a pairing takes twice that from the
+ * *rail's* slack rather than out of the graveyard.
+ *
+ * The gap inside is tighter than the rail's own, because these are one thing:
+ * a player's command zone, with two chairs in it. */
+.field-command {
+  display: flex;
+  flex-grow: var(--seats, 1);
+  flex-shrink: 1;
+  flex-basis: 0;
+  min-width: 0;
+  gap: 5px;
+  align-items: center;
+}
+/* A seat is a named place rather than a pile, so its label is the name of
+   whoever belongs in it and has to hold a real word rather than a heading.
+   Slightly smaller and un-tracked: "Thrasios" at 0.07em of letter-spacing on
+   a tile this wide is an ellipsis. */
+.field-seat .field-pile-label {
+  font-size: 0.55rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 2px 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The companion is in this zone and is not one of the commanders, so its seat
+   is dressed in the same room and edged differently: green rather than brass,
+   which is the colour Magic gives a bond between a creature and the player who
+   keeps it. A ring rather than a fill, so the painting underneath is still the
+   throne room. */
+.field-seat-companion {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--vine) 55%,
+      transparent),
+    -2px -2px 0 -1px rgba(0, 0, 0, 0.45);
+}
+.field-seat-companion .field-pile-throne {
+  color: color-mix(in srgb, var(--vine) 82%, #d9e6c8);
+}
+
 /* The empty chair, centred in the slot and drawn on the brass the rest of the
-   rail is carved in. `is-throne` lifts the pile back out of `is-empty`'s
-   dimming: an empty graveyard is nothing to look at, and an empty command
-   zone is somebody standing on the battlefield. */
-.field-pile.is-throne { opacity: 0.85; }
+   rail is carved in. `is-vacant` lifts the pile back out of `is-empty`'s
+   dimming: an empty graveyard is nothing to look at, and an empty seat in the
+   command zone is somebody standing on the battlefield — or, for a companion,
+   a card already bought into a hand. */
+.field-pile.is-vacant { opacity: 0.85; }
 .field-pile-throne {
   position: absolute;
   inset: 0;

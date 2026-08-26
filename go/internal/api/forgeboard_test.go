@@ -45,7 +45,7 @@ func aReel(steps int) *tier3.BoardReel {
 func TestTheBoardsSeatsBecomeDecksAndNothingElseDoes(t *testing.T) {
 	t.Parallel()
 	board := newForgeBoard(aReel(3),
-		map[int]string{1: "gyome", 2: "trostani"}, nil, 3)
+		map[int]string{1: "gyome", 2: "trostani"}, nil, nil, 3)
 	if board == nil {
 		t.Fatal("a board with seats and steps came back nil")
 	}
@@ -70,7 +70,7 @@ func TestASeatTheShelfCannotNameStillGetsARail(t *testing.T) {
 	// An empty seat map is what a pre-theater worker or a mid-deploy skew
 	// produces. A board with no rails would read as a bug; a board with rails
 	// and Forge's own titles on them reads as a match.
-	board := newForgeBoard(aReel(2), map[int]string{}, nil, 2)
+	board := newForgeBoard(aReel(2), map[int]string{}, nil, nil, 2)
 	if board == nil || len(board.Seats) != 2 {
 		t.Fatalf("an unnamed board came back as %+v", board)
 	}
@@ -89,7 +89,7 @@ func TestTheStepsAreCutWhereTheBeatsAre(t *testing.T) {
 	// The property this file exists for. A game that outran the beat ceiling
 	// must lose exactly as many steps, because the room advances the board by
 	// counting the beats it has told.
-	board := newForgeBoard(aReel(900), map[int]string{1: "gyome"}, nil,
+	board := newForgeBoard(aReel(900), map[int]string{1: "gyome"}, nil, nil,
 		ForgeBeatsMax)
 	if len(board.Steps) != ForgeBeatsMax {
 		t.Errorf("%d steps crossed against a ceiling of %d beats; the picture "+
@@ -98,7 +98,7 @@ func TestTheStepsAreCutWhereTheBeatsAre(t *testing.T) {
 	}
 
 	// And a short game keeps every step it had.
-	whole := newForgeBoard(aReel(9), map[int]string{1: "gyome"}, nil, 9)
+	whole := newForgeBoard(aReel(9), map[int]string{1: "gyome"}, nil, nil, 9)
 	if len(whole.Steps) != 9 {
 		t.Errorf("a nine-step game came out as %d", len(whole.Steps))
 	}
@@ -108,11 +108,11 @@ func TestAMatchWithNoBoardShapesToNothing(t *testing.T) {
 	t.Parallel()
 	// A worker without the scribe plays the match and reports no board. The
 	// room draws the account alone — ADR 42's fourth decision, at this layer.
-	if board := newForgeBoard(nil, map[int]string{1: "gyome"}, nil, 5); board != nil {
+	if board := newForgeBoard(nil, map[int]string{1: "gyome"}, nil, nil, 5); board != nil {
 		t.Errorf("a boardless match shaped to %+v", board)
 	}
 	shaped := newForgeBeats(tier3.EventLog{Game: 1, Events: theBeats()},
-		map[int]string{1: "gyome"}, nil)
+		map[int]string{1: "gyome"}, nil, nil)
 	if shaped.Board != nil {
 		t.Error("beats with no board came back carrying one")
 	}
@@ -203,7 +203,7 @@ func TestAMatchWithNoPoolStillDrawsItsBoard(t *testing.T) {
 	a.resolveBoardArt(context.Background(),
 		[]tier3.BoardCard{{ID: 1, Name: "Gyome, Master Chef"}}, known)
 
-	board := newForgeBoard(aReel(2), map[int]string{1: "gyome"}, known, 2)
+	board := newForgeBoard(aReel(2), map[int]string{1: "gyome"}, nil, known, 2)
 	if board == nil || len(board.Cards) != 2 {
 		t.Fatalf("a board without a pool came back as %+v", board)
 	}
@@ -211,5 +211,124 @@ func TestAMatchWithNoPoolStillDrawsItsBoard(t *testing.T) {
 		if card.Name == "" {
 			t.Error("a card lost its name along with its painting")
 		}
+	}
+}
+
+// The command zone, resolved from the deck.
+//
+// Everything that begins in a command zone looks alike from the stream — a
+// commander, a partner and a companion all arrive as a card in `command` on
+// step zero — so the split is made here against `deck.yaml`, and these are the
+// three things that can go wrong with it.
+
+// aPairing is a board where seat 1 ran a partner pair and a companion, and
+// seat 2 ran a double-faced commander under the face Forge knows it by.
+func aPairing() *tier3.BoardReel {
+	return &tier3.BoardReel{
+		Seats: []tier3.BoardSeat{
+			{Seat: 1, Name: "Partners", Life: 40},
+			{Seat: 2, Name: "Two-faced", Life: 40},
+		},
+		Cards: []tier3.BoardCard{
+			{ID: 11, Name: "Kaheera, the Orphanguard", Seat: 1,
+				Types: "Legendary Creature - Cat Beast"},
+			{ID: 12, Name: "Thrasios, Triton Hero", Seat: 1,
+				Types: "Legendary Creature - Merfolk Wizard"},
+			{ID: 13, Name: "Tymna the Weaver", Seat: 1,
+				Types: "Legendary Creature - Human Cleric"},
+			// Forge's index has no `A // B`, so a modal card is on the board
+			// under its front face.
+			{ID: 21, Name: "Brutal Cathar", Seat: 2,
+				Types: "Creature - Human Soldier"},
+			// The same name in the other seat: a board id belongs to one
+			// player, and a lookup that ignored the seat would hand seat 2's
+			// throne to seat 1's card.
+			{ID: 22, Name: "Thrasios, Triton Hero", Seat: 2,
+				Types: "Legendary Creature - Merfolk Wizard"},
+		},
+		Steps: []tier3.BoardStep{{Turn: 1, Seat: 1}},
+	}
+}
+
+func TestAPairingGetsTwoThronesInTheDecksOwnOrder(t *testing.T) {
+	t.Parallel()
+	board := newForgeBoard(aPairing(), map[int]string{1: "pair", 2: "faces"},
+		map[int]forgeCommandZone{
+			1: {Commanders: []string{"Thrasios, Triton Hero",
+				"Tymna the Weaver"},
+				Companion: "Kaheera, the Orphanguard"},
+			2: {Commanders: []string{"Brutal Cathar // Moonrage Brute"}},
+		}, nil, 1)
+	if board == nil || len(board.Seats) != 2 {
+		t.Fatalf("a pairing shaped to %+v", board)
+	}
+	// **Order is the deck's**, not the board's: Tymna is the lower id and
+	// arrives second in `deck.yaml`, so a shaper reading the reel would put
+	// her first and the same commander would change sides between games.
+	if got := board.Seats[0].Commanders; len(got) != 2 ||
+		got[0] != 12 || got[1] != 13 {
+		t.Errorf("seat 1's thrones came out %v, want [12 13] — the order "+
+			"`deck.yaml` lists them in", got)
+	}
+	// The companion is named as itself and is **not** one of the commanders.
+	// It sits in the command zone like they do, and it has never had a tax.
+	if got := board.Seats[0].Companion; got != 11 {
+		t.Errorf("the companion resolved to %d, want 11", got)
+	}
+	for _, id := range board.Seats[0].Commanders {
+		if id == 11 {
+			t.Error("the companion was counted as a commander, which is what " +
+				"charges it commander tax it does not owe")
+		}
+	}
+	// A `A // B` name never appears in Forge's index, so the throne is found
+	// through the same resolution the exporter used to write the `.dck`.
+	if got := board.Seats[1].Commanders; len(got) != 1 || got[0] != 21 {
+		t.Errorf("a double-faced commander resolved to %v, want [21]", got)
+	}
+	if board.Seats[1].Companion != 0 {
+		t.Errorf("a deck with no companion reported %d",
+			board.Seats[1].Companion)
+	}
+}
+
+func TestAThroneIsFoundInItsOwnSeat(t *testing.T) {
+	t.Parallel()
+	// Two decks can run the same commander. Seat 2's Thrasios is id 22, and a
+	// lookup that indexed the whole board by name would have handed it 12 —
+	// which draws one player's commander on the other player's rail.
+	board := newForgeBoard(aPairing(), nil, map[int]forgeCommandZone{
+		2: {Commanders: []string{"Thrasios, Triton Hero"}},
+	}, nil, 1)
+	if got := board.Seats[1].Commanders; len(got) != 1 || got[0] != 22 {
+		t.Errorf("seat 2's own Thrasios resolved to %v, want [22]", got)
+	}
+}
+
+func TestACommanderForgeNeverGotIsNoThroneAtAll(t *testing.T) {
+	t.Parallel()
+	// The pre-flight drops a card Forge does not implement, so a match can run
+	// without a commander in it. Zero is a real answer here: a throne that is
+	// not drawn says "this card is not in this game", where a throne standing
+	// empty says "it is out on the sand", and those are different facts.
+	board := newForgeBoard(aPairing(), nil, map[int]forgeCommandZone{
+		1: {Commanders: []string{"Someone Forge Has Never Heard Of"},
+			Companion: "Nor This One"},
+	}, nil, 1)
+	if got := board.Seats[0].Commanders; len(got) != 0 {
+		t.Errorf("an absent commander drew a throne anyway: %v", got)
+	}
+	if got := board.Seats[0].Companion; got != 0 {
+		t.Errorf("an absent companion resolved to %d, want 0", got)
+	}
+	// And it stays off the wire rather than crossing as a zero, so a browser
+	// tells "no companion" from "companion id nought".
+	raw, err := json.Marshal(board.Seats[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "companion") ||
+		strings.Contains(string(raw), "commanders") {
+		t.Errorf("an empty command zone crossed as %s", raw)
 	}
 }

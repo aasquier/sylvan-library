@@ -313,3 +313,74 @@ describe('the board at a moment', () => {
     expect(foldBoard(null, 5)).toEqual({ turn: 0, active: 0, sides: [] })
   })
 })
+
+describe('the command zone as places', () => {
+  /** A seat that ran a pairing and a companion, with an emblem in the zone. */
+  const zone: ForgeBoard = {
+    seats: [{
+      seat: 1, slug: 'pair', name: 'A pairing', life: 40,
+      commanders: [1, 2], companion: 3,
+    }],
+    cards: [
+      { id: 1, name: 'Thrasios, Triton Hero', seat: 1,
+        types: 'Legendary Creature - Merfolk Wizard' },
+      { id: 2, name: 'Tymna the Weaver', seat: 1,
+        types: 'Legendary Creature - Human Cleric' },
+      { id: 3, name: 'Kaheera, the Orphanguard', seat: 1,
+        types: 'Legendary Creature - Cat Beast' },
+      { id: 4, name: 'Emblem', seat: 1, types: 'Emblem' },
+    ],
+    steps: [
+      { turn: 1, seat: 1, changes: [
+        { id: 1, zone: 'command', seat: 1 },
+        { id: 2, zone: 'command', seat: 1 },
+        { id: 3, zone: 'command', seat: 1 },
+        { id: 4, zone: 'command', seat: 1 },
+      ] },
+      { turn: 2, seat: 1, changes: [{ id: 2, zone: 'battlefield', seat: 1 }] },
+    ],
+  } as unknown as ForgeBoard
+
+  it('holds a throne for every commander, wherever it is standing', () => {
+    const out = foldBoard(zone, 2)
+    const side = out.sides[0]
+    // Tymna is on the battlefield and still has a chair. That is the whole
+    // point of drawing the zone as places: an empty seat says *where she is*,
+    // and a pile that simply dropped her would say nothing at all.
+    expect(side?.thrones.map((c) => c.name))
+      .toEqual(['Thrasios, Triton Hero', 'Tymna the Weaver'])
+    expect(side?.thrones[1]?.zone).toBe('battlefield')
+    expect(side?.creatures.map((c) => c.name)).toEqual(['Tymna the Weaver'])
+  })
+
+  it('keeps the companion out of the commanders it prices', () => {
+    const side = foldBoard(zone, 2).sides[0]
+    expect(side?.companion?.name).toBe('Kaheera, the Orphanguard')
+    // A companion in the command zone is not a commander who has been cast
+    // from it. Counting it as one put a price on the rail for a card that has
+    // never been cast from anywhere.
+    expect(side?.commanders.map((c) => c.name))
+      .not.toContain('Kaheera, the Orphanguard')
+  })
+
+  it('leaves whatever else is in the zone as a pile', () => {
+    const side = foldBoard(zone, 2).sides[0]
+    // The two commanders and the companion have places of their own, so what
+    // is left is the emblem — and it is still drawn, because a card the room
+    // silently dropped would be a card nobody could find.
+    expect(side?.command.map((c) => c.name)).toEqual(['Emblem'])
+  })
+
+  it('draws the whole zone as one pile when nobody named the seats', () => {
+    // A board shaped by a server that predates this, or a mid-deploy skew.
+    // Nothing is lost: the zone goes back to being a pile.
+    const older = { ...zone, seats: [{ ...zone.seats[0]! }] }
+    delete (older.seats[0] as { commanders?: number[] }).commanders
+    delete (older.seats[0] as { companion?: number }).companion
+    const side = foldBoard(older, 2).sides[0]
+    expect(side?.thrones).toHaveLength(0)
+    expect(side?.companion).toBeNull()
+    expect(side?.command.map((c) => c.name).sort())
+      .toEqual(['Emblem', 'Kaheera, the Orphanguard', 'Thrasios, Triton Hero'])
+  })
+})
