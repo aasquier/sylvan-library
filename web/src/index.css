@@ -5696,6 +5696,20 @@ button:hover .tarot-fan-card {
   margin-inline: auto;
 }
 
+/* **The loop is a different shape and gets the frame it was rendered in.**
+   1.37:1 is the *painting's* crop, and holding the video to it meant
+   `object-fit: cover` quietly trimming a sixth off each side of a 16:9 frame —
+   the sides of the arena, which is most of what makes it an arena. So when the
+   banner is the loop it takes the loop's ratio and the whole column with it
+   (Aaron: "wider/bigger"), and the height cap goes: capping height is what was
+   keeping it narrow, and there is nothing left to protect once nothing is
+   being cropped. */
+.coliseum-hero.is-moving {
+  aspect-ratio: 16 / 9;
+  max-height: none;
+  width: 100%;
+}
+
 .coliseum-hero-art {
   position: absolute;
   inset: 0;
@@ -5708,6 +5722,17 @@ button:hover .tarot-fan-card {
    * percent. */
   animation: coliseum-breathe 80s ease-in-out infinite;
 }
+
+/* **The loop does its own moving.** When the banner is the derivative rather
+   than the plate, the eighty-second push is a second animation on top of a
+   frame that is already travelling, and the two beat against each other at
+   their own periods. The still keeps it; the loop does not need it. */
+.coliseum-hero.is-moving .coliseum-hero-art { animation: none; }
+/* The scrim over the top of the frame exists so pennants read against
+   something, and the loop paints its own sky — darkening from noon to
+   midnight across fifteen seconds. Laid over that, a fixed wash flattens the
+   daylight half and doubles the night. */
+.coliseum-hero.is-moving .coliseum-hero-sky { opacity: 0; }
 
 /* The sky end of the frame, so pennants read against something. */
 .coliseum-hero-sky {
@@ -5725,54 +5750,20 @@ button:hover .tarot-fan-card {
   50%      { transform: scale(1.05) translate3d(-1%, -0.8%, 0); }
 }
 
-/* The nameplate: the title and the credit share one bar across the foot of
- * the frame, and that is a bug fix rather than a tidy-up. They used to be two
- * absolutes both anchored to the bottom, which is a collision waiting for a
- * narrow enough frame — twelve pixels apart at 1456px and straight through
- * each other on a phone, which is where Aaron photographed it (2026-08-25).
- * A flex row cannot overlap itself.
+/* The credit, under the frame rather than on it.
  *
- * The scrim is the other half. White ink at 78% over Critchlow's *pale* stone
- * was legible at night and nearly gone in daylight, because the light theme
- * dims this painting by 5% and that is all; a credit is somebody's name and it
- * does not get to be optional in one theme. A bottom-up wash is what every
- * printed poster does, it costs the plain at the foot of the painting and
- * nothing else, and it makes both lines land the same way in both themes. */
-.coliseum-plate {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 4;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.15rem 1rem;
-  padding: 2.2rem 1.25rem 0.95rem;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgb(0 0 0 / 0.5) 62%,
-    rgb(0 0 0 / 0.72) 100%);
-}
-
-.coliseum-title {
-  flex: 0 1 auto;
-  text-shadow: 0 2px 12px rgb(0 0 0 / 0.85);
-}
-
-/* The credit, as a footnote on the painting rather than a caption under it.
- * `margin-left: auto` keeps it against the right edge on the shared line and
- * still against it on its own line when the bar wraps. */
+ * It used to be white ink on a scrim washed across the foot of the painting,
+ * because white at 78% over Critchlow's pale stone was legible at night and
+ * nearly gone in daylight. Underneath there is no stone to fight: it is page
+ * ink on page, it reads the same in both themes without a gradient paying for
+ * it, and the picture is whole. Right-aligned, because a credit belongs at the
+ * end of the thing it credits. */
 .coliseum-footnote {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-left: auto;
+  margin: 0.55rem 0 0;
   text-align: right;
   font-size: 0.68rem;
   line-height: 1.45;
-  color: color-mix(in oklab, #fff 86%, transparent);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
+  color: var(--text-muted);
 }
 
 /* ------------------------------------------------- the per-arena stage ---

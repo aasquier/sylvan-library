@@ -520,22 +520,66 @@ describe('the tale of the tape', () => {
     }
   })
 
-  it('keeps the title and the credit in one bar so they cannot collide',
+  it('keeps a heading for the outline while the banner does the talking',
      async () => {
-    // Two absolutes both anchored to the bottom of the frame is how these
-    // came to sit twelve pixels apart on a laptop and straight through each
-    // other on a phone (Aaron photographed it, 2026-08-25). jsdom has no
-    // layout and can never measure that overlap — but it can hold the shape
-    // that makes it impossible: one flex bar owning both.
+    // The visible title is gone — the banner says "coliseum" better than the
+    // word does — and this is what stops that from costing anything a reader
+    // needs. A screen reader has no picture to be spoken for by, and a page
+    // whose outline starts nowhere is a page nobody can navigate.
+    //
+    // It also retires the collision this test used to guard: the title and
+    // the credit were two absolutes anchored to the same edge, twelve pixels
+    // apart on a laptop and straight through each other on a phone (Aaron
+    // photographed it, 2026-08-25). One of them no longer occupies the frame
+    // at all, so there is nothing left to collide with.
     const { container } = show()
     await screen.findByText(/harena/)
 
-    const plate = container.querySelector('.coliseum-plate')
-    expect(plate).toBeTruthy()
-    expect(plate?.querySelector('.coliseum-title')).toBeTruthy()
-    expect(plate?.querySelector('.coliseum-footnote')).toBeTruthy()
-    // And neither is positioned out of the bar's flow behind the other's back.
-    expect(container.querySelector('.coliseum-title')?.parentElement)
-      .toBe(container.querySelector('.coliseum-footnote')?.parentElement)
+    const heading = screen.getByRole('heading', { level: 1, name: /coliseum/i })
+    expect(heading.className, 'the heading is read, never drawn')
+      .toContain('sr-only')
+    // And the credit is under the frame rather than washed across the foot of
+    // it. The scrim that used to make white ink legible over Critchlow's pale
+    // stone was paid for by the picture; underneath, it is ink on page.
+    const hero = container.querySelector('.coliseum-hero')
+    const credit = container.querySelector('.coliseum-footnote')
+    expect(hero).toBeTruthy()
+    expect(credit).toBeTruthy()
+    expect(hero?.contains(credit!), 'the credit sits under the frame, not on it')
+      .toBe(false)
+  })
+
+  it('credits the painting, and says so differently once it moves',
+     async () => {
+    // **The two lines are different claims and must not be the same words.**
+    // Over Critchlow's plate the footnote is a credit. Over the generated
+    // loop it is an acknowledgement: what is on screen was made *from* that
+    // painting and is not his work, so "art by" alone would put his name on
+    // something he did not make.
+    const still = show()
+    await screen.findByText(/harena/)
+    const credit = () => still.container
+      .querySelector('.coliseum-footnote')?.textContent ?? ''
+    expect(credit()).toMatch(/^Grand Coliseum, Onslaught — art by Carl Critchlow$/)
+    expect(still.container.querySelector('video.coliseum-hero-art')).toBeNull()
+    cleanup()
+
+    // And with the derivative on the shelf, the banner is the loop.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ready: true, effect: 'daynight', fingerprint: 'abc',
+        urls: { mp4: '/api/art/motion/x/daynight/loop.mp4?v=abc' },
+      }),
+    }))
+    const { container } = show()
+    await screen.findByText(/harena/)
+    await waitFor(() => {
+      expect(container.querySelector('video.coliseum-hero-art')).toBeTruthy()
+    })
+    expect(container.querySelector('.coliseum-footnote')?.textContent)
+      .toMatch(/^Motion inspired by Grand Coliseum, Onslaught — art by Carl Critchlow$/)
+    // The still is not left underneath it: one banner, not two stacked.
+    expect(container.querySelector('img.coliseum-hero-art')).toBeNull()
   })
 })

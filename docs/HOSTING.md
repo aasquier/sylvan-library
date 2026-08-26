@@ -189,6 +189,18 @@ fly ssh sftp put -r data/cache/cardmotion /data/cache/cardmotion
 Nothing under `/data/cache` needs backing up — a lost cache regenerates
 from the same pool, and the deck pages simply show stills until it does.
 
+**One entry is the exception, and it is the only one that cannot be
+regenerated:** `cardmotion/grand-coliseum-daynight/` is the Coliseum's banner,
+rendered outside the toolbox and pushed by hand. `cardmotion sync` will not
+rebuild it; losing it costs the banner, and the room falls back to Critchlow's
+still exactly as it did before the loop existed. Keep the source file
+somewhere that is not this volume.
+
+```bash
+fly ssh sftp put -r data/cache/cardmotion/grand-coliseum-daynight \
+  /data/cache/cardmotion/grand-coliseum-daynight
+```
+
 ## Watching it
 
 ```bash
