@@ -57,8 +57,17 @@ The properties, each asserted against a running container:
   and CI pins that a fresh volume reports `"pool": false` rather than
   failing — unseeded is a correct state, and a 500 there would have the
   platform restarting a healthy machine forever.
-- **Multi-arch** (`linux/amd64` required, `linux/arm64` as `image-arm64`)
-  via buildx.
+- **`linux/amd64` only**, via buildx, and that is the whole list (ADR 47).
+  The obvious question is why it ever was not: an `image-arm64` job built
+  `linux/arm64` on a native runner until 2026-08-26, and was a required
+  check. It built with `push: false`, so the result was never pushed, never
+  pulled and never run — the deployed machine reports `x86_64`, and `deploy`
+  builds one architecture. A required check that gates an architecture
+  nothing runs is a check that can only ever be wrong in one direction: it
+  blocks merges without protecting anything. If the instance ever moves to
+  arm, the honest cost is one porting session, paid once, instead of an
+  emulated or duplicated build paid on every pull request forever.
+  **`go (arm64)` is a different argument and stays** — see ADR 47.
 - **Trivy scanning**, failing on HIGH/CRITICAL, `ignore-unfixed` so a CVE
   with no patch does not turn the gate into ignored noise.
 - **Never bake the pool in.** Scryfall's bulk data is not redistributed:
@@ -98,7 +107,7 @@ inheritance**; it has been stale in this file more than once:
 | Setting | Value |
 | --- | --- |
 | Pull request required | yes, 0 approvals (a solo maintainer cannot approve their own) |
-| Required checks | `frontend`, `image`, `no-secrets-or-card-data`, `dependency-review`, `image-arm64`, `go (amd64)`, `go (arm64)`, `go-lint` — **eight, read back from the API 2026-08-24** |
+| Required checks | `frontend`, `image`, `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`, `go (arm64)`, `go-lint` — **seven, read back from the API 2026-08-26** |
 | Strict (branch up to date) | yes |
 | Enforce for admins | yes — off, it would not apply to the only contributor |
 | Force pushes, deletions | blocked |
@@ -121,6 +130,16 @@ gh api -X POST repos/aasquier/sylvan-library/branches/main/protection/required_s
 (the same path with `-X DELETE` removes one). A required context matches the
 **check-run name** — the job's `name:` if set, its id otherwise — not the
 workflow's `name:`.
+
+**Removing a job is the same two steps, in the opposite order, and the order
+is not optional.** A required context that no longer has a job never reports:
+the pull request sits on *Expected — waiting for status to be reported*
+forever, and there is no green to wait for. So the `DELETE` above happens
+**before** the branch deleting the job can merge, never after. ADR 47 is the
+worked example — the row above says seven because the eighth context had to
+come off `main` for that very change to land, which is also why this row
+cannot quietly drift from the API in the removing direction. It still can in
+the adding direction: re-read, do not trust the row.
 
 `dependency-review` runs only on `pull_request` (a push to `main` has no
 base to diff against), which is why the `deploy` job's `needs` list and the

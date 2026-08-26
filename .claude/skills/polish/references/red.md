@@ -97,24 +97,25 @@ robustness, and whether the free tier has grown capabilities worth adopting.
   non-GitHub-authored), permissions blocks minimal (`contents: read` unless
   a job needs more), no `pull_request_target` foot-guns. This repo is
   public; its workflows are an attack surface.
-- The pinned invariants stay pinned: `image` and `image-arm64` as the only
-  container builds anywhere (neither runnable on this Mac), the `go` matrix as
-  the only arm64 compiler this project has, and **`deploy` naming every other
-  job in `ci.yml` in its `needs`.** Verify that last one by reading both lists
-  in the file, because *nothing checks it any more* — it used to be a test
-  that derived the expected set from the file's own job list, and that test is
-  gone. An unguarded invariant is this pass's own standing
-  lesson: rebuilding it in Go is a queued item, and until it lands, a job
-  added without `needs` deploys off a partial suite and nothing says so.
+- The pinned invariants stay pinned: `image` as the only container build
+  anywhere (not runnable on this Mac — `image-arm64` was removed by ADR 47,
+  and the reasoning there is worth reading before proposing any second build),
+  the `go` matrix as the only arm64 compiler this project has, and **`deploy`
+  naming every other job in `ci.yml` in its `needs`.** That last one is
+  guarded again — `TestTheDeployJobWaitsForEveryOtherJobInTheFile`
+  (`go/cmd/mtglab/pipeline_test.go`) derives the expected set from the file's
+  own `jobs:` keys, in both directions. It was unguarded for a window, and a
+  job added without `needs` deployed off a partial suite for a day with
+  nothing saying so; that remains this pass's standing lesson about unguarded
+  invariants even though this particular one is now held.
 - **Free-tier feature audit**: check GitHub's changelog for features now free
   for public repos — merge queue, artifact attestations, better caching,
   required workflows. Adoptions that change contributor workflow are queued;
   pure-win config (a better cache key) is a safe fix.
 - Local/CI parity: everything CI checks must be runnable locally except
-  **four** — `image` and `image-arm64` (no container runtime on this Mac),
-  `dependency-review` (it diffs a base against a head, and a laptop has no
-  base), and **CodeQL**, which wants the CLI and its query packs and is in no
-  runbook. The arm64 leg is a half-exception worth naming: the tests
+  **three** — `image` (no container runtime on this Mac), `dependency-review`
+  (it diffs a base against a head, and a laptop has no base), and **CodeQL**,
+  which wants the CLI and its query packs and is in no runbook. The arm64 leg is a half-exception worth naming: the tests
   themselves run locally, but only on amd64, so an arm64-specific failure is
   CI's to find. CodeQL is the one that bites: White's first run spent four
   commits teaching a correct guard to satisfy a path-injection query, which is
