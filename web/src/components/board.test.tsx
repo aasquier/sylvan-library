@@ -334,6 +334,84 @@ it('says what a creature does in the one corner that was free', () => {
   expect(held?.querySelectorAll('.field-keyword')).toHaveLength(0)
 })
 
+/** The four paintings the board's own zones wear. Checked-in prose on the
+ *  server, pinned to a printing — see `ColiseumZone`. */
+const DRESSING = [
+  { key: 'command' as const, card: 'Throne of Eldraine', why: '',
+    art: { url: 'https://example.test/throne.jpg', artist: 'Kieran Yanner',
+           printing: 'Wilds of Eldraine Commander' } },
+  { key: 'graveyard' as const, card: 'Ancient Tomb', why: '',
+    art: { url: 'https://example.test/tomb.jpg', artist: 'Colin MacNeil',
+           printing: 'Tempest' } },
+  { key: 'exile' as const, card: 'Path to Exile', why: '',
+    art: { url: 'https://example.test/path.jpg', artist: 'Torgeir Fjereide',
+           printing: 'Tales of Middle-earth Commander' } },
+  { key: 'ghost' as const, card: 'Crypt Ghast', why: '',
+    art: { url: 'https://example.test/ghast.jpg', artist: 'Chris Rahn',
+           printing: 'Gatecrash' } },
+]
+
+it('dresses each zone in its own painting, and names the painter', () => {
+  // Three-letter labels on a 26px tile is what a scoreboard does; a player
+  // knows these three places by sight. The painting says *which* zone.
+  const { container } = render(
+    <MatchBoard board={COMBAT} shown={2} game={1} running={false} beat={null}
+                zones={DRESSING} name={(_s, f) => f}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const pileFor = (label: string) => container.querySelector(
+    `.field-side-far .field-pile[aria-label^="${label}"]`)
+  const groundOf = (label: string) =>
+    pileFor(label)?.querySelector('.field-pile-ground')?.getAttribute('src')
+
+  expect(groundOf('Graveyard')).toBe('https://example.test/tomb.jpg')
+  expect(groundOf('Exile')).toBe('https://example.test/path.jpg')
+  expect(groundOf('Command zone')).toBe('https://example.test/throne.jpg')
+
+  // Somebody painted it, and rule 9 says name them. The arm the marks ride is
+  // `aria-hidden`, so the pile's own title is where this has to live.
+  expect(pileFor('Graveyard')?.getAttribute('title'))
+    .toContain('Ancient Tomb, art by Colin MacNeil')
+
+  // The ghost is not a zone and must not be drawn as one.
+  expect(container.querySelectorAll('.field-pile-ground')).toHaveLength(6)
+})
+
+it('draws the brass tiles it always had when no painting arrives', () => {
+  // `/api/coliseum` answers before any match is asked for, and with no pool at
+  // all — but a deployment that has not been refreshed, or a future room that
+  // forgets to pass them, must still get a board. Empty is a legible state.
+  const { container } = render(
+    <MatchBoard board={COMBAT} shown={2} game={1} running={false} beat={null}
+                name={(_s, f) => f}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  expect(container.querySelectorAll('.field-pile-ground')).toHaveLength(0)
+  expect(container.querySelectorAll('.field-pile').length).toBeGreaterThan(0)
+})
+
+it('raises a ghost off the grave that just received something', () => {
+  // Two beats, two pictures: the skull lands on the creature as it dies, held
+  // on the sand for that beat, and this rises from the zone it is bound for.
+  const { container } = render(
+    <MatchBoard board={COMBAT} shown={2} game={1} running={false}
+                beat={said({ kind: 'dies', card: 'Qasali Pridemage' })}
+                zones={DRESSING} name={(_s, f) => f}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const ghosts = container.querySelectorAll('.field-pile-ghost img')
+  expect(ghosts, 'one grave, one ghost').toHaveLength(1)
+  expect(ghosts[0]?.getAttribute('src')).toBe('https://example.test/ghast.jpg')
+  // On the graveyard, never on exile or the command zone.
+  expect(container.querySelector('.field-pile-ghost')
+    ?.closest('.field-pile')?.getAttribute('aria-label')).toMatch(/^Graveyard/)
+  // And the skull is still on the creature — these are two marks, not one.
+  expect(container.querySelector('.field-rows .field-card.is-dies '
+    + '.field-mark-dies img')).toBeTruthy()
+})
+
 it('keeps the loupe on the battlefield, where a fight is the question', () => {
   const { container } = show()
   // A hand is a fan overlapped to the 27px strip carrying each card's name, so

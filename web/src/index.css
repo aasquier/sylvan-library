@@ -6747,19 +6747,56 @@ button:hover .tarot-fan-card {
    one everything in Magic reaches for. The command zone is here for the same
    reason — in Commander it holds the most important card in the deck, and a
    number cannot say whether the commander is home or out. */
+/* ------------------------------------------------- the zones, dressed
+ *
+ * **Twenty-six pixels and a three-letter label is what a scoreboard does, not
+ * what a table does.** A player knows the graveyard, exile and the command
+ * zone by sight, and this board made you read "GY" (Aaron, 2026-08-25: icons
+ * "to represent the graveyard and exile", and the command zone as "its own
+ * area of interest").
+ *
+ * So each zone grows to 46px and wears a painting. The size is not decoration:
+ * a photograph or a card's art box needs pixels to be anything, and at 26 the
+ * only images that survive are high-contrast silhouettes — which is why the
+ * five wings and the whole `keywords.tsx` set are *drawn* and these are not.
+ * Forty-six is where a painting starts being a picture again.
+ *
+ * The ground sits **under** the top card rather than instead of it. A graveyard
+ * with cards in it still has to say what is on top — that is the one question a
+ * closed zone is asked — so the painting is what says *which* zone, and the
+ * card is what says what is in it. */
 .field-pile {
   position: relative;
   flex: 0 0 auto;
-  width: 26px;
-  height: 36px;
-  border-radius: 3px;
+  width: 46px;
+  height: 64px;
+  border-radius: 4px;
   overflow: hidden;
   background: rgba(10, 8, 5, 0.5);
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, transparent),
     -2px -2px 0 -1px rgba(0, 0, 0, 0.45);
 }
-.field-pile.is-empty { opacity: 0.4; }
+/* An empty zone is quieter, not invisible: the painting is how you know which
+   zone it is, and dimming it to 40% took that away exactly when the pile had
+   nothing else to say. */
+.field-pile.is-empty { opacity: 0.72; }
+
+/* The painting. Darkened and desaturated on purpose — it is a *ground*, and a
+   ground that competes with the card on top of it is a mistake wearing good
+   art. `object-position: 50% 35%` because a card's art box is landscape and a
+   zone tile is portrait: the middle-upper band is where these four paintings
+   keep their subject. */
+.field-pile-ground {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 35%;
+  opacity: 0.66;
+  filter: saturate(0.72) brightness(0.78);
+}
 
 /* The wrapper is the hover target, and it holds the pile *and* the tray that
    opens off it. That is the whole trick: a panel anchored to a 26px pile which
@@ -6864,13 +6901,17 @@ button:hover .tarot-fan-card {
     transition: opacity 120ms ease, visibility 0s linear 120ms;
   }
 }
+/* The top card, over the ground and inset from it, so the painting reads as
+   the *place* and the card reads as the thing lying in it. */
 .field-pile-art {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: 5px 4px 11px;
+  width: calc(100% - 8px);
+  height: calc(100% - 16px);
   object-fit: cover;
-  opacity: 0.85;
+  border-radius: 2px;
+  opacity: 0.94;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 .field-pile-label {
   position: absolute;
@@ -7578,6 +7619,44 @@ button:hover .tarot-fan-card {
 .field-mark-dies { background: rgba(6, 5, 4, 0.55); border-radius: 4px; }
 .field-card.is-dies .field-card-turn { filter: grayscale(0.85) brightness(0.62); }
 
+/* --- the ghost, rising off the grave ------------------------------------
+ *
+ * Two beats, two pictures. The skull lands on the creature *as it dies*, held
+ * on the sand for exactly that beat; this rises from the zone that received
+ * it. Where the skull drops and sets like a headstone, this one lifts and
+ * thins — a thing leaving rather than a thing placed.
+ *
+ * Magic's own spectre rather than a photograph, and that is the lesson this
+ * room keeps relearning: everything photographic that reads as a ghost is pale
+ * and low-contrast by nature, and a mark that lives one second cannot afford
+ * either. */
+.field-pile-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 60%,
+    rgba(150, 190, 210, 0.28) 0%, rgba(6, 8, 10, 0.62) 70%);
+}
+.field-pile-ghost img {
+  width: 84%;
+  height: auto;
+  border-radius: 2px;
+  animation: grave-ghost 1500ms ease-out both;
+  filter: saturate(0.6) brightness(1.25) contrast(1.05);
+}
+@keyframes grave-ghost {
+  0%   { opacity: 0; transform: translateY(5px) scale(0.9); }
+  22%  { opacity: 0.95; transform: translateY(0) scale(1); }
+  70%  { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-7px) scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-pile-ghost img { animation: mark-still 1200ms ease-out both; }
+}
+
 /* --- leaving play: held where it stood, for one beat -------------------
  *
  * **The skull had nowhere to land.** Forge reports a death and the zone change
@@ -7695,7 +7774,12 @@ button:hover .tarot-fan-card {
   .field-life { font-size: 1.1rem; }
   .field-seam-turn { font-size: 0.66rem; letter-spacing: 0.1em; }
   .field-seam-game { display: none; }
-  .field-pile { width: 22px; height: 30px; }
+  /* The zones shrink with the cards, not below them. Twenty-two pixels was
+     right when a pile was a brass tile with three letters on it; now it wears
+     a painting, and a painting at 22px is the mistake this room has made
+     before. Thirty-four matches `.field-card-small`, which is the narrowest
+     anything on this board is allowed to be. */
+  .field-pile { width: 34px; height: 47px; }
   .field-rail-name { font-size: 0.76rem; }
   /* The scrubber takes its own line rather than squeezing the buttons into
      tap targets nobody can hit. */

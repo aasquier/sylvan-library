@@ -581,5 +581,47 @@
         }
       ]
     }
+  ],
+  "zones": [
+    {
+      "key": "command",
+      "card": "Throne of Eldraine",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/6/b/6bba4159-d507-4bb2-8c71-be7cd42d9277.jpg?1783914978",
+        "artist": "Kieran Yanner",
+        "printing": "Wilds of Eldraine Commander"
+      },
+      "why": "A throne room with the throne standing empty and five knights kneeling before it, which is the command zone said as a picture: the seat is empty exactly when the commander is out on the sand, and the kneeling retinue is what the 99 are to the one who leads them. The banners behind it are the five courts, which is a fair accident. Chosen over Sigil of the Empty Throne and Throne of Empires because those are objects and this is a room. Syr Gwyn, Hero of Ashvale is printed in Throne of Eldraine, so under commandment 4 this is not a throne room, it is hers."
+    },
+    {
+      "key": "graveyard",
+      "card": "Ancient Tomb",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/3/0/30e401e3-282b-4524-87e1-c6cd50cd6d00.jpg?1783946598",
+        "artist": "Colin MacNeil",
+        "printing": "Tempest"
+      },
+      "why": "Aaron's pick over a Roman funerary altar, a columbarium photograph and six other Magic cards. A tomb is a place rather than an object, which is what a zone is, and it reads as one at the size a rail draws. The Roman photography lost on a rule this project keeps relearning: a museum plate needs pixels, and a zone tile has not got them."
+    },
+    {
+      "key": "exile",
+      "card": "Path to Exile",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/5/8/58237803-5afc-445f-ba95-2233935fdac1.jpg?1783915959",
+        "artist": "Torgeir Fjereide",
+        "printing": "Tales of Middle-earth Commander"
+      },
+      "why": "A hooded rider on a road in the rain, riding away from a lit city on the horizon: exile is a leaving, and this is the only printing of the card that draws one. The Conflux original is a creature dissolving into motes, which is unmaking rather than departure, and the current default printing is a Marvel Secret Lair -- which is exactly why every zone here pins a printing id."
+    },
+    {
+      "key": "ghost",
+      "card": "Crypt Ghast",
+      "art": {
+        "url": "https://cards.scryfall.io/art_crop/front/3/7/3795a4e7-646f-4bb7-b154-2610eb740e8d.jpg?1783940132",
+        "artist": "Chris Rahn",
+        "printing": "Gatecrash"
+      },
+      "why": "The mark that rises when a card reaches a graveyard, where the skull is the mark that lands on the creature dying. Two different beats and two different pictures: the skull is the death, the ghast is what is left. Magic's own spectre rather than a photograph, because everything photographic that reads as a ghost is a pale, low-contrast thing and this mark lives for about a second."
+    }
   ]
 }

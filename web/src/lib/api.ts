@@ -2212,8 +2212,30 @@ export interface ColiseumArena {
   facts: ColiseumFact[]
 }
 
+/** The painting one of the board's own zones is dressed in.
+ *
+ *  Not an arena and not a card in play: the graveyard, exile and the command
+ *  zone are furniture, and they were three-letter labels on a 26px tile. The
+ *  printing is pinned in the checked-in prose, because the pool answers a bare
+ *  name with the *newest* printing and the newest is increasingly a crossover
+ *  — Path to Exile's default art is a Marvel Secret Lair of the Thing.
+ *
+ *  `ghost` is not a zone but the mark a graveyard raises when a card reaches
+ *  it, carried here because it is the same kind of fact: a chosen painting,
+ *  pinned, credited and hotlinked. */
+export interface ColiseumZone {
+  key: 'command' | 'graveyard' | 'exile' | 'ghost'
+  card: string
+  art: ArenaArt
+  /** The argument for this painting over another, so a later session inherits
+   *  the reasoning rather than the conclusion. Not rendered. */
+  why: string
+}
+
 export interface Coliseum {
   arenas: ColiseumArena[]
+  /** Checked-in prose, so this answers even with no pool at all. */
+  zones: ColiseumZone[]
   /** Whether a card pool answered at all. */
   pool: boolean
   /** Names the pool could not resolve, dropped rather than guessed. */

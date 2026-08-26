@@ -50,7 +50,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
-import type { ForgeBoard } from '../lib/api'
+import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
@@ -129,6 +129,15 @@ function markOf(kind: string): Mark | null {
  *  creature animate again rather than sitting there already-animated. */
 const Struck = createContext<{ card: string; mark: Mark; key: string } | null>(
   null)
+
+/** The paintings the board's own zones are dressed in, by zone key.
+ *
+ *  A context rather than a prop threaded through four levels, for `Struck`'s
+ *  reason: the rail is drawn twice, once per seat, and both rails want the
+ *  same four pictures. Empty is a legible state — the room answers before any
+ *  match is asked for, and a zone with no painting is the brass tile it has
+ *  always been. */
+const Dressing = createContext<Record<string, ColiseumZone>>({})
 
 /** How wide the card held up on hover is drawn, and how much room it needs.
  *
@@ -549,12 +558,24 @@ function LifeTotal({ life }: { life: number }) {
  * for the same reason: in Commander it is where the game's most important card
  * waits, and a number cannot say which commander is home and which is out.
  */
-function FieldPile({ label, cards, short, throne }: {
+function FieldPile({ label, cards, short, zone, throne, receiving }: {
   label: string
   cards: BoardCard[]
   short: string
+  /** Which of the board's own zones this is, which is how it finds its
+   *  painting in `Dressing`. */
+  zone: 'command' | 'graveyard' | 'exile'
   /** The command zone, which is the one pile whose *emptiness* is news. */
   throne?: boolean
+  /** The beat's key when *this* seat's grave is the one receiving a death, and
+   *  null otherwise.
+   *
+   *  **Decided by the rail, not here**, and it has to be: the card whose death
+   *  is being announced is held on the *battlefield* for that beat now, so a
+   *  graveyard cannot answer "did I just get it?" by looking at what it holds —
+   *  it holds nothing yet. The rail can see the side that is holding the body.
+   *  Without this both graves raised a ghost for one death. */
+  receiving?: string | null
 }) {
   // Held open by a tap. Hover and keyboard focus open it in CSS; this is for
   // the pointer that has no hover to give.
@@ -568,9 +589,27 @@ function FieldPile({ label, cards, short, throne }: {
   // the card, which is where Aaron asked for it and where it belongs.
   const top = cards[cards.length - 1]
   const seat = throne && !top
-  const title = top ? `${label}: ${cards.length}, ${top.name} on top`
-    : seat ? `${label}: empty — out on the battlefield`
-    : `${label}: empty`
+  // **The zone, dressed.** These three were three-letter labels on a 26px
+  // tile, which is what a scoreboard does and not what a table does — a player
+  // knows the graveyard, exile and the command zone by sight (Aaron,
+  // 2026-08-25: *"icons to represent the graveyard and exile"*, and the
+  // command zone *"its own area of interest"*). The painting is Magic's own,
+  // pinned to a printing in checked-in prose, and it sits *under* the pile's
+  // top card rather than instead of it: a graveyard with cards in it still
+  // shows what is on top, and the ground says which graveyard it is.
+  const dressing = useContext(Dressing)
+  const dressed = dressing[zone]
+  const ghost = dressing.ghost
+  // Keyed on the beat so a second death raises a second ghost rather than
+  // reusing a finished animation — `Struck`'s own trick, one level out.
+  const arriving = receiving ?? null
+  const title = [
+    top ? `${label}: ${cards.length}, ${top.name} on top`
+      : seat ? `${label}: empty — out on the battlefield`
+      : `${label}: empty`,
+    // Named because somebody painted it, and because rule 9 says so.
+    dressed ? `${dressed.card}, art by ${dressed.art.artist}` : '',
+  ].filter(Boolean).join(' · ')
   return (
     <div className="field-pile-wrap">
     <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
@@ -581,6 +620,10 @@ function FieldPile({ label, cards, short, throne }: {
            if (e.pointerType === 'mouse' || cards.length === 0) return
            setOpen((was) => !was)
          }}>
+      {dressed && (
+        <img className="field-pile-ground" src={dressed.art.url} alt=""
+             loading="lazy" draggable={false} />
+      )}
       {top && top.image ? (
         <img className="field-pile-art" src={top.image} alt="" loading="lazy"
              draggable={false} />
@@ -589,6 +632,17 @@ function FieldPile({ label, cards, short, throne }: {
           is the opposite of an empty graveyard and was drawn the same way.
           The chair says which: theirs, and nobody in it. */}
       {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
+      {/* **The ghost, rising off the grave.** Two beats, two pictures: the
+          skull lands on the creature *as it dies*, held on the sand for that
+          beat, and this rises from the zone that received it. Magic's own
+          spectre rather than a photograph — everything photographic that reads
+          as a ghost is pale and low-contrast, and this mark lives about a
+          second. */}
+      {arriving && ghost && (
+        <span key={arriving} className="field-pile-ghost" aria-hidden="true">
+          <img src={ghost.art.url} alt="" draggable={false} />
+        </span>
+      )}
       <span className="field-pile-label">{short}</span>
       <span className="field-pile-n tabular">{cards.length}</span>
     </div>
@@ -625,6 +679,16 @@ function FieldPile({ label, cards, short, throne }: {
 
 /** The stone rail one player's name, life and closed zones are carved into. */
 function FieldRail({ side, name }: { side: BoardSide; name: string }) {
+  // **Whose grave is about to receive the body.** The dying card is held on
+  // the sand for the beat that announces it, so no graveyard can answer this
+  // by looking at what it holds — it holds nothing yet. The side that is
+  // holding the body is the side whose grave it is bound for, and a rail is
+  // the first thing up the tree that knows which side it is drawing. Without
+  // this, one death raised a ghost over both players' graves.
+  const struck = useContext(Struck)
+  const holding = struck?.mark === 'dies' && [side.creatures, side.walkers,
+    side.artifacts, side.enchantments, side.land].some((row) =>
+    row.some((c) => c.leaving && sameCard(c.name, struck.card)))
   // Two generic for each previous cast from the zone. With partners this
   // reports the dearer of the two: there is one pile and forty pixels of it,
   // and the expensive commander is the one whose price changes a decision.
@@ -634,7 +698,7 @@ function FieldRail({ side, name }: { side: BoardSide; name: string }) {
       <span className="field-rail-name" title={side.name}>{name}</span>
       <span className="field-rail-totals">
         <FieldPile label="Command zone" short="CMD" cards={side.command}
-                   throne />
+                   zone="command" throne />
         {/* **Beside the pile rather than on it.** Inside, the chip covered
             the zone's own three-letter label — the first draft read "CI +4",
             which is a worse pile than one with no tax on it at all. Twenty-six
@@ -646,8 +710,10 @@ function FieldRail({ side, name }: { side: BoardSide; name: string }) {
             +{tax}
           </span>
         )}
-        <FieldPile label="Graveyard" short="GY" cards={side.graveyard} />
-        <FieldPile label="Exile" short="EX" cards={side.exile} />
+        <FieldPile label="Graveyard" short="GY" cards={side.graveyard}
+                   zone="graveyard"
+                   receiving={holding && struck ? struck.key : null} />
+        <FieldPile label="Exile" short="EX" cards={side.exile} zone="exile" />
         <LifeTotal life={side.life} />
       </span>
     </div>
@@ -903,8 +969,12 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
  * two to keep in step.
  */
 export function MatchBoard({ board, shown, game, name, running, beat,
-  speed, setSpeed, of, seek, games, playing, chooseGame }: {
+  speed, setSpeed, of, seek, games, playing, chooseGame, zones = [] }: {
   board: ForgeBoard | null
+  /** The paintings the board's own zones wear, from `/api/coliseum`. Checked-in
+   *  prose, so it arrives before any match does; empty is a legible state and
+   *  draws the brass tiles the rail has always had. */
+  zones?: ColiseumZone[]
   shown: number
   /** The beat the room has just spoken, which is the one the board marks.
    *  Null before a game starts, and while the account is silent. */
@@ -923,6 +993,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   playing: number
   chooseGame: (game: number) => void
 }) {
+  const dressing: Record<string, ColiseumZone> = {}
+  for (const z of zones) dressing[z.key] = z
   const state = foldBoard(board, shown)
   const far = state.sides[0]
   const near = state.sides[1]
@@ -952,6 +1024,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   }
 
   return (
+    <Dressing.Provider value={dressing}>
     <Struck.Provider value={struck}>
     <section className="field" aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
@@ -1000,5 +1073,6 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                       chooseGame={chooseGame} />
     </section>
     </Struck.Provider>
+    </Dressing.Provider>
   )
 }
