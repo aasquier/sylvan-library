@@ -122,6 +122,12 @@ const THRONE: ForgeBoard = {
     { turn: 1, seat: 1, changes: [{ id: 30, zone: 'command', seat: 1 }] },
     { turn: 2, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
     { turn: 3, seat: 1, changes: [{ id: 30, zone: 'command', seat: 1 }] },
+    // **A beat with nothing in it, and it is load-bearing.** A card that
+    // leaves the battlefield is held standing there for exactly the beat that
+    // says so, so the step above is the commander being *seen to die* rather
+    // than the commander being home. It is home on the next beat, and that is
+    // the one the questions below are asking about.
+    { turn: 3, seat: 1, changes: [] },
     { turn: 4, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
     { turn: 5, seat: 1, changes: [{ id: 31, zone: 'battlefield', seat: 1,
       power: 3, toughness: 3,
@@ -137,7 +143,7 @@ function throne(shown: number) {
   return render(
     <MatchBoard board={THRONE} shown={shown} game={1} running={false}
                 name={(_slug, fallback) => fallback}
-                speed="play" setSpeed={vi.fn()} of={5} seek={vi.fn()}
+                speed="play" setSpeed={vi.fn()} of={6} seek={vi.fn()}
                 games={[1]} playing={1} chooseGame={vi.fn()} />)
 }
 
@@ -149,7 +155,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
   const railOf = (c: HTMLElement) =>
     c.querySelector('.field-side-far .field-rail') as HTMLElement
 
-  const home = throne(3)
+  const home = throne(4)
   expect(railOf(home.container).querySelector('.field-pile.is-throne'),
     'a zone with the commander in it is not an empty chair').toBeNull()
   expect(railOf(home.container).querySelector('.field-tax')?.textContent?.trim())
@@ -157,7 +163,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
   cleanup()
 
   // Out again: the chair is empty and the price has gone up.
-  const away = throne(4)
+  const away = throne(5)
   expect(railOf(away.container).querySelectorAll('.field-pile.is-throne'),
     'the commander is on the battlefield, so the seat is empty').toHaveLength(1)
   expect(railOf(away.container).querySelector('.field-tax')?.textContent?.trim())
@@ -165,7 +171,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
 })
 
 it('draws counters as their own signed chips rather than one sum', () => {
-  const { container } = throne(5)
+  const { container } = throne(6)
   const chips = [...container.querySelectorAll('.field-counter')]
   // Three +1/+1 and one -1/-1 is not "2". They are two kinds of counter that
   // have not annihilated yet, and the board must not do that arithmetic for
@@ -181,7 +187,7 @@ it('draws counters as their own signed chips rather than one sum', () => {
 })
 
 it('puts power and toughness behind glass rather than over the painting', () => {
-  const { container } = throne(5)
+  const { container } = throne(6)
   expect(container.querySelector('.field-card-stats'),
     'the always-on black tab is gone').toBeNull()
   const lens = container.querySelector('.field-card-lens')
@@ -347,7 +353,7 @@ it('keeps the loupe on the battlefield, where a fight is the question', () => {
   // that gives a creature real figures is `throne`, which is why the positive
   // half of this property is checked against that board rather than this one.
   cleanup()
-  expect(throne(5).container
+  expect(throne(6).container
     .querySelectorAll('.field-rows .field-card-lens').length)
     .toBeGreaterThan(0)
 })
@@ -479,16 +485,24 @@ const COMBAT: ForgeBoard = {
     { turn: 1, seat: 1, changes: [
       { id: 50, zone: 'battlefield', seat: 1, power: 3, toughness: 3 },
       { id: 51, zone: 'battlefield', seat: 2, power: 4, toughness: 4 },
-      { id: 52, zone: 'graveyard', seat: 1 },
+      // **It has to stand somewhere before it can be seen to fall.** This card
+      // used to be put straight into a graveyard, which was an honest fixture
+      // when the skull had nowhere to land but the pile. Now the mark goes on
+      // the card, and a card that was never on the battlefield never leaves it.
+      { id: 52, zone: 'battlefield', seat: 1, power: 2, toughness: 2 },
     ] },
+    { turn: 1, seat: 1, changes: [{ id: 52, zone: 'graveyard', seat: 1 }] },
   ],
 } as unknown as ForgeBoard
 
-function combat(beat: StagedBeat | null) {
+/** `shown` is 1 for the beats that happen while everything is still standing,
+ *  and 2 for the death — which is the last step, so the card that took it is
+ *  held on the sand for exactly that beat. */
+function combat(beat: StagedBeat | null, shown = 1) {
   return render(
-    <MatchBoard board={COMBAT} shown={1} game={1} running={false} beat={beat}
+    <MatchBoard board={COMBAT} shown={shown} game={1} running={false} beat={beat}
                 name={(_slug, fallback) => fallback}
-                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
                 games={[1]} playing={1} chooseGame={vi.fn()} />)
 }
 
@@ -523,26 +537,64 @@ it('brings a shield up on a blocker and nothing else', () => {
   expect(lion?.querySelector('.field-mark')).toBeNull()
 })
 
-it('lays the skull on the grave, because the creature is already in it', () => {
-  // **The constraint this encodes.** Forge reports the death and the zone
-  // change on one line, so the step that tells the beat is the step that moves
-  // the card: there is no instant at which the board holds a dead creature
-  // still standing, and a mark aimed at the battlefield would land on nothing.
-  const { container } = combat(said({ kind: 'dies', card: 'Qasali Pridemage' }))
+it('lays the skull on the creature, held where it fell', () => {
+  // **The constraint that used to make this impossible.** Forge reports a
+  // death and the zone change on one line, so the step that tells the beat is
+  // the step that moves the card — there was no instant at which the board
+  // held a dead creature still standing, and a mark aimed at the battlefield
+  // landed on nothing. The skull went on the *pile* instead, which is where a
+  // headstone goes and not where a death happens (Aaron, 2026-08-25: "it
+  // should appear over the card being destroyed itself, like the shield").
+  //
+  // `foldBoard` holds a card that left the battlefield on the final applied
+  // step in the row it left, for exactly that beat. So the mark lands on the
+  // card, and the grave it is about to enter shows nothing yet.
+  const { container } = combat(
+    said({ kind: 'dies', card: 'Qasali Pridemage' }), 2)
+
+  const fallen = container.querySelector('img[alt="Qasali Pridemage"]')
+    ?.closest('.field-card')
+  expect(fallen, 'the dead creature is still on the sand for its own beat')
+    .toBeTruthy()
+  expect(fallen?.className).toContain('is-dies')
+  expect(fallen?.className, 'and it is visibly on its way out')
+    .toContain('is-leaving')
+  expect(fallen?.querySelector('.field-mark-dies img'),
+    'the skull is on the card').toBeTruthy()
+
+  // It is in one place, not two: the graveyard it is bound for does not also
+  // hold it this beat. A card in two zones is a worse answer than a card a
+  // beat behind.
   const grave = container.querySelector(
-    '.field-side-far .field-pile-wrap:has([aria-label^="Graveyard"])')
-  expect(grave?.querySelector('.field-pile-buried img'),
-    'the grave that received it is marked').toBeTruthy()
-  // The other seat's graveyard is empty and stays unmarked.
-  const other = container.querySelector(
-    '.field-side-near .field-pile-wrap:has([aria-label^="Graveyard"])')
-  expect(other?.querySelector('.field-pile-buried')).toBeNull()
+    '.field-side-far .field-pile-wrap [aria-label^="Graveyard"]')
+  expect(grave?.getAttribute('aria-label')).toBe('Graveyard: 0')
+
+  // The creatures that did not die carry nothing.
+  const lion = container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card')
+  expect(lion?.querySelector('.field-mark')).toBeNull()
+  expect(lion?.className).not.toContain('is-leaving')
+})
+
+it('lets the dead go on the next beat, rather than holding them forever', () => {
+  // The hold is a function of the count, like everything else in the fold —
+  // which is what makes it survive a scrub in both directions.
+  const { container } = combat(null, 2)
+  expect(container.querySelector('img[alt="Qasali Pridemage"]')
+    ?.closest('.field-rows'), 'held on the beat it fell').toBeTruthy()
+  cleanup()
+
+  // One beat earlier it was alive and the graveyard was empty.
+  const before = combat(null, 1)
+  expect(before.container.querySelector(
+    '.field-side-far .field-pile-wrap [aria-label^="Graveyard"]')
+    ?.getAttribute('aria-label')).toBe('Graveyard: 0')
+  expect(before.container.querySelector('.field-card.is-leaving')).toBeNull()
 })
 
 it('draws no mark at all for a beat that is not one of the three', () => {
   const { container } = combat(said({ kind: 'life', card: undefined }))
   expect(container.querySelectorAll('.field-mark')).toHaveLength(0)
-  expect(container.querySelectorAll('.field-pile-buried')).toHaveLength(0)
   cleanup()
   // And none before a game has said anything.
   const quiet = combat(null)

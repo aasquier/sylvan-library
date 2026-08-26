@@ -345,21 +345,104 @@ func TestATokenLeavingTheBattlefieldGoesToTheEther(t *testing.T) {
 		}
 	}
 
-	// And the death still happens. Silencing the zone must not silence the
-	// sentence: the beat is raised from the scribe's line rather than from the
-	// board's answer, and that separation is the whole reason this is safe.
-	died := false
+	// And silencing the zone must not silence the account. The beat is raised
+	// from the scribe's line rather than from the board's answer, and that
+	// separation is the whole reason this is safe: creatures still die.
+	died := 0
 	for _, log := range logs {
 		for _, e := range log.Events {
-			if e.Kind == tier3.EventDies && strings.Contains(e.Card, "Token") {
-				died = true
+			if e.Kind == tier3.EventDies {
+				died++
 			}
 		}
 	}
-	if !died {
-		t.Error("no token died in either game -- a token that ceases to " +
-			"exist still went to a graveyard on the way, and its death is " +
-			"still worth a sentence")
+	if died == 0 {
+		t.Error("nothing died in either game -- taking tokens out of the " +
+			"graveyard must not take the deaths out of the account")
+	}
+
+	// The tokens in this recording are Food and Treasure, which are artifacts
+	// and therefore do not *die* -- see the rule 700.4 test below. Both facts
+	// are true at once and neither implies the other: the token is gone from
+	// the zone, and it was never announced as dying.
+	for _, log := range logs {
+		for _, e := range log.Events {
+			if e.Kind == tier3.EventDies && strings.Contains(e.Card, "Token") {
+				t.Errorf("game %d: %q was announced as dying, and every token "+
+					"in this recording is an artifact", log.Game, e.Card)
+			}
+		}
+	}
+}
+
+// Only creatures and planeswalkers die -- rule 700.4 -- and the account has to
+// use the word the way the game does.
+//
+// **This fired for every permanent.** A Commander game narrated "Wooded
+// Foothills dies" several times a turn, which teaches somebody learning the
+// game the wrong meaning of a real Magic term, and commandment 2 will not have
+// it. It hid for as long as it did because the skull it draws landed on the
+// *graveyard pile*, where a fetchland's death was one anonymous flicker among
+// many; holding the dying card on the sand put the skull on the card, and a
+// skull on a land is impossible to miss.
+//
+// The recording is a good witness: four fetchlands crack in it, a Saga
+// finishes, and The Great Henge goes. Every one of those used to die.
+func TestOnlyCreaturesAndPlaneswalkersDie(t *testing.T) {
+	t.Parallel()
+	logs, _ := scribed(t, true)
+
+	// What each name is, taken from the board's own dictionary rather than
+	// assumed -- the same source the ruling reads.
+	types := map[string]string{}
+	for _, log := range logs {
+		for _, card := range log.Board.Cards {
+			if card.Types != "" {
+				types[card.Name] = card.Types
+			}
+		}
+	}
+
+	deaths := 0
+	for _, log := range logs {
+		for _, e := range log.Events {
+			if e.Kind != tier3.EventDies {
+				continue
+			}
+			deaths++
+			line := types[e.Card]
+			if line == "" {
+				t.Errorf("game %d: %q died and the board never said what it "+
+					"is", log.Game, e.Card)
+				continue
+			}
+			if !strings.Contains(line, "Creature") &&
+				!strings.Contains(line, "Planeswalker") {
+				t.Errorf("game %d: %q is %q -- it was sacrificed or "+
+					"destroyed, and only creatures and planeswalkers die",
+					log.Game, e.Card, line)
+			}
+		}
+	}
+	if deaths == 0 {
+		t.Fatal("nothing died in two games of Commander, so this test is " +
+			"describing a game that did not happen")
+	}
+
+	// And the ones that should not have died really are in this recording, so
+	// a future change that reopens the hole has something to trip over.
+	fetched := false
+	for _, log := range logs {
+		for _, card := range log.Board.Cards {
+			if strings.Contains(card.Types, "Land") &&
+				!strings.Contains(card.Types, "Creature") {
+				fetched = true
+			}
+		}
+	}
+	if !fetched {
+		t.Error("no plain land in the recording, so nothing here proves a " +
+			"land is not announced as dying")
 	}
 }
 

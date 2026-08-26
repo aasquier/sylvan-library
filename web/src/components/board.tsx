@@ -316,6 +316,11 @@ function FieldCard({ card, size, count, inPlay = false }: {
   return (
     <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
                     + (count > 1 ? ' is-stacked' : '')
+                    // Still standing, but only for this beat. Every way of
+                    // leaving play gets it — died, bounced, exiled, ceased to
+                    // exist — because what it draws is *departure*. Which
+                    // departure it was is the mark's business.
+                    + (card.leaving ? ' is-leaving' : '')
                     + (mark ? ` is-${mark.mark}` : '')}
          ref={box} title={title} tabIndex={card.image ? 0 : -1}
          onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
@@ -554,15 +559,13 @@ function FieldPile({ label, cards, short, throne }: {
   // Held open by a tap. Hover and keyboard focus open it in CSS; this is for
   // the pointer that has no hover to give.
   const [open, setOpen] = useState(false)
-  const struck = useContext(Struck)
-  // **The skull lands on the grave, and it has to.** By the time the sentence
-  // "X dies" is read, the card is already in the graveyard — Forge reports the
-  // death and the zone change on one line, so the step that tells the beat is
-  // the step that moves the card, and there is no instant at which the board
-  // holds a dead creature still standing. Marking the pile it went into is not
-  // a consolation for that; it is where a headstone goes.
-  const buried = struck?.mark === 'dies'
-    && cards.some((c) => sameCard(c.name, struck.card))
+  // **The skull used to land here, and no longer does.** Forge reports a death
+  // and the zone change on one line, so by the time the room said "X dies" the
+  // card was already in this pile and there was no instant at which the board
+  // held a dead creature standing. The grave was the only surface the mark
+  // could reach — a headstone rather than a death. `foldBoard` holds the dying
+  // card in its own row for the length of its beat now, so the skull lands on
+  // the card, which is where Aaron asked for it and where it belongs.
   const top = cards[cards.length - 1]
   const seat = throne && !top
   const title = top ? `${label}: ${cards.length}, ${top.name} on top`
@@ -586,11 +589,6 @@ function FieldPile({ label, cards, short, throne }: {
           is the opposite of an empty graveyard and was drawn the same way.
           The chair says which: theirs, and nobody in it. */}
       {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
-      {buried && struck && (
-        <span key={struck.key} className="field-pile-buried" aria-hidden="true">
-          <img src={mementoArt} alt="" draggable={false} />
-        </span>
-      )}
       <span className="field-pile-label">{short}</span>
       <span className="field-pile-n tabular">{cards.length}</span>
     </div>

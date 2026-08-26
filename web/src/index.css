@@ -7556,8 +7556,7 @@ button:hover .tarot-fan-card {
 
 /* --- died: the stone goes down ----------------------------------------- */
 
-.field-mark-dies img,
-.field-pile-buried img {
+.field-mark-dies img {
   width: 70%;
   height: auto;
   border-radius: 2px;
@@ -7579,26 +7578,39 @@ button:hover .tarot-fan-card {
 .field-mark-dies { background: rgba(6, 5, 4, 0.55); border-radius: 4px; }
 .field-card.is-dies .field-card-turn { filter: grayscale(0.85) brightness(0.62); }
 
-/* The grave's own copy, smaller because a pile is 26px wide and the skull has
-   to sit inside its rim rather than over it. */
-.field-pile-buried {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  background: rgba(6, 5, 4, 0.5);
+/* --- leaving play: held where it stood, for one beat -------------------
+ *
+ * **The skull had nowhere to land.** Forge reports a death and the zone change
+ * on one line, so by the time the room said "X dies" the card was already in a
+ * graveyard — the mark went on the *pile*, which is a headstone rather than a
+ * death (Aaron, 2026-08-25: "it should appear over the card being destroyed
+ * itself, like the shield"). `foldBoard` holds a card that left the
+ * battlefield in its own row for exactly the beat that says so, and the mark
+ * lands on the card.
+ *
+ * This class is the *departure*, not the death: bounced, exiled, sacrificed
+ * and ceasing-to-exist all get it, because all of them are a permanent being
+ * seen to go. What kind of going it was is `.is-dies` and its relatives on
+ * top. So the motion here is only what every leaving has in common — the card
+ * lifts a little off the sand and starts to let go. */
+.field-card.is-leaving { animation: card-leaving 900ms ease-out both; }
+.field-card.is-leaving .field-card-turn {
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.62),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, transparent);
 }
-.field-pile-buried img { width: 76%; }
+@keyframes card-leaving {
+  0%   { transform: none; opacity: 1; }
+  100% { transform: translateY(-3px); opacity: 0.88; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .field-card.is-attacks,
   .field-card.is-blocks { animation: none; }
   .field-mark-attacks { animation: mark-lamp 900ms steps(2, end) both; }
+  .field-card.is-leaving { animation: none; }
   .field-mark-blocks img,
-  .field-mark-dies img,
-  .field-pile-buried img {
+  .field-mark-dies img {
     animation: mark-still 1200ms ease-out both;
   }
   @keyframes mark-still {
