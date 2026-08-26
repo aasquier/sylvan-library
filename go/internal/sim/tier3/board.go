@@ -548,7 +548,31 @@ func (b *board) isToken(id int) bool {
 }
 
 // change is the pending change for a card, made on first touch this step.
+//
+// **Only for a card the dictionary holds**, which is ADR 44's rule read the
+// strict way: the board may only say things about objects it has named. A
+// change against an id with no entry in `b.cards` is a change nothing can
+// render — the browser folds it into a card whose name is the empty string,
+// and an empty name is not a gap a reader can see. It is a blank card tucked
+// under a creature, and it was worse than blank before `stackRow` learned to
+// count attachments: an empty name joins to the empty string, which is
+// byte-for-byte the key of a card carrying nothing at all, so an equipped
+// token merged into the unequipped pile beside it and the pile drew one sword
+// above a count of two.
+//
+// [board.keywords] has always said this for itself, in as many words, and
+// nothing else said it for anybody — so an `attach` line naming an id the
+// dictionary had refused put a nameless card on somebody's battlefield. Said
+// here now, once, for every fold: the dictionary and the changes cannot
+// disagree about which cards exist if only one of them decides.
+//
+// The refused change goes into a scratch [BoardChange] rather than a nil, so
+// that every caller keeps writing the same three lines and none of them has to
+// ask first. Nothing reads it, and it never joins `pending`.
 func (b *board) change(id int) *BoardChange {
+	if _, drawn := b.known[id]; !drawn {
+		return &BoardChange{ID: id}
+	}
 	if c, ok := b.changing[id]; ok {
 		return c
 	}
