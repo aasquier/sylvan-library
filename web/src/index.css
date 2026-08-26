@@ -7210,14 +7210,96 @@ button:hover .tarot-fan-card {
  *
  * The gap inside is tighter than the rail's own, because these are one thing:
  * a player's command zone, with two chairs in it. */
+/* **The frame is the zone's, not each tile's.**
+ *
+ * Every place in here used to carry a complete tile of its own — brass ring,
+ * dark ground, its own corner radius — and the companion carried a second ring
+ * on top of that in a different colour. Three framed boxes in a row is three
+ * places, and a player has no way to know that two of them are one zone and
+ * the third is *also* that zone (Aaron, 2026-08-26: *"companions shouldn't be
+ * in their own mini zone, they should just be in the main command zone to the
+ * side"*).
+ *
+ * So the ring moves out here, once, around the whole zone, and the places
+ * inside it become slots: no frame, no ground, divided by a hairline the way
+ * seats at a table are divided by nothing much. The zone is a thing you can
+ * point at now, which is what it has to be — in Commander it is where the
+ * game's most important card waits. */
 .field-command {
   display: flex;
   flex-grow: var(--seats, 1);
   flex-shrink: 1;
   flex-basis: 0;
   min-width: 0;
-  gap: 5px;
-  align-items: center;
+  gap: 0;
+  /* Stretch, so the side slot is the *height* of the zone and only its width
+     says it is not a chair. Centred, it came out 30x18 on a 375px phone —
+     measured, not guessed — and a horn in eighteen pixels is a smudge. The
+     chairs keep their own aspect ratio and so still set the zone's height;
+     this only gives the companion the full run of it. */
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 7px;
+  background: rgba(10, 8, 5, 0.5);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, transparent),
+    -2px -2px 0 -1px rgba(0, 0, 0, 0.45);
+}
+/* A slot rather than a tile. The radius stays a little rounded so a painting
+   does not run square into the zone's own corner, and the ground goes because
+   the zone is carrying it for all of them now. */
+.field-command .field-pile {
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+}
+/* The hairline between two places. Not a border on the tile — a tile with a
+   line down one edge is a tile with a mistake on it; this is the gap between
+   two seats, and it belongs to the gap. */
+.field-command .field-pile-wrap + .field-pile-wrap {
+  margin-left: 4px;
+  border-left: 1px solid
+    color-mix(in srgb, var(--field-brass) 20%, transparent);
+  padding-left: 4px;
+}
+/* **The companion's slot: in the zone, at the side, narrower than a chair.**
+ *
+ * `--aside` is `COMPANION_SHARE` in `components/board.tsx`, which also adds it
+ * into the group's total share — the two are the same number or the zone comes
+ * out the wrong width. Its divider is the vine's rather than the brass's,
+ * which is the whole of what is left of the old green edge: enough to say this
+ * place is not one of the chairs, and not so much that it reads as a box. */
+.field-command .field-seat-wrap-companion {
+  flex-grow: var(--aside, 0.72);
+  border-left-color: color-mix(in srgb, var(--vine) 62%, transparent);
+}
+/* **The companion's difference is a material, not a frame.**
+ *
+ * It still has to be tellable from a chair when somebody is sitting in it —
+ * both show a card and a name, and only one of them can ever be taxed. A ring
+ * around it is what said so before, and a ring is the thing that made it read
+ * as a second zone. A wash does the same work without drawing an edge: the
+ * side of this zone is greener than the middle of it, and green is the colour
+ * Magic gives the bond between a creature and the player who keeps it.
+ *
+ * Not a horn, deliberately. `HornGlyph` and `ThroneGlyph` are hollow *because*
+ * they are drawn for a seat with nobody in it — see `glyphs.tsx`, where the
+ * filled crown is the present card and the outline is the absence. A hollow
+ * horn laid over an occupied slot would say the companion has gone, which is
+ * the one thing this slot must never say by accident. */
+.field-command .field-seat-wrap-companion .field-pile {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--vine) 20%, transparent) 0%,
+    color-mix(in srgb, var(--vine) 6%, transparent) 100%);
+}
+/* The side slot takes the zone's whole height, so it is a tall narrow place
+   rather than a small one — which is what "at the side" looks like, and what
+   keeps the horn legible where the rail is only 55px wide. Dropping the
+   aspect ratio is the point: a chair is shaped like the painting it holds,
+   and this is shaped like the edge it sits on. */
+.field-command .field-seat-wrap-companion .field-pile {
+  aspect-ratio: auto;
+  height: 100%;
 }
 /* A seat is a named place rather than a pile, so its label is the name of
    whoever belongs in it and has to hold a real word rather than a heading.
@@ -7232,19 +7314,23 @@ button:hover .tarot-fan-card {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* The companion is in this zone and is not one of the commanders, so its seat
-   is dressed in the same room and edged differently: green rather than brass,
-   which is the colour Magic gives a bond between a creature and the player who
-   keeps it. A ring rather than a fill, so the painting underneath is still the
-   throne room. */
-.field-seat-companion {
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--vine) 55%,
-      transparent),
-    -2px -2px 0 -1px rgba(0, 0, 0, 0.45);
-}
+/* **Still not one of them, and no longer a box about it.**
+ *
+ * The companion is in this zone and is not a commander: it never pays a penny
+ * of tax, and it leaves for a hand rather than for the battlefield. That
+ * distinction has to survive — it was the point of giving it a mark of its own
+ * in the first place — but it was being made with a *frame*, and a frame says
+ * "separate place" louder than a colour says "different kind of place".
+ *
+ * So what carries it now is the green itself, on the two things that are
+ * actually the companion's: the horn, and its name. Green because that is the
+ * colour Magic gives a bond between a creature and the player who keeps it,
+ * and it reads against the brass every chair on this rail is carved in. */
 .field-seat-companion .field-pile-throne {
   color: color-mix(in srgb, var(--vine) 82%, #d9e6c8);
+}
+.field-seat-companion .field-pile-label {
+  color: color-mix(in srgb, var(--vine) 62%, #f4ecd8);
 }
 
 /* The empty chair, centred in the slot and drawn on the brass the rest of the

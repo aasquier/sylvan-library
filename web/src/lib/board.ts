@@ -732,7 +732,30 @@ export function stackRow(cards: BoardCard[]): BoardStack[] {
       // and merging them would hide the sword *and* miscount the bears. Names
       // rather than ids, so two identically equipped tokens still stack —
       // which is the case this whole function exists for.
-      card.attachments.map((a) => a.name).join('+'),
+      //
+      // **How many, as well as which**, and the count is not belt-and-braces:
+      // a name can be empty. An attachment the server never put in the card
+      // dictionary folds with `name: ''` (see `foldBoard`, which has always
+      // allowed for it), and `[''].join('+')` is byte-for-byte the key of a
+      // card carrying nothing whatsoever. So an equipped permanent merged into
+      // the bare pile beside it, and the pile drew one sword over a count of
+      // two — the sword hidden and the bears miscounted, which is the exact
+      // pair of harms the line above exists to prevent.
+      //
+      // **It could only ever have shown on a token.** Commander is singleton,
+      // so tokens are the only cards that repeat, and a stack of one is a
+      // stack whose key never has to be right. That is why the report came in
+      // as a fact about tokens (Aaron, 2026-08-26: *"equipment on a token
+      // should put it in its own pile"*) and why the bare-versus-equipped test
+      // above it passed the whole time.
+      //
+      // Sorted, because the order two swords were picked up in is not
+      // something anybody can see across a table: the tuck in `FieldGeared`
+      // shows a 7px corner per attachment, which says *how many* and never
+      // *which came first*. Two creatures wearing the same two things are one
+      // pile. `map` already copies, so this sorts the names and not the cards.
+      card.attachments.length,
+      card.attachments.map((a) => a.name).sort().join('+'),
     ].join('|')
     const already = at.get(key)
     if (already) {
