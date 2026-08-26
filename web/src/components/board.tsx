@@ -998,9 +998,71 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
    *  Without this both graves raised a ghost for one death. */
   receiving?: string | null
 }) {
-  // Held open by a tap. Hover and keyboard focus open it in CSS; this is for
-  // the pointer that has no hover to give.
-  const [open, setOpen] = useState(false)
+  // **Who is holding this tray open, in three states rather than two.**
+  //
+  // `null` — nobody has said. A pointer that has hover to give, and the
+  // keyboard, decide it in CSS.
+  // `true` — held open by a tap or a keypress, for the pointer that has no
+  // hover to give.
+  // `false` — **shut on purpose**, which is a different thing from "not
+  // opened" and has to be, because on a touch screen `:hover` *latches* on
+  // the tapped element and does not let go until the next tap lands
+  // somewhere else. A boolean could only stop asserting `is-open`, and the
+  // latched hover went on holding the panel up: the tray had no way to shut
+  // (Aaron, 2026-08-26, on the live site: *"when I click in a graveyard or
+  // command zone and it expands, it is awkward to get it to collapse again.
+  // A touch outside the zone or on the same zone itself should easily
+  // collapse it."*). `is-shut` is that third state, and every rule that
+  // opens the tray steps aside for it.
+  const [open, setOpen] = useState<boolean | null>(null)
+  /** The zone entire — the pile and the tray that opens off it — which is
+   *  what "outside" is measured against. */
+  const zoneBox = useRef<HTMLDivElement>(null)
+  /** Shut it, and mean it. `false` rather than `null`, so a latched `:hover`
+   *  and a standing keyboard focus both stand down. */
+  const shut = () => setOpen(false)
+  // **The two ways out of an open tray that a person tries without being
+  // told**, and neither existed: a tap anywhere else, and Escape.
+  //
+  // Registered only while this tray is the one being held open, so a band of
+  // six zones costs no listeners at rest — `FieldCard`'s scroll listener
+  // keeps the same discipline one component up, and for the same reason.
+  //
+  // **It is also the whole of the one-tray-at-a-time rule.** Opening the
+  // graveyard while the command zone is spread lands a pointer outside the
+  // command zone, so the command zone shuts itself on the way past. Nothing
+  // has to know about anything else, and there is no shared "which one is
+  // open" for two panels to disagree about.
+  const holding = open === true
+  useEffect(() => {
+    if (!holding) return
+    const away = (e: PointerEvent) => {
+      const hit = e.target as Element | null
+      if (!hit || !zoneBox.current) return
+      // Inside the zone is not outside it. **This is the trap**: a document
+      // listener that skips this test shuts the graveyard the instant
+      // somebody reaches for a card in the graveyard.
+      if (zoneBox.current.contains(hit)) return
+      // A card lifted out of *this* tray is drawn in a dialog portalled to
+      // the body, so it is outside this wrapper by construction and is not a
+      // dismissal. Shutting the tray behind it would mean putting a card
+      // down and finding the pile you took it from had closed itself.
+      if (hit.closest('[role="dialog"]')) return
+      shut()
+    }
+    // Escape from wherever the keyboard happens to be. A tap opens this tray
+    // without focusing anything, so the wrapper's own `onKeyDown` — which
+    // only ever sees keys pressed *inside* the zone — cannot be the whole
+    // answer for a tray somebody opened with a finger and then reached for
+    // the keyboard to dismiss.
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') shut() }
+    document.addEventListener('pointerdown', away, true)
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('pointerdown', away, true)
+      document.removeEventListener('keydown', key)
+    }
+  }, [holding])
   // **The skull used to land here, and no longer does.** Forge reports a death
   // and the zone change on one line, so by the time the room said "X dies" the
   // card was already in this pile and there was no instant at which the board
@@ -1062,16 +1124,52 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
     // slot is the flex item. A commander's chair takes a full share; the
     // companion's takes less than one, which is what "off to the side" is
     // in a row of flex items.
-    <div className={`field-pile-wrap${kind ? ` field-seat-wrap-${kind}` : ''}`}>
+    <div className={`field-pile-wrap${kind ? ` field-seat-wrap-${kind}` : ''}`}
+         ref={zoneBox}
+         // A mouse arriving is the one signal that says the hand on this
+         // machine has hover to give after all — so forget that a tap once
+         // shut this zone, and let `:hover` do its job again. Nothing else
+         // clears `is-shut`, because nothing else should: on a phone it has
+         // to outlive every latched hover there is.
+         onPointerEnter={(e) => {
+           if (e.pointerType === 'mouse') setOpen(null)
+         }}
+         // Escape, from anywhere inside the zone — the tile, or a card down
+         // in the open tray. React's `onKeyDown` is the bubbling kind, so
+         // one handler on the wrapper covers both without the tray needing
+         // to know it is being watched.
+         onKeyDown={(e) => { if (e.key === 'Escape') shut() }}
+         // Focus has left the zone altogether, so the shutting is spent:
+         // arriving back here by keyboard should open it the way a first
+         // arrival does, not find a panel that remembers being dismissed.
+         onBlur={(e) => {
+           if (!e.currentTarget.contains(e.relatedTarget)) {
+             setOpen((was) => (was === false ? null : was))
+           }
+         }}>
     <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
                     + (empty ? ' is-vacant' : '')
                     + (kind ? ` field-seat field-seat-${kind}` : '')}
          title={title}
          aria-label={solo ? title : `${label}: ${cards.length}`}
          tabIndex={cards.length > 0 ? 0 : -1}
+         // **The thing you opened is the thing that closes it.** A tap
+         // toggles, from any of the three states — which is what a person
+         // tries first, and until now the second tap did nothing they could
+         // see.
          onPointerUp={(e) => {
            if (e.pointerType === 'mouse' || cards.length === 0) return
-           setOpen((was) => !was)
+           setOpen((was) => was !== true)
+         }}
+         // The keyboard's half of the same toggle. Focus alone opens the
+         // tray (see `.field-pile:focus-visible` in the stylesheet), so this
+         // is what gives somebody who pressed Escape a way back in without
+         // having to tab away and return.
+         onKeyDown={(e) => {
+           if (cards.length === 0) return
+           if (e.key !== 'Enter' && e.key !== ' ') return
+           e.preventDefault()   // Space scrolls the page otherwise.
+           setOpen((was) => was !== true)
          }}>
       {dressed && (
         <img className="field-pile-ground" src={dressed.art.url} alt=""
@@ -1120,7 +1218,8 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
         wrapper as the pile — the pointer never leaves the hover target on its
         way in, which is the trap that makes most hover panels unusable. */}
     {cards.length > 0 && (
-      <div className={`field-tray${open ? ' is-open' : ''}`}
+      <div className={`field-tray${open === true ? ' is-open' : ''}`
+                      + (open === false ? ' is-shut' : '')}
            role="group" aria-label={`${label}, all ${cards.length}`}>
         <span className="field-tray-head">
           {label}<span className="field-tray-n tabular">{cards.length}</span>
