@@ -143,12 +143,22 @@ jobs:
 
 
   # The Go module (docs/go-migration/PLAN.md; ADR 38): `go vet`, the
-  # race-detected tests, and a tidy check, on both architectures the image is
-  # built for. Both, because the module carries a CGO dependency -- the DuckDB
-  # driver links a prebuilt libduckdb per platform -- and "it builds" has to
-  # mean both, the same reason `image-arm64` exists. Coverage is printed and
-  # not yet gated: the floor is set from Phase 3's measured baseline (PLAN
-  # section 8), not guessed here.
+  # race-detected tests, and a tidy check, on amd64 and arm64.
+  #
+  # The arm64 leg deliberately outlived `image-arm64`, removed 2026-08-26
+  # (ADR 47). The two were never the same argument, and reading them as one
+  # is why the image build survived as long as it did. A *container* built
+  # for an architecture nothing runs proves the Dockerfile against a machine
+  # that will never exist. A *compiler* run against this module proves
+  # something else: it carries a CGO dependency, the DuckDB driver links a
+  # prebuilt libduckdb per platform, and this leg is the only arm64 compiler
+  # *and the only arm64 scheduler* the project has -- the dev Mac is Intel.
+  # It has already found a real data race that twenty `-race -count` runs on
+  # that Mac did not; `internal/api/forgeroute_test.go` names it. It is also
+  # among the cheapest jobs here.
+  #
+  # Coverage is printed and not yet gated: the floor is set from Phase 3's
+  # measured baseline (PLAN section 8), not guessed here.
   #
   # Adding these was the plan's two steps -- written here, and required on
   # `main`. ENGINEERING section 5 keeps the list and the read-back command.
@@ -308,12 +318,17 @@ jobs:
     # image Trivy looked at.
     outputs:
       security-epoch: ${{ steps.epoch.outputs.day }}
-    # amd64 only since 2026-08-19. arm64 used to run here at the end, under
-    # QEMU, and cost 182 of this job's 302 seconds -- 60% of the longest job
-    # in the pipeline, emulating an architecture nothing deploys to: the live
-    # machine answers `x86_64` and the arm64 manifest was never pushed. It is
-    # now `image-arm64` below, on a native runner. The ceiling stays generous
-    # because it is a stuck-build ceiling, not a target.
+    # amd64 only, and since 2026-08-26 the only container build in this file.
+    #
+    # arm64 ran here at the end under QEMU until 2026-08-19 -- 182 of this
+    # job's 302 seconds -- then in a native `image-arm64` job until it was
+    # removed outright (ADR 47). Both moves answered the same question and
+    # only the last one answered it properly: the live machine reports
+    # `x86_64`, the arm64 image was built with `push: false`, and nothing has
+    # ever pulled or run it. A required check should gate something real.
+    #
+    # The ceiling stays generous because it is a stuck-build ceiling, not a
+    # target.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -322,13 +337,18 @@ jobs:
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
 
       # `load`ed into the daemon, because every check below needs a real image
-      # to run rather than a manifest -- which is also why this is the job
-      # that keeps them: a multi-arch build cannot be loaded, so the arm64
-      # job can build and nothing more.
+      # to run rather than a manifest. Building one platform is what makes
+      # that possible at all -- buildx cannot load a multi-arch result -- so
+      # the architecture that deploys is also the one that can be
+      # interrogated, which is the whole reason those checks live here.
       #
-      # The cache scope is named per architecture. Left at the default, the
-      # two jobs share one scope and each evicts the other's layers on every
-      # run, which is a cache that costs storage and returns nothing.
+      # The cache scopes are named per image, not per architecture as they
+      # were while two jobs built two. This job builds two images from two
+      # Dockerfiles; left at the default they would share one scope and each
+      # evict the other's layers on every run, which is a cache that costs
+      # storage and returns nothing. `image-amd64` keeps its name so the
+      # existing cache is not orphaned by a rename.
+      #
       # **Today, as a cache key.** `SECURITY_EPOCH` is threaded into every
       # image build below and is the only thing that makes the `apt-get
       # upgrade` layer rebuild: `cache-from: type=gha` serves that layer from
@@ -574,58 +594,6 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
-      # Last, because it is the slowest: arm64 runs under QEMU. It is here at
-      # all because the dev machine is Intel and anything this would deploy to
-      # is arm64, so "it builds" has to mean both. Nothing is pushed -- there is
-      # no registry in this story yet, and publishing is a decision with a
-      # signing and provenance conversation attached (ENGINEERING §5).
-  # arm64, built natively rather than emulated. Split out of `image` on
-  # 2026-08-19: under QEMU this build was 182 of that job's 302 seconds, and
-  # the thing it was proving -- that the Dockerfile is architecture-honest --
-  # does not need an emulator to prove it. GitHub's arm64 runners went GA for
-  # public repositories on 2025-08-07 and are free for them, so this costs
-  # nothing but a second runner.
-  #
-  # It builds and stops. The pool, deck, art and smoke checks all live in
-  # `image` and all need a loaded image, which a cross-architecture build
-  # cannot give this runner -- and running them twice would prove the same
-  # `.dockerignore` twice.
-  #
-  # Nothing here pushes. The live machine answers `x86_64`; this is the job
-  # that means a move to arm would be a deploy rather than a porting session.
-  image-arm64:
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
-
-      # **Today, as a cache key.** `SECURITY_EPOCH` is threaded into every
-      # image build below and is the only thing that makes the `apt-get
-      # upgrade` layer rebuild: `cache-from: type=gha` serves that layer from
-      # cache indefinitely, because nothing above it in the Dockerfile changes
-      # when Debian publishes a fix. It has skipped a deploy twice — the
-      # Dockerfile names both CVEs — and both times the fix on record was for
-      # somebody to bust the cache by hand, which is not a fix.
-      #
-      # A date means the layer is at most a day stale, with no human in the
-      # loop. It is deliberately a *date* and not the run id: per-run would
-      # rebuild the layer on every push and throw away a cache that is doing
-      # real work the rest of the time.
-      - name: The security layer's cache key
-        id: epoch
-        run: echo "day=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
-
-      - name: Build (linux/arm64)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
-        with:
-          context: .
-          platforms: linux/arm64
-          push: false
-          build-args: SECURITY_EPOCH=${{ steps.epoch.outputs.day }}
-          cache-from: type=gha,scope=image-arm64
-          cache-to: type=gha,mode=max,scope=image-arm64
-
   # Continuous deployment to the Fly instance. Added 2026-08-14, because the
   # alternative was a person running `fly deploy` from a laptop and remembering
   # to -- and the deploy that gets forgotten is the one where `main` and the
@@ -643,7 +611,7 @@ jobs:
   # arrived with the Go crossing and was never wired in, so every deploy for a
   # day shipped without the toolbox gate ever having had to be green.
   deploy:
-    needs: [frontend, no-secrets-or-card-data, tools, go, go-lint, image, image-arm64]
+    needs: [frontend, no-secrets-or-card-data, tools, go, go-lint, image]
     # Two conditions, and the ref one is deliberately outside the event check.
     #
     # Never from a pull request: a fork's PR must not be able to reach the
@@ -685,9 +653,13 @@ jobs:
       # The alternative, `--remote-only`, provisions a builder Machine on the
       # account and bills for it; this runner is already paid for and already
       # has buildx. Note the image is therefore built twice per run -- once by
-      # the `image` job for the two-architecture check, once here for the one
-      # architecture actually deployed. That is a few minutes, not a bug, and
-      # collapsing them means publishing to a registry, which ENGINEERING §5
+      # the `image` job, which is the copy Trivy scans and the smoke checks
+      # interrogate, and once here, which is the copy that actually ships.
+      # Both are `linux/amd64` since ADR 47; before it the `image` side was
+      # described as a two-architecture check, which made the duplication
+      # sound like the price of portability. It is not: it is the price of
+      # having no registry between the two jobs. That is a few minutes, not a
+      # bug, and collapsing it means publishing to one, which ENGINEERING §5
       # keeps behind a signing and provenance conversation.
       #
       # There is one machine and one volume, so Fly cannot roll: this stops the

@@ -36,7 +36,7 @@ they differ.
 | [20](0020-the-theme-interview-reads-a-person.md) | The theme interview reads a person, and Python decides when it may propose | Accepted |
 | [21](0021-a-persona-is-a-voice-and-the-spread-is-the-slots.md) | A persona is a voice, and a tarot spread is the slots wearing pictures | Accepted |
 | [22](0022-decks-have-owners-and-sharing-is-a-flag.md) | Decks have owners, and sharing is a flag on the deck | Accepted |
-| [23](0023-a-green-main-deploys-itself.md) | A green `main` deploys itself, and the deploy is not done until the instance answers | Accepted |
+| [23](0023-a-green-main-deploys-itself.md) | A green `main` deploys itself, and the deploy is not done until the instance answers | Accepted — the *two-architecture check* clause superseded by [47](0047-one-architecture-and-a-required-check-gates-something-real.md) |
 | [24](0024-no-python-autoformatter.md) | No Python autoformatter; the lint rules hold the line instead | Accepted |
 | [25](0025-argue-a-slot-argues-one-direction.md) | Argue a slot argues one direction, and that asymmetry is the guard | Accepted |
 | [26](0026-research-answers-about-magic-not-about-your-deck.md) | Research answers about Magic, never about your deck | Accepted |
@@ -59,6 +59,7 @@ they differ.
 | [44](0044-the-board-holds-state-and-never-holds-a-guess.md) | The board holds the state the events do not, and never holds a guess | Accepted |
 | [45](0045-the-scribe-listens-for-four-more-things-and-still-never-guesses.md) | The scribe listens for four more things, and the board still never guesses | Accepted — finishes the three events [44](0044-the-board-holds-state-and-never-holds-a-guess.md) left undone, and corrects its claim that `GameEventCombatUpdate` is the end-of-combat signal |
 | [46](0046-the-coliseum-runs-at-night.md) | The Coliseum runs at night | Proposed — the record is built, the night is designed |
+| [47](0047-one-architecture-and-a-required-check-gates-something-real.md) | One architecture, and a required check gates something real | Accepted — supersedes the *two-architecture check* clause of [23](0023-a-green-main-deploys-itself.md) |
 
 **A note on the numbering.** There is no 41, and this table does not know why
 — the number was never used. The hole stays: renumbering would move a number

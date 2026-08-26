@@ -97,10 +97,17 @@ func TestEveryImageBuildKeysTheSecurityLayerOnADate(t *testing.T) {
 	// Anti-vacuity: a renamed action or a changed `with` shape would make the
 	// loop above find nothing and say nothing, which is the failure mode this
 	// whole file exists to avoid.
+	//
+	// The floor was three when the three were the app image, its arm64 twin
+	// and the Forge worker — which was already miscounted, because the worker
+	// is built twice. ADR 47 removed the arm64 twin and the number came out
+	// unchanged, by luck rather than by the argument: this floor would have
+	// held just as quietly if the *app* build had been the one to go.
 	if builds < 3 {
-		t.Fatalf("%s has %d image builds; the app image, its arm64 twin and "+
-			"the Forge worker are three, so the shape has probably changed "+
-			"and this test is no longer looking at anything", path, builds)
+		t.Fatalf("%s has %d image builds; the app image and the Forge worker "+
+			"twice — once before the merge and once pushed at deploy — are "+
+			"three, so the shape has probably changed and this test is no "+
+			"longer looking at anything", path, builds)
 	}
 }
 
