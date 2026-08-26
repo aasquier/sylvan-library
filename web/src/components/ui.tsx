@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText, symbolName } from '../lib/mtg'
 import { ManaGlyph, OfficialSymbol } from './manasymbol'
@@ -594,9 +594,34 @@ export function CardArt({
   )
 }
 
+/** A card carried by the card being held up — an Equipment or an Aura.
+ *
+ *  Structural on purpose: the board's `BoardCard` satisfies it without this
+ *  file learning what a board is. */
+export interface SheetWorn {
+  name: string
+  image: string
+}
+
+/** Nothing is attached. Hoisted rather than defaulted to a fresh `[]`, which
+ *  would be a new identity on every render and would churn everything
+ *  downstream that watches this prop. */
+const NOTHING: readonly SheetWorn[] = []
+
+/** How far a finger travels before it is a riffle and not a tap that
+ *  wandered. Below it the sheet closes, which is what a tap here has always
+ *  done. */
+const SWIPE_MIN = 44
+
+/** How many cards deep the carousel draws before a card is simply gone. Two
+ *  is one hinted neighbour on each side plus one in reserve mid-flight; a
+ *  creature wearing five things does not want five ghosts on a phone. */
+const SEEN = 2
+
 /**
  * One card, held up: centred over a dimmed room, dismissed by a tap anywhere
- * or by Escape.
+ * or by Escape — and, when that card is carrying something, **the whole
+ * assemblage**, one card at a time.
  *
  * Its own component because two very different surfaces need the same
  * gesture — a thumbnail in a list (`CardHover` below) and a permanent on the
@@ -607,24 +632,199 @@ export function CardArt({
  * Portalled to the body. A `position: fixed` sheet rendered in place is
  * trapped by any ancestor carrying a transform, and both callers sit inside
  * several that do — the board's cards are literally mid-rotation.
+ *
+ * **`worn`, and why the sheet grew a carousel.** The board draws a suited-up
+ * creature as one thing — the sword tucked down-and-right under the creature
+ * holding it — and then opening it showed the creature *alone* (Aaron,
+ * 2026-08-26: *"I want to see all of the cards, especially the equipment and
+ * what not underneath, as I swipe left or right through them"*). The tucked
+ * corners are the one part of this board that says **that** a creature is
+ * carrying something without ever saying **what**, and on a phone the sheet
+ * is the only way to find out, because the tuck's own answer is a hover.
+ *
+ * **The creature comes first.** A player opened the Bear, not the
+ * Bonesplitter, so index zero is the card that was tapped and the attachments
+ * follow in the order they went on. It clamps at both ends rather than
+ * wrapping: this is an ordered assemblage and not a ring, and a dead end you
+ * can see is kinder to a newcomer than a loop that silently returns them to
+ * the start (commandment 2).
+ *
+ * **Three ways to move, because a swipe is not a control.** Swipe, the arrow
+ * keys, and a rail of controls that is visible without touching anything.
+ * This project has shipped a touch-only or hover-only reading affordance
+ * twice and lost half the audience both times; a carousel a laptop cannot
+ * work is the same bug wearing a third costume. The pips are buttons too, so
+ * the fourth way is jumping straight to the sword.
+ *
+ * **One card is still one card.** With nothing attached this renders exactly
+ * what it always rendered — one image, no rail, no caption and no "1 of 1" —
+ * which is also what keeps the twenty-three `CardHover` call sites untouched.
+ * An attachment the pool gave no painting is dropped rather than drawn as a
+ * blank slide, on the board's own rule that no painting opens no sheet.
  */
-export function CardSheet({ name, image, onClose }: {
+export function CardSheet({ name, image, onClose, worn = NOTHING }: {
   name: string
   image: string
   onClose: () => void
+  /** What is attached to the card being held up, in the order it went on.
+   *  Empty everywhere but the battlefield. */
+  worn?: readonly SheetWorn[]
 }) {
+  const [want, setWant] = useState(0)
+  // The card that was opened, then what it is carrying. Rebuilt each render
+  // rather than memoised: it is at most a handful of entries, and a memo on
+  // an array prop that the board rebuilds on every scrub buys nothing.
+  const opened: SheetWorn = { name, image }
+  const cards: SheetWorn[] = [opened, ...worn.filter((w) => w.image)]
+  const many = cards.length > 1
+  // Clamped on read rather than on write. A board being scrubbed backwards
+  // can take the sword off the creature while its sheet is open, and an index
+  // that outlived its card would render nothing at all.
+  const at = Math.min(want, cards.length - 1)
+  // The fallback is unreachable — `at` is clamped into a list that always has
+  // the opened card in it — and is written down because an index into an
+  // array is not a promise the compiler will take on trust.
+  const here = cards[at] ?? opened
+  const step = (d: number) =>
+    setWant(Math.min(cards.length - 1, Math.max(0, at + d)))
+
+  const box = useRef<HTMLSpanElement>(null)
+  // Where a drag began, and whether it went far enough to be a riffle. Both
+  // refs: neither is drawn, and a re-render mid-swipe would lose the origin.
+  const from = useRef<{ x: number; y: number } | null>(null)
+  const swiped = useRef(false)
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (!many) return
+      if (e.key === 'ArrowRight') { e.preventDefault(); step(1) }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    // Deliberately every render, so the handler reads *this* card's position
+    // rather than the one the sheet opened on. One listener, re-hung only
+    // when something actually changed the sheet — a modal does not render on
+    // a timer.
+  })
+
+  // Only when there is something to steer. Moving focus for a lone card would
+  // change what a tap does on every card list in the app; here it is what
+  // makes Tab reach the rail at all.
+  useEffect(() => { if (many) box.current?.focus() }, [many])
+
+  if (!many) {
+    return createPortal(
+      <span role="dialog" aria-modal="true" aria-label={name}
+            className="card-sheet" onClick={onClose}>
+        <img src={image} alt={name} className="card-sheet-art" />
+      </span>,
+      document.body)
+  }
 
   return createPortal(
-    <span role="dialog" aria-modal="true" aria-label={name}
-          className="card-sheet" onClick={onClose}>
-      <img src={image} alt={name} className="card-sheet-art" />
+    <span role="dialog" aria-modal="true" aria-label={name} ref={box}
+          tabIndex={-1} className="card-sheet is-many"
+          onPointerDown={(e) => {
+            swiped.current = false
+            from.current = { x: e.clientX, y: e.clientY }
+          }}
+          onPointerUp={(e) => {
+            const start = from.current
+            from.current = null
+            if (!start) return
+            const dx = e.clientX - start.x
+            const dy = e.clientY - start.y
+            // Horizontal, and decisively so. A drag that is mostly vertical is
+            // somebody scrolling the room behind the sheet, not riffling.
+            if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) <= Math.abs(dy)) return
+            swiped.current = true
+            step(dx < 0 ? 1 : -1)
+          }}
+          // A swipe ends in a click, and a click here closes. Without this the
+          // sheet would change card and then vanish in the same gesture.
+          onClick={() => { if (!swiped.current) onClose() }}>
+      <span className="card-sheet-hold">
+        <span className="card-sheet-stage">
+          {cards.map((c, n) => {
+            const o = n - at
+            const d = Math.min(Math.abs(o), SEEN)
+            return (
+              <span key={`${n}-${c.name}`}
+                    className={'card-sheet-slide'
+                               + (o === 0 ? ' is-front' : '')
+                               + (d >= SEEN ? ' is-gone' : '')}
+                    aria-hidden={o !== 0}
+                    style={{ '--o': Math.max(-SEEN, Math.min(SEEN, o)),
+                             '--d': d } as CSSProperties}
+                    // The hinted neighbour is a target, which is how a mouse
+                    // riffles without going near the rail.
+                    onClick={(e) => {
+                      if (o === 0) return
+                      e.stopPropagation()
+                      setWant(n)
+                    }}>
+                <img src={c.image} alt={c.name} className="card-sheet-art"
+                     draggable={false} />
+              </span>
+            )
+          })}
+        </span>
+        {/* Said in words, and said again every time the card changes: the
+            painting is the answer for somebody who can see it, and the name
+            is the answer for everybody else. */}
+        <span className="card-sheet-say" aria-live="polite">
+          <span className="card-sheet-say-name">{here.name}</span>
+          {at > 0 && (
+            <span className="card-sheet-say-on">attached to {name}</span>
+          )}
+        </span>
+        {/* The rail is inside the sheet, so a click on it would close the
+            sheet on the way past. It does not. */}
+        <span className="card-sheet-rail"
+              onClick={(e) => e.stopPropagation()}>
+          <button type="button" className="btn card-sheet-step"
+                  aria-label="The card before this one"
+                  disabled={at === 0} onClick={() => step(-1)}>
+            <Chevron back />
+          </button>
+          <span className="card-sheet-pips">
+            {/* The position is in the name rather than drawn as "2 of 3"
+                beside them. A sighted person already has it — the lit pip is
+                second of three — and a second copy in words is clutter. A
+                reader has no pips, so without this the only way to find out
+                where you are is to walk all of them. */}
+            {cards.map((c, n) => (
+              <button key={`${n}-${c.name}`} type="button"
+                      className={`card-sheet-pip${n === at ? ' is-on' : ''}`}
+                      aria-label={`${c.name}, ${n + 1} of ${cards.length}`}
+                      aria-current={n === at ? true : undefined}
+                      onClick={() => setWant(n)} />
+            ))}
+          </span>
+          <button type="button" className="btn card-sheet-step"
+                  aria-label="The card after this one"
+                  disabled={at === cards.length - 1} onClick={() => step(1)}>
+            <Chevron />
+          </button>
+        </span>
+      </span>
     </span>,
     document.body)
+}
+
+/** The arrow on a rail button. Drawn rather than typed: a `‹` is a font's
+ *  opinion about a quotation mark, and it sits off-centre in half of them. */
+function Chevron({ back = false }: { back?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+         fill="none" stroke="currentColor" strokeWidth="2.2"
+         strokeLinecap="round" strokeLinejoin="round"
+         style={back ? { transform: 'scaleX(-1)' } : undefined}>
+      <path d="M9 5l7 7-7 7" />
+    </svg>
+  )
 }
 
 /**
