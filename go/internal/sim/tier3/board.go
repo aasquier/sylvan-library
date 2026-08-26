@@ -100,6 +100,26 @@ type BoardCard struct {
 	// A stolen permanent moves seats with its zone change; this is where it
 	// started.
 	Seat int `json:"seat,omitempty"`
+	// CopiedBy is the board id of the card whose ability made this one, and it
+	// is set only when this card is a **copy** of something.
+	//
+	// Populate is the ask (Aaron, 2026-08-26: *"It really is making a clone, or
+	// splitting one thing into two"*), and its presence is the copy: a token
+	// minted fresh carries nothing here and a populated one carries this, so
+	// "was this card copied into existence" is answerable at all for the first
+	// time. `GameEventTokenCreated` is a bare signal with no fields and could
+	// never have answered it.
+	//
+	// **It is not what the card was copied *from*.** Forge sets a token's clone
+	// origin to the *ability's host* — a Centaur Token populated by Growing
+	// Ranks names Growing Ranks, not the Centaur Token it duplicated — which
+	// `scribe/Scribe.java` records against the bytecode. The permanent that was
+	// copied lives on Forge's model rather than its view and does not reach this
+	// pipe, so it is not here and is not guessed at.
+	//
+	// In the dictionary rather than in a change because it never moves: a card
+	// is made a copy once, at the instant it exists.
+	CopiedBy int `json:"copied_by,omitempty"`
 }
 
 // BoardCounter is one kind of counter and how many are on the card.
@@ -232,6 +252,100 @@ type BoardChange struct {
 	// draws players as rails rather than as cards and there is nothing there
 	// to hang it on. It stays in its own row, which is where it was.
 	AttachedTo *int `json:"attached_to,omitempty"`
+	// Live is every keyword this card **instance** has right now, granted ones
+	// included — not the keywords its printing carries.
+	//
+	// The difference is the whole reason it exists (Aaron, 2026-08-26: *"Some
+	// cards like Kaheera give vigilance or another effect to other cards, we
+	// currently are not representing that symbolically"*). The board's only
+	// keywords until now were Scryfall's, keyed by card *name*, so every copy of
+	// a card wore the same marks all game and a Beast standing beside Kaheera
+	// gained a visible +1/+1 and an invisible vigilance.
+	//
+	// A pointer for [BoardChange.Counters]'s reason: a creature that *loses* its
+	// last granted keyword has an empty set, and under a plain slice that is the
+	// same bytes as "nothing changed".
+	//
+	// **Which of these are granted is not decided here**, because this layer
+	// does not know what any card was printed with — `api/forge.go` does, and it
+	// fills [BoardChange.Granted] from this. Forge itself cannot be asked: its
+	// view layer erases the `isIntrinsic` flag and every trace of what granted a
+	// keyword, which `Scribe.java` records.
+	Live *[]string `json:"live,omitempty"`
+	// Granted is the subset of [BoardChange.Live] that this card's **printing
+	// does not carry** — the keywords something else gave it.
+	//
+	// **Filled one layer up, in `api/forge.go`, and never here.** It is a
+	// comparison against Scryfall's keyword list for the card, which is a fact
+	// this package has no access to and no business holding; the shaping layer
+	// already resolves every card's printing to paint the board and knows it for
+	// free.
+	//
+	// It says *that* a keyword was granted and never *by what*. Forge's view
+	// layer erases attribution completely — `KeywordView` is four fields and
+	// none of them is a source — so the card to blame is not available at any
+	// price, and inventing one is what ADR 44 exists to forbid. The copy that
+	// renders this must not imply an agent.
+	Granted *[]string `json:"granted,omitempty"`
+	// Fate is **how** this permanent left, when Forge said so: [FateSacrificed],
+	// and nothing else.
+	//
+	// A Treasure cracked for mana raised no beat at all and folded silently into
+	// the next step (Aaron, 2026-08-26: *"things that tap before being
+	// sacrificed… they must tap to sacrifice and they go into the ether"*). A
+	// fetchland is the same shape. `dies` cannot cover them: rule 700.4 gives
+	// that word to creatures and planeswalkers, and an artifact cracked for mana
+	// does not die.
+	//
+	// **Sacrifice is the only word this bus has, and the other two are not
+	// coming.** `GameEventCardDestroyed` is a record with no components at all —
+	// it cannot say which card — and a combat death is announced nowhere as
+	// such. So the board says "sacrificed" where Forge said it and says nothing
+	// about the rest, rather than reading a word off the circumstances.
+	Fate string `json:"fate,omitempty"`
+}
+
+// FateSacrificed is [BoardChange.Fate] for a permanent its controller
+// sacrificed — a cost paid, rather than something that happened to it.
+const FateSacrificed = "sacrificed"
+
+// BoardFloating is one seat's floating mana, as the symbols a person writes.
+//
+// `"GGW"` is two green and one white; `""` is an empty pool, which is a real
+// answer and the one that ends every step. Per seat rather than per card
+// because a pool belongs to a player (ADR 44 says so in as many words), which
+// is why this sits beside [BoardStep.Life] and not on a permanent.
+//
+// **Not to be confused with `forgeBoardCard.Mana`**, one layer up, which is
+// Scryfall's `produced_mana` — a static fact about whether a printing can make
+// mana at all. This is mana that exists right now and drains at the end of the
+// step. The names are deliberately different for that reason.
+type BoardFloating struct {
+	Seat int    `json:"seat"`
+	Pool string `json:"pool"`
+}
+
+// BoardAbility is one ability going on the stack at one step: whose, whose
+// card, and from where.
+//
+// **Transient by construction.** It rides the step rather than the card because
+// using an ability is a moment rather than a state — there is nothing to clear
+// afterwards and nothing that can leak. A board folded to step N reads the
+// abilities of step N and no others.
+//
+// Zone is Forge's own name for where the source was — `Command` for eminence,
+// `Battlefield` for the rest — which is what lets a room draw a commander doing
+// something from a zone it never leaves (Aaron, 2026-08-26: *"It can be used on
+// the battlefield or from the command zone… It should just visually indicate
+// that an ability is being used"*).
+type BoardAbility struct {
+	ID   int    `json:"id"`
+	Seat int    `json:"seat,omitempty"`
+	Zone string `json:"zone,omitempty"`
+	// Trigger is whether the game raised this ability rather than the player
+	// activating it. Eminence is a triggered ability; a Treasure being cracked
+	// is an activated one.
+	Trigger bool `json:"trigger,omitempty"`
 }
 
 // BoardLife is one seat's life total after it changed.
@@ -260,6 +374,14 @@ type BoardStep struct {
 	Seat    int           `json:"seat,omitempty"`
 	Life    []BoardLife   `json:"life,omitempty"`
 	Changes []BoardChange `json:"changes,omitempty"`
+	// Floating is every seat whose mana pool moved at this step. See
+	// [BoardFloating] — beside the life totals because a pool is a player's,
+	// not a permanent's.
+	Floating []BoardFloating `json:"floating,omitempty"`
+	// Abilities is every ability that went on the stack at this step, in order.
+	// See [BoardAbility] — a moment rather than a state, which is why it is
+	// here and not on a card.
+	Abilities []BoardAbility `json:"abilities,omitempty"`
 }
 
 // BoardReel is one game's board: who is at the table, what the cards are, and
@@ -330,12 +452,35 @@ type board struct {
 	// was destroyed.
 	left map[int]string
 
+	// live is the keyword set each card instance currently has, joined as it
+	// arrived. Compared as one string rather than as a set because the scribe
+	// renders Forge's own order and a re-send of the same set is the common
+	// case; the split happens only when it has actually moved.
+	live map[int]string
+	// pool is each seat's floating mana as it stands.
+	pool map[int]string
+	// sawCombatEnd is whether Forge has told this game when combat ended.
+	//
+	// **One rule with a stated precedence, rather than two that can disagree.**
+	// Combat ends when Forge says it ends; the turn boundary stands in only
+	// while this is false, which is what a stream from a worker built before
+	// `GameEventCombatEnded` was listened for looks like. Latched per game
+	// because the answer cannot go backwards inside one — a stream that has said
+	// it once will say it every combat.
+	sawCombatEnd bool
+
 	// pending is what has changed since the last beat, in the order the cards
 	// were first touched — deterministic, because a map's iteration order is
 	// not and a recorded golden would flap.
 	pending   []int
 	changing  map[int]*BoardChange
 	lifeMoved []int
+	// poolMoved is every value a pool took since the last beat, in order. A
+	// seat appears once per change rather than once per step — see
+	// [board.floating] for why the sequence is the point.
+	poolMoved []BoardFloating
+	// used is the abilities raised since the last beat, in order.
+	used []BoardAbility
 
 	turn int
 	// active is whose turn it is. Kept apart from the turn number because a
@@ -354,6 +499,7 @@ func newBoard() *board {
 		combat:   map[int]string{}, attacking: map[int]int{},
 		blocking: map[int]int{}, casts: map[int]int{},
 		life: map[int]int{}, left: map[int]string{},
+		live: map[int]string{}, pool: map[int]string{},
 		changing: map[int]*BoardChange{},
 	}
 }
@@ -605,19 +751,41 @@ func (b *board) inCombat(id int, role string, attacking, blocking int) {
 	}
 }
 
+// combatEnded is Forge saying combat is over, which is the real boundary.
+//
+// **`GameEventCombatUpdate` is the wrong event, and ADR 44 named it as the
+// right one.** That ADR left this undone with the note that the bus carries a
+// combat signal the scribe does not listen for; it does, and it is not that
+// one. `GameEventCombatUpdate` is constructed in exactly two places in the
+// whole of Forge — `InputAttack` and `InputBlock`, the *human* declare-attackers
+// and declare-blockers handlers — so it fires on a person's clicks and never
+// once in a headless AI match. A listener built on it would have compiled,
+// subscribed, and changed nothing. `GameEventCombatEnded` is the engine's own,
+// raised from `PhaseHandler.onPhaseEnd()`.
+//
+// The latch is what keeps this one rule rather than two. See
+// [board.sawCombatEnd].
+func (b *board) combatEnded() {
+	b.sawCombatEnd = true
+	b.endCombat()
+}
+
 // endCombat takes everybody out of the fight.
 //
-// **Called when a turn begins, because that is the only boundary the stream
-// has.** Forge's bus does carry `GameEventCombatUpdate` and the scribe does
-// not listen for it (ADR 42's table of what it discards), so the honest
-// reading available here is "this combat lasts until the next turn" — which is
-// right about the picture for the whole of combat and a phase late afterwards,
-// where a creature keeps a sword mark through a second main phase it is no
-// longer attacking in. The one case it reads wrong is an extra combat inside
-// one turn, where the first combat's attackers stay marked alongside the
-// second's; that is rare, and a mark left on for too long is a smaller lie
-// than an attacker the board never drew at all. A creature that leaves the
-// battlefield is taken out of combat immediately, by [board.became].
+// **The turn boundary stands in only until Forge says otherwise.** Before the
+// scribe listened for `GameEventCombatEnded` this was the only boundary the
+// stream had, and it was a phase late: a creature kept its sword mark through a
+// second main phase it was no longer attacking in, and two combats in one turn
+// piled the first one's attackers in with the second's. Both are now answered
+// where the answer comes from Forge — but a worker image built before the
+// scribe learned that event still sends no `combat_end` at all, and a board
+// that dropped the fallback would leave those matches marked as attacking
+// forever. So the old rule survives exactly as long as it is the only one
+// there is: [board.began] asks this, and [board.sawCombatEnd] silences it the
+// moment Forge speaks for itself.
+//
+// A creature that leaves the battlefield is taken out of combat immediately,
+// by [board.became], on either path.
 func (b *board) endCombat() {
 	for _, id := range b.fighting {
 		if b.combat[id] == "" {
@@ -731,6 +899,123 @@ func (b *board) counter(id int, kind string, was, now int) {
 	}
 }
 
+// keywords folds the live keyword set for one card instance.
+//
+// `joined` is the scribe's comma-joined string and the empty string is a real
+// answer — a creature that has lost the last keyword something gave it — which
+// is why an unseen card and a card known to have none are told apart by the
+// map rather than by the value. Without that, the first card ever reported with
+// no keywords would publish an empty set that nobody needed and every card that
+// *lost* one would publish nothing.
+//
+// Compared as the whole string, because the scribe re-sends a card's keywords
+// on every line that mentions it and almost none of them are news — the same
+// trade `Scribe.seen` makes one layer earlier, for the same reason.
+func (b *board) keywords(id int, joined string) {
+	// Only for a card this board is already drawing. Every line the scribe
+	// writes about a card carries its keywords, including lines about cards
+	// that never enter a drawn zone, and a change against an id the dictionary
+	// has no entry for is a change nothing can render.
+	if _, drawn := b.known[id]; !drawn {
+		return
+	}
+	was, seen := b.live[id]
+	if seen && was == joined {
+		return
+	}
+	b.live[id] = joined
+	// **A card that has never had a keyword says nothing**, which is `shed`'s
+	// rule applied to the other set a card carries. Most permanents in most
+	// games have no keywords at all, so publishing "this Forest still has none"
+	// the first time each land is mentioned was thirty-odd changes a game
+	// carrying no information — measured on a real match before this guard
+	// existed. Going *back* to none is still news and still published, because
+	// that is a creature losing something it had.
+	if !seen && joined == "" {
+		return
+	}
+	set := []string{}
+	if joined != "" {
+		set = strings.Split(joined, ",")
+	}
+	b.change(id).Live = &set
+}
+
+// fate folds how a permanent left. Silent on the empty string, so that a card
+// leaving for a reason Forge did not name says nothing rather than saying it
+// left for no reason.
+func (b *board) fate(id int, fate string) {
+	if id == 0 || fate == "" {
+		return
+	}
+	b.change(id).Fate = fate
+}
+
+// floating folds one seat's mana pool.
+//
+// **Every value it takes, in order, and not just the one it ends on.** This is
+// the one place in this file where a step carries a *sequence* rather than a
+// state, and it is the difference between answering Aaron's question and
+// missing it entirely. He asked to see the pool *"as things tap into it before
+// it is drained to cast things"* — and a pool fills and empties several times
+// between two beats, so the value at the end of a step is almost always zero.
+// Measured on a real match before this was a sequence: ten pool changes reached
+// the browser and **nine of them were an empty pool**, which is a truthful
+// answer to a question nobody asked.
+//
+// So the room gets the whole movement. A consumer that only wants the resting
+// state reads the last entry for that seat, which is what a fold does anyway;
+// one that wants to draw the mana arriving and being spent has the frames to do
+// it with. Every entry is a state Forge announced — nothing here is
+// interpolated.
+//
+// **A pool that has never held anything says nothing**, the same rule
+// [board.keywords] follows: a seat's first event is often the drain at the end
+// of its first step, and "this empty pool is still empty" is not news.
+func (b *board) floating(seat int, mana string) {
+	if seat <= 0 {
+		return
+	}
+	was, seen := b.pool[seat]
+	if seen && was == mana {
+		return
+	}
+	b.pool[seat] = mana
+	if !seen && mana == "" {
+		return
+	}
+	b.poolMoved = append(b.poolMoved, BoardFloating{Seat: seat, Pool: mana})
+}
+
+// usedAbility records an ability going on the stack at this step.
+//
+// Appended rather than deduplicated: a card really can use the same ability
+// twice before the next beat, and two uses are two things that happened.
+func (b *board) usedAbility(id, seat int, zone string, trigger bool) {
+	if id == 0 {
+		return
+	}
+	b.used = append(b.used, BoardAbility{ID: id, Seat: seat, Zone: zone,
+		Trigger: trigger})
+}
+
+// copiedBy records that a card was made as a copy, by `by`.
+//
+// On the dictionary rather than in a change, because it is true from the
+// instant the card exists and never changes after — see [BoardCard.CopiedBy].
+// Silent for a card this board has not been told the name of yet; the scribe
+// sends the two together on every line, so the next one settles it.
+func (b *board) copiedBy(id, by int) {
+	if id == 0 || by == 0 {
+		return
+	}
+	at, seen := b.known[id]
+	if !seen || b.cards[at].CopiedBy == by {
+		return
+	}
+	b.cards[at].CopiedBy = by
+}
+
 // lives folds a life total.
 func (b *board) lives(seat, life int) {
 	if seat <= 0 || b.life[seat] == life {
@@ -745,8 +1030,14 @@ func (b *board) lives(seat, life int) {
 	b.lifeMoved = append(b.lifeMoved, seat)
 }
 
-// began records a turn.
+// began records a turn, and ends the last one's combat if nothing better has.
+//
+// The fallback lives here rather than at the call site so that the precedence
+// between the two boundaries is stated in one place — see [board.endCombat].
 func (b *board) began(turn, seat int) {
+	if !b.sawCombatEnd {
+		b.endCombat()
+	}
 	if turn > 0 {
 		b.turn = turn
 	}
@@ -766,12 +1057,20 @@ func (b *board) beat() {
 	for _, seat := range b.lifeMoved {
 		step.Life = append(step.Life, BoardLife{Seat: seat, Life: b.life[seat]})
 	}
+	if len(b.poolMoved) > 0 {
+		step.Floating = append([]BoardFloating(nil), b.poolMoved...)
+	}
+	if len(b.used) > 0 {
+		step.Abilities = append([]BoardAbility(nil), b.used...)
+	}
 	for _, id := range b.pending {
 		step.Changes = append(step.Changes, *b.changing[id])
 	}
 	b.steps = append(b.steps, step)
 	b.pending = b.pending[:0]
 	b.lifeMoved = b.lifeMoved[:0]
+	b.poolMoved = b.poolMoved[:0]
+	b.used = b.used[:0]
 	b.changing = map[int]*BoardChange{}
 }
 

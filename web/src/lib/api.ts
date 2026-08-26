@@ -609,6 +609,20 @@ export interface ForgeBeat {
   turn?: number
   who: string | null
   card?: string
+  /** The board id of `card`, so a beat can point at the exact permanent in
+   *  the picture. Absent on a match played without the scribe, which has no
+   *  ids — read a missing id as "not said", never as a card.
+   *
+   *  A name cannot answer "which one": two Egg Tokens are one string between
+   *  them, and so are two copies of a commander. */
+  id?: number
+  /** Where an `'ability'` beat's source was standing — `'Command'` for an
+   *  eminence trigger, `'Battlefield'` for most things. Absent on every other
+   *  kind. */
+  zone?: string
+  /** Whether an `'ability'` beat was raised by the game rather than activated
+   *  by a player: *triggers* against *activates*. */
+  trigger?: boolean
   target?: string
   against: string | null
   amount?: number
@@ -699,6 +713,14 @@ export interface ForgeBoardCard {
    *  the ones it has a sign for and ignores the rest, so adding a sign is a
    *  change to one file in the browser. */
   keywords?: string[]
+  /** The board id of the card whose ability made this one a **copy**, and
+   *  absent for every card that is not one — a token minted fresh carries
+   *  nothing here and a populated one carries this.
+   *
+   *  **Not what it was copied *from*.** A Centaur Token populated by Growing
+   *  Ranks names Growing Ranks, because that is the card whose ability made
+   *  it; the permanent it duplicated never crosses this wire. */
+  copied_by?: number
 }
 
 /** One card's change at one step. Everything is optional because almost
@@ -756,6 +778,28 @@ export interface ForgeBoardChange {
    *  almost every card almost every step; zero means attached to nothing now,
    *  which a sword coming off a bear really is. */
   attached_to?: number
+  /** Every keyword this card **instance** has right now, granted ones
+   *  included — not the keywords its printing carries, which are
+   *  `ForgeBoardCard.keywords` and are the same for every copy of a card.
+   *
+   *  **An empty array is a real answer**, as it is for `counters`: it means a
+   *  creature has lost the last keyword something was giving it. */
+  live?: string[]
+  /** The subset of `live` that this card's **printing does not carry** — the
+   *  keywords something else gave it. A Beast standing beside Kaheera has
+   *  vigilance here and nothing in its own text that explains it.
+   *
+   *  **It says that a keyword was granted and never by what.** Forge erases
+   *  attribution completely, so the card to blame is not available at any
+   *  price — copy that renders this must not imply an agent. */
+  granted?: string[]
+  /** **How** this permanent left, when Forge said so: `'sacrificed'`, and
+   *  nothing else.
+   *
+   *  Sacrifice is the only word this pipe has. Forge announces a destruction
+   *  without saying which card it was, and a combat death as nothing at all,
+   *  so the board says what it knows and stays quiet about the rest. */
+  fate?: string
 }
 
 /** The board's movement between one beat and the next.
@@ -770,6 +814,24 @@ export interface ForgeBoardStep {
   seat?: number
   life?: { seat: number; life: number }[]
   changes?: ForgeBoardChange[]
+  /** Every value a mana pool took during this step, in order — `'GGW'` is two
+   *  green and one white, and `''` is a pool that has drained.
+   *
+   *  **A sequence rather than a state, and the only one on this wire.** A pool
+   *  fills and empties several times between two beats, so a step holding only
+   *  the value it ends on holds an empty pool nearly every time — measured on a
+   *  real match at nine empty out of ten. A seat therefore appears more than
+   *  once here, and the last entry for it is the resting value. */
+  floating?: { seat: number; pool: string }[]
+  /** Every ability that went on the stack at this step, in order.
+   *
+   *  **Transient**: using an ability is a moment rather than a state, so this
+   *  rides the step and there is nothing to clear afterwards. `zone` is where
+   *  the source was — `'Command'` for an eminence trigger, whose card never
+   *  moves and so has no other signal anywhere in this stream. */
+  abilities?: {
+    id: number; seat?: number; zone?: string; trigger?: boolean
+  }[]
 }
 
 /** The battlefield, as the room receives it. */

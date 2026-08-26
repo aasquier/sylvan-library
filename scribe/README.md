@@ -70,6 +70,25 @@ game (Gyome/Food against Atla/Eggs, seed 11, 2026-08-25):
 | `outcome` | 2 | one of Forge's own outcome sentences, with the last turn |
 | `mulligan` | — | a hand thrown back (neither player did, that game) |
 | `game`, `result` | 2 | the frame around a game |
+| `mana` | — | a seat's whole floating pool, as symbols: `"GGW"`, or `""` |
+| `sacrificed` | — | a permanent its controller sacrificed |
+| `combat_end` | — | Forge saying combat is over |
+| `ability` | — | an ability on the stack: its source, that source's zone, and whether the game raised it |
+
+The last four arrived later (ADR 45) and are not in that game's counts. On a
+separate recorded match — a Kaheera deck against itself, 2026-08-26 — a
+fourteen-turn game raised 50 `mana`, 13 `combat_end`, 4 `ability` and 1
+`sacrificed`, and a forty-six-turn game raised 10 `ability`. Two card fields
+came with them: `keywords`, the instance's **live** set rather than its
+printing's, and `copied_by`, set only on a card made as a copy.
+
+**Two encodings in those four are worth knowing before reading the code**, and
+both are argued in `Scribe.java` against the bytecode. `GameEventCombatUpdate`
+is *not* the end-of-combat signal — it is raised only by Forge's human input
+handlers and never fires in a headless match, so `GameEventCombatEnded` is the
+one here. And Forge's colourless mana is byte 32 (`ManaAtom`) rather than 0
+(`MagicColor`), so asking `MagicColor.COLORLESS` for a count returns zero
+forever and a Sol Ring's mana simply never appears.
 
 534 lines for a game the prose log told in 453 — but every line is typed, and
 the board is in them. **The `stats` figure is the one to watch.** Before it

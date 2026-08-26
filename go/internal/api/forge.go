@@ -224,6 +224,20 @@ type forgeBeat struct {
 	// card instead.
 	Who  *string `json:"who"`
 	Card string  `json:"card,omitempty"`
+	// ID is that card's board id, so a beat and the picture can be pointed at
+	// each other. Zero on a match played by the prose parser, which has no ids
+	// to give — a consumer must read zero as "not said" rather than as a card.
+	//
+	// A name cannot answer "which one": two Egg Tokens are one string between
+	// them, and a room lighting up the card a beat is about would light the
+	// wrong one as often as not.
+	ID int `json:"id,omitempty"`
+	// Zone is where an `ability` beat's source was standing — `Command` for an
+	// eminence trigger, whose card never moves and so has no other sign.
+	Zone string `json:"zone,omitempty"`
+	// Trigger is whether an `ability` beat was raised by the game rather than
+	// activated by a player: "triggers" against "activates".
+	Trigger bool `json:"trigger,omitempty"`
 	// Target is the card on the other end: blocked, or damaged.
 	Target string `json:"target,omitempty"`
 	// Against is the deck on the other end: attacked, or damaged.
@@ -378,6 +392,11 @@ type forgeBoardCard struct {
 	// few hundred short strings on a payload already measured in tens of
 	// kilobytes.
 	Keywords []string `json:"keywords,omitempty"`
+	// CopiedBy is the board id of the card whose ability made this one a copy,
+	// and zero for every card that is not one. Populate is what it is for —
+	// see [tier3.BoardCard.CopiedBy], which records why it is **not** the card
+	// this one was copied *from*.
+	CopiedBy int `json:"copied_by,omitempty"`
 }
 
 // forgeBoard is the battlefield as the room receives it.
@@ -471,6 +490,108 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 	})
 }
 
+// grantKeywords fills [tier3.BoardChange.Granted] on every change that reported
+// a live keyword set: the keywords that card instance has which its **printing
+// does not carry**.
+//
+// **This is the half of the question Go can answer and `internal/sim/tier3`
+// cannot.** The scribe sends the live set off Forge's view, which is honest and
+// complete and says nothing about where any of it came from; Scryfall's list
+// for the printing lives here, because this is the layer that already resolves
+// every card to paint it. Kaheera standing beside a Beast is the case: the
+// Beast's live set holds Vigilance, its printing does not, so the vigilance is
+// something else's doing and the board can finally show it (Aaron, 2026-08-26).
+//
+// **It says that a keyword was granted, never by what.** Forge erases
+// attribution at its view boundary — `KeywordView` carries the word, the enum,
+// a title and reminder text, and not one field about a source or even the
+// `isIntrinsic` flag its own model has. The card to blame is unavailable at any
+// price on this pipe, so the copy that renders this must not name one. ADR 44.
+//
+// The steps are rebuilt rather than written through: the reel belongs to the
+// stored job and a room re-reading a match must not find it edited underneath.
+func grantKeywords(steps []tier3.BoardStep,
+	printed map[int][]string) []tier3.BoardStep {
+	touched := false
+	for _, step := range steps {
+		for _, change := range step.Changes {
+			if change.Live != nil {
+				touched = true
+			}
+		}
+	}
+	if !touched {
+		return steps
+	}
+	out := make([]tier3.BoardStep, len(steps))
+	copy(out, steps)
+	for i := range out {
+		if out[i].Changes == nil {
+			continue
+		}
+		changes := make([]tier3.BoardChange, len(out[i].Changes))
+		copy(changes, out[i].Changes)
+		for j := range changes {
+			if changes[j].Live == nil {
+				continue
+			}
+			granted := beyondPrinting(*changes[j].Live, printed[changes[j].ID])
+			changes[j].Granted = &granted
+		}
+		out[i].Changes = changes
+	}
+	return out
+}
+
+// beyondPrinting is the keywords in `live` that `oracle` does not account for.
+//
+// **The two lists speak different dialects of the same language**, which is the
+// only hard part. Forge writes a keyword as its card scripts do — `Ward:2`,
+// `Protection from red` — and Scryfall writes the bare keyword — `Ward`,
+// `Protection`. Compared as plain strings, a card that *prints* Ward 2 would
+// have it reported as granted, which is precisely the small confident lie ADR 44
+// refuses. So a live keyword counts as printed when the oracle name is a prefix
+// of it **at a word boundary**: `ward` accounts for `ward:2`, `protection` for
+// `protection from red`, and `ward` does not account for a hypothetical
+// `warden`. Whole-string equality is the ordinary case and falls out of the same
+// test.
+//
+// An empty result is a real answer and is returned as an empty slice rather than
+// nil, for the same reason [tier3.BoardChange.Counters] is a pointer: a creature
+// that has just lost the last keyword something gave it must be able to say so.
+func beyondPrinting(live, oracle []string) []string {
+	granted := []string{}
+	for _, word := range live {
+		if word == "" || accountedFor(word, oracle) {
+			continue
+		}
+		granted = append(granted, word)
+	}
+	return granted
+}
+
+// accountedFor is whether one live keyword is explained by the printing.
+func accountedFor(word string, oracle []string) bool {
+	live := strings.ToLower(strings.TrimSpace(word))
+	if cut, _, ok := strings.Cut(live, ":"); ok {
+		live = strings.TrimSpace(cut)
+	}
+	for _, printed := range oracle {
+		name := strings.ToLower(strings.TrimSpace(printed))
+		if name == "" {
+			continue
+		}
+		if live == name {
+			return true
+		}
+		// A word boundary, so that `ward` explains `ward 2` and not `warden`.
+		if strings.HasPrefix(live, name+" ") {
+			return true
+		}
+	}
+	return false
+}
+
 // newForgeBoard shapes one game's board for the room.
 //
 // `steps` is cut to `kept` — the number of beats that survived
@@ -535,14 +656,17 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 		row.Companion = boardIDOf(zone.Companion, held[seat.Seat])
 		out.Seats = append(out.Seats, row)
 	}
+	printed := map[int][]string{}
 	for _, card := range reel.Cards {
 		painted := art[card.Name]
+		printed[card.ID] = painted.Keywords
 		out.Cards = append(out.Cards, forgeBoardCard{
 			ID: card.ID, Name: card.Name, Token: card.Token,
-			Types: card.Types, Seat: card.Seat,
+			Types: card.Types, Seat: card.Seat, CopiedBy: card.CopiedBy,
 			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
 			Mana: painted.Mana, Keywords: painted.Keywords})
 	}
+	out.Steps = grantKeywords(out.Steps, printed)
 	return out
 }
 
@@ -599,7 +723,8 @@ func newForgeBeats(log tier3.EventLog, seats map[int]string,
 	for _, e := range events {
 		out.Beats = append(out.Beats, forgeBeat{
 			Kind: string(e.Kind), Turn: e.Turn, Who: slug(e.Seat),
-			Card: e.Card, Target: e.Target, Against: slug(e.TargetSeat),
+			Card: e.Card, ID: e.ID, Zone: e.Zone, Trigger: e.Trigger,
+			Target: e.Target, Against: slug(e.TargetSeat),
 			Amount: e.Amount, Life: e.Life, Note: e.Note})
 	}
 	return out

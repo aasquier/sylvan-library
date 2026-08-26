@@ -12,6 +12,8 @@ import java.util.Map;
 import com.google.common.collect.Multimap;
 import com.google.common.eventbus.Subscribe;
 
+import forge.card.MagicColor;
+import forge.card.mana.ManaAtom;
 import forge.game.GameEntityView;
 import forge.game.card.CardView;
 import forge.game.event.EventValueChangeType;
@@ -21,11 +23,14 @@ import forge.game.event.GameEventBlockersDeclared;
 import forge.game.event.GameEventCardAttachment;
 import forge.game.event.GameEventCardCounters;
 import forge.game.event.GameEventCardDamaged;
+import forge.game.event.GameEventCardSacrificed;
 import forge.game.event.GameEventCardStatsChanged;
 import forge.game.event.GameEventCardTapped;
+import forge.game.event.GameEventCombatEnded;
 import forge.game.event.GameEventGameOutcome;
 import forge.game.event.GameEventGameStarted;
 import forge.game.event.GameEventLandPlayed;
+import forge.game.event.GameEventManaPool;
 import forge.game.event.GameEventMulligan;
 import forge.game.event.GameEventPlayerDamaged;
 import forge.game.event.GameEventPlayerLivesChanged;
@@ -33,8 +38,11 @@ import forge.game.event.GameEventSpellAbilityCast;
 import forge.game.event.GameEventTurnBegan;
 import forge.game.event.GameEventZone;
 import forge.game.event.IGameEventVisitor;
+import forge.game.keyword.KeywordView;
 import forge.game.player.PlayerView;
 import forge.game.spellability.SpellAbilityView;
+import forge.game.spellability.StackItemView;
+import forge.game.zone.ZoneType;
 
 /**
  * A listener on Forge's game event bus, writing the board as it changes.
@@ -227,6 +235,127 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
         return null;
     }
 
+    /**
+     * The floating mana in one player's pool, whole, every time it moves.
+     *
+     * This is what a permanent tapping *for* something looks like before the
+     * something happens (Aaron, 2026-08-26: *"show the mana pool as things tap
+     * into it before it is drained to cast things"*). The board has always had
+     * the tap and never the mana, so a land going sideways and a Sol Ring going
+     * sideways said the same nothing.
+     *
+     * **The whole pool crosses rather than the change**, and that is a decoding
+     * decision rather than a preference. `GameEventManaPool` carries a *mode*
+     * and a set of colours that moved, and the set is **null** on the mode that
+     * empties the pool — `ManaPool`'s clear path passes `aconst_null` where the
+     * other two pass a set (`javap -c`). A reader that added and subtracted the
+     * reported colours would therefore drift on exactly the event that matters
+     * most, the one at the end of a step where everything unspent drains away.
+     * Sending the totals costs six lookups and cannot drift.
+     *
+     * **The amounts are read off the view, and they are fresh.** The event
+     * carries a `PlayerView` rather than the model's `ManaPool`, which is not
+     * reachable from it — but all three sites in `ManaPool` that raise this
+     * event call `Player.updateManaForView()` on the line before they construct
+     * it, so the view's map is already the pool as it now stands. That was
+     * checked in the bytecode rather than assumed, because a stale read here
+     * would show mana one event behind and look like a Forge bug.
+     *
+     * @see #pool for the byte the colourless count hides behind.
+     */
+    @Override
+    public Void visit(GameEventManaPool event) {
+        PlayerView player = event.player();
+        if (player == null) return null;
+        Json line = new Json("mana").put("game", game);
+        who(line, player);
+        say(line.put("pool", pool(player)));
+        return null;
+    }
+
+    /**
+     * One player's floating mana as the symbols a person would write.
+     *
+     * `"GGW"` is two green and one white, in Magic's own colour order, and an
+     * empty string is an empty pool — which is a real answer and the one that
+     * ends every step, so it is said rather than omitted.
+     *
+     * **The colourless count lives at byte 32, not byte 0**, and that is the
+     * trap this method exists to shut. Forge has two constant sets for the same
+     * six things: `MagicColor` calls colourless 0 and `ManaAtom` calls it 32.
+     * `PlayerView.updateMana` fills its map by iterating `ManaAtom.MANATYPES`,
+     * so 32 is the key that is actually there, and `getMana(byte)` is a plain
+     * map lookup with no masking — `getMana(MagicColor.COLORLESS)` asks for key
+     * 0, misses, and returns zero forever. The two readings are indistinguishable
+     * in the data: a pool with no colourless mana in it and a pool whose
+     * colourless mana we asked the wrong question about both render `""`.
+     * `Mana.isColorless()` is literally `color == 32`, which is what settled it.
+     *
+     * Mapping the other way is safe — `MagicColor.Color.fromByte` sends
+     * everything it does not recognise to COLORLESS, so 32 comes back as the
+     * right colour — which is why the symbol is read through it rather than
+     * from a table written out here.
+     */
+    private static String pool(PlayerView player) {
+        StringBuilder symbols = new StringBuilder(8);
+        for (byte type : ManaAtom.MANATYPES) {
+            int held = player.getMana(type);
+            if (held <= 0) continue;
+            MagicColor.Color colour = MagicColor.Color.fromByte(type);
+            String symbol = colour == null ? "?" : colour.getShortName();
+            for (int i = 0; i < held; i++) symbols.append(symbol);
+        }
+        return symbols.toString();
+    }
+
+    /**
+     * A permanent sacrificed — which is not the same as one that died.
+     *
+     * Aaron asked for the Treasure that taps and is then cracked (*"they must
+     * tap to sacrifice and they go into the ether"*), and that card raised no
+     * beat at all: `dies` is creatures and planeswalkers by rule 700.4, and a
+     * token leaving the battlefield is rewritten to `gone`, so the whole
+     * transaction folded silently into the next step. A fetchland is the same
+     * shape and this deck format is full of them.
+     *
+     * **Sacrifice is the only word on this bus, and the other two are not
+     * available.** `GameEventCardDestroyed` is a record with **no components at
+     * all** — a bare signal like `GameEventTokenCreated` — so nothing can be
+     * said about *which* card was destroyed, and combat deaths are not
+     * separately announced anywhere. Rather than guess a word from the
+     * circumstances, this reports the one Forge actually names and the board
+     * says nothing about the rest (ADR 44).
+     */
+    @Override
+    public Void visit(GameEventCardSacrificed event) {
+        return card(new Json("sacrificed").put("game", game), event.card());
+    }
+
+    /**
+     * Combat is over — Forge's own signal, rather than the next turn beginning.
+     *
+     * **`GameEventCombatUpdate` is the wrong event and it looks like the right
+     * one.** ADR 44 names it as the end-of-combat signal this board was missing,
+     * and it is not one: a reference scan across all of Forge's classes finds it
+     * constructed in exactly two places, `InputAttack` and `InputBlock` — the
+     * *human* declare-attackers and declare-blockers handlers, which fire it on
+     * every click so a person's own screen can keep up. Nothing in
+     * `forge.game.**` posts it. In a headless AI match it never fires once, so a
+     * listener built on it would compile, subscribe, and sit silent forever
+     * while the board went on guessing.
+     *
+     * `GameEventCombatEnded` is the engine's own, posted from
+     * `PhaseHandler.onPhaseEnd()` while `inCombat()`, and it carries the
+     * attackers and blockers that were in the fight. Only the fact is used: the
+     * far side is already holding who was fighting, and sending the roster again
+     * would be two sources for one thing with the losing one arriving later.
+     */
+    @Override
+    public Void visit(GameEventCombatEnded event) {
+        say(new Json("combat_end").put("game", game));
+        return null;
+    }
+
     @Override
     public Void visit(GameEventPlayerLivesChanged event) {
         Json line = new Json("life").put("game", game);
@@ -313,11 +442,52 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
     @Override
     public Void visit(GameEventSpellAbilityCast event) {
         SpellAbilityView sa = event.sa();
-        if (sa == null || !sa.isSpell()) return null;
+        if (sa == null) return null;
         CardView host = sa.getHostCard();
         if (host == null) return null;
+        if (!sa.isSpell()) return ability(event, host);
         Json line = new Json("cast").put("game", game);
         who(line, host.getController());
+        return card(line, host);
+    }
+
+    /**
+     * An ability going on the stack: which card is using it, and from where.
+     *
+     * **Abilities never reached this stream at all** — the method above returned
+     * on anything that was not a spell — so a commander sitting in the command
+     * zone doing the thing it is in the deck to do was invisible. Aaron wants
+     * eminence drawn (*"It can be used on the battlefield or from the command
+     * zone… It should just visually indicate that an ability is being used"*),
+     * and eminence is a triggered ability whose source never has to move, so
+     * there was nothing anywhere in the pipe to draw it from.
+     *
+     * **This is not the stack, and it does not reopen the stack.** The board
+     * refuses to model the stack as a zone because those events never balance —
+     * 52 `Stack in` against 14 `Stack out` in one measured game — and that
+     * remains true and untouched: `GameEventZone` for the Stack is still dropped
+     * whole on the far side. This is a different event on a different subject.
+     * It says *an ability was used*, once, at a moment, and nothing downstream
+     * holds it afterwards or waits for it to come off anything. There is nothing
+     * to leak, because nothing accumulates.
+     *
+     * **The zone is the eminence half.** `CardView.getZone()` is on the view, so
+     * the far side can tell an ability used from the command zone from one used
+     * on the battlefield without being told which cards are commanders — a
+     * question ADR 44 deliberately left off this wire.
+     *
+     * `StackItemView` is where the kind lives. `SpellAbilityView` has only
+     * `isSpell()`; the stack item knows `isTrigger()` as well, which separates
+     * the ability a player chose to activate from the one the game raised on
+     * their behalf. It is nullable, so its absence simply leaves the flag off.
+     */
+    private Void ability(GameEventSpellAbilityCast event, CardView host) {
+        Json line = new Json("ability").put("game", game);
+        who(line, host.getController());
+        StackItemView item = event.si();
+        if (item != null) line.put("trigger", item.isTrigger());
+        ZoneType zone = host.getZone();
+        if (zone != null) line.put("zone", zone.name());
         return card(line, host);
     }
 
@@ -462,10 +632,42 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
         if (card == null) return null;
         line.put("id", card.getId()).put("card", card.getName())
             .put("token", card.isToken());
+        // **This card is a copy, and this is the card whose ability made it.**
+        //
+        // Aaron on populate: *"It really is making a clone, or splitting one
+        // thing into two"* — and to draw that you need to know a copy happened
+        // at all. `GameEventTokenCreated` cannot help: it is a record with no
+        // components, a bare signal. `CardView.getCloneOrigin()` can, and it is
+        // on the view rather than model-only, so it costs nothing but this line.
+        //
+        // **It is not what the token was copied *from*, and the wrong reading
+        // looks exactly like the right one.** In a real match a Centaur Token
+        // populated by Growing Ranks came back with a clone origin of *Growing
+        // Ranks* — the enchantment, not the Centaur Token beside it that was
+        // actually copied. `TokenEffectBase` hands `sa.getHostCard()` to
+        // `setCloneOrigin`, which the bytecode says plainly and a name like
+        // "copied from" would quietly contradict. The permanent that was copied
+        // is `Card.getCopiedPermanent()`, which is model-only and does not cross
+        // this boundary; the far side is told what is true and not told what is
+        // not (ADR 44).
+        //
+        // Only ever set by a copy effect, so **its presence is the copy**: a
+        // Centaur Token minted fresh by Call of the Conclave carries nothing
+        // here, and the populated one carries this. A whole-jar scan finds
+        // `setCloneOrigin` called from one game effect and otherwise only from
+        // the AI's own state-copying machinery, so there is no second meaning
+        // waiting in another card.
+        CardView copier = card.getCloneOrigin();
+        if (copier != null) {
+            line.put("copied_by", copier.getId())
+                .put("copied_by_card", copier.getName());
+        }
         CardView.CardStateView state = card.getCurrentState();
         if (state != null) {
             line.put("power", state.getPower()).put("toughness", state.getToughness());
             if (state.getType() != null) line.put("types", state.getType().toString());
+            String keywords = keywords(state);
+            if (!keywords.isEmpty()) line.put("keywords", keywords);
         }
         String rendered = line.toString();
         if (onlyIfChanged && rendered.equals(seen.put(card.getId(), rendered))) {
@@ -475,6 +677,48 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
         out.println(rendered);
         out.flush();
         return null;
+    }
+
+    /**
+     * This card instance's keywords **as it currently has them**, not as it was
+     * printed.
+     *
+     * The difference is the whole point. A board that reads keywords off the
+     * printing gives every copy of a card the same marks forever, so Kaheera
+     * standing beside a Beast changes the Beast's power and toughness on screen
+     * and not the vigilance it just gained (Aaron, 2026-08-26: *"Some cards like
+     * Kaheera give vigilance or another effect to other cards, we currently are
+     * not representing that symbolically"*). `CardStateView.getKeywords()` is
+     * recomputed by `updateKeywords`, which calls `Card.updateKeywordsCache`
+     * first — so it is the live set, granted keywords included.
+     *
+     * **`original()` rather than `title()`.** The title is a display string
+     * Forge localises; the original is the keyword as Forge's own card scripts
+     * write it, which is the stable thing to match on and the thing that
+     * survives a language setting.
+     *
+     * **Which keywords are *granted* is not decided here**, and cannot be:
+     * `KeywordView` is a four-field record — original, keyword, title, reminder
+     * — and carries no host, no source and not even the `isIntrinsic` flag the
+     * model has. Attribution is erased at Forge's view boundary. So this sends
+     * the whole live set and the far side, which knows what the card was
+     * printed with, works out the difference.
+     *
+     * A comma joins them because [Json] writes flat objects of scalars on
+     * purpose and no keyword Forge writes contains one — the parameterised ones
+     * use a colon (`Ward:2`), which is why the far side splits on the comma and
+     * keeps whatever is inside.
+     */
+    private static String keywords(CardView.CardStateView state) {
+        StringBuilder all = new StringBuilder(32);
+        for (KeywordView keyword : state.getKeywords()) {
+            if (keyword == null || keyword.original() == null) continue;
+            String word = keyword.original().trim();
+            if (word.isEmpty() || word.indexOf(',') >= 0) continue;
+            if (all.length() > 0) all.append(',');
+            all.append(word);
+        }
+        return all.toString();
     }
 
     /**
