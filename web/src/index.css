@@ -6517,28 +6517,31 @@ button:hover .tarot-fan-card {
   transform: scaleX(-1);
 }
 
-/* The middle band: no window margin worth using, so the sand gives up a
-   little. `padding-inline` on the grid moves the arena in; the statues sit in
-   the space it vacated, because an absolutely positioned child measures from
-   the padding box's outer edge. */
-@media (min-width: 80rem) {
-  .field-stage { padding-inline: 7.25rem; }
-  .field-secutor { display: block; width: 6.5rem; }
-  .field-secutor-left { left: 0; }
-  .field-secutor-right { right: 0; }
-}
-
-/* Wide: the window's own margins are big enough to stand in, so the sand gets
-   every pixel back and they step outside it entirely. The width follows the
-   margin rather than a guess, with a ceiling so a 2560px screen does not get
-   a two-storey gladiator. */
-@media (min-width: 96rem) {
-  .field-stage { padding-inline: 0; }
+/* **The sand never pays for them.** A first cut took 7.25rem a side out of the
+   arena between 80rem and 96rem, on the offer that we could "shrink the sand a
+   tad" — and the tad was the first thing anybody noticed (Aaron, on the local
+   room: "That still shrunk the field"). The battlefield is the thing nobody
+   wants smaller; that rule has now been rediscovered three times in this file
+   and it holds here too.
+ *
+ * So the width is exactly the free space beside the stage and nothing else:
+ * `main` is `max-w-7xl px-6`, so its content box tops out at 1232px, and
+ * `(100vw - 1232px) / 2` is what is genuinely going spare on each flank —
+ * the window's own margin plus the 24px of page padding the arena does not
+ * use. They take all of it, less a hairline gap, up to a ceiling.
+ *
+ * The gate is the same number said as a media query: below it the spare space
+ * is too thin for a figure to read as one, so there is no figure. There is no
+ * arrangement of a 199x448 plate that is both large and narrow — it is 2.25
+ * times as tall as it is wide, so height *is* width here — and the honest
+ * answer at a narrow window is nothing rather than a splinter. */
+@media (min-width: 87rem) {
   .field-secutor {
-    width: clamp(6.5rem, calc((100vw - 1280px) / 2 - 1.25rem), 13rem);
+    display: block;
+    width: clamp(4.5rem, calc((100vw - 1232px) / 2 - 0.5rem), 16rem);
   }
-  .field-secutor-left { left: auto; right: 100%; margin-right: 0.75rem; }
-  .field-secutor-right { right: auto; left: 100%; margin-left: 0.75rem; }
+  .field-secutor-left { right: 100%; margin-right: 0.5rem; }
+  .field-secutor-right { left: 100%; margin-left: 0.5rem; }
 }
 /* **A band under the arena, two seats side by side.**
  *
