@@ -332,3 +332,48 @@ func TestACommanderForgeNeverGotIsNoThroneAtAll(t *testing.T) {
 		t.Errorf("an empty command zone crossed as %s", raw)
 	}
 }
+
+// The command zone has exactly three shapes, and now it says which one it is.
+//
+// Aaron, 2026-08-26: *"at most it should just be two slots for partners, one
+// for a singular commander, or a second companion devoted slot for Kaheera, et
+// al. Those are the only combinations possible in that zone."* A list of ids
+// names none of them — two ids and one commander that happened to get cloned
+// read alike — so the shape is stated outright, off `deck.yaml`'s own
+// declaration rather than worked back out of the cards.
+func TestTheCommandZoneSaysWhichShapeItIs(t *testing.T) {
+	t.Parallel()
+	board := newForgeBoard(aPairing(), nil, map[int]forgeCommandZone{
+		1: {Commanders: []string{"Thrasios, Triton Hero", "Tymna the Weaver"},
+			Companion: "Kaheera, the Orphanguard"},
+		2: {Commanders: []string{"Brutal Cathar // Moonrage Brute"}},
+	}, nil, 1)
+	if got := board.Seats[0].Shape; got != commandPartners {
+		t.Errorf("a pairing called itself %q, want %q", got, commandPartners)
+	}
+	// The companion rides beside the shape rather than inside it: it can come
+	// with either, and it is not part of what leads the deck.
+	if got := board.Seats[0].Companion; got != 11 {
+		t.Errorf("the companion resolved to %d, want 11", got)
+	}
+	if got := board.Seats[1].Shape; got != commandSolo {
+		t.Errorf("one commander called itself %q, want %q", got, commandSolo)
+	}
+}
+
+// A seat with no deck behind it keeps its silence.
+//
+// The shape comes from `deck.yaml`, so a board shaped before a deck was known
+// — a mid-deploy skew, or the shim — has nothing to say and says nothing. The
+// browser draws the zone as a pile then, which is what every board did before
+// the zone was named at all.
+func TestASeatWithNoDeckClaimsNoShape(t *testing.T) {
+	t.Parallel()
+	board := newForgeBoard(aPairing(), nil, nil, nil, 1)
+	for _, seat := range board.Seats {
+		if seat.Shape != "" {
+			t.Errorf("seat %d claimed the shape %q with no deck behind it",
+				seat.Seat, seat.Shape)
+		}
+	}
+}

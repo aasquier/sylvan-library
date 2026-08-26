@@ -157,18 +157,31 @@ func TestTheLibraryIsNeverOnTheBoard(t *testing.T) {
 // A `Commander Effect` sits in each command zone with a real id, a real name
 // and an empty type line. Drawing it would put a blank card beside every
 // commander.
+//
+// **Asked by id rather than by name**, because the name is no longer there to
+// ask about: a phantom is now refused before it reaches the dictionary, so a
+// test that looked its id up in `Board.Cards` would find nothing and pass
+// whatever the board did. The two ids are the recording's own — `Commander
+// Effect` is 101 for the first seat and 202 for the second, in both games —
+// and this pins both halves: the phantom never moves, and it is never carried
+// to a browser as a card in the first place.
 func TestForgesCommanderPhantomIsNotDrawn(t *testing.T) {
 	t.Parallel()
 	logs, _ := scribed(t, true)
+	phantoms := map[int]bool{101: true, 202: true}
 	for _, log := range logs {
 		for _, step := range log.Board.Steps {
 			for _, change := range step.Changes {
-				for _, card := range log.Board.Cards {
-					if card.ID == change.ID && card.Name == "Commander Effect" {
-						t.Fatalf("game %d moved Forge's `Commander Effect` "+
-							"phantom onto the board", log.Game)
-					}
+				if phantoms[change.ID] {
+					t.Fatalf("game %d moved Forge's `Commander Effect` "+
+						"phantom (id %d) onto the board", log.Game, change.ID)
 				}
+			}
+		}
+		for _, card := range log.Board.Cards {
+			if phantoms[card.ID] || card.Name == "Commander Effect" {
+				t.Fatalf("game %d carried Forge's %q (id %d) to the browser "+
+					"as a card", log.Game, card.Name, card.ID)
 			}
 		}
 	}

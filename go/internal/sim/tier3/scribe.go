@@ -74,7 +74,14 @@ type scribeLine struct {
 	Tapped bool   `json:"tapped"`
 
 	Counter string `json:"counter"`
-	Now     int    `json:"now"`
+	// Was and Now are both totals rather than a delta, which is the scribe's
+	// own decision and stated in `Scribe.java`: a consumer adding deltas would
+	// drift the first time one was dropped. `Was` is read for the history a
+	// hover shows — see [BoardCounterMove] — and this reader used to drop it
+	// on the floor, which left the board able to say a creature had three
+	// counters and unable to say when it got them.
+	Was int `json:"was"`
+	Now int `json:"now"`
 
 	TargetID    int    `json:"target_id"`
 	Target      string `json:"target"`
@@ -215,16 +222,26 @@ func (p *ScribeParser) fold(l scribeLine) {
 		}
 		return
 	}
+	// **The phantoms, on every line that carries a card.** Forge keeps
+	// bookkeeping cards with a real id, a real name and — usually — an empty
+	// type line; they are invisible in any real game and drawing one puts a
+	// blank card beside somebody's commander. `isForgeEffect` is the rule.
+	//
+	// Checked here rather than inside `case "zone"`, where it used to be, for
+	// two reasons. A zone line is not the only way one of these reaches the
+	// board: `stats`, `counters` and `attach` all name a card and all raise a
+	// change against it. And the name went into the dictionary *before* the
+	// old check, so every effect in the match was carried to the browser as a
+	// card even when nothing ever moved it.
 	switch l.Kind {
-	case "zone":
-		p.board.name(l.ID, l.Card, l.Types, l.Token, l.Seat)
-		// **The phantoms.** Forge keeps bookkeeping cards in the command
-		// zone: a real id, a real name, and an empty type line. They are
-		// invisible in any real game and drawing one puts a blank card beside
-		// somebody's commander.
+	case "zone", "attach", "detach", "tapped", "stats", "counters":
 		if isForgeEffect(l.Zone, l.Card, l.Types) {
 			return
 		}
+	}
+	switch l.Kind {
+	case "zone":
+		p.board.name(l.ID, l.Card, l.Types, l.Token, l.Seat)
 		was := p.board.zone[l.ID]
 		if was == ZoneGone {
 			// Forge announces the leaving before the arriving, so the zone a
@@ -310,7 +327,7 @@ func (p *ScribeParser) fold(l scribeLine) {
 		p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
 	case "counters":
 		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
-		p.board.counter(l.ID, l.Counter, l.Now)
+		p.board.counter(l.ID, l.Counter, l.Was, l.Now)
 	case "life":
 		if l.Life == nil {
 			return
@@ -319,6 +336,9 @@ func (p *ScribeParser) fold(l scribeLine) {
 		after := *l.Life
 		p.raise(GameEvent{Kind: EventLife, Seat: l.Seat, Life: &after})
 	case "turn":
+		// A turn beginning is where the last one's combat ends — the only
+		// boundary this stream has. [board.endCombat] argues it.
+		p.board.endCombat()
 		p.board.began(l.Turn, l.Seat)
 		if l.Life != nil {
 			p.board.lives(l.Seat, *l.Life)
@@ -331,14 +351,30 @@ func (p *ScribeParser) fold(l scribeLine) {
 	case "cast":
 		p.raise(GameEvent{Kind: EventCast, Seat: l.Seat, Card: l.Card})
 	case "attack":
+		// **The board learns the fight too, not only the account.** An
+		// attacking creature and a sleeping one used to be the same picture,
+		// so a wall of tokens said nothing about which of them was swinging
+		// (Aaron, 2026-08-26, on wanting attacking and blocking token piles
+		// apart). `against_seat` is who is being attacked; `seat` is the
+		// attacker's own controller and is not it.
+		p.board.inCombat(l.ID, CombatAttacking, l.AgainstSeat, 0)
 		p.raise(GameEvent{Kind: EventAttack, Seat: l.Seat, Card: l.Card,
 			TargetSeat: l.AgainstSeat})
 	case "block":
+		// `target_id` is the **attacker** this creature stopped, and it is the
+		// half of the line the beat cannot carry: two Egg Tokens are one name
+		// and the account has nowhere to put an id. On the board a blocker
+		// points at the exact card it is facing.
+		p.board.inCombat(l.ID, CombatBlocking, 0, l.TargetID)
 		p.raise(GameEvent{Kind: EventBlock, Seat: l.Seat, Card: l.Card,
 			Target: l.Target})
 	case "unblocked":
 		// The seat is who declined to block, so the card is the *attacker* —
-		// the same reading the prose parser's own comment records.
+		// the same reading the prose parser's own comment records. **The board
+		// is deliberately not touched here**: the attacker was already marked
+		// by its own `attack` line, and this line's seat is the defender's, so
+		// folding it would name the wrong side of the table as the one under
+		// attack.
 		p.raise(GameEvent{Kind: EventUnblocked, Seat: l.Seat, Card: l.Card})
 	case "damage":
 		p.raise(GameEvent{Kind: EventDamage, Card: l.Card, Amount: l.Amount,
@@ -514,9 +550,60 @@ func (p *ScribeParser) finishGame(l scribeLine) (*EventLog, *GameResult) {
 // carry. It could: the cost is a field on every card line and a worker image.
 // It is not obviously worth it while the shape above is this clean, and the
 // fallback would have to exist anyway for a worker deployed before the field.
+//
+// # The fourth fact, and why the first three were not enough
+//
+// The rule above is an **and** of two conditions, and a real board got past it
+// (Aaron, 2026-08-26: *"hovering on the command zone pops up some things I
+// don't understand, like 'Olinda the Oblivious (99)'s Effect'"*). Either half
+// can fail — an effect reported outside a command zone, or one that arrived
+// carrying a type line — and both leave a blank card in somebody's picture.
+//
+// So a fourth fact stands beside them, and it needs neither: **an effect built
+// by an ability writes its own source into its name, id and all.**
+// `SpellAbilityEffect.createEffect` names it from the host card, and Forge's
+// `Card.toString()` renders a card as `Name (id)` — which is exactly the shape
+// of `Rogue's Passage (123)'s Effect` and of Olinda's, where the number is the
+// *host's* id and not the effect's. [forgeEffectName] matches that shape and
+// nothing else.
+//
+// **No Magic card can collide with it.** Card names have never contained a
+// parenthesis, so a real card called `Somebody's Effect` — the case the tests
+// pin — is untouched, and so is one called `Butterfly Effect` if a set ever
+// prints one. The narrow shape is the whole safety: matching on the word
+// `Effect` alone would eventually eat a real card, and matching on the
+// parenthesised id cannot.
 func isForgeEffect(zone, name, types string) bool {
-	if zone != "Command" || types != "" {
+	if strings.HasPrefix(name, "Emblem") {
 		return false
 	}
-	return !strings.HasPrefix(name, "Emblem")
+	if forgeEffectName(name) {
+		return true
+	}
+	return zone == "Command" && types == ""
+}
+
+// forgeEffectName is whether a name is one Forge built for an ability's
+// effect: a host card rendered as `Name (id)`, with `'s Effect` after it.
+func forgeEffectName(name string) bool {
+	host, ok := strings.CutSuffix(name, "'s Effect")
+	if !ok || !strings.HasSuffix(host, ")") {
+		return false
+	}
+	open := strings.LastIndex(host, "(")
+	if open < 0 {
+		return false
+	}
+	id := host[open+1 : len(host)-1]
+	if id == "" {
+		return false
+	}
+	for _, digit := range id {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	// Something has to be the host. `(12)'s Effect` on its own is not a shape
+	// Forge produces, and swallowing it would be swallowing an unknown.
+	return strings.TrimSpace(host[:open]) != ""
 }

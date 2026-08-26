@@ -84,7 +84,7 @@ func TestACounterGoingToZeroLeavesTheCard(t *testing.T) {
 	for _, step := range logs[0].Board.Steps {
 		for _, change := range step.Changes {
 			if change.ID == 7 && change.Counters != nil {
-				newest = change.Counters
+				newest = *change.Counters
 			}
 		}
 	}
@@ -111,7 +111,7 @@ func TestCountersRenderInAStableOrder(t *testing.T) {
 		for _, change := range step.Changes {
 			if change.ID == 9 && change.Counters != nil {
 				kinds = nil
-				for _, c := range change.Counters {
+				for _, c := range *change.Counters {
 					kinds = append(kinds, c.Kind)
 				}
 			}

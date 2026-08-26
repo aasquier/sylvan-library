@@ -40,6 +40,32 @@ export const ZONES = [
 
 export type Zone = (typeof ZONES)[number]
 
+/** What a creature is doing in the combat happening now. The words are the
+ *  server's; `''` is a creature standing out of the fight, which is most of
+ *  them most of the time. */
+export const ATTACKING = 'attacking'
+export const BLOCKING = 'blocking'
+
+/** One counter event on one card: which kind moved, from what to what, and on
+ *  whose turn.
+ *
+ *  **The account of how a card got its counters**, which the set alone cannot
+ *  give — by the time a creature has three, the arithmetic that made three has
+ *  scrolled past (Aaron, 2026-08-26: *"keep a history of why a creature has
+ *  all of the counters it does"*).
+ *
+ *  It says what happened and never who did it. Forge reports no source for a
+ *  counter, so naming the card that put them there would be a guess dressed as
+ *  a fact, and this side of the wire does not make those. */
+export interface CounterMoment {
+  kind: string
+  was: number
+  now: number
+  /** The turn number **a player would say** — the same count `BoardState.turn`
+   *  carries, not Forge's. */
+  turn: number
+}
+
 /** One card as it currently stands. */
 export interface BoardCard {
   id: number
@@ -73,14 +99,31 @@ export interface BoardCard {
   power: number | null
   toughness: number | null
   counters: { kind: string; n: number }[]
+  /** How this card's counters arrived, oldest first — the account a hover
+   *  reads out. Empty for a card carrying none, because a card with nothing
+   *  on it has nothing to explain.
+   *
+   *  Accumulated from the wire's per-step moves rather than sent whole; see
+   *  `CounterMoment` and `foldBoard`'s note on what bounds it. */
+  counterHistory: CounterMoment[]
+  /** What this creature is doing in the fight: `ATTACKING`, `BLOCKING`, or
+   *  `''` for one standing out of it.
+   *
+   *  The server's word, kept as a string for `zone`'s reason — a newer server
+   *  could learn another one, and a room that compares against the two it
+   *  knows simply finds neither. */
+  combat: string
+  /** The seat this creature is attacking, or 0. */
+  attacking: number
+  /** The board id of the attacker this creature is blocking, or 0. Paired by
+   *  id because two identical tokens have one name between them. */
+  blocking: number
   /** How many times this card has *left* the command zone.
    *
    *  Commander tax is two generic for each previous cast from the command
-   *  zone, and Forge never reports the tax — but it reports every zone
-   *  change, and a card going command-to-anywhere is that cast. Counted here
-   *  rather than in the view because it is history: the view holds one folded
-   *  moment, and by the time a commander is home again the casts that made it
-   *  expensive have scrolled past. */
+   *  zone. Forge never reports the tax and the browser used to count these
+   *  transitions itself; it is the server's count now, for ADR 14's reason —
+   *  counting them is a reading of the game, and this file reads none. */
   casts: number
 }
 
@@ -276,20 +319,26 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           zone: 'gone', seat: known?.seat ?? 0, tapped: false,
           mana: known?.mana ?? false, keywords: known?.keywords ?? [],
           leaving: null,
-          power: null, toughness: null, counters: [], casts: 0,
+          power: null, toughness: null, counters: [], counterHistory: [],
+          combat: '', attacking: 0, blocking: 0, casts: 0,
           attachedTo: 0, attachments: [],
         }
         state.set(change.id, card)
         order.push(change.id)
       }
+      // **Whether this card is being held on the sand for the beat that says
+      // it is leaving**, decided below and read at the bottom of this loop.
+      //
+      // A creature that dies keeps the counters it died with for exactly that
+      // beat. The server sheds them on the zone change, correctly — a card
+      // that changes zones is a new object and arrives with nothing on it —
+      // and the same step is the one where the board deliberately stands the
+      // dead creature back up so the skull has something to land on. Applying
+      // the shed there would strip the counters off the card in the instant a
+      // person is looking straight at it. It is a beat late, and being a beat
+      // late is what the hold is.
+      let held = false
       if (change.zone) {
-        // Before the assignment, because the transition is the fact: a card
-        // that was in the command zone and is now anywhere else was cast from
-        // it. (Put onto the battlefield without casting would over-count, and
-        // Forge's AI does not do it with commanders.)
-        if (card.zone === 'command' && change.zone !== 'command') {
-          card.casts += 1
-        }
         // **The dead are held where they died, for the length of one beat.**
         //
         // Forge reports a death and the zone change on the same line, so by
@@ -313,6 +362,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
         if (i === upTo - 1 && change.zone !== card.zone
             && (card.zone === 'battlefield' || card.zone === 'land')) {
           card.leaving = card.zone
+          held = true
         }
         card.zone = change.zone
       }
@@ -321,7 +371,32 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
       if (change.power != null) card.power = change.power
       if (change.toughness != null) card.toughness = change.toughness
       if (change.types) card.types = change.types
-      if (change.counters) card.counters = change.counters
+      if (change.combat != null) card.combat = change.combat
+      if (change.attacking != null) card.attacking = change.attacking
+      if (change.blocking != null) card.blocking = change.blocking
+      if (change.casts != null) card.casts = change.casts
+      if (!held) {
+        for (const move of change.counter_moves ?? []) {
+          remember(card.counterHistory, move, taken.get(active) ?? 0)
+        }
+        // **An empty array is the server saying this card has none.** Being
+        // exact about where the bug was, because this line looks like the fix
+        // and is not it: an empty array is truthy, so the old truthy test
+        // would have applied one perfectly well. Nothing ever sent one — the
+        // field was a plain slice and `omitempty` renders "none" and "nothing
+        // changed" as the same absent bytes — so a dead creature went on
+        // wearing the counters it had in life (Aaron, 2026-08-26). The fix is
+        // in Go; `!= null` is this side saying the same thing in a way that
+        // cannot be misread later.
+        if (change.counters != null) {
+          card.counters = change.counters
+          // A card with nothing on it has nothing to explain, so the account
+          // goes with the counters. This is also what keeps the history from
+          // outliving the object it describes: a creature that dies and comes
+          // back is a new card and starts its story again.
+          if (change.counters.length === 0) card.counterHistory = []
+        }
+      }
       // `!= null` rather than truthy: zero is the detach, and it is the half
       // of this field that matters most — a sword that came off must stop
       // being drawn on the bear.
@@ -421,6 +496,48 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   return { turn: taken.get(active) ?? 0, active, sides }
 }
 
+/**
+ * The most moments one card's counter history will hold.
+ *
+ * **Bounded because the fold is not incremental.** A board is rebuilt from
+ * step zero on every render — about a hundred and forty of them in a game — so
+ * anything that grows per card is walked and rebuilt that many times.
+ *
+ * Two things keep it small, and the ceiling is only the backstop. Counters are
+ * rare: the recorded match raises five counter events across two whole games,
+ * and the work here is proportional to that count however long the game runs.
+ * And `remember` folds repeats together, so a creature pumped nine times on
+ * one turn is one moment rather than nine — which is also how a person would
+ * say it. Reaching forty needs forty *distinct* turns on which some kind of
+ * counter moved, and a game that long has other problems.
+ *
+ * Oldest first out, because a hover that is one line short at the top still
+ * reads true; one that stopped recording would be silently wrong about the
+ * counters actually on the card.
+ */
+const HISTORY_MOMENTS = 40
+
+/**
+ * Fold one counter move into a card's history.
+ *
+ * **Repeats on the same turn are one moment.** A creature that gains six
+ * counters one at a time is a creature that gained six counters, and six lines
+ * saying so is not an account — it is a log. Merging keeps the `was` of the
+ * first and the `now` of the last, which is the whole of what happened.
+ */
+function remember(
+  history: CounterMoment[], move: { kind: string; was: number; now: number },
+  turn: number,
+): void {
+  const last = history[history.length - 1]
+  if (last && last.kind === move.kind && last.turn === turn) {
+    last.now = move.now
+    return
+  }
+  history.push({ kind: move.kind, was: move.was, now: move.now, turn })
+  if (history.length > HISTORY_MOMENTS) history.shift()
+}
+
 /** Whether this card has a throne of its own, and so is not part of the pile
  *  of everything else in the command zone. */
 function throned(board: ForgeBoard, card: BoardCard): boolean {
@@ -475,6 +592,17 @@ export function stackRow(cards: BoardCard[]): BoardStack[] {
     const key = [
       card.name,
       card.tapped ? 't' : '',
+      // **An attacking token pile and a blocking one are two piles**, which is
+      // the ask this exists to answer (Aaron, 2026-08-26: *"make sure when it
+      // comes to tokens that blocking and attacking token piles are separated
+      // visually"*). Twelve Saprolings of which five are swinging is the one
+      // fact anybody across the seam is looking for, and one stack of twelve
+      // hides it completely.
+      //
+      // The *role* only, not the card each blocker is facing: two blockers on
+      // two different attackers are still one wall to look at, and splitting
+      // them would take the piles back apart card by card.
+      card.combat,
       // A dying Saproling must not merge into the eight beside it — the whole
       // point of holding it is that somebody is looking at that one.
       card.leaving ?? '',
