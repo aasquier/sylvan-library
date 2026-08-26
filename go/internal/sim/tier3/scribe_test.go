@@ -694,3 +694,113 @@ func TestAnUntypedCardOffTheCommandZoneIsStillDrawn(t *testing.T) {
 			"Forge's command-zone effects, which is not where they live")
 	}
 }
+
+// Attachment: an Aura or Equipment finding a host, and losing one.
+//
+// Forge's *log* has no attachment line at all — `GameLogEntryType` has no
+// category for it, the same hole ADR 42 was written about — so a Voltron deck
+// could win a game through the log without a word about the sword that did it.
+// The bus carries it as `GameEventCardAttachment`.
+//
+// **`newTarget == null` is the detach**, read out of Forge's bytecode rather
+// than guessed: `Card.attachToEntity` fires the event with a non-null target
+// and `Card.unattachFromEntity` fires it with `aconst_null` in the same slot,
+// and Forge's own `toString` on that record branches on exactly this test. The
+// two readings — "attached to nothing" and "detached from something" — are the
+// same shape in the data and only one of them is a fact.
+func TestGearFindsItsHostAndLosesIt(t *testing.T) {
+	t.Parallel()
+	const who = `"seat":1,"who":"Voltron"`
+	bear := `,"id":50,"card":"Ulvenwald Tracker","power":1,"toughness":1,` +
+		`"types":"Creature - Bear"`
+	sword := `,"id":51,"card":"Lightning Greaves","power":0,"toughness":0,` +
+		`"types":"Artifact - Equipment"`
+	lines := []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,` + who + `,"life":40}`,
+		`{"t":"zone","game":1,"zone":"Battlefield","mode":"in",` + who + bear + `}`,
+		`{"t":"zone","game":1,"zone":"Battlefield","mode":"in",` + who + sword + `}`,
+		`{"t":"turn","game":1,"turn":1,` + who + `,"life":40}`,
+		`{"t":"attach","game":1,` + who + `,"target_id":50,` +
+			`"target":"Ulvenwald Tracker"` + sword + `}`,
+		// Said twice. Forge re-announces an attachment when a permanent
+		// changes controller or re-enters, and the second one is not news.
+		`{"t":"attach","game":1,` + who + `,"target_id":50,` +
+			`"target":"Ulvenwald Tracker"` + sword + `}`,
+		`{"t":"turn","game":1,"turn":2,` + who + `,"life":40}`,
+		`{"t":"detach","game":1,` + who + sword + `}`,
+		// A beat after it, because a change rides the *next* one — which is
+		// true of every change this board makes, not just this one, and is
+		// why a fact raised after the last beat of a game is a fact nobody
+		// sees. The game is over by then, so nobody minds.
+		`{"t":"turn","game":1,"turn":3,` + who + `,"life":40}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Voltron"}`,
+	}
+	p := tier3.NewScribeParser(true)
+	var log *tier3.EventLog
+	for _, line := range lines {
+		if got, _ := p.Feed(line); got != nil {
+			log = got
+		}
+	}
+	if log == nil || log.Board == nil {
+		t.Fatal("the stream produced no board")
+	}
+
+	// Every change this stream raised about the sword, in order.
+	var host []int
+	for _, step := range log.Board.Steps {
+		for _, change := range step.Changes {
+			if change.ID == 51 && change.AttachedTo != nil {
+				host = append(host, *change.AttachedTo)
+			}
+		}
+	}
+	// Attached once, detached once — and **not attached twice**. A change
+	// raised for a fact that has not moved is a step saying something happened
+	// when nothing did.
+	if len(host) != 2 || host[0] != 50 || host[1] != 0 {
+		t.Errorf("the sword's hosts came out %v, want [50 0] — one attach, "+
+			"one detach, and nothing for the repeat", host)
+	}
+
+	// The beat, once, naming what it went on. Coming off raises nothing: every
+	// way of losing a host that anybody would narrate already has a beat.
+	var said []string
+	for _, e := range log.Events {
+		if e.Kind == tier3.EventAttach {
+			said = append(said, e.Card+" -> "+e.Target)
+		}
+	}
+	if len(said) != 1 || said[0] != "Lightning Greaves -> Ulvenwald Tracker" {
+		t.Errorf("the attach beats were %v, want one naming the host", said)
+	}
+}
+
+// The detach has to survive being written down.
+//
+// **Rendered rather than matched**, which is this repo's recorded lesson about
+// exactly this kind of claim. `AttachedTo` is a `*int` so that nil means "did
+// not change" and a pointer to zero means "attached to nothing now" — and the
+// whole distinction lives or dies on `encoding/json` actually emitting that
+// zero. `omitempty` drops a zero *int*; it keeps a pointer to one. A test that
+// read the struct field would pass just as happily against a wire that had
+// silently dropped it, and the browser would leave a detached sword drawn on
+// the creature forever.
+func TestADetachCrossesTheWireAsAZeroRatherThanNothing(t *testing.T) {
+	t.Parallel()
+	off := 0
+	on := 7
+	raw, err := json.Marshal([]tier3.BoardChange{
+		{ID: 1, AttachedTo: &off},
+		{ID: 2, AttachedTo: &on},
+		{ID: 3},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = `[{"id":1,"attached_to":0},{"id":2,"attached_to":7},{"id":3}]`
+	if string(raw) != want {
+		t.Errorf("the changes crossed as\n  %s\nwant\n  %s", raw, want)
+	}
+}

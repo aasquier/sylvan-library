@@ -18,6 +18,7 @@ import forge.game.event.EventValueChangeType;
 import forge.game.event.GameEvent;
 import forge.game.event.GameEventAttackersDeclared;
 import forge.game.event.GameEventBlockersDeclared;
+import forge.game.event.GameEventCardAttachment;
 import forge.game.event.GameEventCardCounters;
 import forge.game.event.GameEventCardDamaged;
 import forge.game.event.GameEventCardStatsChanged;
@@ -150,6 +151,44 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
                 .put("mode", event.mode() == EventValueChangeType.Added ? "in" : "out");
         who(line, event.player());
         return card(line, card);
+    }
+
+    /**
+     * An Aura, Equipment or Fortification finding a host, or losing one.
+     *
+     * **`newTarget == null` is Forge's own sentinel for coming off**, and it
+     * is the one thing here worth checking rather than assuming: the record is
+     * `(equipment, oldEntity, newTarget)` and both of the last two are
+     * nullable, so "attached to nothing" and "detached from something" are the
+     * same shape read two ways. `Card.attachToEntity` fires it with a non-null
+     * `newTarget` and an `oldEntity` that is null on a first attach;
+     * `Card.unattachFromEntity` fires it with `aconst_null` in the target
+     * slot. Read out of the bytecode with `javap -c` against 2.0.14, and
+     * Forge's own `toString` on this record branches on exactly the same test.
+     *
+     * The old host is deliberately **not** reported on a detach. The far side
+     * is already holding what this card was attached to — that is the whole
+     * point of it having been told — and sending it a second time would be
+     * two sources for one fact, with the losing one arriving later.
+     *
+     * A target is a card most of the time and a *player* for a curse, so the
+     * two go out through the two helpers that already exist for exactly this
+     * distinction. There is no third case worth a branch: a battle or a
+     * planeswalker is a card.
+     */
+    @Override
+    public Void visit(GameEventCardAttachment event) {
+        CardView gear = event.equipment();
+        if (gear == null) return null;
+        GameEntityView onto = event.newTarget();
+        Json line = new Json(onto == null ? "detach" : "attach").put("game", game);
+        who(line, gear.getController());
+        if (onto instanceof CardView host) {
+            target(line, host);
+        } else if (onto != null) {
+            against(line, onto);
+        }
+        return card(line, gear);
     }
 
     /** Tapped state, exactly — rather than inferred from a mana line. */

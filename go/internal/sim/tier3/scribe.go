@@ -278,6 +278,30 @@ func (p *ScribeParser) fold(l scribeLine) {
 		if p.board.zone[l.ID] == ZoneBattlefield && was != ZoneBattlefield {
 			p.raise(GameEvent{Kind: EventEnters, Seat: l.Seat, Card: l.Card})
 		}
+	case "attach", "detach":
+		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
+		// `TargetID` is present on an attach and absent on a detach, so the
+		// zero it leaves behind *is* the answer: attached to nothing. The
+		// scribe deliberately does not report the old host on a detach —
+		// this side is already holding it.
+		moved := p.board.attach(l.ID, l.TargetID)
+		// **Narrated only when the board moved**, which is the same guard one
+		// level up: Forge re-announces an attachment that has not changed, and
+		// a room that said "the sword goes on the bear" twice over a still
+		// board would read as a stutter rather than as a game.
+		//
+		// A curse names a player rather than a card and finds no host, so it
+		// never moves the board — and it is still worth saying out loud, which
+		// is why the target check is an `||` rather than a second `&&`.
+		if l.Kind == "attach" && (moved || l.Against != "") &&
+			(l.Target != "" || l.Against != "") {
+			target := l.Target
+			if target == "" {
+				target = l.Against
+			}
+			p.raise(GameEvent{Kind: EventAttach, Seat: l.Seat,
+				Card: l.Card, Target: target})
+		}
 	case "tapped":
 		p.board.name(l.ID, l.Card, l.Types, l.Token, 0)
 		p.board.tap(l.ID, l.Tapped)

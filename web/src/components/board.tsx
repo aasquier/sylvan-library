@@ -56,8 +56,8 @@ import { HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
-import { type BoardCard, type BoardSide, fightingStats, foldBoard, stackRow }
-  from '../lib/board'
+import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
+  foldBoard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
 import type { Speed, StagedBeat } from '../lib/reel'
 
@@ -538,8 +538,7 @@ function FieldRow({ label, cards, size = 'normal', empty }: {
         // The only four rows a permanent actually stands in: creatures,
         // artifacts and enchantments, and lands. Everything else that draws a
         // `FieldCard` is a card somebody is holding or has already lost.
-        <FieldCard key={stack.card.id} card={stack.card} size={size}
-                   count={stack.count} inPlay />
+        <FieldGeared key={stack.card.id} stack={stack} size={size} />
       ))}
     </div>
   )
@@ -748,6 +747,57 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
         </div>
       </div>
     )}
+    </div>
+  )
+}
+
+/**
+ * A permanent and whatever is attached to it, drawn as one thing.
+ *
+ * **Because they are one thing.** An Aura or an Equipment on the battlefield
+ * used to stand in the artifacts or enchantments row, which is a list of loose
+ * objects with no way to tell which creature across the seam was carrying
+ * which — and this is Commander, where suiting one creature up is a whole way
+ * to win a game. Forge has always known; its *log* never said, which is the
+ * same hole ADR 42 was written about.
+ *
+ * So they tuck under, stepped down and to the right, the way you slide a sword
+ * under the creature holding it at a real table. What each one shows is a
+ * corner — not enough to read, and it is not meant to be read: what the board
+ * has to say at this size is **that** this creature is carrying something and
+ * *how many* somethings, and both of those are legible from the steps alone.
+ * Reading them is the loupe's job, and every tucked card keeps its own hover
+ * preview.
+ *
+ * The wrapper reserves the overhang as margin rather than letting it lie over
+ * the next card in the row. A stack that overlapped its neighbour would be
+ * saying the neighbour is part of it.
+ */
+function FieldGeared({ stack, size }: {
+  stack: BoardStack
+  size: 'normal' | 'small'
+}) {
+  const { card, count } = stack
+  if (card.attachments.length === 0) {
+    return <FieldCard card={card} size={size} count={count} inPlay />
+  }
+  const worn = card.attachments.map((a) => a.name).join(', ')
+  return (
+    <div className="field-geared"
+         style={{ '--gear': card.attachments.length } as CSSProperties}
+         role="group" aria-label={`${card.name}, carrying ${worn}`}>
+      {/* First in the DOM so the host paints over them: both are positioned,
+          neither carries a z-index, and among positioned elements at auto the
+          later one wins. A z-index here would be a stacking context fighting
+          the loupe and the card preview, which are the two things on this
+          board that have to escape one. */}
+      {card.attachments.map((a, i) => (
+        <span className="field-gear" key={a.id}
+              style={{ '--i': i + 1 } as CSSProperties}>
+          <FieldCard card={a} size={size} count={1} inPlay />
+        </span>
+      ))}
+      <FieldCard card={card} size={size} count={count} inPlay />
     </div>
   )
 }

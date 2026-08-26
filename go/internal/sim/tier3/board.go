@@ -112,6 +112,20 @@ type BoardChange struct {
 	Toughness *int           `json:"toughness,omitempty"`
 	Types     string         `json:"types,omitempty"`
 	Counters  []BoardCounter `json:"counters,omitempty"`
+	// AttachedTo is the card this one is attached to: an Aura on what it
+	// enchants, an Equipment on what it is equipping.
+	//
+	// **A pointer to zero is the detach**, and that is why this is not a plain
+	// int. Nil means "did not change this step", which is true of every card
+	// on the board almost every step; zero means "attached to nothing now",
+	// which a sword coming off a bear really is. An int alone would make those
+	// two the same value and a detached sword would stay drawn on the bear
+	// forever.
+	//
+	// An Aura on a *player* — a curse — reports no host, because the board
+	// draws players as rails rather than as cards and there is nothing there
+	// to hang it on. It stays in its own row, which is where it was.
+	AttachedTo *int `json:"attached_to,omitempty"`
 }
 
 // BoardLife is one seat's life total after it changed.
@@ -180,7 +194,11 @@ type board struct {
 	toughness map[int]int
 	types     map[int]string
 	counters  map[int]map[string]int
-	life      map[int]int
+	// attached is what each card is attached to, by host id. Absent and zero
+	// are the same thing here — nothing — because a board only ever asks the
+	// question about a card it is already drawing.
+	attached map[int]int
+	life     map[int]int
 	// left is the last real zone a card was cleared out of.
 	//
 	// Needed because **Forge announces the leaving before the arriving**: a
@@ -212,7 +230,8 @@ func newBoard() *board {
 		known: map[int]int{}, zone: map[int]string{}, seat: map[int]int{},
 		tapped: map[int]bool{}, power: map[int]int{}, toughness: map[int]int{},
 		types: map[int]string{}, counters: map[int]map[string]int{},
-		life: map[int]int{}, left: map[int]string{},
+		attached: map[int]int{},
+		life:     map[int]int{}, left: map[int]string{},
 		changing: map[int]*BoardChange{},
 	}
 }
@@ -363,6 +382,27 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		no := false
 		c.Tapped = &no
 	}
+}
+
+// attach folds an attachment, and a `host` of zero folds it coming off.
+// Reports whether anything actually moved.
+//
+// Idempotent on purpose, and **the answer is what the beat is raised on**.
+// Forge re-announces an attachment when a permanent changes controller or
+// re-enters, and a change raised for a fact that has not moved is a step
+// saying something happened when nothing did — the same noise `Scribe.seen`
+// exists to keep out of the stream, applied to the one event that can arrive
+// twice for one state. Swallowing the change and narrating it anyway would
+// have been worse than doing neither: a room saying "the sword goes on the
+// bear" twice, with the board perfectly still both times.
+func (b *board) attach(id, host int) bool {
+	if id == 0 || b.attached[id] == host {
+		return false
+	}
+	b.attached[id] = host
+	to := host
+	b.change(id).AttachedTo = &to
+	return true
 }
 
 // tap folds a tapped event. `tapped` is false when the scribe omitted the
