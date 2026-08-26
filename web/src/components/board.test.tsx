@@ -121,7 +121,13 @@ const THRONE: ForgeBoard = {
   ],
   steps: [
     { turn: 1, seat: 1, changes: [{ id: 30, zone: 'command', seat: 1 }] },
-    { turn: 2, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
+    // **`casts` is the server's count**, not a transition the browser watches.
+    // It is the number of times this card has left the command zone, and the
+    // tax is two generic for each — so it arrives *with* the cast rather than
+    // being worked back out of the zone changes around it. Going back into the
+    // zone carries none: a commander coming home is not a cast.
+    { turn: 2, seat: 1,
+      changes: [{ id: 30, zone: 'battlefield', seat: 1, casts: 1 }] },
     { turn: 3, seat: 1, changes: [{ id: 30, zone: 'command', seat: 1 }] },
     // **A beat with nothing in it, and it is load-bearing.** A card that
     // leaves the battlefield is held standing there for exactly the beat that
@@ -129,7 +135,8 @@ const THRONE: ForgeBoard = {
     // than the commander being home. It is home on the next beat, and that is
     // the one the questions below are asking about.
     { turn: 3, seat: 1, changes: [] },
-    { turn: 4, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
+    { turn: 4, seat: 1,
+      changes: [{ id: 30, zone: 'battlefield', seat: 1, casts: 2 }] },
     { turn: 5, seat: 1, changes: [{ id: 31, zone: 'battlefield', seat: 1,
       power: 3, toughness: 3,
       // `n` is *how many*, and the sign lives on the kind: one -1/-1 counter
@@ -1001,8 +1008,14 @@ const PAIRING: ForgeBoard = {
       { id: 42, zone: 'command', seat: 1 },
     ] },
     // Tymna goes to the sand; Kaheera is bought into a hand for {3}.
+    //
+    // `casts` is the server's count of the times a card has left the command
+    // zone, and the tax is read off it. The browser used to count the same
+    // transition itself — which is why Kaheera carries none here rather than
+    // carrying a zero: a companion leaving the zone is not a cast, and the
+    // side of the wire that reads the game is the side that knows it.
     { turn: 2, seat: 1, changes: [
-      { id: 41, zone: 'battlefield', seat: 1 },
+      { id: 41, zone: 'battlefield', seat: 1, casts: 1 },
       { id: 42, zone: 'hand', seat: 1 },
     ] },
   ],

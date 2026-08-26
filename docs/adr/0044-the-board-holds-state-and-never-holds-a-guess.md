@@ -132,8 +132,17 @@ parenthesis, so that shape is safe to drop wherever it appears. A phantom no
 longer reaches the dictionary either, which it used to do even when nothing
 ever moved it.
 
-**Two things Forge's bus has and the scribe does not listen for stay
-undone**: `GameEventManaPool`, for showing the pool as permanents tap into it,
-and `GameEventCardSacrificed`, for marking a Treasure tapped and then
-sacrificed. Both need Java, both are additive to this shape, and neither is
-blocked by anything decided here.
+**Three things Forge's bus has and the scribe does not listen for stay
+undone**, all of them additive to this shape and none blocked by anything
+decided here:
+
+- `GameEventCombatUpdate` — *the* end-of-combat signal, which would replace
+  the turn boundary decision 3 settles for. That is the one place this ADR
+  knowingly takes a worse answer than the bus can give, and it takes it
+  because the alternative was drawing no combat at all until somebody writes
+  Java.
+- `GameEventManaPool` — showing the pool as permanents tap into it. Per seat,
+  so it belongs beside `BoardStep.Life` rather than on a card.
+- `GameEventCardSacrificed` and `GameEventCardDestroyed` — *how* a permanent
+  left, which is what a Treasure tapped and then sacrificed needs. The board
+  already draws the departure; what is missing is the word for it.

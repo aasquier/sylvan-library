@@ -608,8 +608,9 @@ func (b *board) inCombat(id int, role string, attacking, blocking int) {
 // endCombat takes everybody out of the fight.
 //
 // **Called when a turn begins, because that is the only boundary the stream
-// has.** Forge's bus has no end-of-combat event the scribe listens for, so the
-// honest reading is "this combat lasts until the next turn starts" — which is
+// has.** Forge's bus does carry `GameEventCombatUpdate` and the scribe does
+// not listen for it (ADR 42's table of what it discards), so the honest
+// reading available here is "this combat lasts until the next turn" — which is
 // right about the picture for the whole of combat and a phase late afterwards,
 // where a creature keeps a sword mark through a second main phase it is no
 // longer attacking in. The one case it reads wrong is an extra combat inside

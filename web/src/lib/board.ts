@@ -379,10 +379,15 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
         for (const move of change.counter_moves ?? []) {
           remember(card.counterHistory, move, taken.get(active) ?? 0)
         }
-        // `!= null` rather than truthy, and it is the whole of the fix: an
-        // empty array is the server saying this card has none, and reading it
-        // as "nothing changed" left a dead creature still wearing the counters
-        // it had in life (Aaron, 2026-08-26).
+        // **An empty array is the server saying this card has none.** Being
+        // exact about where the bug was, because this line looks like the fix
+        // and is not it: an empty array is truthy, so the old truthy test
+        // would have applied one perfectly well. Nothing ever sent one — the
+        // field was a plain slice and `omitempty` renders "none" and "nothing
+        // changed" as the same absent bytes — so a dead creature went on
+        // wearing the counters it had in life (Aaron, 2026-08-26). The fix is
+        // in Go; `!= null` is this side saying the same thing in a way that
+        // cannot be misread later.
         if (change.counters != null) {
           card.counters = change.counters
           // A card with nothing on it has nothing to explain, so the account
