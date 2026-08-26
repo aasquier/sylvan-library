@@ -63,13 +63,28 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
       <span className="stage-veil" aria-hidden="true" />
       <span className="stage-frame">
         <StageFace item={item} />
-        {/* The skull, falling onto the card as it dies. A **child of the
-            frame**, so it travels down with the card when the card sinks —
-            which is the whole difference between one continuous death and a
-            skull and a card that happen to be on screen together. */}
+        {/* A death, in two layers over the card and never *through* it.
+
+            Both are **children of the frame**, so they travel down with the
+            card when it sinks — which is the whole difference between one
+            continuous death and a skull and a card that happen to be on
+            screen together.
+
+            The pall is the grave coming up over the picture, and it is an
+            element rather than a `filter` for a reason that is licence rather
+            than taste: Scryfall's imagery guidelines forbid desaturating card
+            imagery, and ADR 32 bounds this room to motion and parallax over
+            the artwork and nothing else. Until tonight the light went out of
+            a dying card through `grayscale()` on this very face. It is laid
+            *on* the card now, the way the token materials lay light on an
+            object rather than on the painting under it. `index.css`'s "the
+            grave, coming up over it" argues the whole of it. */}
         {item.manner === 'dies' && (
-          <img className="stage-skull" src={mementoArt} alt=""
-               draggable={false} />
+          <>
+            <span className="stage-pall" aria-hidden="true" />
+            <img className="stage-skull" src={mementoArt} alt=""
+                 draggable={false} />
+          </>
         )}
       </span>
       <span className="stage-plate-strip">
