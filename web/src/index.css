@@ -8376,21 +8376,41 @@ button:hover .tarot-fan-card {
   background-image: var(--leaf-art, none);
   background-size: cover;
   background-position: center;
-  /* Darker the further back it stands, so the fan has depth rather than being
-     four flat copies. `abs()` is not universal yet; squaring the step is the
-     same curve and arrives everywhere. */
-  filter: brightness(calc(0.72 - 0.09 * var(--leaf) * var(--leaf)));
   transform-origin: 50% 100%;
   transform: rotate(calc(var(--leaf) * 2.2deg));
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(0, 0, 0, 0.45);
-  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
-              filter 260ms ease;
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Darker the further back it stands, so the fan has depth rather than being
+   four flat copies — **as shade lying on the leaf, not as a filter through
+   it.** These leaves are `--leaf-art`, which is the card's own painting, so
+   `filter: brightness()` here was Wizards' art being dimmed on its way to the
+   screen: the same rule the dying card broke, one block over, and found by the
+   same sweep. Shade over a picture is a picture in shade; a filter is a
+   different picture. Scryfall's imagery guidelines and ADR 32 both draw the
+   line in that exact place.
+
+   `abs()` is not universal yet; squaring the step is the same curve and
+   arrives everywhere. The alphas are what the old `brightness()` worked out to
+   — 1 minus the multiplier — so a stack of four looks the way it looked. */
+.field-card-leaf::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background-color: rgb(0 0 0 / calc(0.28 + 0.09 * var(--leaf) * var(--leaf)));
+  transition: background-color 260ms ease;
 }
 .field-card.is-stacked:hover .field-card-leaf,
 .field-card.is-stacked:focus-visible .field-card-leaf {
   transform: rotate(calc(var(--leaf) * 8deg)) translateY(-3px);
-  filter: brightness(calc(0.95 - 0.07 * var(--leaf) * var(--leaf)));
+}
+/* Opened, the fan is the thing being looked at, so the shade comes most of the
+   way off it. */
+.field-card.is-stacked:hover .field-card-leaf::after,
+.field-card.is-stacked:focus-visible .field-card-leaf::after {
+  background-color: rgb(0 0 0 / calc(0.05 + 0.07 * var(--leaf) * var(--leaf)));
 }
 /* A fan that opened under its neighbours would be a fan nobody can see. Five
    rather than six: an attacking card is the one thing on this board allowed
@@ -8402,7 +8422,8 @@ button:hover .tarot-fan-card {
      simply *is* fanned when the pointer is on it is the honest reduced version
      of one that opens. */
   .field-card-pile,
-  .field-card-leaf { transition: none; }
+  .field-card-leaf,
+  .field-card-leaf::after { transition: none; }
 }
 
 /* ------------------------------------------------------------- the arm
@@ -8981,9 +9002,86 @@ button:hover .tarot-fan-card {
   82%  { opacity: 1; }
   100% { opacity: 0; transform: translateY(2px) scale(0.98); }
 }
-/* Whatever it lands on goes cold under it. */
-.field-mark-dies { background: rgba(6, 5, 4, 0.55); border-radius: 4px; }
-.field-card.is-dies .field-card-turn { filter: grayscale(0.85) brightness(0.62); }
+/* --- and what a death is *not* drawn with ------------------------------
+ *
+ * **The painting is never touched.** Scryfall's imagery guidelines forbid
+ * cropping, distorting, desaturating and colour-shifting card imagery, and
+ * ADR 32 already bounds this room's entire effect vocabulary to *"motion and
+ * parallax, never distortion, blur or colour-shift of the artwork"* for
+ * exactly that reason. What stood here until tonight was
+ * `filter: grayscale(0.85) brightness(0.62)` on `.field-card-turn` — which is
+ * the art's own container, so the grey went *through* Wizards' painting. The
+ * rule was written down; the stylesheet had drifted off it.
+ *
+ * **The house already had the answer**, three hundred lines up in the token
+ * materials: light is laid on a card through a layer of its own, never as a
+ * filter on the art. A shadow drawn over a picture is what a shadow is; a
+ * `filter` is the picture being re-rendered before anybody sees it.
+ *
+ * And the replacement says *more* than the grey did, which is the part worth
+ * keeping. Colour draining out of a card is a card being processed. Darkness
+ * climbing it from the bottom edge is a card being **buried**, and down is
+ * the one direction a graveyard has ever been in. It also leaves the top of
+ * the picture lit longest, so at fifty-eight pixels the creature that just
+ * died stays legible the whole way down — which a flat 62% brightness over
+ * the entire card was quietly working against (commandment 2).
+ */
+
+/* The stone's own shadow, thrown on whatever it landed on. A vignette under
+   the headstone rather than the flat sheet of dark that used to sit here: a
+   sheet is the room dimming, a vignette is an object with weight sitting on
+   something. **On `::before` rather than on the container**, for the reason
+   the sword's lamp is — `.field-mark`'s opacity governs the picture inside
+   it too, so a shadow declared on the container could never be timed against
+   the headstone it belongs to. */
+.field-mark-dies::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: radial-gradient(closest-side,
+    rgba(4, 7, 5, 0.74) 0%,
+    rgba(4, 7, 5, 0.44) 54%,
+    rgba(4, 7, 5, 0) 92%);
+  animation: mark-pall var(--mark-life-dies, 2000ms) ease-out both;
+}
+/* Nothing until the stone is nearly down, and then all at once — a shadow is
+   cast *by* an object arriving, so it may not precede it. `mark-buried` lands
+   the headstone at 11%; this is a frame behind it and spreads as it settles. */
+@keyframes mark-pall {
+  0%, 5% { opacity: 0; transform: scale(1.28); }
+  14%    { opacity: 1; transform: scale(1); }
+  82%    { opacity: 1; transform: scale(1); }
+  100%   { opacity: 0; transform: scale(1); }
+}
+
+/* The grave, climbing the card. **A child of `.field-card-turn`**, which is
+   two things the filter it replaces got for free and an overlay pinned to the
+   slot would lose: it is clipped by the card's own corner radius, and it
+   turns with a card that is tapped. It grows out of the bottom edge on a
+   `scaleY` from that edge, so what a person sees is dark welling up rather
+   than a panel sliding across — and it is a transform, so forty of them cost
+   the compositor and not the layout. */
+.field-card.is-dies .field-card-turn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  background: linear-gradient(180deg,
+    rgba(6, 11, 9, 0) 0%,
+    rgba(5, 9, 7, 0.44) 42%,
+    rgba(3, 6, 5, 0.9) 100%);
+  animation: card-interred var(--mark-life-dies, 2000ms) ease-out both;
+}
+@keyframes card-interred {
+  0%   { opacity: 0; transform: scaleY(0.04); }
+  12%  { opacity: 1; transform: scaleY(0.38); }
+  48%  { opacity: 1; transform: scaleY(1); }
+  84%  { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
 
 /* --- the ghost, rising off the grave ------------------------------------
  *
@@ -9091,6 +9189,20 @@ button:hover .tarot-fan-card {
     animation: mark-still var(--mark-life-blocks, 1800ms) ease-out both;
   }
   .field-mark-dies img {
+    animation: mark-still var(--mark-life-dies, 2000ms) ease-out both;
+  }
+  /* **The dark still falls; it just does not climb.** This is the half of a
+     death that carries the *information* — that this creature, of the forty on
+     the sand, is the one that died — so it is the half that may not be
+     answered with nothing. Somebody who asked for stillness gets the shadow
+     under the stone and the grave over the card at full strength, arrived at
+     rather than travelled to. `transform` is reset by name on both, because
+     the moving versions park their whole effect in one (`scale`, `scaleY`) and
+     dropping only the animation would leave the pall at four percent of its
+     height — which is the same as leaving it out. */
+  .field-mark-dies::before,
+  .field-card.is-dies .field-card-turn::after {
+    transform: none;
     animation: mark-still var(--mark-life-dies, 2000ms) ease-out both;
   }
   @keyframes mark-still {
@@ -10056,20 +10168,25 @@ button:hover .tarot-fan-card {
    The whole commitment is in the first quarter and the rest is the hold, which
    is the same shape the attack lunge was given: a card that takes a second to
    arrive is not arriving, it is drifting. */
-/* The blur is pinned at zero from the first frame for the reason `stage-doom`
-   argues at length: a filter named in one keyframe is interpolated across the
-   whole animation, not applied at the end of it. */
+/* **No blur on the way out, and that is a licence line rather than taste.**
+   This used to end on `filter: blur(4px)`, softening the card as it left —
+   and `.stage-frame` is the box the painting is inside, so the blur went
+   through Wizards' art. Scryfall's imagery guidelines forbid exactly that,
+   and ADR 32 bounds this room to *"motion and parallax, never distortion,
+   blur or colour-shift of the artwork"*. Motion is what is left, and motion
+   turns out to be enough: the card is already rising, growing and turning out
+   of the plane while it fades, and a thing leaving on that curve does not
+   need to be defocused to read as gone. */
 @keyframes stage-rise {
-  0%   { opacity: 0; filter: blur(0);
+  0%   { opacity: 0;
          transform: translateY(13%) scale(0.68) rotateX(26deg); }
   13%  { opacity: 1;
          transform: translateY(0) scale(1.06) rotateX(-2deg); }
   21%  { transform: scale(0.985) rotateX(1deg); }
   28%  { transform: scale(1) rotateX(0deg); }
-  76%  { opacity: 1; transform: scale(1) rotateX(0deg); filter: blur(0); }
+  76%  { opacity: 1; transform: scale(1) rotateX(0deg); }
   100% { opacity: 0;
-         transform: translateY(-9%) scale(1.07) rotateX(-9deg);
-         filter: blur(4px); }
+         transform: translateY(-13%) scale(1.09) rotateX(-11deg); }
 }
 
 /* --- a death, as one motion -------------------------------------------- */
@@ -10084,42 +10201,123 @@ button:hover .tarot-fan-card {
   animation: stage-doom var(--mark-life-dies, 2000ms)
     cubic-bezier(0.22, 0.9, 0.3, 1) both;
 }
-/* **`filter` is declared early on purpose, and it is not decoration.** A
-   property that appears in only *one* keyframe is interpolated by the browser
-   across the whole animation from the element's own value — so naming the
-   blur at 100% alone did not blur the card at the end, it blurred it the
-   entire time, ramping up. What that produced was a dying card that was
-   quietly out of focus from the moment it arrived: soft enough to read as
-   wrong and never as anything nameable. Pinned at zero through the hold, so
-   the blur is only ever the last thing that happens to it. */
+/* **There is no `filter` in here any more, and the reason is the licence.**
+   This ended on `blur(2px)`, and `.stage-frame` is the box the painting sits
+   inside — so the softening went through Wizards' art, which Scryfall's
+   imagery guidelines forbid and ADR 32 already bounded this room away from.
+   The sink is the whole gesture and it does not need help: a card that goes
+   *down* while it shrinks and turns is a card being put in the ground.
+
+   The trap that comment used to record is worth keeping even with nothing
+   left in here to trip it: **a property named in only one keyframe is
+   interpolated across the whole animation**, not applied at the end of it. A
+   blur written at 100% alone did not blur the card at the end — it blurred it
+   the entire time, ramping up, which reads as wrong and never as anything
+   nameable. Whatever is added here later, declare it at 0% too. */
 @keyframes stage-doom {
-  0%   { opacity: 0; transform: translateY(8%) scale(0.74) rotateX(20deg);
-         filter: blur(0); }
+  0%   { opacity: 0; transform: translateY(8%) scale(0.74) rotateX(20deg); }
   9%   { opacity: 1; transform: translateY(0) scale(1.05) rotateX(-1deg); }
   15%  { transform: scale(1) rotateX(0deg); }
   /* The stone lands at 22% and the card takes the weight of it. */
   24%  { transform: translateY(1.6%) scale(0.985) rotateX(2deg); }
   30%  { transform: translateY(0) scale(1) rotateX(0deg); }
-  78%  { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg);
-         filter: blur(0); }
+  78%  { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg); }
   /* And down. Not away and not out — *down*, because that is the one direction
-     a graveyard has ever been in. */
+     a graveyard has ever been in. Further and smaller than it used to go, by
+     exactly the amount the blur used to be worth. */
   100% { opacity: 0;
-         transform: translateY(34%) scale(0.62) rotateX(24deg);
-         filter: blur(2px); }
+         transform: translateY(42%) scale(0.56) rotateX(28deg); }
 }
-/* The colour goes out of it under the stone. The same grey the skull's own
-   mark puts on a card in its row, arrived at over time rather than switched. */
+
+/* --- the grave, coming up over it --------------------------------------
+ *
+ * **The light goes out of the card. The colour never does.** What stood here
+ * was `@keyframes stage-cold`, ending on
+ * `filter: grayscale(0.8) brightness(0.72)` over `.stage-face` — and
+ * `.stage-face` is the painting itself, so this was the card being
+ * desaturated in front of the person looking at it. Scryfall's imagery
+ * guidelines name desaturation specifically; ADR 32 wrote the same boundary
+ * into this repo eleven days ago and this rule was simply on the wrong side
+ * of it.
+ *
+ * **The token materials had already solved this exact problem**, and this is
+ * deliberately the same technique wearing a different costume: a layer of its
+ * own, laid over the card, carrying the light — never a filter reaching
+ * through to the art. Standing something in front of a painting is not
+ * altering the painting, and that distinction is the whole of what makes one
+ * of these allowed and the other not.
+ *
+ * It is also a better picture. Grey is a card being *processed*; dark rising
+ * from the bottom edge while the card sinks is a card being **buried**, which
+ * is a thing that happens in the world and the thing this beat actually is.
+ * And it keeps the top of the art lit longest — so a newcomer can still see
+ * *what* died the whole way down, which the old flat 72% brightness was
+ * spending its last frames destroying. */
+.stage-pall {
+  position: absolute;
+  inset: 0;
+  /* Over the painting, under the stone. The frame is `preserve-3d`, so these
+     three are coplanar and sorted by `z-index` — face 1, this 2, stone 3. */
+  z-index: 2;
+  pointer-events: none;
+  /* Magic's own corner, the same pair `.stage-face` carries; a rectangle of
+     shadow with square corners on a card with round ones is a sticker. */
+  border-radius: 4.75% / 3.4%;
+  transform-origin: 50% 100%;
+  /* Deep at the foot and never quite nothing at the head. **Measured against
+     the rule it replaces rather than guessed at**: the first pass ran from
+     fully transparent at the top and did not reach its full height until
+     nearly two thirds through, and put side by side with the old
+     `grayscale(0.8) brightness(0.72)` at the same instants it was plainly the
+     weaker picture at 340 and 760 milliseconds — which is the one way this
+     change was allowed to fail. */
+  background: linear-gradient(180deg,
+    rgba(6, 12, 9, 0.12) 0%,
+    rgba(5, 10, 8, 0.44) 30%,
+    rgba(4, 8, 6, 0.78) 62%,
+    rgba(2, 5, 4, 0.95) 100%);
+  animation: stage-interred var(--mark-life-dies, 2000ms) ease-out both;
+}
+/* Nothing while the card is arriving to be looked at; it comes up with the
+   stone, which lands at 22%, and is over the whole card well before the sink
+   begins. Grown from the bottom edge rather than faded in place, because a
+   shadow that simply appears is a light being switched and a shadow that
+   rises is a thing coming up out of the ground to meet it. */
+@keyframes stage-interred {
+  0%, 10% { opacity: 0; transform: scaleY(0.04); }
+  24%     { opacity: 1; transform: scaleY(0.55); }
+  44%     { opacity: 1; transform: scaleY(1); }
+  92%     { opacity: 1; transform: scaleY(1); }
+  100%    { opacity: 0; transform: scaleY(1); }
+}
+
+/* **And the light goes off the card itself.** The face wears a rim of the
+   arena's brass and a soft halo of whatever colour the moment is lit in; on a
+   death that halo goes out and the drop shadow deepens, so the card is not
+   only in shadow, it has stopped being lit. `box-shadow` is drawn *around* an
+   element rather than through it — the same reason the token materials are
+   allowed their glint — so this reaches the painting no more than a lamp
+   being switched off across the room does.
+
+   It is what carries the death at stage size in the first half a second,
+   which is exactly where the shadow alone was thinner than the grey it
+   replaced. */
 .stage-card.is-dies .stage-face {
-  animation: stage-cold var(--mark-life-dies, 2000ms) ease-out both;
+  animation: stage-unlit var(--mark-life-dies, 2000ms) ease-out both;
 }
-/* Grey, and not *dark* grey. The colour going is the whole signal; taking the
-   light with it as well left a card nobody could read under a stone, which is
-   a death that has forgotten to say who died. */
-@keyframes stage-cold {
-  0%, 14% { filter: none; }
-  34%     { filter: grayscale(0.8) brightness(0.78); }
-  100%    { filter: grayscale(0.8) brightness(0.72); }
+@keyframes stage-unlit {
+  0%, 16% {
+    box-shadow:
+      0 14px 34px rgba(0, 0, 0, 0.72),
+      0 0 0 1px color-mix(in srgb, var(--field-brass) 34%, transparent),
+      0 0 22px color-mix(in srgb, var(--stage-glow) 26%, transparent);
+  }
+  48%, 100% {
+    box-shadow:
+      0 20px 44px rgba(0, 0, 0, 0.9),
+      0 0 0 1px color-mix(in srgb, var(--field-brass) 12%, transparent),
+      0 0 0 color-mix(in srgb, var(--stage-glow) 0%, transparent);
+  }
 }
 /* A death is not a spell being channelled. */
 .stage-card.is-dies .stage-frame::before { animation: none; opacity: 0; }
@@ -10142,7 +10340,10 @@ button:hover .tarot-fan-card {
    every keyframe carries the same pair so nothing snaps to a corner. */
 .stage-skull {
   position: absolute;
-  z-index: 2;
+  /* Above the pall, which is above the painting. A stone lying in shadow is a
+     stone nobody can see, and it is the one thing on the card that has to be
+     read at a glance. */
+  z-index: 3;
   top: 50%;
   left: 50%;
   width: 46%;
@@ -10290,11 +10491,26 @@ button:hover .tarot-fan-card {
 .stage-card.is-parting .stage-frame,
 .stage-card.is-parting .stage-frame::before,
 .stage-card.is-parting .stage-face,
+.stage-card.is-parting .stage-pall,
 .stage-card.is-parting .stage-skull,
 .stage-card.is-parting .stage-plate-strip { animation: none; }
-/* ...but a card that was dying stays dead on the way out. */
+/* ...but a card that was dying stays dead on the way out — the grave over it
+   in full, held rather than still climbing. `transform` is named because
+   `stage-interred` parks the whole effect in a `scaleY` and stopping the
+   animation alone would leave the pall at three percent of its height, which
+   is the same as it not being there. */
+.stage-card.is-parting.is-dies .stage-pall {
+  opacity: 1;
+  transform: scaleY(1);
+}
+/* ...and it does not get its light back on the way out either. Stopping
+   `stage-unlit` without saying what to stop *at* hands the face its base
+   rule, which is the lit one — so a dying card shoved off by the next spell
+   would flare for a fifth of a second on its way past. */
 .stage-card.is-parting.is-dies .stage-face {
-  filter: grayscale(0.8) brightness(0.72);
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, 0.9),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 12%, transparent);
 }
 @keyframes stage-part {
   0%   { opacity: 1; transform: scale(1) translateY(0); }
@@ -10347,10 +10563,24 @@ button:hover .tarot-fan-card {
   .stage-skull {
     animation: stage-still var(--mark-life-dies, 2000ms) linear both;
   }
-  /* Grey, but arrived at rather than faded into — the fact, without the fade. */
+  /* **The grave arrives whole, rather than climbing.** This is the half of a
+     death that carries the information rather than the drama — the stone and
+     the dark over the card are what say *this one died* — so stillness takes
+     the travel and never the fact. It fades with everything else on the same
+     clock; only the rise is gone. `transform` is named because
+     `stage-interred` parks its whole effect in a `scaleY`, and dropping the
+     animation without it would leave the pall three percent tall. */
+  .stage-pall {
+    transform: scaleY(1);
+    animation: stage-still var(--mark-life-dies, 2000ms) linear both;
+  }
+  /* Unlit from the first frame rather than dimming over two seconds. Same
+     fact, no journey. */
   .stage-card.is-dies .stage-face {
     animation: none;
-    filter: grayscale(0.8) brightness(0.72);
+    box-shadow:
+      0 20px 44px rgba(0, 0, 0, 0.9),
+      0 0 0 1px color-mix(in srgb, var(--field-brass) 12%, transparent);
   }
   .stage-card.is-parting { animation: stage-gone 200ms linear both; }
   @keyframes stage-still {
