@@ -9436,3 +9436,473 @@ button:hover .tarot-fan-card {
   .verdict-wreath,
   .verdict-gauntlet { animation: none; }
 }
+
+/* ================================================== the centre of the arena
+ *
+ * **Half of Commander never touches the battlefield.** A Lightning Bolt is
+ * cast, resolves and is in a graveyard inside one beat, and until now the
+ * Coliseum drew exactly nothing for it — the board draws permanents, because a
+ * board is a place and a place holds what stays (Aaron, 2026-08-26: *"there is
+ * nothing to mark their existence in the coliseum"*). So every cast gets a
+ * moment in the middle of the sand: the card, big enough to read, held for
+ * about a beat and a half, and gone.
+ *
+ * **Every duration here comes from `--stage-life`**, set on each card by
+ * `stage.tsx`, and that is not a style choice — it is the fix `board.tsx`
+ * already had to make once. A visual timed by the *beat* is a visual cut off
+ * before it is half told, because a beat at watching pace is 480ms. So one
+ * number is both the animation's duration and the element's life in the tree,
+ * and it crosses as a custom property so the two cannot drift. A fallback
+ * stands in every `var()` for the reason the rest of this file carries them: a
+ * duration that fails to resolve does not fall back to a default, it drops the
+ * whole `animation` and leaves a card frozen over the arena at full strength —
+ * which is the one failure this must never have.
+ *
+ * A death takes `--mark-life-dies` instead, inherited from `.field-stage`. The
+ * skull on the card in its row, the ghost rising off the graveyard pile and
+ * this are **one event drawn in three places**, and two clocks for one event
+ * is exactly how they end up out of step.
+ */
+
+.stage {
+  position: absolute;
+  inset: 0;
+  /* Above the sand, the cards and their marks (6) and the zone trays (8), and
+     below the card preview (60), which is a thing a person opened on purpose
+     where this is a thing that happened to them. */
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  /* **Never in the way of the hand.** Somebody dragging the scrubber through
+     a match is dragging it through sixty casts, and a spell that swallowed the
+     drag would break the timeline at the moment it is most wanted. */
+  pointer-events: none;
+}
+
+.stage-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  /* A depth for the card to come up through. The same call the shield's mark
+     made, and for the same reason: a rectangle that only ever scales is a
+     decal, and the same rectangle turning a few degrees out of the plane is an
+     object being lifted into the light. */
+  perspective: 900px;
+}
+
+/* What colour the light is. Warm for a spell being cast — brass and torchlight,
+   the arena's own palette, and deliberately not any one colour of mana, because
+   the room does not know which and a wrong colour is worse than none. Cold and
+   green for a death, which is the light Magic has always drawn a graveyard
+   in. */
+.stage-card.is-cast { --stage-glow: var(--field-sun); }
+.stage-card.is-dies { --stage-glow: #8fb59a; }
+
+/* --- the light gathering behind it -------------------------------------- */
+
+/* A pool, not a scrim. A rectangle of dark over the whole arena would take the
+   board away from anybody reading the timeline; a radial centred on the card
+   separates it from the sand and leaves the rows either side of it legible,
+   which is the whole difference between an overlay and an eclipse.
+   Measured rather than guessed at: the first version put its dark stop at 0.74
+   and reached 88% of the box, which on a real arena is most of the sand and
+   read as the room switching off around the card. It hugs the card now — dark
+   enough to lift it off the floor, done well before the rows either side. */
+.stage-veil {
+  position: absolute;
+  inset: -6%;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 40% 48% at 50% 48%,
+      color-mix(in srgb, var(--stage-glow) 30%, transparent) 0%,
+      color-mix(in srgb, var(--stage-glow) 9%, transparent) 40%,
+      rgba(8, 6, 4, 0.62) 66%,
+      rgba(8, 6, 4, 0) 86%);
+  animation: stage-veil-up var(--stage-life, 1150ms) ease-out both;
+}
+@keyframes stage-veil-up {
+  0%   { opacity: 0; transform: scale(0.82); }
+  11%  { opacity: 1; transform: scale(1); }
+  72%  { opacity: 0.94; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.14); }
+}
+
+/* --- the card ----------------------------------------------------------- */
+
+.stage-frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  /* **The frame is 488 by 680 and nothing here may argue with it.** A card
+     stretched by a pixel is the one thing a Magic player sees instantly, and
+     the height-plus-max-width pair below lets the box shrink on a narrow
+     screen without ever changing shape. */
+  aspect-ratio: 488 / 680;
+  height: min(58%, 340px);
+  max-width: min(62%, 244px);
+  transform-style: preserve-3d;
+  animation: stage-rise var(--stage-life, 1150ms)
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The spell being channelled: a ring of light turning behind the card while it
+   holds. Drawn rather than photographed, and this is the one place in this room
+   where that is the right way round — there is no free-use photograph of a
+   spell being cast, and the honest answer to that is light, which is what a
+   conic gradient is made of. */
+.stage-frame::before {
+  content: '';
+  position: absolute;
+  inset: -16%;
+  z-index: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--stage-glow) 46%, transparent) 34deg,
+    transparent 92deg,
+    transparent 180deg,
+    color-mix(in srgb, var(--stage-glow) 30%, transparent) 214deg,
+    transparent 272deg);
+  /* Hollow: the light belongs around the card, not washed over its art. */
+  mask: radial-gradient(closest-side, transparent 62%, #000 76%, #000 100%);
+  filter: blur(7px);
+  animation: stage-ring-turn var(--stage-life, 1150ms) linear both;
+}
+@keyframes stage-ring-turn {
+  0%   { opacity: 0; transform: rotate(-40deg) scale(0.82); }
+  14%  { opacity: 0.9; transform: rotate(24deg) scale(1); }
+  74%  { opacity: 0.66; }
+  100% { opacity: 0; transform: rotate(230deg) scale(1.1); }
+}
+
+.stage-face {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Magic's own corner, in the proportion the printing uses — the same pair
+     `.field-peek` carries, because they are the same card at two sizes. */
+  border-radius: 4.75% / 3.4%;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.72),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 34%, transparent),
+    0 0 22px color-mix(in srgb, var(--stage-glow) 26%, transparent);
+}
+
+/* Up out of the sand, over-large for an instant, held, and then let go
+   upward — a spell arriving, being read, and resolving into whatever it does.
+   The whole commitment is in the first quarter and the rest is the hold, which
+   is the same shape the attack lunge was given: a card that takes a second to
+   arrive is not arriving, it is drifting. */
+/* The blur is pinned at zero from the first frame for the reason `stage-doom`
+   argues at length: a filter named in one keyframe is interpolated across the
+   whole animation, not applied at the end of it. */
+@keyframes stage-rise {
+  0%   { opacity: 0; filter: blur(0);
+         transform: translateY(13%) scale(0.68) rotateX(26deg); }
+  13%  { opacity: 1;
+         transform: translateY(0) scale(1.06) rotateX(-2deg); }
+  21%  { transform: scale(0.985) rotateX(1deg); }
+  28%  { transform: scale(1) rotateX(0deg); }
+  76%  { opacity: 1; transform: scale(1) rotateX(0deg); filter: blur(0); }
+  100% { opacity: 0;
+         transform: translateY(-9%) scale(1.07) rotateX(-9deg);
+         filter: blur(4px); }
+}
+
+/* --- a death, as one motion -------------------------------------------- */
+
+/* **Rise, skull, sink.** The three things Aaron asked for are one gesture and
+   not three effects that fire together: the card comes up to be looked at, the
+   stone falls onto it and drives it down, the colour goes out of it, and it
+   descends. The skull is a *child* of the frame, so it travels down with the
+   card rather than hanging in the air over a card that has left — which is the
+   whole of what makes it read as one thing. */
+.stage-card.is-dies .stage-frame {
+  animation: stage-doom var(--mark-life-dies, 2000ms)
+    cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+/* **`filter` is declared early on purpose, and it is not decoration.** A
+   property that appears in only *one* keyframe is interpolated by the browser
+   across the whole animation from the element's own value — so naming the
+   blur at 100% alone did not blur the card at the end, it blurred it the
+   entire time, ramping up. What that produced was a dying card that was
+   quietly out of focus from the moment it arrived: soft enough to read as
+   wrong and never as anything nameable. Pinned at zero through the hold, so
+   the blur is only ever the last thing that happens to it. */
+@keyframes stage-doom {
+  0%   { opacity: 0; transform: translateY(8%) scale(0.74) rotateX(20deg);
+         filter: blur(0); }
+  9%   { opacity: 1; transform: translateY(0) scale(1.05) rotateX(-1deg); }
+  15%  { transform: scale(1) rotateX(0deg); }
+  /* The stone lands at 22% and the card takes the weight of it. */
+  24%  { transform: translateY(1.6%) scale(0.985) rotateX(2deg); }
+  30%  { transform: translateY(0) scale(1) rotateX(0deg); }
+  78%  { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg);
+         filter: blur(0); }
+  /* And down. Not away and not out — *down*, because that is the one direction
+     a graveyard has ever been in. */
+  100% { opacity: 0;
+         transform: translateY(34%) scale(0.62) rotateX(24deg);
+         filter: blur(2px); }
+}
+/* The colour goes out of it under the stone. The same grey the skull's own
+   mark puts on a card in its row, arrived at over time rather than switched. */
+.stage-card.is-dies .stage-face {
+  animation: stage-cold var(--mark-life-dies, 2000ms) ease-out both;
+}
+/* Grey, and not *dark* grey. The colour going is the whole signal; taking the
+   light with it as well left a card nobody could read under a stone, which is
+   a death that has forgotten to say who died. */
+@keyframes stage-cold {
+  0%, 14% { filter: none; }
+  34%     { filter: grayscale(0.8) brightness(0.78); }
+  100%    { filter: grayscale(0.8) brightness(0.72); }
+}
+/* A death is not a spell being channelled. */
+.stage-card.is-dies .stage-frame::before { animation: none; opacity: 0; }
+.stage-card.is-dies .stage-veil {
+  animation: stage-veil-up var(--mark-life-dies, 2000ms) ease-out both;
+}
+
+/* **Small enough that the card is still the subject.** The first version put
+   the stone at 56% of the card's width, which on a desaturated card is not a
+   death, it is a skull with a grey rectangle behind it — Aaron asked to see
+   *the dying card* enlarged, and if the art is covered the only thing naming
+   the creature is the plate.
+
+   And it was **nine pixels low**, which is the sort of thing that reads as
+   "slightly wrong" and never as anything nameable. `margin` percentages
+   resolve against the containing block's *width* in both axes, so the
+   half-height offset was only ever going to be right for a square picture and
+   this one is 200×238. Centred on a transform instead, which is exact — the
+   base below is what the reduced-motion and parting cases fall back to, and
+   every keyframe carries the same pair so nothing snaps to a corner. */
+.stage-skull {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 46%;
+  height: auto;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  box-shadow:
+    0 5px 15px rgba(0, 0, 0, 0.86),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 42%, transparent);
+  animation: stage-stone var(--mark-life-dies, 2000ms) ease-out both;
+}
+/* It falls, it lands, it stays. A stone set down has weight, so it settles
+   once at 26% rather than arriving perfectly still — the same beat the small
+   mark's headstone takes, because they are the same stone. */
+@keyframes stage-stone {
+  0%   { opacity: 0;
+         transform: translate(-50%, -50%) translateY(-140%) scale(1.5)
+           rotate(-9deg); }
+  10%  { opacity: 0;
+         transform: translate(-50%, -50%) translateY(-90%) scale(1.34)
+           rotate(-6deg); }
+  22%  { opacity: 1;
+         transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  26%  { transform: translate(-50%, -50%) translateY(-3%) scale(1.03)
+           rotate(0.6deg); }
+  32%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  86%  { opacity: 1; }
+  100% { opacity: 0.82; }
+}
+
+/* --- the card that has no picture --------------------------------------- */
+
+/* **A missing painting is not a missing card.** The board only draws what it
+   was handed art for, which is right on a floor of forty cards and wrong here:
+   this exists so nothing in the game happens unseen, and falling back to
+   nothing would put the hole back where it was. So a card with no face is set
+   in type instead — named, framed and rimmed in the arena's own brass, the way
+   a card looks before the art is printed onto it. On a phone it is arguably
+   the more legible of the two: a name in words at fifteen point beats the same
+   name printed at four point across the top of a picture. */
+.stage-plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9%;
+  box-sizing: border-box;
+  text-align: center;
+  background:
+    radial-gradient(ellipse 78% 52% at 50% 38%,
+      color-mix(in srgb, var(--stage-glow) 17%, transparent) 0%,
+      transparent 72%),
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--field-sand-dark) 92%, #000) 0%,
+      #17120b 58%,
+      #241b10 100%);
+}
+.stage-plate-name {
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: clamp(0.9rem, 2.7vw, 1.5rem);
+  line-height: 1.25;
+  color: #f4e9d0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  overflow-wrap: anywhere;
+}
+.stage-plate-rule {
+  width: 54%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--field-brass) 78%, transparent), transparent);
+}
+
+/* --- the plate under the exhibit ---------------------------------------- */
+
+/* The arena is a building full of things worth looking at, and this is the one
+   moment a card is held up to be looked at — so it gets the plate an exhibit
+   gets. It is also the half of this that a person who has asked for stillness
+   still receives in full: reduced motion takes the movement away and leaves
+   the card and these words, so a newcomer relying on it still learns that a
+   spell was cast and which one (commandment 2). */
+.stage-plate-strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 9px;
+  max-width: 84%;
+  padding: 3px 13px 4px;
+  text-align: center;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--field-brass) 46%, transparent);
+  background: linear-gradient(180deg, rgba(24, 18, 10, 0.92),
+    rgba(10, 8, 5, 0.94));
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 color-mix(in srgb, var(--field-brass) 22%, transparent);
+  animation: stage-plate-up var(--stage-life, 1150ms) ease-out both;
+}
+.stage-card.is-dies .stage-plate-strip {
+  animation: stage-plate-up var(--mark-life-dies, 2000ms) ease-out both;
+}
+@keyframes stage-plate-up {
+  0%   { opacity: 0; transform: translateY(7px); }
+  18%  { opacity: 1; transform: translateY(0); }
+  78%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(3px); }
+}
+/* Magic's own word for what just happened, cut into the brass. */
+.stage-plate-word {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.stage-plate-title {
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  color: #efe4c9;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  overflow-wrap: anywhere;
+}
+
+/* --- one spell following another ---------------------------------------- */
+
+/* Two spells cast a beat apart is an ordinary thing — a ritual and what it
+   paid for, a cascade, a storm count — and the first one blinking out of
+   existence to be replaced by the second reads as a fault rather than as a
+   game. So the one on its way out is *shoved off* instead of cut: back and
+   away in a fifth of a second, which is not something anybody is meant to
+   watch. Deliberately not scaled by pace, because it is the absence of a hard
+   cut rather than an effect of its own.
+   Every inner animation stops, so the group's own is the only thing moving —
+   two cards mid-flight in opposite directions is a worse picture than the cut
+   this replaces. */
+.stage-card.is-parting {
+  animation: stage-part 200ms cubic-bezier(0.4, 0, 0.9, 0.5) both;
+}
+.stage-card.is-parting .stage-veil,
+.stage-card.is-parting .stage-frame,
+.stage-card.is-parting .stage-frame::before,
+.stage-card.is-parting .stage-face,
+.stage-card.is-parting .stage-skull,
+.stage-card.is-parting .stage-plate-strip { animation: none; }
+/* ...but a card that was dying stays dead on the way out. */
+.stage-card.is-parting.is-dies .stage-face {
+  filter: grayscale(0.8) brightness(0.72);
+}
+@keyframes stage-part {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.84) translateY(-5%); }
+}
+
+/* --- a phone ------------------------------------------------------------ */
+
+/* The case most likely to be wrong, and the only one Aaron has to hand today.
+   A card at 58% of a tall narrow arena is most of the arena; at 46% with a
+   tighter cap it is still far bigger than anything else on the sand and the
+   rows either side of it stay visible, which is the property that matters more
+   than the size does. */
+@media (max-width: 640px) {
+  .stage-frame {
+    height: min(46%, 232px);
+    max-width: min(58%, 168px);
+  }
+  .stage-plate-strip {
+    max-width: 90%;
+    padding: 2px 9px 3px;
+    gap: 2px 7px;
+  }
+  .stage-plate-title { font-size: 0.8rem; }
+  .stage-plate-word { font-size: 0.54rem; }
+}
+
+/* --- stillness ---------------------------------------------------------- */
+
+/* **The movement goes; the card does not.** A big thing arriving in the middle
+   of the screen is exactly what somebody turns this setting on to be spared,
+   and answering that by drawing nothing at all would take the whole mechanic
+   away from the person most likely to need it — a newcomer who has asked for a
+   still page still has to be able to learn that a spell was cast and which one.
+   So: no travel, no scale, no turning ring, no blur. The card fades up, holds
+   for its full length beside its plate, and fades away. Every duration is still
+   the same custom property, so nothing here can fall out of step with the clock
+   the element is actually taken down on. */
+@media (prefers-reduced-motion: reduce) {
+  .stage-card { perspective: none; }
+  .stage-frame::before { animation: none; opacity: 0; }
+  .stage-veil,
+  .stage-frame,
+  .stage-plate-strip {
+    animation: stage-still var(--stage-life, 1150ms) linear both;
+  }
+  .stage-card.is-dies .stage-veil,
+  .stage-card.is-dies .stage-frame,
+  .stage-card.is-dies .stage-plate-strip,
+  .stage-skull {
+    animation: stage-still var(--mark-life-dies, 2000ms) linear both;
+  }
+  /* Grey, but arrived at rather than faded into — the fact, without the fade. */
+  .stage-card.is-dies .stage-face {
+    animation: none;
+    filter: grayscale(0.8) brightness(0.72);
+  }
+  .stage-card.is-parting { animation: stage-gone 200ms linear both; }
+  @keyframes stage-still {
+    0%, 100% { opacity: 0; }
+    8%, 86%  { opacity: 1; }
+  }
+  @keyframes stage-gone {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+  }
+}

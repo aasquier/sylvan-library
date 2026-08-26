@@ -655,6 +655,26 @@ function onTheTable(card: BoardCard): boolean {
   return card.zone === 'battlefield' || card.zone === 'land' || !!card.leaving
 }
 
+/**
+ * Whether a beat's card and a board card are the same card.
+ *
+ * Not `===`, and the reason is a fact about the wire: Forge names a **face**,
+ * never Scryfall's combined `A // B` (`events.go`, and `docs/FORGE.md`'s
+ * fourth fact). The board's names come from the scribe and can carry the
+ * combined spelling, so a transforming creature would attack, block and die
+ * without a single mark ever landing on it — silently, and only in the decks
+ * that play them. Comparing the front face costs one split.
+ *
+ * **Here rather than in a component**, because two callers ask it now and they
+ * ask it from opposite ends: the board matching a beat against a card in a
+ * row, and the centre stage looking a *cast* card up in the match's own card
+ * list, since a cast beat carries a name and no id. Two copies of this ruling
+ * would be two places for it to rot, and the rot would be invisible.
+ */
+export function sameCard(onBoard: string, inBeat: string): boolean {
+  return onBoard === inBeat || onBoard.split(' // ')[0] === inBeat
+}
+
 /** A run of identical cards, drawn as one stack with a count on it. */
 export interface BoardStack {
   /** The first of them, which is what gets drawn. */
