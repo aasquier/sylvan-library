@@ -4744,6 +4744,78 @@ button:hover .tarot-fan-card {
   padding-top: calc(var(--canopy-drop) + 0.75rem);
 }
 
+/* The bar the ivy hangs from, and the fold that gets it out of the way (punch
+ * list 2026-08-26: "it really should fold up and disappear like the ivy").
+ *
+ * The colour and the hairline live here rather than in a `style` attribute on
+ * the element, because the states below have to reach them and an inline style
+ * is precisely what a `:focus-within` can never win against — commandment 17's
+ * own footnote about how the last hundred dull controls happened.
+ *
+ * Note what is NOT here: any change to `.page-main`'s padding. The bar is
+ * `sticky`, so it holds its space in the flow whatever its transform says, and
+ * a transform reflows nothing. The page underneath does not move a pixel when
+ * this folds — which is the entire reason it is a transform. */
+.site-header {
+  background: color-mix(in srgb, var(--page) 88%, transparent);
+  border-bottom: 1px solid var(--hairline);
+  /* The frost the 88% wash was always drawn against. The element carried a
+   * `backdrop-blur` class and nothing answered it — the utility is not in the
+   * generated sheet, so the computed `backdrop-filter` was `none` and the
+   * whole bar was a plain 12%-transparent pane with the page's own headings
+   * legible straight through it. Invisible while the bar merely sat there;
+   * impossible to miss the moment it started sliding over content. The
+   * `-webkit-` half is not optional — it is the only one iOS reads, and iOS is
+   * where this bar is looked at most.
+   *
+   * Prefixed FIRST, standard second, which is this file's convention
+   * everywhere it pairs the two (see the `-webkit-mask-image` sites). It is
+   * not a style preference: the minifier folds a prefixed/unprefixed pair down
+   * to whichever came LAST, so writing them the other way round ships only the
+   * `-webkit-` one — invisible on this Mac and on iOS, and no frost at all in
+   * Firefox, which has never supported the prefixed spelling. Checking the
+   * source would not have caught it; checking `web_dist` did. */
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
+  transform-origin: 50% 0;
+  /* Coming back is quicker than leaving. Scrolling up is a request, and a
+   * request answered over 380ms feels answered late; leaving takes the ivy's
+   * own timing below, so the two halves of the canopy roll away as one. */
+  transition:
+    transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 180ms ease;
+}
+
+/* Folded: up into the top edge, compressed a little on the way, so it reads as
+ * a blind rolling rather than a panel sliding off a shelf. Same origin, same
+ * curve and the same 380ms as `.header-canopy.is-retracted` — that agreement
+ * is what makes the bar and the vine look like one piece of furniture leaving
+ * instead of two things that happened to go at once.
+ *
+ * A transform and an opacity, deliberately — never `display` or `visibility`.
+ * Both of those take the nav out of the tab order, and the rule after this one
+ * depends on a Tab still being able to land in here.
+ *
+ * The vine needs nothing of its own: it is an absolutely-positioned child, so
+ * this carries it bodily, and it is long since rolled up anyway — it withdraws
+ * at 8px and the bar will not fold before 96. */
+.site-header.is-furled {
+  transform: translateY(-100%) scaleY(0.92);
+  opacity: 0;
+  transition:
+    transform 380ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 260ms ease;
+}
+
+/* Whatever the scroll says, a keyboard inside the bar unfolds it. A focused
+ * link nobody can see is a real bug and a common one; this is the fix, in CSS
+ * rather than in a focus handler so that it cannot fall out of step with the
+ * state above or lose a race with it. */
+.site-header.is-furled:focus-within {
+  transform: none;
+  opacity: 1;
+}
+
 .header-canopy {
   position: absolute;
   top: 100%;
@@ -5284,8 +5356,13 @@ button:hover .tarot-fan-card {
     animation: none;
   }
   /* The vine still gets out of the page's way when scrolled -- that is a fix,
-   * not an ornament -- but it does it instantly rather than rolling up. */
-  .header-canopy {
+   * not an ornament -- but it does it instantly rather than rolling up. The
+   * bar above it folds on exactly the same terms and for the same reason: a
+   * sticky header over a phone screen is in the way whether or not you asked
+   * for animation, so it still goes, it just does not perform going. */
+  .header-canopy,
+  .site-header,
+  .site-header.is-furled {
     transition: none;
   }
   .scene-mote {
