@@ -1,59 +1,63 @@
 {
-  "symbols": {
-    "cdn": "https://svgs.scryfall.io/card-symbols",
-    "code": "[0-9A-Z]{1,10}",
-    "max_bytes": 65536
-  },
-  "ocr": {
-    "cache_stamp": "6.1.2-7.0.0-4.0.0_fast",
-    "max_bytes": 16777216,
-    "assets": {
-      "tesseract-core-simd-lstm.wasm.js": {
-        "url": "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.1.2/tesseract-core-simd-lstm.wasm.js",
-        "digest": "9d7c43fb206dc9f48475228b46bf35f888fa9e6259da2e67d5a75c77049f2dc7",
-        "size": 3954569,
-        "media_type": "text/javascript"
-      },
-      "worker.min.js": {
-        "url": "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/worker.min.js",
-        "digest": "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d",
-        "size": 111307,
-        "media_type": "text/javascript"
-      },
-      "eng.traineddata.gz": {
-        "url": "https://tessdata.projectnaptha.com/4.0.0_fast/eng.traineddata.gz",
-        "digest": "18c1ac52b75e35d44735fb6c2a60acfaf23033524653200738e98f0243edb75b",
-        "size": 1984273,
-        "media_type": "application/gzip"
-      },
-      "worker.min.js.LICENSE.txt": {
-        "url": "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/worker.min.js.LICENSE.txt",
-        "digest": "45f54171aeaa1d10c0c1a66f374b7bba1f02472b1487fbe892eec04f840002ac",
-        "size": 466,
-        "media_type": "text/plain"
-      }
-    }
-  },
-  "cardmotion": {
-    "servable": [
-      "depth.png",
-      "loop.mp4",
-      "loop.webm",
-      "poster.webp"
-    ],
-    "effects": {
-      "depth-drift": {
-        "fingerprint": "2213272c5c36e846",
-        "needs_depth": true
-      },
-      "slow-pan": {
-        "fingerprint": "0c3e8edb6faf44f1",
-        "needs_depth": false
-      },
-      "breath": {
-        "fingerprint": "47473ac00a110546",
-        "needs_depth": false
-      }
-    }
+ "symbols": {
+  "cdn": "https://svgs.scryfall.io/card-symbols",
+  "code": "[0-9A-Z]{1,10}",
+  "max_bytes": 65536
+ },
+ "ocr": {
+  "cache_stamp": "6.1.2-7.0.0-4.0.0_fast",
+  "max_bytes": 16777216,
+  "assets": {
+   "tesseract-core-simd-lstm.wasm.js": {
+    "url": "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.1.2/tesseract-core-simd-lstm.wasm.js",
+    "digest": "9d7c43fb206dc9f48475228b46bf35f888fa9e6259da2e67d5a75c77049f2dc7",
+    "size": 3954569,
+    "media_type": "text/javascript"
+   },
+   "worker.min.js": {
+    "url": "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/worker.min.js",
+    "digest": "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d",
+    "size": 111307,
+    "media_type": "text/javascript"
+   },
+   "eng.traineddata.gz": {
+    "url": "https://tessdata.projectnaptha.com/4.0.0_fast/eng.traineddata.gz",
+    "digest": "18c1ac52b75e35d44735fb6c2a60acfaf23033524653200738e98f0243edb75b",
+    "size": 1984273,
+    "media_type": "application/gzip"
+   },
+   "worker.min.js.LICENSE.txt": {
+    "url": "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/worker.min.js.LICENSE.txt",
+    "digest": "45f54171aeaa1d10c0c1a66f374b7bba1f02472b1487fbe892eec04f840002ac",
+    "size": 466,
+    "media_type": "text/plain"
+   }
   }
+ },
+ "cardmotion": {
+  "servable": [
+   "depth.png",
+   "loop.mp4",
+   "loop.webm",
+   "poster.webp"
+  ],
+  "effects": {
+   "depth-drift": {
+    "fingerprint": "2213272c5c36e846",
+    "needs_depth": true
+   },
+   "slow-pan": {
+    "fingerprint": "0c3e8edb6faf44f1",
+    "needs_depth": false
+   },
+   "breath": {
+    "fingerprint": "47473ac00a110546",
+    "needs_depth": false
+   },
+   "daynight": {
+    "fingerprint": "0e4db4024921d6b5",
+    "needs_depth": false
+   }
+  }
+ }
 }

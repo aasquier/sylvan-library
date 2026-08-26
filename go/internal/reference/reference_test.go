@@ -141,9 +141,31 @@ func TestTheShelvesAreWhatTheModulesHold(t *testing.T) {
 	if len(sh.OCR.Assets) != 4 || sh.OCR.CacheStamp == "" || sh.OCR.Assets["worker.min.js"].Digest == "" {
 		t.Fatalf("ocr %+v", sh.OCR)
 	}
-	if len(sh.Cardmotion.Effects) != 3 || len(sh.Cardmotion.Effects["depth-drift"].Fingerprint) != 16 ||
-		len(sh.Cardmotion.Servable) != 4 {
+	// **A property, not a tally.** This read `len(Effects) != 3` and broke the
+	// day a fourth was added, which is the only day a count like that ever
+	// does anything — and what it does is say "something changed", which the
+	// diff already said. What actually has to hold is that every effect is
+	// keyed by a fingerprint the shelf can find it by: sixteen hex characters,
+	// and no two the same, because two effects sharing one would serve each
+	// other's derivatives.
+	if len(sh.Cardmotion.Effects) == 0 || len(sh.Cardmotion.Servable) != 4 {
 		t.Fatalf("cardmotion %+v", sh.Cardmotion)
+	}
+	seen := map[string]string{}
+	for name, effect := range sh.Cardmotion.Effects {
+		if len(effect.Fingerprint) != 16 {
+			t.Errorf("effect %q has fingerprint %q, want sixteen characters",
+				name, effect.Fingerprint)
+		}
+		if other, clash := seen[effect.Fingerprint]; clash {
+			t.Errorf("effects %q and %q share fingerprint %q, so each would "+
+				"find the other's derivatives", name, other, effect.Fingerprint)
+		}
+		seen[effect.Fingerprint] = name
+	}
+	if _, ok := sh.Cardmotion.Effects["depth-drift"]; !ok {
+		t.Error("depth-drift is gone; ADR 32's own effect is the anti-vacuity " +
+			"check that this is reading the real file")
 	}
 }
 

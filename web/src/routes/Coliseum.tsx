@@ -68,6 +68,7 @@ import {
   beatLine, playerTurns, shortName, theaterBeats, theaterRows, turnsTaken,
 } from '../lib/theater'
 import { CrossedSwordsGlyph } from '../components/glyphs'
+import { reducedMotion, useCardMotion } from '../lib/motion'
 import { HelpTip, Term } from '../components/term'
 import secutorArt from '../assets/coliseum/secutor.webp'
 
@@ -110,6 +111,11 @@ const HERO = {
   url: 'https://cards.scryfall.io/art_crop/front/c/2/c2dc8061-a855-4a81-9eb7-350b355a9b3f.jpg?1783945028',
   printing: 'Onslaught',
   artist: 'Carl Critchlow',
+  /** The painting's oracle id, which is how the motion shelf is keyed
+   *  (ADR 32). Written down rather than looked up: this room shows one fixed
+   *  painting on purpose — see the note above — so a pool round trip would be
+   *  a request to learn a constant. */
+  oracleId: '1cea9b82-d2e9-4758-8ec8-729fcf4bb7d7',
   alt: 'A vast oval arena of pale stone standing alone on a bare plain, '
      + 'ringed with gatehouses and crowned by two tall statues, under a wide '
      + 'and hazy sky.',
@@ -121,30 +127,72 @@ const HERO = {
  *  **Whole, not cropped.** Spanning the page and cropping the page are
  *  different asks; `art_crop` is 1.37:1 and this frame keeps that ratio, so
  *  none of Critchlow's arena is thrown away to make a letterbox. */
-function Hero() {
-  return (
-    <div className="coliseum-hero">
-      <img className="coliseum-hero-art" src={HERO.url} alt={HERO.alt} />
-      <div className="coliseum-hero-sky" aria-hidden="true" />
+/** The only derivative this banner will accept.
+ *
+ *  Not the usual ladder. `depth-drift` and `slow-pan` are parallaxes *of the
+ *  plate* and would fight a frame that is already moving; this room wants the
+ *  one loop that was made for it or the painting, and nothing in between. */
+const HERO_EFFECTS = ['daynight'] as const
 
-      {/* One bar, not two absolutes. Both used to be anchored to the bottom
-          of the frame and they closed to twelve pixels on a laptop and
-          overlapped outright on a phone; a flex row cannot overlap itself,
-          and below the width where both fit the credit takes its own line.
-          The scrim under them is in `.coliseum-plate` and is what makes the
-          credit legible over pale stone in the light theme. */}
-      <div className="coliseum-plate">
-        <h1 className="coliseum-title text-3xl font-semibold text-white
-                       sm:text-4xl">
-          The Coliseum
-        </h1>
-        {/* The credit as a footnote on the painting rather than a caption
-            under it — small, but never absent: it is somebody's work. */}
-        <p className="coliseum-footnote">
-          <em>Grand Coliseum</em>, {HERO.printing} — art by {HERO.artist}
-        </p>
-      </div>
+function Hero() {
+  // One status pass. `ready: false`, an error, or an instance that never had
+  // the loop pushed to it all land in the same place: the still, which is the
+  // page exactly as it was before this existed.
+  const motion = useCardMotion(HERO.oracleId, HERO_EFFECTS, HERO.url)
+  // **A fifteen-second day-to-night pass is motion by anybody's definition.**
+  // Somebody who has asked their machine to stop moving things gets the
+  // painting, not a poster frame of the loop — the painting is the better
+  // still and it is the one a person made.
+  const loop = reducedMotion() ? undefined
+    : motion?.ready ? motion.urls?.mp4 : undefined
+  // **Slower than it was rendered.** Fifteen seconds is a whole day and night,
+  // which is a lot of sky to move through while somebody is reading the
+  // paragraph underneath it. Six tenths makes it twenty-five, which is closer
+  // to the eighty-second breath the still has always had — this is a room's
+  // backdrop, not a thing to watch. `playbackRate` survives no attribute, so
+  // it is set on the element and set again whenever the source changes.
+  const film = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    if (film.current) film.current.playbackRate = 0.6
+  }, [loop])
+  return (
+    <>
+    <div className={`coliseum-hero${loop ? ' is-moving' : ''}`}>
+      {loop ? (
+        // `role="img"` with the still's own description: what a screen reader
+        // needs here is what the frame shows, and that has not changed.
+        <video className="coliseum-hero-art" src={loop} ref={film}
+               poster={motion?.urls?.poster}
+               autoPlay loop muted playsInline
+               role="img" aria-label={HERO.alt} />
+      ) : (
+        <img className="coliseum-hero-art" src={HERO.url} alt={HERO.alt} />
+      )}
+      <div className="coliseum-hero-sky" aria-hidden="true" />
     </div>
+    {/* **The title is read, not seen.** The banner says "coliseum" better than
+        the word does (Aaron: "we can drop the Coliseum title since the video
+        speaks for itself"), but a page still needs a heading — a screen reader
+        has no picture to be spoken for by, and an outline with no `h1` is a
+        page that starts nowhere. */}
+    <h1 className="sr-only">The Coliseum</h1>
+    {/* **The credit sits under the frame now, not on it** (Aaron: "lets move
+        the credit underneath the video"). It was a footnote *on* the painting
+        over a scrim that existed to make white ink legible over pale stone —
+        and the scrim was a wash across the foot of the picture, paid for by
+        the picture. Underneath, the credit is simply readable and the frame is
+        whole.
+
+        It changes with what is on screen, because the two are different
+        claims. Over the painting it is a credit. Over the loop it is an
+        *acknowledgement*: what is playing was generated from that painting and
+        is not the artist's own work, and "art by" alone over it would put his
+        name on something he did not make. */}
+    <p className="coliseum-footnote">
+      {loop ? <>Motion inspired by </> : null}
+      <em>Grand Coliseum</em>, {HERO.printing} — art by {HERO.artist}
+    </p>
+    </>
   )
 }
 
@@ -162,7 +210,7 @@ function Slide({ fact }: { fact: ColiseumFact }) {
   return (
     <div className="arena-slide">
       <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em]
-                    text-[var(--muted)]">
+                    text-[var(--text-muted)]">
         {KIND_LABEL[fact.kind]}
       </p>
       {fact.rome && (
@@ -173,7 +221,7 @@ function Slide({ fact }: { fact: ColiseumFact }) {
       {fact.magic && (
         <p className={`text-[0.95rem] leading-relaxed ${
           fact.rome
-            ? 'mt-3 border-l-2 pl-3 text-[var(--muted)]'
+            ? 'mt-3 border-l-2 pl-3 text-[var(--text-muted)]'
             : 'mt-2 text-[var(--ink)]'
         }`}
            style={fact.rome ? { borderColor: 'var(--arena-glow)' } : undefined}>
@@ -181,7 +229,7 @@ function Slide({ fact }: { fact: ColiseumFact }) {
         </p>
       )}
       {fact.card && (
-        <p className="mt-2 text-[0.75rem] italic text-[var(--muted)]">
+        <p className="mt-2 text-[0.75rem] italic text-[var(--text-muted)]">
           {fact.card}
         </p>
       )}
@@ -505,7 +553,7 @@ export default function ColiseumRoom() {
           was actually protecting. The h1 moves here with it. */}
       <Hero />
 
-      <p className="mt-6 max-w-2xl text-[0.95rem] leading-relaxed text-[var(--muted)]">
+      <p className="mt-6 max-w-2xl text-[0.95rem] leading-relaxed text-[var(--text-muted)]">
         Six houses, and what Rome did in each of them. Send two decks in and
         {' '}<Term name="tier-3">the Forge</Term> plays real games — whole
         ones, with an opponent, told blow by blow. It takes minutes; this is
@@ -645,7 +693,7 @@ export default function ColiseumRoom() {
       )}
 
       {failed && (
-        <p className="mt-8 text-[var(--muted)]">
+        <p className="mt-8 text-[var(--text-muted)]">
           The coliseum is dark tonight — its doors did not answer.
         </p>
       )}
@@ -679,7 +727,7 @@ export default function ColiseumRoom() {
             <div>
               <Stage arena={arena} />
               {/* Somebody painted this. Name them. */}
-              <p className="mt-2 text-[0.75rem] text-[var(--muted)]">
+              <p className="mt-2 text-[0.75rem] text-[var(--text-muted)]">
                 {arena.plane}
                 {arena.backdrop && <> · <em>{arena.backdrop.name}</em></>}
                 {' · '}{arena.art.printing}, art by {arena.art.artist}
@@ -762,7 +810,7 @@ export default function ColiseumRoom() {
                             onClick={() => step(-1)}>Back</button>
                     <button type="button" className="btn btn-quiet btn-sm"
                             onClick={() => step(1)}>Next</button>
-                    <span className="ml-1 text-[0.75rem] text-[var(--muted)]">
+                    <span className="ml-1 text-[0.75rem] text-[var(--text-muted)]">
                       {facts.length === 0 ? 'nothing to tell'
                         : `${slide + 1} of ${facts.length}`}
                     </span>
@@ -774,11 +822,11 @@ export default function ColiseumRoom() {
 
           <section aria-label={`Champions of ${arena.name}`} className="mt-8">
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em]
-                           text-[var(--muted)]">
+                           text-[var(--text-muted)]">
               Who fights here
             </h2>
             {arena.champions.length === 0 ? (
-              <p className="mt-3 text-[0.9rem] text-[var(--muted)]">
+              <p className="mt-3 text-[0.9rem] text-[var(--text-muted)]">
                 The stable is empty until the card pool answers.
               </p>
             ) : (
@@ -797,7 +845,7 @@ export default function ColiseumRoom() {
                           <p className="text-[0.85rem] font-semibold text-[var(--ink)]">
                             {c.name}
                           </p>
-                          <p className="mt-0.5 text-[0.78rem] leading-snug text-[var(--muted)]">
+                          <p className="mt-0.5 text-[0.78rem] leading-snug text-[var(--text-muted)]">
                             {c.role}
                           </p>
                         </div>
@@ -873,7 +921,7 @@ export default function ColiseumRoom() {
           )}
 
           {!data.pool && (
-            <p className="mt-8 text-[0.8rem] text-[var(--muted)]">
+            <p className="mt-8 text-[0.8rem] text-[var(--text-muted)]">
               No card pool has answered, so the arenas are showing without their
               paintings. Everything written here still stands.
             </p>
