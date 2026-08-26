@@ -6889,9 +6889,14 @@ button:hover .tarot-fan-card {
 
 .field-pile {
   position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  aspect-ratio: 3 / 4;
+  width: 100%;
+  /* **Landscape, because the painting is.** A Scryfall art crop is about
+     626x457, and a portrait tile throws away a third of it — which is why
+     these paintings kept looking like textures (Aaron, 2026-08-25: "seems
+     like it will be tough to use our card art backgrounds that way"). A zone
+     is not a card. It is a *place*, and it can be whatever shape shows the
+     place best. Matching the crop's own ratio shows it very nearly whole. */
+  aspect-ratio: 626 / 457;
   border-radius: 6px;
   overflow: hidden;
   background: rgba(10, 8, 5, 0.5);
@@ -6915,9 +6920,9 @@ button:hover .tarot-fan-card {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 35%;
-  opacity: 0.95;
-  filter: saturate(0.95) brightness(0.9);
+  object-position: 50% 45%;
+  opacity: 1;
+  filter: saturate(1) brightness(0.94);
 }
 
 /* The wrapper is the hover target, and it holds the pile *and* the tray that
@@ -6925,7 +6930,18 @@ button:hover .tarot-fan-card {
    the pointer has to leave the pile to reach is a panel nobody can reach, and
    keeping both inside one hover group means the pointer never crosses a gap.
    `focus-within` gives the keyboard the same thing for free. */
-.field-pile-wrap { position: relative; flex: 0 0 auto; }
+/* **The wrap is the flex child, so the wrap is what flexes.** This carried
+   `flex: 0 0 auto` while the pile inside it carried `flex: 1 1 0` with no
+   width — so the wrap sized itself to its content, the content wanted to grow
+   from a zero basis, and the zones came out *zero pixels wide*. They were in
+   the DOM, correctly dressed, and invisible. jsdom has no layout and the
+   suite reads an empty stylesheet, so nothing in 734 green tests could have
+   seen it; Aaron opening the page saw it immediately. */
+.field-pile-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
 
 .field-tray {
   position: absolute;
@@ -7038,12 +7054,11 @@ button:hover .tarot-fan-card {
  * in a place rather than hangs on a wall. */
 .field-pile-art {
   position: absolute;
-  left: 50%;
-  bottom: 20%;
-  width: 46%;
+  right: 7%;
+  bottom: 16%;
+  width: 26%;
   height: auto;
   aspect-ratio: 488 / 680;
-  transform: translateX(-50%);
   object-fit: cover;
   border-radius: 2.5px;
   box-shadow:
