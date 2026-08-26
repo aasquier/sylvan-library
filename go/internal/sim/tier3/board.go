@@ -34,8 +34,15 @@ import "strings"
 //     `Commander Effect` for each player (ids 101 and 202 in the recorded
 //     match), one per companion, and one for every activated ability that
 //     needs somewhere to hang. They are invisible in any real game and
-//     drawing one puts a blank card beside somebody's commander. The rule and
-//     the three bytecode facts under it are `isForgeEffect` in `scribe.go`.
+//     drawing one puts a blank card beside somebody's commander. Neither half
+//     of that description holds always — a real board produced one carrying a
+//     type line and one outside a command zone — so a fourth fact stands
+//     beside the three bytecode ones: an effect an ability built writes its
+//     own source into its name. `isForgeEffect` in `scribe.go` is the rule and
+//     carries all four; `ScribeParser.refused` is why the answer is asked once
+//     per card rather than again on every line, and `board.change` is the
+//     other side of the same coin — the board says nothing about a card the
+//     dictionary has not named.
 //  4. **`out` only clears a zone the card is actually in.** Forge does not
 //     promise that a card's `out` of its old zone precedes its `in` to the
 //     new one, and an unconditional clear on a late `out` blanks a card that
