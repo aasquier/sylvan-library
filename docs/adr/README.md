@@ -57,6 +57,7 @@ they differ.
 | [42](0042-a-scribe-rides-forges-event-bus.md) | A scribe rides Forge's event bus, and the board is a listener rather than a parser | Accepted |
 | [43](0043-a-generated-banner-is-a-shelf-entry-and-never-a-commit.md) | A generated banner is a shelf entry, and never a commit | Accepted — widens the effect vocabulary of [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) |
 | [44](0044-the-board-holds-state-and-never-holds-a-guess.md) | The board holds the state the events do not, and never holds a guess | Accepted |
+| [46](0046-the-coliseum-runs-at-night.md) | The Coliseum runs at night | Proposed — the record is built, the night is designed |
 
 **A note on the numbering.** There is no 41, and this table does not know why
 — the number was never used. The hole stays: renumbering would move a number

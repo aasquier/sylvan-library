@@ -61,6 +61,7 @@ import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
 import { tokenSigil } from '../lib/tokens'
+import { stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 
 /** One card on the field.
@@ -1467,13 +1468,23 @@ function FieldSide({ side, facing, active }: {
  * backwards costs exactly what forwards costs. The controls are a second way
  * to set that number, not a second engine.
  */
-function FieldTransport({ speed, setSpeed, at, of, seek,
+function FieldTransport({ speed, setSpeed, at, of, seek, turns = [],
   games, playing: onGame, chooseGame }: {
   speed: Speed
   setSpeed: (s: Speed) => void
   at: number
   of: number
   seek: (to: number) => void
+  /** Where each turn begins, as a count of beats told — so seeking to one puts
+   *  the turn's own announcement on the board as the last thing said.
+   *
+   *  **One player's turn, not a round.** Forge alternates seats and prints a
+   *  turn line for each, so consecutive marks are one player's turn apart.
+   *  That is the unit somebody studying a game wants (Aaron, 2026-08-26:
+   *  "a player's turn at a time, not a full two player turn"), and this
+   *  project has been bitten once already by Forge's two different turn
+   *  numbers — `lib/theater.ts` carries that argument in full. */
+  turns?: number[]
   /** Every game the match has finished, in order. One while it is still being
    *  played; all of them once it is over. */
   games: number[]
@@ -1482,6 +1493,12 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
   chooseGame: (game: number) => void
 }) {
   const running = speed !== 'paused'
+
+  // Where a turn step lands is `stepToTurn`'s rule, in `lib/theater.ts` beside
+  // the rest of the turn arithmetic — a component is a poor place for a rule
+  // worth pinning with a test.
+  const step = (to: number) => { setSpeed('paused'); seek(to) }
+
   return (
     <div className="field-transport">
       {/* Which game. A place rather than an action, so `.strip-tab`'s
@@ -1500,10 +1517,31 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
           ))}
         </div>
       )}
+      {/* **Two units, and the controls say which is which.** The inner pair
+          walks a beat — one line of the account, one change on the board. The
+          outer pair walks a whole turn, and wears the word so nobody has to
+          discover the difference by pressing it. That asymmetry is the label:
+          a glyph alone means "the small step", a glyph beside "Turn" means the
+          big one.
+
+          The turn pair only appears once the account has raised a turn to step
+          to. A control that cannot do anything is not a control (the same rule
+          the game chips above follow), and before the first turn line lands
+          there is nothing for these to reach. */}
       <div className="field-transport-buttons">
+        {turns.length > 0 && (
+          <button type="button" className="btn btn-sm field-step field-turn"
+                  onClick={() => step(stepToTurn(turns, at, of, 'back'))}
+                  disabled={at <= 0} aria-label="Back one turn"
+                  title="Back one turn">
+            <span aria-hidden="true">◀</span>
+            <span className="field-turn-word">Turn</span>
+          </button>
+        )}
         <button type="button" className="btn btn-sm field-step"
-                onClick={() => { setSpeed('paused'); seek(at - 1) }}
-                disabled={at <= 0} aria-label="Back one beat">
+                onClick={() => step(at - 1)}
+                disabled={at <= 0} aria-label="Back one beat"
+                title="Back one beat">
           <span aria-hidden="true">◀◀</span>
         </button>
         <button type="button"
@@ -1513,10 +1551,20 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
           <span aria-hidden="true">{running ? '❙❙' : '▶'}</span>
         </button>
         <button type="button" className="btn btn-sm field-step"
-                onClick={() => { setSpeed('paused'); seek(at + 1) }}
-                disabled={at >= of} aria-label="Forward one beat">
+                onClick={() => step(at + 1)}
+                disabled={at >= of} aria-label="Forward one beat"
+                title="Forward one beat">
           <span aria-hidden="true">▶▶</span>
         </button>
+        {turns.length > 0 && (
+          <button type="button" className="btn btn-sm field-step field-turn"
+                  onClick={() => step(stepToTurn(turns, at, of, 'on'))}
+                  disabled={at >= of} aria-label="Forward one turn"
+                  title="Forward one turn">
+            <span className="field-turn-word">Turn</span>
+            <span aria-hidden="true">▶</span>
+          </button>
+        )}
       </div>
 
       {/* Places rather than actions, so `.chip-toggle` rather than `.btn` —
@@ -1559,7 +1607,7 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
  * two to keep in step.
  */
 export function MatchBoard({ board, shown, game, name, running, beat,
-  speed, setSpeed, of, seek, games, playing, chooseGame, zones = [] }: {
+  speed, setSpeed, of, seek, turns, games, playing, chooseGame, zones = [] }: {
   board: ForgeBoard | null
   /** The paintings the board's own zones wear, from `/api/coliseum`. Checked-in
    *  prose, so it arrives before any match does; empty is a legible state and
@@ -1579,6 +1627,9 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   /** How many beats this game has in total, told and untold. */
   of: number
   seek: (to: number) => void
+  /** Where each of this bout's turns begins, for stepping a turn at a time.
+   *  See [FieldTransport] — these are player-turns, not rounds. */
+  turns?: number[]
   games: number[]
   playing: number
   chooseGame: (game: number) => void
@@ -1708,7 +1759,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
 
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
-                      seek={seek} games={games} playing={playing}
+                      seek={seek} turns={turns} games={games} playing={playing}
                       chooseGame={chooseGame} />
     </section>
     <aside className="field-zones" aria-label="Zones off the battlefield">
