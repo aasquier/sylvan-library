@@ -711,9 +711,13 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
 }
 
 /** The stone rail one player's name, life and closed zones are carved into. */
-function FieldRail({ side, facing }: {
+function FieldRail({ side, facing, name }: {
   side: BoardSide
   facing: 'far' | 'near'
+  /** Whose zones these are. The nameplate came off the old grey bar and back
+   *  onto *this*, which is the difference between a label floating on a strip
+   *  and a heading over the thing it names. */
+  name: string
 }) {
   // **Whose grave is about to receive the body.** The dying card is held on
   // the sand for the beat that announces it, so no graveyard can answer this
@@ -731,14 +735,14 @@ function FieldRail({ side, facing }: {
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
   return (
     <div className={`field-rail field-rail-${facing}`}>
-      {/* **The nameplate is gone, and the stone bar with it.** The name was
-          said twice — the hand beside this rail already carries it, and a
-          board that tells you the same thing in two places has spent the room
-          twice (Aaron, 2026-08-25). The bar it sat in was a grey strip with a
-          hatch on it, which is furniture pretending to be material: the sand
-          is the material, and three lit places standing on it is a table.
-          `title` keeps the full deck name reachable for anybody who wants it. */}
-      <span className="field-rail-totals" title={side.name}>
+      {/* **The stone bar is gone; the name came back as a heading.** It was a
+          label floating on a grey strip, which is furniture pretending to be
+          material. Now the two seats' zones stand side by side in a band of
+          their own, and a band holding two players' places needs to say whose
+          is whose — so each panel is headed by its deck. `title` keeps the
+          full name for anybody who wants it. */}
+      <span className="field-rail-name" title={side.name}>{name}</span>
+      <span className="field-rail-totals">
         <FieldPile label="Command zone" short="Command Zone"
                    cards={side.command} zone="command" throne />
         {/* **Beside the pile rather than on it.** Inside, the chip covered
@@ -1119,8 +1123,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                       chooseGame={chooseGame} />
     </section>
     <aside className="field-zones" aria-label="Zones off the battlefield">
-      <FieldRail side={far} facing="far" />
-      <FieldRail side={near} facing="near" />
+      <FieldRail side={far} facing="far" name={name(far.slug, far.name)} />
+      <FieldRail side={near} facing="near" name={name(near.slug, near.name)} />
     </aside>
     </div>
     </Struck.Provider>

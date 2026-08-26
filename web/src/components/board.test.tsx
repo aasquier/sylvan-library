@@ -443,18 +443,24 @@ it('gives each zone its whole name, now there is room for one', () => {
   expect(names).toEqual(['Command Zone', 'Graveyard', 'Exile'])
 })
 
-it('says a deck name once, beside the hand that holds it', () => {
-  // The rail carried a nameplate and the hand beside it carries the same name.
-  // A board that says one thing twice has spent the room twice, and the room
-  // is the scarce thing here.
+it('heads each seat\'s zones with whose they are', () => {
+  // The name used to float on a grey strip under the rows, and it came off
+  // with the strip. It is back for a different reason: the zones are a band
+  // under the arena holding *both* players side by side, and a band holding
+  // two players has to say which half is whose. A label on a bar and a heading
+  // over the thing it names are not the same object.
   const { container } = show()
-  expect(container.querySelector('.field-rail-name'),
-    'the rail no longer repeats the hand').toBeNull()
-  // Still reachable for anyone who wants the full deck title.
-  expect(container.querySelector('.field-rail-far .field-rail-totals')
-    ?.getAttribute('title')).toBeTruthy()
-  expect(container.querySelector('.field-hand-far .field-hand-label')
+  const heads = [...container.querySelectorAll('.field-zones .field-rail-name')]
+    .map((n) => n.textContent)
+  expect(heads).toHaveLength(2)
+  expect(heads[0]).toContain('Arahbo')
+  expect(heads[1]).toContain('Atla')
+
+  // Each heading sits inside its own seat's panel, not loose in the band.
+  expect(container.querySelector('.field-rail-far .field-rail-name')
     ?.textContent).toContain('Arahbo')
+  expect(container.querySelector('.field-rail-near .field-rail-name')
+    ?.textContent).toContain('Atla')
 })
 
 it('dresses each zone in its own painting, and names the painter', () => {
