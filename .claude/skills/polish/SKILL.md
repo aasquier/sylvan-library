@@ -493,10 +493,10 @@ It is what makes the pass cumulative rather than repetitive.
 
    The line between safe and queued is fuzziest for the *one-line change that
    only CI can fully verify*. Three live cases, all one-liners and all
-   queued-class: anything in a `Dockerfile`, because the `image` and
-   `image-arm64` jobs are the only place a container is ever built and neither
-   can run on this Mac; anything inside a platform-tagged file, because a
-   `_linux.go` body is not typechecked by a green lint on darwin; and anything
+   queued-class: anything in a `Dockerfile`, because the `image` job is the
+   only place a container is ever built anywhere and it cannot run on this
+   Mac; anything inside a platform-tagged file, because a `_linux.go` body is
+   not typechecked by a green lint on darwin; and anything
    arm64-shaped, because the Go matrix's second leg is the only arm64 compiler
    this project has. The test is not diff size; it is *can I fully prove this
    green before pushing?* If the only proof is CI itself, queue it (or land it
