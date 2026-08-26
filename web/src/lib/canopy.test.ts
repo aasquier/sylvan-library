@@ -19,6 +19,7 @@
 
 import { cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import type { CanopyState } from './canopy'
 import {
   CANOPY_FURL_FLOOR,
   CANOPY_FURL_TOLERANCE,
@@ -154,6 +155,37 @@ it('costs no renders while the answer is unchanged', () => {
   for (let i = 0; i < 20; i++) scrollTo(DEEP + (i % 3))
 
   expect(renders).toBe(settled)
+})
+
+it('leaves nothing folded behind when the last reader goes', () => {
+  // The store outlives the components reading it, and `useSyncExternalStore`
+  // reads `getSnapshot` **during the render** but only subscribes a commit
+  // later. Between those two moments the store's leftovers are the only answer
+  // a bar can render with — so a fold left in there is a lie about a page this
+  // reader has not scrolled, and the next mounting wears it.
+  //
+  // That is not hypothetical: it is how one test's scroll became the next
+  // test's starting position and made the header-fold cases in `App.test.tsx`
+  // intermittent (#324). Priming on subscribe cannot cover it, because priming
+  // is the thing that has not happened yet.
+  const bar = renderHook(() => useCanopyScroll())
+  scrollTo(DEEP)
+  expect(bar.result.current.furled).toBe(true)
+
+  bar.unmount()
+  window.scrollY = 0
+
+  // Every render this second reader performs, in order. `result.current` is no
+  // use here — it is the settled value, after the subscription exists. The
+  // first entry is the one under test.
+  const seen: CanopyState[] = []
+  renderHook(() => {
+    const state = useCanopyScroll()
+    seen.push(state)
+    return state
+  })
+
+  expect(seen[0]).toEqual({ retracted: false, furled: false })
 })
 
 it('keeps one scroll listener however many things are watching', () => {

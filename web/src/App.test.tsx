@@ -13,7 +13,7 @@
  * has to work through in a browser.
  */
 
-import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -143,13 +143,35 @@ describe('the header fold', () => {
     fireEvent.scroll(window)
   }
 
+  /**
+   * Mount, and do not come back until the canopy is actually listening.
+   *
+   * The bar is not in the first commit: the app renders its gate, asks
+   * `/api/auth/me` and `/api/health`, and only then puts the nav on the page.
+   * The canopy attaches its scroll listener from a passive effect, which is a
+   * flush *after* that commit. `findBy*` resolves the instant the DOM holds
+   * the link — which can be the commit and not the flush — and a scroll fired
+   * in between is read by nobody at all: no listener, no reading, the bar
+   * never moves, and the failure is indistinguishable from the fold being
+   * broken. That was the flake #324 shipped, and it is load-sensitive because
+   * what varies is how much of React's pending work gets a turn.
+   *
+   * So: `findBy*` for the commit, then `act` for the effects it scheduled.
+   * `act` is a flush, not a wait — nothing here polls, times out, or gives a
+   * wrong answer a second chance to be right.
+   */
+  async function openAtTheTop() {
+    renderApp()
+    await screen.findByRole('link', { name: 'Laboratory' })
+    await act(async () => {})
+  }
+
   afterEach(() => {
     window.scrollY = 0
   })
 
   it('is open at the top of a page and folds on the way down', async () => {
-    renderApp()
-    await screen.findByRole('link', { name: 'Laboratory' })
+    await openAtTheTop()
     expect(header()?.className).not.toContain('is-furled')
 
     scrollTo(600)
@@ -168,8 +190,8 @@ describe('the header fold', () => {
     // fire, because focus can never get in. So the guard is that a Tab still
     // lands, folded or not; the unfolding it triggers is CSS, and CSS is
     // empty in this suite.
-    renderApp()
-    const lab = await screen.findByRole('link', { name: 'Laboratory' })
+    await openAtTheTop()
+    const lab = screen.getByRole('link', { name: 'Laboratory' })
 
     scrollTo(600)
     expect(header()?.className).toContain('is-furled')

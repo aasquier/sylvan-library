@@ -132,7 +132,24 @@ function subscribe(notify: () => void): () => void {
   listeners.add(notify)
   return () => {
     listeners.delete(notify)
-    if (listeners.size === 0) window.removeEventListener('scroll', read)
+    if (listeners.size === 0) {
+      window.removeEventListener('scroll', read)
+      // And put the store back the way it was found. Priming above already
+      // says a fresh mount inherits no fold — but priming happens on
+      // *subscribe*, and `useSyncExternalStore` subscribes in an effect, one
+      // commit after it has read `getSnapshot` to render with. In that window
+      // these two variables are the only answer available to a bar that is
+      // already on the page, and a leftover fold there is a claim about a
+      // scroll the reader looking at it never made.
+      //
+      // Nothing is watching the page now and nothing will update these until
+      // somebody does, so leaving them warm buys nothing and costs exactly
+      // that lie. Found because it made the header-fold cases in
+      // `App.test.tsx` intermittent: with no subscriber attached the fold one
+      // case performed was still sitting here for the next one to render.
+      snapshot = OPEN
+      anchor = 0
+    }
   }
 }
 
