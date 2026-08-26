@@ -711,7 +711,10 @@ function FieldPile({ label, cards, short, zone, throne, receiving }: {
 }
 
 /** The stone rail one player's name, life and closed zones are carved into. */
-function FieldRail({ side }: { side: BoardSide }) {
+function FieldRail({ side, facing }: {
+  side: BoardSide
+  facing: 'far' | 'near'
+}) {
   // **Whose grave is about to receive the body.** The dying card is held on
   // the sand for the beat that announces it, so no graveyard can answer this
   // by looking at what it holds — it holds nothing yet. The side that is
@@ -727,7 +730,7 @@ function FieldRail({ side }: { side: BoardSide }) {
   // and the expensive commander is the one whose price changes a decision.
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
   return (
-    <div className="field-rail">
+    <div className={`field-rail field-rail-${facing}`}>
       {/* **The nameplate is gone, and the stone bar with it.** The name was
           said twice — the hand beside this rail already carries it, and a
           board that tells you the same thing in two places has spent the room
@@ -736,8 +739,8 @@ function FieldRail({ side }: { side: BoardSide }) {
           is the material, and three lit places standing on it is a table.
           `title` keeps the full deck name reachable for anybody who wants it. */}
       <span className="field-rail-totals" title={side.name}>
-        <FieldPile label="Command zone" short="CMD" cards={side.command}
-                   zone="command" throne />
+        <FieldPile label="Command zone" short="Command Zone"
+                   cards={side.command} zone="command" throne />
         {/* **Beside the pile rather than on it.** Inside, the chip covered
             the zone's own three-letter label — the first draft read "CI +4",
             which is a worse pile than one with no tax on it at all. Twenty-six
@@ -749,10 +752,11 @@ function FieldRail({ side }: { side: BoardSide }) {
             +{tax}
           </span>
         )}
-        <FieldPile label="Graveyard" short="GY" cards={side.graveyard}
+        <FieldPile label="Graveyard" short="Graveyard" cards={side.graveyard}
                    zone="graveyard"
                    receiving={holding && struck ? struck.key : null} />
-        <FieldPile label="Exile" short="EX" cards={side.exile} zone="exile" />
+        <FieldPile label="Exile" short="Exile" cards={side.exile}
+                   zone="exile" />
         <LifeTotal life={side.life} />
       </span>
     </div>
@@ -900,11 +904,9 @@ function FieldSide({ side, facing }: {
   ]
   return (
     <div className={`field-side field-side-${facing}`}>
-      {facing === 'far' && <FieldRail side={side} />}
       <div className="field-rows">
         {facing === 'far' ? rows : [...rows].reverse()}
       </div>
-      {facing === 'near' && <FieldRail side={side} />}
     </div>
   )
 }
@@ -1085,6 +1087,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
 
       <FieldSide side={far} facing="far" />
+      <FieldRail side={far} facing="far" />
 
       {/* The seam: in the real building, the trench the lifts came up through.
           Here it is where the turn is announced and where the two
@@ -1098,6 +1101,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         <span className="field-seam-rule" aria-hidden="true" />
       </div>
 
+      <FieldRail side={near} facing="near" />
       <FieldSide side={near} facing="near" />
 
       <FieldHand side={near} facing="near"

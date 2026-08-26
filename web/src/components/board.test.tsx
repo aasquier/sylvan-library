@@ -153,7 +153,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
   // its zone is legitimately an empty chair the whole way through and would
   // answer either question the wrong way.
   const railOf = (c: HTMLElement) =>
-    c.querySelector('.field-side-far .field-rail') as HTMLElement
+    c.querySelector('.field-rail-far') as HTMLElement
 
   const home = throne(4)
   expect(railOf(home.container).querySelector('.field-pile.is-throne'),
@@ -272,7 +272,7 @@ it('opens a closed zone into something you can look through', () => {
   // **A graveyard is public information in every format**, and it was drawn
   // as a number with a picture on it. Every card in it is in the tray, not
   // just the one on top.
-  const grave = container.querySelector('.field-side-far .field-pile-wrap:has('
+  const grave = container.querySelector('.field-rail-far .field-pile-wrap:has('
     + '[aria-label^="Graveyard"]) .field-tray') as HTMLElement
   expect(grave, 'the graveyard has a tray').toBeTruthy()
   expect(grave.getAttribute('aria-label')).toBe('Graveyard, all 2')
@@ -282,7 +282,7 @@ it('opens a closed zone into something you can look through', () => {
   // nothing to look through, and a panel that opens onto nothing is a worse
   // answer than a pile that stays shut.
   const exileWrap = container.querySelector(
-    '.field-side-near .field-pile-wrap:has([aria-label^="Exile"])')
+    '.field-rail-near .field-pile-wrap:has([aria-label^="Exile"])')
   expect(exileWrap?.querySelector('.field-tray'),
     "the near seat's exile is empty, so it does not open").toBeNull()
 })
@@ -368,7 +368,7 @@ it('draws life as how much is left, not just as a number', () => {
                   name={(_s, f) => f} speed="play" setSpeed={vi.fn()}
                   of={1} seek={vi.fn()} games={[1]} playing={1}
                   chooseGame={vi.fn()} />)
-    const ring = container.querySelector('.field-side-far .field-life') as HTMLElement
+    const ring = container.querySelector('.field-rail-far .field-life') as HTMLElement
     return {
       shown: ring?.querySelector('.field-life-n')?.textContent,
       left: ring?.style.getPropertyValue('--life-left'),
@@ -402,6 +402,40 @@ it('draws life as how much is left, not just as a number', () => {
   expect(dead.spent).toBe('100%')
 })
 
+it('puts the hand on the left and the zones on the right, in that order', () => {
+  // **Which side a thing is on is a fact about tables**, and it is held as
+  // document order because that is what survives both breakpoints: the grid
+  // places these five areas differently at each width, and DOM order is the
+  // thing neither branch can quietly get wrong. A player's hand is on their
+  // left; the places they push cards into are on their right (Aaron,
+  // 2026-08-25). Stacked, the same order reads top to bottom.
+  const { container } = show()
+  const order = [...container.querySelectorAll(
+    '.field-hand-far, .field-side-far, .field-rail-far,'
+    + ' .field-rail-near, .field-side-near, .field-hand-near')]
+    .map((el) => ['field-hand-far', 'field-side-far', 'field-rail-far',
+      'field-rail-near', 'field-side-near', 'field-hand-near']
+      .find((c) => el.classList.contains(c)))
+  expect(order).toEqual([
+    'field-hand-far', 'field-side-far', 'field-rail-far',
+    'field-rail-near', 'field-side-near', 'field-hand-near',
+  ])
+
+  // And the zones left the battlefield's own stack, which is what let them
+  // grow: a strip under the rows can only be as tall as the room it takes
+  // from the sand.
+  expect(container.querySelector('.field-side-far .field-pile'),
+    'the zones are their own column, not a bar inside the half').toBeNull()
+})
+
+it('gives each zone its whole name, now there is room for one', () => {
+  // "GY" and "CMD" are what you write when a tile is 26px wide.
+  const { container } = show()
+  const names = [...container.querySelectorAll('.field-rail-far .field-pile-label')]
+    .map((n) => n.textContent)
+  expect(names).toEqual(['Command Zone', 'Graveyard', 'Exile'])
+})
+
 it('says a deck name once, beside the hand that holds it', () => {
   // The rail carried a nameplate and the hand beside it carries the same name.
   // A board that says one thing twice has spent the room twice, and the room
@@ -410,7 +444,7 @@ it('says a deck name once, beside the hand that holds it', () => {
   expect(container.querySelector('.field-rail-name'),
     'the rail no longer repeats the hand').toBeNull()
   // Still reachable for anyone who wants the full deck title.
-  expect(container.querySelector('.field-side-far .field-rail-totals')
+  expect(container.querySelector('.field-rail-far .field-rail-totals')
     ?.getAttribute('title')).toBeTruthy()
   expect(container.querySelector('.field-hand-far .field-hand-label')
     ?.textContent).toContain('Arahbo')
@@ -426,7 +460,7 @@ it('dresses each zone in its own painting, and names the painter', () => {
                 games={[1]} playing={1} chooseGame={vi.fn()} />)
 
   const pileFor = (label: string) => container.querySelector(
-    `.field-side-far .field-pile[aria-label^="${label}"]`)
+    `.field-rail-far .field-pile[aria-label^="${label}"]`)
   const groundOf = (label: string) =>
     pileFor(label)?.querySelector('.field-pile-ground')?.getAttribute('src')
 
@@ -709,7 +743,7 @@ it('lays the skull on the creature, held where it fell', () => {
   // hold it this beat. A card in two zones is a worse answer than a card a
   // beat behind.
   const grave = container.querySelector(
-    '.field-side-far .field-pile-wrap [aria-label^="Graveyard"]')
+    '.field-rail-far .field-pile-wrap [aria-label^="Graveyard"]')
   expect(grave?.getAttribute('aria-label')).toBe('Graveyard: 0')
 
   // The creatures that did not die carry nothing.
@@ -730,7 +764,7 @@ it('lets the dead go on the next beat, rather than holding them forever', () => 
   // One beat earlier it was alive and the graveyard was empty.
   const before = combat(null, 1)
   expect(before.container.querySelector(
-    '.field-side-far .field-pile-wrap [aria-label^="Graveyard"]')
+    '.field-rail-far .field-pile-wrap [aria-label^="Graveyard"]')
     ?.getAttribute('aria-label')).toBe('Graveyard: 0')
   expect(before.container.querySelector('.field-card.is-leaving')).toBeNull()
 })
