@@ -4757,6 +4757,44 @@ button:hover .tarot-fan-card {
  * a transform reflows nothing. The page underneath does not move a pixel when
  * this folds — which is the entire reason it is a transform. */
 .site-header {
+  /* Where the bar sits, and — the half that bit us — what it sits *above*.
+   *
+   * These three were utility classes on the element until 2026-08-26, and the
+   * stacking one among them was silently not there at all. It appeared exactly
+   * once in the whole frontend, on this element, and #324 rewrote that one
+   * occurrence into a template literal that glued it straight onto the
+   * interpolation — `...top-0 <it>${furled ? ' is-furled' : ''}` with no space
+   * in front of the `$`. The scanner that decides which utility rules get
+   * generated reads candidates out of raw source text, and a token with `$`
+   * stuck to its tail is not that token. Every other utility glued that way in
+   * this codebase survives on luck alone: each is also written plainly
+   * somewhere else, so it gets emitted anyway. This one had nowhere else to be
+   * written, no rule was generated, and the computed value fell back to `auto`.
+   *
+   * `auto` loses to `.page-main`'s, which is 10. The bar was underneath the
+   * page — invisible while furled, and buried under whatever the reader had
+   * scrolled to the moment a scroll up brought it back, which is how Aaron
+   * found it ("when I fast scroll up the top menu appears awkwardly under the
+   * main page"). It was swallowing the taps meant for the nav the whole time,
+   * too: a hit test anywhere in the bar landed in `main`.
+   *
+   * So the whole positioning decision lives here now, beside the colour, the
+   * hairline and the frost — for the reason the note below already gives about
+   * `backdrop-filter`, which died of this same disease and was moved here to
+   * cure it. A rule in this file is a rule that exists; a utility class is a
+   * request that something else has to honour.
+   *
+   * Note for whoever edits this comment: **this stylesheet is scanned for
+   * candidates too.** Spelling that utility out here, even inside a comment,
+   * is enough to generate its rule again — which would put the sheet back to
+   * working by coincidence and hide the next regression completely. That is
+   * why the paragraph above talks around it instead of naming it. */
+  position: sticky;
+  top: 0;
+  /* Above `.page-main` and the footer (10) and the corner sprout
+   * (`.library-whisper`, 30); below the 50s, which are the overlays that are
+   * meant to cover the chrome. Exactly what the old utility stood for. */
+  z-index: 40;
   background: color-mix(in srgb, var(--page) 88%, transparent);
   border-bottom: 1px solid var(--hairline);
   /* The frost the 88% wash was always drawn against. The element carried a

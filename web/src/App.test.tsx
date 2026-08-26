@@ -199,6 +199,51 @@ describe('the header fold', () => {
     lab.focus()
     expect(document.activeElement).toBe(lab)
   })
+
+  /**
+   * The bar asks the stylesheet where it sits, never a utility class.
+   *
+   * This is the guard on a real regression (Aaron, 2026-08-26: "when I fast
+   * scroll up the top menu appears awkwardly under the main page"). The bar
+   * carried a z-index utility, and this was the *only* place that class was
+   * written in the whole frontend. #324 rewrote the line into a template
+   * literal that put it flush against the interpolation, the scanner that
+   * decides which utility rules get generated stopped seeing it, and no rule
+   * was emitted — so the computed z-index was `auto`, which loses to the 10
+   * that `.page-main` carries. The header was underneath the page: invisible while
+   * folded, buried under whatever was on screen the moment a scroll up brought
+   * it back, and swallowing the taps aimed at the nav the whole time.
+   *
+   * Nothing about that is visible from here, and this test does not pretend
+   * otherwise. jsdom has no layout, and this suite is handed the stylesheet as
+   * the empty string however it asks for it — through `?raw`, through
+   * `import.meta.glob`, and `node:fs` neither typechecks nor runs under this
+   * config (all three measured, 2026-08-26). So the paint order itself is a
+   * browser's answer and was verified in one.
+   *
+   * What *is* checkable here is the decision that made the bar safe: its
+   * stacking is a rule in `index.css` keyed on `.site-header`, not a request
+   * for a class that something else has to generate. A `z-` utility reappearing
+   * on this element is the tempting one-word "fix" for a stacking bug, it is
+   * exactly what was already there, and it can silently do nothing at all.
+   *
+   * Note that neither the assertion nor this prose spells such a class out.
+   * They cannot: every file under `src/` is scanned for candidates — tests and
+   * comments included — so writing one here generates its rule and papers over
+   * the exact failure this guard exists to catch. Measured, not assumed: the
+   * first draft of this comment named it, and the class reappeared in the
+   * built stylesheet.
+   */
+  it('leaves its stacking to the stylesheet, not to a generated utility',
+     async () => {
+    await openAtTheTop()
+    const classes = [...(header()?.classList ?? [])]
+
+    expect(classes).toContain('site-header')
+    expect(classes.filter((c) => /^z-/.test(c)),
+      'the header wears a z-index utility again — put it in `.site-header`')
+      .toHaveLength(0)
+  })
 })
 
 describe('the ambience switch', () => {
