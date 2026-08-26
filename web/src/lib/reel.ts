@@ -31,7 +31,7 @@
  * is not a component, and more than one file needs it.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { ForgeBoard } from './api'
 
@@ -92,15 +92,11 @@ interface Reel {
    *
    * The room outlives a match — the hook is not remounted between them — so
    * without this a second match would show the first one's board for as long
-   * as it took its own opening bout to arrive. Carrying the match's identity
-   * in the reel makes "these beats are not this match's" a thing the room can
-   * *see*, rather than a stale frame it has to be raced out of. */
+   * as it took its own opening bout to arrive. The mark carries the match it
+   * was made in, so a mark belonging to a finished match simply does not
+   * apply to this one and the field opens empty. Nothing has to be raced out
+   * of a stale frame, because the stale frame is never derived. */
   match: string
-}
-
-const EMPTY: Reel = {
-  shown: [], queue: [], game: 0, truncated: false, told: 0, board: null,
-  match: '',
 }
 
 /**
@@ -197,10 +193,18 @@ export interface Series {
 export function useReel(match: string, games: number[],
   stage: (game: number) => Arriving | null,
   speed: Speed): [Reel, (to: number) => void, Series] {
-  // One piece of state rather than five, because every change moves two of
-  // them together: a beat leaving the queue is a beat entering the shown list,
-  // and a bout beginning does both at once.
-  const [reel, setReel] = useState<Reel>(EMPTY)
+  // **One piece of state, and it is a position rather than a copy.** The reel
+  // used to hold the beats twice over — a `shown` list and a `queue` — and
+  // move them across a mark, which meant every arrival had to be *loaded* into
+  // it by an effect. That shape is why this file kept needing a ref to
+  // remember what it had already loaded, and why React rightly complained
+  // about a `setState` running straight out of an effect.
+  //
+  // Where the mark is says everything. The two lists are a slice of one array
+  // at that number, taken during render, and a bout that has not been reached
+  // yet needs no loading because nothing was ever copied out of it.
+  const [mark, setMark] = useState<{ match: string; game: number; told: number }>(
+    { match: '', game: 0, told: 0 })
   // The bout somebody asked for, and the match they asked for it in. Carrying
   // the match with it is what makes a pick expire on its own: a choice made
   // during the last match is not a choice about this one, and a bare number
@@ -213,76 +217,73 @@ export function useReel(match: string, games: number[],
   const wanted = asked.match === match ? asked.game : 0
   const target = wanted || games[0] || 0
 
-  // The bout already loaded, as match-and-number. A ref rather than state
-  // because it exists only to stop the effect below reloading what it just
-  // loaded: `stage` is rebuilt whenever a new game lands, and without this
-  // every arrival would restart the bout being told from its first beat.
-  const staged = useRef('')
-  const at = `${match}:${target}`
+  // The bout in words. Resolved once per *bout* rather than once per beat:
+  // `stage` walks a game's worth of beats, and doing that on every tick of the
+  // clock would be a hundred and thirty translations a second.
+  const bout = useMemo(() => (target === 0 ? null : stage(target)),
+    [stage, target])
 
-  useEffect(() => {
-    if (target === 0 || staged.current === at) return
-    const next = stage(target)
-    // A bout the room cannot resolve yet is not an error: the match has said
-    // it exists before its beats crossed. The next render tries again.
-    if (!next) return
-    staged.current = at
-    setReel({
-      shown: [],
-      queue: next.beats,
-      game: next.game,
-      truncated: next.truncated,
-      // A new bout is a new board, so both start over together.
-      told: 0,
-      board: next.board,
-      match,
-    })
-  }, [at, target, match, stage])
+  // How far into *this* bout of *this* match the mark has got. A mark left
+  // behind by another bout — or by a match that is over — is not this one's,
+  // and the room opens at the first beat rather than somewhere in the middle
+  // of a fight it has never shown. This is the whole of what used to need a
+  // ref, an `EMPTY` sentinel and a loading effect to arrange.
+  const told = (mark.match === match && mark.game === target)
+    ? Math.min(mark.told, bout?.beats.length ?? 0)
+    : 0
+
+  const beats = bout?.beats
+  const queued = (beats?.length ?? 0) - told
+
+  const reel: Reel = {
+    shown: beats ? beats.slice(0, told) : [],
+    queue: beats ? beats.slice(told) : [],
+    game: bout?.game ?? 0,
+    truncated: bout?.truncated ?? false,
+    told,
+    board: bout?.board ?? null,
+    match,
+  }
 
   // One beat leaves the queue per tick, and the next tick is scheduled from
   // what is left — so the pace is re-read after every beat rather than once a
   // game. A queue that empties simply stops scheduling.
   useEffect(() => {
-    if (speed === 'paused') return
-    const next = reel.queue[0]
-    if (!next) return
-    const id = window.setTimeout(() => setReel((r) => ({
-      ...r,
-      shown: [...r.shown, next],
-      queue: r.queue.slice(1),
-      told: r.told + 1,
-    })), SPEEDS[speed])
+    if (speed === 'paused' || queued <= 0) return
+    const id = window.setTimeout(
+      () => setMark({ match, game: target, told: told + 1 }), SPEEDS[speed])
     return () => window.clearTimeout(id)
-  }, [reel.queue, speed])
-
-  // Beats from a match that is over are not this match's. Until this match's
-  // opening bout is staged the field is empty, which is the honest picture and
-  // costs nobody a frame of the last match's board.
-  const showing = reel.match === match ? reel : EMPTY
+  }, [speed, queued, match, target, told])
 
   /** The next bout after the one being told, or zero. A number rather than the
    *  list, so the breath below is not restarted every time a bout lands. */
   const nextUp = useMemo(
-    () => games.find((g) => g > showing.game) ?? 0, [games, showing.game])
+    () => games.find((g) => g > reel.game) ?? 0, [games, reel.game])
 
   // The walk forward. A bout whose queue has run dry hands over to the next
   // one the match has raised — after a breath, so its last sentence is read
   // rather than glimpsed. Paused holds it: a room somebody has stopped does
   // not wander on to the next fight without them.
   useEffect(() => {
-    if (speed === 'paused' || showing.game === 0 || nextUp === 0) return
-    if (showing.queue.length > 0) return
+    if (speed === 'paused' || !bout || nextUp === 0 || queued > 0) return
     const id = window.setTimeout(
       () => setAsked({ match, game: nextUp }), BETWEEN_BOUTS)
     return () => window.clearTimeout(id)
-  }, [speed, nextUp, match, showing.game, showing.queue.length])
+  }, [speed, bout, nextUp, match, queued])
 
   // Moving the mark by hand. It sets the reel's own position rather than
   // overlaying it, so pressing play afterwards carries on from where the hand
   // left off instead of snapping back.
+  //
+  // Scrubbing is possible at all because the board is a **pure fold over a
+  // count** — `foldBoard(board, n)` is the board after n beats, with no state
+  // carried between calls — so going backwards is the same operation as going
+  // forwards and costs the same. The controls are a second way to set the
+  // number, not a second engine.
+  const total = beats?.length ?? 0
   const seek = useCallback((to: number) => {
-    setReel((r) => seekReel(r, to))
-  }, [])
+    setMark({ match, game: target, told: Math.max(0, Math.min(to, total)) })
+  }, [match, target, total])
 
   const pick = useCallback(
     (game: number) => setAsked({ match, game }), [match])
@@ -291,32 +292,9 @@ export function useReel(match: string, games: number[],
     // The bouts still ahead of the one on the field. Not simply "the others":
     // a match watched back from the middle has bouts behind it too, and those
     // are not waiting for anybody — they have already been told.
-    waiting: games.filter((g) => g > showing.game).length,
+    waiting: games.filter((g) => g > reel.game).length,
     pick,
-  }), [games, showing.game, pick])
+  }), [games, reel.game, pick])
 
-  return [showing, seek, series]
-}
-
-/**
- * Move the room to a beat by hand.
- *
- * Scrubbing is possible at all because the board is a **pure fold over a
- * count** — `foldBoard(board, n)` is the board after n beats, with no state
- * carried between calls — so going backwards is the same operation as going
- * forwards and costs the same. That was true before anybody asked for it; the
- * controls are just a second way to set the number.
- *
- * The whole game's beats are held either side of the mark, so a step back is a
- * beat moving from `shown` to `queue` and a step forward is the reverse.
- */
-export function seekReel(reel: Reel, to: number): Reel {
-  const all = [...reel.shown, ...reel.queue]
-  const at = Math.max(0, Math.min(to, all.length))
-  return {
-    ...reel,
-    shown: all.slice(0, at),
-    queue: all.slice(at),
-    told: at,
-  }
+  return [reel, seek, series]
 }

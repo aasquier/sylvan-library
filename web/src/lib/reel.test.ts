@@ -22,7 +22,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  BETWEEN_BOUTS, beatDelay, seekReel, useReel, type Arriving, type Speed,
+  BETWEEN_BOUTS, beatDelay, useReel, type Arriving, type Speed,
 } from './reel'
 
 describe('how fast a beat is told', () => {
@@ -63,48 +63,64 @@ describe('how fast a beat is told', () => {
   })
 })
 
+/**
+ * Moving the mark by hand.
+ *
+ * These drive the hook rather than a pure helper beside it, which is the
+ * correction: the helper took a reel and returned a reel, and a test could
+ * satisfy it while the control on screen was wired to nothing. The mark *is*
+ * the reel's only state now, so setting it is the whole mechanism.
+ */
 describe('moving the mark by hand', () => {
-  const beat = (n: number) => ({
-    key: `1:${n}`, game: 1, turn: 1, kind: 'land',
-    who: 'gyome', text: `plays a land ${n}`,
+  /** One bout, five beats long. */
+  const bout = (game: number): Arriving => ({
+    game, truncated: false, board: null,
+    beats: Array.from({ length: 5 }, (_, i) => ({
+      key: `${game}:${i}`, game, turn: 1, kind: 'land',
+      who: 'gyome', text: `plays a land ${i}`,
+    })),
   })
-  const reel = {
-    shown: [beat(1), beat(2)],
-    queue: [beat(3), beat(4), beat(5)],
-    game: 1, truncated: false, told: 2, board: null, match: 'j1',
-  }
 
-  it('moves beats across the mark in both directions', () => {
-    const forward = seekReel(reel, 4)
-    expect(forward.told).toBe(4)
-    expect(forward.shown).toHaveLength(4)
-    expect(forward.queue).toHaveLength(1)
+  const held = () => renderHook(
+    () => useReel('j1', [1], bout, 'paused'))
+
+  it('moves the mark across the beats in both directions', () => {
+    const { result } = held()
+    act(() => { result.current[1](4) })
+    expect(result.current[0].told).toBe(4)
+    expect(result.current[0].shown).toHaveLength(4)
+    expect(result.current[0].queue).toHaveLength(1)
 
     // Backwards is the same operation, which is only true because the board is
     // a pure fold over the count — going back costs what going forward costs.
-    const back = seekReel(reel, 1)
-    expect(back.told).toBe(1)
-    expect(back.shown).toHaveLength(1)
-    expect(back.queue).toHaveLength(4)
+    act(() => { result.current[1](1) })
+    expect(result.current[0].told).toBe(1)
+    expect(result.current[0].shown).toHaveLength(1)
+    expect(result.current[0].queue).toHaveLength(4)
   })
 
-  it('clamps to the game rather than running off either end', () => {
-    expect(seekReel(reel, 99).told).toBe(5)
-    expect(seekReel(reel, -4).told).toBe(0)
-    expect(seekReel(reel, -4).queue).toHaveLength(5)
+  it('clamps to the bout rather than running off either end', () => {
+    const { result } = held()
+    act(() => { result.current[1](99) })
+    expect(result.current[0].told).toBe(5)
+    act(() => { result.current[1](-4) })
+    expect(result.current[0].told).toBe(0)
+    expect(result.current[0].queue).toHaveLength(5)
   })
 
   it('keeps every beat, whichever side of the mark it is on', () => {
+    const { result } = held()
     for (const to of [0, 1, 3, 5]) {
-      const at = seekReel(reel, to)
+      act(() => { result.current[1](to) })
+      const at = result.current[0]
       expect(at.shown.length + at.queue.length).toBe(5)
     }
   })
 
   it('keeps the beats with the match they were raised in', () => {
-    // The mark moves; whose match it is does not. A reel that lost this on a
-    // seek would show the field as belonging to no match and blank itself.
-    expect(seekReel(reel, 4).match).toBe('j1')
+    const { result } = held()
+    act(() => { result.current[1](4) })
+    expect(result.current[0].match).toBe('j1')
   })
 })
 
