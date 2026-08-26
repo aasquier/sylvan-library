@@ -6500,16 +6500,25 @@ button:hover .tarot-fan-card {
   object-fit: contain;
   object-position: bottom;
   pointer-events: none;
-  /* **Above the floor, below every card.** `.field-floor` is at -1 and a card
-     is positioned with an automatic z-index, so a plain 0 here lands the
-     statue between them and tree order does the rest — the statues are written
-     before any row. Raise this and the game starts happening behind a
-     decoration. */
   z-index: 0;
-  /* Stone at the edge of a lit floor, not a sticker on it. Enough that the
-     sand still reads through the ankles and a card crossing him is obviously
-     in front. */
-  opacity: 0.82;
+  /* **Cover, not contain, and this is the whole trick.** The box is only ever
+     as wide as the page's margin allows, and at 1440px that margin is about a
+     hundred pixels against a figure that wants a hundred and eighty. `contain`
+     would answer by shrinking him until he fitted — which is the small statue
+     we already rejected — and `cover` answers by keeping the height and
+     letting the box crop the width instead.
+     It crops *only* the width, and that is arithmetic rather than luck: the
+     scale factor is the larger of the two ratios, the box is never wider than
+     the plate's own ratio allows (see the `min()` below), so the height ratio
+     always wins and the crop is horizontal every time. His head and his feet
+     are never in danger. */
+  object-fit: cover;
+  /* Keep the plate's left-hand portion, which is the side he faces. On the
+     right-hand statue that lands his front against the arena; on the left-hand
+     one the mirror puts the same portion on the inner edge. So both crops take
+     the shoulder that is turned away, and the face, shield and leading leg are
+     what survive at the page's edge. */
+  object-position: 0% 50%;
   animation: secutor-drift 38s ease-in-out infinite;
 }
 /* **The mirror is a variable, because the animation owns `transform`.**
@@ -6525,38 +6534,42 @@ button:hover .tarot-fan-card {
   transform: scaleX(-1);
 }
 
-/* **Sized by height, because inside the arena height is the free axis.**
+/* **Height first, and the width is whatever the black will give.**
  *
- * Two earlier cuts put them outside the field and both ran into the same wall.
- * The flank is only ever as wide as the window has going spare; the plate is
- * two and a quarter times as tall as it is wide with no croppable margin (the
- * figure's own bounding box is x3..x195 of 199); so out there "taller" and
- * "wider" are one request, and at 1440px the window's answer was 96 pixels.
- * Taking the difference out of the sand was the first cut, and the shrunk
- * field was the first thing anybody noticed.
+ * Three cuts got here. Sizing them off the margin made them small (96px at
+ * 1440); taking the difference out of the sand shrank the field, which was the
+ * first thing anybody noticed; standing them on the sand fixed the size and
+ * put a decoration in front of the game. The verdict on that last one was
+ * "size is good, overlap into sand bad. If that size was out in the black
+ * again we are good."
  *
- * On the sand there is no budget to argue with. They take a share of the
- * arena's own height and the width follows, and because they are painted
- * under every card the overlap costs a reader nothing.
+ * So the height is chosen first and held, and the width is only ever the free
+ * margin — `main` is `max-w-7xl px-6`, so its content box tops out at 1232px
+ * and `(100vw - 1232px) / 2` is what is genuinely spare on each flank. The two
+ * do not have to agree, because `object-fit: cover` above lets the box be
+ * narrower than the figure and crop the difference.
  *
- * `62rem` is the field's own breakpoint — the one where it stops stacking and
- * the two halves sit side by side — rather than a guess about a device. Below
- * it the arena is a narrow column and a figure at either edge is standing in
- * the middle of the game. */
-@media (min-width: 62rem) {
+ * The `min()` is what guarantees the crop is horizontal: a box wider than the
+ * plate's own ratio would start cropping the *height* instead, and a statue
+ * with no head is a worse answer than a small one. Past about 1770px the
+ * margin is wider than he needs and the second term wins, so he is drawn whole
+ * with black to spare.
+ *
+ * At 1440: 26rem tall, 104px of margin against a natural 185px, so roughly the
+ * outer two-fifths of his back is out of frame — which is the trade the size
+ * was worth. Below 86rem there is not enough margin for a figure to read as
+ * one, so there is no figure; a phone has none at all. */
+@media (min-width: 86rem) {
   .field-secutor {
     display: block;
-    height: min(62%, 26rem);
-    width: auto;
-    /* A floor under the arena's own height: a short game with two empty rows
-       is a short field, and a figure scaled to 62% of nothing is a smudge. */
-    min-height: 11rem;
-    /* ...and a ceiling on how much of the floor a decoration may cover, for
-       the same reason the other way round. */
-    max-width: 18%;
+    height: clamp(14rem, 30vw, 26rem);
+    width: min(
+      calc((100vw - 1232px) / 2 - 0.5rem),
+      calc(clamp(14rem, 30vw, 26rem) * 0.4442)
+    );
   }
-  .field-secutor-left { left: 0; }
-  .field-secutor-right { right: 0; }
+  .field-secutor-left { right: 100%; }
+  .field-secutor-right { left: 100%; }
 }
 /* **A band under the arena, two seats side by side.**
  *
