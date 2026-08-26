@@ -55,6 +55,7 @@ import { CardSheet } from './ui'
 import { HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
 import aegisArt from '../assets/coliseum/aegis.webp'
+import secutorArt from '../assets/coliseum/secutor.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, stackRow } from '../lib/board'
@@ -1212,6 +1213,24 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         it belongs off the floor entirely. So the field keeps its own box at
         its own size, and the zones stand outside it in their own column. */}
     <div className="field-stage">
+    {/* **Two statues, flanking the sand, each facing in.**
+        A real amphitheatre puts figures around its floor, and this room had a
+        good one filling a hole in a slide — which is the wrong reason for a
+        figure to be anywhere. Here he is the thing he looks like: stone
+        standing at the edge of the arena, watching the fight.
+
+        They stand in the window's own margins first and take from the
+        battlefield only when the window has none to give. Below that they are
+        not drawn at all: a phone has no spare width, and a decoration that
+        costs the sand a column on a 390-pixel screen is a decoration that has
+        stopped decorating.
+
+        `aria-hidden`, and no alt: they are the same figure twice and say
+        nothing the room has not said. */}
+    <img className="field-secutor field-secutor-left" src={secutorArt}
+         alt="" aria-hidden="true" draggable={false} />
+    <img className="field-secutor field-secutor-right" src={secutorArt}
+         alt="" aria-hidden="true" draggable={false} />
     <section className="field" aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">

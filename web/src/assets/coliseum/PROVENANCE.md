@@ -29,7 +29,7 @@ Why committed rather than hotlinked: Two reasons, and the first is the licence. 
   - `resize`: height=448.
   - Encoded WEBP, quality 82.
 
-Why committed rather than hotlinked: The licence is clean and the figure is small, but the real reason is that he stands in a slot that is empty by construction. He fills the slack between a short slide and the controls pinned under it — space that exists because the painting beside him is tall, and that varies with every one of thirteen slides. A decoration that is sometimes 224 pixels tall and sometimes 80 has to be a local file: a figure that resolves from somebody else's CDN would pop in at a different size on every slide, and the one place a reader's eye is already moving is exactly where a late-arriving image is most obvious.
+Why committed rather than hotlinked: The licence is clean and the figure is small, but the real reason is that he is drawn twice on every board — once each side of the arena, mirrored facing in — so he is on screen for the whole of a match somebody is watching minute by minute. A decoration that is present that long and that constant has to be a local file: a figure resolving from somebody else’s CDN would pop into a room whose whole subject is motion, and it would do it twice. He no longer stands in the fun-facts slide he was made for — that slot was a hole in a layout, which is the wrong reason for a figure to be anywhere.
 <!-- animist:end secutor -->
 
 <!-- animist:begin aegis -->

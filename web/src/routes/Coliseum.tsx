@@ -69,7 +69,6 @@ import {
 } from '../lib/theater'
 import { CrossedSwordsGlyph } from '../components/glyphs'
 import { HelpTip, Term } from '../components/term'
-import secutorArt from '../assets/coliseum/secutor.webp'
 
 /** Every control and figure here, keyed to the served glossary — the same
  *  contract the Simulator's own controls use. */
@@ -747,10 +746,20 @@ export default function ColiseumRoom() {
                       already say what a secutor was, and a screen reader
                       reading a caption of the illustration of the thing it
                       just described is noise. */}
-                  <div className="coliseum-yard">
-                    <img className="coliseum-secutor" src={secutorArt}
-                         alt="" aria-hidden="true" />
-                  </div>
+                  {/* **The slack, and nobody standing in it now.** The
+                      secutor used to fill this — he was put here because the
+                      hole existed, which is the wrong reason for a figure to
+                      be anywhere (Aaron: "not very good... it would be cool
+                      if it was on either side of the battlefield"). He stands
+                      on the flanks of the arena instead, where a statue at a
+                      real amphitheatre stands.
+
+                      The yard stays, because the hole was never his: a short
+                      slide beside a tall painting leaves between 162 and 274
+                      pixels of nothing, and this is what absorbs it so the
+                      controls stay pinned under the column rather than
+                      floating up it. */}
+                  <div className="coliseum-yard" aria-hidden="true" />
                   <div className="mt-4 flex items-center gap-2">
                     {/* `.btn` alone is a border-box with a transparent
                         border and no voice at all: no hover, no press,

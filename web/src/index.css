@@ -5970,74 +5970,37 @@ button:hover .tarot-fan-card {
   }
 }
 
-/* -------------------------------------------------------------- the secutor
+/* ----------------------------------------------------------------- the yard
  *
- * The man the room keeps describing. Two of the thirteen slides name him — the
- * retiarius "against the armoured secutor", and one later, "his usual
- * opponent, the secutor, wore fish-scale motifs on purpose" — and until now
- * the room said that and drew nothing.
+ * **The slack under a slide, and nobody in it.** The secutor stood here — he
+ * was put here because the hole existed, which is the wrong reason for a
+ * figure to be anywhere, and Aaron's verdict on the result was "not very
+ * good". He flanks the arena now, where a statue at a real amphitheatre
+ * stands; `.field-secutor` is that.
  *
- * **He is sized by the hole he stands in**, which is the point. The controls
- * below him are pinned to the bottom of the column so they do not move as the
- * prose changes length; that pinning is what leaves 162 to 274 pixels of
- * nothing above them, measured across all thirteen slides of the deployed
- * room. `height: 100%` of the yard hands him exactly that space, whatever it
- * is on the slide you are reading.
- *
- * The floor and the ceiling are the two numbers that are not slack. The
- * ceiling is the asset's own height at 2x, so he is never upscaled. The floor
- * is what makes this work on a phone at all: below `lg` the columns stack, the
- * slide gets narrower and taller, and the slack goes to nearly nothing — a
- * figure sized purely by the gap would simply not exist on the device most
- * likely to be holding this page.
- *
- * The drift is six pixels over thirty-eight seconds. It is under the threshold
- * of anything you would call movement and over the threshold of a page that
- * sits perfectly still (commandment 6), and it is a transform rather than a
- * filter so the two themes can each light him their own way without fighting
- * an animation for the same property.
+ * The hole is still real and still needs absorbing. The controls below are
+ * pinned to the bottom of the column so they do not move as the prose changes
+ * length, and that pinning leaves between 162 and 274 pixels of nothing above
+ * them — measured across all thirteen slides of the deployed room. This is
+ * what takes it, so the controls stay under the column rather than floating
+ * up it.
  */
 .coliseum-yard {
   display: flex;
-  /* **`0%` rather than `auto`, and that is the whole mechanism.** On `auto`
-     the yard's base size is its content — the image — so it claims the
-     figure's height instead of the column's leftover, `height: 100%` below
-     has no definite parent to resolve against, and the figure comes out at
-     its ceiling on every slide while the column quietly overflows the
-     painting beside it. Measured that way it was 224 pixels tall whether the
-     slack was 274 or 162. A basis of zero makes the yard exactly the free
-     space and nothing else, which is what the figure is then a percentage
-     of. */
+  /* **`0%` rather than `auto`.** On `auto` the yard's base size would be its
+     content rather than the column's leftover; a basis of zero makes it
+     exactly the free space and nothing else. */
   flex: 1 1 0%;
   min-height: 5rem;
-  align-items: flex-end;
-  justify-content: flex-end;
-  /* The figure is taken out of flow inside here, and that is the second half
-     of the mechanism. A flex item with a basis of zero still contributes its
-     *content* to the container's intrinsic height, so an in-flow image fed
-     its own 224px back into the grid row, the row grew past the painting, and
-     the yard ended up creating height rather than absorbing it — measured as
-     a 443px row against a 404px painting, with the controls hanging below the
-     frame beside them. Absolutely positioned, he contributes nothing, the row
-     is the painting's height again, and the yard is honestly the leftover. */
-  position: relative;
+  /* Empty, so it contributes no content height of its own and is honestly the
+     leftover. It held an absolutely-positioned figure for the same reason: a
+     flex item with a basis of zero still feeds its *content* back into the
+     grid row, which once grew the row past the painting beside it — 443px
+     against a 404px painting, with the controls hanging below the frame. */
   overflow: hidden;
-  padding-top: 10px;
   pointer-events: none;
 }
 
-.coliseum-secutor {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  height: 100%;
-  max-height: 8rem;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
-  object-position: bottom right;
-  animation: secutor-drift 38s ease-in-out infinite;
-}
 
 /* **The ceiling is the layout's, not the device's.** 64rem is `lg:`, the
    breakpoint at which the painting and this column stop being stacked and sit
@@ -6051,29 +6014,29 @@ button:hover .tarot-fan-card {
    Keyed to the grid's own breakpoint rather than to a guess about the phone,
    deliberately: the two can then never disagree about which shape the room is
    in, which is the failure the pickers' floor was written to end. */
-@media (min-width: 64rem) {
-  .coliseum-secutor { max-height: 14rem; }
-}
 
+/* `--face` is 1 on the right-hand statue and -1 on the left, so one keyframe
+   set serves both and the pair sways mirror-symmetrically rather than sliding
+   the same way like a pair of trucks. */
 @keyframes secutor-drift {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50%      { transform: translate3d(-6px, 0, 0); }
+  0%, 100% { transform: scaleX(var(--face, 1)) translate3d(0, 0, 0); }
+  50%      { transform: scaleX(var(--face, 1)) translate3d(-6px, 0, 0); }
 }
 
 /* Fired clay is pale, and the two grounds it stands on are opposites: a warm
    drop-shadow carries him on the dark page, and on paper he needs to be taken
    down rather than lifted or he washes into the sheet. */
-:root[data-theme='dark'] .coliseum-secutor,
-:root:where(:not([data-theme='light'])) .coliseum-secutor {
+:root[data-theme='dark'] .field-secutor,
+:root:where(:not([data-theme='light'])) .field-secutor {
   filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.5)) brightness(1.02);
 }
-:root[data-theme='light'] .coliseum-secutor {
+:root[data-theme='light'] .field-secutor {
   filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.24)) brightness(0.93)
           saturate(1.08);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .coliseum-secutor { animation: none; }
+  .field-secutor { animation: none; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -6498,9 +6461,84 @@ button:hover .tarot-fan-card {
  * below; side by side they are a column of their own with nothing but page
  * behind them. */
 .field-stage {
+  /* The containing block for the two statues on the flanks. They are
+     absolutely positioned, so they add nothing to the grid and cannot change
+     the height of anything. */
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+/* ------------------------------------------------- the flanks of the arena
+ *
+ * **Two of him, one each side, facing in.** He filled a hole in a fun-facts
+ * slide, which is the wrong reason for a figure to be anywhere; here he is the
+ * thing he looks like — stone at the edge of the floor, watching the fight.
+ *
+ * **He faces left as photographed** — the crest, the leading leg and the
+ * manica on his sword arm all read that way — so the *right*-hand statue is
+ * the plate as it stands and the left one is mirrored. Getting this backwards
+ * gives you two men with their backs to the game.
+ *
+ * The width problem is the whole design. `main` is `max-w-7xl`, so a window
+ * wider than 1280px has margins doing nothing, and margins doing nothing are
+ * exactly where a statue belongs — it costs the battlefield not one pixel.
+ * Under that there are no margins, so the sand gives up a little instead
+ * (Aaron: "we could shrink the sand a tad too"), and under *that* they are not
+ * drawn at all. A phone has no spare width, and a decoration that takes a
+ * column out of a 390-pixel screen has stopped decorating.
+ *
+ * `object-position: bottom` and `bottom: 0` so both stand on the same line as
+ * each other whatever height they end up: a pair of statues at different
+ * heights reads as a mistake, not as perspective. */
+.field-secutor {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  height: auto;
+  object-fit: contain;
+  object-position: bottom;
+  pointer-events: none;
+  /* Behind everything on the sand. The board is the point; he is the room. */
+  z-index: 0;
+  animation: secutor-drift 38s ease-in-out infinite;
+}
+/* **The mirror is a variable, because the animation owns `transform`.**
+   A running animation wins the cascade on the property it animates, so a
+   plain `transform: scaleX(-1)` on the left-hand statue was silently thrown
+   away every frame and both men faced the same way — the drift is 38 seconds
+   long and 6 pixels wide, so there was nothing on screen to suggest an
+   animation was involved at all. The keyframes read `--face` instead, and the
+   declaration below is what still mirrors him when the animation is switched
+   off for reduced motion. */
+.field-secutor-left {
+  --face: -1;
+  transform: scaleX(-1);
+}
+
+/* The middle band: no window margin worth using, so the sand gives up a
+   little. `padding-inline` on the grid moves the arena in; the statues sit in
+   the space it vacated, because an absolutely positioned child measures from
+   the padding box's outer edge. */
+@media (min-width: 80rem) {
+  .field-stage { padding-inline: 7.25rem; }
+  .field-secutor { display: block; width: 6.5rem; }
+  .field-secutor-left { left: 0; }
+  .field-secutor-right { right: 0; }
+}
+
+/* Wide: the window's own margins are big enough to stand in, so the sand gets
+   every pixel back and they step outside it entirely. The width follows the
+   margin rather than a guess, with a ceiling so a 2560px screen does not get
+   a two-storey gladiator. */
+@media (min-width: 96rem) {
+  .field-stage { padding-inline: 0; }
+  .field-secutor {
+    width: clamp(6.5rem, calc((100vw - 1280px) / 2 - 1.25rem), 13rem);
+  }
+  .field-secutor-left { left: auto; right: 100%; margin-right: 0.75rem; }
+  .field-secutor-right { right: auto; left: 100%; margin-left: 0.75rem; }
 }
 /* **A band under the arena, two seats side by side.**
  *
