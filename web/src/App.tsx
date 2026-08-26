@@ -176,11 +176,25 @@ function AuthScreen({ theme, onToggleTheme, children }: {
  * `children` comes from the caller's render, so a fold re-renders this bar and
  * nothing else: the nav links, the settings menu and the ivy are all
  * reference-identical elements React skips straight over.
+ *
+ * The only class here is `site-header` and the fold's own modifier. It used to
+ * also carry the sticky/top/z-index utilities; `index.css` owns all three now,
+ * and the long note in `.site-header` says what it cost to find out why. The
+ * short version: the z-index utility was written exactly once in this frontend
+ * — here — and writing it flush against the interpolation meant its rule was
+ * never generated at all, so the bar spent a day sitting *underneath* the page
+ * it is supposed to float over. A utility class only works if something scans
+ * it back out of this file; a rule in the stylesheet is simply there. Anything
+ * single-use belongs there.
+ *
+ * (Deliberately not naming that class here either — this comment is source
+ * text, the scanner reads source text, and naming it would quietly generate
+ * the rule again and hide the next regression behind a coincidence.)
  */
 function SiteHeader({ children }: { children: React.ReactNode }) {
   const { furled } = useCanopyScroll()
   return (
-    <header className={`site-header sticky top-0 z-40${furled ? ' is-furled' : ''}`}>
+    <header className={`site-header${furled ? ' is-furled' : ''}`}>
       {children}
     </header>
   )
