@@ -10732,3 +10732,56 @@ button:hover .tarot-fan-card {
   .stage-mana.is-far { top: 20%; }
   .stage-mana.is-near { bottom: 30%; }
 }
+
+/* ------------------------------------------------------- the mouse gets in
+ *
+ * **A desktop user could not open a card on this board at all.** `FieldCard`
+ * turned a mouse away on the way up — the sheet arrived as the touch
+ * substitute for a hover preview a phone cannot have, and the mouse already
+ * had the preview, so it was never given the second answer. That held while
+ * the preview *was* the answer. It stopped holding when cards started
+ * carrying things: a peek shows one face, and a creature under a sword and
+ * two auras is four faces and a question about which. The card is a control
+ * now, and commandment 17 says a control answers the hand reaching for it.
+ *
+ * `zoom-in` rather than `pointer`, because that is what the press does — it
+ * makes the card bigger, it does not go anywhere — and it is the one cursor
+ * a first-time player already knows from every photograph on the internet
+ * (commandment 2). Only on the cards that will actually answer: `tabindex="0"`
+ * is set exactly when the pool gave the card a painting, so a Forest with no
+ * art keeps the ordinary arrow and tells the truth by doing so.
+ */
+.field-card[tabindex="0"] { cursor: zoom-in; }
+
+/* The press, and it is deliberately not a filter. The board's cards sit in
+   transformed ancestors and carry a rotating arm of their own; a `filter` on
+   this element flattens the 3D context underneath it, which is how a glint
+   turned into a bug once already. A hair of scale and a brass edge is the
+   whole reply — the same brass `:focus-visible` draws, so the keyboard and
+   the hand are visibly being answered by the same surface. */
+.field-card[tabindex="0"]:active {
+  transform: scale(0.955);
+  box-shadow: 0 0 0 2px var(--field-brass), 0 4px 14px rgba(0, 0, 0, 0.55);
+  border-radius: 4.75% / 3.4%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-card[tabindex="0"]:active { transform: none; }
+}
+
+/* **The pile a card was lifted out of needs no rule of its own**, and the two
+ * that were tried here are worth recording because both look right.
+ *
+ * A `:has(.is-held)` rule holds the tray up for exactly as long as the sheet
+ * is — and drops it the instant the card goes back, which is one frame too
+ * early: the pointer is wherever the dismissing click landed, hover has long
+ * since gone, and the graveyard shuts behind the card being returned to it.
+ * Restoring focus to the card does not save it either, and fails in a way you
+ * have to watch to believe — a closing tray goes `visibility: hidden`, a
+ * hidden subtree may not hold focus, so the browser drops that focus to
+ * `<body>`: the card cannot hold the panel open by being focused, because the
+ * panel closing is what un-focuses it.
+ *
+ * So the pile is told, and enters the same `is-open` state a tap gives it —
+ * `Lifted` in `board.tsx` carries that argument. Which means the rules above
+ * already cover this, `is-shut` still outranks them, and there is nothing to
+ * add here but the reason there is nothing to add here. */

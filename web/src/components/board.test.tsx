@@ -237,6 +237,86 @@ it('hands the whole card to a tap, because a phone cannot hover a peek', () => {
   expect(screen.getByRole('dialog', { name: 'Fleecemane Lion' })).toBeTruthy()
 })
 
+/** A click, the way a mouse makes one — pressed and lifted, main button.
+ *
+ *  `button` is defined and `tap` does not define it, which is the whole
+ *  difference: `FieldCard` turns away a right- or middle-click, because that
+ *  is the browser opening its own menu rather than somebody asking to read a
+ *  card. jsdom has no `PointerEvent`, so a plain `Event` reports `undefined`
+ *  for `button` and would be refused — a mouse test that forgets this passes
+ *  for the wrong reason. Touch never reaches that test at all. */
+function click(el: Element, button = 0) {
+  for (const type of ['pointerdown', 'pointerup']) {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'pointerType', { value: 'mouse' })
+    Object.defineProperty(ev, 'button', { value: button })
+    fireEvent(el, ev)
+  }
+}
+
+/** The one card in `BOARD` the pool gave a painting to. */
+function lion(container: HTMLElement) {
+  return container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card') as Element
+}
+
+it('hands the whole card to a mouse too, which had no way in at all', () => {
+  const { container } = show()
+  const card = lion(container)
+
+  // **Hover keeps its job.** The peek is the mouse's fast path — a glance at
+  // one card without committing to anything — and the sheet is the long look.
+  // Two questions, two answers; the click must not have eaten the first one.
+  fireEvent.mouseEnter(card)
+  expect(document.querySelector('.field-peek'),
+    'hover still peeks').toBeTruthy()
+  expect(screen.queryByRole('dialog'),
+    'and peeking is not holding the card up').toBeNull()
+
+  // The gap this closes: `onPointerUp` used to return on `pointerType ===
+  // 'mouse'`, so a desktop player could not open this sheet by any means.
+  click(card)
+  expect(screen.getByRole('dialog', { name: 'Fleecemane Lion' })).toBeTruthy()
+  expect(document.querySelector('.field-peek'),
+    'and the peek stands down rather than sitting behind it').toBeNull()
+
+  // **Nor can it come back while the card is up.** Both are portalled to the
+  // body, so a peek armed behind a sheet does not hide politely underneath
+  // it — it draws a second copy of the same card over the dimmed room. Seen
+  // in Chrome on a suited-up creature, where the sheet mounting under the
+  // cursor was enough to re-arm the card it had just covered.
+  fireEvent.mouseEnter(card)
+  fireEvent.focus(card)
+  expect(document.querySelector('.field-peek'),
+    'one answer at a time, whatever the pointer does').toBeNull()
+})
+
+it('leaves a right-click to the browser, whose menu it already is', () => {
+  const { container } = show()
+  click(lion(container), 2)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  click(lion(container), 1)
+  expect(screen.queryByRole('dialog'), 'nor a middle-click').toBeNull()
+})
+
+it('opens on Enter and on Space, and Escape puts the card back down', () => {
+  const { container } = show()
+  const card = lion(container)
+
+  for (const key of ['Enter', ' ']) {
+    fireEvent.keyDown(card, { key })
+    expect(screen.getByRole('dialog', { name: 'Fleecemane Lion' }),
+      `${key === ' ' ? 'Space' : key} holds the card up`).toBeTruthy()
+    fireEvent.keyDown(card, { key: 'Escape' })
+    expect(screen.queryByRole('dialog'), 'and Escape puts it down').toBeNull()
+  }
+
+  // A key nobody bound does nothing, which is worth holding: the handler sits
+  // on every card on the board and reads every key pressed inside one.
+  fireEvent.keyDown(card, { key: 'a' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
 it('leaves a card with no painting alone rather than opening an empty sheet', () => {
   const { container } = show()
   // Atla's Dragonlord never reaches the field in these steps; the Forest does,
@@ -388,6 +468,86 @@ it('lets Escape out of an open tray', () => {
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(grave.tray.className, 'Escape is the way out everywhere else')
     .toContain('is-shut')
+})
+
+/** A graveyard whose cards have paintings, so one can be lifted out of it.
+ *
+ *  Its own fixture rather than an image added to `ZONES`: the four tests above
+ *  press cards in that tray to prove a dismissal, and giving those cards a
+ *  painting would open a sheet in the middle of each one. */
+const BURIED = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 50, name: 'Qasali Pridemage', types: 'Creature - Cat', seat: 1,
+      image: 'https://example.test/qasali.jpg' },
+    { id: 51, name: 'Regal Caracal', types: 'Creature - Cat', seat: 1,
+      image: 'https://example.test/caracal.jpg' },
+  ],
+  steps: [{ turn: 1, seat: 1, changes: [
+    { id: 50, zone: 'graveyard', seat: 1 },
+    { id: 51, zone: 'graveyard', seat: 1 },
+  ] }],
+} as unknown as ForgeBoard
+
+function buried() {
+  const { container } = render(
+    <MatchBoard board={BURIED} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  const grave = zone(container, 'far', 'Graveyard')
+  return { container, grave,
+    card: grave.tray.querySelector('.field-card') as Element }
+}
+
+it('keeps the pile spread while one of its cards is being read', () => {
+  const { grave, card } = buried()
+
+  // **A tray is held open by two different things and only one survives a
+  // modal.** A tap sets `is-open`; a mouse gets nothing but `:hover` on the
+  // wrapper — and the sheet is a full-viewport panel that takes the pointer
+  // the instant it opens, so the pile shut itself behind the very card it had
+  // just handed over. Lifting a card out of a pile now puts that pile into
+  // the same state a tap does, which is the half of this a suite can see.
+  expect(grave.tray.className, 'nothing has opened it yet')
+    .not.toContain('is-open')
+  click(card)
+  expect(screen.getByRole('dialog', { name: 'Qasali Pridemage' })).toBeTruthy()
+  expect(grave.tray.className, 'the pile stays spread behind the card')
+    .toContain('is-open')
+
+  // And putting it back finds the graveyard as it was left, which is the
+  // whole point — the state outlives the sheet rather than tracking it.
+  fireEvent.click(screen.getByRole('dialog'))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(grave.tray.className, 'and it is still spread afterwards')
+    .toContain('is-open')
+
+  // Not a latch: every dismissal the zone already had still ends it.
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(grave.tray.className).toContain('is-shut')
+})
+
+it('puts the card down on Escape without shutting the pile it came from', () => {
+  const { grave, card } = buried()
+  click(card)
+  expect(grave.tray.className).toContain('is-open')
+
+  // **One press, one meaning.** The zone wrapper closes its tray on Escape,
+  // and this card is inside that wrapper — so without stopping the key here,
+  // a single Escape would put the card down *and* shut the pile behind it,
+  // and the reader would be two gestures from where they were.
+  fireEvent.keyDown(card, { key: 'Escape' })
+  expect(screen.queryByRole('dialog'), 'the card goes back').toBeNull()
+  expect(grave.tray.className, 'the pile does not').not.toContain('is-shut')
+  expect(grave.tray.className).toContain('is-open')
+
+  // A second Escape, with no card held, is the tray's own again.
+  fireEvent.keyDown(card, { key: 'Escape' })
+  expect(grave.tray.className, 'and now it shuts').toContain('is-shut')
 })
 
 it('spreads one zone at a time', () => {
