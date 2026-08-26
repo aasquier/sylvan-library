@@ -302,6 +302,12 @@ jobs:
   # that does not gate.
   image:
     runs-on: ubuntu-latest
+    # Published so `deploy` builds against the same day this job scanned. Two
+    # jobs each calling `date` would agree except across midnight, and the one
+    # night a year that matters is the night the deployed image is not the
+    # image Trivy looked at.
+    outputs:
+      security-epoch: ${{ steps.epoch.outputs.day }}
     # amd64 only since 2026-08-19. arm64 used to run here at the end, under
     # QEMU, and cost 182 of this job's 302 seconds -- 60% of the longest job
     # in the pipeline, emulating an architecture nothing deploys to: the live
@@ -323,6 +329,22 @@ jobs:
       # The cache scope is named per architecture. Left at the default, the
       # two jobs share one scope and each evicts the other's layers on every
       # run, which is a cache that costs storage and returns nothing.
+      # **Today, as a cache key.** `SECURITY_EPOCH` is threaded into every
+      # image build below and is the only thing that makes the `apt-get
+      # upgrade` layer rebuild: `cache-from: type=gha` serves that layer from
+      # cache indefinitely, because nothing above it in the Dockerfile changes
+      # when Debian publishes a fix. It has skipped a deploy twice — the
+      # Dockerfile names both CVEs — and both times the fix on record was for
+      # somebody to bust the cache by hand, which is not a fix.
+      #
+      # A date means the layer is at most a day stale, with no human in the
+      # loop. It is deliberately a *date* and not the run id: per-run would
+      # rebuild the layer on every push and throw away a cache that is doing
+      # real work the rest of the time.
+      - name: The security layer's cache key
+        id: epoch
+        run: echo "day=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
       - name: Build (linux/amd64)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:
@@ -330,6 +352,7 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: sylvan-library:ci
+          build-args: SECURITY_EPOCH=${{ steps.epoch.outputs.day }}
           cache-from: type=gha,scope=image-amd64
           cache-to: type=gha,mode=max,scope=image-amd64
 
@@ -353,6 +376,7 @@ jobs:
           file: Dockerfile.forge
           platforms: linux/amd64
           push: false
+          build-args: SECURITY_EPOCH=${{ steps.epoch.outputs.day }}
           cache-from: type=gha,scope=forge-amd64
           cache-to: type=gha,mode=max,scope=forge-amd64
 
@@ -576,12 +600,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
 
+      # **Today, as a cache key.** `SECURITY_EPOCH` is threaded into every
+      # image build below and is the only thing that makes the `apt-get
+      # upgrade` layer rebuild: `cache-from: type=gha` serves that layer from
+      # cache indefinitely, because nothing above it in the Dockerfile changes
+      # when Debian publishes a fix. It has skipped a deploy twice — the
+      # Dockerfile names both CVEs — and both times the fix on record was for
+      # somebody to bust the cache by hand, which is not a fix.
+      #
+      # A date means the layer is at most a day stale, with no human in the
+      # loop. It is deliberately a *date* and not the run id: per-run would
+      # rebuild the layer on every push and throw away a cache that is doing
+      # real work the rest of the time.
+      - name: The security layer's cache key
+        id: epoch
+        run: echo "day=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
       - name: Build (linux/arm64)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:
           context: .
           platforms: linux/arm64
           push: false
+          build-args: SECURITY_EPOCH=${{ steps.epoch.outputs.day }}
           cache-from: type=gha,scope=image-arm64
           cache-to: type=gha,mode=max,scope=image-arm64
 
@@ -652,10 +693,20 @@ jobs:
       # There is one machine and one volume, so Fly cannot roll: this stops the
       # instance and starts the new one. A few seconds of downtime per deploy
       # is inherent to that shape and was equally true by hand.
+      #
+      # `SECURITY_EPOCH` is passed for the same reason it is passed to every
+      # other build: the `apt-get upgrade` layer must not come out of a cache.
+      # This runner's Docker daemon is cold, so today it changes nothing — and
+      # that is precisely the trap. The `image` job builds *with* a cache and
+      # is the thing Trivy scans, so without this the artifact that was
+      # scanned and the artifact that ships are two different images, and only
+      # one of them was ever looked at. Same day, same key, same image.
       - name: Deploy
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --local-only
+        run: |
+          flyctl deploy --local-only \
+            --build-arg SECURITY_EPOCH=${{ needs.image.outputs.security-epoch }}
 
       # A deploy that returns success and an instance that works are different
       # facts, and the gap between them is where the interesting failures live.
@@ -739,6 +790,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: registry.fly.io/sylvan-library:forge-worker-${{ github.sha }}
+          build-args: SECURITY_EPOCH=${{ needs.image.outputs.security-epoch }}
           cache-from: type=gha,scope=forge-amd64
 
       - name: Point the forge-worker machine at it, and put it to sleep

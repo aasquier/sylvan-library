@@ -179,6 +179,16 @@ LABEL org.opencontainers.image.title="sylvan-library-forge-worker" \
 # nowhere, and `fontconfig`+`fonts-dejavu-core` so font init finds something
 # to load. ~200MB over the headless build, on an image that already carries
 # half a gigabyte of card scripts.
+#
+# `SECURITY_EPOCH` is the same dial the app image carries and it is here for
+# the same reason: the layer is cached under `scope=forge-amd64` and nothing
+# above it moves when Debian ships a fix, so without a date in the key the
+# upgrade above never runs again. This image is **not** Trivy-scanned — the
+# distribution is upstream's jar-with-dependencies and a fixable CVE inside it
+# would red a required check forever — which means nothing here would ever
+# tell us it had gone stale. That is a reason to keep it fresh, not a reason
+# to care less.
+ARG SECURITY_EPOCH=0
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends \

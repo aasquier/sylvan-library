@@ -53,16 +53,32 @@ ENV MTGLAB_DATA_DIR=/data \
 # Take Debian's security updates rather than waiting for Docker Hub to
 # republish the base: the image otherwise inherits exactly whatever
 # `debian:trixie-slim` last shipped, and a Debian security fix reaches it
-# only when the base is rebuilt — the gap that skipped a deploy once
-# (CVE-2026-53615; Trivy was right and the image was stale). `ignore-unfixed`
-# in ci.yml means that gate only ever fires when a fixed version exists.
+# only when the base is rebuilt. `ignore-unfixed` in ci.yml means that gate
+# only ever fires when a fixed version exists.
 #
 # `libstdc++6` is for the DuckDB static archive the binary links; the slim
-# base does not promise it. A known edge, written down rather than
-# discovered later: `cache-from: type=gha` can serve this layer from cache,
-# so it goes stale exactly while the base digest is unchanged AND Debian has
-# shipped something new; the Trivy gate catches the window, and hitting it
-# needs a deliberate cache bust rather than a re-run.
+# base does not promise it.
+#
+# **`SECURITY_EPOCH` is what makes the line below actually run.** `cache-from:
+# type=gha` will happily serve this layer forever: nothing above it changes
+# when Debian ships a fix, so the layer stays warm and the upgrade never
+# happens. That is not a hypothetical — it has now skipped a deploy twice,
+# CVE-2026-53615 and CVE-2026-14456, and both times the remedy written down
+# here was "a deliberate cache bust", which is a remedy that requires somebody
+# to notice. Nobody noticed either time; the first sign was a red required
+# check on `main` and a site that had silently stopped deploying.
+#
+# So the cache key carries a date. CI passes today's, the layer is rebuilt at
+# most once a day, and the image is never more than a day behind Debian's
+# security archive without anybody having to think about it. The default is a
+# constant so a local `docker build` with no arguments still builds and still
+# caches; CI is the only place freshness is a promise, and CI is the only
+# place the image is built for a deploy.
+#
+# The cost is the layers below this one rebuilding daily: a `useradd`, the
+# binary, and two directory copies. The Go build is a separate stage above and
+# does not notice.
+ARG SECURITY_EPOCH=0
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends libstdc++6 ca-certificates \
