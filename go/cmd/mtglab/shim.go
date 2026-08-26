@@ -366,7 +366,23 @@ func failureText(err error) string {
 }
 
 func serveShim(ctx context.Context, forge tier3.Settings) error {
-	host, port, limit := forge.ShimHost, forge.ShimPort, forge.IdleSeconds
+	addr := net.JoinHostPort(forge.ShimHost, strconv.Itoa(forge.ShimPort))
+	return serveShimOn(ctx, forge, func() (net.Listener, error) {
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			return nil, fmt.Errorf("forge shim: %w", err)
+		}
+		return l, nil
+	})
+}
+
+// serveShimOn is [serveShim] with the listener supplied rather than named, for
+// the same reason [serveOn] takes one: an address is not a reservation, and a
+// caller that hands over a port number cannot hold it while this boots. The
+// argument is made in full on [serveOn].
+func serveShimOn(ctx context.Context, forge tier3.Settings,
+	listen func() (net.Listener, error)) error {
+	limit := forge.IdleSeconds
 
 	state := newShimState()
 	handler := &shim{state: state, log: log.Default(), forge: forge}
@@ -392,11 +408,11 @@ func serveShim(ctx context.Context, forge tier3.Settings) error {
 		ReadHeaderTimeout: 30 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
-	listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	listener, err := listen()
 	if err != nil {
-		return fmt.Errorf("forge shim: %w", err)
+		return err
 	}
-	fmt.Printf("forge shim: listening on [%s]:%d\n", host, port)
+	fmt.Printf("forge shim: listening on %s\n", listener.Addr())
 	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

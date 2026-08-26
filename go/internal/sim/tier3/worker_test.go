@@ -600,27 +600,94 @@ func TestAStreamThatGoesQuietIsCancelledRatherThanWaitedOnForever(t *testing.T) 
 	}
 }
 
+// handTimer is [stallTimer] on a clock the test turns, and the stall it fires
+// is the real one — the callback [readStreamOn] was handed.
+type handTimer struct {
+	now      time.Duration
+	deadline time.Duration
+	stall    func()
+	fired    bool
+	stopped  bool
+	resets   int
+}
+
+// arm is the constructor [readStreamOn] takes.
+func (h *handTimer) arm(d time.Duration, stall func()) stallTimer {
+	h.deadline, h.stall = h.now+d, stall
+	return h
+}
+
+// pass moves the clock forward and fires the stall if the deadline went by,
+// which is the whole of what `time.AfterFunc` would have done for us.
+func (h *handTimer) pass(d time.Duration) {
+	h.now += d
+	if !h.fired && !h.stopped && h.now >= h.deadline {
+		h.fired = true
+		h.stall()
+	}
+}
+
+func (h *handTimer) Reset(d time.Duration) bool {
+	h.resets++
+	h.deadline = h.now + d
+	return true
+}
+
+func (h *handTimer) Stop() bool { h.stopped = true; return true }
+
+// pacedReader hands back one line per read and lets `gap` pass before each,
+// so **the stream's own pacing is the clock** and there is nothing running
+// beside it to race. A fired stall reads as the closed pipe the real
+// cancellation produces.
+type pacedReader struct {
+	lines []string
+	gap   time.Duration
+	clock *handTimer
+	i     int
+}
+
+func (p *pacedReader) Read(b []byte) (int, error) {
+	if p.i >= len(p.lines) {
+		return 0, io.EOF
+	}
+	p.clock.pass(p.gap)
+	if p.clock.fired {
+		return 0, errors.New("io: read/write on closed pipe")
+	}
+	n := copy(b, p.lines[p.i])
+	p.i++
+	return n, nil
+}
+
 // The stall timer is reset on every line, so a stream that keeps talking runs
 // as long as it likes -- the property that makes this a per-read budget
 // rather than a second, shorter copy of the far side's whole-match ceiling.
+//
+// **The clock is turned by hand, because the assertion is about a budget.**
+// This used to pace the lines with `time.Sleep(15 * time.Millisecond)` against
+// a 60ms budget, the sum deliberately larger than the budget while no single
+// gap was. That reads as an assertion about the reset and is really an
+// assertion about the machine's scheduler: a starved one stretches a single
+// 15ms sleep past 60ms unaided, the timer fires, and the test reports **"a
+// chatty stream was cancelled"** about a stream that was perfectly chatty.
+// Measured under load it failed 6 runs in 20, and it had failed on several
+// unrelated changes in one day. Nothing sleeps here now — the same numbers
+// prove the same thing on any machine, in no time at all.
 func TestTheStallBudgetIsPerReadRatherThanPerMatch(t *testing.T) {
 	t.Parallel()
-	pr, pw := io.Pipe()
-	go func() {
-		// Five lines, each arriving comfortably inside the budget but
-		// together taking longer than it.
-		for i := 1; i <= 5; i++ {
-			time.Sleep(15 * time.Millisecond)
-			_, _ = fmt.Fprintf(pw, `{"game":%d}`+"\n", i)
-		}
-		_, _ = io.WriteString(pw, `{"result":{"games":[],"seats":{},"wall_seconds":1.0}}`+"\n")
-		_ = pw.Close()
-	}()
+	const budget, gap = 60 * time.Millisecond, 15 * time.Millisecond
 
+	lines := make([]string, 0, 6)
+	for i := 1; i <= 5; i++ {
+		lines = append(lines, fmt.Sprintf(`{"game":%d}`+"\n", i))
+	}
+	lines = append(lines, `{"result":{"games":[],"seats":{},"wall_seconds":1.0}}`+"\n")
+
+	clock := &handTimer{}
+	body := &pacedReader{lines: lines, gap: gap, clock: clock}
 	ticks := 0
-	run, err := readStream(pr, 60*time.Millisecond, func() {
-		_ = pr.CloseWithError(errors.New("stalled"))
-	}, MatchAsk{OnGame: func(int, *GameResult) { ticks++ }})
+	run, err := readStreamOn(body, budget, func() {},
+		MatchAsk{OnGame: func(int, *GameResult) { ticks++ }}, clock.arm)
 	if err != nil {
 		t.Fatalf("a chatty stream was cancelled: %v", err)
 	}
@@ -629,6 +696,22 @@ func TestTheStallBudgetIsPerReadRatherThanPerMatch(t *testing.T) {
 	}
 	if run == nil {
 		t.Fatal("no run came back")
+	}
+	if clock.fired {
+		t.Error("the stall fired on a stream that never stopped talking")
+	}
+	// **The test is only saying anything while this holds.** The point is a
+	// total beyond the budget with no single gap near it; a later edit that
+	// trims a line or widens the budget could leave every assertion above
+	// passing and nothing being proved.
+	if clock.now <= budget {
+		t.Errorf("the stream ran %v against a %v budget, so nothing here "+
+			"distinguishes a per-read budget from a per-match one",
+			clock.now, budget)
+	}
+	if clock.resets != len(lines) {
+		t.Errorf("the deadline was re-armed %d times for %d lines",
+			clock.resets, len(lines))
 	}
 }
 

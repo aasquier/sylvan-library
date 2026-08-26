@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -45,33 +47,49 @@ func atoi(t *testing.T, port string) int {
 	return n
 }
 
-// freePort takes an ephemeral port and gives it straight back, so the caller
-// can name it. A race in principle; in practice the kernel does not hand the
-// same port out twice in the microseconds between.
-// **A free port is not a held one.** `:0` asks the kernel for an unused port
-// and this hands it back the moment it has the number, so between the close
-// here and the bind in whatever is about to use it, anything on the machine
-// may take it — and `go test ./...` runs forty-odd test binaries at once, most
-// of them standing up `httptest.Server`s out of the same ephemeral range.
+// heldPort takes an ephemeral port and **keeps** it, handing back the
+// listener itself so the caller can give it to whatever is about to serve on
+// it.
 //
-// That is a race with no fix at this level, which is why nothing here trusts
-// one port: [bootServer] and [bootShim] retry on a fresh one, and both watch
-// the boot for a bind failure rather than waiting out a timeout that would
-// report the wrong thing. **A test that reports "the server never answered"
-// when the truth is "the port was taken" sends the next person after a bug
-// that is not there** — this failed exactly once on CI, on amd64 only, and
-// said the former.
-func freePort(t *testing.T) string {
+// **A free port is not a held one**, and that is what this replaces. The old
+// helper asked the kernel for an unused port with `:0` and gave it straight
+// back the moment it had the number, so between that close and the bind in
+// whatever was about to use it, anything on the machine could take it — and
+// `go test ./...` runs forty-odd binaries at once, most of them standing up
+// `httptest.Server`s out of the same ephemeral range.
+//
+// The window was neither theoretical nor small, and the retry that used to
+// stand here was covering the wrong half of it. Measured on this machine, the
+// boot took 0.2s to reach its bind when idle and 5.3s under load, while the
+// probe waiting for it gave up after a flat ~2.2s — 100 sleeps of 20ms, a
+// wall clock that a starved CPU does not stretch. **The boot's cost is
+// unbounded and the budget was a constant**, so the busier the machine the
+// likelier the budget lost; and because nothing held the port meanwhile,
+// every attempt fast-failed with ECONNREFUSED instead of waiting. The failure
+// it produced said `the server never answered`, which blames the server for a
+// race in the test, and it cost a green `main` a deploy (ADR 23) when the job
+// it failed was the one gating one.
+//
+// Holding the port closes both halves at once: nothing can take it, and a
+// probe against a bound port is accepted into the backlog immediately and
+// then **waits for the boot rather than racing it**. No timeout moved.
+func heldPort(t *testing.T) net.Listener {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Whoever serves on it closes it; this is for the paths that never get
+	// that far, and a second close is not a failure worth reporting.
+	t.Cleanup(func() { _ = l.Close() })
+	return l
+}
+
+// portOf is the port half of a listener's address.
+func portOf(t *testing.T, l net.Listener) string {
+	t.Helper()
 	_, port, err := net.SplitHostPort(l.Addr().String())
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := l.Close(); err != nil {
 		t.Fatal(err)
 	}
 	return port
@@ -94,7 +112,7 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 
 	// The ladder ran on the way up, which is the first thing the boot owes.
 	port, base, done := bootServer(t, d)
-	resp, err := waitForHealth(t, base+"/api/health")
+	resp, err := waitForHealth(t, base+"/api/health", done)
 	if err != nil {
 		t.Fatalf("the server never answered on %s: %v", base, err)
 	}
@@ -136,90 +154,67 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 	}
 }
 
-// bootServer starts `serve` on a port nothing else is holding and returns once
-// it is listening. Retries on a fresh port when the bind loses the race
-// described on [freePort], and fails loudly on any other refusal — a boot that
-// died for a real reason must not be reported as a boot that was slow.
+// bootServer starts `serve` on a listener this test is **already holding**
+// (see [heldPort]) and returns straight away: there is no port to lose between
+// here and the bind, so there is nothing to poll for and nothing to retry. The
+// caller waits for health, and [waitForHealth] is what watches the boot.
 func bootServer(t *testing.T, d deployment) (port, base string, done chan error) {
 	t.Helper()
-	for attempt := range 4 {
-		port = freePort(t)
-		base = "http://127.0.0.1:" + port
-		done = make(chan error, 1)
-		go func() {
-			done <- serve(d.Config, tier3.Settings{}, "127.0.0.1", port, t.TempDir(), t.TempDir())
-		}()
-		if err := listening(base + "/api/health"); err == nil {
-			return port, base, done
-		}
-		// It is not answering. Either the bind lost the port, in which case
-		// `serve` has already returned and we take a new one, or it is simply
-		// still coming up -- and then `done` is empty and we let it be.
-		select {
-		case err := <-done:
-			if err != nil && strings.Contains(err.Error(), "listen on") {
-				t.Logf("boot attempt %d lost the port (%v); taking another", attempt+1, err)
-				continue
-			}
-			t.Fatalf("the boot ended for a reason that is not the port: %v", err)
-		default:
-			return port, base, done
-		}
-	}
-	t.Fatal("four ports in a row were taken between the pick and the bind")
-	return "", "", nil
+	l := heldPort(t)
+	port = portOf(t, l)
+	// Taken on this goroutine: `t.TempDir` belongs to the test, not to the
+	// server it is about to start.
+	webDist, tarot := t.TempDir(), t.TempDir()
+	done = make(chan error, 1)
+	go func() {
+		done <- serveOn(d.Config, tier3.Settings{}, webDist, tarot,
+			func() (net.Listener, error) { return l, nil })
+	}()
+	return port, "http://127.0.0.1:" + port, done
 }
 
-// bootShim is [bootServer] for the worker's door: the same race, the same
-// retry, and the same refusal to report a lost port as a slow boot.
+// bootShim is [bootServer] for the worker's door: the same held listener, for
+// the same reason.
 //
 // **Zero idle seconds means never stop**, which is what a laptop running the
 // shim by hand wants -- and what keeps this test from having its own process
 // exited out from under it by the watchdog.
-func bootShim(t *testing.T, ctx context.Context) string {
+func bootShim(t *testing.T, ctx context.Context) (base string, done chan error) {
 	t.Helper()
-	for attempt := range 4 {
-		port := freePort(t)
-		forge := tier3.Settings{
-			ShimHost: "127.0.0.1", ShimPort: atoi(t, port),
-			Home: t.TempDir(), IdleSeconds: 0,
-		}
-		done := make(chan error, 1)
-		go func() { done <- serveShim(ctx, forge) }()
-
-		base := "http://127.0.0.1:" + port
-		if err := listening(base + "/healthz"); err == nil {
-			return base
-		}
-		select {
-		case err := <-done:
-			t.Logf("shim attempt %d lost the port (%v); taking another", attempt+1, err)
-			continue
-		default:
-			return base
-		}
+	l := heldPort(t)
+	port := portOf(t, l)
+	forge := tier3.Settings{
+		ShimHost: "127.0.0.1", ShimPort: atoi(t, port),
+		Home: t.TempDir(), IdleSeconds: 0,
 	}
-	t.Fatal("four ports in a row were taken between the pick and the bind")
-	return ""
+	done = make(chan error, 1)
+	go func() {
+		done <- serveShimOn(ctx, forge, func() (net.Listener, error) { return l, nil })
+	}()
+	return "http://127.0.0.1:" + port, done
 }
 
-// listening polls until something answers, for about two seconds.
-func listening(target string) error {
-	client := &http.Client{Timeout: 2 * time.Second}
-	var err error
-	for range 100 {
-		var resp *http.Response
-		if resp, err = client.Get(target); err == nil {
-			_ = resp.Body.Close()
-			return nil
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	return err
-}
-
-// waitForHealth is [listening] again, keeping the response this time.
-func waitForHealth(t *testing.T, target string) (*http.Response, error) {
+// waitForHealth polls a held port until the server behind it answers, and
+// gives up only when the boot itself ends.
+//
+// The hundred rounds below are the same hundred as before; what changed is
+// what one costs. Against an **unbound** port each is a refusal that returns
+// instantly, so the hundred were 100 sleeps of 20ms — a flat ~2.2s, measured,
+// and a wall clock a starved CPU does not stretch, which is how a fixed budget
+// came to be racing a boot that took 0.2s idle and 5.3s loaded. Against a
+// **held** port each round is instead accepted into the listen backlog and
+// waits on `Serve` for up to the client's own 2s, so the same hundred span
+// minutes rather than seconds. The budget is no longer the thing that decides.
+//
+// What decides is `done`: a boot that returned has a reason, and **reporting
+// that as a server that never answered sends the next person after a bug that
+// is not there**, which is exactly what this test did on #337, on `main` at
+// 46474eb, and again on #341 — where it shared a job with a genuine failure and
+// gave it somewhere to hide.
+//
+// This is therefore only honest while every caller hands over a listener it is
+// already holding, which is [heldPort]'s whole job.
+func waitForHealth(t *testing.T, target string, done <-chan error) (*http.Response, error) {
 	t.Helper()
 	client := &http.Client{Timeout: 2 * time.Second}
 	var resp *http.Response
@@ -228,9 +223,89 @@ func waitForHealth(t *testing.T, target string) (*http.Response, error) {
 		if resp, err = client.Get(target); err == nil {
 			return resp, nil
 		}
+		select {
+		case bootErr := <-done:
+			if bootErr == nil {
+				// Its own fault, and a stranger one: nothing refused, and
+				// nothing served either.
+				return nil, errors.New("the boot returned cleanly without ever answering")
+			}
+			return nil, fmt.Errorf("the boot ended before it answered: %w", bootErr)
+		default:
+		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	return nil, err
+}
+
+// **The fix, in one assertion.** The address [heldPort] hands back is already
+// bound, so there is no instant between choosing it and serving on it in which
+// anything else could take it.
+//
+// This is the guard the flake never had, and it fails against the helper it
+// replaces rather than merely passing against the new one: run the same
+// `net.Listen` at `freePort`'s old return and it **succeeds every time** —
+// measured 5 of 5 — because a port that has just been closed is by
+// construction available to whoever asks next. That is not a rare race that
+// needs a loaded machine to show; it is the helper's whole contract, and the
+// only reason it did not fail constantly is that the thief usually never came.
+func TestAHeldPortIsHeld(t *testing.T) {
+	t.Parallel()
+	l := heldPort(t)
+	second, err := net.Listen("tcp", "127.0.0.1:"+portOf(t, l))
+	if err == nil {
+		_ = second.Close()
+		t.Fatal("the address was free to take, so the boot it is handed to is racing for it")
+	}
+}
+
+// A boot slower than the probe's old patience is **waited for**, not called a
+// server that never answered.
+//
+// The old shape gave the wait a fixed budget — 100 sleeps of 20ms against an
+// unbound port, a flat ~2.2s measured, which a busy CPU does not stretch
+// because sleeping needs none of it — while the boot behind it cost 0.2s idle
+// and 5.3s under load. A constant racing something unbounded loses eventually,
+// and it lost on GitHub's runners three times in one evening. Holding the port
+// is what removes the clock: the connection is accepted the moment it is made
+// and the request waits for `Serve` to reach it.
+//
+// The delay here is past that whole old budget on purpose. Nothing sleeps in
+// the fix; the sleep is this test standing in for a slow machine.
+func TestASlowBootIsWaitedForRatherThanCalledDead(t *testing.T) {
+	t.Parallel()
+	l := heldPort(t)
+	go func() {
+		time.Sleep(3 * time.Second)
+		_ = http.Serve(l, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+	}()
+	// A boot that has not returned: the wait has no reason to stop early.
+	resp, err := waitForHealth(t, "http://"+l.Addr().String()+"/api/health", make(chan error))
+	if err != nil {
+		t.Fatalf("a boot that was merely slow was reported as no server at all: %v", err)
+	}
+	_ = resp.Body.Close()
+}
+
+// And the other half: a boot that **ended** is reported as a boot that ended,
+// naming its reason, rather than polled at until the budget runs out and then
+// blamed on a server that never answered. That mistake is what hid a real
+// failure behind a familiar-looking flake on #341.
+func TestABootThatDiedIsNotReportedAsASlowOne(t *testing.T) {
+	t.Parallel()
+	l := heldPort(t)
+	done := make(chan error, 1)
+	done <- errors.New("the ladder could not be applied")
+
+	_, err := waitForHealth(t, "http://"+l.Addr().String()+"/api/health", done)
+	if err == nil {
+		t.Fatal("a boot that had already ended was reported as healthy")
+	}
+	if !strings.Contains(err.Error(), "the ladder could not be applied") {
+		t.Errorf("the failure said %q without naming why the boot ended", err)
+	}
 }
 
 // A port already in use is a refusal that names the address, because the
@@ -267,7 +342,10 @@ func TestAnUnrunnableLadderRefusesToServe(t *testing.T) {
 		DataDir:  "/nonexistent/never-mounted",
 		DecksDir: "/nonexistent/never-mounted/decks",
 	}
-	err := serve(unmounted, tier3.Settings{}, "127.0.0.1", freePort(t), t.TempDir(), t.TempDir())
+	// Port "0" and no port at all are the same thing here: the ladder fails
+	// above the listener, so nothing is ever bound — which is the assertion
+	// underneath this one, and the reason this needs no port of its own.
+	err := serve(unmounted, tier3.Settings{}, "127.0.0.1", "0", t.TempDir(), t.TempDir())
 	if err == nil {
 		t.Fatal("a boot with no writable volume served anyway")
 	}
@@ -360,9 +438,9 @@ func runProbe(t *testing.T, url string) error {
 func TestTheShimListensAndAnswersItsHealthRoute(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
-	base := bootShim(t, ctx)
+	base, done := bootShim(t, ctx)
 
-	resp, err := waitForHealth(t, base+"/healthz")
+	resp, err := waitForHealth(t, base+"/healthz", done)
 	if err != nil {
 		cancel()
 		t.Fatalf("the shim never answered on %s: %v", base, err)

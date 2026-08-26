@@ -200,8 +200,21 @@ and `ci.yml` gated on the other.
   on amd64 only. Worse than the flake was the message: the test polled for two
   seconds and reported **"the server never answered"** when the truth was "the
   port was taken", which sends the next person after a bug that is not there.
-  `bootServer`/`bootShim` in `cmd/mtglab/serve_test.go` retry on a fresh port
-  and watch the boot channel, so a real refusal is still a real refusal.
+
+  Retrying on a fresh port was the first answer and it was the wrong one — it
+  covered the half where the bind *failed* and left the half where the bind was
+  merely *late*, which is the half that kept firing: it cost #337, #341, and a
+  green `main` at 46474eb whose `deploy` job skipped, so merged work never
+  reached the site until someone re-ran it by hand. Measured, the two sides
+  never had a chance of agreeing — the boot took 0.2s to reach its bind when
+  idle and 5.3s under load, while the wait gave up after a flat ~2.2s, because
+  100 sleeps of 20ms is a wall clock a starved CPU does not stretch. **A
+  constant racing something unbounded loses eventually.**
+  `heldPort` in `cmd/mtglab/serve_test.go` now keeps the listener and hands it
+  to `serveOn`/`serveShimOn`, which take one rather than a port number: nothing
+  can take the port, and a probe against a bound port is accepted into the
+  backlog and waits for the boot instead of racing it. Under a same-machine A/B
+  at load 224 the old shape failed 5 of 15 and the new one 0 of 15.
 - **A sweep that sweeps nothing passes.** Every table-driven sweep here carries
   a floor (`if swept < 15`), because a pattern filler that stops matching the
   route table is silent otherwise — and silent is indistinguishable from green.

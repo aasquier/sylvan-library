@@ -141,7 +141,39 @@ func configComplaints(cfg config.Config) []string {
 	return out
 }
 
+// serve is the whole app coming up on `host:port` and serving until a signal
+// stops it.
 func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot string) error {
+	addr := net.JoinHostPort(host, port)
+	return serveOn(cfg, forge, webDist, tarot, func() (net.Listener, error) {
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			return nil, fmt.Errorf("listen on %s: %w", addr, err)
+		}
+		return l, nil
+	})
+}
+
+// serveOn is [serve] with the listener supplied rather than named, acquired at
+// exactly the point in the boot where the listener has always been acquired —
+// after the ladder, the summary, the reconciliation and the door, so the fixed
+// order this package's comment argues for is unchanged.
+//
+// **The listener is a parameter because an address is not a reservation.** A
+// caller that can only say "port 41019" has to let this function bind it, and
+// between the caller choosing that number and the bind here there is a window
+// in which anything on the machine may take it. For the boot test that window
+// was measured at 0.2s idle and 5.3s on a loaded machine — and because
+// nothing held the port during it, every probe fast-failed with
+// ECONNREFUSED, so the test's ~2.2s of polling (100 sleeps of 20ms, a wall
+// clock a busy CPU never stretches) expired against a boot whose own cost is
+// unbounded. The result was `the server never answered`, which is a lie about
+// a server that was still coming up. A caller that hands over a listener it is
+// already holding has no window and needs no clock: the connection is accepted
+// into the backlog the moment it is made, and the probe waits for the boot
+// instead of racing it.
+func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
+	listen func() (net.Listener, error)) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	// The schema ladder, before anything opens the file: creating `app.db`
 	// and bringing it to `auth.SchemaVersion` is this command's job, and a
@@ -189,16 +221,20 @@ func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot s
 	}
 	defer func() { _ = d.Close() }()
 
-	addr := net.JoinHostPort(host, port)
+	// The listener, where the listener has always been: after the door, so a
+	// boot that dies below never opened a port at all.
+	listener, err := listen()
+	if err != nil {
+		return err
+	}
+	// The address the kernel actually gave, not the one that was asked for —
+	// with port 0 those differ, and the one worth printing is the real one.
+	addr := listener.Addr().String()
 	server := &http.Server{
 		Addr:              addr,
 		Handler:           d.Handler(),
 		ReadHeaderTimeout: 30 * time.Second,
 		IdleTimeout:       120 * time.Second,
-	}
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("listen on %s: %w", addr, err)
 	}
 	fmt.Printf("sylvan-library -> http://%s\n", addr)
 
