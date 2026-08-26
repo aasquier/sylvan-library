@@ -3,9 +3,16 @@
  *
  * **The list lives here and the materials live in `index.css`**, on the gold
  * edge a token already wears — `.field-card-token.is-treasure` and its two
- * siblings. That is the whole reason this file is one function and no
- * pictures: the board draws Wizards' actual painting for every token, and the
- * only thing a browser adds is the light lying on it.
+ * siblings. This file stays one function and no pictures even though each
+ * material now stands a real object on the card, and that is deliberate: the
+ * three objects are museum plates cut and committed under ADR 29, and CSS
+ * reaches them by `url()` out of `assets/coliseum` without a name in any
+ * module. So a fourth material is still exactly two edits — a name below, and
+ * a rule beside the gold edge — and neither of them is here.
+ *
+ * The board still draws Wizards' own painting under all of it. The object
+ * stands *on* the card and the light lies on the object; nothing filters,
+ * blurs or recolours the art, which is the line ADR 32 draws.
  *
  * **Three, because three is what the pool says is common.** Counting printings
  * that carry art, in the pool this app already ships against: Treasure 98,
@@ -27,7 +34,11 @@
 
 /** In no particular order; this array is a spelling, not a priority. Every
  *  name here must have a `.field-card-token.is-<name>` rule beside the gold
- *  edge in `index.css`. */
+ *  edge in `index.css`, and that rule must stand an object on the card and
+ *  clip its light to the same object — `tokens.test.ts` reads the stylesheet
+ *  off disk and holds the two halves equal, because a mask that has drifted
+ *  from its background is a light falling next to the thing it is lighting
+ *  and nothing whatever says so. */
 export const TOKEN_MATERIALS = ['treasure', 'food', 'clue'] as const
 
 export type TokenMaterial = (typeof TOKEN_MATERIALS)[number]

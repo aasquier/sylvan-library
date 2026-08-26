@@ -1,0 +1,78 @@
+# The dish a Food token is eaten off.
+#
+# "Something better for food like a plate of some food" (Aaron, 2026-08-26).
+# This is the one of the three that could not be a photograph, because no
+# museum holds a plate of food -- and it did not need to be. Dutch and Flemish
+# still life is the closest thing to studio photography the seventeenth
+# century made, and at forty pixels the difference between Osias Beert's wild
+# strawberries and a photograph of wild strawberries is not a difference. What
+# it buys instead is colour: a heap of red in a blue-and-white Wanli bowl is
+# unmistakably *food* at a glance, where a gold cup and a gilt lens are both
+# gold and have to be told apart by shape.
+#
+# **No key at all, and that is why this crop and not a better-looking one.**
+# Every food in a still life is standing on a tablecloth or a tabletop, and a
+# flood key that has to cross white linen eats the porcelain along with it.
+# Two candidates died on exactly that: Heda's "Banquet Piece with Mince Pie"
+# (National Gallery of Art), whose pie is dark on a wide pale platter and
+# reads at render size as a grey oval with a smudge in it; and Heda's
+# meat-pie tabletop, which is the more beautiful object and sits half on dark
+# ground and half on white cloth -- the one arrangement no single tolerance
+# crosses. A bowl seen from above needs no key: it is an ellipse in the
+# picture and a circle in life, so the shield's trick applies and the edge is
+# *stated* from a distance field rather than found.
+#
+# **The ellipse was measured off the rim.** The bowl's mouth spans 1286 pixels
+# across and 563 down in the 4000x3024 plate, which puts the painter's eye
+# about twenty-six degrees above the table. Cropping to that box and resizing
+# to a square undoes the foreshortening, and `mask_circle` then cuts a real
+# circle rather than leaving a crescent of tabletop at the top -- which is
+# what a circular mask over an elliptical bowl gives you, and how the tilt got
+# measured in the first place.
+#
+# One honest note: the near rim is cut a little tight, so the strawberries run
+# to the edge at the bottom of the disc where they sit behind a rim at the
+# top. It reads as a heaped dish, which is what it is.
+animist: 1
+
+why_committed: >
+  The same argument the gold and the glass beside it make: one file drawn by
+  every Food on the board, needed the instant a token arrives. And this one
+  is a crop -- a hotlink would have to fetch a 4000-pixel painting to draw
+  forty pixels of it, every time, which is the whole cost of the picture spent
+  on the part nobody sees.
+
+sources:
+  # Public domain, confirmed through the Commons API at fetch time: the
+  # painting is early seventeenth century and the Staatliche Museen zu Berlin
+  # release the photograph of it without reservation.
+  ferculum:
+    provider: wikimedia
+    title: "Osias Beert (der Ältere) (1580 - 1623) - Still Life with Cherries and Strawberries in Porcelain Bowls - 60.2 - Gemäldegalerie.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Osias_Beert_(der_%C3%84ltere)_(1580_-_1623)_-_Still_Life_with_Cherries_and_Strawberries_in_Porcelain_Bowls_-_60.2_-_Gem%C3%A4ldegalerie.jpg
+    found_via: >
+      Commons, searching Flemish and Dutch still life for a dish of food seen
+      from above with clear ground all round it, then filtered to public
+      domain and CC0 -- of the ones that qualify this is the only bowl whose
+      whole rim is visible and whose contents are a strong colour rather than
+      another shade of the porcelain
+    licence: Public domain
+
+outputs:
+  # 200 square for a dish drawn at about 36, which is 44% of an 81px card.
+  # Quality 84 rather than the sand's 70 for the mosaic's reason: two hundred
+  # small red berries with lit tips is exactly the pattern a low quality
+  # setting turns to jam.
+  - file: ferculum.webp
+    from: ferculum
+    ops:
+      # The rim's own bounding box: (1206, 1815) to (2492, 2378) of 4000x3024.
+      - crop: {frac_box: [0.3015, 0.6002, 0.6230, 0.7864]}
+      # Both axes named, so the ellipse becomes the circle the bowl is.
+      - resize: {width: 200, height: 200}
+      # A hair inside the rim, the same 0.497 the shield takes and for the
+      # same reason: a fraction of a pixel of porcelain against certainty
+      # that no tabletop survives anywhere on the circumference.
+      - mask_circle: {cx: 0.5, cy: 0.5, r: 0.497, feather: 1.5}
+    encode: {format: webp, quality: 84}
+    expect: {width: 200, height: 200, budget_kb: 20, metadata: none}

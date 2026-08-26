@@ -105,3 +105,46 @@ Why committed rather than hotlinked: It appears in the same breath as the wreath
 
 Why committed rather than hotlinked: It is the largest thing on the screen at the moment it appears and it appears exactly once, at the end of a match a user has just spent minutes watching. An image that resolves late from somebody else's CDN would pop in after the sentence it is illustrating, which is worse here than anywhere else on the board -- everywhere else a late picture is a decoration arriving, and here it is the punchline arriving after the joke. The licence is also a photograph of an ancient work, which is the category where a third-party file most quietly changes terms.
 <!-- animist:end corona -->
+
+<!-- animist:begin aurum -->
+## aurum.webp
+
+- **Source**: "Goblet, Avar, 700s, gold", <https://www.metmuseum.org/art/collection/search/464121>, found via the Met Open Access API, searching for gold coins, gold cups and gold hoards and then keeping the plates where the object is alone, face-on and lit from one side -- of the gold in the results this is the only one that is both unmistakably a vessel and bright enough to read as gold rather than as brass
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build aurum.recipe.yaml`):
+  - `matte_neutral`: tolerance=16, soft=12.
+  - `crop`: frac_box=[0.1853, 0.1059, 0.8176, 0.9676].
+  - `resize`: height=200.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: A board can hold a dozen Treasures at once and every one of them draws this single file, so it belongs in the bundle rather than at the end of a dozen requests to somebody else's CDN. It is drawn the instant a token arrives, which is the worst possible moment for a picture to be late: a Treasure that fades in after the beat has passed is not a Treasure, it is a flicker. At ten kilobytes it is also cheaper to commit than to ask for.
+<!-- animist:end aurum -->
+<!-- animist:begin ferculum -->
+## ferculum.webp
+
+- **Source**: "Osias Beert (der Ältere) (1580 - 1623) - Still Life with Cherries and Strawberries in Porcelain Bowls - 60.2 - Gemäldegalerie.jpg", <https://commons.wikimedia.org/wiki/File:Osias_Beert_(der_%C3%84ltere)_(1580_-_1623)_-_Still_Life_with_Cherries_and_Strawberries_in_Porcelain_Bowls_-_60.2_-_Gem%C3%A4ldegalerie.jpg>, found via Commons, searching Flemish and Dutch still life for a dish of food seen from above with clear ground all round it, then filtered to public domain and CC0 -- of the ones that qualify this is the only bowl whose whole rim is visible and whose contents are a strong colour rather than another shade of the porcelain
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build ferculum.recipe.yaml`):
+  - `crop`: frac_box=[0.3015, 0.6002, 0.623, 0.7864].
+  - `resize`: width=200, height=200.
+  - `mask_circle`: cx=0.5, cy=0.5, r=0.497, feather=1.5.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: The same argument the gold and the glass beside it make: one file drawn by every Food on the board, needed the instant a token arrives. And this one is a crop -- a hotlink would have to fetch a 4000-pixel painting to draw forty pixels of it, every time, which is the whole cost of the picture spent on the part nobody sees.
+<!-- animist:end ferculum -->
+<!-- animist:begin lens -->
+## lens.webp
+
+- **Source**: "Magnifying Glass MET ADA5941.jpg", <https://commons.wikimedia.org/wiki/File:Magnifying_Glass_MET_ADA5941.jpg>, found via Commons, searching magnifying glasses restricted to bitmaps -- an unrestricted search returns almost nothing but scanned books -- and then filtered to public domain and CC0 only, after the Met's own Open Access API turned up no plate of a magnifier by itself
+.
+- **Licence**: CC0. Confirmed through the Wikimedia Commons API at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build lens.recipe.yaml`):
+  - `matte_neutral`: tolerance=44, soft=12.
+  - `crop`: frac_box=[0.2529, 0.1482, 0.7842, 0.741].
+  - `resize`: height=210.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: The same argument the gold beside it makes: a dozen tokens on one board draw one file, and it is drawn the moment the token arrives rather than a request later. There is a second reason particular to this one -- it is a photograph of an object held by a museum, re-hosted by a third party, and that is precisely the category where somebody else's copy quietly changes licence or disappears. A copy checked once and committed is a copy whose provenance stays true.
+<!-- animist:end lens -->
