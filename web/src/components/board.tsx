@@ -46,8 +46,8 @@
  */
 
 import {
-  type CSSProperties, type ReactNode, createContext, useContext, useEffect,
-  useRef, useState,
+  type CSSProperties, type ReactNode, createContext, useCallback, useContext,
+  useEffect, useRef, useState,
 } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -332,6 +332,39 @@ type Leads = 'commander' | 'companion'
  */
 const Crowned = createContext<ReadonlyMap<number, Leads>>(new Map())
 
+/**
+ * How a card lifted out of a pile tells the pile to stay spread.
+ *
+ * **A tray is held open by two different things, and only one of them
+ * survives a modal.** On a phone a tap sets real state (`is-open`), so #340's
+ * dismissal can step around a card lifted into a dialog and putting it down
+ * finds the graveyard exactly as it was left. On a mouse the tray is held by
+ * `:hover` on the wrapper alone — and the sheet is a full-viewport panel that
+ * takes the pointer the instant it opens. So the pile shut itself behind the
+ * very card it had just handed over, and there was nothing to come back to.
+ *
+ * Focus cannot be the answer here, which is worth writing down because it is
+ * the obvious answer and it fails in a way you have to watch to believe: a
+ * tray that is closing goes `visibility: hidden`, an element inside a hidden
+ * subtree may not hold focus, and so the browser drops the restored focus to
+ * `<body>` — the card cannot hold the panel open by being focused, because
+ * the panel closing is what un-focuses it. Measured in Chrome, not reasoned
+ * about.
+ *
+ * So the card says it out loud instead, and the pile answers by entering the
+ * *same* state a tap puts it in. Nothing new dismisses it: a press outside,
+ * Escape, or a second tap on the tile, exactly as #340 built them — and a
+ * mouse arriving back over the zone hands it to `:hover` again, which is that
+ * file's own rule for "this hand has hover to give after all". A pin that
+ * every existing gesture already releases is not the latch that PR removed.
+ *
+ * A context rather than a prop for `Crowned`'s reason: the same `FieldCard` is
+ * drawn on the sand, in a fan and in four kinds of tray, and only the ones
+ * standing in a tray have a pile to speak to. Everywhere else this is null and
+ * the call is a no-op.
+ */
+const Lifted = createContext<(() => void) | null>(null)
+
 /** Every card on one side that wears a mark, by board id. */
 function crownedOn(side: BoardSide): ReadonlyMap<number, Leads> {
   const out = new Map<number, Leads>()
@@ -513,6 +546,8 @@ function FieldCard({ card, count, inPlay = false }: {
   // synthetically after a tap, so without this a tap would open the sheet and
   // arm a hover preview behind it — `CardHover` learned the same thing.
   const coarse = useRef(false)
+  // Null everywhere except inside an opened pile. See `Lifted`.
+  const lifted = useContext(Lifted)
   const show = () => {
     if (coarse.current || !card.image || !box.current) return
     // The panel this card is sitting in, if any. Asked of the DOM rather than
@@ -526,6 +561,49 @@ function FieldCard({ card, count, inPlay = false }: {
     })
   }
   const hide = () => setAt(null)
+  /**
+   * Hold the whole card up — the sheet, for every hand there is.
+   *
+   * **The mouse used to be turned away here, and it was the only hand that
+   * was.** `onPointerUp` opened on a lift by a finger and returned on a lift
+   * by a mouse, because the sheet arrived as the *touch substitute* for a
+   * hover preview a phone cannot have. That reasoning was sound while the
+   * preview was the whole answer, and it stopped being sound the moment a
+   * card started carrying things: the peek shows one face, and a creature
+   * wearing a sword and two auras is four faces and a question about which.
+   * A carousel is a thing you step through, and nothing you have to keep
+   * hovering to keep alive can be stepped through — so the deep look needs a
+   * surface that stays, and a click is how a mouse asks for one.
+   *
+   * **What the early return was not.** It was never the guard against a
+   * double-fire; `coarse` is, one field up, and it is untouched — a touch
+   * browser's synthetic `mouseenter` still cannot arm a peek behind a sheet.
+   * Nor is anything latched here: `held` is state a click or Escape clears,
+   * with no `:hover` and no `:focus-within` in it (the two latches #340
+   * root-caused).
+   */
+  const lift = () => {
+    if (!card.image) return
+    hide()
+    setHeld(true)
+    // If this card is standing in a pile, the pile stays spread. See `Lifted`.
+    lifted?.()
+  }
+  /** Put it down, and hand the card back to whoever was reading it.
+   *
+   *  A dialog that closes onto `<body>` has dropped the keyboard on the floor,
+   *  which is the standard fault of every home-made modal. Restoring focus
+   *  *does* fire `onFocus`, and `show` obliges by arming a peek of the card
+   *  just put down — so the peek is stood back down in the same beat, where
+   *  React batches the pair and only the second one is ever rendered.
+   *
+   *  A finger never had the card to give back, and a ring drawn round it on
+   *  the way out would be an answer to a question nobody asked. */
+  const drop = () => {
+    setHeld(false)
+    if (!coarse.current) box.current?.focus()
+    hide()
+  }
   // A preview placed in viewport coordinates is wrong the moment the page
   // moves under it, and the room scrolls while a match is playing. Registered
   // only while one is open, so a board of forty cards costs zero listeners at
@@ -599,9 +677,37 @@ function FieldCard({ card, count, inPlay = false }: {
            // pointer — so on a touch screen the whole board was a mosaic. The
            // sheet is the same answer the card lists got: held up, centred,
            // and free of every box on the way out.
-           if (e.pointerType === 'mouse' || !card.image) return
-           hide()
-           setHeld(true)
+           //
+           // A right- or middle-click is not somebody asking to read a card,
+           // and the browser is already answering it with a menu of its own.
+           // Every touch lift reports button 0, so this only ever turns away
+           // a mouse — and it is the last thing on this element that asks
+           // which hand is on it.
+           if (e.pointerType === 'mouse' && e.button !== 0) return
+           lift()
+         }}
+         // **The keyboard's way in, and it is the one the zone tiles already
+         // use.** Focus alone lifts the peek, the way hover does; Enter and
+         // Space are how you commit to the longer look, and Escape puts it
+         // back — which is the vocabulary #340 settled one component out, on
+         // the pile this card may well be standing in.
+         //
+         // Escape is caught *here* rather than left to the sheet's own
+         // listener because the zone wrapper above this card closes its tray
+         // on Escape too, and one press must not both put the card down and
+         // shut the pile it was lifted out of. Stopping it here is what keeps
+         // those two meanings apart.
+         onKeyDown={(e) => {
+           if (held && e.key === 'Escape') {
+             e.stopPropagation()
+             drop()
+             return
+           }
+           if (e.key !== 'Enter' && e.key !== ' ') return
+           if (!card.image) return
+           e.preventDefault()   // Space scrolls the page otherwise.
+           e.stopPropagation()
+           lift()
          }}
          // **The card, readable.** A permanent on this board is fifty-eight
          // pixels of painting — enough to know a Forest from a Dragon and
@@ -823,7 +929,16 @@ function FieldCard({ card, count, inPlay = false }: {
           )}
         </span>
       )}
-      {at && card.image && (
+      {/* **One answer at a time.** The peek and the sheet answer the same
+          question at two depths, and both are portalled to the body — so a
+          peek left armed behind a sheet does not hide politely underneath it,
+          it draws a second copy of the same card over the dimmed room. `lift`
+          stands the peek down on the way up, and this is the guarantee rather
+          than the attempt: while a card is held up there is no arrangement of
+          enter, leave and focus that can put a preview back on the page.
+          Seen, not reasoned about — it took a real click on a suited-up
+          creature to make it happen. */}
+      {at && !held && card.image && (
         <FieldPeek card={card} at={at.card} avoid={at.tray} />
       )}
       {held && card.image && (
@@ -840,7 +955,7 @@ function FieldCard({ card, count, inPlay = false }: {
         // passes an empty list and the sheet stays exactly one card.
         <CardSheet name={count > 1 ? `${count} × ${card.name}` : card.name}
                    image={card.image} worn={card.attachments}
-                   onClose={() => setHeld(false)} />
+                   onClose={drop} />
       )}
     </div>
   )
@@ -1018,6 +1133,9 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
   /** Shut it, and mean it. `false` rather than `null`, so a latched `:hover`
    *  and a standing keyboard focus both stand down. */
   const shut = () => setOpen(false)
+  /** Hold it open, the way a tap does — for a card lifted out of it into a
+   *  sheet. See `Lifted`. Stable, because it is a context value. */
+  const spread = useCallback(() => setOpen(true), [])
   // **The two ways out of an open tray that a person tries without being
   // told**, and neither existed: a tap anywhere else, and Escape.
   //
@@ -1221,10 +1339,16 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
         <span className="field-tray-head">
           {label}<span className="field-tray-n tabular">{cards.length}</span>
         </span>
+        {/* A card in here that gets lifted up keeps this pile spread while
+            it is out, and leaves it spread when it is put back. `Lifted`
+            carries the argument; `spread` is stable so the cards below do
+            not re-render every time the zone's own state moves. */}
         <div className="field-tray-cards">
-          {cards.map((c) => (
-            <FieldCard key={c.id} card={c} count={1} />
-          ))}
+          <Lifted.Provider value={spread}>
+            {cards.map((c) => (
+              <FieldCard key={c.id} card={c} count={1} />
+            ))}
+          </Lifted.Provider>
         </div>
       </div>
     )}
