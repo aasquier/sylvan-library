@@ -246,6 +246,34 @@ it('leaves a card with nothing on it exactly as it was', () => {
   expect(screen.queryAllByRole('button')).toHaveLength(0)
 })
 
+it('keeps every part of itself inside one role="dialog"', () => {
+  // **A cross-lane contract, and the only place it can be held.** The board's
+  // zone trays shut themselves on a pointer that lands outside them, and that
+  // listener spares anything inside `[role="dialog"]` — because a card lifted
+  // out of a graveyard is portalled to the body and is outside the tray by
+  // construction. Without the exemption, opening a card from a pile shuts the
+  // pile behind it; without *this*, a future rework of the sheet could move
+  // the role inward and break a tray in a file this component never mentions.
+  //
+  // So: the role sits on the outermost element, and the outermost element is
+  // the full-viewport scrim — which means every pointer that lands anywhere
+  // while a sheet is open lands inside the dialog, the riffle included.
+  for (const worn of [[], [SWORD, AURA]]) {
+    render(<CardSheet name={CARD.name} image={CARD.image}
+                      worn={worn} onClose={() => {}} />)
+    const sheet = screen.getByRole('dialog')
+    expect(sheet.className).toContain('card-sheet')
+    // Nothing the sheet draws sits outside the dialog, and nothing nests a
+    // second one that a `closest` would stop at first.
+    for (const el of document.querySelectorAll(
+      '.card-sheet-slide, .card-sheet-rail, .card-sheet-pip,'
+      + ' .card-sheet-step, .card-sheet-say, .card-sheet-art')) {
+      expect(el.closest('[role="dialog"]')).toBe(sheet)
+    }
+    cleanup()
+  }
+})
+
 it('drops an attachment the pool gave no painting rather than drawing a blank', () => {
   // The board's own rule: no painting opens no sheet. A blank slide in the
   // middle of a riffle is a rendering fault wearing a card's shape — and one
