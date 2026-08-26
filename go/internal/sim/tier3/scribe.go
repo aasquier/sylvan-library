@@ -143,6 +143,10 @@ type ScribeParser struct {
 	board     *board
 	// seats is the roster, for turning an outcome sentence back into a seat.
 	seats map[int]string
+	// phantoms is every card id this reader has refused as Forge's own
+	// bookkeeping. Per game, like Forge's ids. [ScribeParser.refused] argues
+	// why the answer is remembered rather than asked again.
+	phantoms map[int]bool
 	// turn is the highest turn number Forge announced, which is what
 	// `GameResult.Turns` means everywhere else in this package.
 	turn int
@@ -157,7 +161,7 @@ type ScribeParser struct {
 // rows passes false and pays for none of it.
 func NewScribeParser(watching bool) *ScribeParser {
 	return &ScribeParser{prose: NewStreamParser(), watching: watching, game: 1,
-		board: newBoard(), seats: map[int]string{}}
+		board: newBoard(), seats: map[int]string{}, phantoms: map[int]bool{}}
 }
 
 // Output is the run's tally — the complaints, and the games.
@@ -222,6 +226,7 @@ func (p *ScribeParser) startGame(number int) {
 	p.events, p.truncated = nil, false
 	p.board = newBoard()
 	p.seats = map[int]string{}
+	p.phantoms = map[int]bool{}
 	p.turn, p.outcomeTurn = 0, 0
 }
 
@@ -248,10 +253,13 @@ func (p *ScribeParser) fold(l scribeLine) {
 	// change against it. And the name went into the dictionary *before* the
 	// old check, so every effect in the match was carried to the browser as a
 	// card even when nothing ever moved it.
+	//
+	// The answer is [ScribeParser.refused]'s rather than [isForgeEffect]'s
+	// directly, because it has to be the same answer on every line.
 	switch l.Kind {
 	case "zone", "attach", "detach", "tapped", "stats", "counters",
 		"sacrificed", "ability":
-		if isForgeEffect(l.Zone, l.Card, l.Types) {
+		if p.refused(l) {
 			return
 		}
 	}
@@ -588,8 +596,55 @@ func (p *ScribeParser) finishGame(l scribeLine) (*EventLog, *GameResult) {
 	p.game++
 	p.events, p.truncated = nil, false
 	p.board = newBoard()
+	p.phantoms = map[int]bool{}
 	p.turn, p.outcomeTurn = 0, 0
 	return log, &game
+}
+
+// refused is whether this line is about one of Forge's own bookkeeping cards,
+// and it remembers the answer for the rest of the game.
+//
+// **A refusal is a fact about the card, not about the line**, and that is the
+// whole of this. [isForgeEffect] asks three questions and two of them — where
+// the card is, and whether it has a type line — are properties of the object
+// rather than of the event. Only a `zone` line carries a zone. So moving the
+// guard onto every card-shaped line moved the *name-shape* half of the rule
+// and could not move the other: a `Commander Effect` refused on the line that
+// created it was let straight back in by the next `stats`, `tapped` or
+// `attach` line about it, because those carry no zone for the rule to read.
+// [ScribeParser.note] then put it in the dictionary and the board folded a
+// change against it — the phantom back on the wire, one line later, wearing
+// the same name Aaron reported seeing in the command zone.
+//
+// The same inconsistency is what left a **nameless attachment** on the board.
+// The dictionary and the changes were deciding separately whether a card
+// exists, and once two places decide that, it is only a question of which line
+// arrives to make them disagree. `board.change` holds the other half of the
+// answer: a change is never folded against a card the dictionary does not
+// hold.
+//
+// **Asked at the earliest moment there is.** Every one of the 145 first
+// sightings in `testdata/scribed-match.ndjson` is a `zone` line, which is what
+// Forge's bus does — an object exists because it entered a zone — so a card is
+// judged on its arrival and never on a later line that knows less about it. A
+// phantom whose first line was something else would still reach the dictionary;
+// nothing in a recorded match does that, and the board refuses to draw it
+// either way.
+//
+// Nothing here is looser than what stood before: the refusals are exactly the
+// ones [isForgeEffect] already made, applied to every line about the card
+// instead of to whichever line happened to carry the fields.
+func (p *ScribeParser) refused(l scribeLine) bool {
+	if l.ID != 0 && p.phantoms[l.ID] {
+		return true
+	}
+	if !isForgeEffect(l.Zone, l.Card, l.Types) {
+		return false
+	}
+	if l.ID != 0 {
+		p.phantoms[l.ID] = true
+	}
+	return true
 }
 
 // isForgeEffect is whether a card arriving in a command zone is Forge's own
