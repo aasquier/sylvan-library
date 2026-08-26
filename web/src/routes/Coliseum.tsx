@@ -632,6 +632,7 @@ export default function ColiseumRoom() {
       {hasBeats && (
         <div className="mt-6">
           <MatchBoard key={`board-${job?.id}`} board={reel.board}
+                      zones={data?.zones ?? []}
                       shown={reel.told} game={reel.game}
                       name={seatName} running={running}
                       beat={reel.shown[reel.shown.length - 1] ?? null}

@@ -233,13 +233,43 @@ func (p *ScribeParser) fold(l scribeLine) {
 		}
 		p.board.moved(l.ID, l.Zone, l.Mode, l.Seat)
 		p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
-		// A permanent leaving the battlefield for a graveyard is the one zone
-		// change worth a sentence — it is `dies` everywhere in this package,
-		// and it is the same reading the log's `Zone Change: ... was put into
-		// Graveyard from Battlefield` gave, from typed fields instead.
+		// A **creature or planeswalker** leaving the battlefield for a
+		// graveyard is the one zone change worth a sentence — it is `dies`
+		// everywhere in this package, and it is the same reading the log's
+		// `Zone Change: ... was put into Graveyard from Battlefield` gave,
+		// from typed fields instead.
+		//
+		// **Only those two types, because that is what the word means.** Rule
+		// 700.4 defines "dies" as put into a graveyard from the battlefield
+		// and gives the term to creatures and planeswalkers; a sacrificed
+		// fetchland does not die, and an artifact cracked for mana does not
+		// either. This fired for every permanent, so a Commander game narrated
+		// "Wooded Foothills dies" several times a turn — teaching a newcomer
+		// the wrong word for a real Magic term, which commandment 2 will not
+		// have.
+		//
+		// It hid for as long as it did because the skull it draws used to land
+		// on the *graveyard pile*, where a fetchland's death was one anonymous
+		// flicker among many. Holding the dying card on the sand put the skull
+		// on the card, and a skull on a land is impossible to miss.
+		//
+		// The type line is the board's rather than the line's: `stats` and
+		// `zone` both carry types, but a `zone` line for a card Forge has
+		// already described need not repeat them, and the answer has to be the
+		// same either way. An animated Dryad Arbor is a Creature Land and does
+		// die; the check is on what it *is*, not which row it was drawn in.
+		//
+		// Everything else still moves — the board shows any permanent leaving
+		// play — it simply does so without a sentence, and therefore on the
+		// next beat, which is what already happens to every change this
+		// account does not narrate.
 		if l.Mode == "in" && l.Zone == "Graveyard" &&
 			(was == ZoneBattlefield || was == ZoneLand) {
-			p.raise(GameEvent{Kind: EventDies, Seat: l.Seat, Card: l.Card})
+			types := p.board.types[l.ID]
+			if strings.Contains(types, "Creature") ||
+				strings.Contains(types, "Planeswalker") {
+				p.raise(GameEvent{Kind: EventDies, Seat: l.Seat, Card: l.Card})
+			}
 			return
 		}
 		// A permanent arriving. See [EventEnters] for why lands are excluded

@@ -122,6 +122,12 @@ const THRONE: ForgeBoard = {
     { turn: 1, seat: 1, changes: [{ id: 30, zone: 'command', seat: 1 }] },
     { turn: 2, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
     { turn: 3, seat: 1, changes: [{ id: 30, zone: 'command', seat: 1 }] },
+    // **A beat with nothing in it, and it is load-bearing.** A card that
+    // leaves the battlefield is held standing there for exactly the beat that
+    // says so, so the step above is the commander being *seen to die* rather
+    // than the commander being home. It is home on the next beat, and that is
+    // the one the questions below are asking about.
+    { turn: 3, seat: 1, changes: [] },
     { turn: 4, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
     { turn: 5, seat: 1, changes: [{ id: 31, zone: 'battlefield', seat: 1,
       power: 3, toughness: 3,
@@ -137,7 +143,7 @@ function throne(shown: number) {
   return render(
     <MatchBoard board={THRONE} shown={shown} game={1} running={false}
                 name={(_slug, fallback) => fallback}
-                speed="play" setSpeed={vi.fn()} of={5} seek={vi.fn()}
+                speed="play" setSpeed={vi.fn()} of={6} seek={vi.fn()}
                 games={[1]} playing={1} chooseGame={vi.fn()} />)
 }
 
@@ -147,9 +153,9 @@ it('seats an empty throne when the commander is out, and prices the return', () 
   // its zone is legitimately an empty chair the whole way through and would
   // answer either question the wrong way.
   const railOf = (c: HTMLElement) =>
-    c.querySelector('.field-side-far .field-rail') as HTMLElement
+    c.querySelector('.field-rail-far') as HTMLElement
 
-  const home = throne(3)
+  const home = throne(4)
   expect(railOf(home.container).querySelector('.field-pile.is-throne'),
     'a zone with the commander in it is not an empty chair').toBeNull()
   expect(railOf(home.container).querySelector('.field-tax')?.textContent?.trim())
@@ -157,7 +163,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
   cleanup()
 
   // Out again: the chair is empty and the price has gone up.
-  const away = throne(4)
+  const away = throne(5)
   expect(railOf(away.container).querySelectorAll('.field-pile.is-throne'),
     'the commander is on the battlefield, so the seat is empty').toHaveLength(1)
   expect(railOf(away.container).querySelector('.field-tax')?.textContent?.trim())
@@ -165,7 +171,7 @@ it('seats an empty throne when the commander is out, and prices the return', () 
 })
 
 it('draws counters as their own signed chips rather than one sum', () => {
-  const { container } = throne(5)
+  const { container } = throne(6)
   const chips = [...container.querySelectorAll('.field-counter')]
   // Three +1/+1 and one -1/-1 is not "2". They are two kinds of counter that
   // have not annihilated yet, and the board must not do that arithmetic for
@@ -181,7 +187,7 @@ it('draws counters as their own signed chips rather than one sum', () => {
 })
 
 it('puts power and toughness behind glass rather than over the painting', () => {
-  const { container } = throne(5)
+  const { container } = throne(6)
   expect(container.querySelector('.field-card-stats'),
     'the always-on black tab is gone').toBeNull()
   const lens = container.querySelector('.field-card-lens')
@@ -266,7 +272,7 @@ it('opens a closed zone into something you can look through', () => {
   // **A graveyard is public information in every format**, and it was drawn
   // as a number with a picture on it. Every card in it is in the tray, not
   // just the one on top.
-  const grave = container.querySelector('.field-side-far .field-pile-wrap:has('
+  const grave = container.querySelector('.field-rail-far .field-pile-wrap:has('
     + '[aria-label^="Graveyard"]) .field-tray') as HTMLElement
   expect(grave, 'the graveyard has a tray').toBeTruthy()
   expect(grave.getAttribute('aria-label')).toBe('Graveyard, all 2')
@@ -276,7 +282,7 @@ it('opens a closed zone into something you can look through', () => {
   // nothing to look through, and a panel that opens onto nothing is a worse
   // answer than a pile that stays shut.
   const exileWrap = container.querySelector(
-    '.field-side-near .field-pile-wrap:has([aria-label^="Exile"])')
+    '.field-rail-near .field-pile-wrap:has([aria-label^="Exile"])')
   expect(exileWrap?.querySelector('.field-tray'),
     "the near seat's exile is empty, so it does not open").toBeNull()
 })
@@ -328,6 +334,196 @@ it('says what a creature does in the one corner that was free', () => {
   expect(held?.querySelectorAll('.field-keyword')).toHaveLength(0)
 })
 
+/** The four paintings the board's own zones wear. Checked-in prose on the
+ *  server, pinned to a printing — see `ColiseumZone`. */
+const DRESSING = [
+  { key: 'command' as const, card: 'Throne of Eldraine', why: '',
+    art: { url: 'https://example.test/throne.jpg', artist: 'Kieran Yanner',
+           printing: 'Wilds of Eldraine Commander' } },
+  { key: 'graveyard' as const, card: 'Ancient Tomb', why: '',
+    art: { url: 'https://example.test/tomb.jpg', artist: 'Colin MacNeil',
+           printing: 'Tempest' } },
+  { key: 'exile' as const, card: 'Path to Exile', why: '',
+    art: { url: 'https://example.test/path.jpg', artist: 'Torgeir Fjereide',
+           printing: 'Tales of Middle-earth Commander' } },
+  { key: 'ghost' as const, card: 'Crypt Ghast', why: '',
+    art: { url: 'https://example.test/ghast.jpg', artist: 'Chris Rahn',
+           printing: 'Gatecrash' } },
+]
+
+it('draws life as how much is left, not just as a number', () => {
+  // **A bare numeral is the wrong fact.** What a player reads off a life total
+  // is how much is *left*, and a "23" makes you do that arithmetic. The ring
+  // is the arithmetic done: the arc is life over forty and the figure sits in
+  // it, so trouble is visible without reading a digit.
+  const at = (life: number) => {
+    const board = {
+      seats: [{ seat: 1, slug: 'a', name: 'A', life: 40 },
+        { seat: 2, slug: 'b', name: 'B', life: 40 }],
+      cards: [{ id: 1, name: 'X', types: 'Creature', seat: 1 }],
+      steps: [{ life: [{ seat: 1, life }], changes: [] }],
+    } as unknown as ForgeBoard
+    const { container } = render(
+      <MatchBoard board={board} shown={1} game={1} running={false}
+                  name={(_s, f) => f} speed="play" setSpeed={vi.fn()}
+                  of={1} seek={vi.fn()} games={[1]} playing={1}
+                  chooseGame={vi.fn()} />)
+    const ring = container.querySelector('.field-rail-far .field-life') as HTMLElement
+    return {
+      shown: ring?.querySelector('.field-life-n')?.textContent,
+      left: ring?.style.getPropertyValue('--life-left'),
+      spent: ring?.style.getPropertyValue('--life-spent'),
+    }
+  }
+
+  const full = at(40)
+  expect(full.shown).toBe('40')
+  expect(Number(full.left)).toBe(1)
+  expect(full.spent).toBe('0%')
+  cleanup()
+
+  const half = at(20)
+  expect(half.shown).toBe('20')
+  expect(Number(half.left)).toBeCloseTo(0.5, 5)
+  expect(half.spent).toBe('50%')
+  cleanup()
+
+  // Clamped both ways, because Commander does both: a lifegain deck goes past
+  // forty and the ring simply reads full, and a dead player reads empty rather
+  // than winding the arc backwards.
+  const gained = at(63)
+  expect(gained.shown, 'the figure is always the truth').toBe('63')
+  expect(Number(gained.left), 'the ring stops at full').toBe(1)
+  cleanup()
+
+  const dead = at(-3)
+  expect(dead.shown).toBe('-3')
+  expect(Number(dead.left)).toBe(0)
+  expect(dead.spent).toBe('100%')
+})
+
+it('stands the zones off the sand, beside the arena rather than on it', () => {
+  // **The property, and it is the one that was got wrong twice.** The zones
+  // were briefly a column *inside* the field, which stood them on the
+  // battlefield's own sand and took their width out of it — so the arena came
+  // out scaled awkwardly (Aaron, 2026-08-25). A graveyard is not somewhere you
+  // stand; it is somewhere cards go, and it belongs off the floor.
+  //
+  // Held as containment rather than as geometry: the grid places these
+  // differently at each breakpoint, and "is it inside the arena" is the thing
+  // neither branch can quietly get wrong.
+  const { container } = show()
+  const field = container.querySelector('.field') as HTMLElement
+  expect(field).toBeTruthy()
+  expect(field.querySelector('.field-rail'),
+    'the zones are not on the sand').toBeNull()
+  expect(container.querySelector('.field-stage > .field-zones'),
+    'they stand beside the arena, in the stage').toBeTruthy()
+
+  // The hands stay in the arena, on the player's left, where a hand is held.
+  expect(field.querySelector('.field-hand-far')).toBeTruthy()
+  expect(field.querySelector('.field-hand-near')).toBeTruthy()
+
+  // And within the field, hand comes before the half it belongs to at every
+  // width — document order is what survives both breakpoints.
+  const order = [...field.children]
+    .map((el) => ['field-hand-far', 'field-side-far', 'field-seam',
+      'field-side-near', 'field-hand-near']
+      .find((c) => el.classList.contains(c)))
+    .filter(Boolean)
+  expect(order).toEqual(['field-hand-far', 'field-side-far', 'field-seam',
+    'field-side-near', 'field-hand-near'])
+})
+
+it('gives each zone its whole name, now there is room for one', () => {
+  // "GY" and "CMD" are what you write when a tile is 26px wide.
+  const { container } = show()
+  const names = [...container.querySelectorAll('.field-rail-far .field-pile-label')]
+    .map((n) => n.textContent)
+  expect(names).toEqual(['Command Zone', 'Graveyard', 'Exile'])
+})
+
+it('heads each seat\'s zones with whose they are', () => {
+  // The name used to float on a grey strip under the rows, and it came off
+  // with the strip. It is back for a different reason: the zones are a band
+  // under the arena holding *both* players side by side, and a band holding
+  // two players has to say which half is whose. A label on a bar and a heading
+  // over the thing it names are not the same object.
+  const { container } = show()
+  const heads = [...container.querySelectorAll('.field-zones .field-rail-name')]
+    .map((n) => n.textContent)
+  expect(heads).toHaveLength(2)
+  expect(heads[0]).toContain('Arahbo')
+  expect(heads[1]).toContain('Atla')
+
+  // Each heading sits inside its own seat's panel, not loose in the band.
+  expect(container.querySelector('.field-rail-far .field-rail-name')
+    ?.textContent).toContain('Arahbo')
+  expect(container.querySelector('.field-rail-near .field-rail-name')
+    ?.textContent).toContain('Atla')
+})
+
+it('dresses each zone in its own painting, and names the painter', () => {
+  // Three-letter labels on a 26px tile is what a scoreboard does; a player
+  // knows these three places by sight. The painting says *which* zone.
+  const { container } = render(
+    <MatchBoard board={COMBAT} shown={2} game={1} running={false} beat={null}
+                zones={DRESSING} name={(_s, f) => f}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const pileFor = (label: string) => container.querySelector(
+    `.field-rail-far .field-pile[aria-label^="${label}"]`)
+  const groundOf = (label: string) =>
+    pileFor(label)?.querySelector('.field-pile-ground')?.getAttribute('src')
+
+  expect(groundOf('Graveyard')).toBe('https://example.test/tomb.jpg')
+  expect(groundOf('Exile')).toBe('https://example.test/path.jpg')
+  expect(groundOf('Command zone')).toBe('https://example.test/throne.jpg')
+
+  // Somebody painted it, and rule 9 says name them. The arm the marks ride is
+  // `aria-hidden`, so the pile's own title is where this has to live.
+  expect(pileFor('Graveyard')?.getAttribute('title'))
+    .toContain('Ancient Tomb, art by Colin MacNeil')
+
+  // The ghost is not a zone and must not be drawn as one.
+  expect(container.querySelectorAll('.field-pile-ground')).toHaveLength(6)
+})
+
+it('draws the brass tiles it always had when no painting arrives', () => {
+  // `/api/coliseum` answers before any match is asked for, and with no pool at
+  // all — but a deployment that has not been refreshed, or a future room that
+  // forgets to pass them, must still get a board. Empty is a legible state.
+  const { container } = render(
+    <MatchBoard board={COMBAT} shown={2} game={1} running={false} beat={null}
+                name={(_s, f) => f}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  expect(container.querySelectorAll('.field-pile-ground')).toHaveLength(0)
+  expect(container.querySelectorAll('.field-pile').length).toBeGreaterThan(0)
+})
+
+it('raises a ghost off the grave that just received something', () => {
+  // Two beats, two pictures: the skull lands on the creature as it dies, held
+  // on the sand for that beat, and this rises from the zone it is bound for.
+  const { container } = render(
+    <MatchBoard board={COMBAT} shown={2} game={1} running={false}
+                beat={said({ kind: 'dies', card: 'Qasali Pridemage' })}
+                zones={DRESSING} name={(_s, f) => f}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const ghosts = container.querySelectorAll('.field-pile-ghost img')
+  expect(ghosts, 'one grave, one ghost').toHaveLength(1)
+  expect(ghosts[0]?.getAttribute('src')).toBe('https://example.test/ghast.jpg')
+  // On the graveyard, never on exile or the command zone.
+  expect(container.querySelector('.field-pile-ghost')
+    ?.closest('.field-pile')?.getAttribute('aria-label')).toMatch(/^Graveyard/)
+  // And the skull is still on the creature — these are two marks, not one.
+  expect(container.querySelector('.field-rows .field-card.is-dies '
+    + '.field-mark-dies img')).toBeTruthy()
+})
+
 it('keeps the loupe on the battlefield, where a fight is the question', () => {
   const { container } = show()
   // A hand is a fan overlapped to the 27px strip carrying each card's name, so
@@ -347,7 +543,7 @@ it('keeps the loupe on the battlefield, where a fight is the question', () => {
   // that gives a creature real figures is `throne`, which is why the positive
   // half of this property is checked against that board rather than this one.
   cleanup()
-  expect(throne(5).container
+  expect(throne(6).container
     .querySelectorAll('.field-rows .field-card-lens').length)
     .toBeGreaterThan(0)
 })
@@ -479,16 +675,24 @@ const COMBAT: ForgeBoard = {
     { turn: 1, seat: 1, changes: [
       { id: 50, zone: 'battlefield', seat: 1, power: 3, toughness: 3 },
       { id: 51, zone: 'battlefield', seat: 2, power: 4, toughness: 4 },
-      { id: 52, zone: 'graveyard', seat: 1 },
+      // **It has to stand somewhere before it can be seen to fall.** This card
+      // used to be put straight into a graveyard, which was an honest fixture
+      // when the skull had nowhere to land but the pile. Now the mark goes on
+      // the card, and a card that was never on the battlefield never leaves it.
+      { id: 52, zone: 'battlefield', seat: 1, power: 2, toughness: 2 },
     ] },
+    { turn: 1, seat: 1, changes: [{ id: 52, zone: 'graveyard', seat: 1 }] },
   ],
 } as unknown as ForgeBoard
 
-function combat(beat: StagedBeat | null) {
+/** `shown` is 1 for the beats that happen while everything is still standing,
+ *  and 2 for the death — which is the last step, so the card that took it is
+ *  held on the sand for exactly that beat. */
+function combat(beat: StagedBeat | null, shown = 1) {
   return render(
-    <MatchBoard board={COMBAT} shown={1} game={1} running={false} beat={beat}
+    <MatchBoard board={COMBAT} shown={shown} game={1} running={false} beat={beat}
                 name={(_slug, fallback) => fallback}
-                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
                 games={[1]} playing={1} chooseGame={vi.fn()} />)
 }
 
@@ -523,26 +727,64 @@ it('brings a shield up on a blocker and nothing else', () => {
   expect(lion?.querySelector('.field-mark')).toBeNull()
 })
 
-it('lays the skull on the grave, because the creature is already in it', () => {
-  // **The constraint this encodes.** Forge reports the death and the zone
-  // change on one line, so the step that tells the beat is the step that moves
-  // the card: there is no instant at which the board holds a dead creature
-  // still standing, and a mark aimed at the battlefield would land on nothing.
-  const { container } = combat(said({ kind: 'dies', card: 'Qasali Pridemage' }))
+it('lays the skull on the creature, held where it fell', () => {
+  // **The constraint that used to make this impossible.** Forge reports a
+  // death and the zone change on one line, so the step that tells the beat is
+  // the step that moves the card — there was no instant at which the board
+  // held a dead creature still standing, and a mark aimed at the battlefield
+  // landed on nothing. The skull went on the *pile* instead, which is where a
+  // headstone goes and not where a death happens (Aaron, 2026-08-25: "it
+  // should appear over the card being destroyed itself, like the shield").
+  //
+  // `foldBoard` holds a card that left the battlefield on the final applied
+  // step in the row it left, for exactly that beat. So the mark lands on the
+  // card, and the grave it is about to enter shows nothing yet.
+  const { container } = combat(
+    said({ kind: 'dies', card: 'Qasali Pridemage' }), 2)
+
+  const fallen = container.querySelector('img[alt="Qasali Pridemage"]')
+    ?.closest('.field-card')
+  expect(fallen, 'the dead creature is still on the sand for its own beat')
+    .toBeTruthy()
+  expect(fallen?.className).toContain('is-dies')
+  expect(fallen?.className, 'and it is visibly on its way out')
+    .toContain('is-leaving')
+  expect(fallen?.querySelector('.field-mark-dies img'),
+    'the skull is on the card').toBeTruthy()
+
+  // It is in one place, not two: the graveyard it is bound for does not also
+  // hold it this beat. A card in two zones is a worse answer than a card a
+  // beat behind.
   const grave = container.querySelector(
-    '.field-side-far .field-pile-wrap:has([aria-label^="Graveyard"])')
-  expect(grave?.querySelector('.field-pile-buried img'),
-    'the grave that received it is marked').toBeTruthy()
-  // The other seat's graveyard is empty and stays unmarked.
-  const other = container.querySelector(
-    '.field-side-near .field-pile-wrap:has([aria-label^="Graveyard"])')
-  expect(other?.querySelector('.field-pile-buried')).toBeNull()
+    '.field-rail-far .field-pile-wrap [aria-label^="Graveyard"]')
+  expect(grave?.getAttribute('aria-label')).toBe('Graveyard: 0')
+
+  // The creatures that did not die carry nothing.
+  const lion = container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card')
+  expect(lion?.querySelector('.field-mark')).toBeNull()
+  expect(lion?.className).not.toContain('is-leaving')
+})
+
+it('lets the dead go on the next beat, rather than holding them forever', () => {
+  // The hold is a function of the count, like everything else in the fold —
+  // which is what makes it survive a scrub in both directions.
+  const { container } = combat(null, 2)
+  expect(container.querySelector('img[alt="Qasali Pridemage"]')
+    ?.closest('.field-rows'), 'held on the beat it fell').toBeTruthy()
+  cleanup()
+
+  // One beat earlier it was alive and the graveyard was empty.
+  const before = combat(null, 1)
+  expect(before.container.querySelector(
+    '.field-rail-far .field-pile-wrap [aria-label^="Graveyard"]')
+    ?.getAttribute('aria-label')).toBe('Graveyard: 0')
+  expect(before.container.querySelector('.field-card.is-leaving')).toBeNull()
 })
 
 it('draws no mark at all for a beat that is not one of the three', () => {
   const { container } = combat(said({ kind: 'life', card: undefined }))
   expect(container.querySelectorAll('.field-mark')).toHaveLength(0)
-  expect(container.querySelectorAll('.field-pile-buried')).toHaveLength(0)
   cleanup()
   // And none before a game has said anything.
   const quiet = combat(null)

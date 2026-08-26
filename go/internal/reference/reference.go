@@ -156,10 +156,47 @@ type Arena struct {
 	Facts     []ColiseumFact `json:"facts"`
 }
 
+// ZoneArt is the painting one of the board's own zones is dressed in.
+//
+// **Not an arena and not a card on the table**: the graveyard, exile and the
+// command zone are *furniture*, and they were three-letter labels on a 26px
+// tile — which is what a scoreboard does and not what a table does. A player
+// knows those three places by sight, and the board should say them the way
+// Magic says them.
+//
+// `Card` is the card the painting belongs to and `Art.Printing` pins *which*
+// printing, because the pool answers a bare name with the **newest** one and
+// the newest is increasingly a crossover: Path to Exile's current default art
+// is a Marvel Secret Lair of the Thing, and this project has already put
+// Ninja Turtles on the Grand Coliseum once. The URL is checked in beside the
+// name for the same reason [ArenaArt]'s is — it is prose about a painting, and
+// a painting that changes under a room is a room that changed without anybody
+// deciding to.
+//
+// The painter is named because rule 9 says so, and because somebody painted
+// it.
+type ZoneArt struct {
+	// Key is the zone this dresses: `command`, `graveyard` or `exile`, or
+	// `ghost` for the mark that rises when a card reaches a graveyard.
+	Key  string   `json:"key"`
+	Card string   `json:"card"`
+	Art  ArenaArt `json:"art"`
+	// Why is the argument for this painting over another, kept beside it so a
+	// later session inherits the reasoning rather than the conclusion.
+	Why string `json:"why"`
+}
+
+// ZoneKeys is every zone the board can dress, checked at boot so a typo in the
+// JSON is a boot failure rather than a picture that silently never draws.
+var ZoneKeys = map[string]bool{
+	"command": true, "graveyard": true, "exile": true, "ghost": true,
+}
+
 // Coliseum is `data/coliseum.json`: the six arenas and everything they hold.
 type Coliseum struct {
-	Note   string  `json:"note"`
-	Arenas []Arena `json:"arenas"`
+	Note   string    `json:"note"`
+	Arenas []Arena   `json:"arenas"`
+	Zones  []ZoneArt `json:"zones"`
 }
 
 // Combination is one of the 32. `Champions` and `Signature` are names; the
@@ -352,6 +389,22 @@ func init() {
 		}
 		byArena[a.Key] = a
 	}
+	seenZone := map[string]bool{}
+	for _, z := range coliseum.Zones {
+		if !ZoneKeys[z.Key] {
+			panic(fmt.Sprintf("reference: coliseum.json dresses unknown zone %q",
+				z.Key))
+		}
+		if seenZone[z.Key] {
+			panic(fmt.Sprintf("reference: coliseum.json dresses zone %q twice",
+				z.Key))
+		}
+		if z.Card == "" || z.Art.URL == "" || z.Art.Artist == "" {
+			panic(fmt.Sprintf("reference: coliseum.json zone %q needs a card, a "+
+				"painting and a painter", z.Key))
+		}
+		seenZone[z.Key] = true
+	}
 	for i := range taxonomy.Combinations {
 		c := &taxonomy.Combinations[i]
 		if _, dup := byKey[c.Key]; dup {
@@ -409,6 +462,9 @@ func Runtime() *RuntimeShelves { return &shelf }
 
 // Arenas is the coliseum's six, in the order the file lists them.
 func Arenas() []Arena { return coliseum.Arenas }
+
+// Zones is the paintings the board's own zones are dressed in.
+func Zones() []ZoneArt { return coliseum.Zones }
 
 // ArenaByKey is one arena by its key.
 func ArenaByKey(key string) (*Arena, bool) {

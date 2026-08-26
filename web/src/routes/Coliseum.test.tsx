@@ -68,9 +68,26 @@ function arena(over: Partial<ColiseumArena> & { key: string; name: string }): Co
   }
 }
 
+/** The four paintings the board's own zones wear. Checked-in prose on the
+ *  server, so this is present whether or not a pool answered. */
+const ZONES: Coliseum['zones'] = [
+  { key: 'command', card: 'Throne of Eldraine', why: '',
+    art: { url: 'https://cards.scryfall.io/art_crop/throne.jpg',
+           artist: 'Kieran Yanner', printing: 'Wilds of Eldraine Commander' } },
+  { key: 'graveyard', card: 'Ancient Tomb', why: '',
+    art: { url: 'https://cards.scryfall.io/art_crop/tomb.jpg',
+           artist: 'Colin MacNeil', printing: 'Tempest' } },
+  { key: 'exile', card: 'Path to Exile', why: '',
+    art: { url: 'https://cards.scryfall.io/art_crop/path.jpg',
+           artist: 'Torgeir Fjereide', printing: 'Tales of Middle-earth Commander' } },
+  { key: 'ghost', card: 'Crypt Ghast', why: '',
+    art: { url: 'https://cards.scryfall.io/art_crop/ghast.jpg',
+           artist: 'Chris Rahn', printing: 'Gatecrash' } },
+]
+
 function room(over: Partial<Coliseum> = {}): Coliseum {
   return {
-    pool: true, dropped: 0,
+    pool: true, dropped: 0, zones: ZONES,
     arenas: [arena({ key: 'grand-coliseum', name: 'The Grand Coliseum' })],
     ...over,
   }

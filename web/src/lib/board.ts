@@ -58,6 +58,9 @@ export interface BoardCard {
   /** Scryfall's keywords for the card, unfiltered. `components/keywords.tsx`
    *  decides which of them the board has a sign for. */
   keywords: string[]
+  /** The drawn zone this card left **on the very last beat applied**, or null
+   *  the rest of the time. See `foldBoard`'s note on holding the dead. */
+  leaving: string | null
   power: number | null
   toughness: number | null
   counters: { kind: string; n: number }[]
@@ -232,6 +235,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
           artist: known?.artist ?? '',
           zone: 'gone', seat: known?.seat ?? 0, tapped: false,
           mana: known?.mana ?? false, keywords: known?.keywords ?? [],
+          leaving: null,
           power: null, toughness: null, counters: [], casts: 0,
         }
         state.set(change.id, card)
@@ -244,6 +248,30 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
         // Forge's AI does not do it with commanders.)
         if (card.zone === 'command' && change.zone !== 'command') {
           card.casts += 1
+        }
+        // **The dead are held where they died, for the length of one beat.**
+        //
+        // Forge reports a death and the zone change on the same line, so by
+        // the time the room says "X dies" the card is already in a graveyard
+        // and there is no instant at which the board holds a dead creature
+        // still standing. The skull therefore had nowhere to land but the
+        // grave — which is where a headstone goes and not where a death
+        // happens (Aaron, 2026-08-25: *"it should appear over the card being
+        // destroyed itself, like the shield"*).
+        //
+        // Only on the final step, which is the beat being spoken *now*: a card
+        // that left the battlefield ten beats ago is simply gone. So this is a
+        // property of the moment being drawn rather than of the card, which is
+        // also why a scrub backwards un-kills it — the hold is a function of
+        // the count, like everything else here.
+        //
+        // Uniform across every way of leaving play, not just dying. Bounced,
+        // exiled, sacrificed, ceasing to exist: the board shows the departure
+        // and then the card is where it went. The *mark* on top is the beat's
+        // business, and only a death draws a skull.
+        if (i === upTo - 1 && change.zone !== card.zone
+            && (card.zone === 'battlefield' || card.zone === 'land')) {
+          card.leaving = card.zone
         }
         card.zone = change.zone
       }
@@ -268,6 +296,15 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     const side = bySeat.get(card.seat)
     if (!side) continue
     if (card.zone === 'command' || card.casts > 0) side.commanders.push(card)
+    // Still standing, for this one beat, in the row it is standing in. It is
+    // deliberately **not** also drawn in the zone it has gone to: a card in
+    // two places is a worse answer than a card a beat behind, and next beat it
+    // is in the graveyard like anything else.
+    if (card.leaving) {
+      if (card.leaving === 'land') side.land.push(card)
+      else side[rowFor(card)].push(card)
+      continue
+    }
     // A zone the browser does not draw — `gone`, or a word a newer server
     // learned — simply takes the card off the table rather than throwing.
     if (card.zone === 'battlefield') {
@@ -321,6 +358,9 @@ export function stackRow(cards: BoardCard[]): BoardStack[] {
     const key = [
       card.name,
       card.tapped ? 't' : '',
+      // A dying Saproling must not merge into the eight beside it — the whole
+      // point of holding it is that somebody is looking at that one.
+      card.leaving ?? '',
       card.power ?? '', card.toughness ?? '',
       card.counters.map((c) => `${c.kind}:${c.n}`).join('+'),
     ].join('|')

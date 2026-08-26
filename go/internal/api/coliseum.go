@@ -37,13 +37,19 @@ func (a *API) coliseum(w http.ResponseWriter, r *http.Request) {
 		Facts     []reference.ColiseumFact `json:"facts"`
 	}
 	type answer struct {
-		Arenas  []arena `json:"arenas"`
-		Pool    bool    `json:"pool"`
-		Dropped int     `json:"dropped"`
+		Arenas []arena `json:"arenas"`
+		// Zones is the paintings the board's own three zones wear, plus the
+		// mark a graveyard raises. Checked-in prose with a pinned printing, so
+		// unlike everything else here it needs no pool at all — which is why
+		// it is set before the pool is opened and survives not having one.
+		Zones   []reference.ZoneArt `json:"zones"`
+		Pool    bool                `json:"pool"`
+		Dropped int                 `json:"dropped"`
 	}
 
 	source := reference.Arenas()
-	out := answer{Arenas: make([]arena, 0, len(source))}
+	out := answer{Arenas: make([]arena, 0, len(source)),
+		Zones: reference.Zones()}
 	for i := range source {
 		src := &source[i]
 		out.Arenas = append(out.Arenas, arena{

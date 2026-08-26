@@ -154,16 +154,29 @@ describe('the board at a moment', () => {
     expect(foldBoard(b, -3).sides[0]?.land).toHaveLength(0)
   })
 
-  it('takes a card off the table when it is gone', () => {
+  it('takes a card off the table when it is gone, one beat after it goes', () => {
     // `gone` is the server saying a card has left every zone drawn here — put
     // back into the library, most often. Leaving it where it was would be a
     // permanent nobody can remove.
+    //
+    // **But not on the beat it leaves.** A card that left the battlefield on
+    // the step being drawn is held standing there, so a person watching sees
+    // the departure rather than finding a hole where a permanent was. It is
+    // `leaving` for exactly that beat and gone on the next one.
     const b = board([
       { changes: [{ id: 11, zone: 'land', seat: 1 }] },
       { changes: [{ id: 11, zone: 'gone' }] },
+      { changes: [] },
     ])
     expect(foldBoard(b, 1).sides[0]?.land).toHaveLength(1)
-    expect(foldBoard(b, 2).sides[0]?.land).toHaveLength(0)
+    expect(foldBoard(b, 1).sides[0]?.land[0]?.leaving).toBeNull()
+
+    const going = foldBoard(b, 2).sides[0]?.land
+    expect(going, 'held for the beat that says it left').toHaveLength(1)
+    expect(going?.[0]?.leaving).toBe('land')
+
+    expect(foldBoard(b, 3).sides[0]?.land,
+      'and off the table on the next').toHaveLength(0)
   })
 
   it('ignores a zone it has never heard of rather than throwing', () => {
@@ -237,8 +250,8 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped = false): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      mana: false, keywords: [], power: null, toughness: null,
-      counters: [], casts: 0,
+      mana: false, keywords: [], leaving: null, power: null,
+      toughness: null, counters: [], casts: 0,
     })
     const stacks = stackRow([forest(1), forest(2), forest(3)])
     expect(stacks).toHaveLength(1)
@@ -255,8 +268,8 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped: boolean): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      mana: false, keywords: [], power: null, toughness: null,
-      counters: [], casts: 0,
+      mana: false, keywords: [], leaving: null, power: null,
+      toughness: null, counters: [], casts: 0,
     })
     const stacks = stackRow([
       forest(1, true), forest(2, false), forest(3, true), forest(4, false),
@@ -272,8 +285,8 @@ describe('the board at a moment', () => {
     const cat = (id: number, over: Partial<BoardCard> = {}): BoardCard => ({
       id, name: 'Cat Token', token: true, types: 'Creature - Cat',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
-      tapped: false, mana: false, keywords: [], power: 1, toughness: 1,
-      counters: [], casts: 0, ...over,
+      tapped: false, mana: false, keywords: [], leaving: null, power: 1,
+      toughness: 1, counters: [], casts: 0, ...over,
     })
     const stacks = stackRow([
       cat(1),

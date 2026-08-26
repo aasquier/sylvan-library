@@ -50,7 +50,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
-import type { ForgeBoard } from '../lib/api'
+import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
@@ -129,6 +129,15 @@ function markOf(kind: string): Mark | null {
  *  creature animate again rather than sitting there already-animated. */
 const Struck = createContext<{ card: string; mark: Mark; key: string } | null>(
   null)
+
+/** The paintings the board's own zones are dressed in, by zone key.
+ *
+ *  A context rather than a prop threaded through four levels, for `Struck`'s
+ *  reason: the rail is drawn twice, once per seat, and both rails want the
+ *  same four pictures. Empty is a legible state — the room answers before any
+ *  match is asked for, and a zone with no painting is the brass tile it has
+ *  always been. */
+const Dressing = createContext<Record<string, ColiseumZone>>({})
 
 /** How wide the card held up on hover is drawn, and how much room it needs.
  *
@@ -316,6 +325,11 @@ function FieldCard({ card, size, count, inPlay = false }: {
   return (
     <div className={`field-card field-card-${size}${card.tapped ? ' is-tapped' : ''}`
                     + (count > 1 ? ' is-stacked' : '')
+                    // Still standing, but only for this beat. Every way of
+                    // leaving play gets it — died, bounced, exiled, ceased to
+                    // exist — because what it draws is *departure*. Which
+                    // departure it was is the mark's business.
+                    + (card.leaving ? ' is-leaving' : '')
                     + (mark ? ` is-${mark.mark}` : '')}
          ref={box} title={title} tabIndex={card.image ? 0 : -1}
          onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
@@ -511,11 +525,31 @@ function FieldRow({ label, cards, size = 'normal', empty }: {
   )
 }
 
-/** A life total that takes the hit visibly.
+/** Commander's starting life, which is what the ring below is a fraction of.
  *
- * The number is the fact and the flash is the news — a total that changed
- * silently is a total nobody notices changing, and life is the one number in
- * Commander everybody is actually tracking. */
+ *  A constant rather than a reading, because this room plays exactly one
+ *  format and the *starting* total is gone by the time a board is folded —
+ *  `BoardSide.life` is the current one. If the Coliseum ever runs a format
+ *  that starts anywhere else, this is the line that has to learn it. */
+const STARTING_LIFE = 40
+
+/** A life total, drawn as the thing everyone at the table is actually
+ *  watching.
+ *
+ * **It was a number in a stone bar** (Aaron, 2026-08-25: *"mega basic, like
+ * whiteclaw basic"*), and he is right twice over. Once on looks: 1.28rem of
+ * bold type is not a treatment, it is a default. And once on *information* —
+ * a bare "23" makes you do the arithmetic that matters, because what a player
+ * reads off a life total is not the integer, it is **how much is left**.
+ *
+ * So it is a ring that drains. The arc is life over forty, the figure sits in
+ * the middle, and the whole thing warms from brass to blood as it goes — three
+ * ways of saying one fact, for the same reason the counters carry a sign as
+ * well as a colour. You can see a player is in trouble from across the room
+ * without reading a digit.
+ *
+ * The flash on change stays: a total that changed silently is a total nobody
+ * notices changing. */
 function LifeTotal({ life }: { life: number }) {
   const previous = useRef(life)
   const [hit, setHit] = useState<'up' | 'down' | null>(null)
@@ -527,9 +561,22 @@ function LifeTotal({ life }: { life: number }) {
     const id = window.setTimeout(() => setHit(null), 700)
     return () => window.clearTimeout(id)
   }, [life])
+  // Clamped both ways: a player on a lifegain deck goes past forty and the
+  // ring simply reads full, and a dead player reads empty rather than negative.
+  const left = Math.max(0, Math.min(1, life / STARTING_LIFE))
+  // The mix is computed here rather than in CSS because a `calc()` inside
+  // `color-mix()`'s percentage is the one part of that function browsers still
+  // disagree about, and this is a colour nobody should have to debug.
+  const spent = `${Math.round((1 - left) * 100)}%`
   return (
-    <span className={`field-life tabular${hit ? ` is-${hit}` : ''}`}>
-      {life}
+    <span className={`field-life${hit ? ` is-${hit}` : ''}`}
+          style={{ '--life-left': left, '--life-spent': spent } as CSSProperties}
+          title={`${life} life`}>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle className="field-life-track" cx="24" cy="24" r="20" />
+        <circle className="field-life-arc" cx="24" cy="24" r="20" />
+      </svg>
+      <span className="field-life-n tabular">{life}</span>
     </span>
   )
 }
@@ -544,30 +591,58 @@ function LifeTotal({ life }: { life: number }) {
  * for the same reason: in Commander it is where the game's most important card
  * waits, and a number cannot say which commander is home and which is out.
  */
-function FieldPile({ label, cards, short, throne }: {
+function FieldPile({ label, cards, short, zone, throne, receiving }: {
   label: string
   cards: BoardCard[]
   short: string
+  /** Which of the board's own zones this is, which is how it finds its
+   *  painting in `Dressing`. */
+  zone: 'command' | 'graveyard' | 'exile'
   /** The command zone, which is the one pile whose *emptiness* is news. */
   throne?: boolean
+  /** The beat's key when *this* seat's grave is the one receiving a death, and
+   *  null otherwise.
+   *
+   *  **Decided by the rail, not here**, and it has to be: the card whose death
+   *  is being announced is held on the *battlefield* for that beat now, so a
+   *  graveyard cannot answer "did I just get it?" by looking at what it holds —
+   *  it holds nothing yet. The rail can see the side that is holding the body.
+   *  Without this both graves raised a ghost for one death. */
+  receiving?: string | null
 }) {
   // Held open by a tap. Hover and keyboard focus open it in CSS; this is for
   // the pointer that has no hover to give.
   const [open, setOpen] = useState(false)
-  const struck = useContext(Struck)
-  // **The skull lands on the grave, and it has to.** By the time the sentence
-  // "X dies" is read, the card is already in the graveyard — Forge reports the
-  // death and the zone change on one line, so the step that tells the beat is
-  // the step that moves the card, and there is no instant at which the board
-  // holds a dead creature still standing. Marking the pile it went into is not
-  // a consolation for that; it is where a headstone goes.
-  const buried = struck?.mark === 'dies'
-    && cards.some((c) => sameCard(c.name, struck.card))
+  // **The skull used to land here, and no longer does.** Forge reports a death
+  // and the zone change on one line, so by the time the room said "X dies" the
+  // card was already in this pile and there was no instant at which the board
+  // held a dead creature standing. The grave was the only surface the mark
+  // could reach — a headstone rather than a death. `foldBoard` holds the dying
+  // card in its own row for the length of its beat now, so the skull lands on
+  // the card, which is where Aaron asked for it and where it belongs.
   const top = cards[cards.length - 1]
   const seat = throne && !top
-  const title = top ? `${label}: ${cards.length}, ${top.name} on top`
-    : seat ? `${label}: empty — out on the battlefield`
-    : `${label}: empty`
+  // **The zone, dressed.** These three were three-letter labels on a 26px
+  // tile, which is what a scoreboard does and not what a table does — a player
+  // knows the graveyard, exile and the command zone by sight (Aaron,
+  // 2026-08-25: *"icons to represent the graveyard and exile"*, and the
+  // command zone *"its own area of interest"*). The painting is Magic's own,
+  // pinned to a printing in checked-in prose, and it sits *under* the pile's
+  // top card rather than instead of it: a graveyard with cards in it still
+  // shows what is on top, and the ground says which graveyard it is.
+  const dressing = useContext(Dressing)
+  const dressed = dressing[zone]
+  const ghost = dressing.ghost
+  // Keyed on the beat so a second death raises a second ghost rather than
+  // reusing a finished animation — `Struck`'s own trick, one level out.
+  const arriving = receiving ?? null
+  const title = [
+    top ? `${label}: ${cards.length}, ${top.name} on top`
+      : seat ? `${label}: empty — out on the battlefield`
+      : `${label}: empty`,
+    // Named because somebody painted it, and because rule 9 says so.
+    dressed ? `${dressed.card}, art by ${dressed.art.artist}` : '',
+  ].filter(Boolean).join(' · ')
   return (
     <div className="field-pile-wrap">
     <div className={`field-pile${cards.length === 0 ? ' is-empty' : ''}`
@@ -578,6 +653,10 @@ function FieldPile({ label, cards, short, throne }: {
            if (e.pointerType === 'mouse' || cards.length === 0) return
            setOpen((was) => !was)
          }}>
+      {dressed && (
+        <img className="field-pile-ground" src={dressed.art.url} alt=""
+             loading="lazy" draggable={false} />
+      )}
       {top && top.image ? (
         <img className="field-pile-art" src={top.image} alt="" loading="lazy"
              draggable={false} />
@@ -586,9 +665,15 @@ function FieldPile({ label, cards, short, throne }: {
           is the opposite of an empty graveyard and was drawn the same way.
           The chair says which: theirs, and nobody in it. */}
       {seat && <span className="field-pile-throne"><ThroneGlyph /></span>}
-      {buried && struck && (
-        <span key={struck.key} className="field-pile-buried" aria-hidden="true">
-          <img src={mementoArt} alt="" draggable={false} />
+      {/* **The ghost, rising off the grave.** Two beats, two pictures: the
+          skull lands on the creature *as it dies*, held on the sand for that
+          beat, and this rises from the zone that received it. Magic's own
+          spectre rather than a photograph — everything photographic that reads
+          as a ghost is pale and low-contrast, and this mark lives about a
+          second. */}
+      {arriving && ghost && (
+        <span key={arriving} className="field-pile-ghost" aria-hidden="true">
+          <img src={ghost.art.url} alt="" draggable={false} />
         </span>
       )}
       <span className="field-pile-label">{short}</span>
@@ -626,17 +711,40 @@ function FieldPile({ label, cards, short, throne }: {
 }
 
 /** The stone rail one player's name, life and closed zones are carved into. */
-function FieldRail({ side, name }: { side: BoardSide; name: string }) {
+function FieldRail({ side, facing, name }: {
+  side: BoardSide
+  facing: 'far' | 'near'
+  /** Whose zones these are. The nameplate came off the old grey bar and back
+   *  onto *this*, which is the difference between a label floating on a strip
+   *  and a heading over the thing it names. */
+  name: string
+}) {
+  // **Whose grave is about to receive the body.** The dying card is held on
+  // the sand for the beat that announces it, so no graveyard can answer this
+  // by looking at what it holds — it holds nothing yet. The side that is
+  // holding the body is the side whose grave it is bound for, and a rail is
+  // the first thing up the tree that knows which side it is drawing. Without
+  // this, one death raised a ghost over both players' graves.
+  const struck = useContext(Struck)
+  const holding = struck?.mark === 'dies' && [side.creatures, side.walkers,
+    side.artifacts, side.enchantments, side.land].some((row) =>
+    row.some((c) => c.leaving && sameCard(c.name, struck.card)))
   // Two generic for each previous cast from the zone. With partners this
   // reports the dearer of the two: there is one pile and forty pixels of it,
   // and the expensive commander is the one whose price changes a decision.
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
   return (
-    <div className="field-rail">
+    <div className={`field-rail field-rail-${facing}`}>
+      {/* **The stone bar is gone; the name came back as a heading.** It was a
+          label floating on a grey strip, which is furniture pretending to be
+          material. Now the two seats' zones stand side by side in a band of
+          their own, and a band holding two players' places needs to say whose
+          is whose — so each panel is headed by its deck. `title` keeps the
+          full name for anybody who wants it. */}
       <span className="field-rail-name" title={side.name}>{name}</span>
       <span className="field-rail-totals">
-        <FieldPile label="Command zone" short="CMD" cards={side.command}
-                   throne />
+        <FieldPile label="Command zone" short="Command Zone"
+                   cards={side.command} zone="command" throne />
         {/* **Beside the pile rather than on it.** Inside, the chip covered
             the zone's own three-letter label — the first draft read "CI +4",
             which is a worse pile than one with no tax on it at all. Twenty-six
@@ -648,8 +756,11 @@ function FieldRail({ side, name }: { side: BoardSide; name: string }) {
             +{tax}
           </span>
         )}
-        <FieldPile label="Graveyard" short="GY" cards={side.graveyard} />
-        <FieldPile label="Exile" short="EX" cards={side.exile} />
+        <FieldPile label="Graveyard" short="Graveyard" cards={side.graveyard}
+                   zone="graveyard"
+                   receiving={holding && struck ? struck.key : null} />
+        <FieldPile label="Exile" short="Exile" cards={side.exile}
+                   zone="exile" />
         <LifeTotal life={side.life} />
       </span>
     </div>
@@ -770,9 +881,8 @@ function FieldHand({ side, name, facing }: {
  * other side of a real table. The hand is no longer among these rows — it is
  * held at the side (`FieldHand` above).
  */
-function FieldSide({ side, name, facing }: {
+function FieldSide({ side, facing }: {
   side: BoardSide
-  name: string
   facing: 'far' | 'near'
 }) {
   // **Outermost first**, and the near player's side is the same list reversed,
@@ -798,11 +908,9 @@ function FieldSide({ side, name, facing }: {
   ]
   return (
     <div className={`field-side field-side-${facing}`}>
-      {facing === 'far' && <FieldRail side={side} name={name} />}
       <div className="field-rows">
         {facing === 'far' ? rows : [...rows].reverse()}
       </div>
-      {facing === 'near' && <FieldRail side={side} name={name} />}
     </div>
   )
 }
@@ -905,8 +1013,12 @@ function FieldTransport({ speed, setSpeed, at, of, seek,
  * two to keep in step.
  */
 export function MatchBoard({ board, shown, game, name, running, beat,
-  speed, setSpeed, of, seek, games, playing, chooseGame }: {
+  speed, setSpeed, of, seek, games, playing, chooseGame, zones = [] }: {
   board: ForgeBoard | null
+  /** The paintings the board's own zones wear, from `/api/coliseum`. Checked-in
+   *  prose, so it arrives before any match does; empty is a legible state and
+   *  draws the brass tiles the rail has always had. */
+  zones?: ColiseumZone[]
   shown: number
   /** The beat the room has just spoken, which is the one the board marks.
    *  Null before a game starts, and while the account is silent. */
@@ -925,6 +1037,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   playing: number
   chooseGame: (game: number) => void
 }) {
+  const dressing: Record<string, ColiseumZone> = {}
+  for (const z of zones) dressing[z.key] = z
   const state = foldBoard(board, shown)
   const far = state.sides[0]
   const near = state.sides[1]
@@ -954,7 +1068,16 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   }
 
   return (
+    <Dressing.Provider value={dressing}>
     <Struck.Provider value={struck}>
+    {/* **The stage: the arena, and the places beside it.**
+        The zones were a column *inside* the field, which put them on the sand
+        — and took their width out of the battlefield, so the arena came out
+        scaled awkwardly (Aaron, 2026-08-25). They are not part of the arena.
+        A graveyard is not somewhere you stand; it is somewhere cards go, and
+        it belongs off the floor entirely. So the field keeps its own box at
+        its own size, and the zones stand outside it in their own column. */}
+    <div className="field-stage">
     <section className="field" aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">
@@ -975,8 +1098,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           is where the two players' hands actually are. */}
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)} />
 
-      <FieldSide side={far} facing="far"
-                 name={name(far.slug, far.name)} />
+      <FieldSide side={far} facing="far" />
 
       {/* The seam: in the real building, the trench the lifts came up through.
           Here it is where the turn is announced and where the two
@@ -990,8 +1112,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         <span className="field-seam-rule" aria-hidden="true" />
       </div>
 
-      <FieldSide side={near} facing="near"
-                 name={name(near.slug, near.name)} />
+      <FieldSide side={near} facing="near" />
 
       <FieldHand side={near} facing="near"
                  name={name(near.slug, near.name)} />
@@ -1001,6 +1122,12 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                       seek={seek} games={games} playing={playing}
                       chooseGame={chooseGame} />
     </section>
+    <aside className="field-zones" aria-label="Zones off the battlefield">
+      <FieldRail side={far} facing="far" name={name(far.slug, far.name)} />
+      <FieldRail side={near} facing="near" name={name(near.slug, near.name)} />
+    </aside>
+    </div>
     </Struck.Provider>
+    </Dressing.Provider>
   )
 }

@@ -6464,6 +6464,15 @@ button:hover .tarot-fan-card {
  * its side into a strip along the foot of the field: the same gesture read
  * across instead of down, and still off the sand.
  */
+/* **Three columns: the hand you hold, the sand you fight on, the places
+ * things go.** Stacked on a narrow screen, side by side once there is room —
+ * and the sides are the ones a table has (Aaron, 2026-08-25): a player's hand
+ * is on their left and the zones they push cards into are on their right.
+ *
+ * The zones used to live *inside* each half, in a strip under the rows, which
+ * is why they were 26px: a horizontal bar can only be as tall as the space it
+ * steals from the battlefield. A column can be as wide as it likes, and that
+ * is the whole reason the paintings became possible. */
 .field {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -6474,6 +6483,47 @@ button:hover .tarot-fan-card {
     'near'
     'handsnear'
     'transport';
+}
+
+/* **The stage: the arena, and the places beside it.**
+ *
+ * The zones were briefly a column *inside* the field, and that was wrong twice
+ * over — it stood them on the sand, and it took their width out of the
+ * battlefield, so the arena came out scaled awkwardly (Aaron, 2026-08-25).
+ * They are not part of the arena. A graveyard is not somewhere you stand; it
+ * is somewhere cards *go*, and it belongs off the floor.
+ *
+ * So the field keeps its own box, its own border and its own sand at its own
+ * size, and the zones stand outside it. Stacked on a narrow screen they fall
+ * below; side by side they are a column of their own with nothing but page
+ * behind them. */
+.field-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+/* **A band under the arena, two seats side by side.**
+ *
+ * Never a column beside the field, and that is the whole lesson of three
+ * attempts: any column on the flank takes its width out of the battlefield,
+ * and the battlefield is the thing nobody wants smaller. Underneath, the zones
+ * cost the sand *nothing* — so they can be as big as they like, which is what
+ * finally makes a painting in one a picture rather than a texture.
+ *
+ * Side by side rather than stacked, because these are two players' places and
+ * a reader compares them: whose graveyard is filling, who still has a
+ * commander home. Stacked, that is a scroll; beside each other it is a glance
+ * (Aaron, 2026-08-25). */
+.field-zones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+@media (max-width: 46rem) {
+  /* One at a time on a phone: two panels of three big tiles in 380 pixels is
+     six small tiles, which is where this started. */
+  .field-zones { grid-template-columns: minmax(0, 1fr); }
 }
 .field-side-far { grid-area: far; }
 .field-seam { grid-area: seam; }
@@ -6617,23 +6667,32 @@ button:hover .tarot-fan-card {
 
 @media (min-width: 62rem) {
   .field {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      'far   handsfar'
-      'seam  handsfar'
-      'near  handsnear'
+      'handsfar  far'
+      'handsfar  seam'
+      'handsnear near'
       'transport transport';
   }
-  /* Wide: the two hands are the right-hand column again, one beside each
-     half — which is what the single rail was already doing, now said by the
-     grid instead of by `space-between`. */
+  /* Wide: the zones become a standing column on the right, and each seat's
+     three places read top to bottom under its life. A column is what let them
+     grow at all — a strip under the rows can only be as tall as the space it
+     takes from the battlefield, and that is why they were 26 pixels. */
+  .field-rail-totals {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Wide: the two hands are the left-hand column, one beside each half —
+     which is the side a player's hand is actually on. */
   .field-hand {
     justify-content: flex-start;
     border: 0;
-    border-left: 1px solid
+    border-right: 1px solid
       color-mix(in srgb, var(--field-brass) 26%, transparent);
     background: linear-gradient(90deg,
-      rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.12) 100%);
+      rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.3) 100%);
   }
   .field-hand-near { justify-content: flex-end; }
   .field-hand-fan {
@@ -6656,13 +6715,26 @@ button:hover .tarot-fan-card {
     transform: translateX(-7px);
   }
 
-  /* Side by side, the hands are the right-hand column and the arena is to
-     their left, which is the only direction with room. */
+  /* **Side by side, everything opens toward the middle**, because the middle
+     is where the room is and both flanking columns are against an edge. The
+     hands are the left column now, so their trays swing *right* into the
+     arena; the zones are the right column, so theirs swing *left*. Getting
+     this backwards is how a panel ends up half off the screen, which is
+     exactly the fault the card preview was rebuilt to stop making. */
   .field-hand-far .field-hand-tray,
   .field-hand-near .field-hand-tray {
     top: 0;
     bottom: auto;
-    right: calc(100% + 6px);
+    right: auto;
+    left: calc(100% + 6px);
+    transform: translateX(-7px) scale(0.97);
+    transform-origin: top left;
+  }
+  .field-rail-far .field-tray,
+  .field-rail-near .field-tray {
+    top: 0;
+    bottom: auto;
+    right: calc(100% + 8px);
     transform: translateX(7px) scale(0.97);
     transform-origin: top right;
   }
@@ -6682,91 +6754,194 @@ button:hover .tarot-fan-card {
 }
 
 /* The rail: cut stone with a brass edge catching the light. */
+/* ------------------------------------------------------- the rail
+ *
+ * **It was a grey stone bar with a hatch on it, and it is gone.** A strip of
+ * fake masonry running under three tiny tiles is furniture pretending to be
+ * material (Aaron, 2026-08-25: "that grey bar is basic AF") — and the sand is
+ * already the material. Three lit places standing directly on it is a table;
+ * a bar with things on it is a toolbar.
+ *
+ * The nameplate went with it. The hand beside this rail already carries the
+ * deck's name, and a board that says the same thing twice has spent the room
+ * twice. */
+/* **Off the sand, so they carry their own ground.** Inside the field they sat
+ * on the floor and needed nothing; standing beside it they are objects on the
+ * page, and an object on a page needs an edge. Not the old grey bar — that was
+ * masonry printed on a strip — but the same brass hairline the rest of the
+ * room is trimmed in, over the page's own dark. */
+/* One seat's places: a heading, and the three zones under it. */
 .field-rail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 5px 12px;
-  border-radius: 4px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
   color: var(--field-stone-ink);
-  background-image:
-    repeating-linear-gradient(93deg,
-      rgba(255, 255, 255, 0.05) 0 3px, rgba(0, 0, 0, 0.04) 3px 7px),
-    linear-gradient(180deg, var(--field-stone) 0%,
-      var(--field-stone-deep) 100%);
+  background: linear-gradient(180deg,
+    rgba(14, 11, 8, 0.72) 0%, rgba(8, 6, 4, 0.86) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.32);
-  border-top: 1px solid color-mix(in srgb, var(--field-brass) 55%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 22%, transparent),
+    0 3px 14px rgba(0, 0, 0, 0.42);
 }
+/* Whose places these are. It used to float on a grey strip; a band holding two
+   players needs to say which half is whose, and a heading over the thing it
+   names is what that looks like. */
 .field-rail-name {
+  font-size: 0.78rem;
   font-weight: 600;
-  font-size: 0.86rem;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--field-brass) 88%, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.field-rail-totals { display: flex; align-items: center; gap: 12px; }
+.field-rail-totals {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
 
-/* Life: the one number everybody at a Commander table is tracking, so it is
-   the biggest thing on the rail and it is the thing that reacts. */
+/* ------------------------------------------------ life, as a thing
+ *
+ * **It was 1.28rem of bold type.** Aaron's verdict was "mega basic, like
+ * whiteclaw basic", and the fault is not only that a bare numeral is a default
+ * rather than a treatment. It is that the integer is the wrong fact: what a
+ * player reads off a life total is *how much is left*, and a "23" makes you do
+ * that arithmetic yourself.
+ *
+ * So it drains. The arc is life over forty, the figure sits inside it, and the
+ * whole ring warms from brass to blood as it empties — three ways of saying
+ * one thing, which is the same reason the counters carry a sign as well as a
+ * hue. You can see somebody is in trouble from across the room without reading
+ * a digit. */
 .field-life {
-  font-size: 1.28rem;
-  font-weight: 700;
-  line-height: 1;
-  min-width: 2.2ch;
-  text-align: right;
-  transition: color 200ms ease;
-}
-.field-life.is-down {
-  color: var(--status-critical);
-  animation: field-life-hit 640ms cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-.field-life.is-up {
-  color: var(--status-good);
-  animation: field-life-gain 640ms cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-@keyframes field-life-hit {
-  0%   { transform: none; }
-  22%  { transform: translateX(-3px) scale(1.14); }
-  44%  { transform: translateX(3px) scale(1.1); }
-  100% { transform: none; }
-}
-@keyframes field-life-gain {
-  0%   { transform: none; }
-  35%  { transform: translateY(-4px) scale(1.12); }
-  100% { transform: none; }
-}
-
-/* A closed zone as the pile it is. The graveyard and exile were numbers on
-   the rail, which is what a scoreboard does and not what a table does: you can
-   see somebody's graveyard from across a table, and the top card of it is the
-   one everything in Magic reaches for. The command zone is here for the same
-   reason — in Commander it holds the most important card in the deck, and a
-   number cannot say whether the commander is home or out. */
-.field-pile {
   position: relative;
   flex: 0 0 auto;
-  width: 26px;
-  height: 36px;
-  border-radius: 3px;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+}
+.field-life svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Twelve o'clock, because a gauge that starts anywhere else is a gauge you
+     have to think about. */
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.field-life circle {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.field-life-track {
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 5.5;
+}
+/* r=20, so the whole way round is 2*pi*20 = 125.66. The dash is what is left
+   and the gap is the rest, which is why nothing here needs a second element. */
+.field-life-arc {
+  stroke: color-mix(in oklab,
+    var(--arena-blood) var(--life-spent, 0%), var(--field-brass));
+  stroke-dasharray: calc(var(--life-left, 1) * 125.66) 125.66;
+  filter: drop-shadow(0 0 3px
+    color-mix(in oklab, var(--arena-blood) var(--life-spent, 0%),
+      var(--field-brass)));
+  transition: stroke-dasharray 420ms cubic-bezier(0.16, 1, 0.3, 1),
+              stroke 420ms ease;
+}
+.field-life-n {
+  position: relative;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  color: color-mix(in oklab,
+    var(--arena-blood) calc(var(--life-spent, 0%) * 0.55), #f4e8cc);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  transition: color 300ms ease;
+}
+/* The news, kept from the old treatment: a total that changes silently is a
+   total nobody notices changing. */
+.field-life.is-down .field-life-n { animation: life-hit-down 700ms ease-out; }
+.field-life.is-up .field-life-n { animation: life-hit-up 700ms ease-out; }
+@keyframes life-hit-down {
+  0%   { transform: scale(1); }
+  22%  { transform: scale(1.24); color: var(--arena-blood); }
+  100% { transform: scale(1); }
+}
+@keyframes life-hit-up {
+  0%   { transform: scale(1); }
+  22%  { transform: scale(1.18); color: #9fe0a4; }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-life-arc { transition: none; }
+  .field-life.is-down .field-life-n,
+  .field-life.is-up .field-life-n { animation: none; }
+}
+
+.field-pile {
+  position: relative;
+  width: 100%;
+  /* **Landscape, because the painting is.** A Scryfall art crop is about
+     626x457, and a portrait tile throws away a third of it — which is why
+     these paintings kept looking like textures (Aaron, 2026-08-25: "seems
+     like it will be tough to use our card art backgrounds that way"). A zone
+     is not a card. It is a *place*, and it can be whatever shape shows the
+     place best. Matching the crop's own ratio shows it very nearly whole. */
+  aspect-ratio: 626 / 457;
+  border-radius: 6px;
   overflow: hidden;
   background: rgba(10, 8, 5, 0.5);
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, transparent),
     -2px -2px 0 -1px rgba(0, 0, 0, 0.45);
 }
-.field-pile.is-empty { opacity: 0.4; }
+/* An empty zone is quieter, not invisible: the painting is how you know which
+   zone it is, and dimming it to 40% took that away exactly when the pile had
+   nothing else to say. */
+.field-pile.is-empty { opacity: 0.72; }
+
+/* The painting. Darkened and desaturated on purpose — it is a *ground*, and a
+   ground that competes with the card on top of it is a mistake wearing good
+   art. `object-position: 50% 35%` because a card's art box is landscape and a
+   zone tile is portrait: the middle-upper band is where these four paintings
+   keep their subject. */
+.field-pile-ground {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 45%;
+  opacity: 1;
+  filter: saturate(1) brightness(0.94);
+}
 
 /* The wrapper is the hover target, and it holds the pile *and* the tray that
    opens off it. That is the whole trick: a panel anchored to a 26px pile which
    the pointer has to leave the pile to reach is a panel nobody can reach, and
    keeping both inside one hover group means the pointer never crosses a gap.
    `focus-within` gives the keyboard the same thing for free. */
-.field-pile-wrap { position: relative; flex: 0 0 auto; }
+/* **The wrap is the flex child, so the wrap is what flexes.** This carried
+   `flex: 0 0 auto` while the pile inside it carried `flex: 1 1 0` with no
+   width — so the wrap sized itself to its content, the content wanted to grow
+   from a zero basis, and the zones came out *zero pixels wide*. They were in
+   the DOM, correctly dressed, and invisible. jsdom has no layout and the
+   suite reads an empty stylesheet, so nothing in 734 green tests could have
+   seen it; Aaron opening the page saw it immediately. */
+.field-pile-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
 
 .field-tray {
   position: absolute;
@@ -6795,16 +6970,19 @@ button:hover .tarot-fan-card {
               transform 210ms cubic-bezier(0.16, 1, 0.3, 1),
               visibility 0s linear 140ms;
 }
-/* Onto the sand, because the field clips its own overflow and a tray hung
-   outside the rail would be cut in half. Each rail opens the only way it has
-   room to. */
-.field-side-far .field-tray {
+/* **A tray opens toward the sand, because the sand is the only room there
+   is.** Stacked, the zones are a row across the field and the only way out is
+   up or down — down from the far seat's row and up from the near seat's, since
+   those are the directions each has anything but edge in front of it. */
+.field-rail-far .field-tray {
   top: calc(100% + 6px);
+  right: 0;
   transform: translateY(-7px) scale(0.97);
   transform-origin: top right;
 }
-.field-side-near .field-tray {
+.field-rail-near .field-tray {
   bottom: calc(100% + 6px);
+  right: 0;
   transform: translateY(7px) scale(0.97);
   transform-origin: bottom right;
 }
@@ -6864,25 +7042,49 @@ button:hover .tarot-fan-card {
     transition: opacity 120ms ease, visibility 0s linear 120ms;
   }
 }
+/* **The top card, small, lying in the place.**
+ *
+ * It used to fill the tile, which made the painting a frame around it — and
+ * the painting is the point (Aaron, 2026-08-25: *"I want to see more of the
+ * background art when a card is there"*). So the card is a *token* of what is
+ * on top rather than a reproduction of it: enough to see which card, and no
+ * more, because reading it is the tray's job and the tray is one hover away.
+ *
+ * Card-shaped and card-proportioned, sat low in the tile the way a card lies
+ * in a place rather than hangs on a wall. */
 .field-pile-art {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  right: 7%;
+  bottom: 16%;
+  width: 26%;
+  height: auto;
+  aspect-ratio: 488 / 680;
   object-fit: cover;
-  opacity: 0.85;
+  border-radius: 2.5px;
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, 0.78),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 34%, transparent);
 }
+/* **Their real names, because there is finally room for them.** "GY" and
+   "CMD" are what you write when a tile is 26 pixels wide; at ninety-six the
+   abbreviation is just a word nobody spelled (Aaron, 2026-08-25). The plate is
+   dark and full-width so the name reads over whatever the painting is doing
+   underneath it. */
 .field-pile-label {
   position: absolute;
-  top: 1px;
+  top: 0;
   left: 0;
   right: 0;
+  padding: 3px 2px;
   text-align: center;
-  font-size: 0.5rem;
+  font-size: 0.58rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #f0e6cf;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #f4ecd8;
+  background: linear-gradient(180deg,
+    rgba(6, 5, 4, 0.86) 0%, rgba(6, 5, 4, 0) 100%);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
 /* The empty chair, centred in the slot and drawn on the brass the rest of the
    rail is carved in. `is-throne` lifts the pile back out of `is-empty`'s
@@ -6923,8 +7125,9 @@ button:hover .tarot-fan-card {
   bottom: 0;
   left: 0;
   right: 0;
+  padding: 1px 0;
   text-align: center;
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.25;
   color: #1a1409;
@@ -7556,8 +7759,7 @@ button:hover .tarot-fan-card {
 
 /* --- died: the stone goes down ----------------------------------------- */
 
-.field-mark-dies img,
-.field-pile-buried img {
+.field-mark-dies img {
   width: 70%;
   height: auto;
   border-radius: 2px;
@@ -7579,26 +7781,77 @@ button:hover .tarot-fan-card {
 .field-mark-dies { background: rgba(6, 5, 4, 0.55); border-radius: 4px; }
 .field-card.is-dies .field-card-turn { filter: grayscale(0.85) brightness(0.62); }
 
-/* The grave's own copy, smaller because a pile is 26px wide and the skull has
-   to sit inside its rim rather than over it. */
-.field-pile-buried {
+/* --- the ghost, rising off the grave ------------------------------------
+ *
+ * Two beats, two pictures. The skull lands on the creature *as it dies*, held
+ * on the sand for exactly that beat; this rises from the zone that received
+ * it. Where the skull drops and sets like a headstone, this one lifts and
+ * thins — a thing leaving rather than a thing placed.
+ *
+ * Magic's own spectre rather than a photograph, and that is the lesson this
+ * room keeps relearning: everything photographic that reads as a ghost is pale
+ * and low-contrast by nature, and a mark that lives one second cannot afford
+ * either. */
+.field-pile-ghost {
   position: absolute;
   inset: 0;
   z-index: 4;
   display: grid;
   place-items: center;
   pointer-events: none;
-  background: rgba(6, 5, 4, 0.5);
+  background: radial-gradient(ellipse at 50% 60%,
+    rgba(150, 190, 210, 0.28) 0%, rgba(6, 8, 10, 0.62) 70%);
 }
-.field-pile-buried img { width: 76%; }
+.field-pile-ghost img {
+  width: 84%;
+  height: auto;
+  border-radius: 2px;
+  animation: grave-ghost 1500ms ease-out both;
+  filter: saturate(0.6) brightness(1.25) contrast(1.05);
+}
+@keyframes grave-ghost {
+  0%   { opacity: 0; transform: translateY(5px) scale(0.9); }
+  22%  { opacity: 0.95; transform: translateY(0) scale(1); }
+  70%  { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-7px) scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-pile-ghost img { animation: mark-still 1200ms ease-out both; }
+}
+
+/* --- leaving play: held where it stood, for one beat -------------------
+ *
+ * **The skull had nowhere to land.** Forge reports a death and the zone change
+ * on one line, so by the time the room said "X dies" the card was already in a
+ * graveyard — the mark went on the *pile*, which is a headstone rather than a
+ * death (Aaron, 2026-08-25: "it should appear over the card being destroyed
+ * itself, like the shield"). `foldBoard` holds a card that left the
+ * battlefield in its own row for exactly the beat that says so, and the mark
+ * lands on the card.
+ *
+ * This class is the *departure*, not the death: bounced, exiled, sacrificed
+ * and ceasing-to-exist all get it, because all of them are a permanent being
+ * seen to go. What kind of going it was is `.is-dies` and its relatives on
+ * top. So the motion here is only what every leaving has in common — the card
+ * lifts a little off the sand and starts to let go. */
+.field-card.is-leaving { animation: card-leaving 900ms ease-out both; }
+.field-card.is-leaving .field-card-turn {
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.62),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, transparent);
+}
+@keyframes card-leaving {
+  0%   { transform: none; opacity: 1; }
+  100% { transform: translateY(-3px); opacity: 0.88; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .field-card.is-attacks,
   .field-card.is-blocks { animation: none; }
   .field-mark-attacks { animation: mark-lamp 900ms steps(2, end) both; }
+  .field-card.is-leaving { animation: none; }
   .field-mark-blocks img,
-  .field-mark-dies img,
-  .field-pile-buried img {
+  .field-mark-dies img {
     animation: mark-still 1200ms ease-out both;
   }
   @keyframes mark-still {
@@ -7683,8 +7936,11 @@ button:hover .tarot-fan-card {
   .field-life { font-size: 1.1rem; }
   .field-seam-turn { font-size: 0.66rem; letter-spacing: 0.1em; }
   .field-seam-game { display: none; }
-  .field-pile { width: 22px; height: 30px; }
-  .field-rail-name { font-size: 0.76rem; }
+  /* The zones shrink with the cards, not below them. Twenty-two pixels was
+     right when a pile was a brass tile with three letters on it; now it wears
+     a painting, and a painting at 22px is the mistake this room has made
+     before. Thirty-four matches `.field-card-small`, which is the narrowest
+     anything on this board is allowed to be. */
   /* The scrubber takes its own line rather than squeezing the buttons into
      tap targets nobody can hit. */
   .field-scrub { flex-basis: 100%; order: 3; }
