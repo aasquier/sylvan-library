@@ -220,6 +220,34 @@ it('plays the skull over the dying card, on the marks own clock', () => {
   expect(container.querySelector('.stage-plate-word')?.textContent).toBe('Dies')
 })
 
+it('draws the light going out of a dying card, and never filters it', () => {
+  // **A licence rule, held by a test rather than by a memory.** The light used
+  // to go out of a dying card through `filter: grayscale()` on `.stage-face` —
+  // which is Wizards' painting, and Scryfall's imagery guidelines forbid
+  // desaturating card imagery outright. ADR 32 had already written that
+  // boundary into this repo; the stylesheet had simply drifted off it.
+  //
+  // So the layer is asserted *structurally*, because jsdom has no layout
+  // engine and cannot see a shadow — what it can see, and what actually
+  // matters, is that a separate element exists to carry the dark and that it
+  // is a sibling of the face rather than something wrapped around it. A future
+  // session that deletes the pall and reaches for a filter again fails here.
+  const dying = replay(said({ kind: 'dies', card: 'Fleecemane Lion',
+    key: 'd2' }))
+  const pall = dying.container.querySelector('.stage-frame .stage-pall')
+  expect(pall, 'the grave is drawn as a layer over the card').toBeTruthy()
+  expect(pall?.previousElementSibling?.className,
+    'and it lies over the painting rather than around it')
+    .toContain('stage-face')
+  cleanup()
+
+  // ...and it belongs to the death, not to the stage. A spell being cast is
+  // not going anywhere, so nothing is drawn over it at all.
+  const cast = replay(said({ card: 'Lightning Bolt', key: 'd3' }))
+  expect(cast.container.querySelector('.stage-pall'),
+    'a card being cast is under no shadow').toBeNull()
+})
+
 it('hands the stylesheet the length a card is actually watched for', () => {
   // **Rendering a value audits it.** The animation's duration and the
   // element's lifetime are one number, and the only way they stay one number
