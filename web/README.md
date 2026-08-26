@@ -61,6 +61,21 @@ them as separate steps on purpose, so a type error reports as a type error.
   is two colours no single glyph states. A drawn pip carries `role="img"` and
   the colour's name, because a drawing contributes nothing to the
   accessibility tree on its own.
+- **A cost is a row of pips; what a permanent *taps for* is one mark**
+  (`ManaProduced` in the same file, `producedSymbol` in `lib/mtg.ts`). `{G}{W}`
+  means two mana and a Temple Garden makes one, so a pair is drawn as the
+  official hybrid — Magic's own glyph for "or" — and three or more as a prism,
+  a disc cut into a wedge per colour, because no official symbol means "any of
+  these". The pair's spelling is the set's (`{G/W}`, never `{W/G}`): the symbol
+  route asks the official set by code, so a reversed pair is a 404 that falls
+  back to a plain disc and nobody ever sees it go wrong. Whatever the mark, the
+  sentence beside it reads the mark rather than the list.
+- **A tapped permanent wears what it taps for, never what it produced.** The
+  bead on the Coliseum's cards (`FieldCard`, `.field-card-bead`) is a fact
+  about the printing — true whether the card was turned to pay for something or
+  to swing. Nothing on that wire can say more: the mana event carries a seat
+  and a pool, the tap event carries a card, and no key joins them, so an
+  attribution would be the guess ADR 44 forbids.
 - **Glossary keys are pinned to the served table.** A `Term` or `HelpTip` name
   must exist in `go/internal/reference/data/glossary.json`, which the app
   fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip

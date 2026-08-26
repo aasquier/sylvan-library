@@ -1400,3 +1400,130 @@ it('prices each chair rather than the whole zone', () => {
   expect(rail.querySelector('.field-tax')?.closest('.field-pile'))
     .toBe(seats[1])
 })
+
+/** A board of turned mana sources, one of each shape the mark has.
+ *
+ * **What the bead claims and what it must never claim.** A turned permanent
+ * that taps for mana wears what it taps for — a fact about the printing, true
+ * whether the card was turned to pay for something, to swing, or by an
+ * opponent. It is not a claim that this activation filled anybody's pool, and
+ * nothing on the wire could support one if it were: the mana event carries a
+ * seat and a pool, the tap event carries a card, and no key joins the two. */
+const TAPPED: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'green', name: 'Green', life: 40 },
+    { seat: 2, slug: 'other', name: 'Other', life: 40 },
+  ],
+  cards: [
+    { id: 40, name: 'Llanowar Elves', types: 'Creature - Elf Druid', seat: 1,
+      mana: true, makes: ['G'] },
+    { id: 41, name: 'Temple Garden', types: 'Land - Forest Plains', seat: 1,
+      mana: true, makes: ['G', 'W'] },
+    { id: 42, name: 'Birds of Paradise', types: 'Creature - Bird', seat: 1,
+      mana: true, makes: ['B', 'G', 'R', 'U', 'W'] },
+    { id: 43, name: 'Forest', types: 'Basic Land - Forest', seat: 1,
+      mana: true, makes: ['G'] },
+    { id: 44, name: 'Craterhoof Behemoth', types: 'Creature - Beast', seat: 1 },
+    // Held, not played: a card in a hand is not turned for anything.
+    { id: 45, name: 'Birds of Paradise', types: 'Creature - Bird', seat: 1,
+      mana: true, makes: ['B', 'G', 'R', 'U', 'W'] },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 40, zone: 'battlefield', seat: 1, tapped: true, power: 1,
+        toughness: 1 },
+      { id: 41, zone: 'land', seat: 1, tapped: true },
+      { id: 42, zone: 'battlefield', seat: 1, tapped: true, power: 0,
+        toughness: 1 },
+      // Standing untapped, and taps for mana all the same.
+      { id: 43, zone: 'land', seat: 1 },
+      // Turned, and taps for nothing.
+      { id: 44, zone: 'battlefield', seat: 1, tapped: true, power: 5,
+        toughness: 5 },
+      { id: 45, zone: 'hand', seat: 1 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function tapped() {
+  return render(
+    <MatchBoard board={TAPPED} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+/** The one card on the sand with this name. */
+function sand(container: HTMLElement, name: string) {
+  return [...container.querySelectorAll('.field-rows .field-card')]
+    .find((c) => c.getAttribute('title')?.startsWith(name)) as HTMLElement
+}
+
+it('shows a turned mana source what it taps for, and nothing else', () => {
+  const { container } = tapped()
+
+  // The ask (Aaron, 2026-08-26): a mana symbol on a turned mana creature.
+  const elves = sand(container, 'Llanowar Elves')
+  expect(elves, 'the fixture put the Elves on the sand').toBeTruthy()
+  expect(elves.querySelectorAll('.field-card-bead'),
+    'a turned dork wears one bead').toHaveLength(1)
+  // On the arm, so it rides the card round when it turns and comes back level
+  // — the loupe's reason, and the keyword marks'.
+  expect(elves.querySelector('.field-card-bead')
+    ?.closest('.field-card-arm')).toBeTruthy()
+  // The arm is `aria-hidden`, so the card's own title is how anybody not
+  // looking at fifteen-pixel pictures gets this. **"taps for", never "made"**
+  // — the second is a claim about this activation and no such claim exists.
+  expect(elves.getAttribute('title')).toContain('taps for green mana')
+  expect(elves.getAttribute('title')).not.toContain('made')
+
+  // **A turned permanent that taps for nothing wears nothing.** Craterhoof is
+  // sideways because it swung, and the board has never suggested otherwise.
+  const hoof = sand(container, 'Craterhoof Behemoth')
+  expect(hoof.querySelectorAll('.field-card-bead')).toHaveLength(0)
+
+  // **Untapped is untapped**, even on a Forest. The bead is what a *turned*
+  // source is doing, and a standing one is doing nothing.
+  const forest = sand(container, 'Forest')
+  expect(forest, 'the fixture put a Forest in the land row').toBeTruthy()
+  expect(forest.querySelectorAll('.field-card-bead')).toHaveLength(0)
+  expect(forest.getAttribute('title')).not.toContain('taps for')
+
+  // Not in a hand — the same line `inPlay` draws for the loupe and the
+  // keyword marks. Nothing being held is turned for anything.
+  const held = container.querySelector('.field-hand-far .field-card')
+  expect(held, 'the fixture put a card in a hand').toBeTruthy()
+  expect(held?.querySelectorAll('.field-card-bead')).toHaveLength(0)
+})
+
+it('draws one mark for a choice of mana, never a row of them', () => {
+  const { container } = tapped()
+
+  // **`{G}{W}` means two mana and a Temple Garden makes one.** Two pips side
+  // by side would be the board teaching somebody something false about the
+  // card in front of them, so a pair is the official hybrid symbol — Magic's
+  // own way of writing "or" — and it is one mark.
+  const garden = sand(container, 'Temple Garden')
+  const gardenBead = garden.querySelector('.field-card-bead') as HTMLElement
+  expect(gardenBead, 'a turned dual wears a bead').toBeTruthy()
+  expect(gardenBead.querySelectorAll('img, svg'),
+    'one mark for one mana, whatever the choice attached to it')
+    .toHaveLength(1)
+  expect(gardenBead.querySelector('img')?.getAttribute('src'),
+    'the official hybrid, in the spelling the set uses')
+    .toBe('/api/symbols/GW.svg')
+  expect(garden.getAttribute('title')).toContain('taps for green or white mana')
+
+  // Five colours has no official symbol at all — nothing in the set means
+  // "any of these" — so it is the prism, a wedge per colour, and still one
+  // mark rather than five pips.
+  const birds = sand(container, 'Birds of Paradise')
+  const birdsBead = birds.querySelector('.field-card-bead') as HTMLElement
+  expect(birdsBead.querySelectorAll('img'),
+    'no official symbol is asked for, because none exists').toHaveLength(0)
+  expect(birdsBead.querySelectorAll('svg path'),
+    'a wedge for each colour it can make').toHaveLength(5)
+  // What a player would actually say, rather than a list of five.
+  expect(birds.getAttribute('title'))
+    .toContain('taps for mana of any colour')
+})

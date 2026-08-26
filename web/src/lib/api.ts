@@ -709,6 +709,10 @@ export interface ForgeBoardCard {
    *  fact, sent because a board keeps mana rocks back with the lands and
    *  reading rules text in a browser is how that judgement would rot. */
   mana?: boolean
+  /** Which mana this printing taps for, from Scryfall's `produced_mana` and
+   *  gated on the same test `mana` is. **What the card does, never what this
+   *  game's pool received** — nothing on that pipe can say the second thing. */
+  makes?: string[]
   /** Every keyword Scryfall lists for the card, unfiltered — the board draws
    *  the ones it has a sign for and ignores the rest, so adding a sign is a
    *  change to one file in the browser. */

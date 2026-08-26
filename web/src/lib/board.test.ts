@@ -250,7 +250,7 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped = false): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      mana: false, keywords: [], leaving: null, power: null,
+      mana: false, makes: [], keywords: [], leaving: null, power: null,
       toughness: null, counters: [], counterHistory: [], combat: '',
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
       live: [], granted: [], fate: '', copiedBy: 0,
@@ -270,7 +270,7 @@ describe('the board at a moment', () => {
     const forest = (id: number, tapped: boolean): BoardCard => ({
       id, name: 'Forest', token: false, types: 'Basic Land - Forest',
       image: '', art: '', artist: '', zone: 'land', seat: 1, tapped,
-      mana: false, keywords: [], leaving: null, power: null,
+      mana: false, makes: [], keywords: [], leaving: null, power: null,
       toughness: null, counters: [], counterHistory: [], combat: '',
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
       live: [], granted: [], fate: '', copiedBy: 0,
@@ -289,7 +289,8 @@ describe('the board at a moment', () => {
     const cat = (id: number, over: Partial<BoardCard> = {}): BoardCard => ({
       id, name: 'Cat Token', token: true, types: 'Creature - Cat',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
-      tapped: false, mana: false, keywords: [], leaving: null, power: 1,
+      tapped: false, mana: false, makes: [], keywords: [], leaving: null,
+      power: 1,
       toughness: 1, counters: [], counterHistory: [], combat: '',
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
       live: [], granted: [], fate: '', copiedBy: 0,
@@ -788,7 +789,8 @@ describe('the fight', () => {
     const saproling = (id: number, combat: string): BoardCard => ({
       id, name: 'Saproling Token', token: true, types: 'Creature - Saproling',
       image: '', art: '', artist: '', zone: 'battlefield', seat: 1,
-      tapped: false, mana: false, keywords: [], leaving: null, power: 1,
+      tapped: false, mana: false, makes: [], keywords: [], leaving: null,
+      power: 1,
       toughness: 1, counters: [], counterHistory: [], combat,
       attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
       live: [], granted: [], fate: '', copiedBy: 0,

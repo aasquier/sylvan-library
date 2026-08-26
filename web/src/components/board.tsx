@@ -55,6 +55,8 @@ import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { CrownGlyph, HandFanGlyph, HornGlyph, ThroneGlyph } from './glyphs'
 import { KeywordMarks } from './keywords'
+import { ManaProduced } from './manasymbol'
+import { COLOR_VAR, producedColors, producedName } from '../lib/mtg'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import ensisArt from '../assets/coliseum/ensis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
@@ -548,6 +550,16 @@ function FieldCard({ card, count, inPlay = false }: {
   // them on a creature that is about to die is exactly the thing somebody is
   // reading the board to find.
   const counters = card.counters.filter((c) => c.n !== 0)
+  // **What a turned permanent taps for**, and only while it is turned.
+  //
+  // Derived entirely from state a fold already settled — tapped, and what the
+  // printing produces — so it can never accumulate, leak between cards, or
+  // survive a scrub back past the tap. There is nothing here to clean up
+  // because there is nothing here that is remembered.
+  //
+  // Not on a card in a hand, for `inPlay`'s reason: a card that is not on the
+  // battlefield is not tapped for anything.
+  const makes = inPlay && card.tapped ? producedColors(card.makes) : []
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
@@ -559,6 +571,10 @@ function FieldCard({ card, count, inPlay = false }: {
     stats,
     counters.map((c) => `${c.n} ${c.kind}`).join(', '),
     card.tapped ? 'tapped' : '',
+    // **"taps for", not "made".** The bead is a fact about the printing shown
+    // while the permanent is turned — see `BoardCard.makes`. A creature can be
+    // turned because it attacked, and this sentence stays true when it was.
+    makes.length ? `taps for ${producedName(makes)}` : '',
     inPlay ? drawableKeywords(card.keywords).join(', ') : '',
     card.artist ? `art by ${card.artist}` : '',
   ].filter(Boolean).join(' · ')
@@ -721,6 +737,47 @@ function FieldCard({ card, count, inPlay = false }: {
                   : undefined}>
             <span className="field-card-lens-glass" />
             <span className="field-card-lens-pt tabular">{stats}</span>
+          </span>
+        )}
+        {/* **The bead: what this turned permanent taps for.**
+
+            A board of forty cards showed a Llanowar Elves lying sideways and
+            said nothing about why (Aaron, 2026-08-26: *"I would like a mana
+            symbol to appear in mana dorks tapped for mana"*). A tapped card is
+            the most legible state on this table and the least informative one:
+            turned is turned, whether it swung, blocked or paid for something.
+
+            **What it claims, exactly.** This permanent is turned, and this
+            permanent taps for {'{'}G{'}'}. It does *not* claim this activation
+            filled anybody's pool — nothing on the wire can say that, and ADR
+            44 is clear that the board holds state and never a guess. The
+            source of a mana is erased before the board ever sees it: the mana
+            event carries a seat and a pool, the tap event carries a card, and
+            no key joins them. So the honest sentence is the one about the
+            printing, which is true whatever the card was turned for — and on
+            a real board a turned mana creature nearly always did just tap for
+            it, which is why the mark is worth drawing at all.
+
+            The right edge, because it is the only side of a 58px card that is
+            still free, and because it makes a system out of what was going to
+            be a leftover: **the left edge is what the card does in a fight**
+            (the keyword marks), **the right edge is what it pays for.** Clear
+            of the count above it and the loupe below it, at every count of
+            both. */}
+        {makes.length > 0 && (
+          <span className="field-card-bead"
+                title={`taps for ${producedName(makes)}`}
+                // The aura takes the mana's own colour when there is one to
+                // take. Three or more has no colour to be, so it falls to the
+                // brass this room is trimmed in rather than picking a winner
+                // out of five. A custom property and not a `style` on the glow
+                // itself, so the `:hover` and the breath can still reach it.
+                style={makes.length <= 2 && makes[0]
+                  ? ({ '--bead-glow': COLOR_VAR[makes[0]] } as CSSProperties)
+                  : undefined}>
+            <span className="field-card-bead-mark">
+              <ManaProduced colors={makes} size={15} />
+            </span>
           </span>
         )}
         {count > 1 && (

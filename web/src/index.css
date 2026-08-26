@@ -8115,6 +8115,9 @@ button:hover .tarot-fan-card {
 .field-card-counters { transform-origin: 0 100%; }
 .field-card-lens { transform-origin: 100% 100%; }
 .field-keywords { transform-origin: 0 0; }
+/* Anchored to the right edge and offset from the top, so its own top-right
+   corner is the corner that must not move. */
+.field-card-bead { transform-origin: 100% 0; }
 
 /* ------------------------------------------------- what the card can do
  *
@@ -8342,6 +8345,92 @@ button:hover .tarot-fan-card {
   background: #e2736a;
   color: #1c0503;
 }
+
+/* ------------------------------------------------ the bead of mana
+ *
+ * **A turned permanent is the most legible state on this table and the least
+ * informative one.** Forty cards on the sand, eight of them lying sideways, and
+ * nothing saying why any of them is — turned is turned, whether it swung,
+ * blocked, or paid for the thing that just resolved (Aaron, 2026-08-26: *"I
+ * would like a mana symbol to appear in mana dorks tapped for mana"*).
+ *
+ * So a bead of mana rides a turned permanent that taps for mana, and it says
+ * **what the card taps for** — never that this turn's pool came from it.
+ * `board.tsx` argues that distinction where the mark is built and
+ * `BoardCard.makes` argues why the honest sentence is the only one available:
+ * the source of a mana is gone before this board ever sees it.
+ *
+ * **Placement makes a system out of the last free edge.** The left edge is what
+ * the card does in a fight — the keyword marks run down it. The right edge is
+ * what it pays for. Nineteen pixels down clears the count above it at any
+ * count, and the loupe below it starts at fifty-five, so the two never meet on
+ * a card carrying both.
+ *
+ * It is drawn only while the card is turned, which means it is only ever drawn
+ * inside `.field-card-arm`'s rotation — carried round to the card's own right
+ * edge and turned back to level, for the loupe's reason: a symbol at forty-five
+ * degrees is a symbol somebody has to tilt their head at. */
+.field-card-bead {
+  position: absolute;
+  right: 1px;
+  top: 19px;
+  z-index: 2;
+  line-height: 0;
+}
+/* The coin. It wells up out of the card once and then simply stays, which is
+   what makes it safe on a scrub: the element exists exactly while the fold
+   says the card is turned, so there is nothing to expire and nothing to pile
+   up when six lands tap in one beat.
+ *
+ * `backwards` rather than `both` on purpose — under `both` the animation's end
+ * state keeps owning `transform` forever and the hover below silently does
+ * nothing. */
+.field-card-bead-mark {
+  position: relative;
+  display: block;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.62);
+  animation: field-bead-wells 480ms cubic-bezier(0.18, 0.9, 0.28, 1.06)
+    backwards;
+  transition: transform 200ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+/* The mana around it, breathing. Its own layer with only `opacity` and
+   `transform` moving, because forty of these animating a `box-shadow` is forty
+   repaints a frame and this room already asks a lot of a laptop. */
+.field-card-bead-mark::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    var(--bead-glow, var(--field-brass)) 0%, transparent 68%);
+  pointer-events: none;
+  animation: field-bead-breathes 3.6s ease-in-out infinite;
+}
+/* Answers the hand, like the loupe beside it. */
+.field-card:hover .field-card-bead-mark,
+.field-card:focus-visible .field-card-bead-mark {
+  transform: scale(1.18);
+}
+@keyframes field-bead-wells {
+  from { opacity: 0; transform: translateY(4px) scale(0.35); }
+  62% { opacity: 1; transform: translateY(-1px) scale(1.12); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes field-bead-breathes {
+  0%, 100% { opacity: 0.34; transform: scale(0.9); }
+  50% { opacity: 0.66; transform: scale(1.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The bead is information, so it stays; only the welling and the breath go.
+     The aura settles at the middle of its own range rather than at either end,
+     which is where it spends most of its time anyway. */
+  .field-card-bead-mark { animation: none; }
+  .field-card-bead-mark::before { animation: none; opacity: 0.5; }
+  .field-card:hover .field-card-bead-mark,
+  .field-card:focus-visible .field-card-bead-mark { transform: none; }
+}
+
 /* ------------------------------------------------- what the beat just did
  *
  * Three marks, drawn on the card the sentence is about. The room drains beats

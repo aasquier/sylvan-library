@@ -382,6 +382,19 @@ type forgeBoardCard struct {
 	// that becomes is the browser's business; whether Sol Ring makes mana is
 	// the pool's.
 	Mana bool `json:"mana,omitempty"`
+	// Makes is which mana this printing taps for -- Scryfall's
+	// `produced_mana`, gated on the same [pool.CardRecord.MakesMana] test
+	// `Mana` is, so a Food engine that has never made a mana in its life does
+	// not report five colours here either.
+	//
+	// **It is what the card taps for, never what this game's pool received.**
+	// Forge's `GameEventManaPool` carries a player, a mode and a colour set,
+	// and no source of any kind; the tap event carries a card and no mana. The
+	// two facts arrive on separate lines with no key between them, so nothing
+	// on this pipe can say *this permanent* filled the pool (ADR 44, ADR 45).
+	// A board drawing this beside a tapped permanent is stating a fact about
+	// the printing, which is true whatever the permanent was tapped for.
+	Makes []string `json:"makes,omitempty"`
 	// Keywords is Scryfall's list for the card, sent whole rather than
 	// filtered.
 	//
@@ -412,6 +425,7 @@ type boardArt struct {
 	Art      string
 	Artist   string
 	Mana     bool
+	Makes    []string
 	Keywords []string
 }
 
@@ -460,6 +474,24 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 			}
 			for name, rec := range found {
 				art := boardArt{Mana: rec.MakesMana(), Keywords: rec.Keywords}
+				// Only when the card taps for it itself. `produced_mana`
+				// alone would hand Smothering Tithe five colours off its
+				// Treasure's reminder text, and a board is not the place to
+				// repeat that.
+				//
+				// **A land is asked differently, and it has to be.**
+				// `MakesMana` reads the card's rules text with reminder text
+				// stripped — and a basic Forest's *entire* text is reminder
+				// text, `({T}: Add {G}.)`, so it strips to nothing and the
+				// commonest tapped mana source in Magic answers "no". So do
+				// the original duals and every land whose only ability is
+				// printed in parentheses. That has never shown, because the
+				// one thing `Mana` decides is whether an *artifact* stands
+				// with the lands. A land's mana is a land's own, so a land
+				// with a `produced_mana` is taken at its word.
+				if art.Mana || rec.IsLand() {
+					art.Makes = rec.ProducedMana
+				}
 				if rec.ImageNormal != nil {
 					art.Image = *rec.ImageNormal
 				}
@@ -664,7 +696,8 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 			ID: card.ID, Name: card.Name, Token: card.Token,
 			Types: card.Types, Seat: card.Seat, CopiedBy: card.CopiedBy,
 			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
-			Mana: painted.Mana, Keywords: painted.Keywords})
+			Mana: painted.Mana, Makes: painted.Makes,
+			Keywords: painted.Keywords})
 	}
 	out.Steps = grantKeywords(out.Steps, printed)
 	return out

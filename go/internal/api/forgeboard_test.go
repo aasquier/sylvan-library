@@ -214,6 +214,59 @@ func TestAMatchWithNoPoolStillDrawsItsBoard(t *testing.T) {
 	}
 }
 
+func TestOnlyACardThatTapsForManaSaysWhichManaItMakes(t *testing.T) {
+	t.Parallel()
+	a := New(Config{Pool: pooltest.Open(t)})
+	known := map[string]boardArt{}
+	a.resolveBoardArt(context.Background(), []tier3.BoardCard{
+		{ID: 1, Name: "Forest"},
+		{ID: 2, Name: "Sol Ring"},
+		{ID: 3, Name: "Smothering Tithe"},
+		{ID: 4, Name: "Gyome, Master Chef"},
+	}, known)
+
+	// **The case that made this its own rule.** A basic land's whole oracle
+	// text is reminder text, so `MakesMana` strips it to nothing and answers
+	// no — which never showed, because the only thing that answer decides is
+	// whether an artifact stands with the lands. Ask a board what a tapped
+	// Forest taps for and "nothing" is the wrong answer.
+	if got := known["Forest"].Makes; len(got) != 1 || got[0] != "G" {
+		t.Errorf("a Forest taps for %v, want [G] -- a basic land's mana "+
+			"ability is printed entirely in reminder text", got)
+	}
+	if got := known["Sol Ring"].Makes; len(got) != 1 || got[0] != "C" {
+		t.Errorf("Sol Ring taps for %v, want [C] -- colourless is a colour a "+
+			"board has to draw, and an empty list draws nothing", got)
+	}
+	// **The whole reason this is gated on `MakesMana` rather than on the
+	// length of `produced_mana`.** Scryfall reports five colours for
+	// Smothering Tithe, read out of the reminder text on the Treasures it
+	// makes; the enchantment has never produced a mana in its life. A board
+	// that drew a five-colour mark on it would be repeating that off a card
+	// whose own text does not support it.
+	if got := known["Smothering Tithe"].Makes; len(got) != 0 {
+		t.Errorf("Smothering Tithe reported %v, want nothing -- its "+
+			"`produced_mana` belongs to a Treasure it has not made yet", got)
+	}
+	if got := known["Gyome, Master Chef"].Makes; len(got) != 0 {
+		t.Errorf("a card with no mana ability reported %v", got)
+	}
+
+	// And it reaches the wire under the card it belongs to.
+	board := newForgeBoard(&tier3.BoardReel{
+		Seats: []tier3.BoardSeat{{Seat: 1, Name: "Green", Life: 40}},
+		Cards: []tier3.BoardCard{{ID: 9, Name: "Forest", Seat: 1,
+			Types: "Basic Land - Forest"}},
+		Steps: []tier3.BoardStep{{Turn: 1, Seat: 1}},
+	}, map[int]string{1: "green"}, nil, known, 1)
+	if board == nil || len(board.Cards) != 1 {
+		t.Fatalf("the board came back as %+v", board)
+	}
+	if got := board.Cards[0].Makes; len(got) != 1 || got[0] != "G" {
+		t.Errorf("the Forest reached the browser making %v, want [G]", got)
+	}
+}
+
 // The command zone, resolved from the deck.
 //
 // Everything that begins in a command zone looks alike from the stream — a
