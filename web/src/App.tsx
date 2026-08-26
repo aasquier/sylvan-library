@@ -9,6 +9,7 @@ import { SettingsMenu } from './components/settings'
 import { ForestAmbience, HeaderCanopy, LibraryMark } from './components/forest'
 import { LibraryWhisper } from './components/whisper'
 import { api, onSessionLost, type AuthState, type Health } from './lib/api'
+import { useCanopyScroll } from './lib/canopy'
 
 // Route-level code splitting. Library stays eager because it is the landing
 // page — a spinner on first paint would tax every visit to pay for none — and
@@ -147,6 +148,45 @@ function AuthScreen({ theme, onToggleTheme, children }: {
 }
 
 /**
+ * The bar across the top of every route, and — since the 2026-08-26 punch list
+ * — one that gets out of the way.
+ *
+ * It is `sticky`, so it followed the reader down every page and sat on top of
+ * whatever they came to read. Measured at 375x812 that is 201px — a wordmark
+ * row and four wrapped rows of nav — standing over an 812px screen, a quarter
+ * of the phone spent on chrome nobody is looking at. So it folds: scroll down
+ * past the top and it rolls up into the top edge, the same direction and the
+ * same easing the ivy underneath it has always used, so the two read as one
+ * thing leaving rather than two.
+ *
+ * Scrolling *up* brings it straight back, wherever you are on the page. That
+ * is the half that matters: a bar you could only recover by travelling all the
+ * way back to the top would be a trap, and it is the reason this pattern gets
+ * a bad name when it gets one. `lib/canopy.ts` owns the thresholds, the dead
+ * zone that keeps a trackpad from flickering it, and the single listener the
+ * ivy reads too.
+ *
+ * Two things it deliberately does not do. It does not leave the flow — a
+ * transform moves no layout, so the page underneath never jumps, and
+ * `.page-main`'s padding stays keyed to the ivy alone. And it does not go
+ * anywhere the keyboard cannot follow: `:focus-within` in `index.css` unfolds
+ * it the instant a Tab lands inside, because a focused link nobody can see is
+ * worse than a bar that overstayed.
+ *
+ * `children` comes from the caller's render, so a fold re-renders this bar and
+ * nothing else: the nav links, the settings menu and the ivy are all
+ * reference-identical elements React skips straight over.
+ */
+function SiteHeader({ children }: { children: React.ReactNode }) {
+  const { furled } = useCanopyScroll()
+  return (
+    <header className={`site-header sticky top-0 z-40${furled ? ' is-furled' : ''}`}>
+      {children}
+    </header>
+  )
+}
+
+/**
  * The app, with a gate in front of it that only exists on an instance that
  * asked for one.
  *
@@ -266,11 +306,7 @@ export default function App() {
           covers this layer and the forest shows through the gaps — which is
           how a firefly gets to pass *behind* a card. */}
       <ForestAmbience />
-      <header className="sticky top-0 z-40 backdrop-blur"
-              style={{
-                background: 'color-mix(in srgb, var(--page) 88%, transparent)',
-                borderBottom: '1px solid var(--hairline)',
-              }}>
+      <SiteHeader>
         {/* One row on a laptop; two or three on a phone. Below `lg` the nav
             entries cannot share a 375px line with the wordmark and the theme
             button — they used to wrap *inside their own labels* ("Start a
@@ -350,7 +386,7 @@ export default function App() {
         {/* The vine draped along the header's underside. Inside the sticky
             element so it travels with the chrome instead of scrolling away. */}
         <HeaderCanopy />
-      </header>
+      </SiteHeader>
 
       {/* `page-main` carries the top padding, keyed to how far the ivy hangs
           (`--canopy-drop`); `pb-8` is the ordinary bottom. */}

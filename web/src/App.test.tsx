@@ -124,6 +124,61 @@ describe('the nav', () => {
   })
 })
 
+/*
+ * The header's fold (punch list 2026-08-26: "our top menu is awkward, it
+ * really should fold up and disappear like the ivy when we scroll down").
+ *
+ * `lib/canopy.test.ts` holds the arithmetic — thresholds, direction, the dead
+ * zone. What is left for this file is the wiring: that the bar is the thing
+ * wearing the class, and that folding it never costs the keyboard its way in.
+ * That second one is the whole reason the CSS uses a transform and an opacity
+ * instead of `display: none`, and it is the kind of decision a later
+ * "simplification" undoes without any visible symptom.
+ */
+describe('the header fold', () => {
+  const header = () => document.querySelector('header.site-header')
+
+  function scrollTo(y: number) {
+    window.scrollY = y
+    fireEvent.scroll(window)
+  }
+
+  afterEach(() => {
+    window.scrollY = 0
+  })
+
+  it('is open at the top of a page and folds on the way down', async () => {
+    renderApp()
+    await screen.findByRole('link', { name: 'Laboratory' })
+    expect(header()?.className).not.toContain('is-furled')
+
+    scrollTo(600)
+    expect(header()?.className).toContain('is-furled')
+
+    // And comes back on the way up, deep in the page — never only at the top.
+    scrollTo(300)
+    expect(header()?.className).not.toContain('is-furled')
+  })
+
+  it('keeps the nav reachable by keyboard while it is folded', async () => {
+    // A focused link nobody can see is a real bug. The bar leaves on a
+    // transform for exactly this reason: `display: none` and
+    // `visibility: hidden` both take these links out of the tab order, and
+    // then `:focus-within` — which is what brings the bar back — can never
+    // fire, because focus can never get in. So the guard is that a Tab still
+    // lands, folded or not; the unfolding it triggers is CSS, and CSS is
+    // empty in this suite.
+    renderApp()
+    const lab = await screen.findByRole('link', { name: 'Laboratory' })
+
+    scrollTo(600)
+    expect(header()?.className).toContain('is-furled')
+
+    lab.focus()
+    expect(document.activeElement).toBe(lab)
+  })
+})
+
 describe('the ambience switch', () => {
   it('removes the weather layer entirely when opted out', async () => {
     localStorage.setItem('mtglab-ambience', '0')
