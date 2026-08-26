@@ -609,9 +609,12 @@ func TestAPhantomRefusedOnceIsRefusedOnEveryLine(t *testing.T) {
 // as naming them, so the equipped token stopped merging into the bare pile
 // beside it — but it should never have been sent one.
 //
-// Both halves of the disagreement are driven here: a card the dictionary
-// refused *by name* (the scribe writes an empty one for a card it cannot see)
-// and a card it never heard of at all.
+// Both ways the two can disagree are driven here: a card the dictionary
+// refused because the line carried no name — `board.name` takes nothing
+// without one — and a card it never heard of at all. **Which Forge event
+// opens the gap is not measured and does not need to be**: the board's job is
+// to survive the disagreement, not to know which line caused it, and guessing
+// at a Forge behaviour to justify a test would be the guess ADR 44 forbids.
 func TestAnAttachmentTheDictionaryNeverNamedIsNotDrawn(t *testing.T) {
 	t.Parallel()
 	bear := zoneLine(10, "Grizzly Bears", "Creature - Bear", "Battlefield",
