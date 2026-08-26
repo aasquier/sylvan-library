@@ -59,11 +59,12 @@ import aegisArt from '../assets/coliseum/aegis.webp'
 import ensisArt from '../assets/coliseum/ensis.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
-  foldBoard, stackRow } from '../lib/board'
+  foldBoard, sameCard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
 import { tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
+import { CenterStage } from './stage'
 
 /** One card on the field.
  *
@@ -104,18 +105,6 @@ function counterSign(kind: string): 'up' | 'down' | 'flat' {
  * What a mark no longer does is *end* when its beat does. See [MARK_LIFE].
  */
 type Mark = 'attacks' | 'blocks' | 'dies'
-
-/** Whether a beat's card and a board card are the same card.
- *
- *  Not `===`, and the reason is written down one layer below: Forge names a
- *  **face**, never Scryfall's combined `A // B` (`events.go`, and
- *  `docs/FORGE.md`'s fourth fact). The board's names come from the scribe and
- *  can carry the combined spelling, so a transforming creature would attack,
- *  block and die without a single mark ever landing on it — silently, and only
- *  on the decks that play them. Comparing the front face costs one split. */
-function sameCard(onBoard: string, inBeat: string): boolean {
-  return onBoard === inBeat || onBoard.split(' // ')[0] === inBeat
-}
 
 /** A legend's name as a player says it: the part before the title.
  *
@@ -1696,8 +1685,17 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   const lit = far.seat === state.active ? 'far'
     : near.seat === state.active ? 'near'
     : null
-  const onTurn = lit === 'far' ? name(far.slug, far.name)
-    : lit === 'near' ? name(near.slug, near.name)
+  const farName = name(far.slug, far.name)
+  const nearName = name(near.slug, near.name)
+  const onTurn = lit === 'far' ? farName : lit === 'near' ? nearName : null
+
+  // Which seat the beat being read belongs to. `Coliseum` stages a beat's
+  // `who` through the same shelf this `name` reads, so the two strings are
+  // comparable — and this is only ever a *preference*: the centre stage uses
+  // it to pick the caster's own copy of a card both seats happen to run, and a
+  // miss is a null, which is the other copy of the same picture.
+  const casting = beat?.who === farName ? far.seat
+    : beat?.who === nearName ? near.seat
     : null
 
   return (
@@ -1761,9 +1759,22 @@ export function MatchBoard({ board, shown, game, name, running, beat,
 
       <FieldSide side={near} facing="near" active={lit === 'near'} />
 
-      <FieldHand side={near} facing="near"
-                 name={name(near.slug, near.name)} />
+      <FieldHand side={near} facing="near" name={nearName} />
 
+      {/* **Everything that is cast, and everything that dies.** The board can
+          only draw what stays, and half of Commander never stays — an instant
+          is cast, resolves and is in a graveyard inside one beat, and the sand
+          had nothing to say about any of it (Aaron, 2026-08-26). So the middle
+          of the arena is its own surface: see `stage.tsx`, which owns every
+          decision about what goes there and for how long.
+
+          Inside the field rather than over the whole stage, on purpose — it is
+          clipped to the sand, it is centred on the arena rather than on the
+          arena plus a column of graveyards, and it inherits the marks' own
+          `--mark-life-dies` from `.field-stage`, which is how a death drawn
+          here and the skull on the card in its row stay one event. */}
+      <CenterStage board={board} beat={beat ?? null} speed={speed} game={game}
+                   dies={markLife('dies', speed)} seat={casting} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
                       seek={seek} turns={turns} games={games} playing={playing}
