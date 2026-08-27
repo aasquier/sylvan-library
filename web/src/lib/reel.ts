@@ -60,6 +60,12 @@ export interface StagedBeat {
   /** The card on the other end — the attacker a blocker stepped in front of,
    *  or the permanent an Aura or Equipment was put on. */
   target?: string
+  /** How an arrival reached the battlefield — `'cast'`, `'put'`, or nothing
+   *  said. Carried past the sentence for `card`'s reason: the arena draws a
+   *  scene for the permanent nobody cast, and only the beat knows which
+   *  those are. See `ForgeBeat.entered`, which argues why the missing case is
+   *  a third answer and not a `'put'`. */
+  entered?: string
   /**
    * How many identical beats in a row this one **begins**.
    *

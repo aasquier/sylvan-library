@@ -64,8 +64,8 @@ import ensisArt from '../assets/coliseum/ensis.webp'
 import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
-import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
-  alignLanes, foldBoard, sameCard, stackRow } from '../lib/board'
+import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
+  fightingStats, alignLanes, foldBoard, sameCard, stackRow } from '../lib/board'
 import { keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
@@ -316,6 +316,116 @@ function useHeldMark(card: string | null, mark: Mark | null, key: string,
  *  beat's own identity, and it is what makes the second attack by the same
  *  creature animate again rather than sitting there already-animated. */
 const Struck = createContext<Struckdown | null>(null)
+
+/**
+ * **What an ability was aimed at**, by board id, for the beat being drawn.
+ *
+ * Aaron, 2026-08-27: *"Would be nice if an emminence ability like arahbos
+ * +3/+3 looked like an aura on the bestowed card too."* It was refused twice
+ * for a reason that turned out to be wrong about the bus rather than about the
+ * room — Forge's `StackItemView` had `getTargetCards()` all along and was only
+ * ever asked whether the thing on the stack was a trigger. It says now, so
+ * this draws.
+ *
+ * **Only where the wire names a target, and that is three abilities in four
+ * left blank.** Seventeen of seventy-five in a measured match were aimed at
+ * anything at all: a surveil trigger targets nothing, and Arahbo's *attack*
+ * pump picks the creature it pumps with `Defined$` rather than by targeting
+ * it, so the same commander produces both kinds inside one turn. An effect
+ * drawn per ability would therefore invent three of every four — which is
+ * exactly the shape of the mistake Aaron's own standing ruling guards against
+ * (*"we don't need to say who granted the ability if it is not traceable"*).
+ * Here the target **is** traceable and drawing on it is a fact; that does not
+ * extend one inch further, and nothing here names a giver.
+ *
+ * **A set of ids, not one id.** Nothing measured has ever carried two, and
+ * nothing measured has ever aimed at a player — but the wire is a list, and a
+ * room that read `targets[0]` would lose the second one silently the day
+ * something has one. It is cheap to be right about a case that has not
+ * happened yet.
+ *
+ * A context rather than a prop, for `Struck`'s reason exactly: `FieldCard` is
+ * drawn in five rows through two wrappers.
+ */
+interface Aimedat {
+  /** The board ids this beat's abilities named. Never empty — a beat with no
+   *  targets is a null rather than an empty set, so nothing downstream has to
+   *  know the difference. */
+  at: ReadonlySet<number>
+  /** The step's own identity, so the same commander triggering on two turns
+   *  running plays twice instead of reconciling onto a finished animation. */
+  key: string
+}
+
+const Aimed = createContext<Aimedat | null>(null)
+
+/** Every card this beat's abilities were aimed at, or null.
+ *
+ *  A plain fold over what `foldBoard` already settled — the abilities of the
+ *  last applied step and no others, which is what makes this a moment rather
+ *  than something that accumulates. */
+function aimedAt(abilities: BoardMoment[], key: string): Aimedat | null {
+  const at = new Set<number>()
+  for (const used of abilities) for (const id of used.targets) at.add(id)
+  return at.size ? { at, key } : null
+}
+
+/** How long an aura is seen, in milliseconds.
+ *
+ *  Between the block's 1800 and the attack's 1250, and the reasoning is the
+ *  marks' own: rarer than an attack, and carrying less than a death. It is
+ *  also the one thing on this board that is drawn to explain a *number that
+ *  changed* — the Cat is visibly a 5/5 a beat later — so it has to outlast the
+ *  glance that notices the change and goes looking for a cause.
+ *
+ *  It shares `MARK_BEATS` and `MARK_FLOOR` rather than declaring its own,
+ *  because the question those two answer is about the transport and not about
+ *  the mark: a reading speed is not a reason to hold a glow for six seconds,
+ *  and a fast one is not a reason to reduce it to a flicker. */
+const AIM_LIFE = 1500
+
+function aimLife(speed: Speed): number {
+  const beat = beatDelay(speed)
+  if (beat === 0) return AIM_LIFE
+  return Math.max(MARK_FLOOR, Math.min(AIM_LIFE, beat * MARK_BEATS))
+}
+
+/** Hold an aura for its own length rather than for its beat's.
+ *
+ *  `useHeldMark` with one slot and one value, and every line of it is that
+ *  function's: it cannot pile up because it holds one value, it clears every
+ *  timeout from the effect that set it, it drops what it is holding at a game
+ *  boundary rather than letting it time out across one, and it raises during
+ *  the render so the glow and the sentence that caused it reach the screen on
+ *  the same commit.
+ *
+ *  Two hooks rather than one shared with the mark, because they are two
+ *  different facts about the beat and they land on different cards: Arahbo
+ *  triggering is an ability on the *Cat*, and the mark for that beat may be a
+ *  sword on something else entirely. */
+function useHeldAim(raised: Aimedat | null, key: string, speed: Speed,
+  game: number): Aimedat | null {
+  const [held, setHeld] = useState<Aimedat | null>(null)
+  const [wasGame, setWasGame] = useState(game)
+  const [wasKey, setWasKey] = useState<string | null>(null)
+  if (game !== wasGame) {
+    setWasGame(game)
+    setWasKey(key)
+    setHeld(raised)
+  } else if (key !== wasKey) {
+    setWasKey(key)
+    // A step with nothing aimed leaves whatever is up alone to finish its own
+    // life, exactly as a silent beat leaves a mark alone.
+    if (raised) setHeld(raised)
+  }
+  useEffect(() => {
+    if (!held) return
+    const done = window.setTimeout(() => setHeld(null),
+      aimLife(speed) + MARK_TAIL)
+    return () => { window.clearTimeout(done) }
+  }, [held, speed])
+  return held
+}
 
 /** The paintings the board's own zones are dressed in, by zone key.
  *
@@ -726,6 +836,19 @@ function FieldCard({ card, count, inPlay = false }: {
   // Two copies of one name is a token or a basic; marking both is a better
   // wrong answer than marking neither, and in a singleton format it is rare.
   const mark = struck && sameCard(card.name, struck.card) ? struck : null
+  // **Matched on the id, which is the whole reason this is drawable.** A beat
+  // names a card and two Egg Tokens are one name between them; an ability
+  // names the board's own id, so the glow lands on the creature that was
+  // actually aimed at and never on its twin.
+  //
+  // Only on the battlefield, for `inPlay`'s reason one field up: a card in a
+  // hand is overlapped to a 27-pixel strip belonging to the card in front of
+  // it, and a nimbus drawn on that is a smear across its neighbour. An ability
+  // aimed at something in a graveyard therefore draws nothing, which is the
+  // same silence this board already keeps about everything it cannot show
+  // cleanly.
+  const aimed = useContext(Aimed)
+  const aura = inPlay && aimed?.at.has(card.id) ? aimed : null
   // `!== 0` rather than `> 0`: a -1/-1 counter is a counter, and the pile of
   // them on a creature that is about to die is exactly the thing somebody is
   // reading the board to find.
@@ -1084,6 +1207,26 @@ function FieldCard({ card, count, inPlay = false }: {
           </span>
         )}
       </div>
+      {/* **The aura.** Under the marks and over everything else, because a
+          creature can be given +3/+3 and swing in the same turn: the sword is
+          the sentence being spoken, and this is the reason the numbers on the
+          card changed. Keyed on the step for the marks' reason below — a
+          commander triggering on two turns running has to play twice.
+
+          It says *this one was aimed at* and nothing more — no name, no
+          amount, no giver. The amount is already on the card, because power
+          and toughness on this wire are live and the Cat is visibly a 5/5 the
+          moment it lands; what was missing was any way to see *which* cat, and
+          that is the whole of what this adds. Forge erases the giver
+          completely (`BoardCard.granted` documents the same hole), so a room
+          that drew a line back to the commander would be inventing the one
+          fact nobody has. */}
+      {aura && (
+        <span key={aura.key} className="field-aura" aria-hidden="true">
+          <span className="field-aura-ring" />
+          <span className="field-aura-sweep" />
+        </span>
+      )}
       {/* **The marks.** Keyed on the beat so the same creature attacking twice
           plays twice — without it React keeps the element and the animation,
           having already run, never runs again.
@@ -2608,6 +2751,19 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // beat describes and not on the one before it. See `useHeldMark`.
   const struck = speed === 'paused' ? live : held
 
+  // **What the beat's abilities were aimed at**, held for its own length for
+  // the mark's reason and given back to the step while paused for the mark's
+  // other one: a scrub must land on the board its beat describes.
+  //
+  // Keyed on `shown` rather than on the beat, because this rides the *step* —
+  // `foldBoard` publishes the abilities of the last applied step and no
+  // others, and dragging the scrubber moves that while the beat under the
+  // pointer may not change at all. The same key `CenterStage` uses for mana,
+  // for the same reason.
+  const aiming = aimedAt(state.abilities, `${shown}`)
+  const heldAim = useHeldAim(aiming, `${shown}`, speed, game)
+  const aimed = speed === 'paused' ? aiming : heldAim
+
   // How long each mark is watched, handed to the stylesheet rather than
   // written down there a second time. It rides `.field-stage` because that is
   // the one box containing both the arena and the zones beside it, and the
@@ -2659,6 +2815,11 @@ export function MatchBoard({ board, shown, game, name, running, beat,
     '--mark-life-spent': `${markLife('spent', speed)}ms`,
     '--mark-life-eaten': `${markLife('eaten', speed)}ms`,
     '--mark-life-cracked': `${markLife('cracked', speed)}ms`,
+    /* The aura's own clock, beside the marks' and for the same reason: one
+       number is both the animation's duration and the element's life in the
+       tree, handed to the stylesheet rather than written down there a second
+       time. */
+    '--aim-life': `${aimLife(speed)}ms`,
   } as CSSProperties
 
   if (!board || !far || !near) {
@@ -2700,6 +2861,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   return (
     <Dressing.Provider value={dressing}>
     <Struck.Provider value={struck}>
+    <Aimed.Provider value={aimed}>
     {/* **The stage, which is now the arena and nothing else.**
 
         It held two things: the field, and a stone band of zones under it. The
@@ -2805,6 +2967,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                       chooseGame={chooseGame} />
     </section>
     </div>
+    </Aimed.Provider>
     </Struck.Provider>
     </Dressing.Provider>
   )

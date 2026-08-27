@@ -1,0 +1,156 @@
+# The field a creature arrives on when nothing cast it.
+#
+# Aaron, 2026-08-27, in the same breath as the crypt: *"Same thing for 'Enters
+# the Battelfield', we should be able to find something cool. A free use
+# painting or picture of a battle before us, like down in a valley or something
+# stylized like our exile one?"* The token half of that ask was already
+# answered — a conjured token gets the middle of the arena. This is the other
+# half, and it waited on the wire rather than on a picture: until the scribe
+# could say **whether a permanent was cast or put there**, an arrival scene
+# would have fired on every creature anybody paid for, which is the resolve
+# drawn twice. It can say now, so this is drawable now.
+#
+# **A painting, and that is the one place this room cannot have the thing
+# itself.** The exile road is a photograph because the Via Appia is still
+# there to stand on; the death vault is a photograph because the Vigna Codini
+# columbaria are still there to walk into. A battle of antiquity is the one
+# subject in this arena that nobody can go and photograph — it is two thousand
+# years gone, and the only honest object left is a picture somebody made of it.
+# So this is not the concession `crypta.recipe.yaml` refused to make (*"about a
+# picture of the idea rather than being the thing"*); the picture **is** the
+# surviving thing. It is also what Aaron asked for, in the word he used first.
+#
+# **Jan Brueghel the Elder, `The Battle of Issus`, 1602, in the Louvre.** You
+# stand on a rise at the near edge of a fight and the whole of it is laid out
+# below and away: cavalry locked in the foreground, a camp with its tents in
+# the middle distance, and then the far host dissolving into haze at the foot
+# of wooded hills. That is Aaron's sentence almost word for word — a battle
+# before us, down in a valley — and it is the composition the two scenes
+# beside it already taught this room to look for. `via.recipe.yaml` learned
+# that a road photographed *across* the frame gives the animation nowhere to
+# go; `crypta.recipe.yaml` learned the same thing about a chamber shot
+# square-on. A battle painted as a frieze would have been that mistake a third
+# time. This one recedes.
+#
+# **It is not Roman, and that was the argument this file had to have.** The
+# arena's other marks are Roman to the letter and two of them are on one road.
+# Three things settled it the other way. The first is above: there is no
+# photograph of an ancient battle, so the register break happens the moment
+# the subject is chosen, whoever painted it. The second is that the surviving
+# *Roman* battle pictures are the wrong shape — a sarcophagus relief is a wall
+# of bodies with no distance in it, and a funerary object is the crypt's
+# furniture, not an arrival's. The third is what the mechanic is: a permanent
+# put onto the battlefield did not come from anywhere this room has been. It
+# appears in a fight already under way, and the one scene in the arena that is
+# **not** the Appian Way is the right one to open for it.
+#
+# Three real candidates were fetched and looked at rather than reasoned about,
+# which is how the last two of these were decided:
+#
+# - **Giulio Romano's `Battle of the Milvian Bridge`** (Vatican, 4433x1858,
+#   public domain) is the Roman answer and it is unusable. It carries flying
+#   angels and a cross-standard across the top third — Constantine's vision,
+#   which is the whole subject — and a Christian miracle behind a Magic card is
+#   a worse register break than a Flemish brush. It also has no valley: the
+#   fight is frontal and foreground, and the fresco's own plaster cracks read
+#   as damage at this size.
+# - **Altdorfer's `Alexanderschlacht`** (Alte Pinakothek, 4592x6000, public
+#   domain) is the more famous bird's-eye battle and it is a portrait panel
+#   whose upper two thirds are the sky it is famous for. Cropping to the band
+#   this needs throws that away and keeps the half that is a dense grey mass of
+#   16th-century pike and plate. Taking the sky off the Alexanderschlacht to
+#   get a decoration is not a trade worth making.
+# - **The Anghiari Master's `Battle of Zama`** (Minneapolis, 6876x2031) is
+#   Roman by subject, beautifully wide, and a flat quattrocento cassone panel
+#   with its gilt frame in the scan. At 620 pixels the figures stop being
+#   figures and it reads as a strip of gold and red ornament — decoration
+#   rather than a place, which is the thing commandment 5 is about.
+#
+# **The crop is the picture's lower two thirds and the sky is what goes.** The
+# same cut `via.recipe.yaml` made and for the same reason: the card travels on
+# the ground, and the top quarter of this painting is bright Flemish sky and
+# treetops, which is both useless to the animation and the brightest thing in
+# a frame that has to sit inside a gold arena. What is left runs from the
+# wooded hillside and the hazy far valley across the top, through the tents and
+# the massed host, down into the cavalry. The bottom tenth goes too, and that
+# is a different call: the foreground there is fallen men at close to full
+# size, and commandment 2 does not want a newcomer's first uncast arrival drawn
+# over a heap of bodies.
+#
+# **No key, no duotone, no levels — crop and resize and nothing else**, which
+# is the restraint every picture in this directory keeps. The stylesheet lays
+# its own dust and its own dusk over this, and a tint baked into the byte
+# stream is a decision `index.css` can no longer argue with.
+animist: 1
+
+why_committed: >
+  The same argument as the road and the vault beside it. This is drawn on the
+  beat that says a permanent arrived uncast and it is gone about a second and a
+  half later, so fetching it from somebody else's host would mean a battlefield
+  that opens after the creature standing on it has already faded. The licence
+  is the second reason: this is a PD-Art photographic reproduction uploaded by
+  an individual contributor, which is the category where somebody else's copy
+  quietly moves or changes terms -- a copy confirmed once and committed is a
+  copy whose provenance stays true.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the
+  # API, with `AttributionRequired` explicitly false. Two independent grounds
+  # in the file's own permission block: Brueghel died in 1625, so the work is
+  # out of copyright everywhere the term is life plus 100 or fewer, and the
+  # photograph of it is a faithful reproduction of a two-dimensional public
+  # domain work. A term expiry rather than a dedication, which is the reason to
+  # re-confirm it on every build rather than trust this comment.
+  campus:
+    provider: wikimedia
+    title: "La Bataille d'Issus - Jan Brueghel l'Ancien - Musée du Louvre Peintures INV 1094 ; MR 596.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:La_Bataille_d%27Issus_-_Jan_Brueghel_l%27Ancien_-_Mus%C3%A9e_du_Louvre_Peintures_INV_1094_;_MR_596.jpg
+    found_via: >
+      Commons, searching `Brueghel Battle of Issus` after `Battle of the
+      Milvian Bridge Giulio Romano` and `Battle of Zama` had been fetched and
+      rejected on sight. Every unrestricted phrasing -- `battle in a valley
+      landscape painting armies`, `bird's eye battle`, `Roman battle
+      landscape` -- returns nothing but scanned art-history books and auction
+      catalogues, which is the trap `lens.recipe.yaml` records; the searches
+      that work are the ones that name a painter and a battle. This is the
+      Louvre's own panel at 11022x6994, and the only one of the four
+      candidates that is both a valley and a landscape band -- the Altdorfer
+      is a valley in a portrait panel, and the other two are friezes.
+    licence: Public domain
+
+outputs:
+  # 720 wide, which is the widest picture in this directory and the cheapest
+  # per pixel, and both of those are facts about the subject rather than a
+  # relaxation of anybody's budget.
+  #
+  # **It needs the width because it is figures.** The road could be
+  # under-sampled -- it is foliage, and nobody was ever going to count the
+  # needles on a pine. Here the whole reading is *those are men and horses and
+  # banners*, and the moment a rider stops being a rider the picture is a smear
+  # of colour behind a card. At 720 into a band drawn at up to 1040 the
+  # enlargement is 1.44x, against the road's 1.75x and the vault's 1.46x.
+  #
+  # **And it costs almost nothing, which was the surprise.** `animist measure`
+  # walked 400 to 800 in fifties: 14.5 KB at 400, 24.5 at 550, 33.1 at 650,
+  # 46.1 at 800. It called the knee at 550 and the curve is nearly a straight
+  # line, so that number is the tool's arithmetic rather than a fact about this
+  # painting -- the same non-answer the vault's curve gave. What the numbers do
+  # say is that the whole range is affordable: 720 lands around 39 KB, which is
+  # *under* the road's 36.5 and the vault's 49.9 at half again their linear
+  # size. A 300-year-old oil panel photographed under gallery light is soft
+  # everywhere; there is no hard edge in it for a codec to spend bytes on.
+  #
+  # Quality 78, between the road's 74 and the mosaic's 82, and for both of
+  # their reasons at once: this has the mosaic's hard little edges everywhere
+  # and the road's excuse -- it is behind a card, moving, for a second and a
+  # half.
+  - file: campus.webp
+    from: campus
+    ops:
+      # Sky and treetops off the top, fallen bodies off the bottom. Both
+      # arguments are in the header; the numbers were fitted by cropping the
+      # Commons thumbnail at three heights and looking at all three.
+      - crop: {frac_box: [0.0, 0.26, 1.0, 0.90]}
+      - resize: {width: 720}
+    encode: {format: webp, quality: 78}
+    expect: {width: 720, height: 292, budget_kb: 60, metadata: none}

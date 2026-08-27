@@ -2550,3 +2550,89 @@ it('takes the weight when the price goes up, and not when it comes back down',
     expect(chip().className, 'a price walked back announces nothing')
       .not.toContain('is-risen')
   })
+
+/** A board where a commander in the command zone triggers at a named cat.
+ *
+ *  Two Cats with the same *name* on purpose: an eminence trigger names a board
+ *  id, and matching on a name would light both of them. In a singleton format
+ *  two copies of a name is a token or a basic — and Arahbo's deck makes Cat
+ *  tokens, so this is the ordinary case rather than a contrived one. */
+const AIMED: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40,
+      commanders: [1] },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 1, name: 'Arahbo, Roar of the World',
+      types: 'Legendary Creature - Cat Avatar', seat: 1 },
+    { id: 30, name: 'Cat Token', types: 'Creature - Cat', token: true,
+      seat: 1 },
+    { id: 31, name: 'Cat Token', types: 'Creature - Cat', token: true,
+      seat: 1 },
+    { id: 32, name: 'Fleecemane Lion', types: 'Creature - Cat', seat: 1 },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 30, zone: 'battlefield', seat: 1, power: 2, toughness: 2 },
+      { id: 31, zone: 'battlefield', seat: 1, power: 2, toughness: 2 },
+      { id: 32, zone: 'hand', seat: 1 },
+    ] },
+    // The trigger, aimed at exactly one of the two.
+    { turn: 1, seat: 1, abilities: [
+      { id: 1, seat: 1, zone: 'Command', trigger: true, targets: [31] }],
+      changes: [{ id: 31, power: 5, toughness: 5 }] },
+    // ...and a later step with an ability that names nothing, which is three
+    // abilities in four.
+    { turn: 2, seat: 1, abilities: [
+      { id: 1, seat: 1, zone: 'Command', trigger: true }] },
+  ],
+} as unknown as ForgeBoard
+
+it('draws an aura on the creature an ability was aimed at, and on no other',
+  () => {
+    // Aaron, 2026-08-27: *"Would be nice if an emminence ability like arahbos
+    // +3/+3 looked like an aura on the bestowed card too."*
+    //
+    // **The card already told half the truth.** Power and toughness on this
+    // wire are live, so the Cat is visibly a 5/5 on the beat it happens — the
+    // number changes in front of you and nothing says which of the Cats it
+    // was, or why. This is the other half.
+    //
+    // jsdom has no layout engine, so whether the nimbus reads as an
+    // enchantment is Aaron's walk. What is held here is *which card it lands
+    // on*, which is the half with a wrong answer available: matching on the
+    // name would light both Cats, and there are two.
+    const at = (shown: number) => (
+      <MatchBoard board={AIMED} shown={shown} game={1} running={false}
+                  name={(_slug, fallback) => fallback}
+                  speed="paused" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                  games={[1]} playing={1} chooseGame={vi.fn()} />)
+    const { container, rerender } = render(at(2))
+
+    const lit = [...container.querySelectorAll('.field-card')]
+      .filter((el) => el.querySelector('.field-aura'))
+    expect(lit, 'one ability, one target, one aura').toHaveLength(1)
+    expect(lit[0]?.querySelector('.field-card-plate')?.textContent)
+      .toBe('Cat Token')
+    // The one that got bigger, and not its twin. The loupe prints the *live*
+    // pair, so this is the card whose numbers moved — which is the half of
+    // this that already worked and the half the aura exists to explain.
+    expect(lit[0]?.querySelector('.field-card-lens-pt')?.textContent)
+      .toBe('5/5')
+
+    // **A step whose abilities name nothing draws nothing.** Three abilities
+    // in four are aimed at nothing at all — a surveil trigger targets nothing,
+    // and Arahbo's *attack* pump picks its creature with `Defined$` rather
+    // than by targeting it, so the same commander produces both kinds. A room
+    // that drew per ability would invent three of every four.
+    rerender(at(3))
+    expect(container.querySelectorAll('.field-aura'),
+      'an ability aimed at nothing is not an aura on everything')
+      .toHaveLength(0)
+
+    // ...and a step before any ability has been used draws nothing either,
+    // which is what makes this a moment rather than something that piles up.
+    rerender(at(1))
+    expect(container.querySelectorAll('.field-aura')).toHaveLength(0)
+  })

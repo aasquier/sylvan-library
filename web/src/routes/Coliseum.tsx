@@ -1133,7 +1133,10 @@ export default function ColiseumRoom() {
           // Carried alongside the sentence rather than dug back out of it:
           // the board marks the card a beat names, and Forge already said
           // which one.
-          card: beat.card, target: beat.target,
+          // ...and how a permanent arrived, for the same reason: the arena
+          // opens a battlefield under a creature nothing cast, and this beat
+          // is the only place that fact is said.
+          card: beat.card, target: beat.target, entered: beat.entered,
         }
       }),
     }

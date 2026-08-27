@@ -847,9 +847,41 @@ describe('what a beat says beyond where the cards are', () => {
       { changes: [{ id: 11, zone: 'land', seat: 1 }] },
     ])
     expect(foldBoard(b, 1).abilities).toEqual([
-      { id: 10, seat: 1, zone: 'Command', trigger: true },
+      { id: 10, seat: 1, zone: 'Command', trigger: true, targets: [] },
     ])
     expect(foldBoard(b, 2).abilities).toEqual([])
+  })
+
+  it('carries what an ability was aimed at, and an empty list when it was '
+    + 'aimed at nothing', () => {
+    // **This fold is a rewrite and not a widening**, which is exactly how
+    // `targets` reached a browser that could not see it: the server had been
+    // sending it since the scribe learned to ask, and the `.map()` that
+    // rebuilds each ability simply did not name the field. Nothing failed.
+    //
+    // The empty case is not a gap — three abilities in four are aimed at
+    // nothing at all, because Forge's own pump effects pick their creature by
+    // definition rather than by targeting it. A room drawing per ability
+    // would invent three of every four; a room drawing per target says what it
+    // was told.
+    const b = board([
+      { abilities: [
+        { id: 10, seat: 1, zone: 'Command', trigger: true, targets: [20] },
+        { id: 11, seat: 1, zone: 'Battlefield', trigger: false },
+      ] },
+    ])
+    expect(foldBoard(b, 1).abilities).toEqual([
+      { id: 10, seat: 1, zone: 'Command', trigger: true, targets: [20] },
+      { id: 11, seat: 1, zone: 'Battlefield', trigger: false, targets: [] },
+    ])
+
+    // A list rather than an id, because the wire is one. Nothing measured has
+    // ever carried two — but a room reading `targets[0]` would lose the
+    // second one silently the day something does.
+    const two = board([
+      { abilities: [{ id: 10, seat: 1, targets: [12, 20] }] },
+    ])
+    expect(foldBoard(two, 1).abilities[0]?.targets).toEqual([12, 20])
   })
 
   it('takes a granted keyword and an empty set as different answers', () => {

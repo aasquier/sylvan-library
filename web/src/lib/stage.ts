@@ -8,8 +8,9 @@
  * stays (Aaron, 2026-08-26: *"there is nothing to mark their existence in the
  * coliseum"*). So every cast gets a moment in the middle of the sand; a
  * creature that dies gets the same moment with the stone played over it and a
- * Roman burial vault opening behind it; and a permanent that is exiled gets it
- * with a road out of the city under it.
+ * Roman burial vault opening behind it; a permanent that is exiled gets it
+ * with a road out of the city under it; and a permanent **nobody cast** gets
+ * it with a battle already under way in the valley below.
  *
  * **And the plate under it is a sentence about a player**, which is the second
  * ask and the one that decided the shape of everything below (Aaron,
@@ -91,6 +92,15 @@ import { beatDelay, type Speed } from './reel'
  *   center stage, with how many tokens were created"*). The count comes from
  *   [countRuns] in `lib/reel.ts`, which argues at length why it is a count and
  *   not a guess.
+ * - `put` — a real card arriving on the battlefield that **nothing cast**: an
+ *   Atla Palani egg cracking into a Blightsteel Colossus, a reanimation, a
+ *   blink, a Collected Company. `made` above answers the *token* half of
+ *   Aaron's *"same thing for 'Enters the Battlefield'"*; this is the other
+ *   half, and it is the half a newcomer most needs, because a creature
+ *   appearing with nothing said about it is the one arrival they cannot
+ *   account for. It was refused twice for want of the beat saying *nobody cast
+ *   this* — see [mannerOf], which carries what changed and the counts behind
+ *   it.
  * - `sacrificed` — a permanent its controller spent. Aaron's word for the hole
  *   was *"before they go to the ether"*, and the ether is where a Food, a Clue
  *   and a Treasure go: they are artifacts, so rule 700.4 does not let them
@@ -108,21 +118,6 @@ import { beatDelay, type Speed } from './reel'
  *
  * Not yet, and what each would need:
  *
- * - **an arrival nobody cast** — a reanimation, a blink, a Collected Company,
- *   or an Atla Palani Egg dying and putting a Blightsteel Colossus onto the
- *   battlefield. `made` above answers the *token* half of Aaron's *"same thing
- *   for Enters the Battlefield"*; this is the other half, and it is the half a
- *   newcomer most needs, because a creature appearing with nothing said about
- *   it is the one arrival they cannot account for. The `enters` beat already
- *   exists and already names the card. What is missing is the bit that
- *   separates it from the resolve: **the beat saying that nothing cast this**.
- *   `card.token` settles the token half only because the scribe put that flag
- *   on the wire; nothing on the wire settles this one. The scribe knows — it
- *   saw, or did not see, the cast for that same id — and the browser cannot
- *   work it out, because a stage item is built from one beat and this file is
- *   deliberately not handed the history. Without it the only honest choice is
- *   every non-token arrival or none, and [mannerOf] carries the counts that
- *   make "every" the wrong one.
  * - **populate** — Forge's token-created event is a bare signal with no fields,
  *   so a populated copy is indistinguishable from any other token entering
  *   play. It needs a beat naming **the card being copied**, and saying that a
@@ -130,13 +125,15 @@ import { beatDelay, type Speed } from './reel'
  *   a block of keyframes: the card, splitting into a mirrored second of itself.
  * - **eminence** — an eminence trigger reaches the stream as an `ability` beat
  *   with a zone and no words, so the room knows a commander did *something*
- *   from the command zone and cannot say what. It needs the ability's own
- *   **text**, because the whole reason to draw eminence is that a newcomer
- *   cannot otherwise see why the board just changed. The words are the part
- *   that matters more than the glow.
+ *   from the command zone and cannot say what. **Which cat it did it to is
+ *   now on the wire** and is drawn where the answer belongs, on the creature
+ *   itself — `components/board.tsx`'s `Aimed`. What is still missing *here*
+ *   is the ability's own **text**, and that is the part a plate would need:
+ *   this stage says a sentence about a card, and "a commander did something"
+ *   is not one.
  */
-export type Manner = 'cast' | 'made' | 'attach' | 'sacrificed' | 'dies'
-  | 'exiled' | 'companion'
+export type Manner = 'cast' | 'made' | 'put' | 'attach' | 'sacrificed'
+  | 'dies' | 'exiled' | 'companion'
 
 /** Which beats get the middle of the arena.
  *
@@ -160,7 +157,9 @@ export type Manner = 'cast' | 'made' | 'attach' | 'sacrificed' | 'dies'
  *   cast one beat earlier and drawn then. A **token** is the exception that
  *   makes the beat worth having: it was never cast, so this is the only moment
  *   it has. `ForgeBoardCard.token` is the scribe's own flag, off Forge's card
- *   state, and there is nothing to infer.
+ *   state, and there is nothing to infer. The **uncast real card** is the
+ *   second exception and it is settled by the beat rather than the card — see
+ *   the section below, which is the whole of this function's history.
  * - `sacrificed` fires for everything spent as a cost, and a *creature*
  *   sacrificed also dies — the scribe raises both, one beat apart, which is
  *   correct in Magic and would be two cards on this stage. So the death keeps
@@ -169,60 +168,73 @@ export type Manner = 'cast' | 'made' | 'attach' | 'sacrificed' | 'dies'
  *   **A card whose type line the match never recorded is left alone**, because
  *   the room would be choosing between two drawings on no evidence, and
  *   silence is what it already does with everything it was not told.
- * ## The arrival that nobody cast, and why it is still missing
+ * ## The arrival that nobody cast
  *
  * Aaron, 2026-08-27, in the same breath as the crypt: *"Same thing for
  * 'Enters the Battlefield', we should be able to find something cool. A free
  * use painting or picture of a battle before us, like down in a valley...?"*
- * The token half of that ask is the `made` row above. The other half is not
- * built, and the reason was measured rather than guessed at — five games
- * across three matches, counting what `enters` actually carries.
+ * The token half of that ask is the `made` row above. This is the other half,
+ * and it was refused twice before it was built — the refusals are kept here
+ * because they are the argument for the shape it finally took.
  *
  * **How often it fires is a fact about the deck, not about the beat.** Gyome,
  * whose whole engine makes Food, raised 36 and 42 arrivals against 14 and 15
  * casts — and *clumped*, one turn raising fourteen of them and another
  * seventeen. Arahbo against Atla Palani, neither leaning on a token engine,
  * raised 5 and 9 against 5 and 11. So a scene on *every* arrival is a strobe
- * in some decks and unremarkable in others, which is a reason to be careful
- * rather than a reason to refuse.
+ * in some decks and unremarkable in others.
  *
- * What refuses it is the rule directly above: almost every arrival that is not
- * a token was **cast one or two beats earlier and drawn then**, so a scene on
- * it is the resolve, drawn twice.
+ * What refuses *every* arrival is the rule directly above: almost all of them
+ * were **cast one or two beats earlier and drawn then**, so a scene on the
+ * arrival is the resolve, drawn twice.
  *
- * **Almost.** A first pass of this paragraph said that category was empty and
- * was wrong: a third match turned up four arrivals in a single game that
- * nothing had cast — a Blightsteel Colossus, an Emrakul, a Bonehoard
- * Dracosaur and a Craterhoof Behemoth, all off Atla Palani, Nest Tender, whose
- * Eggs dying *"reveal cards from the top of your library until you reveal a
- * creature card. Put that card onto the battlefield"*. A reanimation, a blink
- * and a Collected Company are the same shape. A newcomer watching an Emrakul
- * appear out of nothing has exactly the question this room exists to answer,
- * and that is the beat the valley belongs to.
+ * **Almost.** A first pass said that category was empty and was wrong: one
+ * game turned up four arrivals nothing had cast — a Blightsteel Colossus, an
+ * Emrakul, a Bonehoard Dracosaur and a Craterhoof Behemoth, all off Atla
+ * Palani, Nest Tender, whose Eggs dying *"reveal cards from the top of your
+ * library until you reveal a creature card. Put that card onto the
+ * battlefield"*. A reanimation, a blink and a Collected Company are the same
+ * shape. A newcomer watching an Emrakul appear out of nothing has exactly the
+ * question this room exists to answer.
  *
- * **It is unbuildable from here rather than refused**, which puts it with
- * `populate` and `eminence` above and not with `land` and `resolve` below.
- * `card.token` settles the token half because the scribe put that flag on the
- * wire; nothing on the wire settles the other half. The beat carries a name, a
- * seat and a turn, and [Staged] is built from one beat with no history to
- * scan. What it needs is the beat itself saying **nothing cast this** — which
- * the scribe knows, having seen or not seen the cast for that same id. Given
- * that, it is one row in [Manner], one in [PLATE], one in `STAGE_LIFE` and a
- * scene: a field seen from above.
+ * **What was missing was the beat saying *nothing cast this*, and the beat
+ * says it now.** `card.token` settled the token half because the scribe put
+ * that flag on the wire; the other half needed the scribe to reach past the
+ * view it is handed and ask the game model whether the card was cast, which it
+ * now does. `entered` is that answer in Magic's own two words. Of fifty-nine
+ * battlefield arrivals in the measured match, nineteen were cast; of the forty
+ * that were not, twenty-six were lands (played, never cast) and thirteen were
+ * tokens — leaving **one** real spell put onto the battlefield. That is the
+ * rate this scene is drawn at, and it is why it can afford to be a scene.
  *
- * Two narrower cuts were considered and stay rejected. *Only creatures* is
- * still mostly the resolve. *The first each turn* is a rule nobody could learn
- * by watching, which is commandment 2 backwards.
+ * **An empty `entered` stays silent, and that is the case that matters.**
+ * Every match already in the ledger was narrated before the scribe could
+ * answer, and so is every match run by a worker on an older image. Reading
+ * absence as "put" would redraw the whole archive as a room full of creatures
+ * appearing from nowhere — every older game would read as cheating. So the
+ * three states are three answers: `put` opens the field, `cast` says nothing
+ * because the room already showed somebody paying for it, and *nobody said*
+ * says nothing because nobody said.
+ *
+ * Two narrower cuts were considered along the way and stay rejected, because
+ * `entered` made both unnecessary rather than merely wrong. *Only creatures*
+ * is still mostly the resolve. *The first each turn* is a rule nobody could
+ * learn by watching, which is commandment 2 backwards.
  */
-export function mannerOf(kind: string, card?: ForgeBoardCard | null):
-  Manner | null {
+export function mannerOf(kind: string, card?: ForgeBoardCard | null,
+  entered?: string): Manner | null {
   switch (kind) {
     case 'cast': return 'cast'
     case 'dies': return 'dies'
     case 'exiled': return 'exiled'
     case 'attach': return 'attach'
     case 'companion': return 'companion'
-    case 'enters': return card?.token ? 'made' : null
+    // The token first, because a token is *also* uncast and both flags are
+    // true on one of them — Forge's own `wasCast` is false for every token, so
+    // asking `entered` first would draw a Food Token on a battlefield instead
+    // of drawing it being conjured, which is the wrong one of the two scenes.
+    case 'enters': return card?.token ? 'made'
+      : entered === 'put' ? 'put' : null
     case 'sacrificed': return canDie(card?.types) === false
       ? 'sacrificed' : null
     default: return null
@@ -304,6 +316,15 @@ const STAGE_LIFE: Record<Manner, number> = {
      second line naming the host, and a line nobody finishes reading is a line
      that was not worth drawing. */
   attach: 1300,
+  /* **The rarest thing a player does, so it gets the time.** One real spell in
+     fifty-nine arrivals in the measured match, four in the one Atla Palani
+     game this was built for — which puts it between the exile, which happens
+     several times a game, and the companion, which happens once. It is also
+     the only manner that is *both* watched and read: a card arriving has a
+     journey the way an exile does, and a plate with a second line the way an
+     attachment does, and neither half can have the other's time. Deliberately
+     inside the four-beat cap below, so watching pace never clips it. */
+  put: 1600,
   /* A Food going is a smaller event than a Bolt resolving and it happens more
      often — a dozen a game in a deck built to do it — so it takes the cast's
      length and not the death's. */
@@ -424,6 +445,13 @@ export function stageLife(manner: Manner, speed: Speed,
  *   is doing more than naming the event — it says the card was *conjured*
  *   rather than drawn or cast, which is the one thing about tokens a newcomer
  *   has to be told once.
+ * - **"puts"** again for an uncast arrival, and the repeat is the right
+ *   answer rather than a collision. It is one English verb doing one job in
+ *   two places — a sword is *put on* a creature, a Colossus is *put onto the
+ *   battlefield* — and the note line under each says which, exactly as it
+ *   already does for the attachment. Magic uses the same word in both rules
+ *   sentences, so a room that invented a second one would be teaching a
+ *   distinction the game does not draw.
  * - **"'s companion"** rather than a verb, because the word `companion` is the
  *   whole point of the plate. Aaron watched Kaheera arrive in a hand and
  *   thought the game had cheated; the fix is not a smoother sentence, it is
@@ -435,6 +463,13 @@ export const PLATE: Record<Manner, { by: ((who: string) => string) | null;
   alone: string }> = {
   cast: { by: (who) => `${who} casts`, alone: 'Cast' },
   made: { by: (who) => `${who} makes`, alone: 'Made' },
+  /* The `alone` form carries the destination and the `by` form does not, which
+     looks like an asymmetry and is one sentence read twice: "Gyome puts /
+     Blightsteel Colossus" already stands on a picture of the battlefield, and
+     a room hovering over the sand saying "onto the battlefield" is narrating
+     what a person can see. Without a player there is no verb to hang it on, so
+     the phrase has to be the whole plate. */
+  put: { by: (who) => `${who} puts`, alone: 'Put onto the battlefield' },
   attach: { by: (who) => `${who} puts`, alone: 'Put on' },
   sacrificed: { by: (who) => `${who} sacrifices`, alone: 'Sacrificed' },
   companion: { by: (who) => `${who}'s companion`, alone: 'A companion' },
@@ -461,6 +496,13 @@ export const PLATE: Record<Manner, { by: ((who: string) => string) | null;
  * for the same reason from the other side: it is drawn on the way *out*, and
  * where the card has gone matters more than what it was. An attachment and a
  * companion are both already named by their own word.
+ *
+ * **An uncast arrival takes no type either, and it is the closest call of the
+ * six.** The type is there for cards that never land: it says whether to
+ * expect this one again. This one has landed — it is standing in a row on the
+ * board a second later, where its own picture and its own lane say what it is
+ * better than a word could. What the plate has room for instead is the fact
+ * that nothing cast it, which nothing else on the screen says at all.
  */
 export function plateWord(manner: Manner, types: string | undefined,
   who?: string | null): string {
@@ -484,6 +526,14 @@ export function plateWord(manner: Manner, types: string | undefined,
  *   for no visible reason, which is exactly what Aaron asked about — *"for an
  *   aura or something that targets something if the text box called out the
  *   target too"*.
+ * - **That nothing cast it.** The same failure as the companion and a beat
+ *   earlier in a newcomer's evening: a creature standing on the battlefield
+ *   that nobody was seen to pay for looks like somebody skipped a step. The
+ *   plate above says a player put it there; this says the part that makes
+ *   that worth a scene. Deliberately *"nothing cast it"* rather than "no mana
+ *   was paid" — a mana cost may well have been paid somewhere, for the Egg or
+ *   the reanimation spell, and the room does not know. What it knows is that
+ *   this card was not cast, which is Forge's own boolean and not a reading.
  * - **Where a companion came from.** This is the whole reason that beat
  *   exists: a card appearing in a hand nobody dealt it to looks like cheating,
  *   and it looks like cheating *because the room said nothing*. "Outside the
@@ -498,6 +548,7 @@ export function plateWord(manner: Manner, types: string | undefined,
 export function plateNote(manner: Manner,
   target: string | undefined): string | null {
   if (manner === 'attach') return `on ${target || 'a permanent'}`
+  if (manner === 'put') return 'nothing cast it'
   if (manner === 'companion') {
     return 'from outside the game — three mana paid'
   }

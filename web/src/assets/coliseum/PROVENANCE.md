@@ -191,3 +191,17 @@ Why committed rather than hotlinked: It arrives in the same breath as the wreath
 
 Why committed rather than hotlinked: The same argument as the road and the skull beside it. This is drawn on the beat that says a creature died and it is gone two seconds later, so fetching it from somebody else's host would mean a vault that opens after the card has already gone down into it. The second reason is the licence: a scanned glass lantern slide of unknown authorship, re-hosted by a university library and then by Commons, is squarely the category where somebody else's copy quietly changes terms or moves. A copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end crypta -->
+
+<!-- animist:begin campus -->
+## campus.webp
+
+- **Source**: "La Bataille d'Issus - Jan Brueghel l'Ancien - Musée du Louvre Peintures INV 1094 ; MR 596.jpg", <https://commons.wikimedia.org/wiki/File:La_Bataille_d%27Issus_-_Jan_Brueghel_l%27Ancien_-_Mus%C3%A9e_du_Louvre_Peintures_INV_1094_;_MR_596.jpg>, found via Commons, searching `Brueghel Battle of Issus` after `Battle of the Milvian Bridge Giulio Romano` and `Battle of Zama` had been fetched and rejected on sight. Every unrestricted phrasing -- `battle in a valley landscape painting armies`, `bird's eye battle`, `Roman battle landscape` -- returns nothing but scanned art-history books and auction catalogues, which is the trap `lens.recipe.yaml` records; the searches that work are the ones that name a painter and a battle. This is the Louvre's own panel at 11022x6994, and the only one of the four candidates that is both a valley and a landscape band -- the Altdorfer is a valley in a portrait panel, and the other two are friezes.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build campus.recipe.yaml`):
+  - `crop`: frac_box=[0.0, 0.26, 1.0, 0.9].
+  - `resize`: width=720.
+  - Encoded WEBP, quality 78.
+
+Why committed rather than hotlinked: The same argument as the road and the vault beside it. This is drawn on the beat that says a permanent arrived uncast and it is gone about a second and a half later, so fetching it from somebody else's host would mean a battlefield that opens after the creature standing on it has already faded. The licence is the second reason: this is a PD-Art photographic reproduction uploaded by an individual contributor, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end campus -->
