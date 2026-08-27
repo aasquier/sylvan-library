@@ -12353,6 +12353,148 @@ button:hover .tarot-fan-card {
   100% { opacity: 0.82; }
 }
 
+/* --- ...and the place it is going to ------------------------------------
+ *
+ * **A death is a zone change, and until tonight this room only drew half of
+ * it.** The pall and the stone are what happens *to* the creature; they say it
+ * is over and they say nothing about where it went. But rule 700.4 spends its
+ * whole definition on a destination — a creature dies when it is *put into a
+ * graveyard from the battlefield* — which makes a death the same shape as the
+ * exile two blocks down, and the exile has had a place to go since this
+ * morning while the death had a stone and a shadow (Aaron, 2026-08-27: *"I
+ * want something to show when something dies and is going to the graveyard...
+ * a good crypt, tomb, or gothic graveyard"*).
+ *
+ * So the vault: a columbarium passage — walls of arched burial niches running
+ * away from the eye down a corridor. `crypta.recipe.yaml` argues which
+ * photograph and why a Roman chamber rather than the gothic crypt Aaron named,
+ * and `components/stage.tsx` argues the harder question, which was whether the
+ * stone should have given way to it. It did not: the stone is small, bright
+ * and on the card, the vault is large, dark and behind it, and figure against
+ * ground is not the same word said twice.
+ *
+ * **The same clock as everything else in the death** — `--mark-life-dies`, not
+ * `--stage-life`. The two carry the same number by construction (`stageLife`
+ * hands the marks' own value straight back for this manner, and `lib/stage.ts`
+ * argues why at length), and using the property the rest of the `is-dies`
+ * family uses means a future change to one clock cannot leave the vault
+ * running under a card that has already gone. */
+.stage-crypt {
+  position: absolute;
+  inset: 0;
+  /* Under the card and over the veil, exactly where the road sits — the
+     ordering is by source position rather than by z-index, since both are 0. */
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-crypt-open var(--mark-life-dies, 2000ms) ease-out both;
+}
+/* Open before the stone lands, which is at 22%, so the card is already over a
+   grave when the grave takes it — and hold almost to the end, because the last
+   third is the sink and the sink is the half this exists for. */
+@keyframes stage-crypt-open {
+  0%   { opacity: 0; }
+  9%   { opacity: 1; }
+  86%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* **A window under the card**, dissolved into the sand by a mask rather than
+   framed by a rectangle — which is the road's lesson two blocks down, and a
+   hard edge anywhere on a photograph laid over an arena reads as a postcard
+   stuck to the floor.
+
+   **Both axes are stated and no `aspect-ratio` survives, which took two
+   measured failures to arrive at.** The road is a landscape band —
+   `width: min(100%, 980px)` on a 560:310 ratio — and although that overflows
+   the sand vertically, the *visible* part of its mask is only 358 tall and
+   clears it easily. This picture is very nearly square, so copying that put a
+   632-tall box inside a 412-tall `.field` (measured on a real board with a
+   real Sakura-Tribe Elder dying in it) and the mask's outer fade was being cut
+   off by `overflow: hidden` top and bottom. **A mask whose edge is trimmed by
+   a clip is a rectangle again**, which is the exact thing it is here to
+   prevent.
+
+   Leading with the height and letting `aspect-ratio` derive the width fixed
+   that axis and broke the other one, and the second failure is the useful one
+   to record: **`aspect-ratio` with a definite height does not honour
+   `max-width` on a replaced element.** In a field forced to 352 by 430 the
+   box came out 458 wide against a `max-width` that resolved to 352 — it simply
+   did not clamp — so a phone got the same trimmed fade, sideways.
+
+   So both axes are named against the sand's own box and the ratio is dropped
+   altogether. The picture can then never be larger than the arena it is drawn
+   in, on any screen, and `object-fit: cover` below is what keeps the
+   photograph undistorted while the box takes whatever shape the sand is.
+
+   **Both the photograph and the damp over it share one grid cell and one
+   size, and that is deliberately not how the road does it.** The road's haze
+   is `inset: 0` on the parent, so its percentages measure against the whole
+   arena while the mask's measure against the image — harmless there only
+   because that haze is a fifteenth of an opacity and would not be visible if
+   it landed anywhere. This damp is doing real work at real strength, so it has
+   to describe the same box as the picture it is darkening, or it slides
+   against it every time the window resizes. */
+.stage-crypt-art,
+.stage-crypt-damp {
+  grid-area: 1 / 1;
+  width: min(100%, 760px);
+  height: min(100%, 660px);
+  /* **The solid part has to be wider than the card, and the first attempt's
+     was not.** This began at `#000 52%` — copied from the road's shape without
+     redoing its arithmetic — and on a real board that put the fully opaque
+     core at a 149px radius against a card 122px from the middle. Twenty-seven
+     pixels of solid vault down each side, and everything else anybody could
+     see was inside the fade ring: the chamber read as a *ghost* laid over the
+     sand, a double exposure rather than a room. The road learned the same
+     lesson from the other end and its comment says it plainly — it has to
+     reach well past the card's own edges to be a place rather than a backdrop.
+     The road's own core clears its card by about 130 pixels; 66% here clears
+     this one by about 100, which is a tighter space than a road and reads as
+     one. */
+  -webkit-mask-image: radial-gradient(ellipse 48% 46% at 50% 52%,
+    #000 0%, #000 66%, rgba(0, 0, 0, 0.5) 84%, transparent 100%);
+  mask-image: radial-gradient(ellipse 48% 46% at 50% 52%,
+    #000 0%, #000 66%, rgba(0, 0, 0, 0.5) 84%, transparent 100%);
+}
+.stage-crypt-art {
+  object-fit: cover;
+  /* **The vault comes forward while the card goes down**, and it is the same
+     three percent of creep the road takes. The motion is identical and the
+     reading is opposite, which is the whole trick: down the road the ground
+     travels *with* the card, so the two move as one and the card is going
+     somewhere. Here the card sinks and turns away while the chamber closes
+     toward the eye, and two things separating is what makes one of them look
+     left behind. */
+  animation: stage-crypt-close var(--mark-life-dies, 2000ms) ease-out both;
+}
+@keyframes stage-crypt-close {
+  0%   { transform: scale(1.02); }
+  100% { transform: scale(1.09); }
+}
+
+/* **Down into the dark, and the dark is green.** Two jobs, and the gradient's
+   direction is doing both. It sits the photograph down in value so a grey
+   nineteenth-century plate does not read as fog behind a dark card — and it
+   does it hardest at the *foot* of the frame, which is both where the passage
+   floor is and where the card is heading, so the card sinks into the deepest
+   part of the room rather than across an evenly lit one.
+
+   The colour is the graveyard's own, the same cold green `--stage-glow` is set
+   to for this manner and the colour Magic has drawn a graveyard in since
+   Alpha. It is laid on as a *layer* rather than reached for with a `filter`,
+   which is the technique the pall and the token materials already use — and
+   here that is craft rather than licence, since this photograph is ours and
+   ADR 32's boundary is around Wizards' art. A layer is still the better tool:
+   it can be aimed, and a filter can only be dialled. */
+.stage-crypt-damp {
+  background: linear-gradient(180deg,
+    rgba(6, 14, 10, 0.34) 0%,
+    rgba(5, 12, 9, 0.48) 52%,
+    rgba(3, 8, 6, 0.72) 100%);
+}
+
 /* --- the card that has no picture --------------------------------------- */
 
 /* **A missing painting is not a missing card.** The board only draws what it
@@ -12398,19 +12540,29 @@ button:hover .tarot-fan-card {
 
 /* --- an exile, as a road ------------------------------------------------ */
 
-/* **A death happens to the card; an exile happens to the card's place.**
+/* **Nothing is laid on the card here, because nothing happens to it.**
  *
- * That is the whole reason this is built the other way up from the death
- * above. The doom lays two layers *on* the frame — a pall and a stone — because
- * what is being drawn is something arriving on the card. Nothing arrives here.
- * The card is whole and unharmed and simply not in the room any more, so the
- * room is what changes: the sand opens onto a road for a second and a half, and
- * the card goes down it.
+ * That is what makes this the other way up from the death above. The doom lays
+ * two layers *on* the frame — a pall and a stone — because a creature dying is
+ * something arriving on the card. An exiled permanent is whole and unharmed
+ * and simply not in the room any more, so only the room changes: the sand
+ * opens onto a road for a second and a half, and the card goes down it.
+ *
+ * This used to be headed *"a death happens to the card; an exile happens to
+ * the card's place"*, and the second half of that is still true while the
+ * first half was only ever half true — written when a death had nowhere to go
+ * because nobody had drawn it one yet. A creature dying is put **into a
+ * graveyard** (rule 700.4 spends its whole definition on that destination), so
+ * a death is both: something on the card and somewhere it goes. It has a
+ * chamber under it now, two blocks up, and the two scenes are siblings rather
+ * than an exception and a rule.
  *
  * The road is the Via Appia — the road out of Rome, lined for miles with the
- * tombs of people who were not coming back either. `via.recipe.yaml` argues
- * which photograph and why, and `components/stage.tsx` argues why the picture
- * is under the card rather than over it.
+ * tombs of people who were not coming back either. Some of those tombs are the
+ * chamber the death opens onto: `crypta.webp` is the Vigna Codini columbarium,
+ * which stands on this road. `via.recipe.yaml` argues which photograph and
+ * why, and `components/stage.tsx` argues why the picture is under the card
+ * rather than over it.
  *
  * **The recession is a real perspective and not a scale, and that is what
  * `perspective-origin` is doing.** A card that only shrinks is a card getting
@@ -12828,6 +12980,14 @@ button:hover .tarot-fan-card {
 .stage-card.is-parting .stage-skull,
 .stage-card.is-parting .stage-pile,
 .stage-card.is-parting .stage-count,
+/* The two scenes are in here for the same reason as everything else: a vault
+   still creeping forward, or a road still running, under a card that is being
+   shoved off by the next spell is a room that has not noticed the subject
+   left. Their opacity is handed back to the group, which is fading. */
+.stage-card.is-parting .stage-crypt,
+.stage-card.is-parting .stage-crypt-art,
+.stage-card.is-parting .stage-road,
+.stage-card.is-parting .stage-road-art,
 .stage-card.is-parting .stage-plate-strip { animation: none; }
 /* ...but a card that was dying stays dead on the way out — the grave over it
    in full, held rather than still climbing. `transform` is named because
@@ -12921,6 +13081,16 @@ button:hover .tarot-fan-card {
     transform: scaleY(1);
     animation: stage-still var(--mark-life-dies, 2000ms) linear both;
   }
+  /* **The vault is a fact, so it stays; the creep is drama, so it goes.** The
+     same concession the road two blocks down already makes, and for the same
+     reason as the pall directly above: a person who has asked for stillness is
+     asking not to be moved at, not to be told less. The chamber fades up under
+     the card, holds for the death's own length and fades away — a card being
+     put somewhere, stated rather than performed. */
+  .stage-crypt {
+    animation: stage-still var(--mark-life-dies, 2000ms) linear both;
+  }
+  .stage-crypt-art { animation: none; }
   /* Unlit from the first frame rather than dimming over two seconds. Same
      fact, no journey. */
   .stage-card.is-dies .stage-face {

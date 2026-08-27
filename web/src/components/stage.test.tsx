@@ -255,6 +255,52 @@ it('plays the skull over the dying card, on the marks own clock', () => {
   expect(container.querySelector('.stage-plate-word')?.textContent).toBe('Dies')
 })
 
+it('opens a vault under a dying card, without taking the stone off it', () => {
+  // **The scene is under the card and the stone is on it**, and that pairing
+  // is the decision this test exists to hold. A death now draws both, which
+  // was the one real risk in adding the crypt — two objects saying "dead" over
+  // one card. They survive together because they are saying different things
+  // at different depths: the vault is *where the creature is going* and lives
+  // outside the frame, the stone is *what happened to it* and lives inside the
+  // frame so it travels down with the card. `components/stage.tsx` argues it
+  // in full, including the two reasons the stone had to stay.
+  //
+  // jsdom has no layout engine, so what is asserted is the structure — which
+  // is the half that carries the meaning anyway. Whether the chamber reads as
+  // a chamber, and whether the stone is legible against it, is Aaron's walk.
+  const { container } = replay(said({ kind: 'dies', card: 'Fleecemane Lion',
+    key: 'v1' }))
+
+  const crypt = container.querySelector('.stage-crypt')
+  expect(crypt, 'a death opens onto somewhere').toBeTruthy()
+  expect(container.querySelector('.stage-crypt .stage-crypt-art'),
+    'and the somewhere is the photograph').toBeTruthy()
+  // Outside the frame. Inside it, the vault would sink and shrink with the
+  // card, which is a card carrying a room down a hole rather than going into
+  // one.
+  expect(container.querySelector('.stage-frame .stage-crypt'),
+    'the vault is not something the card carries with it').toBeNull()
+  // ...and the stone is still on the card, still inside the frame.
+  expect(container.querySelector('.stage-frame .stage-skull'),
+    'the stone did not give way to it').toBeTruthy()
+
+  // **It belongs to the death alone.** A spell being cast is not going
+  // anywhere, and an exile is going somewhere else entirely — down the road,
+  // which is its own scene. Two scenes under one card would be the room
+  // saying a card was buried and sent away at once.
+  cleanup()
+  const cast = replay(said({ card: 'Lightning Bolt', key: 'v2' }))
+  expect(cast.container.querySelector('.stage-crypt'),
+    'nothing opens under a spell being cast').toBeNull()
+  cleanup()
+  const gone = replay(said({ kind: 'exiled', card: 'Fleecemane Lion',
+    key: 'v3' }))
+  expect(gone.container.querySelector('.stage-crypt'),
+    'and an exile takes the road, not the vault').toBeNull()
+  expect(gone.container.querySelector('.stage-road'),
+    'which it still has').toBeTruthy()
+})
+
 it('draws the light going out of a dying card, and never filters it', () => {
   // **A licence rule, held by a test rather than by a memory.** The light used
   // to go out of a dying card through `filter: grayscale()` on `.stage-face` —
@@ -368,6 +414,18 @@ it('gives the middle of the arena to what happened, and to nothing else', () => 
   // spend the effect on the beat that needs it least. `resolve` is left alone
   // from the other end: a spell cast and then resolving is *one* spell, and
   // drawing it twice a beat apart would read as two.
+  //
+  // **`enters` is in the quiet list on purpose and it cost three matches to
+  // put there** (Aaron, 2026-08-27, asked for a scene on it). Nearly every
+  // arrival is either a token the board already marks or a card the room
+  // showed as it was cast — which is `resolve` under another name, refused
+  // just above. The exception is real but rare, and the room cannot *tell*:
+  // the beat says nothing about whether anything cast the card, so drawing
+  // only the arrivals that deserve it is not possible from the browser.
+  // `lib/stage.ts` above `mannerOf` carries the counts, the Atla Palani game
+  // that produced four uncast arrivals, and the one field the beat would need.
+  // A session that adds `'enters'` here should re-read that first: without the
+  // flag it puts a scene on the resolve.
   expect(mannerOf('cast')).toBe('cast')
   expect(mannerOf('dies')).toBe('dies')
   expect(mannerOf('exiled')).toBe('exiled')
