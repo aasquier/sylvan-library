@@ -10909,11 +10909,17 @@ button:hover .tarot-fan-card {
  * tiles and a table, correct and complete and with no moment in it.
  *
  * Two real objects, both Met Open Access and both cut in `assets/coliseum`
- * (`corona.recipe.yaml`, `manica.recipe.yaml`): a Roman gold wreath for the
- * deck that took the match, and a rust-eaten gauntlet from a castle destroyed
- * in 1399 for the one that did not. The argument for photographs rather than
- * drawn icons is commandment 5 — the alternative to the object is a vector
- * laurel, and a vector laurel is clip art however carefully it is drawn.
+ * (`corona.recipe.yaml`, `cippus.recipe.yaml`): a Roman gold wreath for the
+ * deck that took the match, and a Roman marble grave marker for the one that
+ * did not. The argument for photographs rather than drawn icons is
+ * commandment 5 — the alternative to the object is a vector laurel, and a
+ * vector laurel is clip art however carefully it is drawn.
+ *
+ * **The stone replaced a gauntlet** (Aaron, 2026-08-27: "mega lame, I can't
+ * even tell what it is"). The gauntlet was a fine idea — a hand-shaped object
+ * with no hand in it — and at a hundred and fifty pixels beside a gold crown
+ * it was a brown shape. What replaced it is not a better icon, it is a thing
+ * that needs no decoding: everybody on earth knows a grave marker.
  *
  * **It sits in the page rather than over the board**, which is the layout
  * decision worth writing down. The board keeps its scrubber after a match so
@@ -10943,9 +10949,9 @@ button:hover .tarot-fan-card {
   align-items: center;
 }
 /* **A rule between them, because the two halves cannot align and should not
-   pretend to.** The wreath hangs above its name and the gauntlet lies below
-   its own, which is the whole point — a crown goes on a head and a dropped
-   gauntlet goes at somebody's feet — so the two names sit at different
+   pretend to.** The wreath hangs above its name and the stone stands over its
+   own, which is the whole point — a crown comes down onto a head and a grave
+   marker goes up out of the ground — so the two names sit at different
    heights however the columns are aligned. Side by side with nothing between
    them that reads as a misalignment; with a hairline between them it reads as
    two places, which is what it is. */
@@ -10984,7 +10990,6 @@ button:hover .tarot-fan-card {
 }
 @media (min-width: 40rem) {
   .verdict-crown { max-width: 20rem; }
-  .verdict-gauntlet { max-width: 13rem; }
 }
 .verdict-crown > * { grid-area: 1 / 1; }
 .verdict-wreath {
@@ -11022,14 +11027,54 @@ button:hover .tarot-fan-card {
   flex-direction: column;
   align-items: center;
   gap: 0.1rem;
+  margin-top: 0.55rem;
   text-align: center;
 }
-.verdict-gauntlet {
+/* The plot the stone stands in: the marker, and the ground it is set into.
+   A wrapper rather than a pseudo-element on the picture, because an `img` is
+   a replaced element and cannot carry one — the smudge has to be a sibling. */
+.verdict-plot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
-  max-width: 9.5rem;
+}
+.verdict-stone {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 7.5rem;
   height: auto;
-  margin-top: 0.5rem;
-  animation: verdict-drop 1200ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+  animation: verdict-raise 1250ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both;
+}
+/* Below the crown's own widening rule rather than beside it, because both are
+   `max-width` at the same specificity and the loser is whichever comes first.
+   Written next to the base rule it overrides, which is the only arrangement
+   that cannot be silently undone by an edit to the other one. */
+@media (min-width: 40rem) {
+  .verdict-stone { max-width: 9.75rem; }
+}
+/* Sand pushed aside where the stone was set. It widens as the marker lands,
+   which is what plants it — without this the stone floats a hairline above
+   nothing and reads as a sticker rather than as an object standing up. */
+.verdict-ground {
+  position: absolute;
+  bottom: -0.3rem;
+  left: 50%;
+  width: 8.4rem;
+  height: 0.85rem;
+  margin-left: -4.2rem;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%,
+    color-mix(in srgb, var(--field-sand-dark) 62%, transparent) 0%,
+    color-mix(in srgb, var(--field-sand-dark) 26%, transparent) 52%,
+    transparent 78%);
+  transform-origin: center;
+  animation: verdict-settle 1250ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both;
+}
+@media (min-width: 40rem) {
+  .verdict-ground { width: 10.9rem; margin-left: -5.45rem; }
 }
 
 .verdict-label {
@@ -11081,34 +11126,537 @@ button:hover .tarot-fan-card {
             saturate(var(--gild-sat, 1));
   }
 }
-/* It falls, hits, and rocks once. The overshoot in the timing function is the
-   landing; a gauntlet dropped on sand does not ease into place. */
-@keyframes verdict-drop {
-  0%   { opacity: 0; transform: translateY(-38px) rotate(-13deg); }
-  46%  { opacity: 1; }
-  62%  { transform: translateY(0) rotate(3deg); }
-  80%  { transform: translateY(0) rotate(-1.5deg); }
+/* It is raised, and then it is still. The stone comes up out of the ground and
+   settles under its own weight — no overshoot, no rock, no breath afterwards:
+   the wreath opposite it gilds forever because gold moves under light, and a
+   grave marker that kept moving would be the one thing in the room doing
+   something a grave marker does not do. Stillness is the object's own note. */
+@keyframes verdict-raise {
+  0%   { opacity: 0; transform: translateY(38%) scale(0.94); }
+  70%  { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+/* The ground opens as the stone comes through it — a smudge that is nothing
+   at the start and full width when the marker lands. */
+@keyframes verdict-settle {
+  0%   { opacity: 0; transform: scaleX(0.2) scaleY(0.5); }
   100% { opacity: 1; transform: none; }
 }
 
-/* Fired steel and gold on two opposite grounds, the secutor's problem again.
-   The rust is dark and sinks into a dark page, so it is lifted; the gold is
-   brilliant and flares against paper, so it is taken down. */
-:root[data-theme='dark'] .verdict-gauntlet,
-:root:where(:not([data-theme='light'])) .verdict-gauntlet {
-  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.55)) brightness(1.16)
+/* Marble and gold on two opposite grounds, the secutor's problem again. Aged
+   marble is pale and warm: against the dark page it wants a shadow deep
+   enough to hold it off the surface, and against paper it is nearly the
+   ground's own value, so it is taken down a little and given a tighter,
+   darker contact shadow or the stone dissolves into the page. */
+:root[data-theme='dark'] .verdict-stone,
+:root:where(:not([data-theme='light'])) .verdict-stone {
+  filter: drop-shadow(0 10px 18px rgb(0 0 0 / 0.6)) brightness(1.06);
+}
+:root[data-theme='light'] .verdict-stone {
+  filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.34)) brightness(0.94)
           saturate(1.06);
 }
-:root[data-theme='light'] .verdict-gauntlet {
-  filter: drop-shadow(0 7px 13px rgb(0 0 0 / 0.3)) brightness(0.99);
+/* And the ground has to swap with it. A shadow-coloured smudge is what plants
+   the stone on paper and it is *invisible* on the dark page — dark sand is
+   #2e2416 against a #1a1a19 panel — so on that side the disturbed ground is
+   drawn as light instead: sand kicked up rather than shade cast down, which
+   is the same event lit from the other direction. Verified in both themes at
+   phone width; on dark the stone was floating before this. */
+:root[data-theme='dark'] .verdict-ground,
+:root:where(:not([data-theme='light'])) .verdict-ground {
+  background: radial-gradient(ellipse at 50% 50%,
+    color-mix(in srgb, var(--field-brass) 24%, transparent) 0%,
+    color-mix(in srgb, var(--field-brass) 8%, transparent) 52%,
+    transparent 78%);
 }
 :root[data-theme='light'] .verdict-wreath { --gild-lit: 0.95; --gild-sat: 1.04; }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Both objects still arrive — they simply do not travel, and the gold stops
+  /* Every object still arrives — they simply do not travel, and the gold stops
      breathing. A verdict that cannot render at all is worse than a still one. */
   .verdict-wreath,
-  .verdict-gauntlet { animation: none; }
+  .verdict-stone,
+  .verdict-ground { animation: none; }
+}
+
+/* ------------------------------------------------------ the tale of the tape
+ *
+ * What the house printed after the last game (`routes/Coliseum.tsx`). It was
+ * four identical stat tiles and a plain table, and Aaron's reading of it was
+ * "pretty basic" (2026-08-27) — which it was, in the precise sense that a
+ * *score* had been rendered as four measurements of equal weight. Two decks
+ * fought twelve times; that has a winner and a margin, and a grid of tiles
+ * says neither.
+ *
+ * **The two totals face each other, and the band between them is the margin.**
+ * A tug-of-war rather than a pie: this deck's wins fill from the left, that
+ * deck's from the right, and what neither of them took sits in the middle
+ * where it belongs. The middle is usually the smallest part of the picture and
+ * it is the part a prettier layout would have dropped, so it is the part these
+ * rules spend the most on: a drawn bout and a bout the clock ended are
+ * different objects and never share a segment, because one of them is two
+ * decks playing to a standstill and the other is the measurement giving up.
+ *
+ * **The widths are true from the first paint** and the growing is decoration
+ * over the top of them, which is `components/coliseumrecord.tsx`'s rule and
+ * its reasoning: a width set inline and animated with `scaleX` needs nothing
+ * from JavaScript, so a tab nobody is looking at cannot leave the score at
+ * zero. Nothing here counts up for the same reason — a numeral behind an
+ * animation frame is a number that can be *wrong*, and this one is the answer.
+ *
+ * **No breakpoint decides the shape.** The score is a three-column grid whose
+ * outer columns are `minmax(0, 1fr)`, so the names wrap inside their own
+ * column and the numerals shrink with `clamp` — the row never has to break,
+ * and nothing here depends on a media query having guessed the device right
+ * (the lesson the gatehouse's selects cost three rounds to learn). */
+.tape {
+  position: relative;
+  padding: 1.1rem 1rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--anvil-brass) 30%, transparent);
+  background:
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--anvil-brass) 5%, var(--surface-1)) 0%,
+      var(--surface-1) 60%);
+}
+
+.tape-head {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--anvil-brass) 74%, var(--text-secondary));
+}
+
+/* ---- the score */
+
+/* Capped and centred rather than spanning the card. The room is 64rem wide,
+   and two totals pinned to the far edges of it stop being a *versus* — they
+   read as two unrelated figures with a lot of nothing between them. Held to
+   42rem the pair squares up over the swords, and the cap does nothing at all
+   on any width narrower than that, which is every phone. */
+.tape-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 42rem;
+  margin: 0.7rem auto 0;
+}
+
+.tape-seat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+/* The away seat reads inward, so the two totals meet over the swords rather
+   than pointing off opposite ends of the card. The theater upstairs does the
+   same thing with two gradients and for the same reason. */
+.tape-seat.is-away { text-align: right; align-items: flex-end; }
+
+.tape-seat-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* `clamp` rather than a breakpoint: the numeral is the biggest thing on the
+   card and it is the first thing that has to give on a narrow phone. */
+.tape-seat-wins {
+  font-size: clamp(2rem, 11vw, 3.1rem);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--anvil-brass);
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--anvil-glint) 40%, transparent);
+  animation: tape-strike 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.tape-seat.is-away .tape-seat-wins { animation-delay: 130ms; }
+
+/* `--text-secondary`, not the `--text-muted` a caption this size usually
+   wears. Muted is #898781, which measures about 3.2:1 against this card on
+   the light page — under the floor for type this small, and the record's own
+   figures flagged the same token for the same reason. Everything a person
+   actually reads on this card is set in secondary; hierarchy is carried by
+   size and weight, which cost nobody their eyesight. */
+.tape-seat-of {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+/* The pair between the totals. `.btn-arena`'s glyph, at rest — the swords are
+   already the room's mark for two decks fighting, and reusing it is what
+   makes the gate and its result read as one thing. */
+.tape-cross {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--anvil-brass) 78%, transparent);
+}
+
+/* ---- the band */
+
+.tape-band {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 0.85rem;
+  margin-top: 0.85rem;
+  border-radius: 999px;
+  background: var(--gridline);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 18%, transparent);
+  overflow: hidden;
+}
+
+/* An even break, drawn *over* every band rather than behind it. The one
+   question a person actually asks of a margin is whether it was close, and
+   the answer is which side of this line the two metals meet on — so it has to
+   survive being drawn on top of brass, which a hairline in `--baseline` did
+   not: it vanished completely. Cut dark with a light edge, which is a scratch
+   in the metal rather than a line printed on the page. */
+.tape-even {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgb(0 0 0 / 0.55);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.16);
+  z-index: 2;
+}
+
+/* `flex: 0 0 auto` so a segment is exactly the width it was given. The default
+   `flex-shrink: 1` would let a row that sums past 100% squeeze every segment
+   proportionally, which draws a margin nobody measured — the route widens the
+   denominator so the sum cannot exceed the track, and this makes that
+   guarantee load-bearing rather than decorative. */
+.tape-span {
+  position: relative;
+  flex: 0 0 auto;
+  animation: tape-grow 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+/* Each side grows from its own end, so the two close on the middle. */
+.tape-span.is-home { transform-origin: left center; }
+.tape-span.is-away { transform-origin: right center; }
+.tape-span.is-middle { transform-origin: center; }
+
+.tape-span[data-kind='won'] {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--anvil-glint) 62%, var(--anvil-brass)) 0%,
+    var(--anvil-brass) 58%,
+    color-mix(in srgb, var(--anvil-brass) 62%, #000) 100%);
+}
+/* Where the two runs of brass meet is the margin, and with nothing between
+   them they weld into one bar — a tug-of-war drawn as a progress bar. Each
+   side takes a cut edge on its *inner* end, so the join is visible even when
+   neither a draw nor a clock-out separates them. */
+.tape-span[data-kind='won'].is-home {
+  box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.5);
+}
+.tape-span[data-kind='won'].is-away {
+  box-shadow: inset 1px 0 0 rgb(0 0 0 / 0.5);
+}
+/* A standstill is the same metal, unstruck — two decks that played each other
+   to a stop is not a fault, so it is not coloured like one. */
+.tape-span[data-kind='draw'] {
+  background: color-mix(in srgb, var(--anvil-iron) 55%, var(--gridline));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 22%, transparent);
+}
+/* The clock is not a result and does not get to look like one. Hatched, in
+   the page's own warning ink, so it reads as an interruption at a glance. */
+.tape-span[data-kind='clock'] {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--status-warning) 46%, transparent) 0 4px,
+    color-mix(in srgb, var(--status-warning) 16%, transparent) 4px 8px);
+}
+/* Whatever the counts did not account for. Bare track, deliberately: a gap
+   here means the tallies do not add up, and papering over it would hide the
+   one thing worth seeing. */
+.tape-gap { flex: 1 1 auto; min-width: 0; }
+
+/* ---- the notes under it */
+
+.tape-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.7rem;
+}
+
+.tape-note {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+/* Nothing is hidden when it is zero. "No draws" is an answer; an absent line
+   is a reader wondering whether anybody counted — and the answer is not
+   quietened either, because the sentence is what says there were none. Only
+   the mark goes dim, which is the legend admitting its own segment is not on
+   the band. */
+.tape-note.is-nil .tape-note-mark { opacity: 0.45; }
+
+.tape-note-mark {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+.tape-note-mark[data-kind='won'] {
+  background: var(--anvil-brass);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--anvil-glint) 55%, transparent);
+}
+.tape-note-mark[data-kind='draw'] {
+  background: color-mix(in srgb, var(--anvil-iron) 55%, var(--gridline));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 30%, transparent);
+}
+.tape-note-mark[data-kind='clock'] { background: var(--status-warning); }
+.tape-note-mark[data-kind='length'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--anvil-brass) 60%, transparent);
+}
+
+/* ---- every bout */
+
+.bouts {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* A row per fight. Three columns and the middle one is the only elastic
+   one, so a long deck name wraps inside its own cell instead of pushing the
+   length off the card — which is the failure a table has on a phone and the
+   reason this is not one. */
+.bout {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  background: color-mix(in srgb, var(--anvil-brass) 4%, transparent);
+}
+.bout:nth-child(even) {
+  background: color-mix(in srgb, var(--anvil-brass) 8%, transparent);
+}
+
+.bout-no {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bout-took { color: var(--text-primary); overflow-wrap: anywhere; }
+/* Neither deck took it, so nothing is named as though one had. */
+.bout[data-outcome='draw'] .bout-took,
+.bout[data-outcome='clock'] .bout-took {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.bout-len {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* A struck brass stud for a win, the same stud unstruck for a standstill, and
+   the warning ink for a bout the clock ended — the theater's own vocabulary,
+   so the pips that lit while the match ran mean the same thing here. */
+.bout-mark {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.35rem;
+  border-radius: 999px;
+  vertical-align: baseline;
+  background: var(--anvil-brass);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--anvil-glint) 55%, transparent);
+}
+.bout[data-outcome='draw'] .bout-mark {
+  background: color-mix(in srgb, var(--anvil-iron) 55%, var(--gridline));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--anvil-brass) 30%, transparent);
+}
+.bout[data-outcome='clock'] .bout-mark { background: var(--status-warning); }
+
+/* ---- the foot */
+
+.tape-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+/* The numeral is struck rather than counted: it arrives at its own value and
+   settles. See the block's opening note for why nothing here counts up. */
+@keyframes tape-strike {
+  0%   { opacity: 0; transform: translateY(0.35em) scale(0.86); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes tape-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The score is true either way — these two only ever animated a transform
+     over a value that was already correct, which is what makes switching them
+     off cost nothing at all. */
+  .tape-seat-wins,
+  .tape-span { animation: none; }
+}
+
+/* --------------------------------------------------- the gate, as a card
+ *
+ * `.btn-arena` up in the button family is the voice; this is the painting
+ * hung behind it (Aaron, 2026-08-27: "what if our button to 'Send them in'
+ * was a button made from the card 'Arena'"). It is an extension rather than a
+ * replacement, and deliberately so — every reply to the hand is still the
+ * one `.btn-arena` already had: the lifted edge, the glint across the steel,
+ * the two swords drawing apart on hover and closing on the press. What is
+ * added here is the painting's own answer to those same three states, and
+ * nothing at all is written inline, which is commandment 17's actual
+ * mechanism rather than its slogan.
+ *
+ * **The stacking order is the whole trick and it is not the default.** A
+ * `::before` is the element's *first* child in tree order and would paint
+ * under an absolutely positioned image, which is the opposite of what a scrim
+ * is for. So the four layers are numbered: the painting at 0, the scrim over
+ * it at 1, `.btn-arena`'s own glint at 2, and the label on top at 3.
+ *
+ * **The scrim is legibility, not taste.** The label is `--anvil-glint`, which
+ * clears AA against the blood gradient by a wide margin and clears nothing at
+ * all against the painting's cloud bank. The scrim carries the gradient back
+ * over the picture at a strength that leaves the label where it was — the
+ * painting is the material, never the ground the words stand on.
+ *
+ * **And every bit of that strength is in the scrim, not in the picture.** The
+ * first draft got the same look by fading the `<img>` to 0.68 and thinning
+ * the wash to match, which composites to within a percent of this and is the
+ * wrong mechanism: it is the room reaching *through* a card and changing
+ * Wizards' painting, and hovering it changed the painting again. The rule is
+ * already written down beside the token materials in this file and in ADR 32
+ * — light is laid on a card through a layer of its own, never on the art —
+ * and `cardimagery_test.go` enforces it on the surfaces where it has been
+ * settled. This is one of the surfaces that test names as unsettled, which is
+ * a reason to get it right rather than a permission not to. So the image runs
+ * at full strength and the gradient above it does all the work; hover thins
+ * *the wash*, and the painting underneath is never touched. */
+.btn-arena-card .btn-arena-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* **Low, on the floor, and that is the opposite of the obvious choice.** A
+     control this shape keeps a band about a fifth of the painting's height,
+     so the crop is a decision about which fifth. Aimed at the fighter and the
+     cloud bank — the upper half, where the subject is — it comes out as a
+     wash of pale cloud: low contrast under the label and unreadable as
+     anything. Aimed at the floor it lands on the thing that actually says
+     *arena*: the burning maze cut into black stone, with the fallen beast
+     across it. Higher contrast for the label too, because a floor is dark.
+     Walked at 34, 68 and 78 on a phone; 78 is the one you can read. */
+  object-position: center 78%;
+  transform: scale(1.04);
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.btn-arena-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* 67 / 76 / 86 rather than 52 / 64 / 80: with the picture no longer faded
+     to 0.68, these are the alphas that leave the same share of painting
+     showing through — the mechanism changed and the pixels did not. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--arena-blood-lit) 67%, transparent) 0%,
+    color-mix(in srgb, var(--arena-blood) 76%, transparent) 55%,
+    color-mix(in srgb, var(--arena-blood-deep) 86%, transparent) 100%);
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+.btn-arena-card::after { z-index: 2; }
+/* Unconditional, not `.btn-arena-card .btn-arena-face`: the label wears this
+   whether or not the painting arrived, and the swords glyph carries
+   `display: block` — inside a bare inline span that puts the label on its own
+   line, which is the fallback rendering breaking rather than falling back. */
+.btn-arena-face {
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+/* The theater's own belt-and-braces, for the theater's reason: the scrim is
+   tuned against the *average* of what is behind it and the painting has a
+   cloud bank in it. A shadow under the letters costs nothing and means the
+   label cannot be undone by a bright passage the crop happens to land on. */
+.btn-arena-card .btn-arena-face { text-shadow: 0 1px 4px rgb(0 0 0 / 0.75); }
+/* Room for a painting to be a painting rather than a texture. */
+.btn-arena-card { min-height: 3.1rem; padding-inline: 1.25rem; }
+
+/* The gates opening: the wash thins and the picture comes up and pushes in a
+   little, which is the same gesture the swords make. Pressed, it settles back
+   — the whole control sinks on `:active` and a painting that kept swelling
+   through the press would be the one part of the button not agreeing with the
+   hand. The brightening is done to the scrim; the art never changes. */
+.btn-arena-card:hover:not(:disabled) .btn-arena-art { transform: scale(1.12); }
+.btn-arena-card:hover:not(:disabled)::before { opacity: 0.9; }
+.btn-arena-card:active:not(:disabled) .btn-arena-art { transform: scale(1.03); }
+/* Focus is the keyboard's hover, and it must show the same thing — the ring
+   from `.btn:focus-visible` says *where* you are and the painting says the
+   gate is ready to open. A control that answers a pointer and not a key is
+   half a control. */
+.btn-arena-card:focus-visible:not(:disabled) .btn-arena-art {
+  transform: scale(1.12);
+}
+.btn-arena-card:focus-visible:not(:disabled)::before { opacity: 0.9; }
+
+/* The card the gate is cut from, said once, underneath it. Left-ranged rather
+   than `.coliseum-footnote`'s right, because that one is a credit hanging off
+   the corner of a picture and this one is a sentence somebody reads. */
+/* Secondary rather than muted, for `.tape-seat-of`'s reason: this is a
+   sentence somebody reads rather than a credit they glance at, and it is
+   aimed at the person who has never met the card (commandment 2). */
+.arena-note {
+  margin: 0.55rem 0 0;
+  max-width: 62ch;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.arena-note em { color: var(--text-primary); font-style: italic; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The wash still thins under the hand — that is the control answering, and
+     it is information rather than decoration. What stops is the travel, and it
+     is pinned at its resting scale in every state rather than switched to
+     `none`: at rest it sits at 1.04 to hide the crop's edges, so unsetting it
+     on hover would turn the one promise about not moving into a movement. */
+  .btn-arena-card .btn-arena-art,
+  .btn-arena-card:hover:not(:disabled) .btn-arena-art,
+  .btn-arena-card:focus-visible:not(:disabled) .btn-arena-art,
+  .btn-arena-card:active:not(:disabled) .btn-arena-art {
+    transform: scale(1.04);
+    transition: none;
+  }
 }
 
 /* ================================================== the centre of the arena
