@@ -90,7 +90,8 @@ export function theaterBeats(partial: unknown): ForgeBeats | null {
  * **Every new beat kind needs a case here.** The default is a safety net, not
  * a destination: it prints the kind's own name, which is the wire showing
  * through to a user (commandment 10). `enters` and `attach` sat in it for as
- * long as the scribe has existed. Anything the scribe learns to report next —
+ * long as the scribe has existed, and `exiled` was written into this file in
+ * the same change that raised it, which is the habit worth keeping. Anything the scribe learns to report next —
  * mana, sacrifice, an ability resolving, populate — arrives in exactly the
  * same state and needs a sentence added below before it is on screen.
  *
@@ -154,6 +155,13 @@ export function beatLine(beat: ForgeBeat, name: (slug: string) => string):
       return { who, text: `is at ${beat.life ?? 0}` }
     case 'dies':
       return { who: null, text: `${card} is destroyed` }
+    // Exile's own word, and it is worth not reaching for a synonym: "exiled"
+    // is what the card says, what a player says, and — the part that matters
+    // for commandment 2 — the thing a newcomer will need to look up exactly
+    // once. "Removed" or "banished" would be kinder for one sentence and would
+    // leave them unable to read the card that did it.
+    case 'exiled':
+      return { who: null, text: `${card} is exiled` }
     case 'outcome':
       // Forge writes all nine of its outcome sentences to follow "<player> has
       // won/lost", so the note is already a sentence's tail and is rendered

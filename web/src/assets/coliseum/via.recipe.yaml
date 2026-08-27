@@ -1,0 +1,91 @@
+# The road a card takes when it is exiled.
+#
+# Aaron, 2026-08-27: *"We need a good animation for the exile mechanic, a
+# photo-real winding road leading into the distance of some kind?"* — and then,
+# when the first answer reached for the painting already dressing the exile
+# pile, *"Use a different art, that is already the art for the zone itself."*
+# He is right: the same picture twice is a room that has run out of things to
+# say. The pile keeps Path to Exile's hooded rider; the road under the card is
+# this, and the two are different objects doing different jobs.
+#
+# **It is the Via Appia, and that is not decoration.** Exile in Magic is a
+# leaving that does not come back, and the Appian Way is the road Rome built
+# for exactly that: the road *out* of the city, lined for miles with the tombs
+# of people who were not returning either. It is also the right road for this
+# particular room. The arena's other marks are Roman objects photographed as
+# objects — the memento mori from a Pompeiian dining room, a parade shield, the
+# secutor's helm — and a Roman road is the one piece of scenery that is still
+# there to photograph. Nothing here is a stand-in for the idea; it is the
+# thing.
+#
+# **Photo-real means a photograph**, which ruled out the better-known pictures
+# of this road. Piranesi's etchings of the Appia are magnificent and they are
+# engravings; Canina's plates are reconstructions. The Rijksmuseum's 19th
+# century albumen prints are photographs and are album pages, with the print
+# occupying a fifth of the frame. This is a colour photograph of the paving
+# itself, released to the public domain by the person who took it.
+#
+# **The composition is the whole reason this one and not another.** The basalt
+# runs from the bottom of the frame away to a vanishing point about four fifths
+# of the way across, curving right as it goes, with cypresses down one side,
+# umbrella pines closing over it, and the tomb-tower of Torre Selce standing
+# where a Roman traveller would have read somebody's name. A card can be sent
+# *down* that. A road photographed across the frame, or one whose vanishing
+# point sits dead centre, gives the animation nowhere to go — the card would
+# shrink rather than leave, and shrinking is not what exile looks like.
+#
+# The vanishing point lands at roughly **(0.79, 0.47)** of the finished image,
+# and `index.css` sends the card there. Those two numbers are the coupling
+# between this file and that one: re-crop and the card walks off the road.
+animist: 1
+
+why_committed: >
+  The same argument as the skull and the shield beside it. This is drawn on the
+  beat that says a permanent was exiled and it is gone about a second and a
+  half later, so fetching it from somebody else's host would mean a road that
+  arrives after the card has already left down it. It is also a photograph
+  released into the public domain by an individual rather than by an
+  institution, which is the category where a file most quietly changes licence
+  or disappears — a copy confirmed once and committed is a copy whose
+  provenance stays true.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the
+  # API: the photographer dedicated it outright ("foto di pubblico dominio").
+  # Not an institutional release and not a term expiry — an individual's own
+  # dedication, which is why the licence is confirmed on every build rather
+  # than trusted from this comment.
+  via:
+    provider: wikimedia
+    title: "Appia antica 2-7-05 048.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Appia_antica_2-7-05_048.jpg
+    found_via: >
+      Commons, searching `Appian Way Via Appia road` and then `Via Appia
+      Antica`, filtering to Public domain and CC0 and discarding everything
+      that was not a photograph -- the search returns far more engravings,
+      maps and scanned books than pictures. Of the photographs, most are of
+      the tombs rather than of the road; this is one of the few taken *along*
+      it, standing on the paving and looking down its length.
+    licence: Public domain
+
+outputs:
+  # 560 wide for a band drawn at roughly 300-420, so it holds up on a retina
+  # display without being a second card's worth of bytes.
+  #
+  # **Quality 74 rather than the marks' 82.** The opposite subject from the
+  # memento's mosaic: this is foliage, which is the pattern a high quality
+  # setting spends the most bytes on and the eye examines the least — and it
+  # is drawn *behind a card*, at reduced opacity, moving. The tesserae in the
+  # skull are the whole reason that mark reads as a mosaic; nobody will ever
+  # count the needles on these pines.
+  - file: via.webp
+    from: via
+    ops:
+      # The top quarter is sky, and sky is the one part of this photograph the
+      # animation has no use for: the card travels along the ground. Dropping
+      # it also brings the vanishing point up to the middle of the frame,
+      # which is where a thing receding wants to be aimed.
+      - crop: {frac_box: [0.0, 0.26, 1.0, 1.0]}
+      - resize: {width: 560}
+    encode: {format: webp, quality: 74}
+    expect: {width: 560, height: 310, budget_kb: 70, metadata: none}

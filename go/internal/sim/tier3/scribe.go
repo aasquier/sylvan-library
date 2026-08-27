@@ -327,6 +327,22 @@ func (p *ScribeParser) fold(l scribeLine) {
 			}
 			return
 		}
+		// **A permanent exiled**, which is the other way off the sand and had
+		// nothing to say for itself. See [EventExiled] for why this is every
+		// permanent rather than only creatures, and why it is only ever the
+		// battlefield it is leaving.
+		//
+		// `was` is the zone the card came *from*, worked out above — Forge
+		// announces the leaving before the arriving, so by the time a card
+		// lands anywhere its own zone already reads as nothing. `ZoneLand` is
+		// in here beside `ZoneBattlefield` for the reason it is in the `dies`
+		// check above: the board draws lands in a row of their own, and a
+		// fetchland cracked for a land is a permanent leaving play.
+		if l.Mode == "in" && l.Zone == "Exile" &&
+			(was == ZoneBattlefield || was == ZoneLand) {
+			p.raise(GameEvent{Kind: EventExiled, Seat: l.Seat, Card: l.Card, ID: l.ID})
+			return
+		}
 		// A permanent arriving. See [EventEnters] for why lands are excluded
 		// and why this is not called "resolves".
 		if p.board.zone[l.ID] == ZoneBattlefield && was != ZoneBattlefield {

@@ -28,7 +28,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
-import { faceFor, mannerOf, stageLife } from '../lib/stage'
+import { castType, faceFor, mannerOf, plateWord, stageLife }
+  from '../lib/stage'
 import { MatchBoard } from './board'
 
 afterEach(cleanup)
@@ -121,7 +122,13 @@ it('gives an instant that never touched the board its moment', () => {
   const shown = face(container)
   expect(shown?.getAttribute('src'), 'and its picture is found by name')
     .toBe('https://example.test/bolt.jpg')
-  expect(container.querySelector('.stage-plate-word')?.textContent).toBe('Cast')
+  // **And the plate names the kind**, which is the whole of why the type is
+  // worth drawing: this card is on no battlefield and never will be, so the
+  // word "Instant" is the only thing telling somebody at their first game that
+  // it was never going to stay. The type comes off the match's own card list —
+  // the same lookup that found the picture, asked once.
+  expect(container.querySelector('.stage-plate-word')?.textContent)
+    .toBe('Cast Instant')
   expect(container.querySelector('.stage-plate-title')?.textContent)
     .toBe('Lightning Bolt')
 })
@@ -325,7 +332,7 @@ it('takes no pointer, so the timeline stays draggable underneath', () => {
     .toHaveLength(0)
 })
 
-it('gives the middle of the arena to casts and deaths, and to nothing else', () => {
+it('gives the middle of the arena to casts, deaths and exiles, and to nothing else', () => {
   // **A land is played, not cast**, and this is the one Magic judgement in the
   // file rather than a rendering one. A land does not use the stack, is not
   // cast, and is the most routine thing that happens in a game — eight or ten
@@ -335,6 +342,7 @@ it('gives the middle of the arena to casts and deaths, and to nothing else', () 
   // drawing it twice a beat apart would read as two.
   expect(mannerOf('cast')).toBe('cast')
   expect(mannerOf('dies')).toBe('dies')
+  expect(mannerOf('exiled')).toBe('exiled')
   for (const quiet of ['land', 'resolve', 'attack', 'block', 'turn', 'damage',
     'life', 'enters', 'attach', 'unblocked', 'mulligan', 'outcome']) {
     expect(mannerOf(quiet), `${quiet} does not take the middle`).toBeNull()
@@ -405,4 +413,49 @@ it('never cuts a reveal down to a flicker, at any pace', () => {
   // And it falls back to a real length rather than a plausible default when
   // nobody hands it one.
   expect(stageLife('dies', 'paused', null)).toBe(2000)
+})
+
+it('names the kind of card on the plate, in the word a player would use', () => {
+  // Aaron, 2026-08-27: *"I would also like to display the type, like 'CAST
+  // CREATURE' or 'CAST SORCERY'."* The reason it earns its place is
+  // commandment 2: half of what crosses this stage never reaches the
+  // battlefield, so the picture is all a newcomer gets, and the type is the
+  // difference between *a card happened* and *a spell resolved and is gone*.
+
+  // **The priority is the point, not the lookup.** Most cards carry more than
+  // one type and only one of them is what a player calls the card.
+  expect(castType('Creature - Cat Warrior')).toBe('Creature')
+  expect(castType('Artifact Creature - Golem'), 'an Artifact Creature is a '
+    + 'creature: it is what attacks, and what anybody at the table calls it')
+    .toBe('Creature')
+  expect(castType('Legendary Enchantment Creature - God')).toBe('Creature')
+  expect(castType('Legendary Artifact - Equipment')).toBe('Artifact')
+  expect(castType('Enchantment - Aura')).toBe('Enchantment')
+  expect(castType('Instant')).toBe('Instant')
+  expect(castType('Kindred Sorcery - Elf'), 'Kindred never stands alone, so '
+    + 'reading it would only ever hide the type beside it').toBe('Sorcery')
+  expect(castType('Legendary Planeswalker - Teferi')).toBe('Planeswalker')
+
+  // Scryfall's long dash and Forge's hyphen are both cut, because both reach
+  // this wire — and everything past either one is a subtype, which is the
+  // card's own name said a second time.
+  expect(castType('Creature — Human Wizard')).toBe('Creature')
+
+  // Absent is a real answer: a match that never described the card still gets
+  // a plate, it just gets the shorter one.
+  expect(castType(undefined)).toBeNull()
+  expect(castType('')).toBeNull()
+  expect(castType('Attraction')).toBeNull()
+
+  // **Only a cast takes the type**, and the asymmetry is deliberate. "Cast
+  // Creature" answers a question somebody watching actually has. "Dies
+  // Creature" answers none — rule 700.4 gives that word to creatures and
+  // planeswalkers, so the noun is already nearly settled and the picture on
+  // the stage is the rest of it. Exile sits with the death: it is drawn on the
+  // way out, and where the card has gone matters more than what it was.
+  expect(plateWord('cast', 'Creature - Cat Warrior')).toBe('Cast Creature')
+  expect(plateWord('cast', 'Instant')).toBe('Cast Instant')
+  expect(plateWord('cast', undefined)).toBe('Cast')
+  expect(plateWord('dies', 'Creature - Cat Warrior')).toBe('Dies')
+  expect(plateWord('exiled', 'Creature - Cat Warrior')).toBe('Exiled')
 })

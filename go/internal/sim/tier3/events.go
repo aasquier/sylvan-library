@@ -110,6 +110,35 @@ const (
 	EventDamage    EventKind = "damage"
 	EventLife      EventKind = "life"
 	EventDies      EventKind = "dies"
+	// EventExiled is a permanent leaving the battlefield for exile.
+	//
+	// **[EventDies]'s twin, and it exists for the same hole.** A great deal of
+	// what removal does in Commander exiles rather than destroys — Path to
+	// Exile, Swords to Plowshares, Anguished Unmaking — and every one of those
+	// was a card that vanished off the sand with nothing said about it (Aaron,
+	// 2026-08-27: *"we don't show exiled cards there like we do for destroyed
+	// creatures going to the graveyard"*). The board moved the card, correctly
+	// and silently, and the moment a player would have reacted to went past
+	// unmarked.
+	//
+	// **Every permanent, not only creatures**, which is the one place this
+	// deliberately parts company with `dies`. That restriction is rule 700.4
+	// giving the *word* "dies" to creatures and planeswalkers; it is about what
+	// a sentence may say, not about what is worth saying. Exile has no such
+	// rule and needs no such narrowing — an artifact exiled is as removed as a
+	// creature exiled, and rather more permanently, since it is not coming back
+	// from there.
+	//
+	// **Only off the battlefield**, which is where the noise would otherwise
+	// come from. A card exiled from a graveyard, a hand or the top of a library
+	// is exiled too, and the library ones are the reason the line is drawn
+	// here: impulse draw and cascade exile several cards a turn and put most of
+	// them straight back, so a room that raised a beat for each would spend the
+	// centre of its arena on bookkeeping and have nothing left over for the
+	// Swords to Plowshares. The board still *shows* every one of them; they
+	// simply arrive without a sentence, which is already what happens to every
+	// change this account does not narrate.
+	EventExiled EventKind = "exiled"
 	// EventSacrificed is a permanent its controller sacrificed — a cost paid,
 	// not something that happened to it.
 	//
