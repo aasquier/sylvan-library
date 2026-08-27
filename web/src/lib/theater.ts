@@ -74,10 +74,15 @@ export function theaterBeats(partial: unknown): ForgeBeats | null {
 
 /** One beat as a line of English.
  *
- * The vocabulary is the CLI's (`narrateGame` in `cmd/mtglab/sim.go`), and
- * keeping the two in step is the point rather than a coincidence: the terminal
+ * The vocabulary began as the CLI's (`narrateGame` in `cmd/mtglab/sim.go`), and
+ * the two saying one thing is the point rather than a coincidence: the terminal
  * account exists so a person can read exactly what the browser will be handed,
  * and a beat that reads differently in the two places makes that check a lie.
+ * **The browser has since outrun it** — `enters`, `attach`, `exiled`,
+ * `sacrificed`, `ability` and `companion` all have a sentence here and no case
+ * in the terminal, which quietly says nothing at all for six of the kinds the
+ * scribe raises. That is a gap in the CLI rather than a licence to drift here;
+ * a sentence added below should be added there too when Go is next open.
  *
  * `name` turns a deck's slug into whatever the room calls it. It is passed in
  * because only the room knows — the beat carries a slug, and the shelf carries
@@ -90,21 +95,36 @@ export function theaterBeats(partial: unknown): ForgeBeats | null {
  * **Every new beat kind needs a case here.** The default is a safety net, not
  * a destination: it prints the kind's own name, which is the wire showing
  * through to a user (commandment 10). `enters` and `attach` sat in it for as
- * long as the scribe has existed, and `exiled` was written into this file in
- * the same change that raised it, which is the habit worth keeping. Anything the scribe learns to report next —
- * mana, sacrifice, an ability resolving, populate — arrives in exactly the
- * same state and needs a sentence added below before it is on screen.
+ * long as the scribe has existed, `ability` sat in it for a release after it
+ * started firing forty-odd times a game, and `exiled` was written into this
+ * file in the same change that raised it — which is the habit worth keeping.
+ * Anything the scribe learns to report next — mana, populate — arrives in
+ * exactly the same state and needs a sentence added below before it is on
+ * screen.
  *
- * **Nothing renders these sentences today**, and that is worth knowing before
- * spending an afternoon on the wording. #328 removed "The account", the panel
- * that read them out; `beatLine` is still called for every beat of every game
- * (`routes/Coliseum.tsx`, in `stage`) and its `text` and `who` are stored on
- * `StagedBeat`, but the board reads only a beat's `kind`, `card` and `key`.
- * So this is correct and unread rather than correct and rendered. It is kept
- * because narration is expected back and because a reader that is wrong while
- * nobody is looking is a reader that is wrong on the day somebody looks —
- * whether it returns or `StagedBeat.text` goes with it is Aaron's call, and
- * both halves should move together.
+ * **`who` is read now; `text` still is not.** This comment used to say that
+ * nothing rendered any of it and that whether it came back was Aaron's call.
+ * He made the call — *"It would be nice if we added the players name too,
+ * Gyome CASTS Creature"* — and half of it came back: `who` and `target` now
+ * stand on the plate under the card in the middle of the arena
+ * (`lib/stage.ts`, `components/stage.tsx`). The **sentence** did not, and the
+ * reason is that the plate is not a line of prose. It is a museum label read in
+ * about a second — a name, a deed, a card — so it builds its own short phrase
+ * out of the manner and the card's type line, and `text`'s "casts Lightning
+ * Bolt" would print the card's name a second time under a picture of it.
+ *
+ * So `text` is still correct and unread, and it is still worth keeping right:
+ * the play-by-play #328 removed is expected back, this is what it will read,
+ * and a reader that is wrong while nobody is looking is a reader that is wrong
+ * on the day somebody looks.
+ *
+ * **`who` is the player the sentence is *about*, and a death has none.** That
+ * is the one thing to hold on to when adding a case: `dies`, `exiled` and
+ * `damage` deliberately return `who: null`, because a creature dying is not
+ * something its controller did and a plate reading "Gyome dies" would be the
+ * room saying the wrong thing about the wrong player. The seat is still on the
+ * wire for anything that needs it; it simply is not the subject of this
+ * sentence.
  */
 export function beatLine(beat: ForgeBeat, name: (slug: string) => string):
   { who: string | null; text: string } {
@@ -140,6 +160,55 @@ export function beatLine(beat: ForgeBeat, name: (slug: string) => string):
     // first game.
     case 'attach':
       return { who, text: `puts ${card} on ${beat.target || 'a permanent'}` }
+    // **A companion is bought in, and it was never dealt.** Aaron watched a
+    // match, saw Kaheera land in a hand and thought the engine was cheating —
+    // *"you don't shuffle your companion in with normal cards to be dealt,
+    // they come from outside the game like the commander does"*. He was right
+    // about the rules and Forge was right about the game: the card starts in a
+    // command zone, and its controller pays {3} to put it in their hand. The
+    // room drew that arrival and said nothing at all about it, which is a
+    // beginner being shown a game that cheats (commandment 2).
+    //
+    // **"outside the game" rather than "the command zone"**, which is the same
+    // choice `attach` makes two cases down. Both are true; one of them is what
+    // a person watching needs, and the other is a zone name that means nothing
+    // until you already know the answer.
+    //
+    // **The three is stated, not read.** Rule 702.139b fixes the cost at {3}
+    // for every companion there has ever been, and the scribe deliberately
+    // attributes no mana to the ability — so this is the rulebook speaking,
+    // never a number inferred from whichever lands happened to tap.
+    case 'companion':
+      return { who, text: `calls in ${card} from outside the game` }
+    // A cost paid rather than something that happened to the card, which is
+    // why it is not `dies` — rule 700.4 gives that word to a creature or
+    // planeswalker put into a graveyard, and a Treasure cracked for mana does
+    // neither. The player is the subject here for exactly that reason: a
+    // sacrifice is a thing somebody chose.
+    //
+    // **And the wire does not say which player yet.** Measured on a live match
+    // (2026-08-27): the scribe's `sacrificed` line carries no seat, so `who` is
+    // null on every one of these and the sentence arrives with its subject
+    // missing. That is a hole in Go rather than a reason to write a different
+    // sentence here — the day the seat crosses, this reads correctly with no
+    // change, and until then the plate on the centre stage falls back to its
+    // nameless form rather than naming the wrong person.
+    case 'sacrificed':
+      return { who, text: `sacrifices ${card}` }
+    // **Activated and triggered are two different sentences**, and the wire
+    // already knows which — `trigger` is the scribe reading Forge's own flag.
+    // An ability somebody *activated* is a thing they did, so the player is
+    // the subject; one the game *triggered* happened by itself, so the card
+    // is, exactly as it is for a death. Composing a trigger as "<player>
+    // <card> triggers" would put two subjects in one sentence.
+    //
+    // Forty-odd of these a game — measured on a real match, against fifteen
+    // casts — so this is the commonest kind in the whole stream, and it spent
+    // a release falling to the default and printing its own wire name.
+    case 'ability':
+      return beat.trigger
+        ? { who: null, text: `${card} triggers` }
+        : { who, text: `uses ${card}` }
     case 'attack':
       return { who, text: `attacks ${them ?? 'across the table'} with ${card}` }
     case 'block':
