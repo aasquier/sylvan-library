@@ -148,3 +148,17 @@ Why committed rather than hotlinked: The same argument the gold and the glass be
 
 Why committed rather than hotlinked: The same argument the gold beside it makes: a dozen tokens on one board draw one file, and it is drawn the moment the token arrives rather than a request later. There is a second reason particular to this one -- it is a photograph of an object held by a museum, re-hosted by a third party, and that is precisely the category where somebody else's copy quietly changes licence or disappears. A copy checked once and committed is a copy whose provenance stays true.
 <!-- animist:end lens -->
+
+<!-- animist:begin via -->
+## via.webp
+
+- **Source**: "Appia antica 2-7-05 048.jpg", <https://commons.wikimedia.org/wiki/File:Appia_antica_2-7-05_048.jpg>, found via Commons, searching `Appian Way Via Appia road` and then `Via Appia Antica`, filtering to Public domain and CC0 and discarding everything that was not a photograph -- the search returns far more engravings, maps and scanned books than pictures. Of the photographs, most are of the tombs rather than of the road; this is one of the few taken *along* it, standing on the paving and looking down its length.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-26).
+- **Transformations** (Pillow, scripted -- `animist build via.recipe.yaml`):
+  - `crop`: frac_box=[0.0, 0.26, 1.0, 1.0].
+  - `resize`: width=560.
+  - Encoded WEBP, quality 74.
+
+Why committed rather than hotlinked: The same argument as the skull and the shield beside it. This is drawn on the beat that says a permanent was exiled and it is gone about a second and a half later, so fetching it from somebody else's host would mean a road that arrives after the card has already left down it. It is also a photograph released into the public domain by an individual rather than by an institution, which is the category where a file most quietly changes licence or disappears — a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end via -->

@@ -63,6 +63,12 @@ import { beatDelay, type Speed } from './reel'
  * - `dies` — a creature leaving the battlefield for a graveyard. Already on the
  *   wire, and already drawn twice elsewhere: the skull on the card in its row,
  *   the ghost rising off the graveyard pile. This is the middle of that.
+ * - `exiled` — a permanent leaving the battlefield for exile. `dies`'s twin,
+ *   and it arrived for the same reason: a great deal of Commander's removal
+ *   exiles rather than destroys, and a Path to Exile used to take a creature
+ *   off the sand with nothing said about it at all (Aaron, 2026-08-27). Raised
+ *   in Go by the scribe, which also argues why it is every permanent rather
+ *   than only creatures and why only the battlefield raises it.
  *
  * Not yet, and what each would need:
  *
@@ -78,7 +84,7 @@ import { beatDelay, type Speed } from './reel'
  *   board just changed. The words are the part that matters more than the
  *   glow.
  */
-export type Manner = 'cast' | 'dies'
+export type Manner = 'cast' | 'dies' | 'exiled'
 
 /** Which beats get the middle of the arena.
  *
@@ -96,7 +102,52 @@ export type Manner = 'cast' | 'dies'
  * cast is the moment that is drawn.
  */
 export function mannerOf(kind: string): Manner | null {
-  return kind === 'cast' ? 'cast' : kind === 'dies' ? 'dies' : null
+  return kind === 'cast' ? 'cast'
+    : kind === 'dies' ? 'dies'
+      : kind === 'exiled' ? 'exiled'
+        : null
+}
+
+/**
+ * The card's own kind, in the one word a player would use for it.
+ *
+ * Aaron, 2026-08-27: *"we say 'CAST' and the card name, I would also like to
+ * display the type, like 'CAST CREATURE' or 'CAST SORCERY'."* Which is a
+ * better ask than it looks, and the reason is commandment 2. Half of what
+ * crosses this stage never reaches the battlefield, so the picture is all
+ * anybody gets — and a newcomer watching a Lightning Bolt appear and vanish
+ * has no way to know whether that was a permanent they should expect to see
+ * again. The type is the difference between *a card happened* and *a spell
+ * resolved and is gone*.
+ *
+ * **Reading the line rather than the card**, which is `rowFor`'s precedent one
+ * file over: the type line is on the wire already, and a browser that had to
+ * look a card up to draw a word would be a second place for Magic facts to
+ * rot.
+ *
+ * **The order is a priority and not a search**, because most cards have more
+ * than one type and only one of them is the answer. An Artifact Creature is a
+ * *creature* — that is what it does, what it attacks with and what a player
+ * calls it — and a Legendary Enchantment Artifact — Equipment is an artifact.
+ * So the list runs from the type that most decides how a card behaves to the
+ * type that least does.
+ *
+ * Supertypes never appear: Legendary, Basic, Snow and World are adjectives on
+ * a card, not what it is. Kindred is left out for a different reason — it
+ * never occurs alone, so it can only ever hide the type sitting beside it.
+ * Subtypes are cut with the line, because "Cast Creature" is the useful word
+ * and "Cast Cat Warrior" is the card's own name said twice.
+ */
+const CAST_TYPES = ['Creature', 'Planeswalker', 'Battle', 'Instant', 'Sorcery',
+  'Enchantment', 'Artifact', 'Land'] as const
+
+export function castType(types: string | undefined): string | null {
+  if (!types) return null
+  // Forge writes `Legendary Creature - Cat Warrior`; Scryfall's long dash also
+  // turns up on this wire, so both separators are cut. Everything after either
+  // one is a subtype and none of it is the answer.
+  const head = types.split(/\s[-—]\s/)[0] ?? types
+  return CAST_TYPES.find((t) => head.includes(t)) ?? null
 }
 
 /**
@@ -121,6 +172,14 @@ const STAGE_LIFE: Record<Manner, number> = {
      written down anyway so that a stage rendered without that number still gets
      the right length rather than a plausible-looking default. */
   dies: 2000,
+  /* The longest of the three, and the only one where the length is doing work
+     rather than being spent. A cast is *read* — a name, an art, a plate — and
+     it can end the moment the eye has them. An exile is **watched**: the card
+     goes down a road and the whole point is that it gets smaller and further
+     away, which is a thing that takes time or does not happen. Under about a
+     second and a quarter the card jumps rather than leaves. This is still
+     inside the cap below, so a fast pace shortens it like anything else. */
+  exiled: 1500,
 }
 
 /** The most beats a stage item may outlive its own.
@@ -182,10 +241,37 @@ export function stageLife(manner: Manner, speed: Speed,
  *  exhibits and this is the one moment a card is held up to be looked at. The
  *  words are the game's own — a creature *dies*, which is the rules term and
  *  also the plainer of the two for somebody at their first game. */
-export const PLATE: Record<Manner, string> = { cast: 'Cast', dies: 'Dies' }
+export const PLATE: Record<Manner, string> = {
+  cast: 'Cast', dies: 'Dies', exiled: 'Exiled',
+}
+
+/**
+ * What the plate says, in full.
+ *
+ * The manner's own word, and then the card's kind when there is one and it
+ * adds something. **Only a cast gets the type**, and the asymmetry is the
+ * point rather than an omission: "Cast Creature" answers a question somebody
+ * watching actually has, because half of what is cast never lands and the type
+ * is the only clue about which half this was. "Dies Creature" answers nothing
+ * — rule 700.4 gives that word to creatures and planeswalkers, so a thing that
+ * dies is already one of two things, and the picture on the stage is the other
+ * half of the answer.
+ *
+ * Exile sits with `dies` rather than with `cast` for the same reason from the
+ * other side. It is drawn on the way *out*, and the card is right there being
+ * looked at; what it was matters less than where it has gone.
+ */
+export function plateWord(manner: Manner, types: string | undefined): string {
+  const kind = manner === 'cast' ? castType(types) : null
+  return kind ? `${PLATE[manner]} ${kind}` : PLATE[manner]
+}
 
 /** One card, on the stage, for one moment. */
 export interface Staged {
+  /** What the plate under the card reads, already assembled — see
+   *  [plateWord]. Settled here rather than in the drawing, so the one place
+   *  that knows the card's type line is the one place that reads it. */
+  word: string
   /** The beat's own identity, which is what makes the second Lightning Bolt of
    *  a game play again rather than reconciling onto an element whose animation
    *  has already run. */

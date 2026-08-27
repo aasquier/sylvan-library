@@ -10719,6 +10719,193 @@ button:hover .tarot-fan-card {
     color-mix(in srgb, var(--field-brass) 78%, transparent), transparent);
 }
 
+/* --- an exile, as a road ------------------------------------------------ */
+
+/* **A death happens to the card; an exile happens to the card's place.**
+ *
+ * That is the whole reason this is built the other way up from the death
+ * above. The doom lays two layers *on* the frame — a pall and a stone — because
+ * what is being drawn is something arriving on the card. Nothing arrives here.
+ * The card is whole and unharmed and simply not in the room any more, so the
+ * room is what changes: the sand opens onto a road for a second and a half, and
+ * the card goes down it.
+ *
+ * The road is the Via Appia — the road out of Rome, lined for miles with the
+ * tombs of people who were not coming back either. `via.recipe.yaml` argues
+ * which photograph and why, and `components/stage.tsx` argues why the picture
+ * is under the card rather than over it.
+ *
+ * **The recession is a real perspective and not a scale, and that is what
+ * `perspective-origin` is doing.** A card that only shrinks is a card getting
+ * smaller in the middle of the screen; a card translated in Z under a
+ * perspective whose origin sits on the road's own vanishing point travels
+ * *down the road*, because that is what the projection means. So the two
+ * numbers below are not a taste — they are where the road's paving disappears
+ * among the pines, and they have to agree with the crop in the recipe. Re-crop
+ * the photograph and the card walks off into a hedge. */
+.stage-card.is-exiled {
+  /* **The vanishing point, in this box's own coordinates**, and it is measured
+     rather than reasoned. The road's paving disappears at (0.79, 0.47) of the
+     finished crop; where that lands inside *this* box depends on how the
+     `min()`-sized image sits in it, so the number was read off a rendered
+     board (80.2% / 47.8% at 1512px) rather than derived. Aiming it by
+     arithmetic put it two points left and the card drifted off the paving.
+
+     It is the one coupling between a photograph and a stylesheet in this room.
+     Re-crop `via.recipe.yaml`, or change the width below, and this has to be
+     measured again — the card will walk into a hedge otherwise, and nothing
+     will fail to tell you. */
+  perspective: 1000px;
+  perspective-origin: 80% 48%;
+  /* Distance, going cold. Not the death's green and not the cast's brass: the
+     light on the far end of a road at dusk, which is the one thing in this
+     room that is neither the arena's fire nor the graveyard's damp. */
+  --stage-glow: #93a6b6;
+}
+
+.stage-road {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-road-open var(--stage-life, 1500ms) ease-out both;
+}
+@keyframes stage-road-open {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  /* Held almost to the end. It used to start closing at 70%, which is while
+     the card is still travelling — so the road faded out from under the thing
+     going down it, and the half of the animation that shows the road best was
+     the half spent hiding it. */
+  88%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* **A window behind the card, not a band across the arena.**
+ *
+ * The first size was 84% of the stage and it was wrong twice over: it washed
+ * the sand out on both halves and it lay across the trench, so the turn number
+ * and both players' life totals were reading through a photograph. Roughly
+ * twice the card's own width is the size at which the road is somewhere the
+ * card is going rather than a picture the board is behind.
+ *
+ * **Masked rather than framed**, which is the other half of it. A rounded
+ * rectangle with a vignette painted on top is still a rectangle — there was a
+ * hard horizontal edge across the arena where the sky met the sand. The mask
+ * dissolves the photograph into the floor with no border at all, so what is
+ * left is the middle of the road and the trees either side, opening out of the
+ * sand and closing again. Off-centre, because the road is: the clear part of
+ * the mask sits over the paving rather than over the middle of the frame. */
+.stage-road-art {
+  width: min(100%, 980px);
+  aspect-ratio: 560 / 310;
+  object-fit: cover;
+  /* **A lengthwise oval** (Aaron, 2026-08-27), and the shape is the road's own
+     rather than a frame put around it. A near-square reveal was cutting the
+     corners off a rectangle and still reading as a rectangle; an ellipse half
+     as tall as it is wide reads as a *lens laid along the road* — which is
+     also what the subject is, since everything worth seeing in this photograph
+     is on one horizontal band and the sky and foreground above and below it
+     are the parts that were fighting the arena.
+
+     Wider than tall by roughly three to one in pixels: the radii are
+     percentages of the box's own width and height, and the box runs the width
+     of the arena, so 48% by 33% is about 940 across against 360 down. Off-centre in x for
+     the same reason the whole crop is — the road, and its vanishing point,
+     are right of middle. */
+  -webkit-mask-image: radial-gradient(ellipse 48% 33% at 60% 53%,
+    #000 0%, #000 54%, rgba(0, 0, 0, 0.5) 80%, transparent 100%);
+  mask-image: radial-gradient(ellipse 48% 33% at 60% 53%,
+    #000 0%, #000 54%, rgba(0, 0, 0, 0.5) 80%, transparent 100%);
+  /* **Opaque, and the restraint that used to live here has moved.**
+     The first pass held this at 0.58 on the argument that a photograph behind
+     a Magic card is two pictures competing. The argument was right and the
+     lever was wrong. What made the first road overbearing was its size and its
+     *edges* — 84% of the arena with a hard horizontal line where the sky met
+     the sand, which read as a photograph pasted onto the floor. The **mask**
+     is what fixed that, and it fixed it well enough that the dimming was only
+     ever costing visibility: twice over, Aaron could not see the road at all
+     (2026-08-27, *"Make the road more visible"*, then *"More, still barely
+     visible"*).
+
+     **The card is why it has to be this big.** It is held at full size in the
+     middle of the stage for the first third of its life, and it covers most of
+     what is behind it — so a road sized to the card is a road you see two
+     slivers of trees from. It has to reach well past the card's own edges to
+     be a place rather than a backdrop. It crosses the trench doing that, for
+     about a second, and that is a trade worth taking: the scoreboard is
+     standing information and this is an event. */
+  opacity: 1;
+  /* The road itself creeps toward its own vanishing point, so the ground moves
+     under the card instead of the card sliding over a still postcard. Small:
+     three percent over the whole life, which is felt and not watched. */
+  animation: stage-road-run var(--stage-life, 1500ms) ease-out both;
+}
+@keyframes stage-road-run {
+  0%   { transform: scale(1.03); }
+  100% { transform: scale(1.09); }
+}
+/* A warm dusk laid over the photograph, and nothing at its edges — the mask
+   above has already dissolved those. This is here so a bright Italian sky does
+   not sit inside a gold arena arguing with it: the road keeps its own colour
+   and loses a little of its daylight, which is also what a road looks like at
+   the hour anybody actually leaves on one. */
+.stage-road-haze {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 46% 52% at 50% 50%,
+      rgba(26, 16, 6, 0.08) 0%,
+      rgba(20, 12, 5, 0.03) 58%,
+      rgba(20, 12, 5, 0) 82%);
+}
+
+/* **Down the road, and it does not hurry at the start.** The card is held
+   still long enough to be read — a name, a painting, a plate — and only then
+   does it leave. That pause is the difference between a card being exiled and
+   a card being flicked off the screen, and it is why this manner is given the
+   longest life of the three in `lib/stage.ts`.
+
+   The turn is tiny and it is not decoration: the Appia bends right as it goes,
+   so a card travelling down it turns with the road. Two degrees is enough for
+   the eye to read the curve and not enough to read as a card being thrown. */
+.stage-card.is-exiled .stage-frame {
+  animation: stage-exile var(--stage-life, 1500ms)
+    cubic-bezier(0.4, 0, 0.55, 1) both;
+}
+@keyframes stage-exile {
+  0%   { opacity: 0; transform: translate3d(0, 0, 80px); }
+  10%  { opacity: 1; transform: translate3d(0, 0, 0); }
+  /* The hold. Everything before this is arrival and everything after is
+     departure, and a card that starts leaving before it has been seen has not
+     been shown to anybody. */
+  32%  { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  82%  { opacity: 0.62; }
+  /* **How far down the road is arithmetic, not taste.** Under a perspective of
+     1000, translating by Z lands the element `1 - 1000/(1000 + |Z|)` of the
+     way from where it started to the perspective origin — so -2600 carried it
+     only 72% of the way and the card stopped short of the vanishing point,
+     still on the paving but visibly not gone. -7000 is 87.5%, which at a
+     starting width of 200 pixels leaves a card 25 across at the moment it
+     finishes fading: far enough to be *away* rather than merely small. */
+  100% { opacity: 0; transform: translate3d(0, 0, -7000px) rotate(2deg); }
+}
+/* An exile is not a spell being channelled, and it is not a death either. */
+.stage-card.is-exiled .stage-frame::before { animation: none; opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The journey is the animation, so with motion off there is no journey —
+     what is left is the fact, stated: the road, the card, and the plate that
+     says it has gone. It fades rather than travelling, which is the same
+     concession the death makes two blocks up. */
+  .stage-card.is-exiled .stage-frame,
+  .stage-road-art { animation: none; }
+  .stage-card.is-exiled .stage-frame { opacity: 1; transform: none; }
+  .stage-road { animation: stage-road-open var(--stage-life, 1500ms) linear both; }
+}
+
+
 /* --- the plate under the exhibit ---------------------------------------- */
 
 /* The arena is a building full of things worth looking at, and this is the one

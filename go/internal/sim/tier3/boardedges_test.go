@@ -310,3 +310,93 @@ func TestAGameWithNoOutcomeFallsBackToTheTurnsItSaw(t *testing.T) {
 		t.Errorf("a clock-out came back as %+v", games[0])
 	}
 }
+
+// A permanent exiled off the battlefield says so, whatever kind of permanent
+// it was — and nothing else that reaches exile does.
+//
+// The hole this closes: a great deal of Commander's removal exiles rather than
+// destroys, and every Path to Exile in a match used to take a creature off the
+// sand without a word (Aaron, 2026-08-27). [tier3.EventDies] had the same hole
+// once and was given a sentence; this is its twin.
+//
+// Three properties, and the second and third are the interesting ones.
+//
+// **Every permanent, not only creatures.** `dies` is narrowed to creatures and
+// planeswalkers because rule 700.4 gives that *word* to them; exile has no
+// such rule, and an exiled artifact is exactly as gone.
+//
+// **Only off the battlefield.** Impulse draw and cascade exile several cards a
+// turn off the top of a library and put most of them straight back; a beat for
+// each would spend the centre of the arena on bookkeeping. So a card reaching
+// exile from anywhere else moves the board and says nothing, which is what
+// already happens to every change this account does not narrate.
+//
+// **It is not also a death.** An exiled creature never touches a graveyard, so
+// raising both would be the account describing two events where the game had
+// one — and would put a skull on a card that did not die.
+func TestAPermanentExiledOffTheBattlefieldSaysSo(t *testing.T) {
+	t.Parallel()
+	for _, from := range []struct {
+		name    string
+		types   string
+		wanted  bool
+		leaving string
+	}{
+		{"a creature", "Creature - Cat Warrior", true, "Battlefield"},
+		// The difference from `dies`, stated as a case rather than as a
+		// comment: this one would fail against the graveyard's rule.
+		{"an artifact", "Artifact", true, "Battlefield"},
+		{"an enchantment", "Enchantment - Aura", true, "Battlefield"},
+		// **Forge's zone, not the board's.** A land is on the *Battlefield* as
+		// far as Forge is concerned; `ZoneLand` is a row this board draws, and
+		// the rewrite happens on the way in. Writing "Land" here is a fixture
+		// that describes the picture instead of the stream, and it fails —
+		// which is the useful half of having written it that way once.
+		{"a land", "Land", true, "Battlefield"},
+		// The noise guard. A card exiled out of a graveyard really is exiled;
+		// it is simply not this moment.
+		{"a card in a graveyard", "Creature - Cat Warrior", false, "Graveyard"},
+	} {
+		t.Run(from.name, func(t *testing.T) {
+			t.Parallel()
+			const id = 41
+			const card = "Fleecemane Lion"
+			logs := played(t, openGame, seatOne, seatTwo,
+				zoneLine(id, card, from.types, from.leaving, "in", 1),
+				turnLine(2, 2),
+				zoneLine(id, card, from.types, from.leaving, "out", 1),
+				zoneLine(id, card, from.types, "Exile", "in", 1),
+				turnLine(3, 1),
+				endGame)
+			said, died := false, false
+			for _, e := range logs[0].Events {
+				if e.Kind == tier3.EventExiled && e.Card == card {
+					said = true
+					if e.ID != id {
+						t.Errorf("the beat named card id %d, want %d -- a name "+
+							"cannot answer which one", e.ID, id)
+					}
+				}
+				if e.Kind == tier3.EventDies && e.Card == card {
+					died = true
+				}
+			}
+			if said != from.wanted {
+				t.Errorf("exiling %s from the %s raised %q = %v, want %v",
+					from.name, from.leaving, tier3.EventExiled, said,
+					from.wanted)
+			}
+			if died {
+				t.Errorf("exiling %s raised %q as well; a card that goes to "+
+					"exile never touches a graveyard, and a skull on it would "+
+					"be the account inventing a death", from.name,
+					tier3.EventDies)
+			}
+			// Whatever the account said, the card is in exile — the board
+			// shows every movement, and only the sentence is selective.
+			if got := last(logs[0], id); got != tier3.ZoneExile {
+				t.Errorf("the card ended in %q, want %q", got, tier3.ZoneExile)
+			}
+		})
+	}
+}

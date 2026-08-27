@@ -16,9 +16,10 @@
 import type { CSSProperties } from 'react'
 
 import mementoArt from '../assets/coliseum/memento.webp'
+import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
-import { faceFor, mannerOf, PLATE, type Staged, stagedMana, stageLife,
+import { faceFor, mannerOf, plateWord, type Staged, stagedMana, stageLife,
   type StagedMana, useStaged, useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
@@ -48,6 +49,36 @@ function StageFace({ item }: { item: Staged }) {
   )
 }
 
+/**
+ * **The road out**, drawn behind a card that is being exiled and nowhere else.
+ *
+ * Aaron, 2026-08-27: *"We need a good animation for the exile mechanic, a
+ * photo-real winding road leading into the distance of some kind?"* This is
+ * the road — the Via Appia, which `via.recipe.yaml` argues at length, including
+ * why it is that road and not another and why it is a photograph rather than
+ * an engraving.
+ *
+ * **A sibling of the skull rather than a variant of the veil.** The death lays
+ * two layers *on* the card, because a death happens to the card. An exile
+ * happens to the card's *place*: it is still whole, it is simply not here any
+ * more. So this goes underneath — the arena opens onto somewhere else for a
+ * second and a half, and the card walks off into it.
+ *
+ * The road's own vanishing point is about four fifths across and just under
+ * half way down, measured off the finished crop; the stylesheet sends the card
+ * there. Those two numbers live in `index.css` beside the keyframes that use
+ * them and are named in the recipe, which is the only coupling between a
+ * picture and a stylesheet in this room.
+ */
+function StageRoad() {
+  return (
+    <span className="stage-road" aria-hidden="true">
+      <img className="stage-road-art" src={viaArt} alt="" draggable={false} />
+      <span className="stage-road-haze" />
+    </span>
+  )
+}
+
 /** One card on the stage: the light behind it, the card, what is happening to
  *  it, and the plate saying so. */
 function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
@@ -61,6 +92,7 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
           scrubbing the timeline; a pool centred on the card separates it from
           the sand and leaves the rows either side perfectly readable. */}
       <span className="stage-veil" aria-hidden="true" />
+      {item.manner === 'exiled' && <StageRoad />}
       <span className="stage-frame">
         <StageFace item={item} />
         {/* A death, in two layers over the card and never *through* it.
@@ -88,7 +120,7 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
         )}
       </span>
       <span className="stage-plate-strip">
-        <span className="stage-plate-word">{PLATE[item.manner]}</span>
+        <span className="stage-plate-word">{item.word}</span>
         <span className="stage-plate-title">{item.name}</span>
       </span>
     </span>
@@ -168,12 +200,16 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
 }) {
   const manner = beat ? mannerOf(beat.kind) : null
   const name = beat?.card ?? null
+  // One lookup, two answers: the painting to draw and the type line the plate
+  // reads. Asking twice would be asking the same list the same question.
+  const face = manner && name ? faceFor(board, name, seat) : null
   const next: Staged | null = manner && name && beat
     ? {
       key: beat.key,
       manner,
       name,
-      image: faceFor(board, name, seat)?.image ?? null,
+      word: plateWord(manner, face?.types),
+      image: face?.image ?? null,
       life: stageLife(manner, speed, dies),
     }
     : null
