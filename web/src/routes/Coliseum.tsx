@@ -381,20 +381,33 @@ function CopyTheLink() {
 }
 
 /**
- * The painting the gate is cut from, and it is a *card*.
+ * The card the gate *is*, and "is" is doing all the work in that sentence.
  *
  * Aaron, 2026-08-27: *"what if our button to 'Send them in' was a button made
  * from the card 'Arena' with a little footnote fun fact, that is one of the
  * prime cards to represent a duel in Magic"*. He is right about the card and
- * he is right for a reason worth writing down: the two selects above this
+ * he is right for a reason worth writing down: the two selects beside this
  * button are labelled Champion and Challenger, and *Arena* is the one land in
  * Magic whose whole text is that arrangement — you name a creature of yours,
  * the other player names one of theirs, and the two of them fight.
  *
+ * **`normal/` — the whole card — and that is compliance rather than taste.**
+ * The first build of this control hung the `art_crop/` behind a pill and put a
+ * label on top, which Aaron read twice and ruled on twice: *"I can barely see
+ * the art. I meant literally the full card is the button"*, and then the half
+ * that settles it — *"that was breaking the 'no cropping' scryfall rule"*.
+ * Scryfall's imagery guidelines forbid cropping, distorting, desaturating and
+ * watermarking a card image; ADR 32 wrote that boundary into this repo and
+ * commandment 9 makes it a wall rather than a preference. So the card arrives
+ * whole, is laid out at its own aspect ratio, and is never reframed: no
+ * `object-fit`, no scaling inside a clipped box, no filter on it or on
+ * anything above it in the tree. `components/wheel.tsx`'s folded state is the
+ * pattern and was right all along.
+ *
  * **The printing is pinned here, exactly as `HERO` above pins the Grand
  * Coliseum, and for the same reason.** Asked for a bare name the pool answers
  * with the card's *newest* printing, and Arena's newest is a 2024 Mystery
- * Booster repaint. The painting this control wants is the first one: Rob
+ * Booster repaint. The card this control wants is the first one: Rob
  * Alexander's, from the promo given away with a Magic novel in 1994, reprinted
  * timeshifted in Time Spiral. So it is chosen, credited and hotlinked rather
  * than resolved — a round trip to learn a constant is a round trip that can
@@ -402,10 +415,10 @@ function CopyTheLink() {
  *
  * **And it survives not loading**, which is the failure the pool-fed art on
  * this page handles with `arena-art-missing`. A hotlink has no pool to fail,
- * but somebody else's host can still not answer — so the painting is state,
- * and when the browser says it did not arrive the control falls back to the
- * blood-and-brass face it has always had. Nothing about the gate depends on
- * the picture.
+ * but somebody else's host can still not answer — so the card is state, and
+ * when the browser says it did not arrive the control falls back to the
+ * blood-and-brass plate it has always had. A control that starts fights must
+ * not depend on somebody else's host.
  */
 const ARENA_CARD = {
   /** Arena, Time Spiral Timeshifted (TSB) #117, art by Rob Alexander. Looked
@@ -413,26 +426,55 @@ const ARENA_CARD = {
    *  handoff's claim that this card comes from Portal got caught: it does
    *  not. Its printings are the 1994 HarperPrism book promo, Time Spiral
    *  Timeshifted, an online promo and Mystery Booster 2 — no Portal. */
-  url: 'https://cards.scryfall.io/art_crop/front/e/5/e5b7afa9-e07a-4a84-a41f-7a8bc5c1d274.jpg?1783943260',
+  url: 'https://cards.scryfall.io/normal/front/e/5/e5b7afa9-e07a-4a84-a41f-7a8bc5c1d274.jpg?1783943260',
+  /** The face's own pixels, so the browser reserves the card's shape before
+   *  a byte of it arrives and the gatehouse does not jump when it does. */
+  w: 488,
+  h: 680,
   printing: 'Time Spiral',
   artist: 'Rob Alexander',
 }
 
 /**
- * The gate, wearing the card that means what the gate does.
+ * The gate: a whole Magic card that is also a control, and has to speak.
  *
- * Commandment 17 governs this one hard, so nothing here is an inline style: it
- * is `.btn` + `.btn-arena` — which already answers a hover with a lifted edge,
- * a glint across the steel and the two swords drawing apart, and a press by
- * sinking — plus `.btn-arena-card`, which hangs the painting behind all of
- * that and gives it its own reply to the same three states. An inline `style`
- * is how the last hundred silent buttons happened.
+ * The wheel's folded card had the easy half of this — it stands alone at the
+ * foot of a list, says nothing, and one click opens it. This one stands in a
+ * row of selects, and it has four things to say: three labels and a state
+ * where it cannot be pressed at all.
+ *
+ * **Everything it says is drawn on a layer of its own.** That is the rule the
+ * `normal/` note above lands on, restated as a mechanism: the picture is a
+ * picture, and every word, wash, glow and bar this control needs sits over it
+ * rather than through it. So —
+ *
+ * - **The word rides a plate across the card's own text box** (`.arena-gate`
+ *   in index.css, positioned in percentages of the card so it tracks the
+ *   printed box at any width). It is where a Magic card already puts its
+ *   words, and it leaves the painting, the title, the type line and the
+ *   printed "Illus. Rob Alexander" all visible above and below it. Anywhere
+ *   else the label either covers the painting — the miss this replaces — or
+ *   floats off the card and stops being part of it.
+ * - **Cannot-be-pressed is a portcullis, not a filter.** Greying the card out
+ *   is the exact trap ADR 32 names, so the shut gate is a cool wash and a
+ *   grate *drawn over* the card, and choosing the second seat lifts them
+ *   away. It is the gatehouse's own metaphor, one panel out.
+ * - **Running tilts the card a few degrees**, because *Arena* costs `{T}` and
+ *   a tapped land is the one thing every Magic player reads without being
+ *   told. A whole ninety degrees would be a card lying on its side in a form.
  *
  * The three labels stay exactly as they were. Pressed is a state this control
  * has to be able to show: the job comes back from a POST with a JVM starting
  * behind it, so without its own word the slowest action in the app would be
  * the one whose button sat unchanged for seconds after the click, and the
  * honest reading of that is that the click missed.
+ *
+ * Commandment 17 governs the rest and nothing here is an inline style: `.btn`
+ * and `.btn-arena` still carry the focus ring, the glint across the face and
+ * the two swords drawing apart on hover and closing on the press, and
+ * `.arena-gate` adds the card's own lift, rotation and warmed shadow — which
+ * is `.wheel-folded:hover` doing what it has always done to a card, and is
+ * motion on the object rather than a change to the picture.
  */
 function SendThemIn({ running, lighting, disabled, onPress }: {
   running: boolean
@@ -440,28 +482,42 @@ function SendThemIn({ running, lighting, disabled, onPress }: {
   disabled: boolean
   onPress: () => void
 }) {
-  // The painting is decoration and it is allowed to be absent. `false` is set
-  // by the browser's own `error`, so this is the picture failing rather than a
+  // The card is decoration and it is allowed to be absent. `false` is set by
+  // the browser's own `error`, so this is the picture failing rather than a
   // guess about whether it will.
   const [painted, setPainted] = useState(true)
-  // Interpolated with a space in front of it, and that is not a style
-  // preference: the stylesheet's utilities are generated by scanning this
-  // file's text, and `sm:w-auto${...}` reads as one candidate that does not
-  // exist — the rule vanished from the built sheet and the gate went
-  // full-width on a desktop. A separate word cannot be swallowed by the
-  // expression next to it.
-  const face = painted ? 'btn-arena-card' : ''
+  // Which of the four the gate is in, for the stylesheet to answer. Ordered
+  // by what is *happening* rather than by the props' names: a running match
+  // also reports `disabled`, and a gate that drew the bars down over a bout
+  // in progress would be saying the opposite of the truth.
+  const gate = lighting ? 'lighting'
+    : running ? 'running'
+      : disabled ? 'shut' : 'open'
+  // Whole literals on both arms rather than an interpolation, and that is not
+  // a style preference: the stylesheet's utilities are generated by scanning
+  // this file's text, and `sm:w-auto${...}` reads as one candidate that does
+  // not exist — the rule vanished from the built sheet and the gate went
+  // full-width on a desktop. A word that is never next to an expression
+  // cannot be swallowed by one.
+  const face = painted ? 'btn btn-arena arena-gate' : 'btn btn-arena w-full sm:w-auto'
   return (
-    <button type="button" onClick={onPress} disabled={disabled}
-            className={`btn btn-arena w-full sm:w-auto ${face}`}>
+    <button type="button" onClick={onPress} disabled={disabled} data-gate={gate}
+            className={face}>
       {painted && (
-        <img className="btn-arena-art" src={ARENA_CARD.url} alt=""
+        // `alt=""`: the card is this control's material, and the control's
+        // name is the word on the plate. A screen reader that heard the card
+        // named here would hear it twice — `ArenaFootnote` below says what the
+        // card is, in prose, to everybody.
+        <img className="arena-gate-card" src={ARENA_CARD.url} alt=""
+             width={ARENA_CARD.w} height={ARENA_CARD.h}
              draggable={false} onError={() => setPainted(false)} />
       )}
-      <span className="btn-arena-face">
+      <span className={painted ? 'arena-gate-plate' : 'btn-arena-face'}>
         <CrossedSwordsGlyph />
-        {lighting ? 'Lighting the forge…'
-          : running ? 'The match is on…' : 'Send them in'}
+        <span className="arena-gate-word">
+          {lighting ? 'Lighting the forge…'
+            : running ? 'The match is on…' : 'Send them in'}
+        </span>
       </span>
     </button>
   )
@@ -477,15 +533,23 @@ function SendThemIn({ running, lighting, disabled, onPress }: {
  * as a symbol string — is said in words instead, because this line is for
  * somebody who has never read a card (commandment 2) and because a room
  * explaining a duel should sound like a room.
+ *
+ * **Re-read against the whole card, and one word changed.** It used to open
+ * "cut from", which was honest about a crop and is now the wrong verb twice
+ * over — the card is not cut, and not cutting it is the point. Nothing else
+ * went: the picture shows the card's own name, type line and painter, but at
+ * a hundred and fifty pixels the printed credit is five pixels tall, and ADR
+ * 32 asks for attribution somebody can actually read. The novel promo and the
+ * bargain the two seats make are nowhere on the card at all.
  */
 function ArenaFootnote() {
   return (
     <p className="arena-note">
-      The gate is cut from <em>Arena</em> — a land whose entire job is this
+      That gate is <em>Arena</em>, whole — a land whose entire job is this
       room. Tap it and pay three, and one creature of yours duels one of
       theirs; which of theirs is <em>their</em> call, the same bargain the two
-      seats above make. It was a promo tucked into a Magic novel in 1994, and
-      thirty years on it is still the closest thing the game has to a
+      seats beside it make. It was a promo tucked into a Magic novel in 1994,
+      and thirty years on it is still the closest thing the game has to a
       coliseum. {ARENA_CARD.printing} — art by {ARENA_CARD.artist}.
     </p>
   )
@@ -1235,12 +1299,19 @@ export default function ColiseumRoom() {
                   options={decks.map(seatOption)} />
           <NumberField label="Games" value={games} onChange={setGames}
                        min={1} max={20} help={help('sim.forge_games')} />
-          {/* Blood, sand and the smithy's brass, with the pair squaring up
-              under the hand (Aaron, 2026-08-25 — "could be red with some
-              swords") and, since 2026-08-27, the painting of the card that
-              means what this control does. Both arguments — the material and
-              the three labels — live on `SendThemIn` rather than here, so
-              there is one place to read them and one place to change them. */}
+          {/* **The gate is a card, and it is why this row is tall.** It comes
+              last and it is the one item here that is not a form control's
+              shape: a whole `Arena`, portrait, standing about four times the
+              height of a select. `items-end` above is what makes that work
+              rather than a squash — the pickers, the games dial and the card
+              all stand on the same floor, which is what a gate and its jambs
+              do. Letting the panel grow was the choice; the alternative was
+              flattening a Magic card to a control's height, and a card
+              flattened is a card reframed. Every other argument — the
+              material, the three labels, the printing, and why it is the
+              whole card rather than a crop — lives on `SendThemIn` rather
+              than here, so there is one place to read them and one to change
+              them. */}
           <SendThemIn running={running} lighting={lighting}
                       disabled={running || !a || !b}
                       onPress={() => void sendThemIn()} />

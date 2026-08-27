@@ -387,9 +387,9 @@ describe('the gates', () => {
     vi.mocked(api.simForge).mockReturnValue(new Promise(() => {}))
     show()
     // By role rather than by text: the label lives in a span inside the
-    // button now, because the painting behind it has to be a layer of its own
-    // and the words have to sit above it. The role query is the one that
-    // still finds the control rather than the sentence.
+    // button, because the card is the control and the word has to sit on a
+    // layer of its own over it. The role query is the one that still finds
+    // the control rather than the sentence.
     const gate = () => screen.getByRole('button', {
       name: /Send them in|Lighting the forge/,
     }) as HTMLButtonElement
@@ -399,19 +399,52 @@ describe('the gates', () => {
     await waitFor(() =>
       expect(screen.getByText('Lighting the forge…')).toBeTruthy())
     expect(gate().disabled).toBe(true)
+    // And the gate says which of the four it is in, which is the whole
+    // reason a card had to learn to speak. `lighting` rather than `shut`:
+    // both report `disabled`, and bars drawn over a bout that has already
+    // begun would be the control saying the opposite of the truth.
+    expect(gate().dataset.gate).toBe('lighting')
   })
 
-  it('lets the gate go on without its painting', async () => {
-    // The picture is hotlinked and somebody else's host can decline to serve
-    // it. When the browser says so the control drops back to the face it has
+  it('bars the gate while a seat is empty', async () => {
+    // An empty shelf is the honest way to reach this: with any deck at all
+    // the room seats both fighters itself, so a seat is only ever vacant when
+    // there is nobody to put in it.
+    //
+    // The shut state is *drawn* — a wash and a portcullis over the card, in
+    // `.arena-gate[data-gate="shut"]::before`. It has to be, because the
+    // obvious CSS for "you cannot press this" is a filter on the button, and
+    // a filter on this button lands on Wizards' card (ADR 32).
+    //
+    // jsdom has no layout and no stylesheet here, so this asserts the hook
+    // the drawing hangs off and nothing about how it looks. Whether the bars
+    // read as a barred gate is Aaron's walk, not the suite's.
+    vi.mocked(api.decks).mockResolvedValue([])
+    show()
+    const gate = () => screen.getByRole('button', {
+      name: /Send them in/,
+    }) as HTMLButtonElement
+    await waitFor(() => expect(gate().disabled).toBe(true))
+    expect(gate().dataset.gate).toBe('shut')
+  })
+
+  it('lets the gate go on without its card', async () => {
+    // The card is hotlinked and somebody else's host can decline to serve it.
+    // When the browser says so the control drops back to the plate it has
     // always had — blood, brass and the swords — and nothing about opening
-    // the gates depended on the painting.
+    // the gates depended on the picture.
     show()
     await screen.findByText('Send them in')
-    const art = document.querySelector('.btn-arena-art')
-    expect(art).toBeTruthy()
-    fireEvent.error(art as Element)
-    expect(document.querySelector('.btn-arena-art')).toBeNull()
+    const card = document.querySelector('.arena-gate-card')
+    expect(card).toBeTruthy()
+    // The whole card, never a crop of it: Scryfall's imagery guidelines
+    // forbid cropping and Aaron ruled on this control by name. `art_crop`
+    // here is the bug this test exists to catch coming back.
+    expect(card?.getAttribute('src')).toContain('/normal/')
+    expect(card?.getAttribute('src')).not.toContain('art_crop')
+    fireEvent.error(card as Element)
+    expect(document.querySelector('.arena-gate-card')).toBeNull()
+    expect(document.querySelector('.arena-gate')).toBeNull()
     expect(document.querySelector('.btn-arena')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Send them in/ })).toBeTruthy()
   })
