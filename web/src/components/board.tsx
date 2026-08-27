@@ -974,31 +974,34 @@ function FieldCard({ card, count, inPlay = false }: {
  * grows keeps its element, so its count animates instead of the row rebuilding
  * itself every time a land comes down.
  */
-function FieldRow({ label, cards, empty }: {
+function FieldRow({ label, cards, empty, lane }: {
   label: string
   cards: BoardCard[]
-  /** What to say when the row is empty — and **whether to draw it at all**.
-   *
-   *  Without one the row simply is not there. Splitting the old single
-   *  "permanents" row into artifacts, enchantments and planeswalkers is worth
-   *  doing because it is how a player sorts a table, and it is only worth
-   *  doing if the rows that hold nothing cost nothing: a deck with no
-   *  planeswalkers would otherwise pay a labelled empty row all game, twice,
-   *  once per seat. Creatures and lands pass a line instead, because those two
-   *  are the spine of a board and an empty one in the early turns is the news
-   *  rather than the absence of it. */
-  empty?: string
+  /** Which of the three this is. Only the stylesheet reads it, and it reads it
+   *  to *place* the lane rather than to decorate it: a half is a grid, the two
+   *  seats mirror, and auto-placement cannot mirror. The far player's lands are
+   *  at the top edge and the near player's at the bottom, and each lane is
+   *  named so that each half can say so in one rule. */
+  lane: 'land' | 'other' | 'creatures'
+  /** What to say when the lane is empty. Every lane has one now — there are
+   *  three of them and they are always all three drawn, so "the lane is not
+   *  there" stopped being a state a lane can be in. See `FieldSide`. */
+  empty: string
 }) {
   const stacks = stackRow(cards)
-  if (stacks.length === 0 && !empty) return null
   return (
-    <div className="field-row" aria-label={`${label}: ${cards.length}`}>
+    // A fixed height, and it never wraps — which together are what make the
+    // board one size. A lane handed more than it has room for scrolls; see the
+    // stylesheet, which argues why it scrolls rather than shrinking its cards,
+    // and what it cost to find that out.
+    <div className={`field-row field-row-${lane}`}
+         aria-label={`${label}: ${cards.length}`}>
       {stacks.length === 0 ? (
-        <span className="field-row-empty">{empty ?? label}</span>
+        <span className="field-row-empty">{empty}</span>
       ) : stacks.map((stack) => (
-        // The only four rows a permanent actually stands in: creatures,
-        // artifacts and enchantments, and lands. Everything else that draws a
-        // `FieldCard` is a card somebody is holding or has already lost.
+        // The only three lanes a permanent actually stands in. Everything
+        // else that draws a `FieldCard` is a card somebody is holding, or has
+        // already lost, or is being shown one of in a tray.
         <FieldGeared key={stack.card.id} stack={stack} />
       ))}
     </div>
@@ -1421,14 +1424,50 @@ function FieldGeared({ stack }: {
  */
 const COMPANION_SHARE = 0.72
 
-/** The stone rail one player's name, life and closed zones are carved into. */
-function FieldRail({ side, facing, name }: {
+/**
+ * The three closed zones, in the corner of the half they belong to.
+ *
+ * **They used to be a band under the arena** — two stone panels holding a
+ * name, a life ring and three piles each, sitting below the sand and costing
+ * the page their whole height. Aaron, 2026-08-27, having watched real matches:
+ * *"we should move the command/graveyard/exile zones to be in an inverted L
+ * shape in the … corner of each players half of the arena … that is generally
+ * unused space."*
+ *
+ * He is right about the space, and the reason is worth writing down because it
+ * is a fact about Magic rather than about this layout: **a battlefield is wide
+ * and shallow.** Permanents line up in rows across the table, so the corners
+ * of each half are the parts of the sand nothing ever stands on. Three zones
+ * fit in one of them for free, and — this is the part that matters — they end
+ * up *beside the half they belong to* instead of in a scoreboard under both,
+ * which is where they are on a real table.
+ *
+ * **The L.** Graveyard above, exile in the corner, command zone beside exile;
+ * the notch is the empty cell, and it is the corner nothing is ever played
+ * into:
+ *
+ *     ·           graveyard
+ *     command     exile
+ *
+ * **Bottom right of its own half, and the same way up at both seats** — the
+ * near player's in the bottom right of the whole arena, the far player's in
+ * the bottom right of the top half, just above the trench. The first attempt
+ * put them on the left and turned the far one over through the seam, and
+ * Aaron caught both. The mirror is the interesting half of the correction:
+ * almost everything else on this board *does* mirror, because two players
+ * really are sitting opposite each other and the far player's rows run outward
+ * from the middle exactly as they would across a table. A zone does not work
+ * like that. It is furniture with a word written on it, and the only person
+ * reading that word is on this side of the screen.
+ *
+ * `facing` therefore no longer decides anything about the shape — the
+ * stylesheet places both clusters identically. It is kept because the DOM
+ * should still be able to say whose zones these are, which is what a board
+ * test asks it and what a future combat overlay will have to.
+ */
+function FieldZones({ side, facing }: {
   side: BoardSide
   facing: 'far' | 'near'
-  /** Whose zones these are. The nameplate came off the old grey bar and back
-   *  onto *this*, which is the difference between a label floating on a strip
-   *  and a heading over the thing it names. */
-  name: string
 }) {
   // **Whose grave is about to receive the body.** The dying card is held on
   // the sand for the beat that announces it, so no graveyard can answer this
@@ -1492,8 +1531,9 @@ function FieldRail({ side, facing, name }: {
   const chairs = Math.max(1, side.thrones.length + (unseated ? 1 : 0))
   const seats = chairs + (side.companion ? COMPANION_SHARE : 0)
   return (
-    <div className={`field-rail field-rail-${facing}`}>
-      <span className="field-rail-totals">
+    <div className={`field-zone-l field-zone-l-${facing}`}
+         aria-label="Zones off the battlefield">
+      <span className="field-zone-cell is-command">
         {/* **The command zone is a row of seats, not a pile.**
             A pile answers "how many", and the command zone is never asked
             that — it is asked *who is home*. One pile could not say it for a
@@ -1544,31 +1584,73 @@ function FieldRail({ side, facing, name }: {
                        badge={price(tax)} />
           )}
         </span>
+      </span>
+      {/* The grave sits over the corner and exile sits in it, which is the
+          order Aaron asked for and also the order they are reached for: a
+          graveyard is looked at constantly and exile hardly ever, so the
+          zone that is read gets the edge nearer the sand. */}
+      <span className="field-zone-cell is-graveyard">
         <FieldPile label="Graveyard" short="Graveyard" cards={side.graveyard}
                    zone="graveyard"
                    receiving={holding && struck ? struck.key : null} />
+      </span>
+      <span className="field-zone-cell is-exile">
         <FieldPile label="Exile" short="Exile" cards={side.exile}
                    zone="exile" />
-        {/* **Whose places these are, over the number everybody is watching.**
+      </span>
+    </div>
+  )
+}
 
-            The name was a heading on a line of its own across the top of the
-            panel, and a line holding one short string and nothing else reads
-            as a border somebody put a word in (Aaron, 2026-08-26: *"it would
-            be a better use of space if the commander name was stacked above
-            the life total, then the zones in general would not have a weird
-            top border with only the commander name"*). He is right about the
-            space and righter about the pairing: a player's name and a player's
-            life are one fact — *how this player is doing* — and they belong in
-            one column, at the end of the row, where a scoreboard puts them.
-
-            `title` keeps the deck's full name for anybody who wants it, which
-            is what the heading was doing for the names too long to draw. */}
-        <span className="field-rail-who">
-          <span className="field-rail-name" title={side.name}>{name}</span>
+/**
+ * One player, on the board's own scoreboard: who they are, and how they are
+ * doing.
+ *
+ * **This is the half of the old rail that was not a zone.** A name and a life
+ * ring were carved into a stone panel under the arena, where they were as far
+ * from the game as anything on the page could be — you had to look away from
+ * the sand to find out whether somebody was dying. Aaron, 2026-08-27: *"Lets
+ * make the middle band with the turn number, etc a little bigger, then it
+ * could hold the deck name and the life total dials and they would be much
+ * more visible."*
+ *
+ * So the two players' plates come to the trench between the halves, which is
+ * the one strip of this board that both players are always looking at anyway,
+ * and they are drawn at a size that can be read from across a room rather than
+ * at the 0.7rem a panel could afford.
+ *
+ * **Each plate is anchored to its own half twice over**, because "which one is
+ * mine" has to be answerable without reading: the far player's plate is set
+ * against the top edge of the band and the near player's against the bottom,
+ * and each carries its rule on the side facing its own sand. Left and right
+ * alone would be a coin-flip for a newcomer, and this room is built for one
+ * (commandment 2).
+ *
+ * **The poison slot is here and it is empty.** Poison counters go on the
+ * *player*, so this plate is the only honest place for them — and Forge's bus
+ * really does carry them (`GameEventPlayerCounters`, ADR 42's own table). The
+ * scribe does not subscribe to that event yet, so nothing can be drawn today
+ * and nothing is: the slot holds its width so that wiring it up later is a
+ * component and not a re-layout, and an absent counter renders as absence
+ * rather than as a zero. **A zero would be a claim** — it would say this game
+ * has no poison in it, and what is true is that nobody has asked.
+ */
+function FieldPlate({ side, facing, name }: {
+  side: BoardSide
+  facing: 'far' | 'near'
+  /** Whose plate this is: the deck's name as the room says it. */
+  name: string
+}) {
+  return (
+    <span className={`field-plate field-plate-${facing}`}>
+      <span className="field-plate-rule" aria-hidden="true" />
+      <span className="field-plate-body">
+        <span className="field-plate-name" title={side.name}>{name}</span>
+        <span className="field-plate-figures">
           <LifeTotal life={side.life} />
         </span>
       </span>
-    </div>
+    </span>
   )
 }
 
@@ -1806,23 +1888,41 @@ function FieldSide({ side, facing, active }: {
    *  than a gap to fill. */
   active: boolean
 }) {
-  // **Outermost first**, and the near player's side is the same list reversed,
-  // so the two creature rows finish up either side of the seam.
+  // **Three lanes, always three, the same three every game** (Aaron,
+  // 2026-08-27: *"keep the board the same size universally, enough for three
+  // lanes for each player"*).
   //
-  // Five rows where there were three. Two of them draw only when they hold
-  // something, and that is the difference between organising a board and
-  // padding it: artifacts and enchantments come and go, planeswalkers may
-  // never appear at all, and a permanently empty row labelled "planeswalkers"
-  // is furniture that costs a phone a third of its board. Creatures and lands
-  // always draw — those two are the spine, and an empty one early is news.
+  // It was five, two of which drew only when they held something — which was
+  // the right call for the question *how does a player sort a table* and the
+  // wrong one for *how big is this board*. A board that grows a row when
+  // somebody casts their first enchantment is a board that moves under the eye
+  // watching it: every card on the far half shifts by a lane's height because
+  // the near player played a Signet. Over a ten-game match that happens
+  // constantly, and it is the reason the arena never sat still.
+  //
+  // So the count is fixed and the sorting survives inside it. The fold still
+  // makes all five judgements — `lib/board.ts` argues each, including the two
+  // that are Magic rather than layout (a mana rock stands with the lands, a
+  // battle stands with the enchantments) — and the middle lane is where the
+  // three that are neither land nor creature are drawn together. Merging here
+  // rather than in the fold is the seam that matters: the rulings stay in the
+  // one place that is tested for them, and this file keeps doing what it says
+  // at the top of it, which is layout.
+  //
+  // **Outermost first**, and the near player's side is the same list reversed,
+  // so the two creature lanes finish up either side of the seam.
+  const middle = [...side.enchantments, ...side.artifacts, ...side.walkers]
   const rows = [
-    <FieldRow key="land" label="Lands and mana" cards={side.land}
+    <FieldRow key="land" lane="land" label="Lands and mana" cards={side.land}
               empty="no lands yet" />,
-    <FieldRow key="ench" label="Enchantments" cards={side.enchantments} />,
-    <FieldRow key="arti" label="Artifacts" cards={side.artifacts} />,
-    <FieldRow key="walk" label="Planeswalkers" cards={side.walkers} />,
-    <FieldRow key="crea" label="Creatures" cards={side.creatures}
-              empty="no creatures" />,
+    // Named for all three of the things it can hold, because it is read by a
+    // screen reader and by nobody else — the lane carries no visible heading,
+    // so the length costs nothing and the vagueness would.
+    <FieldRow key="other" lane="other"
+              label="Artifacts, enchantments and planeswalkers"
+              cards={middle} empty="nothing else in play" />,
+    <FieldRow key="crea" lane="creatures" label="Creatures"
+              cards={side.creatures} empty="no creatures" />,
   ]
   return (
     // **The crowns are provided here and nowhere higher**, because a card is
@@ -1848,9 +1948,17 @@ function FieldSide({ side, facing, active }: {
           slower than anything else on the board, so it is felt rather than
           watched. */}
       <span className="field-side-lit" aria-hidden="true" />
-      <div className="field-rows">
-        {facing === 'far' ? rows : [...rows].reverse()}
-      </div>
+      {/* **The corner the game never stands in.** See `FieldZones`: a
+          battlefield is wide and shallow, so the bottom corner of each half is
+          sand nothing is ever played onto, and three closed zones fit in it
+          without taking a card's worth of room from the lanes beside them. */}
+      <FieldZones side={side} facing={facing} />
+      {/* **No wrapper around the lanes**, deliberately: they are placed in the
+          half's own grid, beside and *over* the corner cluster. A box around
+          the three of them would be a box the cluster is outside of, and then
+          the creature lane could not reach across the notch — which is the
+          whole point of the notch. The stylesheet places all four by name. */}
+      {facing === 'far' ? rows : [...rows].reverse()}
     </div>
     </Crowned.Provider>
   )
@@ -2107,13 +2215,18 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   return (
     <Dressing.Provider value={dressing}>
     <Struck.Provider value={struck}>
-    {/* **The stage: the arena, and the places beside it.**
-        The zones were a column *inside* the field, which put them on the sand
-        — and took their width out of the battlefield, so the arena came out
-        scaled awkwardly (Aaron, 2026-08-25). They are not part of the arena.
-        A graveyard is not somewhere you stand; it is somewhere cards go, and
-        it belongs off the floor entirely. So the field keeps its own box at
-        its own size, and the zones stand outside it in their own column. */}
+    {/* **The stage, which is now the arena and nothing else.**
+
+        It held two things: the field, and a stone band of zones under it. The
+        zones went into the corners of the halves they belong to (`FieldZones`)
+        and the names and life rings went into the trench between them
+        (`FieldPlate`), so there is one box here where there were two.
+
+        Worth keeping the wrapper anyway, and not only out of caution: it is
+        where `--mark-life-*` is set, and a death is drawn in three places at
+        once — the skull on the card, the card held in the middle of the sand,
+        the ghost rising off the grave. One event, one clock, and the clock has
+        to hang above all three of them. */}
     <div className="field-stage" style={lives}>
     <section className={`field${lit ? ` is-${lit}-on` : ''}`}
              aria-label="The battlefield">
@@ -2139,11 +2252,18 @@ export function MatchBoard({ board, shown, game, name, running, beat,
 
       <FieldSide side={far} facing="far" active={lit === 'far'} />
 
-      {/* The seam: in the real building, the trench the lifts came up through.
-          Here it is where the turn is announced and where the two
-          battlefields meet. */}
+      {/* **The seam: in the real building, the trench the lifts came up
+          through — and now the board's scoreboard as well.**
+
+          It carried the turn number and two hairlines, which is a lot of the
+          widest strip on the page spent on four words. The two players' names
+          and life rings were in a stone band *below* the arena instead, as far
+          from the sand as the page could put them. They are here now, one
+          plate against each half, and the turn stands between them: everything
+          a person glances up to check, on the one strip both players are
+          already looking at. `FieldPlate` argues the anchoring. */}
       <div className="field-seam">
-        <span className="field-seam-rule" aria-hidden="true" />
+        <FieldPlate side={far} facing="far" name={farName} />
         <span className="field-seam-turn tabular">
           {/* **The light says which half; this says it in a second way.**
               A warm wash on sand is a beautiful signal and a soft one, and
@@ -2161,7 +2281,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           {game > 0 && <span className="field-seam-game">Game {game}</span>}
           {onTurn && <span className="sr-only">, {onTurn} is on turn</span>}
         </span>
-        <span className="field-seam-rule" aria-hidden="true" />
+        <FieldPlate side={near} facing="near" name={nearName} />
       </div>
 
       <FieldSide side={near} facing="near" active={lit === 'near'} />
@@ -2189,10 +2309,6 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                       seek={seek} turns={turns} games={games} playing={playing}
                       chooseGame={chooseGame} />
     </section>
-    <aside className="field-zones" aria-label="Zones off the battlefield">
-      <FieldRail side={far} facing="far" name={name(far.slug, far.name)} />
-      <FieldRail side={near} facing="near" name={name(near.slug, near.name)} />
-    </aside>
     </div>
     </Struck.Provider>
     </Dressing.Provider>
