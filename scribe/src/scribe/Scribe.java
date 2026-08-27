@@ -222,9 +222,12 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
      * no answer: `CardView` carries `isToken`, `getZone` and `hasSickness`, and
      * `TrackableProperty` has `Token` and `TokenCard` and nothing general for
      * this. The model does — `Card.wasCast()` — so the id the event just named
-     * goes back through `Game.findById` and the card is asked. Over two games
-     * that lookup **missed zero times in fifty-nine arrivals**, which is why
-     * there is no third word here for "could not tell".
+     * goes back through `Game.findById` and the card is asked. Across two
+     * recorded runs that lookup **missed zero times in 127 arrivals**, which is
+     * why there is no third word here for "could not tell". If it ever does
+     * miss, the field is simply absent and the far side reads that as "nobody
+     * said" — which is the same silence an older worker image sends, and is
+     * handled rather than guessed.
      *
      * Cross-checked against a second, independent mechanism before it was
      * believed, because two encodings on this bus have already been decoded

@@ -222,6 +222,23 @@ command-zone eminence triggers in that match named their target.
 Not observed at all, and wired on the strength of the accessor rather than of
 having been watched working: **zero of the seventy-five targeted a player.**
 
+**Every count in those three paragraphs is one recorded run, and a second run of
+the same seed will not reproduce them.** Two runs of Atla Palani against Arahbo
+on seed 11 were played an hour apart on 2026-08-27: game 1 came out
+bit-identical both times, and **game 2 diverged** — the machine was at load 135
+on eight cores, and a starved Forge AI plays different Magic rather than the
+same Magic slowly. The second run saw 68 arrivals rather than 59, 21 cast
+rather than 19, and three uncast real spells rather than one (Zacama and
+Zopandrel joined End-Raze Forerunners, all three off Atla Palani).
+
+So read the ratios, not the integers. What held identically across both runs is
+the whole of what the design rests on: **`entered` was answered on every single
+battlefield arrival** — 127 of 127 across the two, no misses — no ability ever
+had **more than one** target, none ever targeted a player, and every
+command-zone eminence trigger named what it pumped. If a re-run gives different
+totals, nothing has broken; if it gives an ability with two targets or an
+arrival with no answer, something has.
+
 ## Narrating a game
 
 `sim -q` prints one line per finished game. Forge's own help calls `-q` the

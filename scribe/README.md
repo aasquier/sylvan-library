@@ -86,6 +86,13 @@ printing's, and `copied_by`, set only on a card made as a copy.
 had been assumed unable to answer, and both measured on one match (Atla
 Palani/Dinosaurs against Arahbo/Cats, seed 11).
 
+The counts below are that one run. A second run of the same seed an hour later
+reproduced game 1 exactly and **diverged on game 2** — the machine was at load
+135 on eight cores, and a starved Forge AI plays different Magic rather than the
+same Magic slowly. `docs/FORGE.md` has both sets. Read the ratios rather than
+the integers: what held across both is that every arrival got an answer, no
+ability had more than one target, and no ability targeted a player.
+
 `entered` says how a permanent reached the battlefield — `cast`, or `put` there
 by something else. It is Forge's own `Card.wasCast()`, which lives on the model
 rather than the view, so the scribe reaches it with `Game.findById` on the id
