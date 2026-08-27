@@ -53,7 +53,8 @@ import { createPortal } from 'react-dom'
 
 import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
-import { CrownGlyph, HandFanGlyph, HornGlyph, ThroneGlyph } from './glyphs'
+import { CrownGlyph, HandFanGlyph, HornGlyph, StrongboxGlyph, ThroneGlyph }
+  from './glyphs'
 import { KeywordMarks } from './keywords'
 import { ManaPip } from './manasymbol'
 import { producedColors, producedName } from '../lib/mtg'
@@ -130,6 +131,19 @@ function calledBy(name: string): string {
   const [head] = name.split(',')
   const short = head?.trim() || name
   return /^\S+ the /.exec(short) ? short.split(' ')[0] ?? short : short
+}
+
+/** A handful of names, said the way a person says them: *a*, *a and b*,
+ *  *a, b and c*.
+ *
+ *  A comma-joined list is what a machine writes and it is the one place this
+ *  board talks to somebody in sentences rather than in furniture — "Behemoth
+ *  Sledge, Ethereal Armor" is a database row and "Behemoth Sledge and Ethereal
+ *  Armor" is what you would say out loud (commandment 2). No Oxford comma,
+ *  which is this project's own house style everywhere else it writes prose. */
+function listed(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
 /**
@@ -333,6 +347,25 @@ const PEEK_MIN_W = 160
 const PEEK_RATIO = 680 / 488
 const PEEK_GAP = 10
 const PEEK_EDGE = 8
+/** How much room the artist line under a preview takes. */
+const PEEK_ARTIST = 18
+/** ...and the two lines that say what a creature is carrying, when it is
+ *  carrying something.
+ *
+ *  **An upper bound rather than a measurement**, and it has to be one: the
+ *  placement below decides where the panel goes *before* the panel exists, so
+ *  nothing can be asked how tall it turned out. The list is clamped to two
+ *  lines in the stylesheet for exactly this reason — an unbounded block here
+ *  is a panel that runs off the bottom of the screen on the day somebody
+ *  suits a creature up with four Auras. Over-estimating costs a slightly
+ *  narrower card; under-estimating clips one.
+ *
+ *  **Fifty-four is the clamped maximum, measured on a live board rather than
+ *  reasoned about**: four above the plate, nine of padding inside it, two
+ *  lines of names at fourteen, and twelve for the line that says how to see
+ *  the rest. One name comes out at forty, so this is fourteen pixels of slack
+ *  in the common case and exact in the worst one. */
+const PEEK_WORN = 54
 
 /** A rectangle of free space, in viewport coordinates. */
 interface Clear { x0: number; x1: number; y0: number; y1: number }
@@ -457,8 +490,10 @@ function FieldPeek({ card, at, avoid }: {
   const wide = doc.clientWidth > 0 ? doc.clientWidth : PEEK_W + 2 * PEEK_EDGE
   const tall = doc.clientHeight > 0 ? doc.clientHeight
     : PEEK_W * PEEK_RATIO + 2 * PEEK_EDGE
-  // The artist line under the painting is part of what has to fit.
-  const chrome = card.artist ? 18 : 0
+  // What is written under the painting is part of what has to fit.
+  const worn = card.attachments
+  const chrome = (card.artist ? PEEK_ARTIST : 0)
+    + (worn.length > 0 ? PEEK_WORN : 0)
   const whole: Clear = { x0: PEEK_EDGE, x1: wide - PEEK_EDGE,
     y0: PEEK_EDGE, y1: tall - PEEK_EDGE }
   /** The widest panel a clearing can hold — capped at the size it wants, and
@@ -520,6 +555,40 @@ function FieldPeek({ card, at, avoid }: {
       <span className="field-peek" aria-hidden="true"
             style={{ left, top, width }}>
         <img src={card.image} alt="" draggable={false} />
+        {/* **What this creature is carrying, and that there is more to see.**
+            The sheet has riffled through a whole assemblage since #345 — the
+            creature, then its sword, then its Auras — and nobody found it,
+            because nothing on the board ever mentioned it existed (Aaron,
+            2026-08-27: *"I still am not seeing the equipment or auras on a
+            creature displayed in their hover? I thought we built a carousel
+            for this but I haven't seen it yet."*). He is describing a
+            discovery fault and not a missing feature: the carousel opens on a
+            click, deliberately — a thing you step through cannot be a thing
+            you have to keep hovering to keep alive — and a mouse was never
+            told the click was there.
+
+            The tucked corners under the card say **that** a creature is
+            carrying something and never **what**. This says what, in the
+            place a mouse is already looking, and then says how to get the
+            rest. Naming them is the half that matters most: somebody who
+            only ever hovers now leaves knowing their Cat is wearing a
+            Behemoth Sledge, which is the question they were asking.
+
+            **A phone reaches all of this without any of it**, which is the
+            trap this project has fallen into twice. There is no peek on a
+            touch screen — a tap goes straight to the sheet, which draws the
+            whole assemblage with a visible rail. This is the mouse's and the
+            keyboard's way in, and both are named because both see it. */}
+        {worn.length > 0 && (
+          <span className="field-peek-worn">
+            <span className="field-peek-worn-list">
+              Carrying {listed(worn.map((a) => a.name))}
+            </span>
+            <span className="field-peek-worn-how">
+              Click or press Enter to look through all {worn.length + 1}
+            </span>
+          </span>
+        )}
         {card.artist && (
           <span className="field-peek-artist">art by {card.artist}</span>
         )}
@@ -729,6 +798,15 @@ function FieldCard({ card, count, inPlay = false }: {
       ? drawableKeywords(worn)
         .map((k) => (lent.has(k) ? `${k} (granted)` : k)).join(', ')
       : '',
+    // **What it is carrying, named.** `FieldGeared` draws an Equipment or an
+    // Aura as a corner peeping out from under its host, which says *that*
+    // something is there and never *what* — and the browser's own tooltip is
+    // the cheapest place in the whole room to say what. It is also the only
+    // one a screen reader reaches through this element; the group wrapper says
+    // the same thing one level up, and saying it twice costs a reader nothing
+    // and a card with no wrapper everything.
+    card.attachments.length
+      ? `carrying ${listed(card.attachments.map((a) => a.name))}` : '',
     card.artist ? `art by ${card.artist}` : '',
   ].filter(Boolean).join(' · ')
 
@@ -1310,12 +1388,20 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
    *  empty chair is worse: the chair has already said it. A graveyard's count
    *  is the whole point of a graveyard and keeps it. */
   solo?: boolean
-  /** A chip pinned to this tile's bottom-right corner, where a Magic card
-   *  keeps the number that says what it is worth right now.
+  /** Something standing on this tile's floor: the bottom-left corner, which
+   *  is the part of a seat no card ever occupies.
+   *
+   *  **This used to be the bottom right, on the argument that a Magic card
+   *  keeps what it is worth in that corner — and the argument was about a
+   *  card.** A seat is not a card. It is a landscape tile wearing a painting,
+   *  with the occupant's card standing in the right quarter of it, so the
+   *  bottom right *is* the card and a chip pinned there is a chip pinned to
+   *  a face. `FieldTax` carries the measurements and the ruling.
    *
    *  Only the command zone uses it, for the commander tax — but it is a
-   *  general corner rather than a tax-shaped hole, because it is the *card's*
-   *  corner and the loupe one row up already proves what belongs there. */
+   *  general floor rather than a tax-shaped hole. What makes it general is
+   *  the one property the old corner never had here: whatever stands in it,
+   *  the card stays whole. */
   badge?: ReactNode
   /** The beat's key when *this* seat's grave is the one receiving a death, and
    *  null otherwise.
@@ -1652,6 +1738,78 @@ function commandSeats(side: BoardSide): number {
   return chairs + (side.companion ? COMPANION_SHARE : 0)
 }
 
+/** How long the strongbox takes the weight of a price that just went up.
+ *
+ *  Long enough to be seen from across a board that is doing several other
+ *  things, and short enough that it is over before the next beat arrives. */
+const TAX_RISE = 900
+
+/**
+ * The commander tax: a strongbox standing on the floor of the seat, with the
+ * price struck beside it.
+ *
+ * **It used to stand on the card, and that is the bug this is.** Aaron,
+ * 2026-08-27: *"When the commander is sent back to the command zone after a
+ * death or exile, I can't see their card anymore, it is hidden behind the
+ * commander tax."* Measured on a live board at 1280 before anything moved: the
+ * chip was **21×14** and the commander's card in its seat is **19×26** — the
+ * price was *wider than the card it was pinned to* and covered 35% of its
+ * face, the whole of its lower third. On a phone it is worse, because the tile
+ * shrinks and the chip's type does not.
+ *
+ * The card only got that small when the zone stopped being a pile and became
+ * a *place*: a seat is a landscape tile wearing a painting, with the card
+ * standing in the right quarter of it. So the corner argument that put the
+ * price there — a Magic card keeps what it is worth in its bottom right — was
+ * true about a card and false about this tile, where the bottom right *is*
+ * the card. The left two thirds of the seat is floor, forty-eight pixels of
+ * it, and nothing has ever stood there.
+ *
+ * **So the price is furniture now.** A strongbox on the floor beside the
+ * throne, the price struck next to it, and the card clear. It is the same
+ * reading it always was and it is no longer in front of the one thing
+ * somebody looks at this zone to see.
+ *
+ * **A price that goes up is an event, so it moves when it does** (commandment
+ * 6). The tax rises at exactly the moment the commander leaves — you have
+ * just paid it, and the seat is empty for that beat — so the box takes the
+ * weight and settles. Off under `prefers-reduced-motion`, beside the rules it
+ * turns off.
+ *
+ * Two things are kept from the chip verbatim, because both were right.
+ * `tabular` figures, so a price going from 9 to 10 does not shuffle the digits
+ * around it. And a `title` that says what commander tax *is* in words a first
+ * game can follow — the number is meaningless to somebody who has never heard
+ * of the rule, and this room is built for one (commandment 2).
+ */
+function FieldTax({ n }: { n: number }) {
+  const previous = useRef(n)
+  const [risen, setRisen] = useState(false)
+  useEffect(() => {
+    const was = previous.current
+    previous.current = n
+    // **Only upward, and a fall stands the load back down.** A tax never falls
+    // in a real game, but the reel scrubs backwards all the time and that walks
+    // it down — so running the animation there would announce a payment being
+    // un-made. Clearing rather than merely not-setting is the half a test
+    // caught: a price stepped forward and then straight back was left wearing
+    // a load it had already put down, because the timer that would have
+    // cleared it was still nine tenths of a second away.
+    if (n <= was) { setRisen(false); return }
+    setRisen(true)
+    const id = window.setTimeout(() => setRisen(false), TAX_RISE)
+    return () => window.clearTimeout(id)
+  }, [n])
+  return (
+    <span className={`field-tax${risen ? ' is-risen' : ''}`}
+          title={`Commander tax: it costs ${n} more to cast this from the `
+            + 'command zone'}>
+      <StrongboxGlyph />
+      <span className="field-tax-n tabular">+{n}</span>
+    </span>
+  )
+}
+
 /**
  * The three closed zones, in the corner of the half they belong to.
  *
@@ -1723,13 +1881,7 @@ function FieldZones({ side, facing }: {
   const taxOn = (c: BoardCard) => 2 * c.casts
   // The zone-wide figure, for the fallback pile below and nothing else.
   const tax = 2 * side.commanders.reduce((n, c) => Math.max(n, c.casts), 0)
-  const price = (n: number) => n > 0 ? (
-    <span className="field-tax tabular"
-          title={`Commander tax: it costs ${n} more to cast this from the `
-            + 'command zone'}>
-      +{n}
-    </span>
-  ) : null
+  const price = (n: number) => n > 0 ? <FieldTax n={n} /> : null
   // **Nothing stands in this zone that is not a seat.**
   //
   // The catch-all pile used to draw alongside the seats whenever the zone was

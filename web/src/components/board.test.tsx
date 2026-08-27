@@ -1716,8 +1716,9 @@ it('prices each chair rather than the whole zone', () => {
   // **The tax rode outside the group** — a red chip in the gap between the
   // command zone and the graveyard, belonging to neither (Aaron, 2026-08-26:
   // "it is outside the perimeter of the command zone and it makes for awkward
-  // styling"). It is on the tile now, in the bottom-right corner a Magic card
-  // keeps for the number saying what it is worth at this moment.
+  // styling"). It is on the tile it prices now — standing on the tile's floor
+  // rather than on its occupant's face, which is a later correction and is
+  // argued where the price is drawn.
   //
   // And it is per chair, which one pile could never be. Thrasios has never
   // been cast and says nothing; Tymna has, and costs two more.
@@ -2297,3 +2298,181 @@ it('gives the commander a face for the light to walk round', () => {
   // And it is the commander that carries it, not the whole row.
   expect(container.querySelectorAll('.field-card.is-commander')).toHaveLength(1)
 })
+
+/** A creature suited up, and one standing on its own.
+ *
+ * The board draws a permanent and everything attached to it as one stack, and
+ * that stack has been the whole of what it says about an Aura: a corner
+ * peeping out from under a Cat. This fixture is the shape those assertions
+ * need — one creature carrying two things, and one carrying nothing, so a
+ * claim about "the card that is wearing something" can be checked against the
+ * card that is not. */
+const SUITED: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 10, name: 'Fleecemane Lion', types: 'Creature - Cat', seat: 1,
+      image: 'https://example.test/lion.jpg' },
+    { id: 11, name: 'Behemoth Sledge', types: 'Artifact - Equipment', seat: 1,
+      image: 'https://example.test/sledge.jpg' },
+    { id: 12, name: 'Ethereal Armor', types: 'Enchantment - Aura', seat: 1,
+      image: 'https://example.test/armor.jpg' },
+    { id: 13, name: 'Regal Caracal', types: 'Creature - Cat', seat: 1,
+      image: 'https://example.test/caracal.jpg' },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 10, zone: 'battlefield', seat: 1 },
+      { id: 13, zone: 'battlefield', seat: 1 },
+    ] },
+    { turn: 2, seat: 1, changes: [
+      { id: 11, zone: 'battlefield', seat: 1, attached_to: 10 },
+      { id: 12, zone: 'battlefield', seat: 1, attached_to: 10 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function suited() {
+  return render(
+    <MatchBoard board={SUITED} shown={2} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+/** The one card in `SUITED` that is carrying something. */
+function carrier(container: HTMLElement) {
+  return container.querySelector('img[alt="Fleecemane Lion"]')
+    ?.closest('.field-card') as HTMLElement
+}
+
+it('names what a creature is carrying, and says how to see the rest', () => {
+  // **The carousel was built and nobody could find it** (Aaron, 2026-08-27:
+  // *"I still am not seeing the equipment or auras on a creature displayed in
+  // their hover? ... I thought we built a carousel for this but I haven't seen
+  // it yet."*). It opens on a click, deliberately — `lift` argues why a thing
+  // you step through cannot be a thing you must keep hovering to keep alive —
+  // and the fault was that nothing ever told a mouse the click was there. The
+  // tucked corners say *that* a creature is carrying something, never *what*.
+  const { container } = suited()
+  fireEvent.mouseEnter(carrier(container))
+
+  const worn = document.querySelector('.field-peek-worn') as HTMLElement
+  expect(worn, 'the preview says what the card is wearing').toBeTruthy()
+  // Said the way a person says it, not the way a database prints it.
+  expect(worn.querySelector('.field-peek-worn-list')?.textContent)
+    .toContain('Carrying Behemoth Sledge and Ethereal Armor')
+  // **Both hands that can ever read this are named.** A peek is `:hover` and
+  // keyboard focus and nothing else; a phone has neither and reaches the same
+  // carousel with one tap. Naming only the mouse is how this project has
+  // shipped a half-a-room affordance twice already.
+  const how = worn.querySelector('.field-peek-worn-how')?.textContent ?? ''
+  expect(how).toContain('Click')
+  expect(how).toContain('Enter')
+  // Three: the creature and the two things on it. The count is also what makes
+  // a clamped list honest — a name that got cut is still counted.
+  expect(how).toContain('3')
+})
+
+it('leaves a card carrying nothing exactly as it was', () => {
+  // The other half of the property. An empty list is not a heading with
+  // nothing under it, and a card with no gear must be drawn as it always was.
+  const { container } = suited()
+  const alone = container.querySelector('img[alt="Regal Caracal"]')
+    ?.closest('.field-card') as HTMLElement
+  fireEvent.mouseEnter(alone)
+  expect(document.querySelector('.field-peek'),
+    'it is still held up').toBeTruthy()
+  expect(document.querySelector('.field-peek-worn'),
+    'and says nothing about gear it does not have').toBeNull()
+})
+
+it('says what a card is carrying in words as well as in corners', () => {
+  // The browser's own tooltip, which is also the only route through this
+  // element for anybody not looking at seven pixels of card edge. The group
+  // wrapper says it too, one level up; saying it twice costs a reader nothing.
+  const { container } = suited()
+  expect(carrier(container).getAttribute('title'))
+    .toContain('carrying Behemoth Sledge and Ethereal Armor')
+  expect(container.querySelector('.field-geared')?.getAttribute('aria-label'))
+    .toContain('Behemoth Sledge')
+})
+
+it('makes each tucked corner a card a hand can actually reach', () => {
+  // Commandment 17, one layer down: every step in the stack is a whole card
+  // with its own preview and its own sheet, so each has to be reachable by the
+  // keyboard as well as by a pointer. **Whether the corner visibly answers is
+  // CSS and Aaron's walk** — `index.css?raw` reads as an empty string under
+  // Vitest and jsdom has no layout, so nothing here can see the slide.
+  const { container } = suited()
+  const gear = [...container.querySelectorAll('.field-gear')]
+  expect(gear, 'a sword and an Aura, tucked under the Cat').toHaveLength(2)
+  for (const g of gear) {
+    expect(g.querySelector('.field-card')?.getAttribute('tabindex'),
+      'a painted card in the stack takes focus like any other').toBe('0')
+  }
+})
+
+it('stands the commander tax on the floor beside the card, as an object', () => {
+  // **The price was drawn on the commander's face.** Measured on a live board
+  // at 1280 before it moved: the chip came out 21x14 against a card of 19x26,
+  // so it was wider than the card it priced and covered its whole lower third
+  // (Aaron, 2026-08-27: *"I can't see their card anymore, it is hidden behind
+  // the commander tax."*). A seat is a landscape tile with its occupant
+  // standing in the right quarter of it, so the bottom-right corner a Magic
+  // *card* keeps for what it is worth is, on this tile, the card.
+  //
+  // **Where it now stands is CSS, and CSS is Aaron's walk** — jsdom has no
+  // layout and `index.css?raw` is empty under Vitest, so no assertion here can
+  // see a corner. What is held is the shape the stylesheet needs, and the two
+  // things the old chip did well: the figure is tabular, and the chip explains
+  // commander tax in words a first game can follow (commandment 2).
+  const { container } = throne(4)
+  const rail = container.querySelector('.field-zone-l-far') as HTMLElement
+  const chip = rail.querySelector('.field-tax') as HTMLElement
+
+  expect(chip.querySelector('svg'), 'the tax wears a strongbox').toBeTruthy()
+  expect(chip.querySelector('svg')?.getAttribute('aria-hidden'),
+    'the picture is decoration; the figure and the title carry the fact')
+    .toBe('true')
+  const figure = chip.querySelector('.field-tax-n') as HTMLElement
+  expect(figure.textContent).toBe('+2')
+  expect(figure.className, 'digits that do not jitter as the price climbs')
+    .toContain('tabular')
+  expect(chip.getAttribute('title'))
+    .toBe('Commander tax: it costs 2 more to cast this from the command zone')
+  // And it is still inside the tile it prices rather than beside the zone.
+  expect(chip.closest('.field-pile')).toBeTruthy()
+})
+
+it('takes the weight when the price goes up, and not when it comes back down',
+  () => {
+    // A tax rises at the moment its commander leaves the zone, which is the
+    // moment somebody paid it — the one event in this corner worth a movement
+    // (commandment 6). **Rendered twice rather than mounted twice**: a fresh
+    // mount has no previous price to have risen from, which is exactly right
+    // and is also why this cannot be two `throne()` calls.
+    const at = (shown: number) => (
+      <MatchBoard board={THRONE} shown={shown} game={1} running={false}
+                  name={(_slug, fallback) => fallback}
+                  speed="play" setSpeed={vi.fn()} of={6} seek={vi.fn()}
+                  games={[1]} playing={1} chooseGame={vi.fn()} />)
+    const { container, rerender } = render(at(4))
+    const chip = () => container.querySelector('.field-tax') as HTMLElement
+    expect(chip().className, 'a first sight of a price is not a rise')
+      .not.toContain('is-risen')
+
+    rerender(at(5))
+    expect(chip().textContent?.trim()).toBe('+4')
+    expect(chip().className, 'the commander was recast, so the box loads')
+      .toContain('is-risen')
+
+    // **Scrubbing back is not a payment being un-made.** The reel walks
+    // backwards all the time and a price falling is that, never an event.
+    rerender(at(4))
+    expect(chip().textContent?.trim()).toBe('+2')
+    expect(chip().className, 'a price walked back announces nothing')
+      .not.toContain('is-risen')
+  })
