@@ -6398,13 +6398,74 @@ button:hover .tarot-fan-card {
 }
 
 /* One player's half. */
+/* **A half is three lanes and a corner, and they share one grid.**
+ *
+ * Two columns by three rows: the lanes take the left column and the closed
+ * zones stand in the right one, packed to its foot. So the cluster is in the
+ * **bottom right corner of its own half** at both seats — the near player's in
+ * the bottom right of the whole arena, the far player's in the bottom right of
+ * the top half, just above the trench (Aaron, 2026-08-27, correcting the first
+ * attempt at this, which put them left and mirrored one of them upside down).
+ *
+ * **Both clusters read the same way up, and that is the correction.** Almost
+ * everything else on this board mirrors through the seam, because the far
+ * player's rows really do run outward from the middle the way they would if
+ * you were sitting across the table from them. A *label* does not work like
+ * that: turning the far player's graveyard, exile and command zone over turns
+ * three words upside down for the only person actually looking at the screen.
+ * Rows mirror; furniture does not.
+ *
+ * The column is three rows tall and the cluster is two tiles, so the space
+ * above it is open sand — the L's notch, which is the part Aaron pointed at as
+ * being unused in real matches anyway.
+ *
+ * **Everything is placed by name rather than flowed**, because the two halves
+ * mirror in the one way that does still mirror: the far player's lands are at
+ * the top edge and their creatures against the trench, and the near player's
+ * are the same three the other way up. Written out, each half is one rule and
+ * neither can drift into the other's shape — and both halves' lanes come out
+ * the same width and the same offset, which is what combat will need when two
+ * creature rows have to line up across the seam. */
 .field-side {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: repeat(3, var(--lane-h));
+  align-items: stretch;
+  gap: 8px 10px;
   padding: 8px 10px;
 }
-.field-rows { display: flex; flex-direction: column; gap: 10px; }
+/* **The box hugs its tiles, and the grid puts the box in the corner.**
+   `align-self: end` rather than the default stretch, and it is load-bearing
+   rather than tidy: the cluster's trays are measured against this element, so
+   a box stretched over all three lane rows threw every tray 313 pixels into
+   the air — over the lanes, off the top of the arena and into its `overflow:
+   hidden` (Aaron, walking it: *"the graveyard and exile hovers look clipped
+   and appear way far above the zones"*). Sized to its contents, `100%` is the
+   tiles and a tray opens six pixels above the pile it came out of. */
+.field-side .field-zone-l {
+  grid-area: 1 / 2 / 4 / 3;
+  align-self: end;
+}
+.field-side-far .field-row-land       { grid-area: 1 / 1; }
+.field-side-far .field-row-other      { grid-area: 2 / 1; }
+.field-side-far .field-row-creatures  { grid-area: 3 / 1; }
+.field-side-near .field-row-creatures { grid-area: 1 / 1; }
+.field-side-near .field-row-other     { grid-area: 2 / 1; }
+.field-side-near .field-row-land      { grid-area: 3 / 1; }
+/* **Three lanes, a fixed height each, at every width and in every game**
+ * (Aaron, 2026-08-27: *"keep the board the same size universally, enough for
+ * three lanes for each player"*).
+ *
+ * The mechanism is the half's `grid-template-rows` above: a grid row has a
+ * height whether or not anything is in it, so an empty lane holds its place
+ * instead of collapsing. They were a flex column that grew and shrank every
+ * time somebody cast their first enchantment — which moved every card on the
+ * *other* half by a lane's height, because the arena is one box and both
+ * halves are in it. Over a ten-game match that happens constantly, and it is
+ * why the arena never sat still under the eye watching it.
+ *
+ * `--lane-h` is the card plus the clearance a turned card leans into; the lane
+ * itself argues that arithmetic below. */
 
 /* ------------------------------------------------------- the hands, held
  *
@@ -6444,6 +6505,58 @@ button:hover .tarot-fan-card {
     'near'
     'handsnear'
     'transport';
+
+  /* ---- the rulers every card in the arena is measured against ----
+   *
+   * All four are here rather than in `.field-row` because a card is drawn in
+   * four places — a lane, a hand, a tray, a pile — and only one of them is
+   * competing for width. A hand asks for `--field-card-full` and gets a card;
+   * a lane overrides `--field-card-w` and gets whatever it can afford.
+   *
+   * `--lane-lean` is not spacing. A tapped permanent leans forty-five degrees
+   * about its own centre, so a 58x81 card sweeps a box about 98 on a side —
+   * roughly an eighth of its height past each edge of the slot it stands in.
+   * That clearance has to be *padding* rather than gap, because a lane clips
+   * at its padding edge when it scrolls: in the gap it would shear the corner
+   * off every turned card in the row. `--lane-turn` is the same clearance
+   * sideways, where the sweep is wider.
+   *
+   * `--lane-h` is therefore the card's own height plus both leans, and it is
+   * the number that makes the board one size: three of these, twice, and the
+   * arena is as tall as it will ever be. */
+  --field-card-full: 58px;
+  --lane-lean: 9px;
+  --lane-turn: 14px;
+  --lane-h: calc(var(--field-card-full) * 81 / 58 + var(--lane-lean) * 2);
+  /* **What a half is worth**: three lanes, the two gaps between them, and its
+   * own padding. Only the wide layout is told this, and the reason is worth
+   * writing down because it is the whole of why the board finally stands
+   * still.
+   *
+   * Stacked, every area here has a row to itself, so each half is as tall as
+   * its own contents — which are three fixed lanes and nothing else, so it is
+   * constant already and `auto` is the truth. Side by side, the near player's
+   * *hand* shares a row with the near player's half. A hand fans at 27px a
+   * card, so it grows every time somebody draws, and an `auto` row is sized by
+   * the tallest thing in it. Measured on a live match: with the lanes already
+   * pinned, the arena still grew six pixels between the opening and turn
+   * twelve, and none of the growth was on the sand.
+   *
+   * So at that width the half is told what it is and the hand fits itself into
+   * what is left (`.field-hand`, `min-height: 0`). */
+  --half-h: calc(var(--lane-h) * 3 + 32px);
+}
+@media (max-width: 46rem) {
+  /* A phone gives the arena about 340px and the corner cluster takes some of
+     it, so the ruler itself comes down rather than every lane being crowded
+     into the floor. Two thirds of a laptop's card, which is still a painting
+     you can tell apart at arm's length — and the loupe is one hover away for
+     anybody who wants to read one. */
+  .field {
+    --field-card-full: 46px;
+    --lane-lean: 7px;
+    --lane-turn: 10px;
+  }
 }
 
 /* **The stage: the arena, and the places beside it.**
@@ -6475,22 +6588,96 @@ button:hover .tarot-fan-card {
  * a reader compares them: whose graveyard is filling, who still has a
  * commander home. Stacked, that is a scroll; beside each other it is a glance
  * (Aaron, 2026-08-25). */
-.field-zones {
+/* **And then they came back onto the sand — into the one part of it nobody
+ * stands on.** The band above did its job and cost a band's worth of page for
+ * it. Aaron, 2026-08-27, after watching real matches: *"we should move the
+ * command/graveyard/exile zones to be in an inverted L shape in the … corner
+ * of each players half of the arena … that is generally unused space."*
+ *
+ * The observation underneath it is a fact about Magic and not about this
+ * layout: **a battlefield is wide and shallow.** Permanents line up in rows
+ * across the table, so each half's bottom corner is sand nothing is ever
+ * played onto. Three zones live there rent-free, beside the half they belong to —
+ * which is where they are on a real table, and which no band under both halves
+ * could ever say.
+ *
+ *     ·           graveyard          the notch is what makes it an L:
+ *     command     exile              the corner nothing is played into
+ *
+ * **Bottom right of its own half, and the same way up at both seats.** The
+ * near player's cluster is in the bottom right of the whole arena; the far
+ * player's in the bottom right of the top half, just above the trench. Turning
+ * the far one over through the seam was the first attempt and Aaron caught it:
+ * the rows mirror because two players really are sitting opposite each other,
+ * but a graveyard is *furniture with a word on it*, and the only person
+ * reading that word is on this side of the screen.
+ *
+ * `--zone-tile` is the ruler. One tile is a graveyard or an exile; the command
+ * zone takes `--seats` of them, which is how a pairing gets two chairs without
+ * the graveyard paying for them (see the seats block further down). */
+.field-zone-l {
+  --zone-tile: 78px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  align-items: start;
+  grid-template-columns: auto var(--zone-tile);
+  gap: 5px;
+  /* Pinned to the outer edge of its own half, which is the corner the game is
+     never played in. The lanes beside it are taller, so without this the L
+     would float in the middle of the half it is supposed to be tucked into. */
+  align-content: end;
+  /* The containing block for its own trays. Each zone opens *into its own
+     half's sand* — up out of the near cluster, down out of the far one — so a
+     tray is over the board it belongs to at every width and never crosses the
+     seam onto somebody else's. */
+  position: relative;
 }
+.field-zone-cell { min-width: 0; }
+.field-zone-cell.is-graveyard { grid-column: 2; grid-row: 1; }
+.field-zone-cell.is-exile     { grid-column: 2; grid-row: 2; }
+.field-zone-cell.is-command   { grid-column: 1; grid-row: 2; }
+
 @media (max-width: 46rem) {
-  /* One at a time on a phone: two panels of three big tiles in 380 pixels is
-     six small tiles, which is where this started. */
-  .field-zones { grid-template-columns: minmax(0, 1fr); }
+  /* **On a phone the corner stops paying, so the L lies down.**
+   *
+   * Measured rather than assumed (390x844, a real board): the arena gets 310px
+   * across, the cluster wants 120 of it, and the two lanes beside it are left
+   * with 158 — three cards. A Commander board holds eight lands. The corner
+   * idea is bought with *spare width*, and a phone has none to sell; keeping
+   * the shape here would be keeping a picture of the reasoning after the
+   * reasoning stopped being true.
+   *
+   * So the three zones lie in a row along the foot of their own half — still
+   * that player's own zones, at the same end of the same sand, and now every
+   * lane has the whole width. Read left to right they are the L read left to
+   * right, so nothing learned on a laptop has to be relearned here. */
+  .field-zone-l {
+    --zone-tile: 58px;
+    gap: 4px;
+    grid-template-columns: auto var(--zone-tile) var(--zone-tile);
+    align-content: stretch;
+  }
+  .field-zone-l .field-zone-cell.is-command   { grid-area: 1 / 1; }
+  .field-zone-l .field-zone-cell.is-graveyard { grid-area: 1 / 2; }
+  .field-zone-l .field-zone-cell.is-exile     { grid-area: 1 / 3; }
+  /* One column: three full-width lanes, and the zone strip at the foot of the
+     half — the same end of the same sand the corner was tucked into, so a
+     phone and a laptop put a player's graveyard in the same *place* even
+     though they draw it in a different shape. */
+  .field-side {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(3, var(--lane-h)) auto;
+  }
+  .field-side .field-zone-l             { grid-area: 4 / 1; }
+  .field-side-far .field-row-land       { grid-area: 1 / 1; }
+  .field-side-far .field-row-other      { grid-area: 2 / 1; }
+  .field-side-far .field-row-creatures  { grid-area: 3 / 1; }
+  .field-side-near .field-row-creatures { grid-area: 1 / 1; }
+  .field-side-near .field-row-other     { grid-area: 2 / 1; }
+  .field-side-near .field-row-land      { grid-area: 3 / 1; }
   /* The narrow band's *other* rules are not here, and that is deliberate.
-     `.field-pile-label` and `.field-rail-who` are both declared further down
-     this file, so an override written at this line loses to them at every
-     width — a media query buys no specificity. See the block beside
-     `.field-pile-label`, and the dead `flex-direction` rule above for what
-     this looks like when nobody notices. */
+     `.field-pile-label` is declared further down this file, so an override
+     written at this line loses to it at every width — a media query buys no
+     specificity. See the block beside `.field-pile-label` for what this looks
+     like when nobody notices. */
 }
 .field-side-far { grid-area: far; }
 .field-seam { grid-area: seam; }
@@ -6514,10 +6701,26 @@ button:hover .tarot-fan-card {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  /* **The hand must not be what decides how tall the board is.**
+   *
+   * Measured, not supposed (2026-08-27, on a live match): with the lanes
+   * pinned to three fixed heights, the arena *still* grew — by six pixels
+   * between the opening and turn twelve — and the growth was not on the sand
+   * at all. A hand fans at 27px a card, so it gets taller every time somebody
+   * draws; the near player's hand shares its grid row with the near player's
+   * half, so a twelfth card in hand pushed the whole board down.
+   *
+   * `min-height: 0` is what lets the row be decided by the sand instead. The
+   * fan takes the room that is left and scrolls if the hand outgrows it, which
+   * is a real answer rather than a silent clip: the nameplate above already
+   * opens the whole hand into a tray, so nothing here is the only way to see a
+   * card. */
+  min-height: 0;
   padding: 6px 10px;
   background: linear-gradient(180deg,
     rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.16) 100%);
 }
+.field-hand-fan { min-height: 0; }
 /* **The nameplate is the handle that opens the hand**, so it is a control and
    has to answer the hand that reaches for it (commandment 17). It is a place
    rather than an action — "show me the whole hand" — so it is carved into the
@@ -6811,23 +7014,23 @@ button:hover .tarot-fan-card {
       'handsfar  seam'
       'handsnear near'
       'transport transport';
+    /* Four rows here against six stacked, and the two halves are the two that
+       are told what they are. See `--half-h`. */
+    grid-template-rows: var(--half-h) auto var(--half-h) auto;
   }
-  /* **A rule for a layout that has not existed since #316, and it never fired
-     anyway.** This turned `.field-rail-totals` into a column, back when the
-     zones were a standing column on the right-hand side of the arena. #316
-     made them a band of two panels *under* the arena — where a column of
-     zones is exactly wrong — and the rule stayed, the way the trays' did
-     until #321 caught them.
+  /* Wide: the two hands are the left-hand column, one beside each half,
+     which is the side a player's hand is actually on.
 
-     What kept it from ever being seen is worse than the staleness: it sits
-     *earlier in this file* than the `.field-rail-totals` rule it was meant to
-     override, at the same specificity, so the later one won at every width.
-     A dead rule describing a dead layout, and neither half visible from the
-     diff that left it here. Both are gone; the row below is what has actually
-     been drawing all along.
-
-     Wide: the two hands are the left-hand column, one beside each half,
-     which is the side a player's hand is actually on. */
+     **A note for whoever moves the zones next**, because this corner of the
+     file has now grown a stale rule twice. A rule that names a layout is dead
+     the moment that layout moves, and neither half of the pair shows up in the
+     diff that killed it: #321 found the trays still swinging sideways for a
+     column of zones that had been a band since #316, and the rule that used to
+     stand here turned a row into a column for the same vanished column — and
+     never fired anyway, because it sat earlier in this file than the rule it
+     meant to override. The zones are in the halves' corners now
+     (`.field-zone-l`). If they move again, search this file for the class,
+     not for the breakpoint. */
   .field-hand {
     justify-content: flex-start;
     border: 0;
@@ -6841,6 +7044,14 @@ button:hover .tarot-fan-card {
     flex-direction: column;
     align-items: center;
     min-height: 0;
+  }
+  .field-hand-fan {
+    /* A column here, so the overrun is vertical. Thin rather than hidden: a
+       card scrolled out of sight with nothing saying so is the fault this is
+       avoiding, not the one it is causing. */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
   }
   .field-hand-fan > .field-card + .field-card {
     margin-left: 0;
@@ -6902,89 +7113,101 @@ button:hover .tarot-fan-card {
   .field-hand-fan .field-card { transition: none; }
 }
 
-/* The rail: cut stone with a brass edge catching the light. */
-/* ------------------------------------------------------- the rail
+/* ------------------------------------------- the plates, in the trench
  *
- * **It was a grey stone bar with a hatch on it, and it is gone.** A strip of
- * fake masonry running under three tiny tiles is furniture pretending to be
- * material (Aaron, 2026-08-25: "that grey bar is basic AF") — and the sand is
- * already the material. Three lit places standing directly on it is a table;
- * a bar with things on it is a toolbar.
+ * **The rail is gone.** It was a stone panel under the arena carrying one
+ * player's name, their life ring and their three zones — furniture holding
+ * two unlike things, as far from the sand as the page could put them. The
+ * zones went into the corner of the half they belong to (`.field-zone-l`);
+ * this is the other half of that move.
  *
- * The nameplate went with it. The hand beside this rail already carries the
- * deck's name, and a board that says the same thing twice has spent the room
- * twice. */
-/* **Off the sand, so they carry their own ground.** Inside the field they sat
- * on the floor and needed nothing; standing beside it they are objects on the
- * page, and an object on a page needs an edge. Not the old grey bar — that was
- * masonry printed on a strip — but the same brass hairline the rest of the
- * room is trimmed in, over the page's own dark. */
-/* One seat's places: a heading, and the three zones under it. */
-.field-rail {
-  /* **The containing block for its trays**, which is what lets one span the
-     panel while still living inside its own pile's wrapper. The wrapper has to
-     stay the hover target — a panel the pointer must leave the pile to reach
-     is a panel nobody can reach — but it does not have to be the thing the
-     tray is measured against, and a 26-pixel tile is the wrong ruler for a
-     graveyard. */
-  position: relative;
+ * Aaron, 2026-08-27: *"Lets make the middle band with the turn number, etc a
+ * little bigger, then it could hold the deck name and the life total dials and
+ * they would be much more visible."* So the two players' plates come to the
+ * trench between the halves — the one strip of this board both players are
+ * always looking at anyway — and they are drawn at a size that reads from
+ * across a room rather than at the 0.7rem a panel could afford.
+ *
+ * **Each plate is anchored to its own half twice**, because *which one is
+ * mine* has to be answerable without reading. It sits against its own half's
+ * edge of the band, and it carries a brass rule on that edge — a plate bolted
+ * to the wall of the trench on the side it belongs to. Left and right alone is
+ * a coin-flip for somebody at their first game, and this room is built for one
+ * (commandment 2). */
+.field-plate {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 10px 12px 12px;
-  border-radius: 10px;
-  color: var(--field-stone-ink);
-  background: linear-gradient(180deg,
-    rgba(14, 11, 8, 0.72) 0%, rgba(8, 6, 4, 0.86) 100%);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 22%, transparent),
-    0 3px 14px rgba(0, 0, 0, 0.42);
-}
-/* **Whose places these are, stacked over the number everybody is watching.**
- *
- * The name was a heading on a line of its own across the whole panel, and a
- * line carrying one short string and nothing else does not read as a heading —
- * it reads as a border somebody put a word in (Aaron, 2026-08-26: "it would be
- * a better use of space if the commander name was stacked above the life
- * total, then the zones in general would not have a weird top border with only
- * the commander name").
- *
- * He is right about the space and righter about the pairing. A player's name
- * and a player's life are one fact — *how this player is doing* — and a
- * scoreboard has always put them in one column. The panel gets its whole
- * height back, and the life total stops being an unlabelled ring at the end of
- * a row of zones. */
-.field-rail-who {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
-  /* Wide enough for the ring under it and no wider, so a long deck name
-     ellipsises rather than pushing the zones about. */
-  max-width: 7.5rem;
+  padding: 2px 0;
 }
-.field-rail-name {
-  max-width: 100%;
-  text-align: center;
-  font-size: 0.7rem;
+/* Against its own sand: the far player's plate rides the top of the trench,
+   the near player's the bottom, and the rule goes on the edge each one is
+   bolted to. */
+.field-plate-far { justify-self: start; justify-content: flex-start; }
+.field-plate-near {
+  justify-self: end;
+  justify-content: flex-end;
+  flex-direction: column-reverse;
+}
+.field-plate-rule {
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--field-brass) 72%, transparent) 0%,
+    color-mix(in srgb, var(--field-brass) 30%, transparent) 70%,
+    rgba(201, 162, 39, 0) 100%);
+}
+.field-plate-near .field-plate-rule {
+  background: linear-gradient(270deg,
+    color-mix(in srgb, var(--field-brass) 72%, transparent) 0%,
+    color-mix(in srgb, var(--field-brass) 30%, transparent) 70%,
+    rgba(201, 162, 39, 0) 100%);
+}
+.field-plate-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.field-plate-near .field-plate-body { flex-direction: row-reverse; }
+/* **The name, at a size somebody can read.** It was 0.7rem in a panel that had
+   to fit three zone tiles beside it; here nothing is competing for the width
+   but the other player's plate, so it gets the trench's whole half. Still one
+   line and still ellipsised — `title` carries the deck's full name — because
+   a name that wrapped would change the trench's height as the match went on,
+   which is the exact fault the fixed lanes above were built to end. */
+.field-plate-name {
+  min-width: 0;
+  font-size: 0.92rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  line-height: 1.2;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
   color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.field-rail-totals {
+/* **The figures, and the room kept for the one that is not here yet.**
+ *
+ * Life today; poison next. Poison counters go on the *player* — that is what
+ * makes this the only honest place for them — and Forge's bus really does
+ * carry them (`GameEventPlayerCounters`, ADR 42's own table of what the log
+ * throws away). The scribe does not subscribe to that event yet, so nothing is
+ * drawn and no space is held open for a number that would be a guess: a `0`
+ * would claim this game has no poison in it, when the truth is that nobody has
+ * asked. What this row is, is a place ready for a second dial — a green bead
+ * of it, when there is one to draw. */
+.field-plate-figures {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
+  flex: 0 0 auto;
 }
+/* Bigger than the panel could give it, which was the ask. The ring is drawn
+   from `--life-size` in one place so the figure inside it scales with it. */
+.field-plate-figures .field-life { --life-size: 66px; }
 
 /* ------------------------------------------------ life, as a thing
  *
@@ -7002,8 +7225,8 @@ button:hover .tarot-fan-card {
 .field-life {
   position: relative;
   flex: 0 0 auto;
-  width: 58px;
-  height: 58px;
+  width: var(--life-size, 58px);
+  height: var(--life-size, 58px);
   display: grid;
   place-items: center;
 }
@@ -7040,7 +7263,9 @@ button:hover .tarot-fan-card {
 }
 .field-life-n {
   position: relative;
-  font-size: 1.3rem;
+  /* Tied to the ring rather than written down, so one number changes both and
+     a bigger dial is a bigger figure rather than a small one in a big hoop. */
+  font-size: calc(var(--life-size, 58px) * 0.38);
   font-weight: 700;
   line-height: 1;
   color: color-mix(in oklab,
@@ -7173,21 +7398,38 @@ button:hover .tarot-fan-card {
  * So: down, both of them, and no rule keyed on which seat it is. There is no
  * longer any difference between the two to key on — they sit at the same
  * height in the same band, which is the whole point of putting them there. */
-.field-rail .field-tray {
-  top: calc(100% + 6px);
-  /* **Pinned to the panel, not to the tile.** A tray anchored to one 26-pixel
-     pile and allowed to grow to 560px has to grow *somewhere*, and whichever
-     edge it grows toward is a page edge for one of the two panels — which is
-     the same fault the card preview was rebuilt to stop making. Spanning the
-     panel it belongs to, it is on screen by construction at every width, and
-     it says whose zone it is by sitting under that player's own panel. The
-     cards inside already wrap. */
-  left: 0;
+/* **A tray opens up and inward, over its own half's sand.**
+ *
+ * It used to drop below whichever stone panel it belonged to, because the
+ * panels were in a band under the arena with empty page beneath them. Both
+ * clusters sit at the *foot* of their own half now, so down is off the board
+ * for one of them and across the seam onto somebody else's half for the
+ * other. Up, for both. And they stand in the right-hand corner, so the panel
+ * runs leftward — into the half, away from the page edge.
+ *
+ * **Measured against the cluster, not against the tile that opened it.** A
+ * graveyard allowed to grow to 560px out of a 78-pixel tile has to grow
+ * somewhere, and whichever edge it grew from would be a page edge for one of
+ * the two seats — the same fault the card preview was rebuilt to stop making.
+ * Anchored to the cluster it opens over the sand its owner is already looking
+ * at, at every width, by construction.
+ *
+ * It is inside the arena now, and the arena clips — so the height is capped to
+ * what a half can actually show rather than to a number that was chosen back
+ * when it opened onto empty page. */
+.field-zone-l .field-tray {
+  bottom: calc(100% + 6px);
+  top: auto;
   right: 0;
-  width: auto;
-  max-width: none;
-  transform: translateY(-7px) scale(0.97);
-  transform-origin: top center;
+  left: auto;
+  width: max-content;
+  max-width: min(72vw, 560px);
+  /* Two lanes, not three. The tray rises out of a cluster that is already
+     sitting on the floor of its own half, so three lanes' worth of panel would
+     climb over the trench and open onto the *other* player's sand. */
+  max-height: calc(var(--lane-h) * 2);
+  transform: translateY(7px) scale(0.97);
+  transform-origin: bottom right;
 }
 /* **A tray opens three ways, and every one of them stands down for `is-shut`.**
  *
@@ -7342,47 +7584,45 @@ button:hover .tarot-fan-card {
     rgba(6, 5, 4, 0.86) 0%, rgba(6, 5, 4, 0) 100%);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
-/* **The narrow band, written *here* rather than up beside `.field-zones`.**
+/* **The narrow overrides, written *here* rather than up beside the layout
+ * they belong to.**
  *
- * A media query buys no specificity. Both of these rules override selectors
+ * A media query buys no specificity. Every rule below overrides a selector
  * declared further down this file than the `@media (max-width: 46rem)` block
- * that holds the rest of the band's narrow layout, so written there they lose
- * at every width — which is precisely how the dead `.field-rail-totals` column
- * rule survived unnoticed for two redesigns. Measured before it was believed:
- * the label came back computing 0.58rem inside a matching media query.
+ * that holds the rest of the narrow layout, so written there they lose at
+ * every width. Measured before it was believed: the label came back computing
+ * 0.58rem inside a matching media query.
  *
- * On a phone the zone tiles are about 55px rather than the 96 a laptop gives
- * them, so the label sheds its tracking first — letter-spacing is what a title
- * wears for effect, and the word is what it is for. And the name over the life
- * ring gives its slack back to the tiles: the ring is 58px, so everything past
- * that was the deck's name spending room the zones needed. It wraps to two
- * lines rather than ellipsising, because half a deck name is not a deck
- * name — `title` still carries the whole of it either way. */
+ * On a phone a zone tile is about 58px rather than the 78 a laptop gives it,
+ * so the label sheds its tracking first — letter-spacing is what a title wears
+ * for effect, and the word is what it is for. The plate's ring comes down with
+ * it, and the name with the ring: the trench has to hold two of these side by
+ * side, and 0.92rem of deck name twice over does not fit across a phone. */
 @media (max-width: 46rem) {
   .field-pile-label { letter-spacing: 0.005em; font-size: 0.5rem; }
-  .field-rail-who { max-width: 4.6rem; }
-  .field-rail-name {
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    font-size: 0.64rem;
-  }
+  .field-plate-name { font-size: 0.7rem; }
+  .field-plate-figures .field-life { --life-size: 46px; }
+  .field-plate-body { gap: 6px; }
 }
 /* ------------------------------------------------ the command zone's seats
  *
- * **The zone is a row of places, and it takes a share of the rail per place.**
- * Every tile on this rail is `flex: 1 1 0`, so dropping a pairing's second
- * throne in beside the graveyard would have made all five tiles smaller — the
- * command zone would have grown by shrinking everything, which is the one
- * outcome nobody asked for. Instead the seats live in a group that claims
- * `--seats` shares of the same space, so one commander is drawn at exactly the
- * width the single pile always was, and a pairing takes twice that from the
- * *rail's* slack rather than out of the graveyard.
+ * **The zone is a row of places, and it is one tile wide per place.**
  *
- * The gap inside is tighter than the rail's own, because these are one thing:
- * a player's command zone, with two chairs in it. */
+ * Dropping a pairing's second throne in beside the graveyard would otherwise
+ * make every tile in the corner smaller — the command zone growing by
+ * shrinking everything, which is the one outcome nobody asked for. So the zone
+ * measures itself in `--zone-tile`, the same ruler the grave and the exile
+ * beside it are cut to: one commander is drawn at exactly the width a single
+ * pile always was, and a pairing takes a second tile's width from the sand
+ * rather than out of the graveyard.
+ *
+ * `--seats` is arithmetic done in `components/board.tsx` — chairs, plus the
+ * companion's fraction of one — and it arrives here as a multiplier. It used
+ * to be a `flex-grow` against the rail's slack; the corner is a grid and has
+ * no slack to claim, so the same number now buys width outright.
+ *
+ * The gap inside is tighter than the corner's own, because these are one
+ * thing: a player's command zone, with two chairs in it. */
 /* **The frame is the zone's, not each tile's.**
  *
  * Every place in here used to carry a complete tile of its own — brass ring,
@@ -7400,9 +7640,7 @@ button:hover .tarot-fan-card {
  * game's most important card waits. */
 .field-command {
   display: flex;
-  flex-grow: var(--seats, 1);
-  flex-shrink: 1;
-  flex-basis: 0;
+  width: calc(var(--zone-tile) * var(--seats, 1));
   min-width: 0;
   gap: 0;
   /* Stretch, so the side slot is the *height* of the zone and only its width
@@ -7443,7 +7681,7 @@ button:hover .tarot-fan-card {
  * which is the whole of what is left of the old green edge: enough to say this
  * place is not one of the chairs, and not so much that it reads as a box. */
 .field-command .field-seat-wrap-companion {
-  flex-grow: var(--aside, 0.72);
+  flex: var(--aside, 0.72) 1 0;
   border-left-color: color-mix(in srgb, var(--vine) 62%, transparent);
 }
 /* **The companion's difference is a material, not a frame.**
@@ -7753,13 +7991,49 @@ button:hover .tarot-fan-card {
    top and bottom. Leaning on the neighbour is the intent — that is what a
    tapped card does on a table — but a third of a card covered is not, and the
    rows had three pixels between them to absorb it. */
+/* **One lane: one line of cards, and it scrolls rather than growing.**
+ *
+ * Wrapping is what made the board breathe, so wrapping is gone. Something has
+ * to give when a lane is handed more permanents than it has room for, and what
+ * gives is the *lane's scroll* rather than the card's size.
+ *
+ * **That is the second answer to this, and the first one is worth writing down
+ * because it looked right.** Cards shrinking to their share of the lane keeps
+ * everything visible, and the share is expressible in pure CSS: React knows
+ * the pile count, the stylesheet knows the width, and `clamp` picks the
+ * smaller of a card and its share. It drew correctly for most of a board and
+ * then blew one lane out to 488 pixels — because an Aura's `.field-gear` is
+ * *absolutely positioned*, so it shrink-wraps its contents, and a child whose
+ * width is a percentage of a parent that is sized by that child has no answer.
+ * Chrome picks one anyway, and the one it picked was the card image's natural
+ * width. **A percentage width is a trap in any box that shrink-wraps**, and
+ * this board has three of them.
+ *
+ * So: a card is a card. If a player has more than about nine distinct
+ * permanents in one lane the lane scrolls, which is honest, discoverable and
+ * — this is the part that makes it acceptable — not the only way to see the
+ * card, because a card is already a hover away from being held up at full size
+ * (`FieldPeek`). If the scroll turns out to be a nuisance on a real board, the
+ * fix is a measured width from a `ResizeObserver`, not a cleverer `calc`.
+ *
+ * **The padding is load-bearing and is not spacing.** A tapped permanent leans
+ * forty-five degrees about its own centre, so it needs about an eighth of its
+ * height in clearance at the top and bottom of the lane, and rather more at
+ * the ends. `overflow` clips at the *padding* edge, so putting that clearance
+ * in padding rather than in the gap is what lets the lane scroll sideways
+ * without shearing the corners off every turned card in it. */
 .field-row {
+  --lane-gap: 7px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-end;
-  gap: 7px;
-  min-height: 42px;
-  padding: 2px 0;
+  gap: var(--lane-gap);
+  height: 100%;
+  min-width: 0;
+  padding: var(--lane-lean) var(--lane-turn);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 .field-row-empty {
   font-size: 0.72rem;
@@ -7785,13 +8059,29 @@ button:hover .tarot-fan-card {
    collapse into one stack before they are drawn, so a row of nine Forests was
    already one card wide. What it costs is height — about twenty-two pixels a
    row, four rows a seat — and that is the trade he asked for. */
+/* **One ruler for every card in the arena** — a lane, a hand, a tray, a pile.
+ *
+ * `--field-card-full` rather than the 58px that used to be written here, so
+ * that a phone can bring every card in the room down together instead of each
+ * surface being narrowed by hand. `aspect-ratio` rather than a second
+ * written-down number, so a card that changes size changes size as a *card*:
+ * a width that moved while the height stood still would stretch somebody's
+ * painting, which is the one thing ADR 32 and Scryfall's own guidelines both
+ * say not to do to it. */
 .field-card {
   position: relative;
   flex: 0 0 auto;
-  width: 58px;
-  height: 81px;
+  width: var(--field-card-full);
+  aspect-ratio: 58 / 81;
+  height: auto;
   animation: field-card-arrives 460ms cubic-bezier(0.18, 0.9, 0.28, 1.02);
 }
+/* **The gear stack is absolutely positioned, so it shrink-wraps** — and a box
+   that shrink-wraps must never be asked to size a child from its own width.
+   Stated here rather than left implicit: this is the box that turned a lane
+   into 488 pixels of Aura, and the next percentage anybody writes onto a
+   `.field-card` will find it again. */
+.field-gear { width: var(--field-card-full); }
 
 /* ------------------------------------------------ a permanent and its gear
  *
@@ -9233,11 +9523,25 @@ button:hover .tarot-fan-card {
 
 /* The seam: the hypogeum. A dark trench with a brass lip either side, and
    the turn announced in the middle of it. */
+/* **The trench, which is now the scoreboard too.**
+ *
+ * It held a turn number between two hairlines — four words across the widest
+ * strip on the page — while the names and life rings sat in a stone band below
+ * the arena, as far from the sand as the page could put them. Three columns
+ * now: a plate against each half, and the turn standing between them where the
+ * lifts came up. Everything a person glances up to check, on the one strip
+ * both players are already looking at.
+ *
+ * The two outer columns are equal and both `minmax(0, …)`, so a long deck name
+ * ellipsises inside its own half instead of shoving the turn off centre — the
+ * turn is the fixed point of this band and it stays put whatever it is
+ * standing between. */
 .field-seam {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 3px 14px;
+  gap: 14px;
+  padding: 5px 14px;
   background:
     linear-gradient(180deg,
       rgba(0, 0, 0, 0.42) 0%, var(--field-trench) 45%,
@@ -9246,19 +9550,17 @@ button:hover .tarot-fan-card {
     inset 0 1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent);
 }
-.field-seam-rule {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg,
-    rgba(201, 162, 39, 0) 0%,
-    color-mix(in srgb, var(--field-brass) 55%, transparent) 50%,
-    rgba(201, 162, 39, 0) 100%);
-}
+/* The turn, on its own plinth in the middle of the trench. The two hairlines
+   that used to flank it are gone with the flex row that stretched them: the
+   plates either side are the thing that separates it now, and a rule between a
+   plate and a number would be a third divider in a band that has two. */
+.field-seam-turn { flex-direction: column; }
 .field-seam-turn {
   display: inline-flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 0.74rem;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  font-size: 0.82rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--field-brass) 88%, #fff);
