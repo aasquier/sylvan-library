@@ -11836,84 +11836,174 @@ button:hover .tarot-fan-card {
   .tape-span { animation: none; }
 }
 
-/* --------------------------------------------------- the gate, as a card
+/* --------------------------------------------------- the gate IS the card
  *
- * `.btn-arena` up in the button family is the voice; this is the painting
- * hung behind it (Aaron, 2026-08-27: "what if our button to 'Send them in'
- * was a button made from the card 'Arena'"). It is an extension rather than a
- * replacement, and deliberately so — every reply to the hand is still the
- * one `.btn-arena` already had: the lifted edge, the glint across the steel,
- * the two swords drawing apart on hover and closing on the press. What is
- * added here is the painting's own answer to those same three states, and
- * nothing at all is written inline, which is commandment 17's actual
- * mechanism rather than its slogan.
+ * `.btn-arena` up in the button family is the voice. This block turns the
+ * control into a whole Magic card and then gives that card four things to
+ * say, all of them on layers drawn over it and none of them reaching into it.
  *
- * **The stacking order is the whole trick and it is not the default.** A
- * `::before` is the element's *first* child in tree order and would paint
- * under an absolutely positioned image, which is the opposite of what a scrim
- * is for. So the four layers are numbered: the painting at 0, the scrim over
- * it at 1, `.btn-arena`'s own glint at 2, and the label on top at 3.
+ * **Why it is the whole card and not a crop.** The first version hung
+ * `art_crop` behind a pill and put the label on top of the painting. Aaron
+ * read it twice: *"I can barely see the art. I meant literally the full card
+ * is the button"*, and then the half that makes it a rule rather than a
+ * preference — *"that was breaking the 'no cropping' scryfall rule"*.
+ * Scryfall's imagery guidelines forbid cropping, distorting, desaturating and
+ * watermarking a card image; ADR 32 wrote that boundary down and
+ * `cardimagery_test.go` enforces it where it is settled. Aaron has now settled
+ * this surface. So the old `.btn-arena-card` rules are gone rather than
+ * quieted, and every one of them was a violation: `object-fit: cover` on a
+ * printed card, `object-position` choosing a fifth of it, and a `scale(1.12)`
+ * on hover inside `overflow: hidden`, which is a hover that crops.
  *
- * **The scrim is legibility, not taste.** The label is `--anvil-glint`, which
- * clears AA against the blood gradient by a wide margin and clears nothing at
- * all against the painting's cloud bank. The scrim carries the gradient back
- * over the picture at a strength that leaves the label where it was — the
- * painting is the material, never the ground the words stand on.
+ * **What replaces them is `components/wheel.tsx`'s folded card, which was
+ * right all along**: the image at its own aspect ratio, full width of the
+ * control, nothing done to it ever. `overflow: hidden` stays, and here it only
+ * rounds the corners — nothing inside this box moves, so it cannot clip a
+ * picture. The control's own replies to the hand are transforms and shadows on
+ * *the card as an object*: it lifts, it turns a degree and a half, its shadow
+ * warms. That is the wheel's hover, and it is motion rather than distortion.
  *
- * **And every bit of that strength is in the scrim, not in the picture.** The
- * first draft got the same look by fading the `<img>` to 0.68 and thinning
- * the wash to match, which composites to within a percent of this and is the
- * wrong mechanism: it is the room reaching *through* a card and changing
- * Wizards' painting, and hovering it changed the painting again. The rule is
- * already written down beside the token materials in this file and in ADR 32
- * — light is laid on a card through a layer of its own, never on the art —
- * and `cardimagery_test.go` enforces it on the surfaces where it has been
- * settled. This is one of the surfaces that test names as unsettled, which is
- * a reason to get it right rather than a permission not to. So the image runs
- * at full strength and the gradient above it does all the work; hover thins
- * *the wash*, and the painting underneath is never touched. */
-.btn-arena-card .btn-arena-art {
-  position: absolute;
-  inset: 0;
+ * **The four layers, and the order is not the default.** A `::before` is the
+ * element's first child in tree order and would paint under an absolutely
+ * positioned sibling, which is the opposite of what a wash is for. So they are
+ * numbered: the card at 0, the state layer at 1, `.btn-arena`'s glint at 2,
+ * the plate at 3.
+ *
+ * **The plate sits in the card's own text box**, in percentages of the card so
+ * it tracks the printed box at any width — measured off the 488x680 face: the
+ * yellow rules box runs 8.8% to 91.2% across and 60.6% to 87.9% down, and the
+ * plate is inset a hair inside that so the printed rule still shows around it.
+ * The painting above it is untouched, and so are the title, the type line and
+ * the printed "Illus. Rob Alexander" underneath. Blood and brass, because that
+ * is what `.btn-arena` is made of and this is still that control.
+ *
+ * **The card holds one width at every screen and there is no breakpoint in
+ * here.** `sm:` has guessed Aaron's phone wrong twice on this very panel (see
+ * `.gatehouse`'s note and the Coliseum's own comment about the seat pickers).
+ * A card is a fixed object; it does not need to know how wide the room is. The
+ * gatehouse grows to hold it instead, and `items-end` stands the pickers and
+ * the gate on the same floor — which is what a gate and its jambs do.
+ */
+.arena-gate {
+  /* Beats `.btn`'s inline-flex and `.btn-arena`'s plate material, both one
+     class and both above this — source order is the whole cascade here. */
+  display: block;
+  width: 9.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.42rem;
+  background: none;
+  line-height: 0;
+  box-shadow:
+    0 3px 12px rgb(0 0 0 / 0.38),
+    0 0 0 1px color-mix(in oklab, var(--anvil-brass) 30%, transparent);
+  transition:
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 240ms ease;
+}
+/* `.btn:disabled` fades every button to 0.4, which on this one is the room
+   reaching through a card and dimming Wizards' painting. The shut gate says
+   so with the grate below instead. */
+.arena-gate:disabled { opacity: 1; }
+
+/* The card. Nothing is done to it, and that list is the specification:
+   no `object-fit`, no `object-position`, no `transform`, no `filter`. */
+.arena-gate-card {
+  position: relative;
   z-index: 0;
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* **Low, on the floor, and that is the opposite of the obvious choice.** A
-     control this shape keeps a band about a fifth of the painting's height,
-     so the crop is a decision about which fifth. Aimed at the fighter and the
-     cloud bank — the upper half, where the subject is — it comes out as a
-     wash of pale cloud: low contrast under the label and unreadable as
-     anything. Aimed at the floor it lands on the thing that actually says
-     *arena*: the burning maze cut into black stone, with the fallen beast
-     across it. Higher contrast for the label too, because a floor is dark.
-     Walked at 34, 68 and 78 on a phone; 78 is the one you can read. */
-  object-position: center 78%;
-  transform: scale(1.04);
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  height: auto;
   pointer-events: none;
 }
-.btn-arena-card::before {
+
+/* The state layer: one drawn surface, four backgrounds. Lifted and gone by
+   default, which makes opening the gate a gesture rather than a switch. */
+.arena-gate::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 1;
-  /* 67 / 76 / 86 rather than 52 / 64 / 80: with the picture no longer faded
-     to 0.68, these are the alphas that leave the same share of painting
-     showing through — the mechanism changed and the pixels did not. */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--arena-blood-lit) 67%, transparent) 0%,
-    color-mix(in srgb, var(--arena-blood) 76%, transparent) 55%,
-    color-mix(in srgb, var(--arena-blood-deep) 86%, transparent) 100%);
+  border-radius: inherit;
   pointer-events: none;
-  transition: opacity 260ms ease;
+  opacity: 0;
+  transform: translate3d(0, -14%, 0);
+  transition: opacity 420ms ease,
+              transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.btn-arena-card::after { z-index: 2; }
-/* Unconditional, not `.btn-arena-card .btn-arena-face`: the label wears this
-   whether or not the painting arrived, and the swords glyph carries
-   `display: block` — inside a bare inline span that puts the label on its own
-   line, which is the fallback rendering breaking rather than falling back. */
+/* Shut: a cold wash and a portcullis over the card, because greying the card
+   out is exactly the filter ADR 32 forbids. The bars are the gatehouse
+   panel's own grate at one card's scale, so the two read as one mechanism. */
+.arena-gate[data-gate='shut']::before {
+  opacity: 1;
+  transform: none;
+  background:
+    repeating-linear-gradient(90deg,
+      color-mix(in oklab, var(--anvil-brass) 44%, transparent) 0 2px,
+      transparent 2px 12px),
+    linear-gradient(180deg,
+      rgb(10 12 18 / 0.58) 0%,
+      rgb(10 12 18 / 0.74) 100%);
+}
+/* Shut, the plaque goes cold with the rest of the gate — a lit plate behind a
+   grate reads as press-me, which is the one thing it is not. The material
+   dims and the ink does not: somebody who cannot open the gate should still
+   be able to read what it would have done (commandment 2). */
+.arena-gate[data-gate='shut'] .arena-gate-plate {
+  border-color: color-mix(in srgb, var(--anvil-brass) 32%, #2a0d0b);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--arena-blood-lit) 54%, #190f11) 0%,
+    color-mix(in oklab, var(--arena-blood) 54%, #190f11) 58%,
+    color-mix(in oklab, var(--arena-blood-deep) 62%, #12090a) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 226 168 / 0.12),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5);
+}
+/* Lighting: embers under the gate, breathing. The forge is being lit and the
+   only honest thing this control can do is look like something started. */
+.arena-gate[data-gate='lighting']::before {
+  opacity: 1;
+  transform: none;
+  background: radial-gradient(125% 64% at 50% 112%,
+    color-mix(in oklab, var(--arena-blood-lit) 86%, transparent) 0%,
+    color-mix(in oklab, var(--arena-blood) 44%, transparent) 44%,
+    transparent 74%);
+  animation: arena-gate-ember 1500ms ease-in-out infinite alternate;
+}
+@keyframes arena-gate-ember {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+/* Running: torchlight, steady. The tilt on the card itself is the other half
+   of this state and it is directly below. */
+.arena-gate[data-gate='running']::before {
+  opacity: 1;
+  transform: none;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--arena-blood-lit) 22%, transparent) 0%,
+    color-mix(in oklab, var(--arena-blood-deep) 38%, transparent) 100%);
+}
+/* The land is tapped. `Arena`'s ability costs three and `{T}`, and a card
+   turned out of true is the one piece of Magic vocabulary a player reads
+   without being told what it means. Six degrees rather than ninety: this one
+   is standing in a row of form controls, and a card lying on its side there
+   reads as a bug. A transform on the button turns the whole object — the clip
+   box goes with it, so nothing is cropped by it. */
+.arena-gate[data-gate='running'] {
+  transform: rotate(6deg);
+  box-shadow:
+    0 10px 24px rgb(0 0 0 / 0.45),
+    0 0 22px color-mix(in oklab, var(--arena-blood-lit) 55%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--anvil-brass) 72%, transparent);
+}
+
+/* The fallback face, for the gate with no card behind it. It is a plain
+   `.btn-arena` at that point, and this span is doing two jobs that survive
+   the rewrite: the swords glyph carries `display: block`, so inside a bare
+   inline span the label lands on its own line — and `.btn-arena::after` is
+   absolutely positioned across the whole face, so without a stacking context
+   the glint paints over the words. */
 .btn-arena-face {
   position: relative;
   z-index: 3;
@@ -11921,34 +12011,102 @@ button:hover .tarot-fan-card {
   align-items: center;
   gap: 0.4rem;
 }
-/* The theater's own belt-and-braces, for the theater's reason: the scrim is
-   tuned against the *average* of what is behind it and the painting has a
-   cloud bank in it. A shadow under the letters costs nothing and means the
-   label cannot be undone by a bright passage the crop happens to land on. */
-.btn-arena-card .btn-arena-face { text-shadow: 0 1px 4px rgb(0 0 0 / 0.75); }
-/* Room for a painting to be a painting rather than a texture. */
-.btn-arena-card { min-height: 3.1rem; padding-inline: 1.25rem; }
 
-/* The gates opening: the wash thins and the picture comes up and pushes in a
-   little, which is the same gesture the swords make. Pressed, it settles back
-   — the whole control sinks on `:active` and a painting that kept swelling
-   through the press would be the one part of the button not agreeing with the
-   hand. The brightening is done to the scrim; the art never changes. */
-.btn-arena-card:hover:not(:disabled) .btn-arena-art { transform: scale(1.12); }
-.btn-arena-card:hover:not(:disabled)::before { opacity: 0.9; }
-.btn-arena-card:active:not(:disabled) .btn-arena-art { transform: scale(1.03); }
-/* Focus is the keyboard's hover, and it must show the same thing — the ring
-   from `.btn:focus-visible` says *where* you are and the painting says the
-   gate is ready to open. A control that answers a pointer and not a key is
-   half a control. */
-.btn-arena-card:focus-visible:not(:disabled) .btn-arena-art {
-  transform: scale(1.12);
+/* The plate, across the card's own text box. */
+.arena-gate-plate {
+  position: absolute;
+  z-index: 3;
+  inset: 61.8% 10.4% 13% 10.4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--anvil-brass) 60%, #2a0d0b);
+  border-radius: 0.16rem;
+  /* `.btn-arena`'s own gradient, at the size of a rules box. The ink is
+     `--anvil-glint`, which clears AA on every band of it — the measurement is
+     recorded up beside `.btn-arena` and the gradient has not changed. */
+  background-image: linear-gradient(
+    180deg,
+    var(--arena-blood-lit) 0%,
+    var(--arena-blood) 58%,
+    var(--arena-blood-deep) 100%);
+  color: var(--anvil-glint);
+  box-shadow:
+    inset 0 1px 0 rgb(255 226 168 / 0.26),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 2px 7px rgb(0 0 0 / 0.45);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
+  transition: border-color 160ms ease, box-shadow 160ms ease,
+              transform 160ms ease;
 }
-.btn-arena-card:focus-visible:not(:disabled)::before { opacity: 0.9; }
+/* Smaller than the seventeen pixels the glyph defaults to: beside a ten-pixel
+   word at the width of a rules box, seventeen is the mark shouting over the
+   sentence. Sized here rather than by a prop so the fallback plate — which is
+   a normal button and has room — keeps the size it was drawn at. */
+.arena-gate-plate svg { width: 14px; height: 14px; flex: none; }
+/* **Scoped to the plate, and that is a fix rather than tidiness.** The word
+   carries this class in both renderings, so unscoped it shrank the *fallback*
+   plate's label to two thirds of a button's size — a face nobody sees until
+   somebody else's host goes down, which is exactly how a rule like this gets
+   shipped. Unqualified, the label only looks right where it was measured. */
+.arena-gate-plate .arena-gate-word {
+  font-size: 0.63rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  /* It wraps rather than truncating — the plate is two lines tall and
+     "Lighting the forge…" is the longest thing it ever says — and it wraps
+     with nothing but `text-align`. `text-wrap: balance` was the obvious
+     reach and `browserfloor_test.go` refused it: that property wants Safari
+     17.4 and this app's declared floor is 16.4. Raising a floor is a
+     decision about whose phone stops working, which is not a decision a
+     nicer line break gets to make (commandment 2). */
+  text-align: center;
+}
 
-/* The card the gate is cut from, said once, underneath it. Left-ranged rather
-   than `.coliseum-footnote`'s right, because that one is a credit hanging off
-   the corner of a picture and this one is a sentence somebody reads. */
+/* The hand, answered three ways (commandment 17). Hover and focus are the
+   same reply because a keyboard is a hand: the card lifts off the row and
+   turns, its shadow warms toward the room's blood, and the plate's edge
+   brightens. `.btn-arena`'s glint crosses the whole face and its two swords
+   draw apart, both already inherited. `.btn:focus-visible` puts the ring
+   outside the box, where `overflow: hidden` cannot touch it. */
+.arena-gate:hover:not(:disabled),
+.arena-gate:focus-visible:not(:disabled) {
+  transform: translateY(-5px) rotate(-1.5deg);
+  box-shadow:
+    0 14px 28px rgb(0 0 0 / 0.46),
+    0 0 20px color-mix(in oklab, var(--arena-blood-lit) 58%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--anvil-brass) 68%, transparent);
+}
+.arena-gate:hover:not(:disabled) .arena-gate-plate,
+.arena-gate:focus-visible:not(:disabled) .arena-gate-plate {
+  border-color: color-mix(in srgb, var(--anvil-brass) 92%, #2a0d0b);
+  box-shadow:
+    inset 0 1px 0 rgb(255 226 168 / 0.44),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 4px 13px rgb(126 36 32 / 0.6);
+}
+/* Pressed, the card comes back down onto the sand and the plate sinks into
+   it — the one place in this control where something moves *into* the face
+   rather than off it, which is what a press is. */
+.arena-gate:active:not(:disabled) {
+  transform: translateY(0) rotate(-0.4deg);
+  box-shadow:
+    0 2px 9px rgb(0 0 0 / 0.5),
+    0 0 0 1px color-mix(in oklab, var(--anvil-brass) 72%, transparent);
+}
+.arena-gate:active:not(:disabled) .arena-gate-plate {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 5px rgb(0 0 0 / 0.6),
+    inset 0 -1px 0 rgb(255 226 168 / 0.1);
+}
+
+/* The card the gate is, said once, underneath it. Left-ranged rather than
+   `.coliseum-footnote`'s right, because that one is a credit hanging off the
+   corner of a picture and this one is a sentence somebody reads. */
 /* Secondary rather than muted, for `.tape-seat-of`'s reason: this is a
    sentence somebody reads rather than a credit they glance at, and it is
    aimed at the person who has never met the card (commandment 2). */
@@ -11962,18 +12120,24 @@ button:hover .tarot-fan-card {
 .arena-note em { color: var(--text-primary); font-style: italic; }
 
 @media (prefers-reduced-motion: reduce) {
-  /* The wash still thins under the hand — that is the control answering, and
-     it is information rather than decoration. What stops is the travel, and it
-     is pinned at its resting scale in every state rather than switched to
-     `none`: at rest it sits at 1.04 to hide the crop's edges, so unsetting it
-     on hover would turn the one promise about not moving into a movement. */
-  .btn-arena-card .btn-arena-art,
-  .btn-arena-card:hover:not(:disabled) .btn-arena-art,
-  .btn-arena-card:focus-visible:not(:disabled) .btn-arena-art,
-  .btn-arena-card:active:not(:disabled) .btn-arena-art {
-    transform: scale(1.04);
-    transition: none;
+  /* What stops is the travel. What stays is every state — the wash, the
+     grate, the brightening edge, the tilt — because those are the control
+     telling somebody where it is, and that is information rather than
+     decoration. The running tilt is restated *after* the blanket `none` for
+     the ordering's sake: it is a state, and a state does not move.  */
+  .arena-gate,
+  .arena-gate:hover:not(:disabled),
+  .arena-gate:focus-visible:not(:disabled),
+  .arena-gate:active:not(:disabled) { transform: none; }
+  .arena-gate[data-gate='running'] { transform: rotate(6deg); }
+  .arena-gate::before,
+  .arena-gate[data-gate='shut']::before { transition: opacity 200ms ease; }
+  .arena-gate::before { transform: none; }
+  .arena-gate[data-gate='lighting']::before {
+    animation: none;
+    opacity: 1;
   }
+  .arena-gate:active:not(:disabled) .arena-gate-plate { transform: none; }
 }
 
 /* ================================================== the centre of the arena
