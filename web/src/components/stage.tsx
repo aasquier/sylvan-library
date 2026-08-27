@@ -15,6 +15,7 @@
 
 import type { CSSProperties } from 'react'
 
+import cryptaArt from '../assets/coliseum/crypta.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
@@ -101,11 +102,20 @@ function StagePile({ item }: { item: Staged }) {
  * says they are one: the place a game keeps what is not in it. The stylesheet
  * reverses the journey; the road is the same road.
  *
- * **A sibling of the skull rather than a variant of the veil.** The death lays
- * two layers *on* the card, because a death happens to the card. An exile
- * happens to the card's *place*: it is still whole, it is simply not here any
- * more. So this goes underneath — the arena opens onto somewhere else for a
- * second and a half, and the card walks off into it.
+ * **It goes underneath, because an exile happens to the card's *place*.** It
+ * is still whole; it is simply not here any more. So the arena opens onto
+ * somewhere else and the card walks off into it, rather than anything being
+ * laid over the picture.
+ *
+ * That paragraph used to draw the line one step further over — it said a
+ * *death* takes layers on the card because a death happens to the card, and
+ * that a scene underneath was exile's alone. Half of that was right and the
+ * other half was a sentence written before there was a crypt to put under a
+ * death. A death is both things at once: the creature is changed (the pall,
+ * the stone, the sinking) **and** it goes somewhere, and Magic's own wording
+ * says so — rule 700.4 defines "dies" as *put into a graveyard from the
+ * battlefield*, which is a zone change with a destination in it, exactly as
+ * exile is. See `StageCrypt`, which is that destination.
  *
  * The road's own vanishing point is about four fifths across and just under
  * half way down, measured off the finished crop; the stylesheet sends the card
@@ -118,6 +128,50 @@ function StageRoad() {
     <span className="stage-road" aria-hidden="true">
       <img className="stage-road-art" src={viaArt} alt="" draggable={false} />
       <span className="stage-road-haze" />
+    </span>
+  )
+}
+
+/**
+ * **The vault below**, drawn behind a card that is dying and nowhere else.
+ *
+ * Aaron, 2026-08-27, having watched the road land: *"I want something to show
+ * when something dies and is going to the graveyard... A good crypt, tomb, or
+ * gothic graveyard would work."* This is the crypt — a columbarium passage on
+ * the Via Appia, which `crypta.recipe.yaml` argues at length, including why a
+ * Roman burial chamber rather than the gothic one he named, and why it is the
+ * same road the exile scene already runs down.
+ *
+ * **The skull stays, and that was the call this needed most.** Two objects
+ * saying "dead" over one card is a real risk and it is the reason the question
+ * was asked at all — but these two are not saying the same thing twice. The
+ * stone is *on the card*, small, bright and sharp-edged, and it is what
+ * happens to this creature. The vault is *behind* it, large, dark and soft,
+ * and it is where the creature is going. Figure and ground, at different
+ * depths and different values.
+ *
+ * Two concrete reasons beyond the argument, either of which would have carried
+ * it alone. On a phone the card fills most of the arena and what shows around
+ * it is mostly shadow, so a death without the stone is a card getting darker;
+ * the stone is what makes the beat read at that size. And the skull is the one
+ * object tying this to the same death drawn on the card in its own row and on
+ * the graveyard pile — one event in three places, which is `lib/stage.ts`'s
+ * whole argument about the clock, and dropping it here would leave the middle
+ * of the arena and the board disagreeing about what just happened.
+ *
+ * **The card sinks and the vault comes forward**, which is the one place this
+ * deliberately reads differently from the road while using the same motion.
+ * The road creeps toward its own vanishing point behind a card travelling the
+ * same way, so the ground moves *with* it. Here the card goes down and away
+ * while the chamber comes toward the eye, and two things moving apart is what
+ * makes one of them look left behind.
+ */
+function StageCrypt() {
+  return (
+    <span className="stage-crypt" aria-hidden="true">
+      <img className="stage-crypt-art" src={cryptaArt} alt=""
+           draggable={false} />
+      <span className="stage-crypt-damp" />
     </span>
   )
 }
@@ -137,6 +191,7 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
       <span className="stage-veil" aria-hidden="true" />
       {(item.manner === 'exiled' || item.manner === 'companion')
         && <StageRoad />}
+      {item.manner === 'dies' && <StageCrypt />}
       <span className="stage-frame">
         {item.count > 1 && <StagePile item={item} />}
         <StageFace item={item} />

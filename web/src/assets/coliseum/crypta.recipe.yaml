@@ -1,0 +1,148 @@
+# The vault a creature goes down into when it dies.
+#
+# Aaron, 2026-08-27, having watched the exile road land: *"I want something to
+# show when something dies and is going to the graveyard... A good crypt, tomb,
+# or gothic graveyard would work."*
+#
+# **The gothic crypt was the legible answer and it is the wrong building.**
+# This room is Rome — the sand, the parade shield, the secutor's helm, the
+# memento mori off a Pompeiian dining-room floor, and the Appian Way the exile
+# road already runs down. A vaulted Christian undercroft with ribbed arches is
+# a thousand years and one religion away from all of it, and dropping one
+# behind a card would be the first object in this directory that is *about* a
+# picture of the idea rather than being the thing. The Roman answer to "where
+# do the dead go" is a **columbarium**: an underground chamber walled floor to
+# ceiling with arched niches, one urn to a niche, tier upon tier of them.
+#
+# **And the register tension resolves itself, because a columbarium is what a
+# crypt is a copy of.** `crypta` is the Latin the word came from — a covered
+# underground passage, the Crypta Balbi's own name — and this photograph is
+# what anybody shown it calls a crypt without being told. Nothing had to be
+# traded: it is Roman to the letter and it reads at a glance, which is
+# commandment 2 and commandment 3 agreeing for once instead of pulling.
+#
+# **It is the same road.** The Vigna Codini columbaria stand on the Via
+# Appia — the tombs `via.recipe.yaml` names in its own argument, *"lined for
+# miles with the tombs of people who were not returning either."* So the two
+# scenes this room now opens onto are one place seen twice: exile goes *down*
+# the road, and death goes *into* the tombs beside it. That was not arranged.
+# It is what the free photographs of Roman burial happen to be of, because the
+# Appia is where Rome buried people.
+#
+# **The composition is why this plate and not the other one.** Commons holds
+# two lantern slides of these chambers under a free licence. GD010219 is a
+# *wall* of niches photographed face-on, with a modern iron handrail across the
+# foreground and an electric cable down the corner — flat, dated, and with
+# nowhere for anything to go. This one is titled `Gang`, the passage: the floor
+# runs from the bottom of the frame away between two walls of arches to a far
+# wall of more of them. The card sinks toward that floor. A chamber photographed
+# square-on would have given the sink nothing to sink into, which is the same
+# thing `via.recipe.yaml` found out about roads photographed across the frame.
+#
+# **A niche is card-shaped, and that is the whole picture.** The thing a
+# columbarium is made of is a rectangle cut in a wall that something is put
+# into and does not come out of. A Magic card going down into a room built
+# entirely out of those needs no caption; the plate says "Dies" anyway, and a
+# newcomer who reads neither still sees a card being filed away among the
+# dead.
+#
+# **The Met's API was 403-ing every request from this machine on the day this
+# was built** — search and object endpoints alike — so this went to Wikimedia
+# Commons, which is where much of the Met's own collection lives by donation
+# anyway. That is recorded here rather than in a commit message because the
+# next person to reach for `provider: met` should know it can fail this way and
+# that the fallback is not a compromise.
+#
+# **No key, no duotone, no levels — crop and resize and nothing else**, which
+# is `via.recipe.yaml`'s own restraint and `memento.recipe.yaml`'s before it.
+# The photograph is a monochrome glass slide and the arena lights it: the
+# death's `--stage-glow` is already the cold green Magic has drawn graveyards
+# in since Alpha, and a grey picture takes that light for free. Baking a tint
+# into the committed file would fix in a byte stream a decision the stylesheet
+# can still argue about.
+animist: 1
+
+why_committed: >
+  The same argument as the road and the skull beside it. This is drawn on the
+  beat that says a creature died and it is gone two seconds later, so fetching
+  it from somebody else's host would mean a vault that opens after the card has
+  already gone down into it. The second reason is the licence: a scanned glass
+  lantern slide of unknown authorship, re-hosted by a university library and
+  then by Commons, is squarely the category where somebody else's copy quietly
+  changes terms or moves. A copy confirmed once and committed is a copy whose
+  provenance stays true.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the
+  # API. A glass lantern slide from KU Leuven's EuroPhot teaching collection,
+  # photographer and date both recorded as unknown -- so this is a term
+  # expiry rather than a dedication, which is the reason to re-confirm it on
+  # every build rather than trust this comment.
+  crypta:
+    provider: wikimedia
+    title: "Roma. Colombari di Vigna Codini Gang, GD010218.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Roma._Colombari_di_Vigna_Codini_Gang,_GD010218.jpg
+    found_via: >
+      Commons, searching `columbarium Rome niches` and then `Vigna Codini
+      columbarium`, both restricted to bitmaps and filtered to Public domain
+      and CC0 -- an unrestricted search returns almost nothing but scanned
+      nineteenth-century guidebooks, which is the trap `lens.recipe.yaml`
+      records. Searches for catacombs and for tufa galleries returned nothing
+      free and large enough at all. The Met's Open Access API was 403-ing
+      every request from this machine on the day of the build, so it was never
+      asked; the two Rijksmuseum albumen prints of the same chambers are CC0
+      and are album pages with two small prints to a sheet.
+    licence: Public domain
+
+outputs:
+  # 520 wide for a reveal drawn at up to 760, which is a tighter ratio than the
+  # road's (560 against 980) and it is the subject that asks for it. The road
+  # is foliage, and foliage is the pattern that survives being under-sampled
+  # because nobody was counting the needles. This is *architecture*: forty-odd
+  # arches in a grid, and an arch is a hard edge whose curve is the only thing
+  # saying "niche" rather than "stain".
+  #
+  # **The size curve refused to choose, and that is worth writing down.**
+  # `animist measure` walked 360 to 720 in forties and reported its knee at
+  # 480 -- but the numbers behind it are very nearly a straight line (25.8 KB
+  # at 360, 43.0 at 480, 49.9 at 520, 86.3 at 720), so there is no cliff to
+  # sit under and the "knee" is the tool's arithmetic rather than a fact about
+  # this picture. Encoding both and looking at the nearest tier of arches
+  # three times over confirmed it from the other side: 480 and 520 are nearly
+  # indistinguishable, because the limit is the *source* -- a soft glass
+  # lantern slide whose lowest niches are in deep shadow and steeply
+  # foreshortened. No amount of width recovers detail that was never on the
+  # glass.
+  #
+  # So the width was decided by the destination instead. The reveal is drawn
+  # at up to 760 CSS pixels, and 520 into 760 is a 1.46x upscale where 480
+  # would be 1.58x -- still tighter than the road, which stretches 560 across
+  # 980. Seven kilobytes to keep the enlargement under the road's.
+  #
+  # Both numbers moved once during the build, because the reveal is now sized
+  # against the sand rather than against a fixed cap -- `index.css` argues that
+  # and the two failures behind it. The ratio is what matters here and it
+  # barely moved with them.
+  #
+  # Quality 78, between the road's 74 and the mosaic's 82, and for the reason
+  # both of those numbers were chosen: this has the mosaic's hard little edges
+  # and the road's excuse -- it is behind a card, moving, for two seconds.
+  - file: crypta.webp
+    from: crypta
+    ops:
+      # **The photograph out of its mount.** The source is a scan of the whole
+      # glass slide: a black surround, a paper label reading "Rome, Vigna
+      # Codini Columbarium" down the left, a "UNIVERSITE DE LOUVAIN" label
+      # down the right, and a round paper spot at the bottom. The plate itself
+      # runs 0.227-0.758 across and 0.085-0.880 down, measured off column and
+      # row brightness profiles rather than by eye.
+      #
+      # Inside that, the top three-tenths is cropped away too, and that is a
+      # composition call rather than a mount one: the upper storeys carry the
+      # brightest thing in the frame -- a lit far wall, dead centre, exactly
+      # where the card is held. Dropping it leaves the near tiers, which are
+      # the big legible arches, and the floor, which is where the card goes.
+      - crop: {frac_box: [0.235, 0.3, 0.752, 0.868]}
+      - resize: {width: 520}
+    encode: {format: webp, quality: 78}
+    expect: {width: 520, height: 488, budget_kb: 60, metadata: none}
