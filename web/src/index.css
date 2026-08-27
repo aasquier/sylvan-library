@@ -11669,6 +11669,14 @@ button:hover .tarot-fan-card {
  * moment in the middle of the sand: the card, big enough to read, held for
  * about a beat and a half, and gone.
  *
+ * **It is a sentence now, not a caption.** The plate under the card names the
+ * player, what they did, the card and — where there is one — what they did it
+ * *to* (Aaron, 2026-08-27: *"Gyome CASTS Creature"*). Six other things reach
+ * the middle beside a cast: a death, an exile, a token conjured, a permanent
+ * spent, an Aura or Equipment finding its host, and a companion walking in
+ * from outside the game. `lib/stage.ts` decides which and for how long; this
+ * file is only how each of them looks.
+ *
  * **Every duration here comes from `--stage-life`**, set on each card by
  * `stage.tsx`, and that is not a style choice — it is the fix `board.tsx`
  * already had to make once. A visual timed by the *beat* is a visual cut off
@@ -11720,9 +11728,31 @@ button:hover .tarot-fan-card {
    the arena's own palette, and deliberately not any one colour of mana, because
    the room does not know which and a wrong colour is worse than none. Cold and
    green for a death, which is the light Magic has always drawn a graveyard
-   in. */
+   in.
+
+   **Every manner needs a line here and there is no default**, which is a trap
+   this repo has already paid for once: an undefined custom property does not
+   fall back, it makes `color-mix()` invalid, and an invalid `color-mix()`
+   drops the whole declaration — so a manner with no glow loses its ring, its
+   veil and the light around its face, silently and only in the one case
+   nobody tested. Add a manner in `lib/stage.ts`, add its colour here. */
 .stage-card.is-cast { --stage-glow: var(--field-sun); }
 .stage-card.is-dies { --stage-glow: #8fb59a; }
+/* An attachment is the spell it came from, finishing — so it keeps that
+   spell's light rather than claiming one of its own. */
+.stage-card.is-attach { --stage-glow: var(--field-sun); }
+/* Conjured out of the table: the arena's own metal rather than the sun's
+   fire, because nothing was cast and no mana was necessarily spent. */
+.stage-card.is-made { --stage-glow: var(--field-brass); }
+/* An ember. A thing spent for what it was worth is neither a death nor a
+   spell, and this is the one light in the room that is on its way out. */
+.stage-card.is-sacrificed { --stage-glow: #c08048; }
+/* **The vine, because that is what a companion already wears.** The board
+   rings a companion in `--vine` in the command zone and on the battlefield
+   (`.field-card.is-companion`, `.field-card-crown.is-companion`), so the card
+   arriving in that green is the same card being introduced rather than a new
+   effect with its own taste. */
+.stage-card.is-companion { --stage-glow: var(--vine); }
 
 /* --- the light gathering behind it -------------------------------------- */
 
@@ -12312,6 +12342,173 @@ button:hover .tarot-fan-card {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
   overflow-wrap: anywhere;
 }
+/* **The rest of the sentence, and always on its own line.** `flex-basis: 100%`
+   rather than a `<br>` or a second strip: the deed and the card's name are one
+   phrase and wrap into each other happily, and this is a different clause — the
+   host an Aura went onto, or where a companion came from. Left in the flow of
+   the same plate so it is inside the same brass frame and rises with it; given
+   a whole line so it never ends up sitting beside a card name and reading as
+   part of it.
+
+   Quieter than the title and warmer than the word, because it is the half
+   somebody reads *second* if they read it at all. Italic for the same reason
+   an aside is italic. */
+.stage-plate-note {
+  flex: 0 0 100%;
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--field-brass) 62%, #f0e6cf);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  overflow-wrap: anywhere;
+}
+
+/* --- several of one card ------------------------------------------------ */
+
+/* **The board's pile, at the size a moment gets.**
+ *
+ * A row of Clue Tokens on the sand is one card with leaves fanned behind it and
+ * a count in its corner, and the instant three of them are conjured is that
+ * same fact a second earlier — so it is drawn with the same two pieces
+ * (`.field-card-pile`, `.field-card-count`) rather than a second notation
+ * invented for the middle of the arena. The custom properties are the board's
+ * too: `--leaf-art` is the card's own painting and `--leaf` is where in the
+ * arc a leaf stands, so anybody who has read one has read both.
+ *
+ * **Open from the first frame, which is the one departure.** On the board the
+ * fan spreads under a thumb, because a pile standing there is a thing you go
+ * and count. This is on screen for a second and a quarter and nobody is going
+ * to hover it, so it arrives spread — which is what the board's pile looks
+ * like at the only moment anybody is looking at it anyway.
+ *
+ * **And it spreads wider here, because it can.** The board's eight degrees is
+ * measured against a row that clips its own overflow eleven pixels away; the
+ * stage is the middle of the arena with sand on both sides, and the leaves of
+ * a card four times the size need a real arc or they read as a printing
+ * error. */
+.stage-pile {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  animation: stage-pile-fan var(--stage-life, 1300ms)
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stage-leaf {
+  position: absolute;
+  inset: 0;
+  border-radius: 4.75% / 3.4%;
+  background-color: var(--field-plate);
+  /* The same painting as the card in front of it. `none` is a legible state: a
+     pool that never painted this card gets the plate colour, which is what the
+     card in front of it is made of too. */
+  background-image: var(--leaf-art, none);
+  background-size: cover;
+  background-position: center;
+  transform-origin: 50% 100%;
+  transform: rotate(calc(var(--leaf) * 7deg));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+/* Shade lying *on* the leaf, never a filter through it — the board's own rule,
+   and it is a licence line rather than a taste one: these leaves carry
+   Wizards' painting, and ADR 32 with Scryfall's imagery guidelines put the
+   boundary exactly there. Darker the further back it stands, squared so the
+   two sides of the fan match without `abs()`. */
+.stage-leaf::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4.75% / 3.4%;
+  background-color: rgb(0 0 0 / calc(0.3 + 0.12 * var(--leaf) * var(--leaf)));
+}
+/* The fan opens as the card arrives rather than being open before it — the
+   pile is *being made*, and a stack that is already spread when the first
+   frame lands is a pile that was always there. */
+@keyframes stage-pile-fan {
+  0%   { opacity: 0; transform: scale(0.9) rotate(0deg); }
+  22%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  76%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The tally, in the board's brass and in the board's corner. "3×" and not "3":
+   a bare number on a card is a stat, and this room prints real stats in a
+   different corner of a different card. Bigger than the board's 0.62rem
+   because the card it sits on is four times the size — the same chip, read at
+   the same distance. */
+.stage-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: baseline;
+  padding: 3px 6px 2px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 3px;
+  background: var(--field-brass);
+  color: #1a1409;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.6);
+  animation: stage-plate-up var(--stage-life, 1300ms) ease-out both;
+}
+.stage-times {
+  font-size: 0.78em;
+  font-weight: 600;
+  opacity: 0.72;
+  margin-left: 1px;
+}
+
+/* --- in from outside the game ------------------------------------------- */
+
+/* **The exile's road, run backwards.**
+ *
+ * A companion does not start in a deck and it is not dealt — it waits outside
+ * the game, and its controller pays {3} to bring it into their hand. Aaron
+ * watched Kaheera land in a hand and was sure the engine had cheated, because
+ * the room drew the card arriving and said nothing at all about where it came
+ * from; the fix is the room *showing* where.
+ *
+ * Which is a road, and it is the road that is already here. Exile is a card
+ * walking away down the Via Appia; this is a card walking up it. Magic keeps
+ * one elsewhere — the place outside the game — and drawing a second picture
+ * for it would say there were two. So the perspective, the vanishing point and
+ * the measured numbers are the exile's, unchanged and shared deliberately:
+ * re-crop `via.recipe.yaml` and *both* directions have to be measured again.
+ *
+ * The turn runs the other way too. The Appia bends right as it goes, so a card
+ * coming *up* it arrives out of that bend and straightens. */
+.stage-card.is-companion {
+  perspective: 1000px;
+  perspective-origin: 80% 48%;
+}
+.stage-card.is-companion .stage-frame {
+  animation: stage-arrive var(--stage-life, 1800ms)
+    cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+@keyframes stage-arrive {
+  /* Out of the vanishing point: -7000 under a perspective of 1000 is 87.5% of
+     the way there, which is the exile's own far end. A card starting nearer
+     than that has not come from outside anything. */
+  0%   { opacity: 0; transform: translate3d(0, 0, -7000px) rotate(2deg); }
+  18%  { opacity: 1; }
+  /* Up the road and onto the table, arriving early and holding — the reverse
+     of the exile's shape, which spends its first third being read and the rest
+     leaving. This is read for the rest of its life, because the plate under it
+     carries a rule and a rule takes longer than a name. */
+  46%  { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  84%  { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(0, 0, 60px) rotate(0deg); }
+}
+/* Not a spell being channelled: nothing was cast, and the ring behind a card
+   is what a cast looks like in this room. The same line the exile draws, for
+   the same reason. */
+.stage-card.is-companion .stage-frame::before { animation: none; opacity: 0; }
+/* Stillness is handled with everything else's, in the block at the foot of
+   this section — a journey overridden in two places is a journey that comes
+   back in one of them. */
 
 /* --- one spell following another ---------------------------------------- */
 
@@ -12334,6 +12531,8 @@ button:hover .tarot-fan-card {
 .stage-card.is-parting .stage-face,
 .stage-card.is-parting .stage-pall,
 .stage-card.is-parting .stage-skull,
+.stage-card.is-parting .stage-pile,
+.stage-card.is-parting .stage-count,
 .stage-card.is-parting .stage-plate-strip { animation: none; }
 /* ...but a card that was dying stays dead on the way out — the grave over it
    in full, held rather than still climbing. `transform` is named because
@@ -12377,6 +12576,18 @@ button:hover .tarot-fan-card {
   }
   .stage-plate-title { font-size: 0.8rem; }
   .stage-plate-word { font-size: 0.54rem; }
+  /* The note is the line most at risk on a narrow screen — it is the longest
+     and the least important of the three — so it loses the most, and it still
+     wraps inside the plate rather than pushing it wider. */
+  .stage-plate-note { font-size: 0.64rem; }
+  /* The card is 46% of a tall arena here rather than 58%, so the chip comes
+     down with it: at the desktop size it would be a fifth of the card's width. */
+  .stage-count {
+    top: 3px;
+    right: 3px;
+    padding: 2px 4px 1px;
+    font-size: 0.7rem;
+  }
 }
 
 /* --- stillness ---------------------------------------------------------- */
@@ -12422,6 +12633,24 @@ button:hover .tarot-fan-card {
     box-shadow:
       0 20px 44px rgba(0, 0, 0, 0.9),
       0 0 0 1px color-mix(in srgb, var(--field-brass) 12%, transparent);
+  }
+  /* **The road is still a road, and the walk down it is gone.** A companion
+     comes in from outside the game and that is the whole information; the
+     journey is the drama. So the frame fades where it stands, on the same
+     clock as everything else, and the road behind it opens and closes as it
+     does for an exile two blocks up. Its own rule is more specific than the
+     blanket `.stage-frame` above, which is why it has to be named here — a
+     travel animation not overridden is a travel animation that still runs. */
+  .stage-card.is-companion .stage-frame {
+    transform: none;
+    animation: stage-still var(--stage-life, 1800ms) linear both;
+  }
+  /* A pile that is *already* fanned when it arrives, rather than opening —
+     the same concession the board's own stack makes with motion off, and the
+     count comes up with the plate rather than climbing on its own. */
+  .stage-pile,
+  .stage-count {
+    animation: stage-still var(--stage-life, 1300ms) linear both;
   }
   .stage-card.is-parting { animation: stage-gone 200ms linear both; }
   @keyframes stage-still {

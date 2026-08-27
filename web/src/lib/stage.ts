@@ -9,6 +9,15 @@
  * coliseum"*). So every cast gets a moment in the middle of the sand, and a
  * creature that dies gets the same moment with the skull played over it.
  *
+ * **And the plate under it is a sentence about a player**, which is the second
+ * ask and the one that decided the shape of everything below (Aaron,
+ * 2026-08-27: *"It would be nice if we added the players name too, Gyome CASTS
+ * Creature, etc"*, and *"for an aura or something that targets something if
+ * the text box called out the target too"*). A moment on this stage is
+ * therefore **who**, **what they did**, **which card**, and **to what** — four
+ * pieces, three of which are usually empty, and a plate that only ever draws
+ * what it was actually told.
+ *
  * The drawing is `components/stage.tsx`. Everything that is not drawing is
  * here, in `lib/` for the reason `lib/reel.ts` gives at the top of its own
  * file: oxlint's fast-refresh rule is right, a table of durations and a hook
@@ -69,6 +78,27 @@ import { beatDelay, type Speed } from './reel'
  *   off the sand with nothing said about it at all (Aaron, 2026-08-27). Raised
  *   in Go by the scribe, which also argues why it is every permanent rather
  *   than only creatures and why only the battlefield raises it.
+ * - `made` — a **token** arriving. The one thing on this stage that was never
+ *   cast, never drawn and never in anybody's deck: it is conjured, so nothing
+ *   before it announced it and the board's own row is the only place it has
+ *   ever appeared (Aaron, 2026-08-27: *"Token creation should show in the
+ *   center stage, with how many tokens were created"*). The count comes from
+ *   [countRuns] in `lib/reel.ts`, which argues at length why it is a count and
+ *   not a guess.
+ * - `sacrificed` — a permanent its controller spent. Aaron's word for the hole
+ *   was *"before they go to the ether"*, and the ether is where a Food, a Clue
+ *   and a Treasure go: they are artifacts, so rule 700.4 does not let them
+ *   *die*, and `dies` was correctly silent about the commonest disappearance
+ *   in a Gyome game. **Only what cannot die takes this**, which is what keeps
+ *   the two from doubling — a sacrificed creature raises both beats one after
+ *   the other, and drawing both would shove one card off the stage to put the
+ *   same card straight back.
+ * - `attach` — an Aura or an Equipment finding a host, and the only beat on
+ *   this wire that carries a **target**. A cast does not: Forge announces the
+ *   spell and the attachment as two separate moments, so *"for an aura or
+ *   something that targets something if the text box called out the target
+ *   too"* (Aaron, 2026-08-27) is answered here rather than on the cast.
+ * - `companion` — a companion bought in from outside the game. See `PLATE`.
  *
  * Not yet, and what each would need:
  *
@@ -77,14 +107,15 @@ import { beatDelay, type Speed } from './reel'
  *   play. It needs a beat naming **the card being copied**, and saying that a
  *   copy is what this was. Given that, it is a `Manner` row, a `PLATE` row and
  *   a block of keyframes: the card, splitting into a mirrored second of itself.
- * - **eminence** — activated and triggered abilities never reach the stream at
- *   all, so an eminence trigger is invisible. It needs a beat naming **the card
- *   whose ability fired** and **the ability's own words**, because the whole
- *   reason to draw eminence is that a newcomer cannot otherwise see why the
- *   board just changed. The words are the part that matters more than the
- *   glow.
+ * - **eminence** — an eminence trigger reaches the stream as an `ability` beat
+ *   with a zone and no words, so the room knows a commander did *something*
+ *   from the command zone and cannot say what. It needs the ability's own
+ *   **text**, because the whole reason to draw eminence is that a newcomer
+ *   cannot otherwise see why the board just changed. The words are the part
+ *   that matters more than the glow.
  */
-export type Manner = 'cast' | 'dies' | 'exiled'
+export type Manner = 'cast' | 'made' | 'attach' | 'sacrificed' | 'dies'
+  | 'exiled' | 'companion'
 
 /** Which beats get the middle of the arena.
  *
@@ -100,12 +131,46 @@ export type Manner = 'cast' | 'dies' | 'exiled'
  * is cast and then resolves is *one* spell, and drawing it twice a beat apart
  * would read as two. The cast is the moment somebody committed to it, so the
  * cast is the moment that is drawn.
+ *
+ * **Two kinds cannot answer from the kind alone**, which is why the card is
+ * passed in, and both of them are the same rule: *nothing is drawn twice*.
+ *
+ * - `enters` fires for every permanent arriving, and almost all of them were
+ *   cast one beat earlier and drawn then. A **token** is the exception that
+ *   makes the beat worth having: it was never cast, so this is the only moment
+ *   it has. `ForgeBoardCard.token` is the scribe's own flag, off Forge's card
+ *   state, and there is nothing to infer.
+ * - `sacrificed` fires for everything spent as a cost, and a *creature*
+ *   sacrificed also dies — the scribe raises both, one beat apart, which is
+ *   correct in Magic and would be two cards on this stage. So the death keeps
+ *   creatures and planeswalkers (rule 700.4's own list) and this takes
+ *   everything else: the Treasure, the Food, the Clue, the cracked fetchland.
+ *   **A card whose type line the match never recorded is left alone**, because
+ *   the room would be choosing between two drawings on no evidence, and
+ *   silence is what it already does with everything it was not told.
  */
-export function mannerOf(kind: string): Manner | null {
-  return kind === 'cast' ? 'cast'
-    : kind === 'dies' ? 'dies'
-      : kind === 'exiled' ? 'exiled'
-        : null
+export function mannerOf(kind: string, card?: ForgeBoardCard | null):
+  Manner | null {
+  switch (kind) {
+    case 'cast': return 'cast'
+    case 'dies': return 'dies'
+    case 'exiled': return 'exiled'
+    case 'attach': return 'attach'
+    case 'companion': return 'companion'
+    case 'enters': return card?.token ? 'made' : null
+    case 'sacrificed': return canDie(card?.types) === false
+      ? 'sacrificed' : null
+    default: return null
+  }
+}
+
+/** Whether rule 700.4 would call this card leaving the battlefield a death —
+ *  and `null` for a card whose type line nobody recorded, which is a third
+ *  answer rather than a no. */
+function canDie(types: string | undefined): boolean | null {
+  const kind = castType(types)
+  if (kind === null) return null
+  return kind === 'Creature' || kind === 'Planeswalker'
 }
 
 /**
@@ -162,23 +227,43 @@ export function castType(types: string | undefined): string | null {
  * goes on behind it.
  */
 const STAGE_LIFE: Record<Manner, number> = {
-  /* The commonest of the two by a wide margin — a game holds sixty or seventy
-     casts and a dozen deaths — so it is the shorter one, for the same reason
+  /* The commonest of them all by a wide margin — a game holds sixty or seventy
+     casts and a dozen deaths — so it is the shortest, for the same reason
      `MARK_LIFE` keeps the attack lamp shortest of its three. */
   cast: 1150,
+  /* A cast plus a moment, and the moment is the number. A pile of tokens says
+     one thing a single card does not — *how many* — and a count is read after
+     the name rather than with it, so it needs the eye to come back. */
+  made: 1300,
+  /* The same, for the same reason from the other end: this plate carries a
+     second line naming the host, and a line nobody finishes reading is a line
+     that was not worth drawing. */
+  attach: 1300,
+  /* A Food going is a smaller event than a Bolt resolving and it happens more
+     often — a dozen a game in a deck built to do it — so it takes the cast's
+     length and not the death's. */
+  sacrificed: 1150,
   /* Normally never read: a death takes the mark's own length, because the skull
      on the card in its row, the ghost off the grave and the card in the middle
      are **one event drawn in three places** and one event gets one clock. It is
      written down anyway so that a stage rendered without that number still gets
      the right length rather than a plausible-looking default. */
   dies: 2000,
-  /* The longest of the three, and the only one where the length is doing work
-     rather than being spent. A cast is *read* — a name, an art, a plate — and
-     it can end the moment the eye has them. An exile is **watched**: the card
-     goes down a road and the whole point is that it gets smaller and further
-     away, which is a thing that takes time or does not happen. Under about a
-     second and a quarter the card jumps rather than leaves. This is still
-     inside the cap below, so a fast pace shortens it like anything else. */
+  /* The longest thing that is not a death, because it is the only plate in the
+     room carrying a **rule** rather than a name. It happens once in a game, at
+     most twice, so the time is spent on something a person sees once — and the
+     sentence it has to land is the one Aaron did not believe when he watched
+     it happen. Deliberately just inside the four-beat cap below, so watching
+     pace never clips it and only the fast end shortens it. */
+  companion: 1800,
+  /* The longest of the ones a player does, and the only one where the length
+     is doing work rather than being spent. A cast is *read* — a name, an art,
+     a plate — and it can end the moment the eye has them. An exile is
+     **watched**: the card goes down a road and the whole point is that it gets
+     smaller and further away, which is a thing that takes time or does not
+     happen. Under about a second and a quarter the card jumps rather than
+     leaves. This is still inside the cap below, so a fast pace shortens it
+     like anything else. */
   exiled: 1500,
 }
 
@@ -235,35 +320,123 @@ export function stageLife(manner: Manner, speed: Speed,
     Math.min(STAGE_LIFE[manner], beat * STAGE_BEATS))
 }
 
-/** What the plate under the card says, in Magic's own words.
+/**
+ * What the plate under the card says, in Magic's own words.
  *
- *  A museum plate rather than a caption: the arena is a building full of
- *  exhibits and this is the one moment a card is held up to be looked at. The
- *  words are the game's own — a creature *dies*, which is the rules term and
- *  also the plainer of the two for somebody at their first game. */
-export const PLATE: Record<Manner, string> = {
-  cast: 'Cast', dies: 'Dies', exiled: 'Exiled',
+ * A museum plate rather than a caption: the arena is a building full of
+ * exhibits and this is the one moment a card is held up to be looked at. The
+ * words are the game's own — a creature *dies*, which is the rules term and
+ * also the plainer of the two for somebody at their first game.
+ *
+ * **Two forms, and which one is used is a fact about the beat rather than a
+ * fallback.** Aaron asked for the player: *"It would be nice if we added the
+ * players name too, Gyome CASTS Creature."* So a deed somebody *did* is
+ * written as they did it — `by`, in the third person, with their name in front
+ * of it. A thing that merely *happened to a card* has no doer, and `alone` is
+ * the whole plate for it. That is not a degraded version of the first: a
+ * creature dying is not something its controller chose, `beatLine` returns no
+ * player for exactly that reason, and a plate reading "Gyome dies" would name
+ * the wrong subject entirely. `by` is `null` for those two, so it cannot
+ * happen even if a player arrives on the beat later.
+ *
+ * `alone` still stands for every other manner, and it is a real state rather
+ * than dead code — two ways over. The room turns a deck's slug into a name off
+ * the shelf, so a finished match reopened before the shelf answers has beats
+ * whose player nobody can name yet. And **a sacrifice has no seat on the wire
+ * at all** (measured on a live match, 2026-08-27), so today every one of them
+ * reads "Sacrificed" rather than "Gyome sacrifices". That is a hole in Go, and
+ * this is the right thing to draw while it is open: the room saying less than
+ * it would like, rather than naming a player nothing told it about.
+ *
+ * A word on three of them:
+ *
+ * - **"puts"** for an attachment, rather than "attaches" or "equips". The
+ *   rulebook's word is *attached*, and `beatLine` already argues why the
+ *   plainer one wins here: this is read by somebody watching their first game,
+ *   and the host is named on the line under it, so "Gyome puts / Bloodforged
+ *   Battle-Axe / on Syr Gwyn" is a whole sentence in three short pieces.
+ * - **"makes"** for a token, which is the word a player says out loud, and it
+ *   is doing more than naming the event — it says the card was *conjured*
+ *   rather than drawn or cast, which is the one thing about tokens a newcomer
+ *   has to be told once.
+ * - **"'s companion"** rather than a verb, because the word `companion` is the
+ *   whole point of the plate. Aaron watched Kaheera arrive in a hand and
+ *   thought the game had cheated; the fix is not a smoother sentence, it is
+ *   the mechanic's own name on screen where it can be looked up, with the rule
+ *   under it. Commandment 2, and the same argument `beatLine` makes for
+ *   keeping the word "exiled".
+ */
+export const PLATE: Record<Manner, { by: ((who: string) => string) | null;
+  alone: string }> = {
+  cast: { by: (who) => `${who} casts`, alone: 'Cast' },
+  made: { by: (who) => `${who} makes`, alone: 'Made' },
+  attach: { by: (who) => `${who} puts`, alone: 'Put on' },
+  sacrificed: { by: (who) => `${who} sacrifices`, alone: 'Sacrificed' },
+  companion: { by: (who) => `${who}'s companion`, alone: 'A companion' },
+  dies: { by: null, alone: 'Dies' },
+  exiled: { by: null, alone: 'Exiled' },
 }
 
 /**
  * What the plate says, in full.
  *
- * The manner's own word, and then the card's kind when there is one and it
- * adds something. **Only a cast gets the type**, and the asymmetry is the
- * point rather than an omission: "Cast Creature" answers a question somebody
- * watching actually has, because half of what is cast never lands and the type
- * is the only clue about which half this was. "Dies Creature" answers nothing
- * — rule 700.4 gives that word to creatures and planeswalkers, so a thing that
- * dies is already one of two things, and the picture on the stage is the other
- * half of the answer.
+ * The deed, and then the card's kind when there is one and it adds something.
+ * **Only a cast and a token get the type**, and the asymmetry is the point
+ * rather than an omission.
  *
- * Exile sits with `dies` rather than with `cast` for the same reason from the
- * other side. It is drawn on the way *out*, and the card is right there being
- * looked at; what it was matters less than where it has gone.
+ * "Gyome casts Creature" answers a question somebody watching actually has,
+ * because half of what is cast never lands and the type is the only clue about
+ * which half this was. A token gets it for a different reason with the same
+ * shape: a Servo Token is a creature and a Food Token is not, they are drawn
+ * in different rows for that reason, and the name alone does not say which.
+ *
+ * "Dies Creature" answers nothing — rule 700.4 gives that word to creatures
+ * and planeswalkers, so a thing that dies is already one of two things, and
+ * the picture on the stage is the other half of the answer. Exile sits with it
+ * for the same reason from the other side: it is drawn on the way *out*, and
+ * where the card has gone matters more than what it was. An attachment and a
+ * companion are both already named by their own word.
  */
-export function plateWord(manner: Manner, types: string | undefined): string {
-  const kind = manner === 'cast' ? castType(types) : null
-  return kind ? `${PLATE[manner]} ${kind}` : PLATE[manner]
+export function plateWord(manner: Manner, types: string | undefined,
+  who?: string | null): string {
+  const said = PLATE[manner]
+  const head = (who && said.by) ? said.by(who) : said.alone
+  const kind = (manner === 'cast' || manner === 'made') ? castType(types) : null
+  return kind ? `${head} ${kind}` : head
+}
+
+/**
+ * The rest of the sentence, under the card's name — and null for the four
+ * manners that are a whole sentence already.
+ *
+ * **One line, and it is the half the card cannot show.** A plate is read in
+ * about a second while a picture the size of the arena is competing with it,
+ * so the test for anything on it is not *is this true* but *would somebody who
+ * missed it have misread what they saw*. Two things pass:
+ *
+ * - **The host.** An Aura on the stack is a card; an Aura on a creature is a
+ *   different creature. Without the name the picture is a card being held up
+ *   for no visible reason, which is exactly what Aaron asked about — *"for an
+ *   aura or something that targets something if the text box called out the
+ *   target too"*.
+ * - **Where a companion came from.** This is the whole reason that beat
+ *   exists: a card appearing in a hand nobody dealt it to looks like cheating,
+ *   and it looks like cheating *because the room said nothing*. "Outside the
+ *   game" is the fact, and the three is the rule — 702.139b fixes it for every
+ *   companion there has ever been, which is why it can be stated here while
+ *   nothing on the wire attributes a single mana to it (ADR 44). A number read
+ *   off whichever lands happened to tap would be the room guessing.
+ *
+ * Everything else is left off. "Gyome sacrifices Food Token, into the
+ * graveyard" spends a line on a fact the graveyard pile is already drawing.
+ */
+export function plateNote(manner: Manner,
+  target: string | undefined): string | null {
+  if (manner === 'attach') return `on ${target || 'a permanent'}`
+  if (manner === 'companion') {
+    return 'from outside the game — three mana paid'
+  }
+  return null
 }
 
 /** One card, on the stage, for one moment. */
@@ -272,6 +445,12 @@ export interface Staged {
    *  [plateWord]. Settled here rather than in the drawing, so the one place
    *  that knows the card's type line is the one place that reads it. */
   word: string
+  /** The rest of the sentence, or null — see [plateNote]. */
+  note: string | null
+  /** How many identical cards this one moment is about, from [countRuns] in
+   *  `lib/reel.ts`. `1` for almost everything; four when four tokens were
+   *  conjured at once, and the stage says so the way the board does. */
+  count: number
   /** The beat's own identity, which is what makes the second Lightning Bolt of
    *  a game play again rather than reconciling onto an element whose animation
    *  has already run. */

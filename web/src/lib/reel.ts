@@ -26,6 +26,13 @@
  * reachable at any time, so nobody is held behind a slow retelling of game one
  * while game four is being fought.
  *
+ * **And it counts the repeats**, which is the running order's other half. Four
+ * tokens made at once reach the browser as four identical beats in a row,
+ * because the only thing the wire can say is that a card moved; [countRuns]
+ * turns that back into one moment with a four on it, without removing a beat
+ * or moving one. Nothing is folded away — the board still steps once per beat
+ * — it is only said once.
+ *
  * A hook rather than a component, in `lib/` for the reason `lib/motion.ts`
  * gives at the top of its own file: oxlint's fast-refresh rule is right, this
  * is not a component, and more than one file needs it.
@@ -50,8 +57,82 @@ export interface StagedBeat {
    *  about, and re-parsing English to get back a name it already had would be
    *  a fine way to introduce a bug. */
   card?: string
-  /** The card on the other end — the attacker a blocker stepped in front of. */
+  /** The card on the other end — the attacker a blocker stepped in front of,
+   *  or the permanent an Aura or Equipment was put on. */
   target?: string
+  /**
+   * How many identical beats in a row this one **begins**.
+   *
+   * `1` for a beat standing alone, `N` for the first of a run of N, and **`0`
+   * for every beat that follows the first** — see [countRuns], which is the
+   * only thing that sets it and carries the whole argument.
+   *
+   * Optional because a `StagedBeat` built anywhere but the reel has not been
+   * counted; read a missing value as `1`, which is what a beat that has not
+   * been asked the question really is.
+   */
+  run?: number
+}
+
+/**
+ * Count identical beats that arrive back to back, so the room can tell one
+ * moment once.
+ *
+ * **Four tokens made at once is one thing that happened, and the wire has no
+ * word for it.** Forge announces a token by moving a card into a zone, one
+ * card at a time with one id each, and the scribe raises one `enters` beat per
+ * card — so a Trostani populate or an Academy Manufactor trigger reaches the
+ * browser as three or six or nine separate beats saying exactly the same
+ * sentence in a row. There is no `amount` anywhere on that path and inventing
+ * one would be the room claiming a fact nothing told it (ADR 44).
+ *
+ * **So it is counted rather than guessed.** Three consecutive beats reading
+ * "Gyome makes Clue Token" *are* three Clue Tokens; that is not an inference
+ * about Magic, it is arithmetic on what the account already said. Measured on
+ * the recorded match rather than hoped for: a real Gyome game raises runs of
+ * three Clues, three Foods and three Treasures back to back, with only
+ * beat-less `stats` lines between them.
+ *
+ * **Identity is the sentence, not a list of fields.** Two beats are the same
+ * moment repeated when their kind, their player and their words all agree —
+ * and `text` already carries everything the beat said, including the numbers a
+ * field-by-field key would have to remember to include (`damage` says "deals 3
+ * to Gyome" and two different damages are two different sentences). A beat
+ * that names no card is never folded: a player taking two turns in a row is
+ * two turns, not one turn twice, and Time Warp is a real card.
+ *
+ * **Nothing is removed.** Every beat still ticks, and the board still folds one
+ * step for each of them, so the tokens still arrive on the sand one by one and
+ * scrubbing still lands where it always did. This only says *which* beat of a
+ * run is the one worth drawing in the middle of the arena, and the followers
+ * are marked `0` so the stage can leave the card that is already up alone
+ * rather than replaying it under a new key.
+ *
+ * **The first of the run carries the count, not the last.** The moment a pile
+ * of tokens is made is the moment the first one lands; announcing it on the
+ * last would tell somebody about a thing that finished happening two beats
+ * ago.
+ */
+export function countRuns(beats: StagedBeat[]): StagedBeat[] {
+  // What makes two beats the same moment: the kind, the player and the words.
+  // A beat that names no card is folded with nothing, so it is given an
+  // identity — its own place in the bout — that nothing else can equal.
+  const same = (b: StagedBeat, at: number) => b.card
+    ? `${b.kind} | ${b.who ?? ''} | ${b.text}`
+    : `alone ${at}`
+  const out = beats.map((b): StagedBeat => ({ ...b, run: 1 }))
+  let head: StagedBeat | null = null
+  let key = ''
+  out.forEach((beat, at) => {
+    if (head && same(beat, at) === key) {
+      beat.run = 0
+      head.run = (head.run ?? 1) + 1
+      return
+    }
+    head = beat
+    key = same(beat, at)
+  })
+  return out
 }
 
 /** How fast the room is telling it, or whether it is telling it at all.
@@ -217,11 +298,20 @@ export function useReel(match: string, games: number[],
   const wanted = asked.match === match ? asked.game : 0
   const target = wanted || games[0] || 0
 
-  // The bout in words. Resolved once per *bout* rather than once per beat:
-  // `stage` walks a game's worth of beats, and doing that on every tick of the
-  // clock would be a hundred and thirty translations a second.
-  const bout = useMemo(() => (target === 0 ? null : stage(target)),
-    [stage, target])
+  // The bout in words, and its repeats counted. Resolved once per *bout*
+  // rather than once per beat: `stage` walks a game's worth of beats, and
+  // doing that on every tick of the clock would be a hundred and thirty
+  // translations a second.
+  //
+  // **The counting belongs to the running order**, which is why it happens
+  // here rather than wherever the beats were made. Whether four identical
+  // beats are four moments or one moment told once is a question about how the
+  // room tells a bout, and this hook is what tells a bout — see [countRuns].
+  const bout = useMemo(() => {
+    if (target === 0) return null
+    const heard = stage(target)
+    return heard && { ...heard, beats: countRuns(heard.beats) }
+  }, [stage, target])
 
   // How far into *this* bout of *this* match the mark has got. A mark left
   // behind by another bout — or by a match that is over — is not this one's,

@@ -19,8 +19,8 @@ import mementoArt from '../assets/coliseum/memento.webp'
 import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
-import { faceFor, mannerOf, plateWord, type Staged, stagedMana, stageLife,
-  type StagedMana, useStaged, useStagedMana } from '../lib/stage'
+import { faceFor, mannerOf, plateNote, plateWord, type Staged, stagedMana,
+  stageLife, type StagedMana, useStaged, useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
 /** The card itself, or the card set in type when there is no picture of it.
@@ -50,13 +50,56 @@ function StageFace({ item }: { item: Staged }) {
 }
 
 /**
- * **The road out**, drawn behind a card that is being exiled and nowhere else.
+ * **Several of one card, drawn as the pile it is** — the board's own language,
+ * spoken here rather than a second one invented for the middle of the arena.
+ *
+ * A row of Clue Tokens on the sand is one card with leaves fanned behind it
+ * and a count in its corner (`.field-card-pile`, `.field-card-count`), and the
+ * moment three of them are conjured is the same fact a second earlier. Drawing
+ * it any other way would teach a person two notations for one thing.
+ *
+ * **Fanned from the first frame, and that is the one departure.** On the board
+ * the fan opens under a thumb, because a pile standing there is a thing you go
+ * and count. This is over in a second and a quarter and nobody is going to
+ * hover it — so the leaves arrive already spread, which is what the board's
+ * pile looks like at the moment somebody is actually looking at it.
+ *
+ * Four leaves at four or more and two below that: the same cap, and the same
+ * reason. The arc is a texture saying *there are several*; the number in the
+ * corner is the tally, and a fan twelve deep would cover the arena to say a
+ * thing already written down.
+ */
+function StagePile({ item }: { item: Staged }) {
+  return (
+    <span className="stage-pile" aria-hidden="true"
+          style={item.image
+            ? ({ '--leaf-art': `url(${item.image})` } as CSSProperties)
+            : undefined}>
+      {(item.count >= 4 ? [-1, -0.42, 0.42, 1] : [-1, 1]).map((leaf) => (
+        <span key={leaf} className="stage-leaf"
+              style={{ '--leaf': leaf } as CSSProperties} />
+      ))}
+    </span>
+  )
+}
+
+/**
+ * **The road**, drawn behind a card that is leaving the game or arriving from
+ * outside it, and behind nothing else.
  *
  * Aaron, 2026-08-27: *"We need a good animation for the exile mechanic, a
  * photo-real winding road leading into the distance of some kind?"* This is
  * the road — the Via Appia, which `via.recipe.yaml` argues at length, including
  * why it is that road and not another and why it is a photograph rather than
  * an engraving.
+ *
+ * **It runs both ways, and that is not a saving.** An exile is a card walking
+ * away down it; a companion is a card walking *up* it — bought in from outside
+ * the game, which is the one other moment in a match where the arena opens
+ * onto somewhere that is not the table. Drawing a second picture for the
+ * second direction would say those were two different elsewheres, and Magic
+ * says they are one: the place a game keeps what is not in it. The stylesheet
+ * reverses the journey; the road is the same road.
  *
  * **A sibling of the skull rather than a variant of the veil.** The death lays
  * two layers *on* the card, because a death happens to the card. An exile
@@ -92,8 +135,10 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
           scrubbing the timeline; a pool centred on the card separates it from
           the sand and leaves the rows either side perfectly readable. */}
       <span className="stage-veil" aria-hidden="true" />
-      {item.manner === 'exiled' && <StageRoad />}
+      {(item.manner === 'exiled' || item.manner === 'companion')
+        && <StageRoad />}
       <span className="stage-frame">
+        {item.count > 1 && <StagePile item={item} />}
         <StageFace item={item} />
         {/* A death, in two layers over the card and never *through* it.
 
@@ -118,10 +163,28 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
                  draggable={false} />
           </>
         )}
+        {/* The tally, in the corner the board puts it in and in the same
+            brass. "3×" rather than "3": a bare number beside a card reads as
+            a stat, which is a thing this room prints in a different corner of
+            a different card. */}
+        {item.count > 1 && (
+          <span className="stage-count tabular">{item.count}<span
+            className="stage-times">×</span></span>
+        )}
       </span>
+      {/* **One engraved line, then the name, then the rest of it.** The deed
+          and the player are one string rather than two spans on purpose: a
+          museum plate is a label, not a layout, and splitting "Gyome casts"
+          into a name and a verb to give them different inks would make the
+          eye assemble a sentence it should simply read. `lib/stage.ts` builds
+          the whole phrase, so the one place that knows the card's type line
+          is the one place that reads it. */}
       <span className="stage-plate-strip">
         <span className="stage-plate-word">{item.word}</span>
         <span className="stage-plate-title">{item.name}</span>
+        {item.note && (
+          <span className="stage-plate-note">{item.note}</span>
+        )}
       </span>
     </span>
   )
@@ -169,9 +232,17 @@ function StageMana({ item }: { item: StagedMana }) {
  * **It never takes a pointer event, and it says nothing to a screen reader.**
  * Somebody dragging the scrubber through a match is dragging it through sixty
  * casts, and a spell that swallowed the drag would make the timeline unusable
- * at the moment it is most wanted. The words are already in the play-by-play
- * beside it, read from the same beat — announcing them twice would be the room
- * talking over itself.
+ * at the moment it is most wanted.
+ *
+ * The silence used to be justified here by the play-by-play beside it reading
+ * the same beats out, and **that panel is gone** — #328 removed it, so the
+ * words on this plate are currently the only place several of these moments
+ * are said at all. The silence is still right for what this *is*: a hundred
+ * and thirty announcements a game, arriving on a timer nobody controls, is a
+ * live region that talks over everything else on the page. It is not right
+ * forever, and the honest shape of the fix is the account coming back as
+ * something a person can read at their own pace — `lib/theater.ts` keeps
+ * `beatLine` correct against exactly that day.
  */
 export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   at }: {
@@ -198,17 +269,29 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
    *  to prefer the caster's own copy of a card both seats run. */
   seat: number | null
 }) {
-  const manner = beat ? mannerOf(beat.kind) : null
   const name = beat?.card ?? null
-  // One lookup, two answers: the painting to draw and the type line the plate
-  // reads. Asking twice would be asking the same list the same question.
-  const face = manner && name ? faceFor(board, name, seat) : null
-  const next: Staged | null = manner && name && beat
+  // **One lookup, three answers, and it now happens before the manner rather
+  // than after it**: the painting to draw, the type line the plate reads, and
+  // whether this card is a token — which is the thing `mannerOf` cannot decide
+  // without, because a permanent entering play is only worth the middle of the
+  // arena when nothing cast it. Asking the same list the same question twice
+  // would be the waste; asking it once, first, is not.
+  const face = name ? faceFor(board, name, seat) : null
+  const manner = beat ? mannerOf(beat.kind, face) : null
+  // **A beat that only repeats the one before it takes nothing.** Four tokens
+  // conjured at once arrive as four identical beats, and `countRuns` marks the
+  // followers `0` so this moment is drawn once, with a four on it, instead of
+  // being replayed under three more keys. A beat the reel never counted has no
+  // `run` at all, and that is a one rather than a nothing.
+  const times = beat?.run ?? 1
+  const next: Staged | null = manner && name && beat && times > 0
     ? {
       key: beat.key,
       manner,
       name,
-      word: plateWord(manner, face?.types),
+      word: plateWord(manner, face?.types, beat.who),
+      note: plateNote(manner, beat.target),
+      count: times,
       image: face?.image ?? null,
       life: stageLife(manner, speed, dies),
     }
