@@ -79,7 +79,7 @@ func insert(tb testing.TB, db *sql.DB, table string, cols []string, rows [][]any
 		switch c {
 		case "colors", "color_identity", "keywords", "produced_mana", "finishes":
 			holders[i] = "?::VARCHAR[]"
-		case "legalities", "card_faces":
+		case "legalities", "card_faces", "all_parts":
 			holders[i] = "?::JSON"
 		case "released_at":
 			holders[i] = "?::DATE"

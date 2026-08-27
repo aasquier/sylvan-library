@@ -84,6 +84,17 @@ predates a column the code now reads, and the affected surfaces degrade to
 fly ssh console -C "mtglab data refresh"
 ```
 
+**One reader does not raise `pool_stale`, and it is the newest one.** The
+deck page's token section reads `oracle_cards.all_parts` — what each card
+creates, which is how "what does this deck make" is answered from a chosen
+printing rather than by looking a name up. A pool built before that column
+cannot answer, and the section says so in its own words rather than claiming
+the deck makes nothing. It is deliberately *not* wired into `Stale`: the
+frozen refresh corpus records no `all_parts` on any card, so a freshly built
+pool would read as stale for a column it had correctly loaded as empty. So
+after any deploy that first shipped the column, run the refresh above once,
+by hand — nothing else will prompt for it.
+
 Facts about that command worth knowing at the terminal:
 
 - **It is transactional.** The delete and the reload of each table share

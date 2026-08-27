@@ -53,6 +53,7 @@ var addedColumns = map[string][][2]string{
 		{"power", "VARCHAR"}, {"toughness", "VARCHAR"}, {"loyalty", "VARCHAR"},
 		{"defense", "VARCHAR"}, {"game_changer", "BOOLEAN"},
 		{"flavor_text", "VARCHAR"}, {"artist", "VARCHAR"},
+		{"all_parts", "JSON"},
 	},
 	"printings": {{"flavor_text", "VARCHAR"}, {"artist", "VARCHAR"}},
 }

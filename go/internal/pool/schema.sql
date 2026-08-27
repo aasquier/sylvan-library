@@ -32,7 +32,17 @@ CREATE TABLE IF NOT EXISTS oracle_cards (
     -- declaration could never be checked against before. 53 cards carry it.
     game_changer    BOOLEAN,
     flavor_text     VARCHAR,
-    artist          VARCHAR
+    artist          VARCHAR,
+    -- What else a card puts on the battlefield: Scryfall's `all_parts`, the
+    -- related printings a card names -- the tokens it creates, the emblem it
+    -- gives, the halves it melds from. NULL for the great majority of cards,
+    -- which relate to nothing.
+    --
+    -- Stored as the document rather than flattened into a table because each
+    -- part names a *printing* id, and that is the whole value of the field:
+    -- "Spirit" is a dozen different bodies and a name can never tell them
+    -- apart, but a printing id is one particular Spirit.
+    all_parts       JSON
 );
 
 CREATE TABLE IF NOT EXISTS printings (

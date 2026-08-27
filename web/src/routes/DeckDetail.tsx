@@ -20,6 +20,7 @@ import { SceneBackdrop } from '../components/forest'
 import { CommanderMotion } from '../components/cardmotion'
 import { WheelOfFortune } from '../components/wheel'
 import { OpeningHandDeal } from '../components/openinghand'
+import { TokenShelf } from '../components/tokens'
 import {
   ArmedButton,
   Badge, CardArt, CardHover, CardLoupe, Caveat, ColorRing, ErrorNote, ManaCost,
@@ -1613,6 +1614,11 @@ export default function DeckDetail() {
               teaches comes before the one that entertains. */}
           <OpeningHandDeal deckRef={deckRef} />
           <WheelOfFortune deckRef={deckRef} />
+
+          {/* The very bottom, where the sideboard will sit beside it (Aaron,
+              2026-08-27). Collapsed by default and asking for nothing until
+              it is opened; the component argues the rest. */}
+          <TokenShelf deckRef={deckRef} />
         </div>
       )}
 

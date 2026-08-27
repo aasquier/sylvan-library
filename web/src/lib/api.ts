@@ -357,6 +357,36 @@ export interface OpeningHand {
   message?: string
 }
 
+/** One token this deck can put onto the battlefield, and the cards that make
+ *  it. The picture and its credit are absent together or present together —
+ *  no library has a printing of every token, and a painting credited to
+ *  nobody is worse than no painting. */
+export interface TokenPlate {
+  name: string
+  /** Scryfall's own classification: "Token Creature — Cat Warrior". */
+  type_line: string
+  image: string | null
+  art_crop: string | null
+  artist: string | null
+  set_code: string | null
+  set_name: string | null
+  /** This deck's own cards, spelled as the deck spells them, sorted. */
+  made_by: string[]
+}
+
+/** What a deck makes.
+ *
+ *  `read` is the honest third state, and it is not the same as an empty
+ *  `tokens`: false means the library has not been read for this yet, true with
+ *  an empty list means it was read and this deck makes nothing. Showing one
+ *  sentence for both would tell somebody something false about their deck. */
+export interface DeckTokens {
+  pool_available: boolean
+  read: boolean
+  tokens: TokenPlate[]
+  message?: string
+}
+
 export interface TurnRow {
   turn: number
   lands: number
@@ -2538,6 +2568,10 @@ export const api = {
     post<OpeningHand>(deckPath(ref, '/opening-hand'), {}),
   suggestions: (ref: DeckRef) =>
     get<Suggestions>(deckPath(ref, '/suggestions')),
+  /** Everything this deck makes on the battlefield that was never in it. A
+   *  GET where the Wheel and the deal are POSTs: those are fresh draws, this
+   *  is a derived fact about the deck that answers the same way every time. */
+  deckTokens: (ref: DeckRef) => get<DeckTokens>(deckPath(ref, '/tokens')),
   // What has been done to this deck, newest first (ADR 28). As reachable as
   // the deck and no more — the server resolves it through the same source, so
   // a deck you cannot read has a history you cannot read either, answered by
