@@ -36,7 +36,15 @@ import (
 //
 //	MTGLAB_LIVE_FORGE=1 \
 //	MTGLAB_SCRIBE_CLASSES=$(pwd)/../scribe/out \
-//	  go test ./internal/sim/tier3/ -run Parity -v
+//	  go test ./internal/sim/tier3/ -run TestTheScribePlaysTheSameMagicAsStockSim -v
+//
+// **The test's own name, spelled out, and not a word that reads like one.**
+// This recipe said `-run Parity` until 2026-08-27, and no test in this package
+// is called that — so it matched nothing, printed `no tests to run`, and
+// **exited zero**. Anybody who followed the instructions above got a green
+// terminal and a gate that had not run. That is the worst possible failure for
+// a file whose whole job is to notice a silent drift, so the name is written
+// out in full even though it is long.
 //
 // A seeded pair of games is the unit. Two rather than one because a seeded
 // *sequence* is the property that matters: a scribe that reseeded per game

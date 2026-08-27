@@ -90,6 +90,13 @@ const (
 	// arrive and leave inside a single beat — `Sakura-Tribe Elder` sacrifices
 	// itself the moment it lands, and without this beat the board never showed
 	// it at all.
+	//
+	// **[GameEvent.Entered] says whether it was cast or put there**, which is
+	// the difference between a creature the room has already watched somebody
+	// pay for and one that simply appeared. Almost every non-token arrival is
+	// the former and needs nothing new said about it; the handful that are not
+	// — a Blightsteel Colossus off an Atla Palani egg — are the ones worth a
+	// scene, and until now they were drawn identically.
 	EventEnters EventKind = "enters"
 	// EventAttach is an Aura, Equipment or Fortification finding a host — and
 	// **only ever finding one**. Coming off raises nothing: an unequip is a
@@ -165,8 +172,19 @@ const (
 	// has no category for it either.
 	EventSacrificed EventKind = "sacrificed"
 	// EventAbility is an ability going on the stack — activated by a player, or
-	// triggered by the game. [GameEvent.Zone] says where its source was and
-	// [GameEvent.Trigger] says which of the two it is.
+	// triggered by the game. [GameEvent.Zone] says where its source was,
+	// [GameEvent.Trigger] says which of the two it is, and [GameEvent.Target]
+	// names what it was aimed at.
+	//
+	// **The target is what turns eminence from a shrug into a picture.** Zone
+	// alone says a commander in the command zone did *something*; with the
+	// target the room can say which cat got bigger. `StackItemView` carried it
+	// the whole time and was only ever asked `isTrigger()`. Most abilities have
+	// none — seventeen of seventy-five in a measured match — which is the shape
+	// of the data rather than a gap: Arahbo's *attack* pump defines its creature
+	// with `Defined$` instead of targeting it. [BoardAbility.Targets] is the
+	// same fact by id, for a room drawing an arrow rather than saying a
+	// sentence.
 	//
 	// **Abilities reached nothing at all before this**, because the scribe
 	// returned on anything that was not a spell, so eminence — a triggered
@@ -285,6 +303,22 @@ type GameEvent struct {
 	// activated by a player — the difference between "triggers" and "activates",
 	// which is the verb the sentence turns on.
 	Trigger bool `json:"trigger,omitempty"`
+	// Entered is how an [EventEnters] permanent got onto the battlefield —
+	// `cast`, or `put` there by something else. Magic's own two words.
+	//
+	// **The empty string is a third state and it is not `put`.** It means
+	// nothing said: the prose path cannot answer this at all, and neither can a
+	// worker image built before the scribe learned to ask. A consumer that read
+	// absence as "put onto the battlefield" would tell a newcomer that every
+	// creature in every older match appeared from nowhere — which is the exact
+	// opposite of the distinction this field exists to draw.
+	//
+	// **`put` is the one worth a scene.** A creature that was cast has already
+	// had its moment: [EventCast] fired a beat earlier and the room showed
+	// somebody paying for it. A creature that was *put* onto the battlefield —
+	// Atla Palani cracking an egg into a Blightsteel Colossus — arrived with
+	// nothing said about it, and that is the beat this makes drawable.
+	Entered string `json:"entered,omitempty"`
 	// Note is an outcome's reason in Forge's own words, kept whole and
 	// designed to follow the verb: "because life total reached 0", "trying to
 	// draw cards from empty library", "due to accumulation of 21 damage from

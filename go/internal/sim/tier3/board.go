@@ -1,6 +1,9 @@
 package tier3
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // The board: Forge's events folded into somewhere to put the cards.
 //
@@ -353,6 +356,20 @@ type BoardAbility struct {
 	// activating it. Eminence is a triggered ability; a Treasure being cracked
 	// is an activated one.
 	Trigger bool `json:"trigger,omitempty"`
+	// Targets is what the ability was aimed at, by board id — the cards a room
+	// can draw an arrow to.
+	//
+	// **This is the half that makes eminence a picture.** Zone says a commander
+	// in the command zone did something; this says which cat got bigger. Both
+	// come off `StackItemView`, which had them the whole time and was only ever
+	// asked whether it was a trigger.
+	//
+	// **Empty is the common case and not a gap**: seventeen of seventy-five
+	// abilities in a measured match were aimed at anything at all. Arahbo's
+	// *attack* pump picks its creature with `Defined$` rather than targeting
+	// it, and a surveil trigger is aimed at nothing. A room that drew an arrow
+	// per ability would invent three of every four.
+	Targets []int `json:"targets,omitempty"`
 }
 
 // BoardLife is one seat's life total after it changed.
@@ -1082,12 +1099,36 @@ func (b *board) floating(seat int, mana string) {
 //
 // Appended rather than deduplicated: a card really can use the same ability
 // twice before the next beat, and two uses are two things that happened.
-func (b *board) usedAbility(id, seat int, zone string, trigger bool) {
+//
+// `targets` is the scribe's comma-joined id list; see [BoardAbility.Targets]
+// for why most abilities have none. Parsed here rather than at the call site so
+// the wire's one spelling of a list is decoded in one place — [board.keywords]
+// is the other, and they split the same way for the same reason.
+func (b *board) usedAbility(id, seat int, zone string, trigger bool, targets string) {
 	if id == 0 {
 		return
 	}
 	b.used = append(b.used, BoardAbility{ID: id, Seat: seat, Zone: zone,
-		Trigger: trigger})
+		Trigger: trigger, Targets: boardIDs(targets)})
+}
+
+// boardIDs reads the scribe's comma-joined list of board ids.
+//
+// **A number this cannot read is dropped, never folded as zero.** Zero is
+// [BoardCard.ID]'s own "no card", so a malformed entry parsed leniently would
+// point a room's arrow at nothing and look like a card that had gone missing.
+// Returns nil rather than an empty slice, so the field stays off the wire.
+func boardIDs(joined string) []int {
+	if joined == "" {
+		return nil
+	}
+	var ids []int
+	for _, part := range strings.Split(joined, ",") {
+		if id, err := strconv.Atoi(strings.TrimSpace(part)); err == nil && id != 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // copiedBy records that a card was made as a copy, by `by`.
