@@ -583,6 +583,12 @@ it('says what a creature does in the one corner that was free', () => {
   // A painting at fifty-eight pixels tells you this is a Dragon. Whether the
   // Dragon *flies* is the question when the other side has ground blockers,
   // and the only way to ask it was to hover forty cards one at a time.
+  //
+  // **This fixture sends no live keyword set at all**, which makes it the
+  // other half of the pair: the marks are drawn from the card's own instance
+  // now, and this is the board saying nothing about one. See "wears a keyword
+  // something else is giving it" at the foot of this file for the half that
+  // does — between them they hold both branches of `worn`.
   const board = {
     seats: [{ seat: 1, slug: 'a', name: 'A', life: 40 },
       { seat: 2, slug: 'b', name: 'B', life: 40 }],
@@ -2123,4 +2129,171 @@ it('gives a sacrificed creature no material, because it is getting a skull', () 
   const { container } = materials(said({ kind: 'sacrificed',
     card: 'Servo Token' }))
   expect(container.querySelectorAll('.field-mark')).toHaveLength(0)
+})
+
+/* ---------------------------------------------------------------------------
+ * The turned card, and the sword that has to know which way is forward.
+ *
+ * **Everything below is structure, and none of it is appearance.** jsdom has
+ * no layout engine, so a test here cannot see an angle, a pixel of clearance
+ * or a chip sitting on a neighbour — every fault these were written for was
+ * *found* in a browser and is *held* here as the DOM fact the stylesheet keys
+ * off. If a rule ever stops matching, these fail; if a rule matches and looks
+ * wrong, only Aaron's walk says so (commandment 16).
+ */
+
+const TURNED: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'gwyn', name: 'Syr Gwyn — Knights', life: 40,
+      commanders: [60] },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+  ],
+  cards: [
+    { id: 60, name: 'Syr Gwyn, Hero of Ashvale',
+      types: 'Legendary Creature - Human Knight', seat: 1,
+      image: 'https://example.test/gwyn.jpg',
+      keywords: ['Vigilance', 'Menace'] },
+    // Two bears identical in every visible way, so `stackRow` folds them into
+    // one pile with a count on it — which is what puts a count, a set of
+    // counters and a loupe on one turned card at the same time.
+    ...[61, 62].map((id) => ({ id, name: 'Grizzly Bears',
+      types: 'Creature - Bear', seat: 1,
+      image: 'https://example.test/bear.jpg' })),
+    // No keywords of its own. Everything it has, something else is giving it.
+    { id: 63, name: 'Regal Caracal', types: 'Creature - Cat', seat: 2,
+      image: 'https://example.test/caracal.jpg' },
+  ],
+  steps: [
+    { turn: 6, seat: 1, changes: [
+      { id: 60, zone: 'battlefield', seat: 1, tapped: true,
+        power: 6, toughness: 6, casts: 1 },
+      ...[61, 62].map((id) => ({ id, zone: 'battlefield', seat: 1,
+        tapped: true, power: 2, toughness: 2,
+        counters: [{ kind: '+1/+1', n: 2 }] })),
+      { id: 63, zone: 'battlefield', seat: 2, power: 3, toughness: 3,
+        live: ['Vigilance'], granted: ['Vigilance'] },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function turned(beat: StagedBeat | null = null) {
+  return render(
+    <MatchBoard board={TURNED} shown={1} game={1} running={false} beat={beat}
+                name={(_slug, fallback) => fallback}
+                speed="paused" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('hangs every chip on a turned card off the arm, one corner each', () => {
+  // **The count, the counters and the loupe on one card, all at once.** The
+  // stylesheet moves the counters off their corner while a card is turned so
+  // they stop landing on the *neighbour's* power and toughness — measured at
+  // twelve and eighteen pixels of overlap on a real board, two creatures'
+  // numbers written over each other (Aaron, 2026-08-27).
+  //
+  // The rule that does it is `.field-card.is-tapped .field-card-arm >
+  // .field-card-counters`, and the `>` is the part a test can hold: wrap the
+  // chips in anything and the placement silently stops applying, with jsdom
+  // reporting nothing at all because there are no positions here. So this asks
+  // for the parentage the rule needs, on a card carrying all three at once.
+  const { container } = turned()
+  const stack = container.querySelector(
+    '.field-card.is-tapped.is-stacked') as HTMLElement
+  expect(stack, 'two identical turned bears fold into one stack').toBeTruthy()
+  const arm = stack.querySelector('.field-card-arm') as HTMLElement
+  for (const chip of ['.field-card-count', '.field-card-counters',
+    '.field-card-lens']) {
+    const el = arm.querySelector(chip)
+    expect(el, `no ${chip} on a turned stack of two with counters`).toBeTruthy()
+    expect(el?.parentElement, `${chip} is not a direct child of the arm`)
+      .toBe(arm)
+  }
+  // And the count is the pile's rather than a stat: two bears, said as two.
+  expect(arm.querySelector('.field-card-count')?.textContent?.trim())
+    .toBe('2×')
+})
+
+it('gives the near seat its attack mark inside its own half', () => {
+  // **The sword points at whoever is being swung at.** The plate is a sword
+  // shot upright and the mark lands point-down, which aims at the trench from
+  // the far half and at the near player's own feet from the near one (Aaron,
+  // 2026-08-27). The stylesheet turns the near half's mark a half-turn, keyed
+  // on `.field-side-near` — the same wrapper the lunge already reads its
+  // direction from.
+  //
+  // The angle is invisible to jsdom. The *containment* is not, and it is the
+  // whole of what the rule needs: a mark drawn outside its half's wrapper
+  // would carry the far seat's blade wherever it stood.
+  const swung = turned(said({ kind: 'attack', card: 'Regal Caracal' }))
+  const near = swung.container.querySelector('.field-mark-attacks')
+  expect(near, 'the near seat’s creature is attacking').toBeTruthy()
+  expect(near?.closest('.field-side-near'),
+    'the near half’s mark must sit inside the near half').toBeTruthy()
+  expect(near?.closest('.field-side-far')).toBeNull()
+  cleanup()
+
+  // The far seat's, which is the one that was always right, from the other
+  // wrapper — so the pair cannot be flipped by editing one selector.
+  const other = turned(said({ kind: 'attack',
+    card: 'Syr Gwyn, Hero of Ashvale' }))
+  const far = other.container.querySelector('.field-mark-attacks')
+  expect(far?.closest('.field-side-far')).toBeTruthy()
+  expect(far?.closest('.field-side-near')).toBeNull()
+})
+
+it('wears a keyword something else is giving it, and names no giver', () => {
+  // Aaron, 2026-08-27: *"I still don't see an icon being displayed on cards
+  // for a bestowed ability, like Kaheera gives the other cats vigilance"*.
+  // The board drew `card.keywords`, which is the *printing* — the same list
+  // for every copy — so a creature standing next to something that grants a
+  // keyword wore nothing at all.
+  const { container } = turned()
+  const cat = container.querySelector('img[alt="Regal Caracal"]')
+    ?.closest('.field-card') as HTMLElement
+  expect(cat.querySelectorAll('.field-keyword'),
+    'the Cat has vigilance and its printing does not').toHaveLength(1)
+
+  // **And the words say it was granted without saying by what.** Forge carries
+  // no source for a granted keyword, so there is nothing to name and naming
+  // one would be the board making a reading of the game (Aaron: *"we don't
+  // need to say who granted the ability if it is not traceable"*). The marks
+  // ride an `aria-hidden` arm, so this sentence is the whole accessible
+  // account of them.
+  const title = cat.getAttribute('title') ?? ''
+  expect(title).toContain('vigilance (granted)')
+  for (const giver of ['Kaheera', 'Gwyn', 'Grizzly']) {
+    expect(title, `the title names a giver: ${giver}`).not.toContain(giver)
+  }
+
+  // The printing still answers for a creature nothing has said anything about
+  // — `live` is published only for a card that has any keywords at all, so an
+  // empty one is "none" and "not mentioned yet" at once, and the fallback is
+  // what stops the second from erasing a board's worth of marks.
+  const gwyn = container.querySelector('img[alt="Syr Gwyn, Hero of Ashvale"]')
+    ?.closest('.field-card') as HTMLElement
+  expect(gwyn.querySelectorAll('.field-keyword'),
+    'vigilance and menace, off the printing, with no live set sent')
+    .toHaveLength(2)
+})
+
+it('gives the commander a face for the light to walk round', () => {
+  // The living gold border is `.field-card.is-commander .field-card-turn` and
+  // a `::before` masked to its edge — a conic gradient whose *angle* is
+  // animated, so the mask itself never moves (Aaron, 2026-08-27: the gold
+  // "doesn't pop... give it a true golden living border of light").
+  //
+  // **Nothing here can see it.** jsdom has no layout, `index.css?raw` reads as
+  // an empty string under Vitest, and a pseudo-element has no node. What a
+  // test can hold is that the two things the rule selects are both on the page
+  // and still nested the way it expects — the class on the card, and the
+  // turning face inside it. Whether the light reads is Aaron's walk.
+  const { container } = turned()
+  const crowned = container.querySelector(
+    '.field-card.is-commander') as HTMLElement
+  expect(crowned, 'Syr Gwyn is on the sand').toBeTruthy()
+  expect(crowned.querySelector(':scope > .field-card-turn'),
+    'the rim is drawn on the face that turns, so it turns with the card')
+    .toBeTruthy()
+  // And it is the commander that carries it, not the whole row.
+  expect(container.querySelectorAll('.field-card.is-commander')).toHaveLength(1)
 })
