@@ -148,7 +148,7 @@ const DoubleStrike: Glyph = () => (
  *  the file's own rule says no two marks may share a silhouette, and by
  *  outline alone this one would share two. What no shield has is *voids*: two
  *  large sockets and a nasal aperture, punched clean through, so the mark is a
- *  mass with dark inside it instead of a mass. They are drawn enormous by
+ *  mass with dark inside it rather than a solid one. They are drawn enormous by
  *  anatomical standards for the same reason the falcon's wings are swept — a
  *  big, low-frequency feature is the kind that is still there at ten pixels,
  *  where a correct one is a grey suggestion. The second discriminator is the
@@ -161,7 +161,7 @@ const DoubleStrike: Glyph = () => (
  *  bone actually does.
  *
  *  **It shares a subject with `assets/coliseum/memento.webp` and not a shape,
- *  and the sharing is the point.** The stage draws that Pompeiian mosaic over a
+ *  and the sharing is the point.** The stage draws that Pompeian mosaic over a
  *  creature that has died. This is a skull too, and a player who has seen the
  *  one will read the other instantly — the room means *death* by *skull*, on
  *  the stage and in a corner, which is a vocabulary rather than a collision.

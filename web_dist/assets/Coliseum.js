@@ -4,9 +4,35 @@ import{o as e}from"./rolldown-runtime.js";import{d as t,g as n,h as r,m as i,n a
                  how it is labelled today — a deck rebuilt into something else
                  does not rewrite what it once was.`,children:(0,D.jsx)(se,{classes:e.archetypes,floor:n})}),e.meetings.length>0&&(0,D.jsx)(ae,{heading:`Head to head`,blurb:`Only bouts fought one against one. In a crowded field nobody
                  beat anybody in particular, so those bouts count on the boards
-                 above and not here.`,children:(0,D.jsx)(M,{meetings:e.meetings,floor:n})})]})}var ue=e(r(),1),de=new Set([`flying`,`first strike`,`double strike`,`deathtouch`,`lifelink`,`vigilance`,`trample`,`haste`,`menace`,`reach`,`hexproof`,`indestructible`,`ward`,`defender`]);function fe(e){let t=new Set,n=[];for(let r of e){let e=r.toLowerCase();!de.has(e)||t.has(e)||(t.add(e),n.push(e))}return n}var pe=()=>(0,D.jsxs)(D.Fragment,{children:[(0,D.jsx)(`path`,{d:`M9.2 6.6 C7 4.7 4.2 3 1.2 2.1 C2.6 5.4 4.6 8.3 7 10.5
+                 above and not here.`,children:(0,D.jsx)(M,{meetings:e.meetings,floor:n})})]})}var ue=e(r(),1),de=new Set([`flying`,`first strike`,`double strike`,`deathtouch`,`toxic`,`lifelink`,`vigilance`,`trample`,`haste`,`menace`,`reach`,`hexproof`,`indestructible`,`ward`,`defender`]);function fe(e){let t=new Set,n=[];for(let r of e){let e=r.toLowerCase();!de.has(e)||t.has(e)||(t.add(e),n.push(e))}return n}var pe=()=>(0,D.jsxs)(D.Fragment,{children:[(0,D.jsx)(`path`,{d:`M9.2 6.6 C7 4.7 4.2 3 1.2 2.1 C2.6 5.4 4.6 8.3 7 10.5
              C8 11.3 9.2 11.1 9.2 9.9 Z`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M10.8 6.6 C13 4.7 15.8 3 18.8 2.1 C17.4 5.4 15.4 8.3 13 10.5
-             C12 11.3 10.8 11.1 10.8 9.9 Z`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M9 6 C8.8 8.6 9 11 9.3 13.2 L10.7 13.2 C11 11 11.2 8.6 11 6 Z`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M9.3 12.8 L8.6 17.6 L10 16.5 L11.4 17.6 L10.7 12.8 Z`,fill:`currentColor`}),(0,D.jsx)(`circle`,{cx:`10`,cy:`4.8`,r:`1.6`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M9 3.9 L10 2.1 L11 3.9 Z`,fill:`currentColor`})]});function P(e,t){return(0,D.jsxs)(`g`,{transform:`translate(${e} 10) rotate(${t})`,children:[(0,D.jsx)(`path`,{d:`M-1.5 -1 L1.5 -1 L1.5 -6.6 L0 -9.4 L-1.5 -6.6 Z`,fill:`currentColor`}),(0,D.jsx)(`rect`,{x:`-4`,y:`-0.9`,width:`8`,height:`2.1`,rx:`0.8`,fill:`currentColor`}),(0,D.jsx)(`rect`,{x:`-1`,y:`0.9`,width:`2`,height:`6.2`,rx:`0.9`,fill:`currentColor`}),(0,D.jsx)(`circle`,{cx:`0`,cy:`8`,r:`1.5`,fill:`currentColor`})]})}var F={flying:pe,"first strike":()=>P(10,0),"double strike":()=>(0,D.jsxs)(D.Fragment,{children:[P(6.6,-13),P(13.4,13)]}),deathtouch:()=>(0,D.jsxs)(D.Fragment,{children:[(0,D.jsx)(`path`,{d:`M10.4 6 C14.6 5.6 17.2 8 16.8 10.8 C16.4 13.6 13 14.2 12 16
+             C12 11.3 10.8 11.1 10.8 9.9 Z`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M9 6 C8.8 8.6 9 11 9.3 13.2 L10.7 13.2 C11 11 11.2 8.6 11 6 Z`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M9.3 12.8 L8.6 17.6 L10 16.5 L11.4 17.6 L10.7 12.8 Z`,fill:`currentColor`}),(0,D.jsx)(`circle`,{cx:`10`,cy:`4.8`,r:`1.6`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M9 3.9 L10 2.1 L11 3.9 Z`,fill:`currentColor`})]});function P(e,t){return(0,D.jsxs)(`g`,{transform:`translate(${e} 10) rotate(${t})`,children:[(0,D.jsx)(`path`,{d:`M-1.5 -1 L1.5 -1 L1.5 -6.6 L0 -9.4 L-1.5 -6.6 Z`,fill:`currentColor`}),(0,D.jsx)(`rect`,{x:`-4`,y:`-0.9`,width:`8`,height:`2.1`,rx:`0.8`,fill:`currentColor`}),(0,D.jsx)(`rect`,{x:`-1`,y:`0.9`,width:`2`,height:`6.2`,rx:`0.9`,fill:`currentColor`}),(0,D.jsx)(`circle`,{cx:`0`,cy:`8`,r:`1.5`,fill:`currentColor`})]})}var F={flying:pe,"first strike":()=>P(10,0),"double strike":()=>(0,D.jsxs)(D.Fragment,{children:[P(6.6,-13),P(13.4,13)]}),deathtouch:()=>(0,D.jsx)(`path`,{d:`M10 1.7
+           C14.6 1.7 17.3 4.5 17.3 8.7
+           C17.3 11.1 16.5 12.6 15.5 13.2
+           C14.6 13.6 13.9 13.9 13.85 14.8
+           C13.85 15.5 13.8 16.2 13.8 16.7
+           C13.3 18.6 11.77 18.6 11.27 16.7
+           C10.77 18.6 9.23 18.6 8.73 16.7
+           C8.23 18.6 6.7 18.6 6.2 16.7
+           C6.2 16.2 6.15 15.5 6.15 14.8
+           C6.1 13.9 5.4 13.6 4.5 13.2
+           C3.5 12.6 2.7 11.1 2.7 8.7
+           C2.7 4.5 5.4 1.7 10 1.7 Z
+           M11.6 7.1 L15.1 6.9
+           C15.55 6.9 15.65 7.4 15.5 8.1
+           C15.2 10 14.5 11.35 13.4 11.35
+           C12.25 11.35 11.5 10.3 11.45 8.7
+           C11.42 7.9 11.45 7.35 11.6 7.1 Z
+           M8.4 7.1 L4.9 6.9
+           C4.45 6.9 4.35 7.4 4.5 8.1
+           C4.8 10 5.5 11.35 6.6 11.35
+           C7.75 11.35 8.5 10.3 8.55 8.7
+           C8.58 7.9 8.55 7.35 8.4 7.1 Z
+           M10 10.6
+           C10.3 11.7 11.05 12.9 11.28 13.55
+           C11.5 14.2 11.05 14.5 10 14.5
+           C8.95 14.5 8.5 14.2 8.72 13.55
+           C8.95 12.9 9.7 11.7 10 10.6 Z`,fill:`currentColor`,fillRule:`evenodd`}),toxic:()=>(0,D.jsxs)(D.Fragment,{children:[(0,D.jsx)(`path`,{d:`M10.4 6 C14.6 5.6 17.2 8 16.8 10.8 C16.4 13.6 13 14.2 12 16
              C11.4 17.1 11.8 17.6 12.8 17.9`,stroke:`currentColor`,strokeWidth:`2.5`,strokeLinecap:`round`,fill:`none`}),(0,D.jsx)(`path`,{d:`M8.8 2.6 C10.6 2.6 11.6 3.8 11.6 5.2 C11.6 6.7 10.6 7.7 8.8 7.7
              C6.4 7.7 3.2 6.7 3.2 5.15 C3.2 3.6 6.4 2.6 8.8 2.6 Z
              M7.3 4.6 A1.35 1.35 0 1 0 4.6 4.6 A1.35 1.35 0 1 0 7.3 4.6 Z`,fill:`currentColor`,fillRule:`evenodd`}),(0,D.jsx)(`path`,{d:`M3.6 6.3 L5.5 6.9 L4.3 9.9 Z`,fill:`currentColor`}),(0,D.jsx)(`path`,{d:`M4.3 11.3 C5.6 12.8 6.2 13.7 6.2 14.5 A1.9 1.9 0 0 1 2.4 14.5
