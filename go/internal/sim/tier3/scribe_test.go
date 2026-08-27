@@ -664,6 +664,233 @@ func TestACompanionsPhantomIsNotDrawnEither(t *testing.T) {
 	}
 }
 
+// companionMatch is the recorded companion sequence, verbatim.
+//
+// **Every line here came off a real match** — an Arahbo/Kaheera deck against
+// itself, seed 11, 2026-08-27, run through the scribe against Forge 2.0.14 —
+// rather than being written to make a test pass. The recording beside this
+// package (`testdata/scribed-match.ndjson`) is `gyome-food` against
+// `atla-palani-dinos` and neither deck has a companion, so the case is not in
+// there and the goldens are never regenerated to reach a new one. `id` 100 is
+// Kaheera and `id` 102 is the commander; both numbers are Forge's own.
+//
+// The `...` in the middle of the real stream is a hundred lines of Magic being
+// played, and three of them matter: the three lands that tapped for the {3}.
+// They are here because the mana is why the card moved, and they are the last
+// thing anybody looking at this can mistake for a deal.
+func companionMatch() []string {
+	const a = `"seat":1,"who":"Companion Probe A"`
+	const kaheera = `,"card":"Kaheera, the Orphanguard","power":3,"toughness":2` +
+		`,"types":"Legendary Creature - Cat Beast","keywords":"Vigilance"`
+	const arahbo = `,"card":"Arahbo, Roar of the World","power":5,"toughness":5` +
+		`,"types":"Legendary Creature - Cat Avatar"`
+	return []string{
+		`{"t":"game","game":1}`,
+		// Setup, and it is **before the first draw**: the companion leaves the
+		// sideboard for the command zone, and Forge's bookkeeping card comes
+		// in beside it.
+		`{"t":"zone","game":1,"zone":"Sideboard","mode":"out",` + a + `,"id":100` + kaheera + `}`,
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + a + `,"id":100` + kaheera + `}`,
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + a + `,"id":101,` +
+			`"card":"Kaheera, the Orphanguard's Companion Effect","power":0,"toughness":0,"types":""}`,
+		`{"t":"zone","game":1,"zone":"Command","mode":"in",` + a + `,"id":102` + arahbo + `}`,
+		`{"t":"seat","game":1,"seat":1,"who":"Companion Probe A","life":40}`,
+		// The first card anybody is dealt, so a hand exists to compare against.
+		`{"t":"zone","game":1,"zone":"Library","mode":"out",` + a + `,"id":79,` +
+			`"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"in",` + a + `,"id":79,` +
+			`"card":"Plains","power":0,"toughness":0,"types":"Basic Land - Plains"}`,
+		`{"t":"turn","game":1,"turn":5,` + a + `,"life":35}`,
+		// The {3}: three lands tapping, the pool rising and draining each time.
+		`{"t":"mana","game":1,` + a + `,"pool":"W"}`,
+		`{"t":"mana","game":1,` + a + `,"pool":""}`,
+		`{"t":"mana","game":1,` + a + `,"pool":"G"}`,
+		`{"t":"mana","game":1,` + a + `,"pool":""}`,
+		`{"t":"mana","game":1,` + a + `,"pool":"W"}`,
+		`{"t":"mana","game":1,` + a + `,"pool":""}`,
+		// And the card comes in from outside the game.
+		`{"t":"zone","game":1,"zone":"Command","mode":"out",` + a + `,"id":100` + kaheera + `}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"in",` + a + `,"id":100` + kaheera + `}`,
+		// The commander leaves the same zone later and goes to the **stack**,
+		// which is what casting looks like and is not this.
+		`{"t":"zone","game":1,"zone":"Command","mode":"out",` + a + `,"id":102` + arahbo + `}`,
+		`{"t":"zone","game":1,"zone":"Stack","mode":"in","id":102` + arahbo + `}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Companion Probe A"}`,
+	}
+}
+
+// fed runs a stream through the reader and hands back the last finished game.
+func fed(t *testing.T, lines []string) *tier3.EventLog {
+	t.Helper()
+	p := tier3.NewScribeParser(true)
+	var log *tier3.EventLog
+	for _, line := range lines {
+		if got, _ := p.Feed(line); got != nil {
+			log = got
+		}
+	}
+	if log == nil || log.Board == nil {
+		t.Fatal("the stream produced no board")
+	}
+	return log
+}
+
+// A companion is never dealt, and the moment it arrives is said out loud.
+//
+// **Aaron watched a match and thought the engine was cheating** (2026-08-27:
+// *"I swear Kaheera was dealt in a hand? That should not be possible"*). He is
+// right about the rules; the engine was right about the game. This is the
+// distinction the board could not draw: a card that appears in a hand having
+// been bought out of the command zone for {3}, against a card that was dealt.
+func TestACompanionComesInFromOutsideTheGame(t *testing.T) {
+	t.Parallel()
+	log := fed(t, companionMatch())
+
+	// Where the companion has stood, in order. The first entry is the whole
+	// answer to the report: a dealt card's first zone is `hand`.
+	var stood []string
+	for _, step := range log.Board.Steps {
+		for _, change := range step.Changes {
+			if change.ID == 100 && change.Zone != "" {
+				stood = append(stood, change.Zone)
+			}
+		}
+	}
+	if len(stood) == 0 || stood[0] != tier3.ZoneCommand {
+		t.Errorf("the companion's zones were %v; a companion begins in the "+
+			"command zone and is never dealt", stood)
+	}
+	// The Plains was dealt, so the two arrivals are side by side and only one
+	// of them is narrated.
+	var companions, turns []int
+	for _, e := range log.Events {
+		if e.Kind == tier3.EventCompanion {
+			companions = append(companions, e.ID)
+			turns = append(turns, e.Turn)
+		}
+	}
+	if len(companions) != 1 || companions[0] != 100 {
+		t.Fatalf("the account raised %v as companion beats, want just card 100 "+
+			"— a card appearing in a hand with nothing said is a game that "+
+			"looks like it cheats", companions)
+	}
+	if turns[0] != 5 {
+		t.Errorf("the companion beat landed on turn %d, want 5", turns[0])
+	}
+	// The beat and the picture are the same index, which is the pacing
+	// contract: the card lands in the hand exactly as the sentence is said.
+	for i, e := range log.Events {
+		if e.Kind != tier3.EventCompanion {
+			continue
+		}
+		reached := ""
+		for _, change := range log.Board.Steps[i].Changes {
+			if change.ID == 100 {
+				reached = change.Zone
+			}
+		}
+		if reached != tier3.ZoneHand {
+			t.Errorf("the beat's own step has the companion in %q, want %q",
+				reached, tier3.ZoneHand)
+		}
+	}
+}
+
+// The commander leaves the same zone in the same game and raises nothing.
+//
+// **The narrow half of the rule, and the one that would rot silently.** A
+// commander being cast is `Command out` and then `Stack in`, so a reader that
+// asked only "did this leave the command zone" would call every cast in every
+// Commander game a companion — which is most of the beats in the account,
+// wrong. The recorded stream above holds a real one, so this is the same
+// evidence read for what it does *not* say.
+func TestOnlyACompanionComesInFromOutsideTheGame(t *testing.T) {
+	t.Parallel()
+	log := fed(t, companionMatch())
+
+	for _, e := range log.Events {
+		if e.Kind == tier3.EventCompanion && e.ID != 100 {
+			t.Errorf("%q (card %d) was narrated as a companion", e.Card, e.ID)
+		}
+	}
+
+	// And a card that reaches a hand having never been near a sideboard is a
+	// draw, whatever else has happened to it. A companion is an ordinary card
+	// once it is bought, so this is the bounce: hand, battlefield, hand again.
+	const who = `"seat":1,"who":"Bounce Fixture"`
+	const bear = `,"card":"Grizzly Bears","power":2,"toughness":2,` +
+		`"types":"Creature - Bear"`
+	bounced := fed(t, []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,` + who + `,"life":40}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"in",` + who + `,"id":7` + bear + `}`,
+		`{"t":"turn","game":1,"turn":2,` + who + `,"life":40}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"out",` + who + `,"id":7` + bear + `}`,
+		`{"t":"zone","game":1,"zone":"Battlefield","mode":"in",` + who + `,"id":7` + bear + `}`,
+		`{"t":"zone","game":1,"zone":"Battlefield","mode":"out",` + who + `,"id":7` + bear + `}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"in",` + who + `,"id":7` + bear + `}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Bounce Fixture"}`,
+	})
+	for _, e := range bounced.Events {
+		if e.Kind == tier3.EventCompanion {
+			t.Errorf("a bounced creature was narrated as a companion: %+v", e)
+		}
+	}
+
+	// **A wish is the near miss.** Forge's `ChangeZoneEffect` takes cards out
+	// of a sideboard mid-game too — that is what Living Wish is — and puts them
+	// straight in a hand. Same first line as a companion, different
+	// destination, and it is a card arriving from a place the board does not
+	// draw, so a reader that watched only the sideboard would call it one.
+	const wisher = `"seat":1,"who":"Wish Fixture"`
+	const elf = `,"card":"Llanowar Elves","power":1,"toughness":1,` +
+		`"types":"Creature - Elf Druid"`
+	wished := fed(t, []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,` + wisher + `,"life":40}`,
+		`{"t":"turn","game":1,"turn":3,` + wisher + `,"life":40}`,
+		`{"t":"zone","game":1,"zone":"Sideboard","mode":"out",` + wisher + `,"id":8` + elf + `}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"in",` + wisher + `,"id":8` + elf + `}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Wish Fixture"}`,
+	})
+	for _, e := range wished.Events {
+		if e.Kind == tier3.EventCompanion {
+			t.Errorf("a wished-for card was narrated as a companion: %+v", e)
+		}
+	}
+}
+
+// A companion Forge never let in is never narrated as arriving.
+//
+// **Forge checks the deck restriction and simply declines**, which is the
+// reason this reader identifies a companion from the stream at all rather than
+// trusting the deck's declaration one layer up. `Player.assignCompanion` scans
+// the sideboard, tests `deckMatchesDeckRestriction` against the library it just
+// built, and returns without moving anything when nothing qualifies — so a deck
+// that *declares* a companion can play a whole match with it sitting in a zone
+// this board does not draw. The account may only narrate what happened.
+func TestACompanionForgeRefusedIsNeverNarrated(t *testing.T) {
+	t.Parallel()
+	const who = `"seat":1,"who":"Refused Fixture"`
+	const kaheera = `,"card":"Kaheera, the Orphanguard","power":3,"toughness":2` +
+		`,"types":"Legendary Creature - Cat Beast"`
+	// No `Sideboard out`, because Forge never took it out: the card is in a
+	// sideboard zone this reader drops whole, and the only way it could reach a
+	// hand is somebody drawing it — which is the bug, not this.
+	log := fed(t, []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,` + who + `,"life":40}`,
+		`{"t":"turn","game":1,"turn":1,` + who + `,"life":40}`,
+		`{"t":"zone","game":1,"zone":"Hand","mode":"in",` + who + `,"id":9` + kaheera + `}`,
+		`{"t":"result","game":1,"ms":1,"seat":1,"winner":"Refused Fixture"}`,
+	})
+	for _, e := range log.Events {
+		if e.Kind == tier3.EventCompanion {
+			t.Errorf("a companion Forge never moved was narrated as arriving: %+v", e)
+		}
+	}
+}
+
 // An untyped card that is **not** in a command zone is still drawn.
 //
 // The rule swallows a card whole, so it is worth pinning what it will not

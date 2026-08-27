@@ -262,3 +262,130 @@ func TestAQuietMatchNarratesNothing(t *testing.T) {
 		t.Errorf("a quiet run kept %d narrated games", len(run.Events))
 	}
 }
+
+// companionDeck is a deck Forge will actually let a companion into.
+//
+// **Built here rather than borrowed from `internal/gate/testdata`**, because
+// the fixture there is a fixture for the *gate* and its 99 hold a Praetor —
+// so Forge tests Kaheera's restriction, finds a creature that is not a Cat,
+// Elemental, Nightmare, Dinosaur or Beast, and leaves her in the sideboard
+// forever. A test about a companion arriving needs a deck whose companion
+// arrives, and the restriction is the deck's own business rather than
+// something to work around.
+//
+// Every name is one Forge implements — read out of its own `cardsfolder.zip`,
+// not remembered — and the creatures are all Cats. Singleton, because Forge's
+// Commander format takes a view about that, and 99 plus a commander because it
+// takes a view about that too.
+func companionDeck(t *testing.T, slug, name string) *deck.Deck {
+	t.Helper()
+	cards := []deck.CardEntry{{Name: "Sol Ring", Category: "ramp",
+		Why: "Two mana on turn one, and it always has been."}}
+	for _, cat := range []string{
+		"Savannah Lions", "Sanctuary Cat", "Trained Caracal", "Prowling Caracal",
+		"Silvercoat Lion", "Maned Serval", "Mesa Lynx", "Pouncing Lynx",
+		"Jungle Lion", "Pouncing Jaguar", "Grizzled Leotau", "Fleecemane Lion",
+		"Noble Panther", "Springing Tiger", "King Cheetah", "Zarichi Tiger",
+		"Pride of Lions", "Guardian Lions", "Cave Tiger", "Glittering Lion",
+	} {
+		cards = append(cards, deck.CardEntry{Name: cat, Category: "threat",
+			Why: "A Cat, which is the whole of what this fixture needs."})
+	}
+	for _, land := range []string{"Plains", "Forest"} {
+		cards = append(cards, deck.CardEntry{Name: land, Category: "land",
+			Qty: 39, Why: "Basic, untapped, and enough of them to pay {3}."})
+	}
+	companion := "Kaheera, the Orphanguard"
+	return &deck.Deck{Slug: slug, Name: name, Status: "theoretical",
+		Stage: "curated", Commander: []string{"Arahbo, Roar of the World"},
+		Companion: &companion, Cards: cards}
+}
+
+// TestARealMatchNeverDealsACompanion is the report, driven rather than argued.
+//
+// **Aaron watched a match and thought a companion had been dealt into a hand**
+// (2026-08-27: *"That should not be possible, you don't shuffle your companion
+// in with normal cards to be dealt, they come from outside the game like the
+// commander does"*). He is right about the rules. This goes and looks at what
+// Forge does with the `[Sideboard]` line `dck.go` writes, because that line is
+// the only thing in this repository that could have made him wrong — and a
+// claim about somebody else's rules engine is a claim about the world, which
+// is what this file is for.
+//
+// **Two assertions, and neither can flake.** The companion is never dealt: the
+// first zone it is ever drawn in is the command zone, whatever else the game
+// does. And every time it does reach a hand from the command zone — the {3}
+// being paid, which Forge's AI may or may not choose to do in any given game —
+// the account says so on the very same step. Nothing here asserts that the AI
+// *must* buy it; that is a decision about Magic and Forge's to make.
+func TestARealMatchNeverDealsACompanion(t *testing.T) {
+	t.Parallel()
+	forge := liveForge(t)
+	decks := []*deck.Deck{
+		companionDeck(t, "companion-probe-a", "Companion Probe A"),
+		companionDeck(t, "companion-probe-b", "Companion Probe B"),
+	}
+
+	run, err := forge.RunGames(decks, tier3.RunOptions{
+		Games: 2, Clock: 240, Seed: bigSeed(11), Narrate: true,
+	})
+	if err != nil {
+		t.Fatalf("the companion match failed: %v", err)
+	}
+	if len(run.Events) != 2 {
+		t.Fatalf("the run narrated %d games, want 2", len(run.Events))
+	}
+
+	const companion = "Kaheera, the Orphanguard"
+	bought := 0
+	for _, log := range run.Events {
+		if log.Board == nil {
+			t.Fatalf("game %d reported no board", log.Game)
+		}
+		// Forge's ids are per game and per seat, so both copies are followed.
+		wanted := map[int]bool{}
+		for _, card := range log.Board.Cards {
+			if card.Name == companion {
+				wanted[card.ID] = true
+			}
+		}
+		if len(wanted) != 2 {
+			t.Fatalf("game %d drew %d companions, want one per seat — a deck "+
+				"whose companion Forge refused proves nothing here",
+				log.Game, len(wanted))
+		}
+		first := map[int]string{}
+		for i, step := range log.Board.Steps {
+			for _, change := range step.Changes {
+				if !wanted[change.ID] || change.Zone == "" {
+					continue
+				}
+				if _, seen := first[change.ID]; !seen {
+					first[change.ID] = change.Zone
+				}
+				if change.Zone != tier3.ZoneHand {
+					continue
+				}
+				// The companion is in a hand. Either it was bought — and the
+				// beat on this very step says so — or it arrived some other
+				// way, which for this deck there is none of.
+				if log.Events[i].Kind == tier3.EventCompanion &&
+					log.Events[i].ID == change.ID {
+					bought++
+					continue
+				}
+				t.Errorf("game %d, step %d: %s reached a hand and the account "+
+					"said %q — to a watcher that is a card being dealt",
+					log.Game, i, companion, log.Events[i].Kind)
+			}
+		}
+		for id, zone := range first {
+			if zone != tier3.ZoneCommand {
+				t.Errorf("game %d: companion %d was first drawn in %q; a "+
+					"companion begins in the command zone and is never shuffled "+
+					"in to be dealt", log.Game, id, zone)
+			}
+		}
+	}
+	t.Logf("two games, %d companions bought in from outside the game", bought)
+}
