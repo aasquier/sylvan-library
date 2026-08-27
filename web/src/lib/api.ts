@@ -701,6 +701,17 @@ export interface ForgeBeat {
   /** Whether an `'ability'` beat was raised by the game rather than activated
    *  by a player: *triggers* against *activates*. */
   trigger?: boolean
+  /** How an `'enters'` permanent reached the battlefield — `'cast'`, or
+   *  `'put'` there by something else. Magic's own two words, and absent on
+   *  every other kind.
+   *
+   *  **Missing is a third state and it is not `'put'`.** It means nobody
+   *  said: every match already in the ledger was narrated before the scribe
+   *  learned to ask, and a worker running an older image still cannot answer.
+   *  A room that read absence as "put onto the battlefield" would tell a
+   *  newcomer that every creature in every older match appeared out of
+   *  nowhere — the exact opposite of the distinction this draws. */
+  entered?: string
   target?: string
   against: string | null
   amount?: number
@@ -919,9 +930,20 @@ export interface ForgeBoardStep {
    *  **Transient**: using an ability is a moment rather than a state, so this
    *  rides the step and there is nothing to clear afterwards. `zone` is where
    *  the source was — `'Command'` for an eminence trigger, whose card never
-   *  moves and so has no other signal anywhere in this stream. */
+   *  moves and so has no other signal anywhere in this stream.
+   *
+   *  `targets` is what the ability was aimed at, **by board id** — the half
+   *  that turns eminence from a shrug into a picture, because zone alone says
+   *  a commander in the command zone did *something* and this says which cat
+   *  got bigger. A list rather than an id: nothing measured has ever carried
+   *  two, and narrowing the wire to the first one would lose the second
+   *  silently the day something does. **Absent is the common case and not a
+   *  gap** — three abilities in four are aimed at nothing at all, because
+   *  Forge's own pump effects pick their creature by definition rather than
+   *  by targeting it. */
   abilities?: {
     id: number; seat?: number; zone?: string; trigger?: boolean
+    targets?: number[]
   }[]
 }
 

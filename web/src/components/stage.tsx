@@ -15,6 +15,7 @@
 
 import type { CSSProperties } from 'react'
 
+import campusArt from '../assets/coliseum/campus.webp'
 import cryptaArt from '../assets/coliseum/crypta.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import viaArt from '../assets/coliseum/via.webp'
@@ -176,6 +177,50 @@ function StageCrypt() {
   )
 }
 
+/**
+ * **The field below**, drawn behind a card that arrived on the battlefield
+ * with nothing having cast it, and nowhere else.
+ *
+ * Aaron, 2026-08-27, in the same breath as the crypt: *"Same thing for 'Enters
+ * the Battelfield', we should be able to find something cool. A free use
+ * painting or picture of a battle before us, like down in a valley or
+ * something stylized like our exile one?"* This is that valley — Jan
+ * Brueghel's `Battle of Issus`, which `campus.recipe.yaml` argues at length,
+ * including why the room's one non-Roman picture is the honest choice for the
+ * one subject nobody can photograph.
+ *
+ * **The third scene, and the only one a card arrives *out of*.** The road
+ * takes a card away down it and the vault takes one down into it; both are
+ * departures, and both animate the card *shrinking*. This one runs the other
+ * way. A permanent put onto the battlefield is not going anywhere — a second
+ * later it is standing in a row on the board — so the card comes **toward**
+ * the eye, out of the fight, and settles. Nothing here recedes, and that is
+ * the whole difference between "it left" and "it is here now", drawn rather
+ * than captioned.
+ *
+ * **The dust is the landing.** A second element over the photograph, blooming
+ * outward from under the card on the beat it lands and gone before the plate
+ * has been read. It is the one thing in the three scenes that is not a fact
+ * about the picture: the road and the vault are places that were already
+ * there, and a field with something dropped into it is a place that has just
+ * been disturbed. Without it the card simply appears in front of a painting;
+ * with it, something happened to the ground.
+ *
+ * **It goes underneath, for the road's reason.** An arrival happens to the
+ * card's *place*, not to the card — it is unchanged, it is simply here now —
+ * so the arena opens onto somewhere else and the card comes out of it, with
+ * nothing laid over the picture.
+ */
+function StageField() {
+  return (
+    <span className="stage-field" aria-hidden="true">
+      <img className="stage-field-art" src={campusArt} alt=""
+           draggable={false} />
+      <span className="stage-field-dust" />
+    </span>
+  )
+}
+
 /** One card on the stage: the light behind it, the card, what is happening to
  *  it, and the plate saying so. */
 function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
@@ -192,6 +237,7 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
       {(item.manner === 'exiled' || item.manner === 'companion')
         && <StageRoad />}
       {item.manner === 'dies' && <StageCrypt />}
+      {item.manner === 'put' && <StageField />}
       <span className="stage-frame">
         {item.count > 1 && <StagePile item={item} />}
         <StageFace item={item} />
@@ -332,7 +378,11 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // arena when nothing cast it. Asking the same list the same question twice
   // would be the waste; asking it once, first, is not.
   const face = name ? faceFor(board, name, seat) : null
-  const manner = beat ? mannerOf(beat.kind, face) : null
+  // **And the beat's own word for how a permanent arrived**, which the card
+  // cannot answer: `face.token` says a thing was conjured, and nothing on a
+  // card says whether the real spell standing on the sand was cast or put
+  // there. `mannerOf` argues why an absent word draws nothing at all.
+  const manner = beat ? mannerOf(beat.kind, face, beat.entered) : null
   // **A beat that only repeats the one before it takes nothing.** Four tokens
   // conjured at once arrive as four identical beats, and `countRuns` marks the
   // followers `0` so this moment is drawn once, with a four on it, instead of

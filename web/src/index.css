@@ -10230,6 +10230,146 @@ button:hover .tarot-fan-card {
   100%    { opacity: 0; transform: scale(1.2); }
 }
 
+/* --- aimed at: an aura settling on the creature that was named ----------
+ *
+ * Aaron, 2026-08-27: *"Would be nice if an emminence ability like arahbos
+ * +3/+3 looked like an aura on the bestowed card too."*
+ *
+ * **The card already told half the truth and could not tell the other half.**
+ * Power and toughness on this wire are live, so a Cat that gets +3/+3 is
+ * visibly a 5/5 on the beat it happens; the number changes in front of you and
+ * nothing anywhere says why, or which of four Cats it was. This is that: the
+ * creature the ability named, lit at the moment it was named.
+ *
+ * **Light rather than an object, and it is the one mark in this room that is.**
+ * The other six are photographs — a Met sword, a knight's shield, a Pompeiian
+ * skull — because the thing being drawn is a thing. An enchantment is not a
+ * thing; it is what Magic has drawn as a nimbus since Alpha, and there is no
+ * free-use photograph of a creature being made bigger. The centre stage
+ * reached the same conclusion about a spell being channelled and drew a
+ * gradient, which is the precedent this follows.
+ *
+ * **Two elements because they are two gestures on two clocks.** A ring that
+ * closes in around the card says *this one*, and a band of light rising up
+ * through it says *something is being laid on it*. Run as one animation they
+ * fight; run as two they read as a single event with a beginning and an end.
+ *
+ * **No colour of mana**, which is the rule the stage's own glow block states
+ * and this obeys for the same reason: the wire does not say what the ability
+ * was, a wrong colour is worse than none, and eminence is not a green
+ * mechanic. So it is the arena's own light, lifted toward white — the same
+ * torch that lights everything else here, turned up on one card.
+ */
+.field-aura {
+  position: absolute;
+  inset: 0;
+  /* Above the card, its arm and its counters (which top out at 4) and below
+     the marks at 6 — a creature can be pumped and swing on the same turn, and
+     the sword is the sentence being spoken while this is the reason the
+     numbers changed. */
+  z-index: 5;
+  border-radius: 4px;
+  pointer-events: none;
+  /* **Load-bearing, twice.** The sweep below is drawn wider than the tile so
+     its edges are never seen arriving, which without this would paint eight
+     pixels of light onto the neighbouring card in a packed row. And nothing
+     animates on this container itself: opacity here would govern both children
+     at once, which is the trap `.field-mark-attacks` records one block up. */
+  overflow: hidden;
+}
+
+/* The ring, closing in. It arrives a little larger than the card and settles
+   onto its edges, which is the difference between a glow that is *on* this
+   card and one that happens to be near it. */
+.field-aura-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  /* **The rim is what carries it and the bloom is what nearly ate the card.**
+     A 13-pixel inner glow is a third of the height of a 58x81 tile, so the
+     first version lit the whole painting rather than its edge. The crisp
+     2-pixel rim says *this one*; the small bloom keeps that rim from looking
+     printed on.
+
+     Both are `inset`, and that is the clip above rather than a preference: an
+     outer glow would be cut off at the tile's edge and paint nothing, so a
+     shadow written to sit outside this box would be a line of CSS that does
+     not exist. */
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--field-sun) 86%, white),
+    inset 0 0 8px 1px color-mix(in srgb, var(--field-sun) 32%, transparent);
+  animation: field-aura-ring var(--aim-life, 1500ms) ease-out both;
+}
+@keyframes field-aura-ring {
+  0%   { opacity: 0; transform: scale(1.16); }
+  18%  { opacity: 1; transform: scale(1); }
+  70%  { opacity: 0.92; }
+  100% { opacity: 0; transform: scale(1.02); }
+}
+
+/* ...and the light going up through it, once. Bottom to top, because that is
+   the direction every enchantment in Magic's art has ever been drawn settling
+   on something — and because the card's own numbers are in the bottom corner,
+   so a band that starts there and rises leaves the eye at the top of a card it
+   has just been told to look at.
+
+   **A band, and it took a browser to find out how narrow it had to be.** The
+   first one was the full height of the tile at 90% opacity, which is not a
+   light passing over a painting, it is a painting turned off: looked at on a
+   real board, a 58x81 creature went pale gold from edge to edge and the art
+   under it was gone. At 46% of the tile's height it reads as a *pass* — there
+   is always more card visible than light, at every frame of it.
+
+   A gradient wider than the tile and moved across it rather than a background
+   position that animates, so it composites on the GPU like everything else on
+   this board. */
+.field-aura-sweep {
+  position: absolute;
+  left: -14%;
+  right: -14%;
+  top: 0;
+  height: 46%;
+  /* **Every stop mixes toward `transparent`, and the one that did not is what
+     made the first pass a wash.** `color-mix(… var(--field-sun) 52%, white)`
+     is a fully *opaque* pale gold: laid across a 58-pixel painting it is not
+     light falling on a card, it is paint. Mixing toward transparent instead
+     gives the same hue at half alpha, so the art is under it the whole way
+     past. No white anywhere either — white read as glare, and this is a
+     torch. */
+  background: linear-gradient(to top,
+    transparent 0%,
+    color-mix(in srgb, var(--field-sun) 15%, transparent) 40%,
+    color-mix(in srgb, var(--field-sun) 38%, transparent) 58%,
+    transparent 100%);
+  animation: field-aura-sweep var(--aim-life, 1500ms)
+    cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes field-aura-sweep {
+  /* Percentages of the band's own height, so 150% starts it clear of the
+     bottom edge and -60% takes it off the top. */
+  0%   { opacity: 0; transform: translateY(150%); }
+  20%  { opacity: 0.78; }
+  70%  { opacity: 0.36; transform: translateY(-42%); }
+  100% { opacity: 0; transform: translateY(-60%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* **Which card was named is the fact; the settling is the drama.** So the
+     ring arrives whole and fades on the same clock, and the sweep goes
+     entirely — a band of light travelling up a still card is exactly the
+     movement somebody turned this setting on to be spared, and it carries
+     nothing the ring does not already say. */
+  .field-aura-ring {
+    transform: none;
+    animation: field-aura-still var(--aim-life, 1500ms) linear both;
+  }
+  .field-aura-sweep { animation: none; opacity: 0; }
+  @keyframes field-aura-still {
+    0%, 100% { opacity: 0; }
+    10%, 82% { opacity: 1; }
+  }
+}
+
 /* --- the ghost, rising off the grave ------------------------------------
  *
  * Two beats, two pictures. The skull lands on the creature *as it dies*, held
@@ -12152,11 +12292,12 @@ button:hover .tarot-fan-card {
  *
  * **It is a sentence now, not a caption.** The plate under the card names the
  * player, what they did, the card and — where there is one — what they did it
- * *to* (Aaron, 2026-08-27: *"Gyome CASTS Creature"*). Six other things reach
+ * *to* (Aaron, 2026-08-27: *"Gyome CASTS Creature"*). Seven other things reach
  * the middle beside a cast: a death, an exile, a token conjured, a permanent
- * spent, an Aura or Equipment finding its host, and a companion walking in
- * from outside the game. `lib/stage.ts` decides which and for how long; this
- * file is only how each of them looks.
+ * spent, a permanent **nobody cast** arriving on the battlefield, an Aura or
+ * Equipment finding its host, and a companion walking in from outside the
+ * game. `lib/stage.ts` decides which and for how long; this file is only how
+ * each of them looks.
  *
  * **Every duration here comes from `--stage-life`**, set on each card by
  * `stage.tsx`, and that is not a style choice — it is the fix `board.tsx`
@@ -12228,6 +12369,13 @@ button:hover .tarot-fan-card {
 /* An ember. A thing spent for what it was worth is neither a death nor a
    spell, and this is the one light in the room that is on its way out. */
 .stage-card.is-sacrificed { --stage-glow: #c08048; }
+/* **Daylight and dust**, which is the one light this room did not have. The
+   cast is torch-brass, the death is the graveyard's damp, the exile is a road
+   at dusk, and every one of them is either burning or going out. A creature
+   put onto a battlefield arrives in the middle of an afternoon somebody else
+   is already fighting through: pale, unsaturated, warm, the colour of sun
+   through the dust the picture behind it is full of. */
+.stage-card.is-put { --stage-glow: #c2b48c; }
 /* **The vine, because that is what a companion already wears.** The board
    rings a companion in `--vine` in the command zone and on the battlefield
    (`.field-card.is-companion`, `.field-card-crown.is-companion`), so the card
@@ -12921,6 +13069,182 @@ button:hover .tarot-fan-card {
 }
 
 
+/* --- ...and the field a creature arrives on that nobody cast -------------
+ *
+ * **The third scene, and the first one a card comes *out* of.** The road takes
+ * a card away down it; the vault takes one down into it. Both are departures,
+ * both shrink the card, and both were built for a permanent that is leaving.
+ * This runs the other way, because the thing it draws is the opposite fact: a
+ * creature *put* onto the battlefield is not going anywhere. A second later it
+ * is standing in a row on the board, which is where the eye will find it.
+ *
+ * Aaron, 2026-08-27, in the same breath as the crypt: *"Same thing for 'Enters
+ * the Battelfield', we should be able to find something cool. A free use
+ * painting or picture of a battle before us, like down in a valley or
+ * something stylized like our exile one?"* It waited on the wire rather than
+ * on a picture — until the beat could say **nothing cast this**, a scene here
+ * would have fired on every creature anybody had just paid seven mana for,
+ * which is the resolve drawn twice. `lib/stage.ts` carries that argument and
+ * the counts behind it; `campus.recipe.yaml` carries which painting and why
+ * this is the room's one picture that is not of Rome.
+ *
+ * **It is a painting and the other two are photographs, and that is the
+ * subject's doing.** The Appian Way is still there to stand on and the Vigna
+ * Codini columbaria are still there to walk into. A battle of antiquity is the
+ * one thing in this arena nobody can go and photograph, so the surviving
+ * object *is* a picture of it.
+ *
+ * **Nothing recedes here, which is the whole of the reading.** There is no
+ * perspective origin to measure against a vanishing point, because the card is
+ * not travelling to one — it comes forward out of the depth of the field and
+ * stops. That is also why this block is shorter than the road's: the road's
+ * length is all coupling to a photograph's geometry, and there is none of that
+ * to keep in step here.
+ */
+.stage-card.is-put {
+  /* Shallower than the road's 1000, and aimed **above** the middle. A card
+     starting at negative Z under an origin at 30% down begins high in the
+     frame and comes down as it comes forward, so one translation is both the
+     descent and the approach. Aiming it at the centre gave a card that grew
+     without ever falling, which reads as a zoom rather than as an arrival. */
+  perspective: 900px;
+  perspective-origin: 50% 30%;
+}
+
+.stage-field {
+  position: absolute;
+  inset: 0;
+  /* Under the card and over the veil, exactly where the road and the vault
+     sit — the ordering is by source position rather than by z-index, since all
+     three are 0. */
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-field-open var(--stage-life, 1600ms) ease-out both;
+}
+/* Open before the card lands, which is at 34%, so there is a battlefield under
+   it at the moment it arrives on one — and hold almost to the end, because
+   everything after the landing is the plate being read and the plate is read
+   over the picture. */
+@keyframes stage-field-open {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  87%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* **A window into the sand, masked rather than framed** — the road's lesson
+   two blocks up, and the same shape for the same reason: everything worth
+   seeing in this crop is on one horizontal band, and a hard edge anywhere on a
+   photograph laid over an arena reads as a postcard stuck to the floor.
+   Slightly wider and slightly less tall than the road's ellipse, because this
+   picture is: 720 by 292 against the road's 560 by 310.
+
+   **Wider than the card by a long way, which is the vault's lesson.** At 1040
+   the solid core runs to 58% of a 50% radius — 302 pixels either side of the
+   middle against a card half-width of 122 — so the fight fills the arena
+   rather than showing as two slivers past the card's edges. A scene sized to
+   the card is a backdrop; a scene that reaches well past it is a place.
+
+   **1040 rather than the road's 980, and it intrudes less rather than more.**
+   The band is 2.46:1 where the road is 1.81:1, so at this width it is 422 tall
+   against the road's 542 — comfortably inside the sand, which is the axis the
+   vault got wrong twice. `width` plus `aspect-ratio` rather than a stated
+   height, for the reason `.stage-crypt-art` records: a definite height does
+   not honour `max-width` on a replaced element. */
+.stage-field-art {
+  width: min(100%, 1040px);
+  aspect-ratio: 720 / 292;
+  object-fit: cover;
+  -webkit-mask-image: radial-gradient(ellipse 50% 40% at 50% 52%,
+    #000 0%, #000 58%, rgba(0, 0, 0, 0.5) 82%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 40% at 50% 52%,
+    #000 0%, #000 58%, rgba(0, 0, 0, 0.5) 82%, transparent 100%);
+  /* **The ground comes up to meet the card**, at the vault's own three percent
+     of creep and in the vault's own direction — and it reads as the opposite,
+     which is the trick both of them are playing. There the card sinks away
+     while the chamber comes forward, and two things separating is what makes
+     one of them look left behind. Here the card comes forward *too*, so the
+     field and the thing arriving on it move as one and the card is joining it
+     rather than being left in front of it. */
+  animation: stage-field-rise var(--stage-life, 1600ms) ease-out both;
+}
+@keyframes stage-field-rise {
+  0%   { transform: scale(1.02); }
+  100% { transform: scale(1.09); }
+}
+
+/* **The dust, and it is the landing.** The one element in the three scenes
+   that is not a fact about a picture: the road and the vault are places that
+   were already there and are simply opened, and a field with something dropped
+   into it is a place that has just been *disturbed*. It blooms out from under
+   the card on the beat it lands and is gone well before the plate has been
+   read — without it a card appears in front of a painting, and with it
+   something happened to the ground.
+
+   Warm and pale rather than the picture's own brown, because dust in sunlight
+   is lighter than the earth it came off. Aimed low: the bloom starts under the
+   card's feet, which is where the impact is. */
+.stage-field-dust {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 30% 19% at 50% 71%,
+      rgba(230, 214, 176, 0.6) 0%,
+      rgba(212, 192, 150, 0.3) 44%,
+      rgba(196, 176, 136, 0) 78%);
+  animation: stage-field-dust var(--stage-life, 1600ms) ease-out both;
+}
+@keyframes stage-field-dust {
+  /* Nothing at all until the card is nearly down — dust that starts before the
+     impact is dust with no cause. */
+  0%, 26% { opacity: 0; transform: scale(0.45); }
+  42%     { opacity: 1; transform: scale(1); }
+  100%    { opacity: 0; transform: scale(1.62); }
+}
+
+/* **Down out of the field, and it lands rather than arriving.** The card
+   starts high and far — negative Z under the origin above puts it up near the
+   hills — comes down and forward onto the sand, overshoots by a hair and
+   settles. That overshoot is the whole difference between a card being *put*
+   somewhere and a card being placed there: a thing dropped onto ground rocks
+   once, and one that is set down does not.
+
+   It then holds for the rest of its life, which is the reverse of the exile's
+   shape and the same as the companion's, and for the same reason both of those
+   give: this plate carries a second line, and a line nobody finishes reading
+   is a line that was not worth drawing. */
+.stage-card.is-put .stage-frame {
+  animation: stage-alight var(--stage-life, 1600ms)
+    cubic-bezier(0.24, 0.86, 0.32, 1) both;
+}
+@keyframes stage-alight {
+  0%   { opacity: 0; transform: translate3d(0, -13%, -820px) rotate(-2deg); }
+  14%  { opacity: 1; }
+  /* The landing. */
+  34%  { transform: translate3d(0, 0, 0) rotate(0deg); }
+  /* The rock, and it is deliberately tiny — 1.2 degrees and eighteen pixels of
+     Z, which is felt rather than watched. Anything bigger and the card is
+     bouncing, which is a cartoon and not a creature. */
+  46%  { transform: translate3d(0, 0, 18px) rotate(1.2deg); }
+  58%  { transform: translate3d(0, 0, 0) rotate(0deg); }
+  86%  { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  /* Out where it stands. It does not leave, because it has not left — it is
+     on the board a beat later, and a card that flew off the stage would be the
+     room contradicting the row it is about to appear in. */
+  100% { opacity: 0; transform: translate3d(0, 0, 22px) rotate(0deg); }
+}
+/* Not a spell being channelled, and here that is the *point* rather than a
+   detail: the ring behind a card is what a cast looks like in this room, and
+   the whole reason this scene exists is that there was no cast. The exile and
+   the companion draw the same line for weaker reasons. */
+.stage-card.is-put .stage-frame::before { animation: none; opacity: 0; }
+/* Stillness is handled with everything else's, in the block at the foot of
+   this section — a journey overridden in two places is a journey that comes
+   back in one of them. */
+
+
 /* --- the plate under the exhibit ---------------------------------------- */
 
 /* The arena is a building full of things worth looking at, and this is the one
@@ -13296,6 +13620,23 @@ button:hover .tarot-fan-card {
     transform: none;
     animation: stage-still var(--stage-life, 1800ms) linear both;
   }
+  /* **The field is a fact, so it stays; the fall and the dust are drama, so
+     they go.** The same concession the vault and the road already make. What a
+     person who has asked for stillness still receives is the whole of the
+     information — a battlefield under the card, the card, and a plate saying
+     nothing cast it — with none of the movement they turned this setting on to
+     be spared. The dust goes entirely rather than fading up: it is a bloom
+     from an impact that no longer happens, and a puff of light in the middle
+     of a still page has no cause a person could read. */
+  .stage-card.is-put .stage-frame {
+    transform: none;
+    animation: stage-still var(--stage-life, 1600ms) linear both;
+  }
+  .stage-field {
+    animation: stage-still var(--stage-life, 1600ms) linear both;
+  }
+  .stage-field-art { animation: none; }
+  .stage-field-dust { animation: none; opacity: 0; }
   /* A pile that is *already* fanned when it arrives, rather than opening —
      the same concession the board's own stack makes with motion off, and the
      count comes up with the plate rather than climbing on its own. */

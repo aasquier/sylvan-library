@@ -301,6 +301,73 @@ it('opens a vault under a dying card, without taking the stone off it', () => {
     'which it still has').toBeTruthy()
 })
 
+it('opens a battlefield under a creature nobody cast, and under nothing '
+  + 'else', () => {
+  // Aaron, 2026-08-27: *"Same thing for 'Enters the Battelfield', we should be
+  // able to find something cool. A free use painting or picture of a battle
+  // before us, like down in a valley...?"*
+  //
+  // The scene is a Brueghel battle panorama under a card that arrived without
+  // being cast — an Atla Palani egg cracking into something enormous. Whether
+  // it reads as a valley, whether the card looks like it *lands*, and whether
+  // the dust is felt rather than watched are all Aaron's walk; jsdom has no
+  // layout engine and would say yes to any of them. What is held here is which
+  // beats get it, which is the half that has a wrong answer.
+  const { container } = replay(said({ kind: 'enters', card: 'Fleecemane Lion',
+    entered: 'put', key: 'p1' }))
+  expect(container.querySelector('.stage-field'),
+    'an uncast arrival opens onto the field it arrived on').toBeTruthy()
+  expect(container.querySelector('.stage-field .stage-field-art'),
+    'and the field is the painting').toBeTruthy()
+  // Outside the frame, for the road's reason: an arrival happens to the card's
+  // *place* rather than to the card, so the arena opens onto somewhere and the
+  // card comes out of it. Inside the frame it would travel with the card,
+  // which is a creature carrying a battlefield around.
+  expect(container.querySelector('.stage-frame .stage-field'),
+    'the field is not something the card brought with it').toBeNull()
+  expect(container.querySelector('.stage-card')?.className).toContain('is-put')
+  expect(container.querySelector('.stage-plate-word')?.textContent,
+    'the plate names the player and the deed').toBe('Arahbo puts')
+  expect(container.querySelector('.stage-plate-note')?.textContent,
+    'and says the part that makes it worth a scene').toBe('nothing cast it')
+
+  // **A match narrated before the scribe could answer draws nothing at all**,
+  // and this is the assertion the whole feature turns on. Every game already
+  // in the ledger sends an `enters` beat with no `entered` on it; if absence
+  // read as "put" then every creature anybody ever cast, in every one of those
+  // matches, would suddenly be shown arriving out of nowhere — the archive
+  // rewritten as a room full of cheating.
+  cleanup()
+  const old = replay(said({ kind: 'enters', card: 'Fleecemane Lion',
+    key: 'p2' }))
+  expect(old.container.querySelector('.stage-field'),
+    'nobody said how this one arrived, so nothing is drawn').toBeNull()
+  expect(old.container.querySelector('.stage'),
+    'and the beat takes no part of the arena at all').toBeNull()
+
+  // And a creature somebody paid for keeps its own moment, one beat earlier,
+  // rather than getting a second one here.
+  cleanup()
+  const paid = replay(said({ kind: 'enters', card: 'Fleecemane Lion',
+    entered: 'cast', key: 'p3' }))
+  expect(paid.container.querySelector('.stage'),
+    'the room already showed this one being cast').toBeNull()
+
+  // **It belongs to the arrival alone**, the way the vault belongs to the
+  // death and the road to the exile. Three scenes under one card would be the
+  // room saying three things happened.
+  cleanup()
+  const gone = replay(said({ kind: 'exiled', card: 'Fleecemane Lion',
+    key: 'p4' }))
+  expect(gone.container.querySelector('.stage-field'),
+    'an exile leaves the field rather than arriving on it').toBeNull()
+  cleanup()
+  const dead = replay(said({ kind: 'dies', card: 'Fleecemane Lion',
+    key: 'p5' }))
+  expect(dead.container.querySelector('.stage-field'),
+    'and a death goes into the vault').toBeNull()
+})
+
 it('draws the light going out of a dying card, and never filters it', () => {
   // **A licence rule, held by a test rather than by a memory.** The light used
   // to go out of a dying card through `filter: grayscale()` on `.stage-face` —
@@ -415,17 +482,14 @@ it('gives the middle of the arena to what happened, and to nothing else', () => 
   // from the other end: a spell cast and then resolving is *one* spell, and
   // drawing it twice a beat apart would read as two.
   //
-  // **`enters` is in the quiet list on purpose and it cost three matches to
-  // put there** (Aaron, 2026-08-27, asked for a scene on it). Nearly every
-  // arrival is either a token the board already marks or a card the room
-  // showed as it was cast — which is `resolve` under another name, refused
-  // just above. The exception is real but rare, and the room cannot *tell*:
-  // the beat says nothing about whether anything cast the card, so drawing
-  // only the arrivals that deserve it is not possible from the browser.
-  // `lib/stage.ts` above `mannerOf` carries the counts, the Atla Palani game
-  // that produced four uncast arrivals, and the one field the beat would need.
-  // A session that adds `'enters'` here should re-read that first: without the
-  // flag it puts a scene on the resolve.
+  // **`enters` answers three ways rather than two**, and it cost three matches
+  // and a decompiler to get there (Aaron, 2026-08-27, asked for a scene on
+  // it). Nearly every arrival is either a token the board already marks or a
+  // card the room showed as it was cast — which is `resolve` under another
+  // name, refused just above. The exception is real but rare, and until the
+  // beat could say *nothing cast this* the room could not tell one from the
+  // other. It can now; `lib/stage.ts` above `mannerOf` carries the counts and
+  // the Atla Palani game that produced four of them.
   expect(mannerOf('cast')).toBe('cast')
   expect(mannerOf('dies')).toBe('dies')
   expect(mannerOf('exiled')).toBe('exiled')
@@ -446,6 +510,30 @@ it('gives the middle of the arena to what happened, and to nothing else', () => 
   const lion = { id: 10, name: 'Fleecemane Lion', types: 'Creature - Cat' }
   expect(mannerOf('enters', clue)).toBe('made')
   expect(mannerOf('enters', lion), 'this card had its moment when it was cast')
+    .toBeNull()
+
+  // **And the third answer: a real card put onto the battlefield.** An Atla
+  // Palani egg cracking into a Blightsteel Colossus, a reanimation, a blink.
+  // `entered` is Forge's own `wasCast`, carried word for word.
+  expect(mannerOf('enters', lion, 'put')).toBe('put')
+  expect(mannerOf('enters', lion, 'cast'), 'the room already showed somebody '
+    + 'paying for this one').toBeNull()
+  // The token wins over the word, because both are true of a token — Forge's
+  // `wasCast` is false for everything it conjures — and only one of the two
+  // scenes is right for it. Drawing a Clue on a battlefield instead of
+  // drawing it being conjured is the wrong one.
+  expect(mannerOf('enters', clue, 'put'), 'a token is conjured, not put')
+    .toBe('made')
+
+  // **The case that matters most, and the one this whole feature could have
+  // got wrong silently.** Every match already in the ledger was narrated
+  // before the scribe learned to ask, and every worker running an older image
+  // still sends nothing. Reading an absent word as "put" would redraw the
+  // entire archive as a room full of creatures appearing from nowhere — every
+  // older game would read as cheating.
+  expect(mannerOf('enters', lion, undefined), 'nobody said, so nothing is '
+    + 'drawn').toBeNull()
+  expect(mannerOf('enters', lion, ''), 'and an empty word is the same silence')
     .toBeNull()
 
   // And a creature sacrificed *also dies* — the scribe raises both, a beat
@@ -645,6 +733,16 @@ it('never cuts a reveal down to a flicker, at any pace', () => {
   // And it falls back to a real length rather than a plausible default when
   // nobody hands it one.
   expect(stageLife('dies', 'paused', null)).toBe(2000)
+
+  // **The arrival is inside the four-beat cap at watching pace**, which is the
+  // property rather than the number: 480ms a beat gives 1920, so anything at
+  // or under that is never clipped by the transport and only the fast end
+  // shortens it. It is the longest thing a *player* does short of buying in a
+  // companion, and it is the rarest.
+  expect(stageLife('put', 'play', null), 'watching pace never clips it')
+    .toBe(1600)
+  expect(stageLife('put', 'fast', null), 'and a fast pace still shortens it '
+    + 'like anything else').toBeLessThan(1600)
 })
 
 it('names the kind of card on the plate, in the word a player would use', () => {
@@ -694,6 +792,12 @@ it('names the kind of card on the plate, in the word a player would use', () => 
   expect(plateWord('dies', 'Creature - Cat Warrior')).toBe('Dies')
   expect(plateWord('exiled', 'Creature - Cat Warrior')).toBe('Exiled')
   expect(plateWord('attach', 'Legendary Artifact - Equipment')).toBe('Put on')
+  // An uncast arrival takes none either, and it is the closest call of the
+  // six: the type says whether to expect a card again, and this one has
+  // landed — it is standing in a row on the board a beat later, where its own
+  // lane says what it is better than a word could.
+  expect(plateWord('put', 'Creature - Phyrexian Golem'))
+    .toBe('Put onto the battlefield')
 })
 
 it('writes the plate as a sentence about a player doing something', () => {
@@ -706,6 +810,14 @@ it('writes the plate as a sentence about a player doing something', () => {
   expect(plateWord('sacrificed', 'Artifact - Food', 'Gyome'))
     .toBe('Gyome sacrifices')
   expect(plateWord('attach', 'Enchantment - Aura', 'Gyome')).toBe('Gyome puts')
+
+  // **"Puts" twice, and it is one English verb doing one job in two places.**
+  // A sword is *put on* a creature and a Colossus is *put onto the
+  // battlefield*; Magic uses the same word in both rules sentences, and the
+  // note line under each says which. Inventing a second verb here would teach
+  // a distinction the game does not draw.
+  expect(plateWord('put', 'Creature - Phyrexian Golem', 'Gyome'))
+    .toBe('Gyome puts')
 
   // **The companion wears the mechanic's own name and not a smoother verb.**
   // The whole reason that beat exists is that Aaron watched Kaheera arrive in
@@ -747,6 +859,16 @@ it('names the target under the card, and the rule under a companion', () => {
   // whichever lands happened to tap is exactly what ADR 44 forbids.
   expect(plateNote('companion', undefined))
     .toBe('from outside the game — three mana paid')
+
+  // **And the one fact nothing else on the screen carries.** A creature
+  // standing on the battlefield that nobody was seen to pay for looks like
+  // somebody skipped a step — the companion's own failure, a beat earlier in a
+  // newcomer's evening. Deliberately *"nothing cast it"* rather than "no mana
+  // was paid": mana may well have been spent, on the Egg or the reanimation
+  // spell, and the room does not know. What it knows is Forge's own boolean.
+  expect(plateNote('put', 'Fleecemane Lion'), 'and it takes no target, '
+    + 'because there is nothing on the other end of an arrival')
+    .toBe('nothing cast it')
 
   // Everything else says nothing. "Gyome sacrifices Food Token, into the
   // graveyard" spends a line on what the graveyard pile is already drawing.

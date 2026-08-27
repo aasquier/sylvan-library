@@ -178,6 +178,17 @@ export interface BoardMoment {
   zone: string
   /** Whether the game raised this rather than a player activating it. */
   trigger: boolean
+  /** What the ability was aimed at, by **board id** — the cards a room can
+   *  draw on.
+   *
+   *  **Empty is the common case and it is the data rather than a gap.** Three
+   *  abilities in four are aimed at nothing at all: a surveil trigger has no
+   *  target, and Arahbo's attack pump picks the creature it pumps by
+   *  definition rather than by targeting it, so the same commander produces
+   *  both kinds within one turn. A room that drew on every ability would be
+   *  inventing three of every four; a room that draws only on these is saying
+   *  what it was told. */
+  targets: number[]
 }
 
 /**
@@ -455,9 +466,15 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     for (const moved of step.floating ?? []) pool.set(moved.seat, moved.pool)
     if (i === upTo - 1) {
       floating = step.floating ?? []
+      // **Every field the wire carries has to be named here.** This is a
+      // rewrite and not a widening, so anything left out is dropped silently —
+      // which is exactly how `targets` reached a browser that could not see
+      // it, on a step that had been carrying it since the scribe learned to
+      // ask. Adding a field to `ForgeBoardStep` and not to this line is a
+      // change nothing fails on.
       abilities = (step.abilities ?? []).map((used) => ({
         id: used.id, seat: used.seat ?? 0, zone: used.zone ?? '',
-        trigger: used.trigger ?? false,
+        trigger: used.trigger ?? false, targets: used.targets ?? [],
       }))
     }
     for (const change of step.changes ?? []) {
