@@ -38,11 +38,28 @@
  * drawing here fails the typecheck, and a drawing here for a word nobody listed
  * fails too. A set of names and a set of pictures that are supposed to be the
  * same set is exactly the pair that quietly stops being the same set.
+ *
+ * **A keyword something else is giving the creature is struck the other way
+ * round**, and the distinction is in the *plate* rather than in the drawing.
+ * The rule above — no two marks share a silhouette — is exactly what forbids
+ * the obvious answer here: there are fifteen drawings and each one is already
+ * the only shape it is allowed to be, so a granted vigilance cannot be a
+ * *different castle*. What is free is the ground the castle stands on, so the
+ * plate and the ink change places: printed marks are brass on a dark chip,
+ * granted ones a dark mark on a brass chip. That is a swap of *value*, not of
+ * colour — it survives a greyscale print, a colour-blind reader and both
+ * themes, which no hue would — and it is the largest difference available in
+ * a thirteen-pixel square. `.field-keyword.is-granted` is the two lines of
+ * stylesheet that do it. **Nothing names the giver**: Forge carries no source
+ * for a granted keyword, so there is nothing to name and inventing one would
+ * be the board making a reading of the game (Aaron, 2026-08-27: *"we don't
+ * need to say who granted the ability if it is not traceable"*).
  */
 
 import type { ReactElement } from 'react'
 
-import { type DrawnKeyword, drawableKeywords } from '../lib/keywords'
+import { type DrawnKeyword, drawableKeywords, keywordWords }
+  from '../lib/keywords'
 
 /** One mark, drawn on `currentColor` in a 20-unit box like the rest of the
  *  house's glyphs. */
@@ -392,18 +409,34 @@ const MOST = 4
  * is upper-right, the counters lower-left and the loupe lower-right. It rides
  * `.field-card-arm` with the rest of them, so it turns with the card and each
  * mark turns back to stay level.
+ *
+ * **`granted` changes the plate a mark stands on and nothing else** — see the
+ * argument at the top of this file. In particular it does not change the
+ * *order*: a mark keeps its place in the card's own list whether it was
+ * printed or lent, because a creature gains and loses granted keywords all
+ * game and a band that regrouped itself every time something entered play
+ * would move the mark a player was reading.
  */
-export function KeywordMarks({ keywords }: { keywords: string[] }) {
+export function KeywordMarks(
+  { keywords, granted = [] }: { keywords: string[]; granted?: string[] },
+) {
   const drawn = drawableKeywords(keywords)
   if (drawn.length === 0) return null
+  const lent = new Set(granted.map((k) => k.toLowerCase()))
+  // Index-aligned with `drawn` by construction — `keywordWords` is that same
+  // call with the lending written in — so the mark and the words about it can
+  // never fall out of step, and the phrasing is spelled in one place.
+  const words = keywordWords(keywords, granted)
   const shown = drawn.slice(0, MOST)
   const rest = drawn.length - shown.length
   return (
-    <span className="field-keywords" title={drawn.join(', ')}>
-      {shown.map((key) => {
+    <span className="field-keywords" title={words.join(', ')}>
+      {shown.map((key, i) => {
         const Mark = MARKS[key]
         return (
-          <span key={key} className="field-keyword" title={key}>
+          <span key={key}
+                className={`field-keyword${lent.has(key) ? ' is-granted' : ''}`}
+                title={words[i]}>
             <svg viewBox="0 0 20 20" aria-hidden focusable="false">
               <Mark />
             </svg>

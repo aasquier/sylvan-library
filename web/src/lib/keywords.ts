@@ -68,3 +68,24 @@ export function drawableKeywords(keywords: string[]): DrawnKeyword[] {
   }
   return out
 }
+
+/**
+ * Every keyword this board can draw for a creature, said in words, with the
+ * lent ones saying so.
+ *
+ * **One phrasing, in one place.** The marks are pictures on an `aria-hidden`
+ * arm, so a sentence is the whole accessible account of them *and* the whole
+ * of what a pointer resting on one gets — and the card's own tooltip says the
+ * same list one element up. Three places, one spelling: change it here.
+ *
+ * A bare parenthetical, with no room in the phrasing for a culprit. `granted`
+ * is `BoardCard.granted`, which is the printing subtracted from the live set
+ * and carries no source, so *that* it was given is the whole of what may be
+ * said. Matched lowercased, because `drawableKeywords` answers lowercased and
+ * Forge does not.
+ */
+export function keywordWords(keywords: string[], granted: string[] = []) {
+  const lent = new Set(granted.map((k) => k.toLowerCase()))
+  return drawableKeywords(keywords)
+    .map((k) => (lent.has(k) ? `${k} (granted)` : k))
+}

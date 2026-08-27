@@ -8909,7 +8909,7 @@ button:hover .tarot-fan-card {
  * turn by exactly the same amount and each chip on it turn back by exactly
  * the same amount. Three places, one angle: change it here and the overlays
  * follow, which is the failure mode the first draft of this had. */
-.field-card { --turn: 45deg; --field-lens: 26px; }
+.field-card { --turn: 45deg; --field-lens: 26px; --field-crown: 17px; }
 .field-card.is-tapped .field-card-turn { transform: rotate(var(--turn)); }
 
 .field-card-art {
@@ -9061,9 +9061,11 @@ button:hover .tarot-fan-card {
     0 0 11px -1px color-mix(in srgb, var(--vine) 55%, transparent);
 }
 /* Top centre, half off the card's own edge — the corner nothing else on this
-   board has claimed. Keywords sit at 1px from the left and end at 14; the
-   count starts about 44; the crown runs 18 to 40 on a 58px card, so it lands
-   between them at every count and every keyword.
+   board has claimed *while the card is upright*. Keywords sit at 1px from the
+   left and end at 14; the count starts about 44; the crown runs 18 to 40 on a
+   58px card, so it lands between them at every count and every keyword. Turned,
+   that lane belongs to the neighbour and the crown goes elsewhere; the rule
+   below this one argues where and why.
 
    Placed with a margin rather than a `translateX`, deliberately: the arm
    counter-rotates every child of it with a blanket `transform`, so anything
@@ -9074,6 +9076,11 @@ button:hover .tarot-fan-card {
   top: -7px;
   left: 50%;
   width: 22px;
+  /* Written down rather than left to the padding and the glyph, because the
+     turned card's rule below moves the keyword band by exactly this — a
+     number that has to agree with another number is a number that has to be
+     said once. It is the height the chip already had. */
+  height: var(--field-crown);
   margin-left: -11px;
   display: flex;
   align-items: center;
@@ -9097,6 +9104,52 @@ button:hover .tarot-fan-card {
    counter-rotation spins it upright in place rather than walking it off the
    card. Every chip on the arm does this; see `.field-card-count` above. */
 .field-card-crown { transform-origin: 50% 0; }
+
+/* **Turned, the crown comes to the point.**
+ *
+ * The crown is the one chip on this board that sits *outside* the card by
+ * design — half off the top edge, which is a free lane on an upright card and
+ * nobody's on a turned one. Turn the card forty-five degrees and "above the
+ * middle of the top edge" swings a third of a card's width to the right, so
+ * the crown leaves its own slot and lands on the **neighbour**: measured at
+ * 7.6 × 17 pixels on a live board, a commander's crown sitting on the next
+ * creature's keyword marks. Same family as the counters further down this
+ * file, same cause — a chip anchored to a corner that stops being a corner.
+ *
+ * The counters' answer was to go straight up into the diamond, and it does not
+ * transfer, because a turned card has no free interior left: the count is at
+ * the right vertex, the loupe and the counters at the bottom one, and the
+ * keyword band runs from the top vertex down the middle four marks deep. The
+ * only place a crown can be is the top vertex — which is, on a leaning card,
+ * exactly where a crown belongs. So the chip moves to the card's own top-left
+ * corner and hangs down from it. `top: 0; left: 0` with the existing
+ * `margin-left: -11px` centres it on that corner, and the anchor is already
+ * the pivot, so the arm's counter-rotation still spins it upright in place.
+ *
+ * **It claims no space the card was not already claiming.** The corner it now
+ * rides is the highest point of the turned card, and the chip hangs *down*
+ * from it — so nothing goes above the sweep the lane's `--lane-lean` padding
+ * was already reserving, and nothing reaches sideways into either neighbour.
+ *
+ * The band steps down out from under it, and only when there is a crown to
+ * step out from under — that is the `.is-commander`/`.is-companion` in the
+ * selector, and it is the whole reason two chips can share one corner. Down
+ * the *screen* by the crown's own height and a hair, and left by half the
+ * band's width so the two sit in one column on the point: rotation first, so
+ * the translate is measured along the screen's axes rather than the card's —
+ * the same trick, and the same trap, as the counters' rule below, which argues
+ * the order at length. Both rules out-specify the arm's blanket
+ * counter-rotation, so neither depends on where in this file it stands. */
+.field-card.is-tapped .field-card-crown {
+  top: 0;
+  left: 0;
+}
+.field-card.is-tapped.is-commander .field-card-arm > .field-keywords,
+.field-card.is-tapped.is-companion .field-card-arm > .field-keywords {
+  transform:
+    rotate(calc(-1 * var(--turn)))
+    translate(-6.5px, calc(var(--field-crown) + 1px));
+}
 
 /* ------------------------------------------ what a token is made of
  *
@@ -9369,6 +9422,36 @@ button:hover .tarot-fan-card {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.6),
     inset 0 0 0 0.5px color-mix(in srgb, var(--field-brass) 40%, transparent);
+}
+/* **A keyword something else is giving it, struck the other way round.**
+ *
+ * The mark itself may not carry this. There are fifteen drawings and the rule
+ * over in `keywords.tsx` is that no two of them share a silhouette, so every
+ * shape is already the only shape it is allowed to be — a granted vigilance
+ * cannot be a *different castle*, and at ten pixels a rim, a dash or a notch
+ * is a grey suggestion rather than a distinction. What is free is the ground
+ * the castle stands on.
+ *
+ * So the plate and the ink change places: brass on dark becomes dark on brass,
+ * the whole thirteen-pixel square swapping value at once. That is the largest
+ * difference this chip has to give, and it is a difference of *value* rather
+ * than colour — it survives a greyscale print, a colour-blind reader and both
+ * themes, none of which a hue would. A card carrying both kinds reads as a
+ * column of alternating light and dark tiles, which is the case that had to
+ * work.
+ *
+ * It also lands in a vocabulary this board already speaks: a brass plate with
+ * dark figures on it is the count chip in the opposite corner. Brass ground is
+ * what the *game* has put on this card; dark ground is what the card itself
+ * says. **And it names nobody.** Forge carries no source for a granted
+ * keyword, so a giver may not be implied here either — the chip says *on
+ * loan*, never *from whom* (Aaron, 2026-08-27). */
+.field-keyword.is-granted {
+  color: rgba(8, 6, 4, 0.92);
+  background: color-mix(in srgb, var(--field-brass) 92%, #fff);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 0.5px rgba(8, 6, 4, 0.45);
 }
 .field-keyword svg {
   display: block;

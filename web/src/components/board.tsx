@@ -66,7 +66,7 @@ import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   alignLanes, foldBoard, sameCard, stackRow } from '../lib/board'
-import { drawableKeywords } from '../lib/keywords'
+import { keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
@@ -768,13 +768,6 @@ function FieldCard({ card, count, inPlay = false }: {
    */
   const worn = card.live.length > 0
     ? card.live : [...card.keywords, ...card.granted]
-  // Which of them something else is giving it, in the spelling
-  // `drawableKeywords` answers in. **That a keyword was granted, and never by
-  // what** — Forge carries no source for one, so `BoardCard.granted` is the
-  // whole of what may be said and a giver may not be implied anywhere: not
-  // here, not in a mark, not in a label (Aaron, 2026-08-27: *"we don't need to
-  // say who granted the ability if it is not traceable"*).
-  const lent = new Set(card.granted.map((k) => k.toLowerCase()))
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
@@ -791,13 +784,14 @@ function FieldCard({ card, count, inPlay = false }: {
     // turned because it attacked, and this sentence stays true when it was.
     makes.length ? `taps for ${producedName(makes)}` : '',
     // The marks ride an `aria-hidden` arm, so this sentence is how anybody not
-    // looking at ten-pixel pictures gets them — which makes it the one place
-    // "and something else is giving it that one" can be said at all. Said as a
-    // bare fact, with no room in the phrasing for a culprit.
-    inPlay
-      ? drawableKeywords(worn)
-        .map((k) => (lent.has(k) ? `${k} (granted)` : k)).join(', ')
-      : '',
+    // looking at ten-pixel pictures gets them. **That a keyword was granted,
+    // and never by what** — Forge carries no source for one, so
+    // `BoardCard.granted` is the whole of what may be said and a giver may not
+    // be implied anywhere: not here, not in a mark, not in a label (Aaron,
+    // 2026-08-27: *"we don't need to say who granted the ability if it is not
+    // traceable"*). `keywordWords` is the one place that phrasing lives, and
+    // the marks below say the same thing on the same words.
+    inPlay ? keywordWords(worn, card.granted).join(', ') : '',
     // **What it is carrying, named.** `FieldGeared` draws an Equipment or an
     // Aura as a corner peeping out from under its host, which says *that*
     // something is there and never *what* — and the browser's own tooltip is
@@ -966,12 +960,18 @@ function FieldCard({ card, count, inPlay = false }: {
 
             **`worn`, not the printing** — see the field above. What is drawn
             here is the set this creature has *now*, so a Cat standing beside
-            Kaheera wears the vigilance Kaheera is giving it. The marks are the
-            same picture whether a keyword is printed or granted, because
-            nothing in the mark may point at a giver and the picture is all
-            there is at ten pixels; the card's `title` is where the difference
-            is said in words. */}
-        {inPlay && <KeywordMarks keywords={worn} />}
+            Kaheera wears the vigilance Kaheera is giving it.
+
+            **And a lent keyword looks lent.** It wore the same chip as a
+            printed one at first, which meant the board had learned to draw
+            something it could not then tell you about — a Cat with a borrowed
+            vigilance and a Cat that prints one were the same picture (Aaron,
+            2026-08-27). `granted` is what separates them, and it is the whole
+            of what may cross: the *drawing* still points at no giver, because
+            there is no giver on the wire to point at. The plate under it
+            changes instead; `keywords.tsx` argues why the plate rather than
+            the mark, and the card's `title` says the same thing in words. */}
+        {inPlay && <KeywordMarks keywords={worn} granted={card.granted} />}
         {/* **The crown, sitting on the top edge of the painting.**
 
             Aaron offered three: oversized, a golden aura, or a crown touching
