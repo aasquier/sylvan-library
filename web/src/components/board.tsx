@@ -1406,14 +1406,23 @@ function LifeTotal({ life }: { life: number }) {
   // Clamped both ways: a player on a lifegain deck goes past forty and the
   // ring simply reads full, and a dead player reads empty rather than negative.
   const left = Math.max(0, Math.min(1, life / STARTING_LIFE))
+  // **Under five, the ring stops being a gauge and starts being an alarm.**
+  // The warming from brass to blood is a gradient, and a gradient is read as
+  // "getting worse" right up until it is over — which is the one thing a
+  // scoreboard has to be able to say out loud. Five rather than a fraction of
+  // forty because it is a fact about Magic rather than about this ring: nearly
+  // every creature on a Commander board can deal five, so under it any attack
+  // that connects is lethal. Dead is not dire — a player on nought has stopped
+  // being in danger and the ring goes quiet.
+  const dire = life > 0 && life < LIFE_IS_DIRE
   // The mix is computed here rather than in CSS because a `calc()` inside
   // `color-mix()`'s percentage is the one part of that function browsers still
   // disagree about, and this is a colour nobody should have to debug.
   const spent = `${Math.round((1 - left) * 100)}%`
   return (
-    <span className={`field-life${hit ? ` is-${hit}` : ''}`}
+    <span className={`field-life${hit ? ` is-${hit}` : ''}${dire ? ' is-dire' : ''}`}
           style={{ '--life-left': left, '--life-spent': spent } as CSSProperties}
-          title={`${life} life`}>
+          title={dire ? `${life} life — one good swing from nothing` : `${life} life`}>
       <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
         <circle className="field-life-track" cx="24" cy="24" r="20" />
         <circle className="field-life-arc" cx="24" cy="24" r="20" />
@@ -1426,6 +1435,31 @@ function LifeTotal({ life }: { life: number }) {
 /** Poison enough to lose on — rule 104.3c, and the whole reason this bead has
  *  a scale on it rather than being a number in a circle. */
 const POISON_KILLS = 10
+
+/** Commander damage enough to lose on, **from one commander** — rule 903.10a.
+ *  The per-source part is the whole of why the trench draws a dial each rather
+ *  than one figure: forty points from two commanders is a player still
+ *  standing. */
+const GENERAL_KILLS = 21
+
+/**
+ * Where each of the three clocks stops being a gauge and starts being an alarm.
+ *
+ * **Two away, on the two that fill, and a Magic fact on the one that drains.**
+ * Nineteen commander damage and eight poison are each one ordinary connection
+ * from over; under five life, every creature on a Commander board is lethal. So
+ * all three say the same thing — *the next thing that happens here could end
+ * it* — which is what lets one grammar carry three different rules to somebody
+ * who has not learned any of them yet (commandment 2).
+ *
+ * They are constants rather than arithmetic on the ceiling because they are
+ * judgements about a game, not fractions of a dial: two-from-lethal happens to
+ * be 90% of ten and 90% of twenty-one, and the day one of those ceilings
+ * changes the warning should not silently move with it.
+ */
+const LIFE_IS_DIRE = 5
+const POISON_IS_DIRE = 8
+const GENERAL_IS_DIRE = 19
 
 /**
  * The counters sitting on a *player*, beside their life.
@@ -1463,6 +1497,91 @@ function PlayerCounters({ counters }: {
   )
 }
 
+/**
+ * The crown's own clock: how much one commander has beaten into this player.
+ *
+ * **The third way to die in this format, and the board could not see it.** Life
+ * and poison were both on the plate; twenty-one combat damage from a single
+ * commander ends a game whatever the life total says (rule 903.10a), and a
+ * player three swings from that was drawn identically to one who was fine.
+ * Forge has kept the tally the whole time — `Player.addCommanderDamage` — and
+ * nothing was reading it.
+ *
+ * **One dial per commander, because the rule counts per commander.** Twenty
+ * from each of two is a player still standing, so a single figure would be a
+ * lie of exactly the kind this room refuses: it would show forty against a
+ * ceiling of twenty-one and call a live player dead. Partners make that an
+ * ordinary board rather than a corner case. Nearly every match draws none of
+ * these and a great many draw one.
+ *
+ * **Built from the poison bead and pointed the other way round the palette.**
+ * Same construction, same grammar — an arc that fills toward the number that
+ * kills — so a newcomer who has read one has read all three. It is blood rather
+ * than Phyrexian green because that is what this room means by combat damage,
+ * and it wears a crown so that a glance can tell it from the disease beside it
+ * without reading either.
+ *
+ * The name is in the title rather than on the plate: at this size it would be a
+ * two-line caption under a 40px dial, and the one thing a scoreboard has to
+ * carry from across the room is *how close*, not *by whom*.
+ */
+function GeneralBead({ name, damage }: { name: string; damage: number }) {
+  const full = Math.max(0, Math.min(1, damage / GENERAL_KILLS))
+  const gone = `${Math.round(full * 100)}%`
+  // Clamped for the arc and not for the class, for the poison bead's reason: a
+  // player on twenty-three is past it, and a full ring says "at least
+  // twenty-one" where the class says "twenty-one".
+  const lethal = damage >= GENERAL_KILLS
+  const dire = !lethal && damage >= GENERAL_IS_DIRE
+  const whose = name || 'a commander'
+  return (
+    <span className={`field-bead is-general${lethal ? ' is-lethal' : ''}${
+            dire ? ' is-dire' : ''}`}
+          style={{ '--bead-full': full, '--bead-gone': gone } as CSSProperties}
+          title={lethal
+            ? `${damage} commander damage from ${whose} — twenty-one is lethal`
+            : `${damage} commander damage from ${whose}, of the twenty-one `
+              + 'that are lethal'}>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle className="field-bead-track" cx="24" cy="24" r="20" />
+        <circle className="field-bead-arc" cx="24" cy="24" r="20" />
+      </svg>
+      {/* The crown, drawn rather than fetched: three points and a band, sitting
+          on the ring's shoulder where it reads as a mark on the dial instead of
+          an ornament beside it. It is the one thing telling this apart from the
+          poison bead at a glance, so it is outside the rotated `svg` above —
+          that one is turned to put twelve o'clock at the top and would take the
+          crown round with it. */}
+      <svg className="field-bead-crown" viewBox="0 0 24 12" aria-hidden="true"
+           focusable="false">
+        <path d="M2 11 L2 3 L6 7 L12 1 L18 7 L22 3 L22 11 Z" />
+      </svg>
+      <span className="field-bead-n tabular">{damage}</span>
+    </span>
+  )
+}
+
+/**
+ * Every commander that has beaten on this player, worst clock first.
+ *
+ * Sorted upstream in `foldBoard`, because the order is the answer to the only
+ * question asked of the list and a component that had to find it could forget
+ * to. Empty is the ordinary state and draws nothing, for `PlayerCounters`'
+ * reason: a nought here would claim somebody's commander had connected.
+ */
+function GeneralDamage({ generals }: {
+  generals: { id: number; name: string; damage: number }[]
+}) {
+  if (generals.length === 0) return null
+  return (
+    <>
+      {generals.map((one) => (
+        <GeneralBead key={one.id} name={one.name} damage={one.damage} />
+      ))}
+    </>
+  )
+}
+
 function PlayerBead({ kind, n }: { kind: string; n: number }) {
   // **Matched without regard to case, and the reason is that this string comes
   // from Forge rather than from us.** `CounterEnumType` builds its display name
@@ -1484,8 +1603,16 @@ function PlayerBead({ kind, n }: { kind: string; n: number }) {
   // threshold, and the ring being full says "at least ten" where the class
   // says "ten".
   const lethal = n >= POISON_KILLS
+  // **Eight is where the bead starts to spread**, and it stays green doing it.
+  // The other two clocks go red at their own thresholds because red is what
+  // this room means by blood; poison is not blood, and Magic has spent thirty
+  // years teaching that this particular way of dying is Phyrexian green. So the
+  // alarm here is the green getting *louder* — brighter, spreading further —
+  // rather than changing colour into a different disease.
+  const dire = !lethal && n >= POISON_IS_DIRE
   return (
-    <span className={`field-bead is-poison${lethal ? ' is-lethal' : ''}`}
+    <span className={`field-bead is-poison${lethal ? ' is-lethal' : ''}${
+            dire ? ' is-dire' : ''}`}
           style={{ '--bead-full': full, '--bead-gone': gone } as CSSProperties}
           title={lethal
             ? `${n} poison counters — ten is lethal`
@@ -2225,6 +2352,7 @@ function FieldPlate({ side, facing, name }: {
         <span className="field-plate-name" title={side.name}>{name}</span>
         <span className="field-plate-figures">
           <LifeTotal life={side.life} />
+          <GeneralDamage generals={side.generals} />
           <PlayerCounters counters={side.counters} />
         </span>
       </span>

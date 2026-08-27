@@ -798,7 +798,78 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
         Json line = new Json("damage").put("game", game)
                 .put("amount", event.amount()).put("combat", event.combat());
         against(line, event.target());
+        // **Before [#card], which is what prints the line.** [Json] builds one
+        // string and closing it is a mutation, so every field a line carries
+        // has to be on it by the time the card goes on.
+        commanderDamage(line, event);
         return card(line, event.source());
+    }
+
+    /**
+     * **The other way a Commander game ends, and the only number on this bus
+     * that nobody was reading.** Twenty-one combat damage from one commander
+     * kills you (rule 903.10a), and until now a player three points from that
+     * looked exactly like a player on the same life total who was fine.
+     *
+     * **It is a running total per commander, and it is Forge's own.** Not a sum
+     * this class keeps and not a rule it applies — `Player.addDamageAfterPrevention`
+     * maintains a `Map&lt;Card, Integer&gt;` and this reads out of it, so a
+     * consumer never adds anything up and cannot drift. Sent as a total for
+     * [#visit(GameEventPlayerCounters)]'s stated reason.
+     *
+     * **The ordering is the whole reason this is one line rather than a second
+     * event**, and it is a bytecode fact rather than a hope. Inside that
+     * method, in this order: `addCommanderDamage(source.getRealCommander(), n)`,
+     * then `view.updateCommanderDamage(this)`, then the triggers, and only then
+     * `fireEvent(new GameEventPlayerDamaged(...))`. The tracker and the view
+     * are both already current at the instant this visitor runs, so the total
+     * asked for here is the one that includes the blow being announced.
+     *
+     * **`getRealCommander()` is why the source's own id is not the key.** Forge
+     * credits the damage to that card, and for a commander merged or melded
+     * into something else it is not the card that dealt the blow —
+     * `PlayerView.updateCommanderDamage` keys the map by `Card.getId()` of
+     * whatever `getRealCommander()` returned, so asking the view about the
+     * *source* would miss and read as nought. The model is where that question
+     * is answered, and the scribe is inside the JVM holding the `Game`, which
+     * is [#entered]'s lesson applied a second time. Where there is no model to
+     * ask, the source stands in: for every commander that is not part of a
+     * merge — which is all of them, nearly always — `getRealCommander()`
+     * returns the card itself.
+     *
+     * **Silent unless there is something to say**, and that silence is honest
+     * twice over. A non-commander source is not in the map and reads nought,
+     * which is not news; and a worker image built before today sends no such
+     * field at all, so the far side reads absence as "nobody said" rather than
+     * as "nought" — the same degradation [#entered] chose and for the same
+     * reason (ADR 42's fourth decision).
+     *
+     * **Combat damage only, and that is Forge's gate rather than this one's.**
+     * The branch is entered on `isCombat`, which is rule 903.10a exactly, so a
+     * commander throwing a Fireball at somebody's face moves their life and not
+     * this figure. Nothing here checks for that: the number is read, and if
+     * Forge did not credit it the number simply has not moved. Reading rather
+     * than reasoning is the point — a rule re-implemented here is a rule that
+     * gets to disagree with the engine.
+     */
+    private Void commanderDamage(Json line, GameEventPlayerDamaged event) {
+        PlayerView target = event.target();
+        CardView source = event.source();
+        if (target == null || source == null) return null;
+        // The card Forge credits the damage to, which is the source itself for
+        // every commander that is not part of a merge.
+        CardView credited = source;
+        if (live != null) {
+            Card model = live.findById(source.getId());
+            if (model != null && model.getRealCommander() != null) {
+                credited = model.getRealCommander().getView();
+            }
+        }
+        if (credited == null) return null;
+        int total = target.getCommanderDamage(credited);
+        if (total <= 0) return null;
+        line.put("commander", credited.getId()).put("commander_damage", total);
+        return null;
     }
 
     /**

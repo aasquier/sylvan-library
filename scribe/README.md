@@ -58,7 +58,7 @@ game (Gyome/Food against Atla/Eggs, seed 11, 2026-08-25):
 | `tapped` | 131 | a card tapping or untapping |
 | `stats` | 23 | power, toughness or type actually changing |
 | `attack` | 16 | an attacker, and the player or planeswalker it was sent at |
-| `damage` | 16 | damage: how much, from what, onto a card or a seat |
+| `damage` | 16 | damage: how much, from what, onto a card or a seat — and on a commander's blow to a player, `commander` and `commander_damage` |
 | `unblocked` | 15 | an attacker nobody blocked |
 | `turn` | 15 | a turn beginning, whose, Forge's number for it, and their life |
 | `land` | 14 | a land played |
@@ -112,6 +112,28 @@ first. All three of Arahbo's command-zone eminence triggers named their target,
 which is the whole reason this exists; the same commander's *attack* pump names
 none, because it picks its creature with `Defined$` rather than targeting it.
 `getTargetPlayers()` is wired and was used **zero** times in that match.
+
+**A third field arrived on 2026-08-27: `commander_damage`, the other way this
+format's games end.** Twenty-one combat damage from one commander kills whatever
+the life total says (rule 903.10a), and it is the one loss condition a life
+total cannot express — so it rides the `damage` line as a **running total**,
+with `commander` beside it naming the commander the blow is credited to.
+
+**The ordering is what makes one line enough**, and it is read out of the
+bytecode rather than hoped for. `Player.addDamageAfterPrevention` credits the
+damage, updates the view, runs the triggers, and *then* fires
+`GameEventPlayerDamaged` — so the tracker is already current at the instant this
+listener runs, and the total it reads includes the blow being announced. The key
+is `getRealCommander()` rather than the source, because a commander merged or
+melded into another permanent is credited under its own id; the model answers
+that and the scribe holds the `Game`, which is `entered`'s lesson again.
+
+Measured on Goreclaw/Stompy against Gyome/Food, seed 11, 2026-08-27: **seven of
+thirty-six blows carried a figure**, every blow from a card seen in the command
+zone carried one with none missed, no figure came from a card that never sat
+there, and the totals matched the running sum of the blows on all thirty-five
+cumulative checks. Absent means nobody said — an older worker sends no such
+field, and so does every ordinary creature's blow.
 
 **Do not reach for `GameEventZone.sa()` to learn what put a card somewhere.**
 It is the fifth component of that record and reads exactly like the spell

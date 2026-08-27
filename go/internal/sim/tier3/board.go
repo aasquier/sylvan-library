@@ -1,6 +1,8 @@
 package tier3
 
 import (
+	"cmp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -404,6 +406,51 @@ type BoardPlayerCounters struct {
 	Counters []BoardCounter `json:"counters"`
 }
 
+// BoardCommanderDamage is one seat's commander damage, by the commander that
+// dealt it, after some of it moved.
+//
+// **The third death clock, and the only one the board could not see.** A player
+// on 34 life who has taken 19 from one commander is two swings from losing, and
+// until now they were drawn identically to a player on 34 who was fine. Rule
+// 903.10a is the rule; twenty-one from a single commander ends it regardless of
+// life, which is exactly why a life total is not a sufficient scoreboard for
+// this format.
+//
+// **Per source, because the rule is per source.** Twenty from one commander and
+// twenty from another is a player still standing, and a single sum would draw
+// them as dead. So this is a set keyed by the commander's board id, and a room
+// asking "how close is this player to losing" takes the largest of it — never
+// the total.
+//
+// **Totals, and the whole set crosses**, matching [BoardPlayerCounters] and
+// [BoardChange.Counters] for their reason: Forge keeps the running figure and
+// the scribe reads it, so nothing on either side of this pipe adds anything up
+// and nothing can drift.
+//
+// **The name is not carried and that is deliberate.** [BoardReel.Cards] is the
+// dictionary and the commander is always in it — it has been on the battlefield
+// to have dealt combat damage — so a name here would be a second copy of a
+// string that can go stale, the same call [BoardAbility.Targets] makes.
+type BoardCommanderDamage struct {
+	Seat int `json:"seat"`
+	// From is every commander that has dealt this player damage, in board-id
+	// order so a recorded golden cannot flap.
+	From []BoardGeneral `json:"from"`
+}
+
+// BoardGeneral is one commander's running damage against one player.
+//
+// Named for Forge's own word for the loss condition — its outcome sentence is
+// `has lost due to accumulation of 21 damage from generals` — because a type
+// called `BoardCommanderDamage.Commander` would read as though the field were
+// the commander rather than the damage it has done.
+type BoardGeneral struct {
+	// ID is the commander's board id, resolvable through [BoardReel.Cards].
+	ID int `json:"id"`
+	// Damage is what that commander has dealt this player so far this game.
+	Damage int `json:"damage"`
+}
+
 // BoardStep is the board's movement between one beat and the next.
 //
 // **Steps are parallel to [EventLog.Events], one for one**, and that is the
@@ -428,6 +475,10 @@ type BoardStep struct {
 	// and its relatives. See [BoardPlayerCounters]; beside the life totals
 	// because both are facts about a player rather than about a card.
 	Counters []BoardPlayerCounters `json:"counters,omitempty"`
+	// Generals is every seat whose commander damage moved at this step. See
+	// [BoardCommanderDamage] — the third of the three clocks a player can die
+	// on, and beside the other two for that reason.
+	Generals []BoardCommanderDamage `json:"generals,omitempty"`
 	// Floating is every seat whose mana pool moved at this step. See
 	// [BoardFloating] — beside the life totals because a pool is a player's,
 	// not a permanent's.
@@ -498,6 +549,10 @@ type board struct {
 	// held is each seat's own counters — poison, energy, experience — by kind.
 	// A seat holding none holds no map, the way `counters` treats a card.
 	held map[int]map[string]int
+	// generals is each seat's commander damage by the commander that dealt it,
+	// the way `held` holds counters by kind. A seat nobody's commander has hit
+	// holds no map, so the common game carries none of this at all.
+	generals map[int]map[int]int
 	// left is the last real zone a card was cleared out of.
 	//
 	// Needed because **Forge announces the leaving before the arriving**: a
@@ -536,6 +591,9 @@ type board struct {
 	// the order they were touched — `lifeMoved`'s reason exactly: a slice
 	// rather than a map so a recorded golden cannot flap between runs.
 	heldMoved []int
+	// generalsMoved is the seats whose commander damage moved since the last
+	// beat, in the order they were touched, for `heldMoved`'s reason.
+	generalsMoved []int
 	// poolMoved is every value a pool took since the last beat, in order. A
 	// seat appears once per change rather than once per step — see
 	// [board.floating] for why the sequence is the point.
@@ -560,8 +618,9 @@ func newBoard() *board {
 		combat:   map[int]string{}, attacking: map[int]int{},
 		blocking: map[int]int{}, casts: map[int]int{},
 		life: map[int]int{}, held: map[int]map[string]int{},
-		left: map[int]string{},
-		live: map[int]string{}, pool: map[int]string{},
+		generals: map[int]map[int]int{},
+		left:     map[int]string{},
+		live:     map[int]string{}, pool: map[int]string{},
 		changing: map[int]*BoardChange{},
 	}
 }
@@ -1214,6 +1273,48 @@ func (b *board) heldChanged(seat int) {
 	b.heldMoved = append(b.heldMoved, seat)
 }
 
+// commanderDamage folds one commander's running total against one player.
+// `total` is what that commander has dealt them altogether, not the blow.
+//
+// **Never allowed to go backwards.** Forge's tracker only ever climbs within a
+// game, so a smaller figure than the one already held is a stream that has been
+// re-read or interleaved rather than a player healing commander damage — which
+// is not a thing that happens. Taking the larger keeps a replayed line from
+// walking the clock back under a room that is watching it.
+//
+// Silent when nothing changed, for [board.lives]' reason.
+func (b *board) commanderDamage(seat, commander, total int) {
+	if seat <= 0 || commander == 0 || total <= 0 {
+		return
+	}
+	from := b.generals[seat]
+	if from == nil {
+		from = map[int]int{}
+		b.generals[seat] = from
+	}
+	if from[commander] >= total {
+		return
+	}
+	from[commander] = total
+	for _, already := range b.generalsMoved {
+		if already == seat {
+			return
+		}
+	}
+	b.generalsMoved = append(b.generalsMoved, seat)
+}
+
+// sortedGenerals renders one seat's commander damage in board-id order, so a
+// recorded golden cannot flap on a map's iteration.
+func sortedGenerals(from map[int]int) []BoardGeneral {
+	out := make([]BoardGeneral, 0, len(from))
+	for id, damage := range from {
+		out = append(out, BoardGeneral{ID: id, Damage: damage})
+	}
+	slices.SortFunc(out, func(a, b BoardGeneral) int { return cmp.Compare(a.ID, b.ID) })
+	return out
+}
+
 // began records a turn, and ends the last one's combat if nothing better has.
 //
 // The fallback lives here rather than at the call site so that the precedence
@@ -1248,6 +1349,10 @@ func (b *board) beat() {
 		step.Counters = append(step.Counters, BoardPlayerCounters{
 			Seat: seat, Counters: sortedCounters(b.held[seat])})
 	}
+	for _, seat := range b.generalsMoved {
+		step.Generals = append(step.Generals, BoardCommanderDamage{
+			Seat: seat, From: sortedGenerals(b.generals[seat])})
+	}
 	if len(b.poolMoved) > 0 {
 		step.Floating = append([]BoardFloating(nil), b.poolMoved...)
 	}
@@ -1261,6 +1366,7 @@ func (b *board) beat() {
 	b.pending = b.pending[:0]
 	b.lifeMoved = b.lifeMoved[:0]
 	b.heldMoved = b.heldMoved[:0]
+	b.generalsMoved = b.generalsMoved[:0]
 	b.poolMoved = b.poolMoved[:0]
 	b.used = b.used[:0]
 	b.changing = map[int]*BoardChange{}
