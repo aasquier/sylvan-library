@@ -151,6 +151,16 @@ const (
 	// ether"). A creature *sacrificed* raises both, which is correct: it was
 	// sacrificed and it did die.
 	//
+	// **[GameEvent.Seat] is the controller** — the player who paid the cost,
+	// never the owner of a permanent somebody stole. It was empty for one
+	// season, because `GameEventCardSacrificed` is the only card-shaped event
+	// on Forge's bus with no player component at all, and a plate that cannot
+	// name a seat can only say "Sacrificed" where the rest of this account
+	// says who. `Scribe.java` now reads the controller off the card — Forge's
+	// own answer, taken out of `GameAction.sacrifice`'s bytecode — and
+	// [ScribeParser.seated] falls back to the board for a worker that predates
+	// it.
+	//
 	// Raised only by the scribe, from `GameEventCardSacrificed`. Forge's log
 	// has no category for it either.
 	EventSacrificed EventKind = "sacrificed"

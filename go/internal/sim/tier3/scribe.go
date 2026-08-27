@@ -251,6 +251,44 @@ func (p *ScribeParser) fold(l scribeLine) {
 		}
 		return
 	}
+	// **A line whose card came back blank is a line that says nothing about
+	// that card**, and it is not a card with no name. See [blankView] for what
+	// Forge is doing and how it was measured; the rule here is what to do about
+	// it.
+	//
+	// Only a `zone` line survives one, and only for the half that never came
+	// off the view: the zone, the mode and the seat are the event's own fields
+	// and are as good as any other line's. Everything else on a blank line —
+	// the name, the power, the toughness, the type line, the keywords — is a
+	// trackable property sitting at its default, and folding a default is
+	// worse than folding nothing. Three things went wrong when this was
+	// believed, all of them on the same measured line:
+	//
+	//   - **A creature died with no name.** The `dies` beat below carried
+	//     `l.Card`, so a death inside the sweep raised a beat naming nobody,
+	//     and a beat naming nobody draws nothing at all on the centre stage —
+	//     a creature died and the room was silent. **Eleven of twelve deaths
+	//     in one measured game**, and thirteen of fifteen across two.
+	//   - **A dying creature was stamped 0/0.** `board.stats` takes the line's
+	//     numbers at face value, so the last thing said about a 3/3 Cat Token
+	//     was that it was a 0/0 — which is the size it is drawn at while the
+	//     skull is on it.
+	//   - **A commander was blacklisted forever.** A commander that dies goes
+	//     back to the command zone, and that arrival is blank too — an untyped
+	//     card in a command zone, which is [isForgeEffect]'s rule exactly. The
+	//     commander was marked one of Forge's own bookkeeping cards and every
+	//     later line about it was dropped for the rest of the game: recast, it
+	//     never came back to the board. [ScribeParser.refused] holds that half
+	//     of the fix, where the rest of that argument already lives.
+	//
+	// The beats a blank `zone` line still raises name the card out of the
+	// dictionary instead — [ScribeParser.named] — which is the same move the
+	// `dies` check below already makes for the type line, and for the same
+	// reason: the board is holding what this card is, and the answer has to be
+	// the same whichever line asks.
+	if blankView(l) && l.Kind != "zone" {
+		return
+	}
 	// **The phantoms, on every line that carries a card.** Forge keeps
 	// bookkeeping cards with a real id, a real name and — usually — an empty
 	// type line; they are invisible in any real game and drawing one puts a
@@ -282,12 +320,14 @@ func (p *ScribeParser) fold(l scribeLine) {
 	// `attack`, `block`, `damage` — and `note` catches the first sighting, where
 	// the card is not in the dictionary yet and this can do nothing. Both are
 	// idempotent, so the overlap costs a map lookup.
-	if l.ID != 0 {
+	if l.ID != 0 && !blankView(l) {
 		p.board.keywords(l.ID, l.Keywords)
 	}
 	switch l.Kind {
 	case "zone":
-		p.note(l, l.Seat)
+		if !blankView(l) {
+			p.note(l, l.Seat)
+		}
 		was := p.board.zone[l.ID]
 		if was == ZoneGone {
 			// Forge announces the leaving before the arriving, so the zone a
@@ -296,15 +336,17 @@ func (p *ScribeParser) fold(l scribeLine) {
 			was = p.board.left[l.ID]
 		}
 		p.board.moved(l.ID, l.Zone, l.Mode, l.Seat)
-		p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
+		if !blankView(l) {
+			p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
+		}
 		// **A companion arriving in a hand from the command zone**, which is
 		// the {3} being paid and was the one moment on this board with nothing
 		// said about it at all. See [EventCompanion] — and see
 		// [ScribeParser.outsideTheGame], which is also the reader that learns
 		// which card is the companion in the first place.
 		if p.outsideTheGame(l, was) {
-			p.raise(GameEvent{Kind: EventCompanion, Seat: l.Seat,
-				Card: l.Card, ID: l.ID})
+			p.raise(GameEvent{Kind: EventCompanion, Seat: p.seated(l),
+				Card: p.named(l), ID: l.ID})
 			return
 		}
 		// A **creature or planeswalker** leaving the battlefield for a
@@ -342,7 +384,8 @@ func (p *ScribeParser) fold(l scribeLine) {
 			types := p.board.types[l.ID]
 			if strings.Contains(types, "Creature") ||
 				strings.Contains(types, "Planeswalker") {
-				p.raise(GameEvent{Kind: EventDies, Seat: l.Seat, Card: l.Card, ID: l.ID})
+				p.raise(GameEvent{Kind: EventDies, Seat: p.seated(l),
+					Card: p.named(l), ID: l.ID})
 			}
 			return
 		}
@@ -359,13 +402,15 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// fetchland cracked for a land is a permanent leaving play.
 		if l.Mode == "in" && l.Zone == "Exile" &&
 			(was == ZoneBattlefield || was == ZoneLand) {
-			p.raise(GameEvent{Kind: EventExiled, Seat: l.Seat, Card: l.Card, ID: l.ID})
+			p.raise(GameEvent{Kind: EventExiled, Seat: p.seated(l),
+				Card: p.named(l), ID: l.ID})
 			return
 		}
 		// A permanent arriving. See [EventEnters] for why lands are excluded
 		// and why this is not called "resolves".
 		if p.board.zone[l.ID] == ZoneBattlefield && was != ZoneBattlefield {
-			p.raise(GameEvent{Kind: EventEnters, Seat: l.Seat, Card: l.Card, ID: l.ID})
+			p.raise(GameEvent{Kind: EventEnters, Seat: p.seated(l),
+				Card: p.named(l), ID: l.ID})
 		}
 	case "attach", "detach":
 		p.note(l, 0)
@@ -433,9 +478,21 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// order Forge announces them in: `sacrificed` then `Battlefield out`
 		// then `Graveyard in`, measured on a real match. All three land on the
 		// same step, so the card leaves and says why in one movement.
+		//
+		// **The seat is the board's when the line has none**, and for one
+		// season it always had none: `GameEventCardSacrificed` is the one
+		// card-shaped event on Forge's bus with no player component at all, so
+		// this beat reached the room with `who: null` and a plate that could
+		// only say "Sacrificed" where every other beat says who did it. The
+		// scribe now reads the controller off the card and sends a seat
+		// (`Scribe.java` argues it against `GameAction.sacrifice`'s bytecode) —
+		// and this falls back to the board for the worker deployed before that,
+		// which is ADR 42's fourth decision applied one field down: an older
+		// scribe degrades, it does not lie.
 		p.note(l, l.Seat)
 		p.board.fate(l.ID, FateSacrificed)
-		p.raise(GameEvent{Kind: EventSacrificed, Seat: l.Seat, Card: l.Card, ID: l.ID})
+		p.raise(GameEvent{Kind: EventSacrificed, Seat: p.seated(l),
+			Card: p.named(l), ID: l.ID})
 	case "combat_end":
 		// Forge saying combat is over, rather than the next turn implying it.
 		// [board.combatEnded] argues why this is the event and why the turn
@@ -513,6 +570,79 @@ func (p *ScribeParser) note(l scribeLine, seat int) {
 	p.board.name(l.ID, l.Card, l.Types, l.Token, seat)
 	p.board.copiedBy(l.ID, l.CopiedBy)
 	p.board.keywords(l.ID, l.Keywords)
+}
+
+// blankView is whether this line's card came back at its defaults — a view
+// Forge had not filled in yet, rather than a card with nothing to say.
+//
+// **Forge freezes its own view layer while it applies state-based actions**,
+// and that is the whole mechanism. `forge.trackable.TrackableObject.set`
+// defers a write while `Tracker.isFrozen()` and the property is
+// `RespectsFreeze`; `TrackableProperty.Name` is one of those and its default
+// value is the empty string, measured by asking the enum on Forge 2.0.14.
+// `javap -c` puts `Tracker.freeze()` at the top of
+// `GameAction.checkStateEffects` and the matching `unfreeze()` at the bottom,
+// so every death by lethal damage, every legend-rule sacrifice and every
+// commander going home happens inside the frozen window — while
+// `GameAction.sacrifice`, which is a cost being paid, does not.
+//
+// That is exactly what a real match shows. Two Squirrel Tokens on one board:
+// the one given up as a cost arrived in the graveyard as
+// `"card":"Squirrel Token"`, and the one that died in combat arrived as
+// `"card":"","power":0,"toughness":0,"types":""` one line after a
+// `Battlefield out` that named it in full (Arahbo/Cats against Gyome/Food,
+// seed 11, 2026-08-27: thirteen of that game's twenty-one graveyard arrivals
+// blank, and nineteen of thirty-six across the two games).
+//
+// **Nothing is wrong on the scribe's side and there is nothing for it to
+// send.** It renders the event as itself, which is this package's whole
+// division of labour — the view really was empty at the instant Forge
+// announced the move. Reassembling a card from what came before belongs on
+// this side of the pipe (ADR 14), which is what [ScribeParser.named] does.
+//
+// **The name is the test, and it is deliberately the loose one.** The rest of
+// a frozen line is empty too — every measured one carried no type line and 0/0
+// — so `card == "" && types == ""` would be the tighter rule. It is not used,
+// because the two failures are not the same size: a frozen line this misses
+// puts all three bugs above straight back, and the only thing the loose rule
+// over-catches is a **face-down** card. Forge builds that state as a nameless
+// 2/2 Creature — `CardUtil.getFaceDownCharacteristic` calls `setName("")` on
+// it, which `javap -c` shows plainly — so a morph reads as blank here and this
+// board would go on calling it whatever it was called last. That costs
+// something only for a permanent turned face down *after* being seen face up,
+// which is a card Forge's AI decks do not play; a creature cast face down was
+// never in the dictionary, so nothing is revealed and nothing is drawn, which
+// is what already happened before any of this.
+func blankView(l scribeLine) bool { return l.ID != 0 && l.Card == "" }
+
+// named is the card a beat is about: the line's name when it has one, and the
+// board's when the line's view came back blank.
+//
+// The dictionary is the right second source and not a guess — [board.name]
+// refuses to record an empty name, so an answer from here is one the scribe
+// itself said about this exact id earlier in this exact game. A card the board
+// has never been told about still comes back empty, which is honest: nothing
+// downstream can draw it either.
+func (p *ScribeParser) named(l scribeLine) string {
+	if l.Card != "" {
+		return l.Card
+	}
+	return p.board.nameOf(l.ID)
+}
+
+// seated is the seat a beat belongs to: the line's when it carries one, and
+// the board's when it does not.
+//
+// Two lines arrive without a seat and mean different things by it. A blank
+// view has lost the *whole* card, seat included. And `sacrificed` never
+// carried one at all until the scribe learned to read the controller off the
+// card — so this is also what a worker image built before that change falls
+// back to.
+func (p *ScribeParser) seated(l scribeLine) int {
+	if l.Seat != 0 {
+		return l.Seat
+	}
+	return p.board.seatOf(l.ID)
 }
 
 // outsideTheGame follows a companion, and answers whether this line is the
@@ -730,9 +860,27 @@ func (p *ScribeParser) finishGame(l scribeLine) (*EventLog, *GameResult) {
 // Nothing here is looser than what stood before: the refusals are exactly the
 // ones [isForgeEffect] already made, applied to every line about the card
 // instead of to whichever line happened to carry the fields.
+//
+// # A blank view is not evidence, and it convicted a commander
+//
+// The paragraph above is the rule this file already lived by — *a refusal is a
+// fact about the card* — and a line whose view came back empty ([blankView])
+// carries no fact about the card to judge. It reads as an untyped card in a
+// command zone, which is [isForgeEffect]'s rule exactly, so a **commander**
+// that died and went home was convicted of being one of Forge's own
+// bookkeeping cards and every later line about it was dropped for the rest of
+// the game. Measured: Arahbo, Roar of the World, on the first of two deaths.
+//
+// The memory above still runs first, and has to: a real Forge effect is named
+// on its own first `zone` line, so it is already in `phantoms` long before any
+// blank line about it could arrive. Nothing that was refused stops being
+// refused.
 func (p *ScribeParser) refused(l scribeLine) bool {
 	if l.ID != 0 && p.phantoms[l.ID] {
 		return true
+	}
+	if blankView(l) {
+		return false
 	}
 	if !isForgeEffect(l.Zone, l.Card, l.Types) {
 		return false

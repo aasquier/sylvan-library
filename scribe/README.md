@@ -71,7 +71,7 @@ game (Gyome/Food against Atla/Eggs, seed 11, 2026-08-25):
 | `mulligan` | — | a hand thrown back (neither player did, that game) |
 | `game`, `result` | 2 | the frame around a game |
 | `mana` | — | a seat's whole floating pool, as symbols: `"GGW"`, or `""` |
-| `sacrificed` | — | a permanent its controller sacrificed |
+| `sacrificed` | — | a permanent its controller sacrificed, and which seat that is |
 | `combat_end` | — | Forge saying combat is over |
 | `ability` | — | an ability on the stack: its source, that source's zone, and whether the game raised it |
 
@@ -89,6 +89,28 @@ handlers and never fires in a headless match, so `GameEventCombatEnded` is the
 one here. And Forge's colourless mana is byte 32 (`ManaAtom`) rather than 0
 (`MagicColor`), so asking `MagicColor.COLORLESS` for a count returns zero
 forever and a Sol Ring's mana simply never appears.
+
+**A sacrifice is the one card-shaped event on this bus with no player on it.**
+The record is a bare `(CardView card)`, so every sacrifice crossed this pipe
+unattributed and the far side could only say "Sacrificed" where the rest of the
+account says who did it. The seat is now read off the card's own controller,
+which is not a rules argument but Forge's: `GameAction.sacrifice` calls
+`Card.getController()` and invokes `addSacrificedThisTurn` on that player, one
+instruction before it fires this event.
+
+**A card announced while Forge's tracker is frozen arrives empty**, and that is
+worth knowing before reading a stream and concluding the scribe dropped
+something. `TrackableObject.set` defers a write during a freeze;
+`GameAction.checkStateEffects` freezes the tracker for the whole state-based
+sweep; and `TrackableProperty.Name` respects the freeze with a default of `""`.
+So a creature killed in combat is announced as
+`"card":"","power":0,"toughness":0,"types":""`, one line after a
+`Battlefield out` that named it in full — thirteen of the twenty-one graveyard
+arrivals in one measured game, and nineteen of thirty-six across a two-game
+match. Nothing here can do better: the view *is* empty at that instant, and
+this class renders events as themselves. Putting the card back together is
+Go's job, and `blankView` in `go/internal/sim/tier3/scribe.go` is where it
+happens.
 
 534 lines for a game the prose log told in 453 — but every line is typed, and
 the board is in them. **The `stats` figure is the one to watch.** Before it
