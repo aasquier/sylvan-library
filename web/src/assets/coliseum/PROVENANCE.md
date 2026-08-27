@@ -177,3 +177,17 @@ Why committed rather than hotlinked: The same argument as the skull and the shie
 
 Why committed rather than hotlinked: It arrives in the same breath as the wreath, at the end of a match, and the two are read against each other -- a stone that turns up a beat after the crown has landed does not merely appear late, it breaks the comparison the panel exists to make. That is the gauntlet's argument and it survives the object being swapped. The second reason is the licence: a photograph of an ancient object re-hosted by a third party is precisely the category where somebody else's copy quietly changes terms or moves, and a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end cippus -->
+
+<!-- animist:begin crypta -->
+## crypta.webp
+
+- **Source**: "Roma. Colombari di Vigna Codini Gang, GD010218.jpg", <https://commons.wikimedia.org/wiki/File:Roma._Colombari_di_Vigna_Codini_Gang,_GD010218.jpg>, found via Commons, searching `columbarium Rome niches` and then `Vigna Codini columbarium`, both restricted to bitmaps and filtered to Public domain and CC0 -- an unrestricted search returns almost nothing but scanned nineteenth-century guidebooks, which is the trap `lens.recipe.yaml` records. Searches for catacombs and for tufa galleries returned nothing free and large enough at all. The Met's Open Access API was 403-ing every request from this machine on the day of the build, so it was never asked; the two Rijksmuseum albumen prints of the same chambers are CC0 and are album pages with two small prints to a sheet.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build crypta.recipe.yaml`):
+  - `crop`: frac_box=[0.235, 0.3, 0.752, 0.868].
+  - `resize`: width=520.
+  - Encoded WEBP, quality 78.
+
+Why committed rather than hotlinked: The same argument as the road and the skull beside it. This is drawn on the beat that says a creature died and it is gone two seconds later, so fetching it from somebody else's host would mean a vault that opens after the card has already gone down into it. The second reason is the licence: a scanned glass lantern slide of unknown authorship, re-hosted by a university library and then by Commons, is squarely the category where somebody else's copy quietly changes terms or moves. A copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end crypta -->

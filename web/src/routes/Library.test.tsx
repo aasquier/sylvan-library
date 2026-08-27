@@ -656,6 +656,23 @@ describe('Library, browsing by player', () => {
     expect(screen.getByRole('tab', { name: /other players/i }).textContent).toContain('2')
   })
 
+  it('wraps the strip, so a third shelf can never widen a phone', async () => {
+    // Two tabs and their counts fit a 375px phone with room to spare today,
+    // which is exactly why this is worth a line: the same strip on the deck
+    // page grew to six tabs and pushed 81px of horizontal scroll onto every
+    // page of the site before anybody noticed. One word stops that happening
+    // here, and it costs nothing while there are only two.
+    //
+    // jsdom has no layout, so this holds the class and never the width — see
+    // the note over the matching case in `DeckDetail.test.tsx`.
+    vi.mocked(api.decks).mockResolvedValue(MIXED)
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    const strip = screen.getByRole('tablist', { name: 'Whose decks' })
+    expect(strip.className).toContain('flex-wrap')
+    expect(strip.className).toContain('flex ')
+  })
+
   it('keeps the filters working inside a group', async () => {
     vi.mocked(api.decks).mockResolvedValue([
       ...MIXED,

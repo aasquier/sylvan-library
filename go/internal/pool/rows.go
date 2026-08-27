@@ -15,7 +15,7 @@ var OracleColumns = []string{
 	"layout", "card_faces", "reserved", "edhrec_rank", "released_at",
 	"set_code", "scryfall_uri", "image_normal", "image_art_crop",
 	"power", "toughness", "loyalty", "defense", "game_changer",
-	"flavor_text", "artist",
+	"flavor_text", "artist", "all_parts",
 }
 
 var PrintingColumns = []string{
@@ -76,6 +76,10 @@ func OracleRow(c map[string]any) []any {
 		// an absent game changer is not a game changer.
 		truthy(c["game_changer"]),
 		asStr(front(c, "flavor_text")), asStr(front(c, "artist")),
+		// Top level, never `front`: what a card relates to belongs to the
+		// card, not to the face you cast it from. A transforming
+		// planeswalker's tokens are listed once, for the whole card.
+		jsonOrNull(c["all_parts"]),
 	}
 }
 
@@ -172,6 +176,26 @@ func jsonText(v any, empty string) any {
 	raw, err := json.Marshal(v)
 	if err != nil {
 		return empty
+	}
+	return string(raw)
+}
+
+// jsonOrNull is [jsonText]'s sibling for a document most cards do not have:
+// absent stays NULL rather than becoming an empty list.
+//
+// `card_faces` gets `[]` because "this card has no faces" is a statement about
+// every card; `all_parts` gets NULL because relating to nothing is the normal
+// case and NULL is the cheaper and truer spelling of it. It also leaves the
+// frozen refresh corpus comparing equal without being regenerated: none of
+// those recorded cards carries `all_parts`, and NULL is what they always
+// said.
+func jsonOrNull(v any) any {
+	if v == nil {
+		return nil
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil
 	}
 	return string(raw)
 }

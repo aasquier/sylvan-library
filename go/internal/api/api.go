@@ -309,9 +309,10 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/cards/search", Handler: a.search},
 		{Method: http.MethodPost, Pattern: "/api/cards/identify", Handler: a.identify},
 		// The deck reads (the third family): the shelf, the deck, the gate's
-		// verdict, the analysis, the suggestions, the commander's panel, the
-		// printings, the history, the artifacts shelf -- every one resolved
-		// through `Library` (ADR 22) -- and the 32 Deck Challenge's score.
+		// verdict, the analysis, the suggestions, the tokens the deck makes,
+		// the commander's panel, the printings, the history, the artifacts
+		// shelf -- every one resolved through `Library` (ADR 22) -- and the
+		// 32 Deck Challenge's score.
 		{Method: http.MethodGet, Pattern: "/api/decks", Handler: a.listDecks},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}", Handler: a.getDeck},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/validate", Handler: a.validateDeck},
@@ -319,6 +320,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/suggestions", Handler: a.suggestions},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/wheel", Handler: a.deckWheel},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/opening-hand", Handler: a.deckOpeningHand},
+		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/tokens", Handler: a.deckTokens},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/commander", Handler: a.commanderDossier},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/printings", Handler: a.commanderPrintings},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/log", Handler: a.deckLog},

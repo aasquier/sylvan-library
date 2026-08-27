@@ -6,8 +6,10 @@
  * finished being read — and until now the Coliseum drew nothing at all for it,
  * because the board draws permanents and a board is a place that holds what
  * stays (Aaron, 2026-08-26: *"there is nothing to mark their existence in the
- * coliseum"*). So every cast gets a moment in the middle of the sand, and a
- * creature that dies gets the same moment with the skull played over it.
+ * coliseum"*). So every cast gets a moment in the middle of the sand; a
+ * creature that dies gets the same moment with the stone played over it and a
+ * Roman burial vault opening behind it; and a permanent that is exiled gets it
+ * with a road out of the city under it.
  *
  * **And the plate under it is a sentence about a player**, which is the second
  * ask and the one that decided the shape of everything below (Aaron,
@@ -61,17 +63,21 @@ import { beatDelay, type Speed } from './reel'
 /**
  * What is happening to the card on the stage.
  *
- * Two of these are drawn today and two are named in this comment without being
- * drawn, which is deliberate rather than unfinished: **the shape of the data
- * they need is the thing that is missing, and guessing at it in a browser
- * would be the room claiming a mechanic happened when nothing told it so.**
+ * Every one of these is drawn today, and three more are named in this comment
+ * without being drawn, which is deliberate rather than unfinished: **the shape
+ * of the data they need is the thing that is missing, and guessing at it in a
+ * browser would be the room claiming a mechanic happened when nothing told it
+ * so.**
  *
  * - `cast` — every spell, from Sol Ring to the sorcery that wins the game.
  *   Forge's `GameEventSpellAbilityCast`, filtered to spells, already crosses as
  *   a `cast` beat carrying the card's name.
  * - `dies` — a creature leaving the battlefield for a graveyard. Already on the
  *   wire, and already drawn twice elsewhere: the skull on the card in its row,
- *   the ghost rising off the graveyard pile. This is the middle of that.
+ *   the ghost rising off the graveyard pile. This is the middle of that, and
+ *   since 2026-08-27 it is the *place* as well as the event — the vault the
+ *   card goes down into, which `components/stage.tsx`'s `StageCrypt` argues
+ *   alongside the question of whether the stone should have given way to it.
  * - `exiled` — a permanent leaving the battlefield for exile. `dies`'s twin,
  *   and it arrived for the same reason: a great deal of Commander's removal
  *   exiles rather than destroys, and a Path to Exile used to take a creature
@@ -102,6 +108,21 @@ import { beatDelay, type Speed } from './reel'
  *
  * Not yet, and what each would need:
  *
+ * - **an arrival nobody cast** — a reanimation, a blink, a Collected Company,
+ *   or an Atla Palani Egg dying and putting a Blightsteel Colossus onto the
+ *   battlefield. `made` above answers the *token* half of Aaron's *"same thing
+ *   for Enters the Battlefield"*; this is the other half, and it is the half a
+ *   newcomer most needs, because a creature appearing with nothing said about
+ *   it is the one arrival they cannot account for. The `enters` beat already
+ *   exists and already names the card. What is missing is the bit that
+ *   separates it from the resolve: **the beat saying that nothing cast this**.
+ *   `card.token` settles the token half only because the scribe put that flag
+ *   on the wire; nothing on the wire settles this one. The scribe knows — it
+ *   saw, or did not see, the cast for that same id — and the browser cannot
+ *   work it out, because a stage item is built from one beat and this file is
+ *   deliberately not handed the history. Without it the only honest choice is
+ *   every non-token arrival or none, and [mannerOf] carries the counts that
+ *   make "every" the wrong one.
  * - **populate** — Forge's token-created event is a bare signal with no fields,
  *   so a populated copy is indistinguishable from any other token entering
  *   play. It needs a beat naming **the card being copied**, and saying that a
@@ -148,6 +169,50 @@ export type Manner = 'cast' | 'made' | 'attach' | 'sacrificed' | 'dies'
  *   **A card whose type line the match never recorded is left alone**, because
  *   the room would be choosing between two drawings on no evidence, and
  *   silence is what it already does with everything it was not told.
+ * ## The arrival that nobody cast, and why it is still missing
+ *
+ * Aaron, 2026-08-27, in the same breath as the crypt: *"Same thing for
+ * 'Enters the Battlefield', we should be able to find something cool. A free
+ * use painting or picture of a battle before us, like down in a valley...?"*
+ * The token half of that ask is the `made` row above. The other half is not
+ * built, and the reason was measured rather than guessed at — five games
+ * across three matches, counting what `enters` actually carries.
+ *
+ * **How often it fires is a fact about the deck, not about the beat.** Gyome,
+ * whose whole engine makes Food, raised 36 and 42 arrivals against 14 and 15
+ * casts — and *clumped*, one turn raising fourteen of them and another
+ * seventeen. Arahbo against Atla Palani, neither leaning on a token engine,
+ * raised 5 and 9 against 5 and 11. So a scene on *every* arrival is a strobe
+ * in some decks and unremarkable in others, which is a reason to be careful
+ * rather than a reason to refuse.
+ *
+ * What refuses it is the rule directly above: almost every arrival that is not
+ * a token was **cast one or two beats earlier and drawn then**, so a scene on
+ * it is the resolve, drawn twice.
+ *
+ * **Almost.** A first pass of this paragraph said that category was empty and
+ * was wrong: a third match turned up four arrivals in a single game that
+ * nothing had cast — a Blightsteel Colossus, an Emrakul, a Bonehoard
+ * Dracosaur and a Craterhoof Behemoth, all off Atla Palani, Nest Tender, whose
+ * Eggs dying *"reveal cards from the top of your library until you reveal a
+ * creature card. Put that card onto the battlefield"*. A reanimation, a blink
+ * and a Collected Company are the same shape. A newcomer watching an Emrakul
+ * appear out of nothing has exactly the question this room exists to answer,
+ * and that is the beat the valley belongs to.
+ *
+ * **It is unbuildable from here rather than refused**, which puts it with
+ * `populate` and `eminence` above and not with `land` and `resolve` below.
+ * `card.token` settles the token half because the scribe put that flag on the
+ * wire; nothing on the wire settles the other half. The beat carries a name, a
+ * seat and a turn, and [Staged] is built from one beat with no history to
+ * scan. What it needs is the beat itself saying **nothing cast this** — which
+ * the scribe knows, having seen or not seen the cast for that same id. Given
+ * that, it is one row in [Manner], one in [PLATE], one in `STAGE_LIFE` and a
+ * scene: a field seen from above.
+ *
+ * Two narrower cuts were considered and stay rejected. *Only creatures* is
+ * still mostly the resolve. *The first each turn* is a rule nobody could learn
+ * by watching, which is commandment 2 backwards.
  */
 export function mannerOf(kind: string, card?: ForgeBoardCard | null):
   Manner | null {
