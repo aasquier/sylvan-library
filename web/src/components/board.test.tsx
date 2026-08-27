@@ -2163,6 +2163,13 @@ const TURNED: ForgeBoard = {
     // No keywords of its own. Everything it has, something else is giving it.
     { id: 63, name: 'Regal Caracal', types: 'Creature - Cat', seat: 2,
       image: 'https://example.test/caracal.jpg' },
+    // And one wearing both kinds at once, which is the case the plates have to
+    // separate. Leonin Skyhunter prints flying and nothing else; Kaheera gives
+    // every other Cat vigilance, so a Skyhunter standing beside her has one of
+    // each. Both card facts checked against the pool, not remembered.
+    { id: 64, name: 'Leonin Skyhunter', types: 'Creature - Cat Knight',
+      seat: 2, image: 'https://example.test/skyhunter.jpg',
+      keywords: ['Flying'] },
   ],
   steps: [
     { turn: 6, seat: 1, changes: [
@@ -2173,6 +2180,8 @@ const TURNED: ForgeBoard = {
         counters: [{ kind: '+1/+1', n: 2 }] })),
       { id: 63, zone: 'battlefield', seat: 2, power: 3, toughness: 3,
         live: ['Vigilance'], granted: ['Vigilance'] },
+      { id: 64, zone: 'battlefield', seat: 2, power: 3, toughness: 3,
+        live: ['Flying', 'Vigilance'], granted: ['Vigilance'] },
     ] },
   ],
 } as unknown as ForgeBoard
@@ -2275,6 +2284,71 @@ it('wears a keyword something else is giving it, and names no giver', () => {
   expect(gwyn.querySelectorAll('.field-keyword'),
     'vigilance and menace, off the printing, with no live set sent')
     .toHaveLength(2)
+})
+
+it('strikes a lent keyword on the other plate, and still names no giver', () => {
+  // **A granted mark used to be the same picture as a printed one.** The board
+  // had learned to draw what a creature has *now* and could not then tell you
+  // that half of it was on loan (Aaron, 2026-08-27). `.is-granted` is what
+  // separates them, and the stylesheet swaps the plate and the ink under it —
+  // brass on dark becomes dark on brass. **jsdom has no layout and no
+  // stylesheet** (`index.css?raw` is `""` here), so what a test can hold is
+  // that the class lands on the right mark and only that one. Whether the swap
+  // reads at ten pixels is Aaron's walk, not this suite's.
+  const { container } = turned()
+  const cat = container.querySelector('img[alt="Leonin Skyhunter"]')
+    ?.closest('.field-card') as HTMLElement
+  const marks = [...cat.querySelectorAll('.field-keyword')]
+  expect(marks.map((m) => m.getAttribute('title')),
+    'flying is printed on the Skyhunter; the vigilance is Kaheera’s')
+    .toEqual(['flying', 'vigilance (granted)'])
+  expect(marks.filter((m) => m.classList.contains('is-granted')).length,
+    'exactly one of the two marks stands on the other plate').toBe(1)
+  expect(marks[1]?.classList.contains('is-granted')).toBe(true)
+
+  // **The words carry the same distinction, and name nobody.** Forge sends no
+  // source for a granted keyword, so there is nothing to name and inventing
+  // one would be the board making a reading of the game (Aaron: *"we don't
+  // need to say who granted the ability if it is not traceable"*). Said once
+  // on the mark a pointer rests on, and again in the card's own sentence.
+  const band = cat.querySelector('.field-keywords')
+  expect(band?.getAttribute('title')).toBe('flying, vigilance (granted)')
+  expect(cat.getAttribute('title')).toContain('flying, vigilance (granted)')
+  for (const giver of ['Kaheera', 'Gwyn', 'Caracal', 'from']) {
+    expect(band?.getAttribute('title'), `the band names a giver: ${giver}`)
+      .not.toContain(giver)
+    expect(cat.getAttribute('title'), `the card names a giver: ${giver}`)
+      .not.toContain(giver)
+  }
+})
+
+it('hangs a turned card’s crown and its marks off the same arm', () => {
+  // **The crown is the one chip that sits outside the card**, half off the top
+  // edge — a free lane while the card is upright and the *neighbour's* while it
+  // is turned. At forty-five degrees it swung a third of a card's width right
+  // and landed on the next creature's keyword marks: 7.6 × 17 pixels, measured
+  // on a real board. Same family as the counters above, same cause.
+  //
+  // It moves to the card's own top-left corner — the top of the diamond, where
+  // a crown belongs on a leaning head — and the keyword band steps down out
+  // from under it. Both rules reach through `.field-card-arm >`, and both key
+  // on `.is-tapped` plus `.is-commander`/`.is-companion`, so what a test can
+  // hold is exactly that: the classes are on the card and the two chips are
+  // direct children of the arm. Wrap either one in anything and the placement
+  // silently stops applying, with jsdom reporting nothing at all because there
+  // are no positions here. The clearance itself is Aaron's walk.
+  const { container } = turned()
+  const gwyn = container.querySelector('img[alt="Syr Gwyn, Hero of Ashvale"]')
+    ?.closest('.field-card') as HTMLElement
+  expect(gwyn.classList.contains('is-tapped')).toBe(true)
+  expect(gwyn.classList.contains('is-commander')).toBe(true)
+  const arm = gwyn.querySelector('.field-card-arm') as HTMLElement
+  for (const chip of ['.field-card-crown', '.field-keywords']) {
+    const el = arm.querySelector(chip)
+    expect(el, `no ${chip} on the turned commander`).toBeTruthy()
+    expect(el?.parentElement, `${chip} is not a direct child of the arm`)
+      .toBe(arm)
+  }
 })
 
 it('gives the commander a face for the light to walk round', () => {
