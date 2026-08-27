@@ -8417,6 +8417,14 @@ button:hover .tarot-fan-card {
     font-size: 0.52rem;
   }
   .field-tax svg { width: 10px; }
+  /* **And on a phone there is nowhere to lift it to.** The tile is 38 tall
+     here, the label claims eleven of that and the count bar eighteen, so the
+     nine pixels between them cannot hold a price at all — lifting it clear of
+     the bar would land it on the label instead. So it stands back down on the
+     bar, which is exactly where it stood before any of this: a number partly
+     covered is a smaller loss than a price over a painting, and this is the
+     legacy pile for a board whose seats were never named. */
+  .field-pile:has(.field-pile-n) .field-tax { bottom: 3px; }
 }
 
 .field-pile-n {
