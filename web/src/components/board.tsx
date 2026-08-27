@@ -64,7 +64,7 @@ import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
-  foldBoard, sameCard, stackRow } from '../lib/board'
+  alignLanes, foldBoard, sameCard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
@@ -1025,7 +1025,7 @@ function FieldCard({ card, count, inPlay = false }: {
  * grows keeps its element, so its count animates instead of the row rebuilding
  * itself every time a land comes down.
  */
-function FieldRow({ label, cards, empty, lane }: {
+function FieldRow({ label, cards, empty, lane, slots }: {
   label: string
   cards: BoardCard[]
   /** Which of the three this is. Only the stylesheet reads it, and it reads it
@@ -1038,8 +1038,16 @@ function FieldRow({ label, cards, empty, lane }: {
    *  three of them and they are always all three drawn, so "the lane is not
    *  there" stopped being a state a lane can be in. See `FieldSide`. */
   empty: string
+  /** The lane already laid out in slots, when somebody upstairs has arranged
+   *  it — the creature lanes during a combat, and nothing else.
+   *
+   *  **A `null` is a slot deliberately left empty**, which is a thing only the
+   *  creature lanes can be: `alignLanes` slides a blocker under the attacker it
+   *  stopped and leaves sand where it came from. Absent here means "stack this
+   *  lane yourself", which is what the other four lanes always want. */
+  slots?: (BoardStack | null)[]
 }) {
-  const stacks = stackRow(cards)
+  const stacks: (BoardStack | null)[] = slots ?? stackRow(cards)
   return (
     // A fixed height, and it never wraps — which together are what make the
     // board one size. A lane handed more than it has room for scrolls; see the
@@ -1047,13 +1055,21 @@ function FieldRow({ label, cards, empty, lane }: {
     // and what it cost to find that out.
     <div className={`field-row field-row-${lane}`}
          aria-label={`${label}: ${cards.length}`}>
-      {stacks.length === 0 ? (
+      {cards.length === 0 ? (
         <span className="field-row-empty">{empty}</span>
-      ) : stacks.map((stack) => (
-        // The only three lanes a permanent actually stands in. Everything
-        // else that draws a `FieldCard` is a card somebody is holding, or has
-        // already lost, or is being shown one of in a tray.
-        <FieldGeared key={stack.card.id} stack={stack} />
+      ) : stacks.map((stack, slot) => (
+        stack ? (
+          // The only three lanes a permanent actually stands in. Everything
+          // else that draws a `FieldCard` is a card somebody is holding, or has
+          // already lost, or is being shown one of in a tray.
+          <FieldGeared key={stack.card.id} stack={stack} />
+        ) : (
+          // **Sand where a blocker used to stand.** It holds a card's width so
+          // that the slot on the other side of the trench stays opposite the
+          // card it belongs to; keyed on the slot because that is the only
+          // identity an empty space has.
+          <span key={`gap${slot}`} className="field-slot" aria-hidden="true" />
+        )
       ))}
     </div>
   )
@@ -1552,6 +1568,20 @@ function FieldGeared({ stack }: {
 const COMPANION_SHARE = 0.72
 
 /**
+ * How many tiles' worth of rail one seat's command zone takes.
+ *
+ * **Extracted because two places have to agree about it and they are in
+ * different components.** `FieldZones` sizes the zone's own frame from it; the
+ * arena sizes *both halves' lane columns* from the larger of the two, which is
+ * the whole of the fix below. Written once, so a third commander arrangement
+ * cannot widen one and not the other.
+ */
+function commandSeats(side: BoardSide): number {
+  const chairs = Math.max(1, side.thrones.length + (side.thrones.length ? 0 : 1))
+  return chairs + (side.companion ? COMPANION_SHARE : 0)
+}
+
+/**
  * The three closed zones, in the corner of the half they belong to.
  *
  * **They used to be a band under the arena** — two stone panels holding a
@@ -1655,8 +1685,7 @@ function FieldZones({ side, facing }: {
   // just be in the main command zone to the side"*). It is in this zone — it
   // really does sit there — so it belongs inside the zone's own frame, at the
   // side, in a slot narrower than the places the commanders keep.
-  const chairs = Math.max(1, side.thrones.length + (unseated ? 1 : 0))
-  const seats = chairs + (side.companion ? COMPANION_SHARE : 0)
+  const seats = commandSeats(side)
   return (
     <div className={`field-zone-l field-zone-l-${facing}`}
          aria-label="Zones off the battlefield">
@@ -1726,6 +1755,53 @@ function FieldZones({ side, facing }: {
                    zone="exile" />
       </span>
     </div>
+  )
+}
+
+/**
+ * The arrows across the trench, one per clash.
+ *
+ * **Lining the two lanes up says a pair are opposite each other; it does not
+ * say they are fighting** (Aaron, 2026-08-27: *"draw stylized arrows attacker
+ * -> blocker"*). Two creatures standing across a seam wide enough to hold the
+ * scoreboard is what every creature on the board is doing. The arrow is the
+ * sentence.
+ *
+ * **Drawn in the trench, positioned by arithmetic.** It has to cross from one
+ * lane to the other, and a lane cannot lend it the room: `.field-row` scrolls
+ * sideways for a board with more creatures than fit, and `overflow-x: auto`
+ * quietly means `overflow-y: auto` too — the same rule that once clipped a
+ * 272px card preview out of a 42px row. So the arrows live in the seam, which
+ * spans the same column as both halves, and reach a slot the way the lane's
+ * own grid does: the half's padding, the lane's clearance for a turned card,
+ * then one pitch per slot. Those three numbers are named on `.field` so that
+ * this and the lanes cannot drift apart.
+ *
+ * It points *from* the attacker, so it runs down out of the far half or up out
+ * of the near one — `alignLanes` says which, because it is the half that is
+ * swinging that decides.
+ */
+function CombatArrows({ slots, from }: {
+  slots: number[]
+  from: 'far' | 'near'
+}) {
+  return (
+    <span className={`field-arrows is-from-${from}`} aria-hidden="true">
+      {slots.map((slot) => (
+        // Keyed on the slot, which is the only identity a clash has: the same
+        // creature blocking again next turn is a different arrow and should
+        // arrive again rather than sit there already-arrived.
+        <span key={slot} className="field-arrow"
+              style={{ '--slot': slot } as CSSProperties}>
+          {/* **The fletching, at the attacker's end.** Two pseudo-elements were
+              already spent on the haft and the head, and the flights are what
+              make the silhouette an *arrow* rather than a spear — so they get
+              an element. It is the tail, so it is the one part that never
+              points at anything. */}
+          <span className="field-arrow-fletch" />
+        </span>
+      ))}
+    </span>
   )
 }
 
@@ -2010,13 +2086,20 @@ function FieldHand({ side, name, facing, speed, at }: {
  * other side of a real table. The hand is no longer among these rows — it is
  * held at the side (`FieldHand` above).
  */
-function FieldSide({ side, facing, active }: {
+function FieldSide({ side, facing, active, creatures }: {
   side: BoardSide
   facing: 'far' | 'near'
   /** Whether it is this seat's turn. Neither half is lit before the first
    *  turn has begun, which is a true thing to say about that moment rather
    *  than a gap to fill. */
   active: boolean
+  /** This half's creature lane, already arranged against the other half's.
+   *
+   *  **Decided upstairs, because it cannot be decided here.** Lining a blocker
+   *  up under its attacker is a fact about *both* seats, and a component that
+   *  can only see one of them has no way to reach it — which is why this is a
+   *  prop rather than a call. `alignLanes` does the arranging. */
+  creatures: (BoardStack | null)[]
 }) {
   // **Three lanes, always three, the same three every game** (Aaron,
   // 2026-08-27: *"keep the board the same size universally, enough for three
@@ -2052,7 +2135,7 @@ function FieldSide({ side, facing, active }: {
               label="Artifacts, enchantments and planeswalkers"
               cards={middle} empty="nothing else in play" />,
     <FieldRow key="crea" lane="creatures" label="Creatures"
-              cards={side.creatures} empty="no creatures" />,
+              cards={side.creatures} slots={creatures} empty="no creatures" />,
   ]
   return (
     // **The crowns are provided here and nowhere higher**, because a card is
@@ -2300,7 +2383,47 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // written down there a second time. It rides `.field-stage` because that is
   // the one box containing both the arena and the zones beside it, and the
   // ghost rising off a graveyard is timed by the same death that put it there.
+  // **One origin for both halves' lanes, and it is the wider corner that sets
+  // it.**
+  //
+  // The half is a two-column grid — lanes, then the closed-zone cluster — and
+  // the cluster's column was `auto`, so it was as wide as whatever happened to
+  // be in it. A companion adds 0.72 of a tile to the command zone, which at 78
+  // pixels is **56**, so a deck running one drew its own lanes 56px narrower
+  // than the deck across the seam (Aaron, 2026-08-27). Nothing was wrong with
+  // either half on its own; they simply did not agree, and two creature rows
+  // that have to line up across the trench cannot start in different places.
+  //
+  // So the column is sized from the *larger* of the two clusters and both
+  // halves are given it. The half that needs less keeps its cluster at its own
+  // size and hugs the outer edge — see `justify-self` in the stylesheet — and
+  // the slack becomes sand in the corner nobody plays in, which is where the
+  // cluster was put for exactly that reason.
+  //
+  // Computed above the empty-board guard below, so both seats are optional
+  // here; one is enough to size a column and neither is a legible board.
+  const zoneSeats = Math.max(far ? commandSeats(far) : 1,
+    near ? commandSeats(near) : 1)
+
+  // **The two front lines, arranged against each other.**
+  //
+  // Both creature lanes were packed left, so a blocker four cards along stood
+  // opposite an attacker it had nothing to do with — and the seam between them
+  // is wide enough to hold the scoreboard, so "who is fighting whom" was a
+  // question you answered by hovering (Aaron, 2026-08-27). `alignLanes` slides
+  // each blocker under the attacker it stopped and leaves everything else
+  // exactly where it was.
+  //
+  // **Here rather than in `FieldSide`**, because it is the one fact on this
+  // board that belongs to both seats at once: a component that can see one half
+  // cannot line it up against the other. Outside a combat it hands both lanes
+  // straight back, so this costs a `some` per beat and nothing else.
+  const lanes = alignLanes(
+    stackRow(far?.creatures ?? []), stackRow(near?.creatures ?? []),
+    [...far?.creatures ?? [], ...near?.creatures ?? []])
+
   const lives = {
+    '--zone-seats': zoneSeats,
     '--mark-life-attacks': `${markLife('attacks', speed)}ms`,
     '--mark-life-blocks': `${markLife('blocks', speed)}ms`,
     '--mark-life-dies': `${markLife('dies', speed)}ms`,
@@ -2383,7 +2506,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)}
                  speed={speed} at={shown} />
 
-      <FieldSide side={far} facing="far" active={lit === 'far'} />
+      <FieldSide side={far} facing="far" active={lit === 'far'}
+                 creatures={lanes.far} />
 
       {/* **The seam: in the real building, the trench the lifts came up
           through — and now the board's scoreboard as well.**
@@ -2396,6 +2520,14 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           a person glances up to check, on the one strip both players are
           already looking at. `FieldPlate` argues the anchoring. */}
       <div className="field-seam">
+        {/* **First child, so it paints under the plates and over the stone.**
+            An arrow crossing the trench passes *behind* the two name plates and
+            the turn, which is what a thing crossing a room does — and putting
+            it above them would run a red line through the one number both
+            players glance at. */}
+        {lanes.attacker && lanes.clashes.length > 0 && (
+          <CombatArrows slots={lanes.clashes} from={lanes.attacker} />
+        )}
         <FieldPlate side={far} facing="far" name={farName} />
         <span className="field-seam-turn tabular">
           {/* **The light says which half; this says it in a second way.**
@@ -2417,7 +2549,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         <FieldPlate side={near} facing="near" name={nearName} />
       </div>
 
-      <FieldSide side={near} facing="near" active={lit === 'near'} />
+      <FieldSide side={near} facing="near" active={lit === 'near'}
+                 creatures={lanes.near} />
 
       <FieldHand side={near} facing="near" name={nearName}
                  speed={speed} at={shown} />
