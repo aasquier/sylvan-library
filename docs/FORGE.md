@@ -55,7 +55,7 @@ what it costs and why it is never on by default.
 
 ## What the bridge had to work around
 
-Six things, each established by running Forge rather than by reading its wiki.
+Seven things, each established by running Forge rather than by reading its wiki.
 
 **`sim` still initialises AWT, and dies silently without a display.** Found on
 the first live worker machine (2026-08-20): `forge.view.Main` touches fonts
@@ -133,6 +133,45 @@ tell. So coverage is checked twice, by two independent routes:
   otherwise look perfectly normal.
 
 All six curated decks pass the pre-flight with no missing cards.
+
+**Forge's view layer is frozen while state-based actions run, and a card
+announced inside that window arrives blank.** The seventh, and the one that
+looked like a Forge bug and is not. `TrackableObject.set` defers a write while
+`Tracker.isFrozen()` and the property is `RespectsFreeze`; `javap -c` puts
+`Tracker.freeze()` at the top of `GameAction.checkStateEffects` and its
+`unfreeze()` at the bottom. `TrackableProperty.Name` respects the freeze and
+its default value is the **empty string** — asked of the enum on 2.0.14 rather
+than inferred — so a card that leaves the battlefield inside the sweep is
+announced with no name, no type line and 0/0.
+
+Measured on one real match (Arahbo/Cats against Gyome/Food, seed 11,
+2026-08-27): **thirteen of the first game's twenty-one graveyard arrivals were
+blank**, nineteen of thirty-six across both games, and the line before each one
+named the same id in full. Which path a card took is the
+whole difference — two Squirrel Tokens on that board, and the one given up as a
+*cost* arrived named while the one that died in *combat* arrived blank, because
+`GameAction.sacrifice` is not inside the freeze and `checkStateEffects` is.
+
+Nothing is wrong on the scribe's side and there is nothing for it to send: the
+view really is empty at the instant Forge announces the move, and the scribe
+renders events as themselves. The reassembly is Go's (ADR 14) — `blankView` in
+`sim/tier3/scribe.go` is the rule, and the three things that went wrong while a
+blank line was believed are written up beside it. The worst of them is worth
+repeating here, because it was invisible: a **commander** that dies goes home to
+the command zone, that arrival is blank, and `Command` plus an empty type line
+is exactly the shape of one of Forge's own bookkeeping effects — so the
+commander was blacklisted and vanished from the board for the rest of the game.
+
+**A sacrifice carries no player, and the controller is Forge's own answer.**
+`GameEventCardSacrificed` is the only card-shaped event on the bus whose record
+is a bare `(CardView card)`. `javap -c` on `GameAction.sacrifice` settles who
+did it without a rules argument: Forge loads the card, calls
+`Card.getController()`, and invokes `addSacrificedThisTurn` **on that player** —
+so the controller is the seat, and the owner would be the wrong answer for a
+stolen permanent. The card handed to the event is the last-known-battlefield
+copy, so reading `getController()` off the view gives the controller it had
+while it was still in play. Measured: three sacrifices in one game, three
+correct seats.
 
 ## Narrating a game
 

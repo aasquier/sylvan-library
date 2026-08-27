@@ -583,6 +583,28 @@ func (b *board) name(id int, card, types string, token bool, seat int) {
 	b.types[id] = types
 }
 
+// nameOf is what this board calls a card, or the empty string for one it has
+// never been told about.
+//
+// The dictionary's answer rather than the line's, for [board.isToken]'s reason
+// and one more: a line can arrive carrying *no* name for a card this board has
+// been drawing all game. See [ScribeParser.named], which is the only caller
+// and holds the measurement.
+func (b *board) nameOf(id int) string {
+	at, seen := b.known[id]
+	if !seen {
+		return ""
+	}
+	return b.cards[at].Name
+}
+
+// seatOf is whose card this is, or zero for one this board has never placed.
+//
+// Kept current by [board.moved] — a permanent that changes controller changes
+// seats here — so it is the controller now rather than whoever cast it. See
+// [ScribeParser.seated].
+func (b *board) seatOf(id int) int { return b.seat[id] }
+
 // isToken is whether a card is a token, asked of the dictionary rather than of
 // the line — a `stats` or `counters` line carries the flag too, but a `zone`
 // line for a token Forge has already named does not have to, and the answer

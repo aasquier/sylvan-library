@@ -326,10 +326,36 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
      * separately announced anywhere. Rather than guess a word from the
      * circumstances, this reports the one Forge actually names and the board
      * says nothing about the rest (ADR 44).
+     *
+     * **The seat is the card's controller, and that is Forge's own answer
+     * rather than a rules argument.** This event is the one card-shaped event
+     * on the bus with no player component at all — the record is
+     * `(CardView card)` and nothing else — so a sacrifice arrived with no seat
+     * on it and the far side could only say "Sacrificed" where every other beat
+     * says who. On a two-player board that is a fact nobody can attribute, and
+     * in a Food deck it is most of what happens.
+     *
+     * `javap -c` on `GameAction.sacrifice` settles which player it is:
+     * immediately before firing this, Forge loads the card, calls
+     * `Card.getController()`, and invokes `addSacrificedThisTurn` **on that
+     * player** — so the controller is the seat by Forge's own reckoning, and
+     * `getOwner()` would part company with it the moment somebody sacrifices a
+     * permanent they stole. Rule 701.17a says the same thing.
+     *
+     * Read off the view rather than off the model, because the view is all this
+     * event carries — and safely: the card it hands over is the *last known
+     * battlefield* copy (`AbilityKey.LastStateBattlefield`, also in that
+     * bytecode), so its `Controller` is the one it had while it was still in
+     * play. Measured on a real match: three sacrifices, three seats, each the
+     * player who paid the cost.
      */
     @Override
     public Void visit(GameEventCardSacrificed event) {
-        return card(new Json("sacrificed").put("game", game), event.card());
+        CardView card = event.card();
+        if (card == null) return null;
+        Json line = new Json("sacrificed").put("game", game);
+        who(line, card.getController());
+        return card(line, card);
     }
 
     /**
@@ -654,6 +680,26 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
      * a board has to tell them apart, and Forge numbers every card in a game.
      * `isToken` rides along because a token's id is real but its card is not,
      * and a consumer resolving names to art must know not to look one up.
+     *
+     * **"As much as the view will say" is sometimes nothing at all**, and that
+     * is a real state of Forge rather than a fault here. `TrackableObject.set`
+     * defers a write while `Tracker.isFrozen()` and the property is
+     * `RespectsFreeze`; `GameAction.checkStateEffects` freezes the tracker for
+     * the whole state-based sweep; and `TrackableProperty.Name` respects the
+     * freeze and defaults to the empty string — asked of the enum on 2.0.14,
+     * because a story this shape is exactly the sort to be sure about. So a
+     * creature killed in combat is rendered
+     * `"card":"","power":0,"toughness":0,"types":""` one line after a
+     * `Battlefield out` that named it in full, and a commander going home is
+     * rendered the same way. Thirteen of twenty-one graveyard arrivals in a
+     * measured game (Arahbo/Cats against Gyome/Food, seed 11, 2026-08-27).
+     *
+     * Nothing is done about it here, deliberately. The view is genuinely empty
+     * at the instant Forge announces the move, this class renders events as
+     * themselves, and filling the name in from [#seen] would be this listener
+     * reconstructing state — which is the one thing the top of this file says
+     * it never does. The far side is holding what the card was; `blankView` in
+     * `go/internal/sim/tier3/scribe.go` is where it puts it back.
      */
     private Void card(Json line, CardView card) {
         return card(line, card, false);
