@@ -671,6 +671,41 @@ function FieldCard({ card, count, inPlay = false }: {
   // Not on a card in a hand, for `inPlay`'s reason: a card that is not on the
   // battlefield is not tapped for anything.
   const makes = inPlay && card.tapped ? producedColors(card.makes) : []
+  /**
+   * **What this creature can do, rather than what its printing says.**
+   *
+   * The marks were drawn from `card.keywords`, which is the *printing* — the
+   * same list for every copy of the card and, in a format built on standing
+   * next to things, routinely not what the creature in front of you has. A
+   * Beast standing beside Kaheera has vigilance and its printing does not
+   * mention it, so the board drew nothing (Aaron, 2026-08-27: *"I still don't
+   * see an icon being displayed on cards for a bestowed ability, like Kaheera
+   * gives the other cats vigilance"*). `BoardCard.live` is that instance's own
+   * set, granted ones included, worked out on the server.
+   *
+   * **The fallback is not belt-and-braces.** `live` is published the first time
+   * the game says anything about a card that has any keywords and never for one
+   * that has none, so an empty `live` is two different facts: a creature with
+   * nothing, and a creature nothing has been said about yet. Falling back to
+   * the printing plus what was granted is right for both — it is what was drawn
+   * before this line existed, so nothing a board used to show can go missing on
+   * the way through, and the granted set still gets drawn on the way past.
+   *
+   * What it does not do is take a keyword *away*: a creature that has lost its
+   * last printed keyword publishes an empty `live` and falls into the same
+   * branch. That is exactly what the board did before, so it is unfixed rather
+   * than broken — and it is only reachable at all on a card the game has said
+   * nothing else about.
+   */
+  const worn = card.live.length > 0
+    ? card.live : [...card.keywords, ...card.granted]
+  // Which of them something else is giving it, in the spelling
+  // `drawableKeywords` answers in. **That a keyword was granted, and never by
+  // what** — Forge carries no source for one, so `BoardCard.granted` is the
+  // whole of what may be said and a giver may not be implied anywhere: not
+  // here, not in a mark, not in a label (Aaron, 2026-08-27: *"we don't need to
+  // say who granted the ability if it is not traceable"*).
+  const lent = new Set(card.granted.map((k) => k.toLowerCase()))
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
@@ -686,7 +721,14 @@ function FieldCard({ card, count, inPlay = false }: {
     // while the permanent is turned — see `BoardCard.makes`. A creature can be
     // turned because it attacked, and this sentence stays true when it was.
     makes.length ? `taps for ${producedName(makes)}` : '',
-    inPlay ? drawableKeywords(card.keywords).join(', ') : '',
+    // The marks ride an `aria-hidden` arm, so this sentence is how anybody not
+    // looking at ten-pixel pictures gets them — which makes it the one place
+    // "and something else is giving it that one" can be said at all. Said as a
+    // bare fact, with no room in the phrasing for a culprit.
+    inPlay
+      ? drawableKeywords(worn)
+        .map((k) => (lent.has(k) ? `${k} (granted)` : k)).join(', ')
+      : '',
     card.artist ? `art by ${card.artist}` : '',
   ].filter(Boolean).join(' · ')
 
@@ -825,7 +867,14 @@ function FieldCard({ card, count, inPlay = false }: {
           furniture rides the corner it names and stays upright to be read,
           which is exactly what a player does with a tapped card: turn the
           card, not your head. Each piece pivots about its own anchor corner,
-          so counter-rotating moves it nowhere. */}
+          so counter-rotating moves it nowhere.
+
+          **One corner is not a corner while the card is turned.** A turned
+          card's corners are its widest points, so a chip anchored to one and
+          grown outward leaves the card — which is what the counters did, onto
+          the *neighbour's* power and toughness. Turned, they leave the corner
+          and stand on top of the loupe instead; the stylesheet's arm block
+          argues it and the measurements are there. */}
       <div className="field-card-arm" aria-hidden="true">
         {/* **What the card does, in the one corner that was free.**
             A painting at fifty-eight pixels tells you this is a Dragon. It
@@ -835,8 +884,16 @@ function FieldCard({ card, count, inPlay = false }: {
             that could block (Aaron, 2026-08-25, on Arena's keyword icons).
 
             Only on the battlefield, for `inPlay`'s reason one field up: these
-            are facts about a fight, and a card in a hand is not in one. */}
-        {inPlay && <KeywordMarks keywords={card.keywords} />}
+            are facts about a fight, and a card in a hand is not in one.
+
+            **`worn`, not the printing** — see the field above. What is drawn
+            here is the set this creature has *now*, so a Cat standing beside
+            Kaheera wears the vigilance Kaheera is giving it. The marks are the
+            same picture whether a keyword is printed or granted, because
+            nothing in the mark may point at a giver and the picture is all
+            there is at ten pixels; the card's `title` is where the difference
+            is said in words. */}
+        {inPlay && <KeywordMarks keywords={worn} />}
         {/* **The crown, sitting on the top edge of the painting.**
 
             Aaron offered three: oversized, a golden aura, or a crown touching
@@ -847,13 +904,18 @@ function FieldCard({ card, count, inPlay = false }: {
             about the card's *stature* rather than its role. A Llanowar Elves
             commander is not a bigger card.
 
-            So: a standing gold rim on the card, and a crown on its brow. Both
-            are steady, and that is what keeps them clear of the attack, block
-            and death marks a beat away — those flash and are gone, this is
-            simply true for as long as the card is standing there. Panache and
-            martial prowess: the metal is the same brass the rest of this room
-            is trimmed in, and the mark is a drawn one rather than a photograph
-            at fourteen pixels.
+            So: a gold rim on the card with a light walking it, and a crown on
+            its brow. The rim is *continuous* where a mark is *sudden*, which
+            is what keeps it clear of the attack, block and death marks a beat
+            away: those arrive and leave, this one is simply on for as long as
+            the card is standing there and only its highlight moves. It was
+            steady until Aaron looked at it and said the gold did not pop
+            (2026-08-27), and stillness turned out to be the wrong way to keep
+            that distinction — the most important card on the board was the
+            quietest thing on it. `.field-card.is-commander` in the stylesheet
+            carries the arithmetic. Panache and martial prowess: the metal is
+            the same brass the rest of this room is trimmed in, and the mark is
+            a drawn one rather than a photograph at fourteen pixels.
 
             A companion gets the horn it already wears in the command zone,
             in the vine green that zone gives it — the same two signs in the
@@ -956,7 +1018,16 @@ function FieldCard({ card, count, inPlay = false }: {
           reads as the block being the decisive half. The sword answers the
           frequency worry by being fast rather than by being absent — it falls
           across the card and is gone. The stylesheet's marks block carries the
-          argument in full. */}
+          argument in full.
+
+          **And the blade points at whoever is being swung at.** The plate is a
+          sword shot upright, so the mark lands point-down-and-left, which aims
+          at the trench from the far half and at the near player's own feet
+          from the near one. The stylesheet turns the near half's mark a full
+          half-turn — the same photograph held by somebody standing on the
+          other side of the table. Nothing here knows which half it is in; the
+          `.field-side-near` wrapper does, which is where the lunge already
+          reads its direction from. */}
       {mark && (
         <span key={mark.key} aria-hidden="true"
               className={`field-mark field-mark-${mark.mark}`}>

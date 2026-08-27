@@ -6561,12 +6561,29 @@ button:hover .tarot-fan-card {
    * off every turned card in the row. `--lane-turn` is the same clearance
    * sideways, where the sweep is wider.
    *
+   * **Both are the geometry now, and one of them used to be a guess.** A w×h
+   * card turned 45° sweeps a square (w+h)/√2 on a side, so it reaches
+   * (w+h)/2√2 − w/2 past each *side* of its slot and (w+h)/2√2 − h/2 past the
+   * top and bottom. With h = 81w/58 that is 0.348w sideways and 0.149w
+   * vertically, rounded *up* to 0.35 and 0.15 so a corner is never sitting
+   * exactly on the line it would be clipped at — and the numbers written here
+   * were 9 and **14**, so the lean was right and the turn was six pixels
+   * short. What that cost was the
+   * leftmost card in every lane: the lane is the scroll container, a scroll
+   * container's overflow is only ever reachable at its *end*, and six pixels
+   * of the first turned card's lower-left corner were therefore not clipped
+   * *until you scrolled* — they were gone (Aaron, 2026-08-27: a tapped card
+   * "on the far left of the arena... gets clipped on the lower left corner by
+   * the border"). Written as arithmetic on one ruler, so a card that changes
+   * size takes its clearance with it and no second number has to be
+   * remembered.
+   *
    * `--lane-h` is therefore the card's own height plus both leans, and it is
    * the number that makes the board one size: three of these, twice, and the
    * arena is as tall as it will ever be. */
   --field-card-full: 58px;
-  --lane-lean: 9px;
-  --lane-turn: 14px;
+  --lane-lean: calc(var(--field-card-full) * 0.15);
+  --lane-turn: calc(var(--field-card-full) * 0.35);
   /* The gap between two cards in a lane, and the padding a half keeps around
      its lanes. Both are declared here rather than where they are used, because
      the combat arrows have to land on the same ruler the lanes are laid out
@@ -6598,12 +6615,12 @@ button:hover .tarot-fan-card {
      it, so the ruler itself comes down rather than every lane being crowded
      into the floor. Two thirds of a laptop's card, which is still a painting
      you can tell apart at arm's length — and the loupe is one hover away for
-     anybody who wants to read one. */
-  .field {
-    --field-card-full: 46px;
-    --lane-lean: 7px;
-    --lane-turn: 10px;
-  }
+     anybody who wants to read one.
+     **One line, where there were three.** The lean and the turn are worked out
+     from this above, so a phone's card carries its own turning clearance and
+     cannot be given a rounder number than its geometry — which is exactly how
+     the desktop pair drifted apart. */
+  .field { --field-card-full: 46px; }
 }
 
 /* **The stage: the arena, and the places beside it.**
@@ -8399,19 +8416,98 @@ button:hover .tarot-fan-card {
  * sand; the crown sits on the top edge of the painting the way a crown sits on
  * a head.
  *
- * **Both are steady, and that is what keeps them clear of the marks.** An
- * attack, a block and a death flash for one beat and are gone. This is simply
- * true for as long as the card is standing there, which is a different kind of
- * statement drawn a different way — no motion, no photograph, no red.
+ * **The rim used to be steady and it is alive now.** The argument for
+ * stillness was that the marks flash and this does not, so the two must not be
+ * confused — and that is still the rule, but it was being kept by making the
+ * one card the whole deck is built around the *quietest* thing on the board
+ * (Aaron, 2026-08-27: the gold "doesn't pop... can we light it up more and
+ * give it a true golden living border of light? Even some of our buttons do
+ * something similar"). A mark is a *sudden* thing that arrives and leaves; a
+ * light walking a rim on a five-second lap is a *continuous* one that is
+ * simply always there, which is exactly the distinction that mattered. Nothing
+ * about the rim ever appears or disappears — only the highlight on it moves.
+ *
+ * **The light walks the border; the border does not move.** The buttons he is
+ * thinking of pass a streak across a face on hover (`.btn-arena::after`), and
+ * the Wheel walks a warm highlight round its rim forever
+ * (`.wheel-rim::after`). This is the Wheel's, cut to a rectangle: a conic
+ * gradient masked to the card's own 1.5px edge, with the *gradient* turning
+ * rather than the element — rotating the box would spin a visible rectangle,
+ * which is the failure the Wheel never had because a ring is round. Turning
+ * the gradient needs the angle to be an animatable value, so it is registered
+ * as one; the mask never moves at all.
+ *
+ * Nothing is drawn over the painting. The ring is on the very edge and the
+ * bloom is outside it, so a commander's art is the same art it always was —
+ * the whole reason the "oversized" option was refused still applies to
+ * anything that would sit *on* the card.
  *
  * A companion wears the horn and the vine green it already wears in the
- * command zone. Same two signs, same two colours, wherever the card is
- * standing. */
+ * command zone — steady, and deliberately so. Same two signs, same two
+ * colours, wherever the card is standing; the commander is the one card a
+ * board has to find first, and giving the light to both would be saying they
+ * are the same rank. */
+@property --field-crown-sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 34deg;
+}
 .field-card.is-commander .field-card-turn {
   box-shadow:
     0 2px 5px rgba(0, 0, 0, 0.45),
-    0 0 0 1.5px color-mix(in srgb, var(--field-brass) 92%, #fff),
-    0 0 11px -1px color-mix(in srgb, var(--field-brass) 62%, transparent);
+    0 0 0 1.5px color-mix(in srgb, var(--field-brass) 96%, #fff),
+    0 0 9px -2px color-mix(in srgb, var(--field-brass) 82%, transparent),
+    0 0 22px 1px color-mix(in srgb, var(--field-brass) 42%, transparent);
+}
+/* The band of light itself. Padding is the ring's thickness and the two masks
+   subtract the inside from the outside, so what survives is the border alone
+   and the painting under it is untouched.
+   The arc is short and the dark is long: about a quarter of the lap carries
+   any light at all, which is what makes it read as a *highlight travelling*
+   rather than as a card that pulses. Its hot centre is nearly white because
+   brass at fifty-eight pixels over an arbitrary painting has to out-run
+   whatever is behind it — the same reason the keyword chips carry their own
+   ground. */
+.field-card.is-commander .field-card-turn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 3px;
+  /* Two pixels, not the rim's one and a half. A permanent is fifty-eight
+     pixels of printing with a black border about that thick around the
+     painting, so a band of this width lands *on the card's own border* — the
+     card edged in gold, rather than gold laid over somebody's art. Thinner
+     than this and the light is a hairline nobody catches out of the corner of
+     an eye, which is the whole complaint. */
+  padding: 2px;
+  background: conic-gradient(from var(--field-crown-sweep) at 50% 50%,
+    transparent 0deg,
+    color-mix(in srgb, var(--field-brass) 50%, transparent) 22deg,
+    #fff4d2 44deg,
+    color-mix(in srgb, var(--field-brass) 50%, transparent) 66deg,
+    transparent 92deg 360deg);
+  -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  -webkit-mask-clip: content-box, border-box;
+  mask-clip: content-box, border-box;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: field-crown-walk 5.2s linear infinite;
+}
+@keyframes field-crown-walk {
+  from { --field-crown-sweep: 34deg; }
+  to { --field-crown-sweep: 394deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The light stops walking and does not go out. Which card is the commander
+     is *information* on a board of forty permanents, so stillness may not
+     answer it with less gold than everybody else gets — and the registered
+     angle above rests at 34 degrees, so the highlight parks high on the card's
+     right shoulder rather than wherever the lap happened to stop. The rim, the
+     bloom and the crown are untouched: none of them ever moved. */
+  .field-card.is-commander .field-card-turn::before { animation: none; }
 }
 .field-card.is-companion .field-card-turn {
   box-shadow:
@@ -8648,27 +8744,39 @@ button:hover .tarot-fan-card {
  * power/toughness"). Neither corner is wrong; the gap between them is.
  *
  * So in this one state the counters stop being a corner and become part of the
- * loupe: they take the glass's own anchor and sit at its upper left, which is
- * where a player's thumb would hold them and the one quadrant of that corner
- * nothing else is using. Power, toughness and what is modifying them end up in
- * one place, which is how they are read anyway.
+ * loupe: they take the glass's own anchor and stand directly on top of it,
+ * which is where a player's thumb would hold them and the one direction out of
+ * that corner that is still over the card. Power, toughness and what is
+ * modifying them end up in one place, which is how they are read anyway.
+ *
+ * **They go straight up, and the first draft sent them up *and left*.** That
+ * put the chips on the card's own lower-left edge — half on the painting and
+ * half off it — and a turned card's lower-left edge is over its neighbour. So
+ * on a full row the counters landed on the loupe of the card *next door*:
+ * measured at 12 and 18 pixels of overlap on a live board, two creatures'
+ * numbers written on top of each other (Aaron, 2026-08-27: "the counter and
+ * card number... icons conflict at times"). The card's own numbers were never
+ * the collision — the count chip in the far corner is nowhere near this — and
+ * that is worth writing down, because it is the pair the report names and the
+ * pair that turns out to be innocent.
+ *
+ * Straight up from the foot of a turned card is the one direction that stays
+ * inside the diamond: at 58×81 the card is still 56 pixels wide at the height
+ * the chips sit, so a stack of two clears the glass and cannot reach a
+ * neighbour in either lane.
  *
  * **The transform order is the whole trick and it is easy to get backwards.**
  * The chip lives inside the arm, so its own axes are already turned forty-five
  * degrees; a bare `translate` would walk it diagonally across the card. Writing
  * the rotation *first* un-turns the coordinate system, and the translate that
- * follows is then measured along the screen's axes — straight up and straight
- * left, which is what "upper left of the loupe" means to somebody looking at
- * it. Swap the two functions and the chips slide down the card's diagonal
- * instead.
+ * follows is then measured along the screen's axes — straight up the page,
+ * which is what "on top of the loupe" means to somebody looking at it. Swap the
+ * two functions and the chips slide down the card's diagonal instead.
  *
- * The offset is the glass's own size less the tuck, and the tuck is geometry
- * rather than taste: the loupe is a circle inscribed in that square, so its rim
- * is about a fifth of the size in from the corner. Move by the full size and
- * the chip floats a visible notch off the glass; move by the size less the tuck
- * and its corner meets the rim. */
+ * The offset is the glass's own height plus a breath, so the chips rest on the
+ * square the circle is inscribed in and touch its rim at one point. Both hang
+ * off the same edge of the same corner, so they read as one instrument. */
 .field-card.is-tapped .field-card-counters {
-  --field-lens-tuck: 5px;
   left: auto;
   right: 0;
   bottom: 0;
@@ -8678,9 +8786,7 @@ button:hover .tarot-fan-card {
 .field-card.is-tapped .field-card-arm > .field-card-counters {
   transform:
     rotate(calc(-1 * var(--turn)))
-    translate(
-      calc(-1 * (var(--field-lens) - var(--field-lens-tuck))),
-      calc(-1 * (var(--field-lens) - var(--field-lens-tuck))));
+    translate(0, calc(-1 * (var(--field-lens) + 2px)));
 }
 /* ------------------------------------------------- what the card can do
  *
@@ -9044,6 +9150,30 @@ button:hover .tarot-fan-card {
   46%  { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.76)) brightness(1); }
   100% { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.76)) brightness(1); }
 }
+
+/* **The near seat swings the other way, because the enemy is the other way.**
+ *
+ * The plate is a sword photographed upright with its pommel at the top, and
+ * `mark-strike` lands it at 34° — point down and a little left, which on the
+ * far half is *toward the trench* and reads exactly right. The near half got
+ * the same mark, so the bottom player's blade came down at their own feet
+ * (Aaron, 2026-08-27: the near seat's sword should be turned "so it looks like
+ * it is facing the top half too").
+ *
+ * **Half a turn, not the quarter that was asked for, and not a mirror.** A
+ * quarter would lay the blade across the card pointing at the neighbour beside
+ * it; a hundred and eighty degrees is the far half's mark read upside down, so
+ * the point is as far above the horizontal as the far seat's is below it, and
+ * it aims across the seam. A `scaleY(-1)` would put it there too and would be
+ * a *reflected photograph* — the same steel lit from the wrong side, which is
+ * the one thing a plate of a real object may not be turned into. A rotation is
+ * the same object, held by somebody standing on the other side of the table.
+ *
+ * It rides the mark rather than the blade so it composes with everything on
+ * it: the swing, the glint, and the still angle reduced motion parks it at all
+ * come round together, and there is one flip to keep in step instead of five.
+ * The lamp underneath is a centred radial, so half a turn costs it nothing. */
+.field-side-near .field-mark-attacks { transform: rotate(180deg); }
 
 /* The lunge goes *toward the seam*, which is where the other player is: the
    far seat leans down the page and the near seat leans up it. A creature that
