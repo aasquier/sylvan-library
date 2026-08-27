@@ -35,16 +35,16 @@ Why committed rather than hotlinked: The licence is clean and the figure is smal
 <!-- animist:begin aegis -->
 ## aegis.webp
 
-- **Source**: "Round Shield with the Surrender of the Elector of Saxony at Mühlberg, Milan, ca. 1560-70", <https://www.metmuseum.org/art/collection/search/24688>, found via the Met Open Access API, searching the Arms and Armor department for round shields with a full studio plate, then keeping the ones lit with a raking light rather than flat -- volume is the whole requirement, and it is a fact about the photograph rather than about the object
+- **Source**: "Schild des Landgrafen Konrad von Thüringen fm810232.jpg", <https://commons.wikimedia.org/wiki/File:Schild_des_Landgrafen_Konrad_von_Th%C3%BCringen_fm810232.jpg>, found via Commons, through the category `Photographs of shields by Ludwig Bickell`, which is where the search finally landed after the Met's Arms and Armor department turned out to hold no heater at all -- its shields are discs, dhals and bouched targes, and a bouche's lobed outline is no more legible small than a circle is. The category was reached from `Heater shields`; every file in it was licence-checked and every one of them passes
 .
-- **Licence**: CC0. Confirmed through met at fetch time (2026-08-26).
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
 - **Transformations** (Pillow, scripted -- `animist build aegis.recipe.yaml`):
-  - `crop`: frac_box=[0.0941, 0.1843, 0.9039, 0.7453].
-  - `resize`: width=260, height=260.
-  - `mask_circle`: cx=0.5, cy=0.5, r=0.497, feather=1.5.
-  - Encoded WEBP, quality 82.
+  - `crop`: frac_box=[0.1162, 0.1916, 0.9072, 0.9172].
+  - `matte_backdrop`: tolerance=30, border=6, soft=26, enclosed='drop'.
+  - `resize`: width=300.
+  - Encoded WEBP, quality 84.
 
-Why committed rather than hotlinked: It is drawn at the moment a beat lands and lives for about a second, which makes it the worst possible thing to fetch from somebody else's CDN: a mark that arrives after the sentence it belongs to has been read is not a mark, it is a flicker on an unrelated card. It is also small enough that committing it costs less than the request would.
+Why committed rather than hotlinked: It is drawn at the moment a beat lands and lives for about a second, which makes it the worst possible thing to fetch from somebody else's CDN: a mark that arrives after the sentence it belongs to has been read is not a mark, it is a flicker on an unrelated card. It is also small enough that committing it costs less than the request would. And the licence here is a *photograph of a medieval object*, which is the category where somebody else's file quietly changes licence or vanishes -- a copy checked once and committed is a copy whose provenance stays true.
 <!-- animist:end aegis -->
 <!-- animist:begin memento -->
 ## memento.webp

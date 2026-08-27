@@ -51,6 +51,31 @@ describe('the keywords a board can draw', () => {
     }
   })
 
+  it('draws the two words that make combat damage mean something worse', () => {
+    // Deathtouch and toxic can stand on one creature — `Bilious Skulldweller`
+    // is the check case, and Scryfall lists its keywords as exactly
+    // `['Toxic', 'Deathtouch']`. Both must survive the match, in the card's
+    // own order, or a corner would say one of the two things a player most
+    // needs to know before they block.
+    expect(drawableKeywords(['Toxic', 'Deathtouch']))
+      .toEqual(['toxic', 'deathtouch'])
+    // Whether the skull and the viper are *distinguishable* at ten pixels is
+    // Aaron's walk, not this suite's: jsdom has no layout and no rasteriser,
+    // so nothing here can see a silhouette. The drawings argue themselves in
+    // `components/keywords.tsx`.
+  })
+
+  it('reads toxic without its number, the way ward already does', () => {
+    // "Toxic 1" and "Ward {2}" both carry an amount and Scryfall's `keywords`
+    // array carries neither. A list entry spelled with a number would match
+    // nothing at all, forever, and silently — the mark simply would not draw.
+    expect(drawableKeywords(['Toxic'])).toEqual(['toxic'])
+    expect(drawableKeywords(['Toxic 1'])).toEqual([])
+    for (const word of DRAWN_KEYWORDS) {
+      expect(word, `${word} carries a number`).not.toMatch(/\d/)
+    }
+  })
+
   it('spells every entry the way a lowercased Scryfall keyword is spelled', () => {
     // A word in the list that no lowercasing could ever produce is a sign that
     // will never be drawn — and nothing else would notice, because the map is

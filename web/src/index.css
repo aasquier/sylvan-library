@@ -9394,8 +9394,8 @@ button:hover .tarot-fan-card {
  * beat that happens often is to make its mark *quick* — a blade that falls
  * across the card and is gone — rather than to make it nothing.
  *
- * So: a Met sword when something attacks, a Met shield when something blocks,
- * and the Pompeii memento mori when something dies.
+ * So: a Met sword when something attacks, a thirteenth-century knight's shield
+ * when something blocks, and the Pompeii memento mori when something dies.
  */
 .field-mark {
   position: absolute;
@@ -9554,49 +9554,62 @@ button:hover .tarot-fan-card {
  *
  * The first version swung in from *big* — scale 2.2 down to 0.93 — which reads
  * as a stamp coming down on the card rather than as somebody stepping in front
- * of somebody else. And the disc is photographed flat, straight down onto a
- * museum plate, so held square to the screen it is a coin: a circle with a boss
- * in it (Aaron, 2026-08-26: "looks more like an emblem or symbol than an actual
- * shield").
- *
- * Both are fixed by giving it a *depth to move in*. The mark takes a
- * perspective, and the shield comes up from below the card lying almost
+ * of somebody else. The fix was to give it a *depth to move in*: the mark takes
+ * a perspective, and the shield comes up from below the card lying almost
  * edge-on, turns its face to meet what is coming, takes the blow, and then
- * **holds at a tilt**. That last part is the one that matters: a disc square to
- * the viewer is a symbol, and the same disc turned eleven degrees out of the
- * plane is an object somebody is holding. Nothing about the picture changed.
+ * **holds at a tilt** — an object somebody is holding up rather than a picture
+ * pasted on.
  *
- * The plate itself was the other half, and it has since been replaced: the
- * grey steel disc is now a gold-damascened one (see `aegis.recipe.yaml`, which
- * argues the swap). So the lighting here no longer has to invent warmth that
- * the photograph lacks — it only has to say where the sun is. */
+ * **The tilt used to be doing a second job, and it is off that job now.** Two
+ * plates ago the object was a round steel disc, and the argument here was that
+ * turning a disc out of the plane was the one thing that stopped it reading as
+ * a symbol. It was true and it was never enough — Aaron read the flat one as
+ * "more like an emblem or symbol than an actual shield" and the domed, gilded
+ * one as "more like a coin than a shield". A circle is a coin at a glance no
+ * matter how it is lit or how it is turned, because every round object a person
+ * meets in a day is a coin, a seal or a badge. So the *outline* changed: the
+ * plate is now a thirteenth-century heater — flat across the top, tapering to a
+ * point at the foot — and `aegis.recipe.yaml` argues that swap at length. The
+ * silhouette says shield on its own, in one frame, with no lighting and no
+ * motion helping it. The tilt is back to meaning what it looks like: somebody
+ * is holding this. */
 .field-mark-blocks { perspective: 300px; }
-/* **As wide as the card, up from 78%.** At 78% the disc floated in the middle
-   of the art like a wax seal stamped on it. At full width it *covers* the
-   creature, which is what blocking is. */
+/* **As wide as the card, and now taller than it is wide.** At 78% the old disc
+   floated in the middle of the art like a wax seal stamped on it, so it went to
+   full width to *cover* the creature, which is what blocking is. Full width
+   still, and the height is no longer a free choice: `height: auto` takes it
+   from the shield's own proportion, which is about 1.21, so the mark stands
+   roughly seven-eighths of the card's height. That is the point — squash a
+   heater back to a square and the shape carrying the whole meaning is the shape
+   being thrown away. */
 .field-mark-blocks img {
   width: 100%;
   height: auto;
-  /* **Chroma for the plate, shadows for the light — and in that order.**
+  /* **Tone for the plate, shadows for the light — and in that order.**
      `filter` applies its functions in sequence, so this is not a cosmetic
-     ordering: chroma first means the three drop-shadows below are laid on the
+     ordering: tone first means the three drop-shadows below are laid on the
      finished metal and keep the colours they are given. Written the other way
-     round, the saturate/contrast/brightness would also act on the shadows and
-     wash the warm rim out of the very edge it exists to draw.
+     round, the sepia/saturate/contrast would also act on the shadows and wash
+     the warm rim out of the very edge it exists to draw.
 
-     The chroma is small on purpose. Fifty-eight pixels of a gold-damascened
-     battle scene averages down into olive-grey — the relief becomes noise and
-     the noise has no colour — so saturation and contrast go back up to recover
-     the *material*, not the scene. It is deliberately not the older, heavier
-     `sepia`/`hue-rotate` correction: that existed to turn grey steel into warm
-     metal, and on a plate that is already gold it cooks.
+     **The warm correction is back, and it is back because the plate changed.**
+     The gilded disc that stood here needed only a small chroma nudge, and this
+     block said so — it named `sepia`/`hue-rotate` as the older, heavier
+     correction that existed to turn grey steel into warm metal and would cook a
+     photograph that is already gold. All true, and the photograph is not gold
+     any more: Ludwig Bickell shot the heater on a glass negative around 1890,
+     so there is no colour in the file to recover and `saturate` alone has
+     nothing to work with. `sepia` supplies the warmth the plate never had, and
+     the contrast is heavier than the disc's because a relief carved in gesso
+     is *only* light and shadow — flatten it and the lion goes, and the lion is
+     the one interior detail that survives fifty-eight pixels.
 
      The three shadows are the light and the ground: a tight dark seat, a hard
      warm rim along the top edge where the low sun is, and a soft one beneath so
      the shield stands off the card instead of being printed on it. The rim is
      what sells the tilt the choreography holds at the end. */
   filter:
-    saturate(1.45) contrast(1.14) brightness(1.08)
+    sepia(0.72) saturate(1.75) contrast(1.5) brightness(1.03)
     drop-shadow(0 0 1.5px rgba(10, 6, 2, 0.9))
     drop-shadow(0 -1px 1.2px color-mix(in srgb, var(--field-sun) 95%, transparent))
     drop-shadow(0 4px 8px rgba(0, 0, 0, 0.8));
@@ -9614,10 +9627,12 @@ button:hover .tarot-fan-card {
   17%  { transform: translateY(0) scale(0.9) rotateX(3deg) rotateZ(-4deg); }
   24%  { transform: scale(1.06) rotateX(9deg) rotateZ(2deg); }
   32%  { transform: scale(0.99) rotateX(12deg) rotateZ(0deg); }
-  /* Held, and **held tilted** — the one frame that decides whether this is a
-     shield or a coin. Square to the screen a disc is a symbol; turned twenty
-     degrees out of the plane it is an object somebody is holding up, and this
-     is the frame a person spends most of the mark looking at. */
+  /* Held, and **held tilted** — the frame a person spends most of the mark
+     looking at, so it is the frame worth spending the tilt on. Twenty degrees
+     out of the plane is a shield somebody is bracing behind; square to the
+     screen it would be a picture of one. (This used to be the frame that
+     decided whether the mark read as a shield at all, back when the object was
+     a disc. It is not carrying that any more — the outline is.) */
   40%  { opacity: 1; transform: scale(1) rotateX(20deg) rotateZ(-1deg); }
   80%  { opacity: 1; transform: scale(1) rotateX(20deg) rotateZ(-1deg); }
   100% { opacity: 0; transform: translateY(-9%) scale(0.97) rotateX(28deg); }

@@ -27,6 +27,11 @@
  * - **No two marks share a silhouette.** A shield and a dome are the same blob
  *   small, so indestructible takes the shield and hexproof takes a dome *with a
  *   ground line under it* — the line is what separates them, and it is thick.
+ *   Deathtouch's skull is the third member of that family and the hardest: by
+ *   outline it is both of the others. It is separated by what it has that they
+ *   have not, which is *holes* — see the argument on the drawing itself. When
+ *   a fourth blob wants to join, that is the move to reach for; a fourth
+ *   outline is not available.
  *
  * **Which keywords get a sign is `lib/keywords.ts`'s list**, and the map at the
  * foot of this file is typed against it — so a word on that list with no
@@ -125,18 +130,98 @@ const DoubleStrike: Glyph = () => (
   </>
 )
 
-/** Deathtouch: a snake, with the drop coming off its fang.
+/** Deathtouch: a skull.
  *
- *  **A fang alone was not enough** (Aaron, 2026-08-25) — a lone tooth with a
- *  drop under it is a dentist, and the keyword is not about a tooth, it is
- *  about the thing the tooth belongs to. A serpent is what every player already
- *  reads as *one touch and you are gone*.
+ *  **A skull, and deliberately not a skull and crossbones** (Aaron, 2026-08-27,
+ *  who offered both). The crossbones are the poison pictogram — the label on a
+ *  bottle, the flag over a hold — and this board now has a keyword that
+ *  genuinely means poison standing directly underneath. `Bilious Skulldweller`
+ *  is a real card with deathtouch *and* toxic, so the two marks stack in one
+ *  corner, and a pair where one is a viper and the other is the international
+ *  sign for venom is a pair that says the same thing twice. Stripped of the
+ *  bones the skull stops meaning *poison* and goes back to meaning *death*,
+ *  which is the rule: any damage at all from this creature is lethal.
+ *
+ *  **Three holes are what make it a skull rather than a shield**, and that is
+ *  the whole drawing. A skull's gross outline — broad at the top, narrowing at
+ *  the bottom — is `Indestructible`'s heater shield, and a dome is `Hexproof`;
+ *  the file's own rule says no two marks may share a silhouette, and by
+ *  outline alone this one would share two. What no shield has is *voids*: two
+ *  large sockets and a nasal aperture, punched clean through, so the mark is a
+ *  mass with dark inside it instead of a mass. They are drawn enormous by
+ *  anatomical standards for the same reason the falcon's wings are swept — a
+ *  big, low-frequency feature is the kind that is still there at ten pixels,
+ *  where a correct one is a grey suggestion. The second discriminator is the
+ *  foot: a shield tapers to a point and a skull ends in a jaw, so the bottom
+ *  edge is a flat scallop of teeth rather than a tip.
+ *
+ *  **The sockets are holes, not dots**, by `evenodd` — the same mechanism and
+ *  the same reason as the viper's eye below. On a card's corner they show the
+ *  chip; anywhere else they show whatever is behind, which is what a hole in a
+ *  bone actually does.
+ *
+ *  **It shares a subject with `assets/coliseum/memento.webp` and not a shape,
+ *  and the sharing is the point.** The stage draws that Pompeiian mosaic over a
+ *  creature that has died. This is a skull too, and a player who has seen the
+ *  one will read the other instantly — the room means *death* by *skull*, on
+ *  the stage and in a corner, which is a vocabulary rather than a collision.
+ *  Nothing about them can be confused: the memento is deliberately uncut, so
+ *  its silhouette is a rectangle of Roman floor, it is photographic where this
+ *  is a cut line, it covers the whole card where this is ten pixels of its
+ *  corner, and it lives for a second where this stands as long as the creature
+ *  does. One says *something died here*; the other says *this is what kills
+ *  it*. */
+const Deathtouch: Glyph = () => (
+  <path d="M10 1.7
+           C14.6 1.7 17.3 4.5 17.3 8.7
+           C17.3 11.1 16.5 12.6 15.5 13.2
+           C14.6 13.6 13.9 13.9 13.85 14.8
+           C13.85 15.5 13.8 16.2 13.8 16.7
+           C13.3 18.6 11.77 18.6 11.27 16.7
+           C10.77 18.6 9.23 18.6 8.73 16.7
+           C8.23 18.6 6.7 18.6 6.2 16.7
+           C6.2 16.2 6.15 15.5 6.15 14.8
+           C6.1 13.9 5.4 13.6 4.5 13.2
+           C3.5 12.6 2.7 11.1 2.7 8.7
+           C2.7 4.5 5.4 1.7 10 1.7 Z
+           M11.6 7.1 L15.1 6.9
+           C15.55 6.9 15.65 7.4 15.5 8.1
+           C15.2 10 14.5 11.35 13.4 11.35
+           C12.25 11.35 11.5 10.3 11.45 8.7
+           C11.42 7.9 11.45 7.35 11.6 7.1 Z
+           M8.4 7.1 L4.9 6.9
+           C4.45 6.9 4.35 7.4 4.5 8.1
+           C4.8 10 5.5 11.35 6.6 11.35
+           C7.75 11.35 8.5 10.3 8.55 8.7
+           C8.58 7.9 8.55 7.35 8.4 7.1 Z
+           M10 10.6
+           C10.3 11.7 11.05 12.9 11.28 13.55
+           C11.5 14.2 11.05 14.5 10 14.5
+           C8.95 14.5 8.5 14.2 8.72 13.55
+           C8.95 12.9 9.7 11.7 10 10.6 Z"
+        fill="currentColor" fillRule="evenodd" />
+)
+
+/** Toxic: a snake, with the venom coming off its fang.
+ *
+ *  **This drawing was deathtouch's first, and it was always really about
+ *  poison** (Aaron, 2026-08-27: *"lets move our current deathtouch icon to be
+ *  the new symbol for when something has the toxic keyword"*). It earned the
+ *  move rather than being handed it. The argument that produced it holds
+ *  exactly as written — *a fang alone was not enough* (Aaron, 2026-08-25), a
+ *  lone tooth with a drop under it is a dentist, and the keyword is not about a
+ *  tooth but about the thing the tooth belongs to — and the drop at the end of
+ *  that fang is the part that was always straining under the old word. Nothing
+ *  drips off deathtouch; deathtouch is an instant, and the creature is simply
+ *  gone. Toxic is the keyword that *leaves something behind* — a poison counter
+ *  that stays on a player for the rest of the game — and a falling drop is that
+ *  sentence said as a picture.
  *
  *  Laid out so nothing has to share room with anything: the head takes the top
  *  left, the body coils away to the right, and the whole left edge below the
  *  snout is left clear for the fang and the drop — which are the two shapes
  *  that carry the meaning and the two that must not be crowded. */
-const Deathtouch: Glyph = () => (
+const Toxic: Glyph = () => (
   <>
     {/* The body, coiling away behind the head. A stroke rather than a filled
         outline: at this size a snake is a thick line that bends, and the bend
@@ -281,6 +366,7 @@ const MARKS: Record<DrawnKeyword, Glyph> = {
   'first strike': FirstStrike,
   'double strike': DoubleStrike,
   deathtouch: Deathtouch,
+  toxic: Toxic,
   lifelink: Lifelink,
   vigilance: Vigilance,
   trample: Trample,

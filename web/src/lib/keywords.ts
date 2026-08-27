@@ -15,12 +15,28 @@
  * is asking is a mark in the way of one they are. Protection is absent for a
  * different reason — protection *from* something cannot be said without saying
  * from what, and a ten-pixel corner has no room to.
+ *
+ * **A keyword that carries a number still gets a mark, and the mark does not
+ * say the number.** Ward has said this since the list was written — the sigil
+ * means *there is a toll*, and what the toll is stays on the card — and toxic
+ * joins it on the same terms. Scryfall's `keywords` array spells both without
+ * their number ("Ward", "Toxic"), so the amount was never on the wire to draw
+ * anyway; a corner that answers *does this creature poison me* is the question
+ * a player is actually asking across the table, and *how much* is the one they
+ * ask afterwards, with the card already in their hand.
  */
 
 /** In the order a card's own keyword list happens to hold them; this array's
- *  order is not a priority, only a spelling. */
+ *  order is not a priority, only a spelling.
+ *
+ *  Deathtouch and toxic sit next to each other on purpose: they are the two
+ *  words that make ordinary combat damage mean something worse than its
+ *  number, they appear together on real cards (Bilious Skulldweller carries
+ *  both), and two marks that can stand in one corner are exactly the pair that
+ *  must not look alike. `components/keywords.tsx` draws them a skull and a
+ *  viper and argues the split there. */
 export const DRAWN_KEYWORDS = [
-  'flying', 'first strike', 'double strike', 'deathtouch', 'lifelink',
+  'flying', 'first strike', 'double strike', 'deathtouch', 'toxic', 'lifelink',
   'vigilance', 'trample', 'haste', 'menace', 'reach', 'hexproof',
   'indestructible', 'ward', 'defender',
 ] as const
