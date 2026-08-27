@@ -19,6 +19,7 @@ import { categoryLabel, identityName } from '../lib/mtg'
 import { SceneBackdrop } from '../components/forest'
 import { CommanderMotion } from '../components/cardmotion'
 import { WheelOfFortune } from '../components/wheel'
+import { OpeningHandDeal } from '../components/openinghand'
 import {
   ArmedButton,
   Badge, CardArt, CardHover, CardLoupe, Caveat, ColorRing, ErrorNote, ManaCost,
@@ -1589,10 +1590,16 @@ export default function DeckDetail() {
             </section>
           )}
 
-          {/* The Wheel of Fortune (punch list item 9): a random suggestion
-              in this deck's colours, spun rather than searched for. At the
-              foot of the list because it is dessert, not dinner — and for
-              readers too, since a spin writes nothing. */}
+          {/* Two toys at the foot of the list, both folded into the card
+              they came from, both dessert rather than dinner — and both for
+              readers too, since neither writes anything.
+
+              Ancestral Recall goes FIRST, and the order is the argument: a
+              spin of the Wheel is an amusement for somebody who already has
+              a deck, and dealing an opening hand is the thing a person who
+              has never played reaches for (commandment 2). The one that
+              teaches comes before the one that entertains. */}
+          <OpeningHandDeal deckRef={deckRef} />
           <WheelOfFortune deckRef={deckRef} />
         </div>
       )}
