@@ -28,7 +28,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
-import { castType, faceFor, mannerOf, plateWord, stageLife }
+import { castType, faceFor, mannerOf, plateNote, plateWord, stageLife }
   from '../lib/stage'
 import { MatchBoard } from './board'
 
@@ -48,6 +48,10 @@ afterEach(cleanup)
  * `Ancestral Vision` is the other half: a real card the pool could not paint,
  * standing in for every name the art lookup misses. It must draw a plate and
  * never a hole.
+ *
+ * The rest are the cards that make a *sentence* possible: a token nothing ever
+ * cast, an Equipment with a host to name, a companion that was never dealt,
+ * and a Food that cannot die because rule 700.4 does not let an artifact.
  */
 const MATCH: ForgeBoard = {
   seats: [
@@ -64,6 +68,18 @@ const MATCH: ForgeBoard = {
       image: 'https://example.test/bolt.jpg' },
     // Named by the match, and never painted by the pool.
     { id: 13, name: 'Ancestral Vision', types: 'Sorcery', seat: 1 },
+    // Conjured. Nothing cast it, so the beat it enters on is the only moment
+    // it will ever have.
+    { id: 14, name: 'Clue Token', types: 'Artifact - Clue', seat: 1,
+      token: true, image: 'https://example.test/clue.jpg' },
+    { id: 15, name: 'Food Token', types: 'Artifact - Food', seat: 1,
+      token: true, image: 'https://example.test/food.jpg' },
+    { id: 16, name: 'Bloodforged Battle-Axe',
+      types: 'Legendary Artifact - Equipment', seat: 1,
+      image: 'https://example.test/axe.jpg' },
+    { id: 17, name: 'Kaheera, the Orphanguard',
+      types: 'Legendary Creature - Cat Beast', seat: 1,
+      image: 'https://example.test/kaheera.jpg' },
     { id: 20, name: 'Dragonlord Atarka', types: 'Creature - Dragon', seat: 2,
       image: 'https://example.test/atarka.jpg' },
   ],
@@ -74,9 +90,13 @@ const MATCH: ForgeBoard = {
   ],
 } as unknown as ForgeBoard
 
+/** A beat as the room stages it: `who` is a **name**, already shortened off the
+ *  shelf (`shortName` in `lib/theater.ts`), because that is what reaches the
+ *  plate. `run` is what `countRuns` puts there — one, unless a test is about
+ *  several of one card arriving at once. */
 function said(over: Partial<StagedBeat> & { key: string }): StagedBeat {
   return {
-    game: 1, turn: 2, kind: 'cast', who: 'Arahbo — Cats', text: '', ...over,
+    game: 1, turn: 2, kind: 'cast', who: 'Arahbo', text: '', run: 1, ...over,
   }
 }
 
@@ -122,15 +142,19 @@ it('gives an instant that never touched the board its moment', () => {
   const shown = face(container)
   expect(shown?.getAttribute('src'), 'and its picture is found by name')
     .toBe('https://example.test/bolt.jpg')
-  // **And the plate names the kind**, which is the whole of why the type is
-  // worth drawing: this card is on no battlefield and never will be, so the
-  // word "Instant" is the only thing telling somebody at their first game that
-  // it was never going to stay. The type comes off the match's own card list —
+  // **And the plate names the player and the kind**, which is the whole of why
+  // either is worth drawing: this card is on no battlefield and never will be,
+  // so the word "Instant" is the only thing telling somebody at their first
+  // game that it was never going to stay, and the name is the only thing
+  // saying whose spell it was. The type comes off the match's own card list —
   // the same lookup that found the picture, asked once.
   expect(container.querySelector('.stage-plate-word')?.textContent)
-    .toBe('Cast Instant')
+    .toBe('Arahbo casts Instant')
   expect(container.querySelector('.stage-plate-title')?.textContent)
     .toBe('Lightning Bolt')
+  // Nothing under it: a cast names no target on this wire, and a line saying
+  // so would be the room filling space.
+  expect(container.querySelector('.stage-plate-note')).toBeNull()
 })
 
 it('sets a card in type when the match never painted one', () => {
@@ -224,6 +248,10 @@ it('plays the skull over the dying card, on the marks own clock', () => {
   // which is three effects rather than one motion.
   expect(container.querySelector('.stage-frame .stage-skull'),
     'the stone falls onto the card, and goes down with it').toBeTruthy()
+  // **And the plate does not name a player, even though the beat carries
+  // one.** A creature dying is not something its controller did, and "Arahbo
+  // dies" would name the wrong subject entirely — so `PLATE.dies` has no
+  // third-person form at all and cannot grow one by accident.
   expect(container.querySelector('.stage-plate-word')?.textContent).toBe('Dies')
 })
 
@@ -332,7 +360,7 @@ it('takes no pointer, so the timeline stays draggable underneath', () => {
     .toHaveLength(0)
 })
 
-it('gives the middle of the arena to casts, deaths and exiles, and to nothing else', () => {
+it('gives the middle of the arena to what happened, and to nothing else', () => {
   // **A land is played, not cast**, and this is the one Magic judgement in the
   // file rather than a rendering one. A land does not use the stack, is not
   // cast, and is the most routine thing that happens in a game — eight or ten
@@ -343,16 +371,162 @@ it('gives the middle of the arena to casts, deaths and exiles, and to nothing el
   expect(mannerOf('cast')).toBe('cast')
   expect(mannerOf('dies')).toBe('dies')
   expect(mannerOf('exiled')).toBe('exiled')
+  expect(mannerOf('attach')).toBe('attach')
+  expect(mannerOf('companion')).toBe('companion')
   for (const quiet of ['land', 'resolve', 'attack', 'block', 'turn', 'damage',
-    'life', 'enters', 'attach', 'unblocked', 'mulligan', 'outcome']) {
+    'life', 'unblocked', 'mulligan', 'outcome', 'ability']) {
     expect(mannerOf(quiet), `${quiet} does not take the middle`).toBeNull()
   }
+
+  // **The two that cannot answer from the kind alone**, and both are the same
+  // rule: nothing is drawn twice.
+  //
+  // A permanent entering play was cast one beat earlier and drawn then — so
+  // `enters` is silent for it and speaks only for a token, which nothing cast
+  // and which has no other moment.
+  const clue = { id: 14, name: 'Clue Token', token: true } as const
+  const lion = { id: 10, name: 'Fleecemane Lion', types: 'Creature - Cat' }
+  expect(mannerOf('enters', clue)).toBe('made')
+  expect(mannerOf('enters', lion), 'this card had its moment when it was cast')
+    .toBeNull()
+
+  // And a creature sacrificed *also dies* — the scribe raises both, a beat
+  // apart — so the death keeps rule 700.4's own list and the sacrifice takes
+  // everything else: the Food, the Treasure, the cracked fetchland.
+  expect(mannerOf('sacrificed', { id: 15, name: 'Food Token',
+    types: 'Artifact - Food', token: true })).toBe('sacrificed')
+  expect(mannerOf('sacrificed', lion), 'a creature sacrificed is drawn dying, '
+    + 'once').toBeNull()
+  expect(mannerOf('sacrificed', { id: 99, name: 'Nameless' }),
+    'and a card whose type line nobody recorded is left alone rather than '
+    + 'guessed at').toBeNull()
 
   // And through the board, because a table of kinds is only a claim about what
   // the room does with it.
   const { container } = replay(said({ kind: 'land', card: 'Forest', key: 'f1' }))
   expect(container.querySelector('.stage'), 'a land drop is not a spell')
     .toBeNull()
+})
+
+it('draws several tokens as one pile with a number on it', () => {
+  // Aaron, 2026-08-27: *"Token creation should show in the center stage, with
+  // how many tokens were created represented by one of our stacked cards x's,
+  // like lands."*
+  //
+  // **The count is counted, never guessed.** Forge announces a token by moving
+  // a card into a zone, one card at a time, and there is no `amount` anywhere
+  // on that path — so three Clue Tokens reach the browser as three identical
+  // beats in a row and `countRuns` in `lib/reel.ts` turns that back into one
+  // moment with a three on it. This drives the *rendering* half of that: a
+  // beat carrying `run: 3` is one card, one fan and one tally.
+  const { container, then } = replay(said({ kind: 'enters', card: 'Clue Token',
+    key: 't1', run: 3 }))
+
+  expect(container.querySelector('.stage-plate-word')?.textContent,
+    'a token was conjured, not cast, and the plate says who by')
+    .toBe('Arahbo makes Artifact')
+  expect(container.querySelector('.stage-count')?.textContent,
+    'the board\'s own tally, in the board\'s own words').toBe('3×')
+  expect(container.querySelectorAll('.stage-leaf'),
+    'two leaves below four, which is the board\'s cap and its reason')
+    .toHaveLength(2)
+
+  // **And the beats that follow take nothing**, which is what makes it one
+  // moment rather than three. `countRuns` marks a run's followers `0`, and a
+  // beat with nothing to show leaves the card that is up alone — so the pile
+  // holds for its own life instead of being replayed under two more keys.
+  then(said({ kind: 'enters', card: 'Clue Token', key: 't2', run: 0 }))
+  expect(cards(container), 'the second of a run does not raise a second card')
+    .toHaveLength(1)
+  expect(container.querySelector('.stage-count')?.textContent).toBe('3×')
+
+  // Four or more thickens the fan rather than widening it — more edges in the
+  // same sweep, which is what a thicker pile looks like under a thumb.
+  cleanup()
+  const many = replay(said({ kind: 'enters', card: 'Food Token', key: 't3',
+    run: 6 }))
+  expect(many.container.querySelectorAll('.stage-leaf')).toHaveLength(4)
+  expect(many.container.querySelector('.stage-count')?.textContent).toBe('6×')
+
+  // A single token is a single card: no fan, no tally, nothing to count.
+  cleanup()
+  const one = replay(said({ kind: 'enters', card: 'Clue Token', key: 't4' }))
+  expect(one.container.querySelector('.stage-pile')).toBeNull()
+  expect(one.container.querySelector('.stage-count')).toBeNull()
+})
+
+it('shows a token going to the ether, and never draws one death twice', () => {
+  // Aaron, 2026-08-27: *"We also should show token deaths like any other in
+  // the center stage before they go to the ether."* The ether is where a Food,
+  // a Clue and a Treasure go — they are artifacts, so rule 700.4 does not let
+  // them *die*, and `dies` was correctly silent about the commonest
+  // disappearance in a Gyome game.
+  const { container } = replay(said({ kind: 'sacrificed', card: 'Food Token',
+    key: 'e1', run: 2 }))
+  expect(container.querySelector('.stage-plate-word')?.textContent)
+    .toBe('Arahbo sacrifices')
+  expect(container.querySelector('.stage-count')?.textContent,
+    'two Foods cracked at once is one moment with a two on it').toBe('2×')
+  cleanup()
+
+  // **A creature sacrificed raises both beats, one after the other, and only
+  // one of them is drawn.** Drawing both would shove a card off the stage to
+  // put the same card straight back — the doubling this file refuses for
+  // `resolve`, arriving by another door.
+  const both = replay(said({ kind: 'sacrificed', card: 'Fleecemane Lion',
+    key: 'e2' }))
+  expect(both.container.querySelector('.stage'),
+    'the death is the moment; the cost paid is not a second one').toBeNull()
+})
+
+it('names the host when a card goes onto another one', () => {
+  // The one beat on this wire that carries a target. A cast does not: Forge
+  // announces the spell and the attachment as two separate moments, so the
+  // sword being cast and the sword being *worn* are two different sentences
+  // and only the second one knows who is wearing it.
+  const { container } = replay(said({ kind: 'attach',
+    card: 'Bloodforged Battle-Axe', target: 'Fleecemane Lion', key: 'a1' }))
+
+  expect(container.querySelector('.stage-plate-word')?.textContent)
+    .toBe('Arahbo puts')
+  expect(container.querySelector('.stage-plate-title')?.textContent)
+    .toBe('Bloodforged Battle-Axe')
+  expect(container.querySelector('.stage-plate-note')?.textContent)
+    .toBe('on Fleecemane Lion')
+})
+
+it('walks a companion in from outside the game, and says what it cost', () => {
+  // **The room used to draw a card appearing in a hand and say nothing at
+  // all**, which is a beginner being shown a game that cheats — Aaron watched
+  // exactly that and did not believe it (*"I swear Kaheera was dealt in a
+  // hand? That should not be possible"*). He was right about the rules and
+  // Forge was right about the game: a companion waits outside the game and its
+  // controller pays {3} to bring it into their hand.
+  const { container } = replay(said({ kind: 'companion',
+    card: 'Kaheera, the Orphanguard', key: 'c1' }))
+
+  const card = container.querySelector('.stage-card')
+  expect(card?.className, 'the manner is on the card').toContain('is-companion')
+  expect(container.querySelector('.stage-plate-word')?.textContent)
+    .toBe("Arahbo's companion")
+  expect(container.querySelector('.stage-plate-note')?.textContent)
+    .toBe('from outside the game — three mana paid')
+
+  // **The road, and it is the exile's road run backwards.** Magic keeps one
+  // elsewhere — the place outside the game — and a second picture for it would
+  // say there were two. The structure is what jsdom can hold: the same
+  // element, under the card rather than over it, so the arena opens onto
+  // somewhere else and the card walks up out of it.
+  const road = container.querySelector('.stage-road')
+  expect(road, 'a companion comes in from somewhere').toBeTruthy()
+  expect(road?.nextElementSibling?.className,
+    'and the road is behind the card, never over it').toContain('stage-frame')
+
+  // It is long enough to read a rule rather than a name — the one plate in the
+  // room carrying one — and still inside the four-beat cap, so watching pace
+  // never clips it.
+  expect((card as HTMLElement).style.getPropertyValue('--stage-life'))
+    .toBe('1800ms')
 })
 
 it('finds a face through a spelling Forge does not use', () => {
@@ -447,15 +621,79 @@ it('names the kind of card on the plate, in the word a player would use', () => 
   expect(castType('')).toBeNull()
   expect(castType('Attraction')).toBeNull()
 
-  // **Only a cast takes the type**, and the asymmetry is deliberate. "Cast
-  // Creature" answers a question somebody watching actually has. "Dies
-  // Creature" answers none — rule 700.4 gives that word to creatures and
-  // planeswalkers, so the noun is already nearly settled and the picture on
-  // the stage is the rest of it. Exile sits with the death: it is drawn on the
-  // way out, and where the card has gone matters more than what it was.
+  // **Only a cast and a token take the type**, and the asymmetry is
+  // deliberate. "Casts Creature" answers a question somebody watching actually
+  // has; a token gets it because a Servo Token is a creature and a Food Token
+  // is not, and the name alone does not say which. "Dies Creature" answers
+  // none — rule 700.4 gives that word to creatures and planeswalkers, so the
+  // noun is already nearly settled and the picture on the stage is the rest of
+  // it. Exile sits with the death: it is drawn on the way out, and where the
+  // card has gone matters more than what it was.
   expect(plateWord('cast', 'Creature - Cat Warrior')).toBe('Cast Creature')
   expect(plateWord('cast', 'Instant')).toBe('Cast Instant')
   expect(plateWord('cast', undefined)).toBe('Cast')
+  expect(plateWord('made', 'Artifact - Food')).toBe('Made Artifact')
   expect(plateWord('dies', 'Creature - Cat Warrior')).toBe('Dies')
   expect(plateWord('exiled', 'Creature - Cat Warrior')).toBe('Exiled')
+  expect(plateWord('attach', 'Legendary Artifact - Equipment')).toBe('Put on')
+})
+
+it('writes the plate as a sentence about a player doing something', () => {
+  // Aaron, 2026-08-27: *"It would be nice if we added the players name too,
+  // Gyome CASTS Creature, etc."* — so a deed somebody did is written the way
+  // they did it, third person, name first.
+  expect(plateWord('cast', 'Creature - Cat Warrior', 'Gyome'))
+    .toBe('Gyome casts Creature')
+  expect(plateWord('made', 'Artifact - Clue', 'Gyome')).toBe('Gyome makes Artifact')
+  expect(plateWord('sacrificed', 'Artifact - Food', 'Gyome'))
+    .toBe('Gyome sacrifices')
+  expect(plateWord('attach', 'Enchantment - Aura', 'Gyome')).toBe('Gyome puts')
+
+  // **The companion wears the mechanic's own name and not a smoother verb.**
+  // The whole reason that beat exists is that Aaron watched Kaheera arrive in
+  // a hand and thought the game had cheated; the word "companion" on screen is
+  // what makes it a thing a person can look up (commandment 2), which is the
+  // same argument `beatLine` makes for keeping "exiled".
+  expect(plateWord('companion', 'Legendary Creature - Cat Beast', 'Gyome'))
+    .toBe("Gyome's companion")
+
+  // **A death and an exile refuse a player even when one is offered**, which
+  // is the property rather than the string: a creature dying is not something
+  // its controller chose, `beatLine` returns no player for exactly that
+  // reason, and a plate reading "Gyome dies" would name the wrong subject.
+  expect(plateWord('dies', 'Creature - Cat', 'Gyome')).toBe('Dies')
+  expect(plateWord('exiled', 'Creature - Cat', 'Gyome')).toBe('Exiled')
+
+  // And the nameless form is a real state, not dead code: the room turns a
+  // slug into a name off the shelf, and a finished match reopened before the
+  // shelf answers has beats nobody can name a player for yet.
+  expect(plateWord('cast', 'Instant', null)).toBe('Cast Instant')
+  expect(plateWord('made', undefined, '')).toBe('Made')
+})
+
+it('names the target under the card, and the rule under a companion', () => {
+  // **The target is the half the picture cannot show.** An Aura on the stack
+  // is a card; an Aura on a creature is a different creature (Aaron,
+  // 2026-08-27: *"for an aura or something that targets something if the text
+  // box called out the target too"*). It is the attach beat that carries it —
+  // a cast does not, because Forge announces the spell and the attachment as
+  // two separate moments.
+  expect(plateNote('attach', 'Syr Gwyn, Hero of Ashvale'))
+    .toBe('on Syr Gwyn, Hero of Ashvale')
+  expect(plateNote('attach', undefined), 'a curse names a player and finds no '
+    + 'host, and the line still has to read').toBe('on a permanent')
+
+  // **The three is the rulebook speaking, not a number read off the board.**
+  // Rule 702.139b fixes it for every companion there has ever been; the wire
+  // attributes no mana to the ability at all, and an amount inferred from
+  // whichever lands happened to tap is exactly what ADR 44 forbids.
+  expect(plateNote('companion', undefined))
+    .toBe('from outside the game — three mana paid')
+
+  // Everything else says nothing. "Gyome sacrifices Food Token, into the
+  // graveyard" spends a line on what the graveyard pile is already drawing.
+  for (const quiet of ['cast', 'made', 'dies', 'exiled', 'sacrificed'] as const) {
+    expect(plateNote(quiet, 'Fleecemane Lion'), `${quiet} is a whole sentence`)
+      .toBeNull()
+  }
 })

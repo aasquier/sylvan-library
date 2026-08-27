@@ -22,7 +22,8 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  BETWEEN_BOUTS, beatDelay, useReel, type Arriving, type Speed,
+  BETWEEN_BOUTS, beatDelay, countRuns, useReel, type Arriving, type Speed,
+  type StagedBeat,
 } from './reel'
 
 describe('how fast a beat is told', () => {
@@ -262,5 +263,97 @@ describe('telling a series in order', () => {
     // raise, and it would have sat empty until it did.
     rerender({ games: [1], speed: 'fast', match: 'j2' })
     expect(result.current[0].game).toBe(1)
+  })
+})
+
+/**
+ * Four tokens made at once is one thing that happened.
+ *
+ * **And the wire has no word for it.** Forge announces a token by moving a
+ * card into a zone, one card at a time with one id each, so a trigger that
+ * makes three Clue Tokens reaches the browser as three beats saying exactly
+ * the same sentence in a row. There is no `amount` anywhere on that path, and
+ * a number invented in a browser would be the room claiming a fact nothing
+ * told it. So it is counted, and these hold the counting.
+ */
+describe('counting what arrives twice', () => {
+  const beat = (over: Partial<StagedBeat> & { key: string }): StagedBeat => ({
+    game: 1, turn: 3, kind: 'enters', who: 'Gyome', text: 'makes a Clue Token',
+    card: 'Clue Token', ...over,
+  })
+
+  it('folds a run into its first beat and empties the rest', () => {
+    const run = countRuns([
+      beat({ key: 'a' }), beat({ key: 'b' }), beat({ key: 'c' }),
+      beat({ key: 'd', card: 'Food Token', text: 'makes a Food Token' }),
+    ])
+    // The first carries the count; the followers carry nothing, so the stage
+    // leaves the card that is already up alone instead of replaying it.
+    expect(run.map((b) => b.run)).toEqual([3, 0, 0, 1])
+  })
+
+  it('keeps every beat, because the board still steps for each of them', () => {
+    // **Nothing is removed and nothing is moved.** The board is folded to the
+    // count of beats told and the server builds one step per beat, so dropping
+    // a beat here would take a token off the sand. This only says which beat
+    // of a run is the one worth drawing in the middle of the arena.
+    const beats = [beat({ key: 'a' }), beat({ key: 'b' }), beat({ key: 'c' })]
+    const run = countRuns(beats)
+    expect(run).toHaveLength(3)
+    expect(run.map((b) => b.key)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('only folds beats that are next to each other', () => {
+    // Two tokens made on turn three and two more on turn seven are four
+    // tokens in two moments, and anything between them parts them — which is
+    // what makes this arithmetic on the account rather than a guess about the
+    // game.
+    const run = countRuns([
+      beat({ key: 'a' }), beat({ key: 'b' }),
+      beat({ key: 'x', kind: 'cast', card: 'Sol Ring', text: 'casts Sol Ring' }),
+      beat({ key: 'c' }), beat({ key: 'd' }), beat({ key: 'e' }),
+    ])
+    expect(run.map((b) => b.run)).toEqual([2, 0, 1, 3, 0, 0])
+  })
+
+  it('reads the whole sentence, so two different beats never merge', () => {
+    // The identity is the kind, the player and the words — and `text` already
+    // carries everything the beat said, numbers included. Two damages of
+    // different sizes are two sentences, and the same event from two seats is
+    // two events.
+    const run = countRuns([
+      beat({ key: 'a', kind: 'damage', card: 'Ball Lightning', who: null,
+        text: 'deals 6 to Gyome' }),
+      beat({ key: 'b', kind: 'damage', card: 'Ball Lightning', who: null,
+        text: 'deals 3 to Gyome' }),
+      beat({ key: 'c', who: 'Atla' }),
+      beat({ key: 'd', who: 'Gyome' }),
+    ])
+    expect(run.map((b) => b.run)).toEqual([1, 1, 1, 1])
+  })
+
+  it('never folds a beat that names no card', () => {
+    // **Time Warp is a real card.** A player taking two turns in a row is two
+    // turns, not one turn twice, and a turn beat names no card to tell them
+    // apart by — so a beat with nothing in its hand is folded with nothing.
+    const turn = (key: string): StagedBeat => ({
+      key, game: 1, turn: 3, kind: 'turn', who: 'Gyome', text: 'takes the turn',
+    })
+    expect(countRuns([turn('a'), turn('b'), turn('c')]).map((b) => b.run))
+      .toEqual([1, 1, 1])
+  })
+
+  it('counts the run inside the reel, where the running order lives', () => {
+    // Through the hook, because a pure helper is only a claim until something
+    // calls it. Whether four identical beats are four moments or one moment
+    // told once is a question about how the room tells a bout, and this hook
+    // is what tells a bout.
+    const bout = (game: number): Arriving => ({
+      game, truncated: false, board: null,
+      beats: [beat({ key: 'a' }), beat({ key: 'b' }), beat({ key: 'c' })],
+    })
+    const { result } = renderHook(() => useReel('j9', [1], bout, 'paused'))
+    act(() => { result.current[1](3) })
+    expect(result.current[0].shown.map((b) => b.run)).toEqual([3, 0, 0])
   })
 })

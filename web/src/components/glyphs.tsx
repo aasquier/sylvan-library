@@ -243,3 +243,73 @@ export function CrownGlyph({ size = 14 }: { size?: number }) {
     </svg>
   )
 }
+
+/**
+ * A strongbox: what a commander costs to call back.
+ *
+ * Commander tax was a bare red chip of digits, and a number alone is a fact
+ * with no thing attached to it — Aaron, 2026-08-27: *"it would be nice if it
+ * was a stylized treasure chest or back of coins or something. Something for
+ * indicative of a tax."* A Roman *arca* is the object that answer wants: a
+ * bound chest with a heavy lock, standing on the floor where the money was
+ * kept, which is furniture this room already has a floor for.
+ *
+ * **Drawn rather than photographed, and that is a measurement rather than a
+ * preference.** This mark renders at fifteen pixels in a seat that is
+ * seventy-two wide — measured on a live board, not guessed — and everything
+ * this project has learned about that size band says a photograph loses
+ * there: the shield next door had to be re-cut twice before it stopped
+ * reading as an emblem, and `CrownGlyph` above says it plainly, that at
+ * fourteen pixels over an arbitrary painting solid metal is what survives.
+ * The two glyphs it stands beside on this very tile — the throne and the
+ * horn — are drawn too, so a photograph here would also be a second visual
+ * language inside one seventy-two pixel tile.
+ *
+ * **Filled, like the crown and unlike the throne**, and for the crown's
+ * reason: the hollow ones are drawn for a seat with *nobody in it*, where an
+ * outline is an absence. A price is not an absence. It is a thing you owe.
+ *
+ * **Everything legible here is a gap.** Inside one solid shape at this size
+ * no detail can be drawn *on* the box, so the seam between lid and body is a
+ * band of nothing, and the hasp is the one place that band is interrupted —
+ * which is the whole difference between a chest and a loaf. The feet are what
+ * keep it standing on a floor rather than floating over one, the same trick
+ * [ThroneGlyph] uses to stop reading as a card.
+ */
+export function StrongboxGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      {/* The barrel lid, a true half-ellipse rather than a rounded corner. A
+          flat top is a crate; the dome is the whole silhouette, and it is what
+          a person recognises before any detail arrives.
+
+          **And it overhangs.** The lid is wider than the body by a unit on
+          each side, which is how a chest is actually built and — at this size
+          the only reason the two read as two parts rather than as one lump. */}
+      <path d="M1.6 9 V8.2 C1.6 5.4 4.6 4 10 4 C15.4 4 18.4 5.4 18.4 8.2 V9 Z"
+            fill="currentColor" />
+      {/* The body, 2 units under the lid: a pixel and a half at the size this
+          renders, which is the narrowest a seam can be and still survive being
+          anti-aliased away.
+
+          **Taller than the lid, which is the proportion that settles what this
+          is.** A dome deeper than its box is a loaf; a box deeper than its
+          dome is a chest. Two attempts had it the other way round and both
+          read as food. */}
+      <path d="M2.8 11 H17.2 V16.4 H2.8 Z" fill="currentColor" />
+      {/* Feet. Two, out at the corners so the base reads as wide as the lid —
+          they are what keep the box standing on the floor of the seat rather
+          than floating over it, which is [ThroneGlyph]'s trick. */}
+      <rect x="3.2" y="16.4" width="3.2" height="1.6" fill="currentColor" />
+      <rect x="13.6" y="16.4" width="3.2" height="1.6" fill="currentColor" />
+      {/* The hasp, bridging lid and body across the seam. It is invisible
+          where it lies on metal and visible where it crosses the gap, so what
+          the eye gets is a seam broken in the middle — which is exactly how a
+          real one looks, and the only detail a solid shape this size can
+          hold. */}
+      <rect x="8.4" y="7.6" width="3.2" height="5.4" rx="0.5"
+            fill="currentColor" />
+    </svg>
+  )
+}
