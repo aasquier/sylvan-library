@@ -1423,7 +1423,8 @@ function LifeTotal({ life }: { life: number }) {
     <span className={`field-life${hit ? ` is-${hit}` : ''}${dire ? ' is-dire' : ''}`}
           style={{ '--life-left': left, '--life-spent': spent } as CSSProperties}
           title={dire ? `${life} life — one good swing from nothing` : `${life} life`}>
-      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <svg className="field-life-ring" viewBox="0 0 48 48" aria-hidden="true"
+           focusable="false">
         <circle className="field-life-track" cx="24" cy="24" r="20" />
         <circle className="field-life-arc" cx="24" cy="24" r="20" />
       </svg>
@@ -1542,16 +1543,25 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
             ? `${damage} commander damage from ${whose} — twenty-one is lethal`
             : `${damage} commander damage from ${whose}, of the twenty-one `
               + 'that are lethal'}>
-      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <svg className="field-bead-ring" viewBox="0 0 48 48" aria-hidden="true"
+           focusable="false">
         <circle className="field-bead-track" cx="24" cy="24" r="20" />
         <circle className="field-bead-arc" cx="24" cy="24" r="20" />
       </svg>
       {/* The crown, drawn rather than fetched: three points and a band, sitting
           on the ring's shoulder where it reads as a mark on the dial instead of
           an ornament beside it. It is the one thing telling this apart from the
-          poison bead at a glance, so it is outside the rotated `svg` above —
-          that one is turned to put twelve o'clock at the top and would take the
-          crown round with it. */}
+          poison bead at a glance.
+
+          **The ring above is turned to put twelve o'clock at the top, and this
+          must not turn with it.** The first cut of this said so in a comment
+          and was wrong on the screen: the rule doing the turning was
+          `.field-bead svg`, a *descendant type* selector, so it caught this
+          element too — and at one class plus one type it outweighed
+          `.field-bead-crown`, taking the rotation, the `inset: 0` and the full
+          40px with it. Aaron saw a crown lying on its side. Both rings carry a
+          class of their own now and nothing in this component is styled by
+          being an `svg`. */}
       <svg className="field-bead-crown" viewBox="0 0 24 12" aria-hidden="true"
            focusable="false">
         <path d="M2 11 L2 3 L6 7 L12 1 L18 7 L22 3 L22 11 Z" />
@@ -1617,7 +1627,8 @@ function PlayerBead({ kind, n }: { kind: string; n: number }) {
           title={lethal
             ? `${n} poison counters — ten is lethal`
             : `${n} poison counters, of the ten that are lethal`}>
-      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <svg className="field-bead-ring" viewBox="0 0 48 48" aria-hidden="true"
+           focusable="false">
         <circle className="field-bead-track" cx="24" cy="24" r="20" />
         <circle className="field-bead-arc" cx="24" cy="24" r="20" />
       </svg>

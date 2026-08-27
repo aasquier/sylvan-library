@@ -7670,7 +7670,14 @@ button:hover .tarot-fan-card {
   display: grid;
   place-items: center;
 }
-.field-bead svg {
+/* **Named, not typed**, and that is the whole of a bug Aaron caught on the
+   screen. This rule used to be `.field-bead svg`, which is a descendant *type*
+   selector — so the moment a second `svg` went inside a bead for the crown, it
+   was caught by this too, and at one class plus one type it outweighed
+   `.field-bead-crown`. The crown took this rotation, this `inset` and this
+   full size, and lay on its side at 40px. A class costs nothing and cannot
+   reach a sibling it was never meant to. */
+.field-bead-ring {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -7853,7 +7860,9 @@ button:hover .tarot-fan-card {
   display: grid;
   place-items: center;
 }
-.field-life svg {
+/* Named for `.field-bead-ring`'s reason, before this one grows a second
+   child too. */
+.field-life-ring {
   position: absolute;
   inset: 0;
   width: 100%;

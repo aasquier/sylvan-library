@@ -89,3 +89,70 @@ export function keywordWords(keywords: string[], granted: string[] = []) {
   return drawableKeywords(keywords)
     .map((k) => (lent.has(k) ? `${k} (granted)` : k))
 }
+
+/**
+ * What each mark actually means, in one plain line.
+ *
+ * **Aaron's ask, and it is commandment 2 with the volume up** (2026-08-27):
+ * *"even if we can't say who bestowed it, we can say what the icon means since
+ * it is not native to that card"*. A granted keyword is the one case where a
+ * player has **nowhere to look it up** — the mark is thirteen pixels, and
+ * lifting the card face out shows a Bronzehide Lion with no vigilance printed
+ * on it. Somebody meeting Magic through this room sees a symbol appear on a
+ * creature and has no way at all to learn what happened.
+ *
+ * Every mark gets one, not only the lent ones. A printed keyword at least has
+ * an answer one hover away, but a viper is a viper whoever put it there, and
+ * making a newcomer work out *which* of the two kinds they are looking at
+ * before they are allowed the sentence is exactly the shape of unkindness this
+ * room does not do.
+ *
+ * **Typed against [DrawnKeyword], for the glyph map's reason**: a word added to
+ * `DRAWN_KEYWORDS` fails the typecheck until it has both a drawing and a
+ * sentence, so the three sets cannot quietly stop being the same set.
+ *
+ * The phrasing rules, because they are what keep these short enough to read in
+ * a tooltip. What the creature *does*, never the rule number; the consequence a
+ * player will meet at a table rather than the wording in the comprehensive
+ * rules; and **no numbers**, matching the marks themselves — ward and toxic
+ * both carry an amount, the sign says only that there is one, and the amount
+ * stays on the card where there is room for it.
+ */
+export const KEYWORD_MEANS: Record<DrawnKeyword, string> = {
+  flying: 'can only be blocked by creatures with flying or reach',
+  'first strike': 'deals its combat damage before creatures without it',
+  'double strike': 'deals combat damage twice — once before other creatures, '
+    + 'and again with them',
+  deathtouch: 'any damage it deals to a creature is enough to destroy it',
+  toxic: 'damage to a player also gives them poison counters, and ten poison '
+    + 'loses the game',
+  lifelink: 'damage it deals also gains its controller that much life',
+  vigilance: 'attacking does not tap it, so it can still block',
+  trample: 'damage beyond what the blockers can take carries through to the '
+    + 'player',
+  haste: 'can attack and tap the turn it arrives',
+  menace: 'cannot be blocked except by two or more creatures',
+  reach: 'can block creatures with flying',
+  hexproof: 'opponents cannot target it with their spells or abilities',
+  indestructible: 'is not destroyed by damage, or by anything that says '
+    + '"destroy"',
+  ward: 'targeting it costs an opponent an extra price first',
+  defender: 'cannot attack',
+}
+
+/**
+ * One mark, said in full: the word, what it means, and whether the card came
+ * with it.
+ *
+ * **The lent case is the one that has to say more**, and it says it plainly
+ * rather than in the bare parenthetical [keywordWords] uses for its list. A
+ * player looking at vigilance on a Bronzehide Lion and then at the Lion's own
+ * text needs to be told the two do not disagree — the card is right and the
+ * creature has it anyway. `granted` carries no source (it is the printing
+ * subtracted from the live set), so *that* it was given stays the whole of
+ * what may be claimed.
+ */
+export function keywordMeaning(word: DrawnKeyword, lent: boolean) {
+  const said = `${word} — ${KEYWORD_MEANS[word]}`
+  return lent ? `${said} (granted; not printed on this card)` : said
+}

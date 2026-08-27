@@ -2121,6 +2121,32 @@ it('sounds the alarm two swings out, and not before', () => {
   expect(dial?.getAttribute('title')).toContain('twenty-one')
 })
 
+// **Nothing in a dial is styled by being an `svg`**, and Aaron caught why.
+//
+// The ring is turned `-90deg` to put twelve o'clock at the top, and the rule
+// doing it used to be `.field-bead svg` — a descendant *type* selector. The
+// moment a second `svg` went inside a bead for the crown, that rule caught it
+// too, and at one class plus one type it outweighed `.field-bead-crown`: the
+// crown took the rotation, the `inset: 0` and the full 40px, and lay on its
+// side. Every check in this file passed while it did, and so did every other
+// one — jsdom applies no stylesheet, so the cascade is not a thing this suite
+// can see at all.
+//
+// So the gate is on the **structure that made it possible** rather than on the
+// pixel: an `svg` inside a bead with no class of its own is one a type selector
+// can still reach. That is checkable here, it is the actual precondition, and
+// it fails for the next decoration somebody adds as well as for this one.
+it('gives every mark in a dial a class a stylesheet can aim at', () => {
+  const { container } = beaten(2)
+  const bare: string[] = []
+  for (const bead of container.querySelectorAll('.field-bead, .field-life')) {
+    for (const mark of bead.querySelectorAll('svg')) {
+      if (!mark.getAttribute('class')) bare.push(bead.className)
+    }
+  }
+  expect(bare).toEqual([])
+})
+
 it('holds two commanders apart rather than summing them into a death', () => {
   const { container } = beaten(4)
   const dials = container.querySelectorAll('.field-bead.is-general')
@@ -2437,9 +2463,18 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
   const cat = container.querySelector('img[alt="Leonin Skyhunter"]')
     ?.closest('.field-card') as HTMLElement
   const marks = [...cat.querySelectorAll('.field-keyword')]
+  // **Each mark says what it means, and the lent one says the card is not
+  // wrong.** Aaron, on this exact pair (2026-08-27): *"even if we can't say who
+  // bestowed it, we can say what the icon means since it is not native to that
+  // card"*. A player who reads the Skyhunter looking for vigilance will not
+  // find it, so the mark is the one that has to explain itself.
   expect(marks.map((m) => m.getAttribute('title')),
     'flying is printed on the Skyhunter; the vigilance is Kaheera’s')
-    .toEqual(['flying', 'vigilance (granted)'])
+    .toEqual([
+      'flying — can only be blocked by creatures with flying or reach',
+      'vigilance — attacking does not tap it, so it can still block '
+        + '(granted; not printed on this card)',
+    ])
   expect(marks.filter((m) => m.classList.contains('is-granted')).length,
     'exactly one of the two marks stands on the other plate').toBe(1)
   expect(marks[1]?.classList.contains('is-granted')).toBe(true)
@@ -2454,6 +2489,10 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
   expect(cat.getAttribute('title')).toContain('flying, vigilance (granted)')
   for (const giver of ['Kaheera', 'Gwyn', 'Caracal', 'from']) {
     expect(band?.getAttribute('title'), `the band names a giver: ${giver}`)
+      .not.toContain(giver)
+    // The sentence on the mark is under the same rule — it explains the sign,
+    // it never guesses at a culprit.
+    expect(marks[1]?.getAttribute('title'), `the mark names a giver: ${giver}`)
       .not.toContain(giver)
     expect(cat.getAttribute('title'), `the card names a giver: ${giver}`)
       .not.toContain(giver)
