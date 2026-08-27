@@ -817,6 +817,15 @@ export interface ForgeBoardStep {
   turn?: number
   seat?: number
   life?: { seat: number; life: number }[]
+  /** Every seat whose **own** counters moved at this step — poison, and the
+   *  energy and experience that arrive through the same event.
+   *
+   *  Beside `life` because both are facts about a player rather than a card,
+   *  and shaped like a card's `counters` for the same reason it is: the whole
+   *  set crosses, so a reader replaces what it is holding instead of adding
+   *  deltas and drifting the first time one is dropped. **An empty array is a
+   *  real answer** — a player who has just had every counter taken off. */
+  counters?: { seat: number; counters: { kind: string; n: number }[] }[]
   changes?: ForgeBoardChange[]
   /** Every value a mana pool took during this step, in order — `'GGW'` is two
    *  green and one white, and `''` is a pool that has drained.

@@ -32,6 +32,7 @@ import forge.game.event.GameEventGameStarted;
 import forge.game.event.GameEventLandPlayed;
 import forge.game.event.GameEventManaPool;
 import forge.game.event.GameEventMulligan;
+import forge.game.event.GameEventPlayerCounters;
 import forge.game.event.GameEventPlayerDamaged;
 import forge.game.event.GameEventPlayerLivesChanged;
 import forge.game.event.GameEventSpellAbilityCast;
@@ -361,6 +362,43 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
         Json line = new Json("life").put("game", game);
         who(line, event.player());
         say(line.put("life", event.newLives()));
+        return null;
+    }
+
+    /**
+     * Counters on a *player* — poison first, and whatever else a game puts
+     * there.
+     *
+     * Life was the only number this listener ever sent about a person, so a
+     * game won on the tenth poison counter arrived as a board where nothing
+     * had happened and then an outcome sentence explaining it. Forge's bus has
+     * carried these the whole time (ADR 42's own table names poison, energy
+     * and experience against this event); nothing subscribed.
+     *
+     * **`amount()` is the new total, not the amount added, and the name says
+     * the opposite.** Every other event on this bus that means a delta is
+     * shaped like one, so this is the sort of thing to be sure about rather
+     * than reasonable about: `Player.setCounters` loads the old count into a
+     * local, calls the setter, and constructs this event with
+     * `(old, newValue.intValue())` — the second figure is the `Integer` it was
+     * *given*, read straight out of the bytecode. Sent as a total to match
+     * `counters` above, and for that entry's reason: a reader adding deltas
+     * drifts the first time one is dropped.
+     *
+     * **A null type means every counter was cleared**, which is a third thing
+     * and not a missing field. `clearCounters` and the bulk `setCounters` both
+     * fire with a null type and two zeroes — the only honest rendering of that
+     * is an empty name, and the far side reads it as "this player now has
+     * none". Writing `"?"` here, as the card path does for a genuinely unknown
+     * type, would ask a board to draw an unnamed counter that does not exist.
+     */
+    @Override
+    public Void visit(GameEventPlayerCounters event) {
+        Json line = new Json("player_counters").put("game", game);
+        who(line, event.receiver());
+        say(line.put("counter", event.type() == null ? "" : event.type().getName())
+                .put("was", event.oldValue())
+                .put("now", event.amount()));
         return null;
     }
 

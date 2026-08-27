@@ -657,3 +657,154 @@ func TestAnAttachmentTheDictionaryNeverNamedIsNotDrawn(t *testing.T) {
 		})
 	}
 }
+
+// --------------------------------------------------------- counters on people
+//
+// The fifth thing this file covers, and the newest. Poison, energy and
+// experience sit on a *player* rather than on a permanent, so none of the
+// rulings above reach them: they arrive through Forge's own
+// `GameEventPlayerCounters`, land on [tier3.BoardStep.Counters] beside the life
+// totals, and are folded by seat rather than by card id.
+
+// poisonLine is one Forge player-counter event, both totals, exactly as the
+// scribe writes them. The empty kind is the clear-all case and is spelled by
+// the caller rather than special-cased here.
+func poisonLine(seat int, kind string, was, now int) string {
+	return fmt.Sprintf(`{"t":"player_counters","game":1,"seat":%d,`+
+		`"who":"A player","counter":%q,"was":%d,"now":%d}`, seat, kind, was, now)
+}
+
+// heldBy folds one seat's own counters the way a browser folds them: the last
+// set that seat was given.
+func heldBy(log tier3.EventLog, seat int) []tier3.BoardCounter {
+	var out []tier3.BoardCounter
+	for _, step := range log.Board.Steps {
+		for _, moved := range step.Counters {
+			if moved.Seat == seat {
+				out = moved.Counters
+			}
+		}
+	}
+	return out
+}
+
+// Poison crosses as a running total, and the wrong reading is a plausible one.
+//
+// Forge's field is called `amount`, which on every other event on that bus
+// would mean a delta. It does not here — `Player.setCounters` hands the event
+// the `Integer` it was given — so a reader treating four, then eight, then
+// twelve as arrivals would have a player on twenty-four when the game killed
+// them at twelve. The numbers below are the ones a real Skithiryx match
+// produced, kept because they are the shape that tells the two readings apart.
+func TestAPlayersPoisonIsATotalAndNotAnArrival(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		poisonLine(2, "Poison", 0, 4),
+		turnLine(2, 2),
+		poisonLine(2, "Poison", 4, 8),
+		turnLine(3, 1),
+		poisonLine(2, "Poison", 8, 12),
+		turnLine(4, 2),
+		endGame)
+	held := heldBy(logs[0], 2)
+	if len(held) != 1 || held[0].Kind != "Poison" || held[0].N != 12 {
+		t.Errorf("the poisoned seat holds %v; twelve counters of one kind is "+
+			"what Forge said, and a summed delta would read twenty-four", held)
+	}
+	if other := heldBy(logs[0], 1); len(other) != 0 {
+		t.Errorf("the other seat was given %v and Forge never mentioned it",
+			other)
+	}
+}
+
+// Every kind Forge announces is carried, not only the one that kills.
+//
+// Deciding here which counters a room is allowed to see would be this package
+// taking a view, which is the division ADR 14 draws: energy and experience come
+// through the same event, and a reel that dropped them would be lossy at
+// exactly the moment somebody wrote the component that wanted them.
+func TestAPlayerHoldsEveryKindOfCounterForgeNames(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		poisonLine(1, "Energy", 0, 3),
+		turnLine(2, 2),
+		poisonLine(1, "Experience", 0, 1),
+		turnLine(3, 1),
+		endGame)
+	held := heldBy(logs[0], 1)
+	if len(held) != 2 || held[0].Kind != "Energy" || held[0].N != 3 ||
+		held[1].Kind != "Experience" || held[1].N != 1 {
+		t.Errorf("the seat holds %v, want three Energy and one Experience "+
+			"sorted by kind", held)
+	}
+}
+
+// A player losing their last counter says so, for [TestACardWithNoCountersLeftSaysSo]'s
+// reason: the far side is holding the old set and has to be told to put it down.
+func TestAPlayerWithNoCountersLeftSaysSo(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		poisonLine(2, "Poison", 0, 2),
+		turnLine(2, 2),
+		poisonLine(2, "Poison", 2, 0),
+		turnLine(3, 1),
+		endGame)
+	said := false
+	for _, step := range logs[0].Board.Steps {
+		for _, moved := range step.Counters {
+			if moved.Seat == 2 && len(moved.Counters) == 0 {
+				said = true
+			}
+		}
+	}
+	if !said {
+		t.Error("the last counter came off a player and no step said the " +
+			"seat was empty; a scoreboard holding the old set draws poison " +
+			"on somebody who has none")
+	}
+}
+
+// The empty kind is Forge clearing every counter at once, and it is a third
+// case rather than a line to drop.
+//
+// `Player.clearCounters` and the bulk `setCounters` both fire with a null type
+// and two zeroes, which the scribe renders as an empty name. Read as a missing
+// field it would be discarded, and a player whose counters had just been wiped
+// would stay poisoned on the board for the rest of the game.
+func TestClearingEveryCounterEmptiesThePlayer(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		poisonLine(2, "Poison", 0, 5),
+		turnLine(2, 2),
+		poisonLine(2, "Energy", 0, 2),
+		turnLine(3, 1),
+		poisonLine(2, "", 0, 0),
+		turnLine(4, 2),
+		endGame)
+	if held := heldBy(logs[0], 2); len(held) != 0 {
+		t.Errorf("every counter was cleared and the seat still holds %v", held)
+	}
+}
+
+// A counter that has not moved is not news.
+//
+// Forge announces a great deal that has not changed, and a scoreboard flinching
+// on a beat where nothing happened is the same fault `lives` guards against.
+func TestAPlayerCounterThatDidNotMoveIsNotAStep(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		poisonLine(2, "Poison", 0, 3),
+		turnLine(2, 2),
+		poisonLine(2, "Poison", 3, 3),
+		poisonLine(2, "Poison", 3, 3),
+		turnLine(3, 1),
+		endGame)
+	steps := 0
+	for _, step := range logs[0].Board.Steps {
+		steps += len(step.Counters)
+	}
+	if steps != 1 {
+		t.Errorf("%d steps carried the seat's counters; three lines said the "+
+			"same three counters and only the first of them was news", steps)
+	}
+}
