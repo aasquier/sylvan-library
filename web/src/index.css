@@ -8154,7 +8154,7 @@ button:hover .tarot-fan-card {
  * turn by exactly the same amount and each chip on it turn back by exactly
  * the same amount. Three places, one angle: change it here and the overlays
  * follow, which is the failure mode the first draft of this had. */
-.field-card { --turn: 45deg; }
+.field-card { --turn: 45deg; --field-lens: 26px; }
 .field-card.is-tapped .field-card-turn { transform: rotate(var(--turn)); }
 
 .field-card-art {
@@ -8758,6 +8758,53 @@ button:hover .tarot-fan-card {
 .field-card-counters { transform-origin: 0 100%; }
 .field-card-lens { transform-origin: 100% 100%; }
 .field-keywords { transform-origin: 0 0; }
+
+/* **Turned, the counters go and stand with the loupe.**
+ *
+ * The scheme above is right for four things in four corners and it has one bad
+ * pairing in it. Upright, counters at bottom-left and the loupe at bottom-right
+ * are a card's width apart. Turned, both corners swing: the loupe's drops to
+ * the foot of the card and the counters' swings *off the left edge entirely*,
+ * so the chips end up hanging in the sand about a dozen pixels up and to the
+ * left of the glass — near enough to read as one object and far enough to read
+ * as a broken one (Aaron, 2026-08-27: the chip "sits awkwardly against its
+ * power/toughness"). Neither corner is wrong; the gap between them is.
+ *
+ * So in this one state the counters stop being a corner and become part of the
+ * loupe: they take the glass's own anchor and sit at its upper left, which is
+ * where a player's thumb would hold them and the one quadrant of that corner
+ * nothing else is using. Power, toughness and what is modifying them end up in
+ * one place, which is how they are read anyway.
+ *
+ * **The transform order is the whole trick and it is easy to get backwards.**
+ * The chip lives inside the arm, so its own axes are already turned forty-five
+ * degrees; a bare `translate` would walk it diagonally across the card. Writing
+ * the rotation *first* un-turns the coordinate system, and the translate that
+ * follows is then measured along the screen's axes — straight up and straight
+ * left, which is what "upper left of the loupe" means to somebody looking at
+ * it. Swap the two functions and the chips slide down the card's diagonal
+ * instead.
+ *
+ * The offset is the glass's own size less the tuck, and the tuck is geometry
+ * rather than taste: the loupe is a circle inscribed in that square, so its rim
+ * is about a fifth of the size in from the corner. Move by the full size and
+ * the chip floats a visible notch off the glass; move by the size less the tuck
+ * and its corner meets the rim. */
+.field-card.is-tapped .field-card-counters {
+  --field-lens-tuck: 5px;
+  left: auto;
+  right: 0;
+  bottom: 0;
+  align-items: flex-end;
+  transform-origin: 100% 100%;
+}
+.field-card.is-tapped .field-card-arm > .field-card-counters {
+  transform:
+    rotate(calc(-1 * var(--turn)))
+    translate(
+      calc(-1 * (var(--field-lens) - var(--field-lens-tuck))),
+      calc(-1 * (var(--field-lens) - var(--field-lens-tuck))));
+}
 /* ------------------------------------------------- what the card can do
  *
  * **The upper-left corner, which was the one this board had left.** Count
@@ -8863,8 +8910,8 @@ button:hover .tarot-fan-card {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 26px;
-  height: 26px;
+  width: var(--field-lens);
+  height: var(--field-lens);
 }
 /* Picked up. The lens lifts and grows a little under the pointer — the only
    thing hover does here now that the glass no longer arrives with it. */
