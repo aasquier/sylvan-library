@@ -14,7 +14,9 @@ import com.google.common.eventbus.Subscribe;
 
 import forge.card.MagicColor;
 import forge.card.mana.ManaAtom;
+import forge.game.Game;
 import forge.game.GameEntityView;
+import forge.game.card.Card;
 import forge.game.card.CardView;
 import forge.game.event.EventValueChangeType;
 import forge.game.event.GameEvent;
@@ -60,6 +62,17 @@ import forge.game.zone.ZoneType;
  * belongs on the far side of the pipe, where it is testable without a JVM
  * (ADR 14's division, applied to a subprocess).
  *
+ * **It may also *ask*, and [#live] is the one thing it asks through.** Forge's event
+ * bus hands over `CardView`s, and a view is a projection: it carries what a
+ * screen needs and drops the rest, which is why keyword attribution is
+ * unanswerable here (ADR 45's fifth ruling) and why *was this card cast* was.
+ * `Card.wasCast()` is Forge's own recorded answer to that exact question and
+ * lives one layer below the view, so [#entered] reaches through
+ * `Game.findById` to read it. That is still listening: the question is put to
+ * Forge about the card the event just named, and Forge's own boolean comes
+ * back. It is not the thing this class refuses — which is *concluding* a fact
+ * nobody announced, from the circumstances around it.
+ *
  * The one piece of state is [#seen], and it is bookkeeping rather than
  * judgement: `GameEventCardStatsChanged` fires on almost every priority pass
  * and re-sends the whole card whether anything moved or not. Measured on one
@@ -104,14 +117,32 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
      * events Forge raises before the game announces it has started.
      */
     private final Map<Integer, Integer> seats = new HashMap<>();
+    /**
+     * The game being played, for the one question the view cannot answer.
+     *
+     * Held rather than passed because the bus hands over events, not the game
+     * that raised them, and [#entered] needs `Game.findById` to reach the model
+     * card behind a `CardView`. Replaced per game and nullable: a `Scribe`
+     * constructed without one — a test, or a future caller — simply says
+     * nothing about how a permanent arrived, rather than failing.
+     */
+    private Game live;
 
     public Scribe(PrintStream out) {
         this.out = out;
     }
 
-    /** Called by the runner between games, before the next one is created. */
-    public void nextGame(int number) {
+    /**
+     * Called by the runner between games, before the next one is started.
+     *
+     * The game object arrives with the number because both are per game and
+     * parting them is how one of them goes stale: a `live` left pointing at
+     * game one would answer every question in game two against a board nobody
+     * is playing on.
+     */
+    public void nextGame(int number, Game playing) {
         this.game = number;
+        this.live = playing;
         seen.clear();
         seats.clear();
         say(new Json("game").put("game", number));
@@ -149,17 +180,84 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
      * reachable at all: `GameEventTokenCreated` is a record with no fields —
      * a bare signal — but a token arriving on the battlefield is a zone change
      * carrying the token's own `CardView`, name, id and all.
+     *
+     * **`GameEventZone.sa()` is not a way to learn what put the card there**,
+     * and it looks exactly like one. The record has five components and the
+     * fifth is a `SpellAbilityView`, which reads as *the spell responsible for
+     * this move* — but the four-argument constructor Forge actually uses passes
+     * `aconst_null` into that slot, and `Zone.add`, `Zone.remove` and
+     * `Zone.setCards` are all that constructor. Only the three-argument form
+     * fills it, and nothing but the stack raises that: measured over two whole
+     * games, `sa()` was non-null 98 times and **every one of them was a
+     * `Stack in`** — the one zone this board drops whole. A reader that reached
+     * for it on a battlefield arrival would find null forever and read that as
+     * "nothing cast this".
      */
     @Override
     public Void visit(GameEventZone event) {
         CardView card = event.card();
         if (card == null || event.zoneType() == null) return null;
+        boolean arriving = event.mode() == EventValueChangeType.Added;
         Json line = new Json("zone")
                 .put("game", game)
                 .put("zone", event.zoneType().name())
-                .put("mode", event.mode() == EventValueChangeType.Added ? "in" : "out");
+                .put("mode", arriving ? "in" : "out");
+        if (arriving && event.zoneType() == ZoneType.Battlefield) {
+            entered(line, card);
+        }
         who(line, event.player());
         return card(line, card);
+    }
+
+    /**
+     * How a permanent got onto the battlefield: **cast, or put there**.
+     *
+     * Magic's own two words, and a real difference a board could not see. Aaron
+     * wants the second one to get a scene — Atla Palani cracking an egg and a
+     * Blightsteel Colossus simply *being there* is the moment that deck is
+     * built for — and until now it arrived looking exactly like a creature the
+     * room had just watched somebody pay for.
+     *
+     * **Forge's own boolean, not a reading of the circumstances.** The view has
+     * no answer: `CardView` carries `isToken`, `getZone` and `hasSickness`, and
+     * `TrackableProperty` has `Token` and `TokenCard` and nothing general for
+     * this. The model does — `Card.wasCast()` — so the id the event just named
+     * goes back through `Game.findById` and the card is asked. Across two
+     * recorded runs that lookup **missed zero times in 127 arrivals**, which is
+     * why there is no third word here for "could not tell". If it ever does
+     * miss, the field is simply absent and the far side reads that as "nobody
+     * said" — which is the same silence an older worker image sends, and is
+     * handled rather than guessed.
+     *
+     * Cross-checked against a second, independent mechanism before it was
+     * believed, because two encodings on this bus have already been decoded
+     * wrongly in a way that looked right. `GameEventCardChangeZone` carries the
+     * zone a card came *from*, and a permanent spell resolves off the stack —
+     * so "arrived from the Stack" and "wasCast" should be the same set.
+     * **They agreed on all fifty-nine, with no disagreement in either
+     * direction.** The boolean is what ships, because it is the answer to the
+     * question rather than a rule applied to a neighbouring fact.
+     *
+     * **A word rather than a flag, and it is on every arrival.** [Json] drops a
+     * false, so a boolean would have made "put onto the battlefield" and "this
+     * scribe never heard of the question" the same silence — and they are not:
+     * a worker image built before today sends neither, and a board that read
+     * absence as `put` would hand every creature in every old match the scene
+     * that belongs to four of them. A missing `entered` means nobody said.
+     *
+     * A land is `put`, which is correct and worth knowing before reading it: a
+     * land is *played*, never cast (rule 305.1), so twenty-six of the forty
+     * uncast arrivals in the measured match were lands and thirteen more were
+     * tokens. The one real spell that entered without being cast was an
+     * End-Raze Forerunners off Atla Palani. Whoever draws this wants
+     * `EventEnters`, which already excludes lands, and `token`, which is
+     * already on the line.
+     */
+    private void entered(Json line, CardView card) {
+        if (live == null) return;
+        Card model = live.findById(card.getId());
+        if (model == null) return;
+        line.put("entered", model.wasCast() ? "cast" : "put");
     }
 
     /**
@@ -544,15 +642,76 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
      * `isSpell()`; the stack item knows `isTrigger()` as well, which separates
      * the ability a player chose to activate from the one the game raised on
      * their behalf. It is nullable, so its absence simply leaves the flag off.
+     *
+     * **And it knows what the ability was aimed at**, which is the half that
+     * makes eminence a picture rather than a shrug. `getTargetCards()` and
+     * `getTargetPlayers()` are on the stack item, populated, and were simply
+     * never read: an Arahbo trigger reached the browser saying a commander in
+     * the command zone had done *something*, with no way to say which cat got
+     * bigger. Measured over two games — three eminence triggers from the
+     * command zone, and **every one of them named its target**.
+     *
+     * **Not every ability has one, and that is the shape of the data rather
+     * than a gap.** Seventeen of seventy-five abilities carried a target and
+     * fifty-eight carried none — Arahbo's *attack* pump defines its creature
+     * with `Defined$` instead of targeting it, and a surveil trigger or a quest
+     * counter is aimed at nothing at all. A room that drew an arrow for every
+     * ability would be inventing three out of four of them.
+     *
+     * **All of them cross, not the first.** No ability in the measured match
+     * had more than one target, so a single pair of fields would have fitted
+     * what was seen — and would have quietly narrowed the first ability that
+     * has two. `targets` is the id list, comma-joined the way `keywords` is and
+     * for the same reason: [Json] writes flat objects of scalars on purpose.
+     * The named `target` beside it is the first one, and it is there for the
+     * *sentence* — a beat says "pumps Bronzehide Lion" and has nowhere to put a
+     * list — while the board reads the ids and points at the exact cards.
+     *
+     * A player target goes out through [#against], which is where every other
+     * beat aimed at a person already goes. **Zero of seventy-five used it** in
+     * the measured match, so unlike everything else here it is wired on the
+     * strength of the accessor existing rather than of having been watched
+     * working; the first curse or trigger aimed at a player will be its first
+     * real exercise.
      */
     private Void ability(GameEventSpellAbilityCast event, CardView host) {
         Json line = new Json("ability").put("game", game);
         who(line, host.getController());
         StackItemView item = event.si();
-        if (item != null) line.put("trigger", item.isTrigger());
+        if (item != null) {
+            line.put("trigger", item.isTrigger());
+            aimedAt(line, item);
+        }
         ZoneType zone = host.getZone();
         if (zone != null) line.put("zone", zone.name());
         return card(line, host);
+    }
+
+    /**
+     * What one stack item was aimed at: the cards by id, and the first by name.
+     *
+     * Both collections are nullable and either may be empty, which is the
+     * common case — see [#ability] for the counts and for why the list is
+     * joined rather than sent one field per target.
+     */
+    private void aimedAt(Json line, StackItemView item) {
+        if (item.getTargetCards() != null) {
+            StringBuilder ids = new StringBuilder(16);
+            for (CardView aim : item.getTargetCards()) {
+                if (aim == null) continue;
+                if (ids.length() == 0) target(line, aim);
+                else ids.append(',');
+                ids.append(aim.getId());
+            }
+            if (ids.length() > 0) line.put("targets", ids.toString());
+        }
+        if (item.getTargetPlayers() != null) {
+            for (PlayerView aim : item.getTargetPlayers()) {
+                if (aim == null) continue;
+                against(line, aim);
+                break;
+            }
+        }
     }
 
     /**

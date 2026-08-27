@@ -72,6 +72,19 @@ type scribeLine struct {
 	Zone   string `json:"zone"`
 	Mode   string `json:"mode"`
 	Tapped bool   `json:"tapped"`
+	// Entered is how a permanent reached the battlefield — `cast` or `put`,
+	// Magic's own two words — and **the empty string is a third state**: it
+	// means nobody said, not that nothing was cast. A worker image built before
+	// the scribe learned to ask sends no such field, and neither does the prose
+	// path, so a reader that took absence for `put` would tell every old match
+	// that every creature in it appeared out of thin air.
+	//
+	// Forge's own `Card.wasCast()`, reached through the model rather than read
+	// off a view — `Scribe.java`'s `entered` argues why the view cannot answer
+	// and how the answer was cross-checked. Only ever on a `zone` line
+	// arriving on the battlefield; a land is `put`, because a land is played
+	// and never cast.
+	Entered string `json:"entered"`
 	// Keywords is the card instance's **live** keyword set, comma-joined —
 	// granted ones included, which is the whole reason it is here. Scryfall's
 	// list one layer up is keyed by card name and says what a *printing* has;
@@ -98,8 +111,18 @@ type scribeLine struct {
 	Was int `json:"was"`
 	Now int `json:"now"`
 
-	TargetID    int    `json:"target_id"`
-	Target      string `json:"target"`
+	TargetID int    `json:"target_id"`
+	Target   string `json:"target"`
+	// Targets is every card an `ability` was aimed at, by board id, comma-joined
+	// the way [scribeLine.Keywords] is — the scribe writes flat objects of
+	// scalars, so a list travels as a string. Empty for the three abilities in
+	// four that target nothing at all.
+	//
+	// [scribeLine.Target] beside it is the *first* of these, by name, and the
+	// two are not a duplicate: a beat says "pumps Bronzehide Lion" and has
+	// nowhere to put a list, while the board points at exact cards and cannot
+	// use a name — two Egg Tokens are one string between them.
+	Targets     string `json:"targets"`
 	Against     string `json:"against"`
 	AgainstSeat int    `json:"against_seat"`
 	Amount      int    `json:"amount"`
@@ -408,9 +431,15 @@ func (p *ScribeParser) fold(l scribeLine) {
 		}
 		// A permanent arriving. See [EventEnters] for why lands are excluded
 		// and why this is not called "resolves".
+		//
+		// **Whether it was cast rides along**, which is the difference between
+		// a creature the room has just watched somebody pay for and one that
+		// simply appeared. `l.Entered` is Forge's own answer, carried straight
+		// through — see [GameEvent.Entered] for why the empty string is a third
+		// state rather than a `put`, and why nothing here supplies a default.
 		if p.board.zone[l.ID] == ZoneBattlefield && was != ZoneBattlefield {
 			p.raise(GameEvent{Kind: EventEnters, Seat: p.seated(l),
-				Card: p.named(l), ID: l.ID})
+				Card: p.named(l), ID: l.ID, Entered: l.Entered})
 		}
 	case "attach", "detach":
 		p.note(l, 0)
@@ -507,10 +536,17 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// Eminence is the ask, and it is why the zone travels: a commander using
 		// an ability from the command zone never moves, so there is no other
 		// signal anywhere in this stream that it did anything at all.
+		//
+		// **What it was aimed at travels twice, at two grains, and neither is
+		// the other's copy.** The board takes the ids, because pointing at a
+		// card is the only way to say *which* Bronzehide Lion; the beat takes
+		// the first target's name, because a sentence has nowhere to put a list
+		// and "pumps Bronzehide Lion" is what a room reads out. See
+		// [BoardAbility.Targets] for how often either is there at all.
 		p.note(l, l.Seat)
-		p.board.usedAbility(l.ID, l.Seat, l.Zone, l.Trigger)
+		p.board.usedAbility(l.ID, l.Seat, l.Zone, l.Trigger, l.Targets)
 		p.raise(GameEvent{Kind: EventAbility, Seat: l.Seat, Card: l.Card,
-			ID: l.ID, Zone: l.Zone, Trigger: l.Trigger})
+			ID: l.ID, Zone: l.Zone, Trigger: l.Trigger, Target: l.Target})
 	case "turn":
 		p.board.began(l.Turn, l.Seat)
 		if l.Life != nil {
