@@ -36,6 +36,19 @@ import (
 // — checked against the enum in the shipped jar, not assumed. That is also
 // where the rules put it.
 //
+// **And it is not dealt**, which is worth writing down here because the line
+// above is the only thing in this repository that could have made it so, and
+// because a watched match looked exactly as though it had been (Aaron,
+// 2026-08-27: *"I swear Kaheera was dealt in a hand"*). Forge's `Match` loads
+// `[Main]` into `ZoneType.Library` and `[Sideboard]` into `ZoneType.Sideboard`
+// — two zones, and `Player.shuffle` touches only the first — then calls
+// `Player.assignCompanion`, which lifts the companion out of the sideboard and
+// into the command zone before anybody draws a card. Checked in the bytecode
+// and then watched happening: a real match on 2026-08-27 put Kaheera in the
+// command zone in the second line of the stream, ahead of the first
+// `Library out` anywhere in it, and moved her to a hand on turn five for {3}.
+// `EventCompanion` in `events.go` is that moment, said out loud.
+//
 // **A `.dck` is a temporary file, never an artifact.** CLAUDE.md rule 3 fixes
 // the deliverables at five, and this is not a sixth: it is an input to a
 // simulator, written into a scratch directory for the length of a run.

@@ -147,6 +147,13 @@ type ScribeParser struct {
 	// bookkeeping. Per game, like Forge's ids. [ScribeParser.refused] argues
 	// why the answer is remembered rather than asked again.
 	phantoms map[int]bool
+	// sidelined is every card id seen leaving a sideboard, and companions is
+	// the ones that went from there into a command zone. Both per game, like
+	// Forge's ids. [ScribeParser.outsideTheGame] argues why two steps rather
+	// than one, and why this reader identifies a companion at all when the
+	// deck one layer up already names it.
+	sidelined  map[int]bool
+	companions map[int]bool
 	// turn is the highest turn number Forge announced, which is what
 	// `GameResult.Turns` means everywhere else in this package.
 	turn int
@@ -161,7 +168,8 @@ type ScribeParser struct {
 // rows passes false and pays for none of it.
 func NewScribeParser(watching bool) *ScribeParser {
 	return &ScribeParser{prose: NewStreamParser(), watching: watching, game: 1,
-		board: newBoard(), seats: map[int]string{}, phantoms: map[int]bool{}}
+		board: newBoard(), seats: map[int]string{}, phantoms: map[int]bool{},
+		sidelined: map[int]bool{}, companions: map[int]bool{}}
 }
 
 // Output is the run's tally — the complaints, and the games.
@@ -227,6 +235,7 @@ func (p *ScribeParser) startGame(number int) {
 	p.board = newBoard()
 	p.seats = map[int]string{}
 	p.phantoms = map[int]bool{}
+	p.sidelined, p.companions = map[int]bool{}, map[int]bool{}
 	p.turn, p.outcomeTurn = 0, 0
 }
 
@@ -288,6 +297,16 @@ func (p *ScribeParser) fold(l scribeLine) {
 		}
 		p.board.moved(l.ID, l.Zone, l.Mode, l.Seat)
 		p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
+		// **A companion arriving in a hand from the command zone**, which is
+		// the {3} being paid and was the one moment on this board with nothing
+		// said about it at all. See [EventCompanion] — and see
+		// [ScribeParser.outsideTheGame], which is also the reader that learns
+		// which card is the companion in the first place.
+		if p.outsideTheGame(l, was) {
+			p.raise(GameEvent{Kind: EventCompanion, Seat: l.Seat,
+				Card: l.Card, ID: l.ID})
+			return
+		}
 		// A **creature or planeswalker** leaving the battlefield for a
 		// graveyard is the one zone change worth a sentence — it is `dies`
 		// everywhere in this package, and it is the same reading the log's
@@ -494,6 +513,56 @@ func (p *ScribeParser) note(l scribeLine, seat int) {
 	p.board.name(l.ID, l.Card, l.Types, l.Token, seat)
 	p.board.copiedBy(l.ID, l.CopiedBy)
 	p.board.keywords(l.ID, l.Keywords)
+}
+
+// outsideTheGame follows a companion, and answers whether this line is the
+// {3} being paid for it. See [EventCompanion] for the whole sequence and the
+// bytecode behind it.
+//
+// **Three lines make the answer, and they are turns apart.** Forge announces
+// `Sideboard out` and then `Command in` before the first turn begins, and that
+// pair is the signature: `forge.game.Match` fills `ZoneType.Sideboard` from the
+// `.dck`'s `[Sideboard]` and immediately calls `Player.assignCompanion`, which
+// is the only thing in a game of Commander that moves a card from a sideboard
+// into a command zone. Much later — turn 5 in the recorded match — the same
+// card goes `Command out`, `Hand in`, and that is the ability being activated.
+//
+// **A wish is the near miss, and the destination is what parts them.** Forge's
+// `ChangeZoneEffect` takes cards out of a sideboard too — that is what Living
+// Wish is — but it puts them in a hand or on the battlefield, never in a
+// command zone. Requiring the command zone *and* the setup keeps the two
+// apart without this having to know what a wish is.
+//
+// **A second reader of the same fact, deliberately.** `api/forge.go` already
+// names the companion, off `deck.yaml`'s own declaration, and normally a
+// second derivation of one fact is the thing this package refuses to build
+// ([forgeBoardSeat.Shape] argues exactly that). These two are not the same
+// fact. The deck says what was *declared*; this says what Forge actually
+// *did*, and they part company for real reasons — Forge checks the companion's
+// deck restriction against the library it built and simply leaves a companion
+// that fails it sitting in the sideboard, where nothing ever moves it. The
+// account may only narrate what happened.
+//
+// A card leaving a sideboard is remembered rather than matched against the
+// next line, because Forge promises nothing about what sits between the two.
+func (p *ScribeParser) outsideTheGame(l scribeLine, was string) bool {
+	if l.ID == 0 {
+		return false
+	}
+	switch {
+	case l.Mode == "out" && l.Zone == "Sideboard":
+		p.sidelined[l.ID] = true
+	case l.Mode == "in" && l.Zone == "Command" && p.sidelined[l.ID] && p.turn == 0:
+		p.companions[l.ID] = true
+	case l.Mode == "in" && l.Zone == "Hand" && was == ZoneCommand:
+		// **The zone it came from is checked as well as the card**, because a
+		// companion is a card like any other once it has been bought: it can
+		// be discarded, milled, and bounced back to the hand by anything that
+		// bounces a creature. Only the trip out of the command zone is the
+		// one somebody paid three mana for.
+		return p.companions[l.ID]
+	}
+	return false
 }
 
 // outcome raises the beat for one of Forge's outcome sentences.

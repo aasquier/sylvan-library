@@ -173,7 +173,50 @@ const (
 	// any new listener on this bus: **ten in a forty-six-turn game**, against 46
 	// lands and 548 zone movements.
 	EventAbility EventKind = "ability"
-	EventOutcome EventKind = "outcome"
+	// EventCompanion is a companion bought in from outside the game: it leaves
+	// the command zone for its controller's hand, which is the {3} being paid.
+	//
+	// **It exists because the board looked like it was cheating** (Aaron,
+	// 2026-08-27: *"I watched a match play and I swear Kaheera was dealt in a
+	// hand? That should not be possible, you don't shuffle your companion in
+	// with normal cards to be dealt, they come from outside the game like the
+	// commander does"*). He is right about the rules and the engine was right
+	// about the game: a companion is never shuffled in, and what he watched was
+	// the {3} being paid. The card simply appeared in a hand with nothing said,
+	// and a beginner watching a hand gain a card it was never dealt has been
+	// shown a game that cheats — which commandment 2 will not have.
+	//
+	// **The whole sequence, measured on a real match** (Arahbo/Kaheera against
+	// itself, seed 11, 2026-08-27) rather than reasoned about:
+	//
+	//	Sideboard out  ->  Command in     (setup, before the first draw)
+	//	  ... three lands tap, the pool rises and drains three times ...
+	//	Command out    ->  Hand in        (turn 5)
+	//	Hand out       ->  Stack in       (cast, normally, from the hand)
+	//
+	// It matches Forge's own bytecode. `Match` loads `[Main]` into
+	// `ZoneType.Library` and `[Sideboard]` into `ZoneType.Sideboard` — two
+	// zones, and only the first is shuffled — then calls
+	// `Player.assignCompanion`, which scans the sideboard for `Keyword.COMPANION`,
+	// checks the deck restriction and ends in
+	// `GameAction.moveTo(ZoneType.Command, companion, ...)`. The effect it
+	// leaves beside it carries
+	// `Cost$ 3 | Origin$ Command | Destination$ Hand | SorcerySpeed$ True`,
+	// which is the ability being activated here.
+	//
+	// **The {3} is not on the wire, because it is a rule rather than an
+	// observation.** Rule 702.139b fixes every companion's cost at {3}; the
+	// stream attributes no mana to the ability, and inventing an amount from
+	// the lands that happened to tap is the class of inference ADR 44 forbids.
+	// A room saying "three mana" is saying what the rule says.
+	//
+	// **Raised only for a card Forge itself took out of a sideboard**, which is
+	// what makes this a fact instead of a guess. Nothing else in a Commander
+	// game moves a card from a sideboard into a command zone, and nothing else
+	// moves a card from a command zone into a hand — a commander leaving its
+	// zone goes to the *stack*, which the same recorded match shows twice.
+	EventCompanion EventKind = "companion"
+	EventOutcome   EventKind = "outcome"
 )
 
 // GameEvent is one beat of a game.

@@ -55,7 +55,7 @@ what it costs and why it is never on by default.
 
 ## What the bridge had to work around
 
-Five things, each established by running Forge rather than by reading its wiki.
+Six things, each established by running Forge rather than by reading its wiki.
 
 **`sim` still initialises AWT, and dies silently without a display.** Found on
 the first live worker machine (2026-08-20): `forge.view.Main` touches fonts
@@ -86,6 +86,29 @@ Recovery // Bala Ged Sanctuary` — and the same for split cards, `Alive` and
 `Well` rather than `Alive // Well`. `coverage.resolve` is the single place a
 Scryfall name becomes a Forge name, and the exporter writes exactly what the
 pre-flight resolved, so a clean report and a correct `.dck` cannot drift apart.
+
+**`[Sideboard]` is a zone, not the back of the library — and that is where a
+companion lives.** Forge has no companion section (`forge.deck.DeckSection` is
+ten values and none of them is one), so `dck.go` writes the companion into
+`[Sideboard]`, which is also where the rules put it. The question that raises
+— *is it then shuffled in and dealt?* — is no, twice over. `forge.game.Match`
+loads `[Main]` into `ZoneType.Library` and `[Sideboard]` into
+`ZoneType.Sideboard`, two different zones, and `Player.shuffle` touches only
+the first; it then calls `Player.assignCompanion`, which scans the sideboard
+for `Keyword.COMPANION`, tests the deck restriction against the library it just
+built, and ends in `GameAction.moveTo(ZoneType.Command, companion, …)`.
+Watched happening on 2026-08-27: an Arahbo/Kaheera deck against itself put the
+companion in the command zone six lines into the stream, ahead of the first
+card anybody drew, and moved it `Command → Hand` on turn five behind three
+lands tapping — the {3} of rule 702.139b. It is then cast from the hand like
+anything else. `TestARealMatchNeverDealsACompanion` is that run, kept.
+
+Two consequences worth knowing before reading a board. **A companion whose
+restriction fails never appears at all** — Forge leaves it in the sideboard,
+silently, and the deck plays as 99 — so a deck that *declares* a companion and
+a game that *has* one are different claims. And the arrival in hand is a real
+zone change that looks exactly like a draw unless somebody says otherwise,
+which is what the `companion` beat is for.
 
 **An unimplemented card does not stop a game.** This is the important one. A
 deck with three names Forge does not know produced:
