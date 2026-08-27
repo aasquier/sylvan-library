@@ -241,6 +241,14 @@ export interface BoardSide {
   slug: string | null
   name: string
   life: number
+  /** This player's **own** counters — poison first, and whatever else a game
+   *  puts on a person.
+   *
+   *  Empty is the ordinary state and it is not the same as a zero: a room
+   *  drawing `0 poison` on every game would be claiming that poison is a thing
+   *  this match is doing, and almost no match is. The trench draws a bead only
+   *  when there is one to draw. */
+  counters: { kind: string; n: number }[]
   /** The front line. */
   creatures: BoardCard[]
   /** Planeswalkers, and anything a future set invents that is none of the
@@ -368,6 +376,7 @@ export interface BoardState {
 function emptySide(seat: ForgeBoardSeat): BoardSide {
   return {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
+    counters: [],
     creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
     hand: [], graveyard: [], exile: [], thrones: [], companion: null,
     command: [], commanders: [], pool: '', raised: '', gained: '',
@@ -396,6 +405,10 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   const order: number[] = []
   const life = new Map<number, number>()
   for (const seat of board.seats) life.set(seat.seat, seat.life)
+  // A player's own counters, folded exactly like their life: the last set a
+  // step published is what they are holding. Nobody starts with any, so an
+  // absent seat here is a seat that has never been given one.
+  const held = new Map<number, { kind: string; n: number }[]>()
   // Each seat's floating mana, and the two transients that belong to the beat
   // being drawn rather than to the game so far — see `BoardState`.
   const pool = new Map<number, string>()
@@ -420,6 +433,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     }
     if (step.seat) active = step.seat
     for (const moved of step.life ?? []) life.set(moved.seat, moved.life)
+    for (const moved of step.counters ?? []) held.set(moved.seat, moved.counters)
     // **The pool folds to its last value and the movement is kept only for the
     // beat being drawn now.** A seat appears more than once in one step — mana
     // arriving and being spent — so the last entry is where the pool came to
@@ -573,6 +587,10 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   for (const [seat, total] of life) {
     const side = bySeat.get(seat)
     if (side) side.life = total
+  }
+  for (const [seat, on] of held) {
+    const side = bySeat.get(seat)
+    if (side) side.counters = on
   }
   for (const [seat, held] of pool) {
     const side = bySeat.get(seat)

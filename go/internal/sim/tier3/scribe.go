@@ -388,6 +388,17 @@ func (p *ScribeParser) fold(l scribeLine) {
 		p.board.lives(l.Seat, *l.Life)
 		after := *l.Life
 		p.raise(GameEvent{Kind: EventLife, Seat: l.Seat, Life: &after})
+	case "player_counters":
+		// A player's own counters — poison and its relatives. No beat, for
+		// `mana`'s reason a few lines down: this is the scoreboard moving, and
+		// the sentence that goes with it has already been said by the combat
+		// that caused it. The step it lands on is whichever beat comes next, so
+		// the bead climbs as the damage is narrated.
+		//
+		// `Now` is a total rather than a delta on both sides of the pipe —
+		// `Scribe.java` argues it against Forge's bytecode, because the field
+		// it is read from is called `amount`.
+		p.board.playerCounter(l.Seat, l.Counter, l.Now)
 	case "mana":
 		// The floating pool, as it stands, for one seat. No beat: mana filling
 		// and draining is a picture rather than a sentence, and a room that

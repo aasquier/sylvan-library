@@ -1957,3 +1957,63 @@ it('flashes the mana that arrived, in the half it arrived for', () => {
   // the timeline at the moment it is most wanted.
   expect(flash.getAttribute('aria-hidden')).toBe('true')
 })
+
+/* ------------------------------------------------- poison, in the trench
+ *
+ * **The slot beside the life dial held its width and drew nothing** until the
+ * scribe subscribed to `GameEventPlayerCounters`. Two things are worth a gate
+ * now that it draws: that an absent counter still renders as *absence*, and
+ * that a present one reaches the plate at all.
+ *
+ * The first is the one that matters. A `0` would be a claim — it would say
+ * this game has poison in it — and nearly every game has none, so nearly every
+ * plate must draw life alone. That is a property no screenshot will ever catch
+ * failing, because the failure looks like a board with an extra dial on it.
+ */
+const POISONED: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'skithiryx', name: 'Skithiryx — Infect', life: 40 },
+    { seat: 2, slug: 'mono-green', name: 'Mono-Green Fixture', life: 40 },
+  ],
+  cards: [{ id: 30, name: 'Plague Stinger', types: 'Creature - Insect', seat: 1 }],
+  steps: [
+    { turn: 1, seat: 1, changes: [{ id: 30, zone: 'battlefield', seat: 1 }] },
+    // The numbers a real Skithiryx match produced: totals, not arrivals.
+    { turn: 2, seat: 1, counters: [{ seat: 2, counters: [{ kind: 'Poison', n: 4 }] }] },
+    { turn: 3, seat: 1, counters: [{ seat: 2, counters: [{ kind: 'Poison', n: 12 }] }] },
+  ],
+} as unknown as ForgeBoard
+
+function poisoned(shown: number) {
+  return render(
+    <MatchBoard board={POISONED} shown={shown} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('draws no bead at all in a game with no poison in it', () => {
+  const { container } = poisoned(1)
+  expect(container.querySelectorAll('.field-bead')).toHaveLength(0)
+})
+
+it('puts the count on the poisoned seat and nowhere else', () => {
+  const { container } = poisoned(2)
+  const beads = container.querySelectorAll('.field-bead')
+  expect(beads).toHaveLength(1)
+  expect(beads[0]?.textContent).toBe('4')
+  expect(beads[0]?.className).toContain('is-poison')
+  // Four of the ten that kill, so not lethal yet — the ring is a fraction and
+  // the class is the threshold.
+  expect(beads[0]?.className).not.toContain('is-lethal')
+})
+
+it('says so when the tenth counter has landed', () => {
+  // Twelve, because Skithiryx swings for four and a player really does go
+  // straight past ten. The arc clamps; the class and the figure do not.
+  const { container } = poisoned(3)
+  const bead = container.querySelector('.field-bead')
+  expect(bead?.textContent).toBe('12')
+  expect(bead?.className).toContain('is-lethal')
+  expect(bead?.getAttribute('title')).toContain('ten is lethal')
+})

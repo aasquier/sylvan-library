@@ -1064,6 +1064,82 @@ function LifeTotal({ life }: { life: number }) {
   )
 }
 
+/** Poison enough to lose on — rule 104.3c, and the whole reason this bead has
+ *  a scale on it rather than being a number in a circle. */
+const POISON_KILLS = 10
+
+/**
+ * The counters sitting on a *player*, beside their life.
+ *
+ * **Poison was the ask and the slot has been waiting for it** — #348 kept the
+ * width here and deliberately drew nothing in it, because a `0` would have
+ * claimed that this game has poison in it when the truth was that nobody had
+ * asked Forge. Somebody has now: the scribe subscribes to
+ * `GameEventPlayerCounters`, so an empty slot means an empty player again.
+ *
+ * **It fills where life drains, and that is the point of drawing it as a dial
+ * at all.** Life empties toward nought and you die; poison fills toward ten and
+ * you die. Two gauges, one grammar, opposite directions — which is a thing a
+ * newcomer can read off the shape without being told the rule, and this room is
+ * built for one (commandment 2). The number is inside it either way, because a
+ * dial alone would make somebody count.
+ *
+ * **Every other kind gets a bead with no scale, and that is deliberate.**
+ * Energy and experience arrive through the same Forge event and have no
+ * threshold to draw against — an arc toward ten would be inventing a rule.
+ * They are the trench's version of `.field-counter.is-flat`: brass, counted,
+ * and taking no view. Drawing nothing instead would be the board quietly
+ * losing something Forge announced.
+ */
+function PlayerCounters({ counters }: {
+  counters: { kind: string; n: number }[]
+}) {
+  if (counters.length === 0) return null
+  return (
+    <>
+      {counters.map((counter) => (
+        <PlayerBead key={counter.kind} kind={counter.kind} n={counter.n} />
+      ))}
+    </>
+  )
+}
+
+function PlayerBead({ kind, n }: { kind: string; n: number }) {
+  // **Matched without regard to case, and the reason is that this string comes
+  // from Forge rather than from us.** `CounterEnumType` builds its display name
+  // from the enum constant — first letter up, the rest down — so `POISON`
+  // reaches this line as `Poison`, which a real match confirms. A Forge release
+  // that changes its mind about the capitalisation would otherwise turn the one
+  // counter in Magic that kills you into an unlabelled brass disc, silently.
+  const deadly = kind.toLowerCase() === 'poison'
+  if (!deadly) {
+    return (
+      <span className="field-bead is-flat tabular" title={`${n} ${kind}`}>
+        {n}
+      </span>
+    )
+  }
+  const full = Math.max(0, Math.min(1, n / POISON_KILLS))
+  const gone = `${Math.round(full * 100)}%`
+  // Clamped for the arc and *not* for this: a player on twelve is past the
+  // threshold, and the ring being full says "at least ten" where the class
+  // says "ten".
+  const lethal = n >= POISON_KILLS
+  return (
+    <span className={`field-bead is-poison${lethal ? ' is-lethal' : ''}`}
+          style={{ '--bead-full': full, '--bead-gone': gone } as CSSProperties}
+          title={lethal
+            ? `${n} poison counters — ten is lethal`
+            : `${n} poison counters, of the ten that are lethal`}>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle className="field-bead-track" cx="24" cy="24" r="20" />
+        <circle className="field-bead-arc" cx="24" cy="24" r="20" />
+      </svg>
+      <span className="field-bead-n tabular">{n}</span>
+    </span>
+  )
+}
+
 /**
  * A closed zone drawn as the pile it is: the top card, with a count.
  *
@@ -1626,14 +1702,16 @@ function FieldZones({ side, facing }: {
  * alone would be a coin-flip for a newcomer, and this room is built for one
  * (commandment 2).
  *
- * **The poison slot is here and it is empty.** Poison counters go on the
- * *player*, so this plate is the only honest place for them — and Forge's bus
- * really does carry them (`GameEventPlayerCounters`, ADR 42's own table). The
- * scribe does not subscribe to that event yet, so nothing can be drawn today
- * and nothing is: the slot holds its width so that wiring it up later is a
- * component and not a re-layout, and an absent counter renders as absence
- * rather than as a zero. **A zero would be a claim** — it would say this game
- * has no poison in it, and what is true is that nobody has asked.
+ * **The poison slot is filled now.** Poison counters go on the *player*, so
+ * this plate is the only honest place for them, and Forge's bus always carried
+ * them (`GameEventPlayerCounters`, ADR 42's own table) — the scribe simply did
+ * not listen. It does; `PlayerCounters` draws them. The slot holding its width
+ * while empty is what made this a component rather than a re-layout.
+ *
+ * **An absent counter still renders as absence rather than as a zero**, and
+ * that has not changed with the wiring. A zero would be a claim — it would say
+ * this game has no poison in it — and nearly every game has none, so nearly
+ * every plate draws life alone.
  */
 function FieldPlate({ side, facing, name }: {
   side: BoardSide
@@ -1648,6 +1726,7 @@ function FieldPlate({ side, facing, name }: {
         <span className="field-plate-name" title={side.name}>{name}</span>
         <span className="field-plate-figures">
           <LifeTotal life={side.life} />
+          <PlayerCounters counters={side.counters} />
         </span>
       </span>
     </span>

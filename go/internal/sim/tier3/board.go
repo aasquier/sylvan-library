@@ -361,6 +361,32 @@ type BoardLife struct {
 	Life int `json:"life"`
 }
 
+// BoardPlayerCounters is one seat's counters after one of them moved.
+//
+// **Counters go on players as well as on permanents**, and until now this reel
+// carried only the permanents' — so a game decided on the tenth poison counter
+// arrived as a board where nothing had happened, followed by an outcome
+// sentence that explained it after the fact. Forge's bus has always said so
+// (`GameEventPlayerCounters`); the scribe now listens.
+//
+// **The whole set crosses rather than the one that moved**, matching
+// [BoardChange.Counters] and for the same reason: a reader holding a set and
+// applying deltas drifts the first time one is dropped, and the question a
+// scoreboard asks is "how much poison does this player have", never "how much
+// arrived just then". [BoardCounter] is reused whole — a counter is a kind and
+// a count wherever it is sitting.
+//
+// **Every kind Forge announces is carried, not only poison.** Deciding here
+// which counters a room cares about would be this layer taking a view, and the
+// division this package is built on puts that on the far side (ADR 14): energy
+// and experience are real, they arrive through the same event, and a reel that
+// dropped them would be silently lossy at the exact moment somebody wrote the
+// component that wanted them.
+type BoardPlayerCounters struct {
+	Seat     int            `json:"seat"`
+	Counters []BoardCounter `json:"counters"`
+}
+
 // BoardStep is the board's movement between one beat and the next.
 //
 // **Steps are parallel to [EventLog.Events], one for one**, and that is the
@@ -381,6 +407,10 @@ type BoardStep struct {
 	Seat    int           `json:"seat,omitempty"`
 	Life    []BoardLife   `json:"life,omitempty"`
 	Changes []BoardChange `json:"changes,omitempty"`
+	// Counters is every seat whose own counters moved at this step — poison
+	// and its relatives. See [BoardPlayerCounters]; beside the life totals
+	// because both are facts about a player rather than about a card.
+	Counters []BoardPlayerCounters `json:"counters,omitempty"`
 	// Floating is every seat whose mana pool moved at this step. See
 	// [BoardFloating] — beside the life totals because a pool is a player's,
 	// not a permanent's.
@@ -448,6 +478,9 @@ type board struct {
 	// casts is how many times each card has left the command zone.
 	casts map[int]int
 	life  map[int]int
+	// held is each seat's own counters — poison, energy, experience — by kind.
+	// A seat holding none holds no map, the way `counters` treats a card.
+	held map[int]map[string]int
 	// left is the last real zone a card was cleared out of.
 	//
 	// Needed because **Forge announces the leaving before the arriving**: a
@@ -482,6 +515,10 @@ type board struct {
 	pending   []int
 	changing  map[int]*BoardChange
 	lifeMoved []int
+	// heldMoved is the seats whose own counters moved since the last beat, in
+	// the order they were touched — `lifeMoved`'s reason exactly: a slice
+	// rather than a map so a recorded golden cannot flap between runs.
+	heldMoved []int
 	// poolMoved is every value a pool took since the last beat, in order. A
 	// seat appears once per change rather than once per step — see
 	// [board.floating] for why the sequence is the point.
@@ -505,7 +542,8 @@ func newBoard() *board {
 		attached: map[int]int{},
 		combat:   map[int]string{}, attacking: map[int]int{},
 		blocking: map[int]int{}, casts: map[int]int{},
-		life: map[int]int{}, left: map[int]string{},
+		life: map[int]int{}, held: map[int]map[string]int{},
+		left: map[int]string{},
 		live: map[int]string{}, pool: map[int]string{},
 		changing: map[int]*BoardChange{},
 	}
@@ -1061,6 +1099,58 @@ func (b *board) lives(seat, life int) {
 	b.lifeMoved = append(b.lifeMoved, seat)
 }
 
+// playerCounter folds one of a player's own counters. `now` is the new total.
+//
+// **The empty kind is a third case and not a missing field**: it is Forge
+// clearing every counter this player has at once, which `Scribe.java` argues
+// where it is decoded. Read as a set that is now empty rather than as a line to
+// drop, because dropping it would leave a dead player poisoned forever on a
+// board that had been told otherwise.
+//
+// Silent when nothing actually changed, for `lives`' reason — Forge announces
+// a great deal that is not news, and a step recording a counter that stayed
+// where it was is a beat where the scoreboard flinches for nothing.
+func (b *board) playerCounter(seat int, kind string, now int) {
+	if seat <= 0 {
+		return
+	}
+	on := b.held[seat]
+	if kind == "" {
+		if len(on) == 0 {
+			return
+		}
+		delete(b.held, seat)
+		b.heldChanged(seat)
+		return
+	}
+	if on[kind] == now {
+		return
+	}
+	if now <= 0 {
+		delete(on, kind)
+		if len(on) == 0 {
+			delete(b.held, seat)
+		}
+	} else {
+		if on == nil {
+			on = map[string]int{}
+			b.held[seat] = on
+		}
+		on[kind] = now
+	}
+	b.heldChanged(seat)
+}
+
+// heldChanged marks a seat's counters as news for the beat being assembled.
+func (b *board) heldChanged(seat int) {
+	for _, already := range b.heldMoved {
+		if already == seat {
+			return
+		}
+	}
+	b.heldMoved = append(b.heldMoved, seat)
+}
+
 // began records a turn, and ends the last one's combat if nothing better has.
 //
 // The fallback lives here rather than at the call site so that the precedence
@@ -1088,6 +1178,13 @@ func (b *board) beat() {
 	for _, seat := range b.lifeMoved {
 		step.Life = append(step.Life, BoardLife{Seat: seat, Life: b.life[seat]})
 	}
+	for _, seat := range b.heldMoved {
+		// A seat that has just lost its last counter publishes an empty set,
+		// not nothing: the far side is holding the old one and has to be told
+		// to put it down.
+		step.Counters = append(step.Counters, BoardPlayerCounters{
+			Seat: seat, Counters: sortedCounters(b.held[seat])})
+	}
 	if len(b.poolMoved) > 0 {
 		step.Floating = append([]BoardFloating(nil), b.poolMoved...)
 	}
@@ -1100,6 +1197,7 @@ func (b *board) beat() {
 	b.steps = append(b.steps, step)
 	b.pending = b.pending[:0]
 	b.lifeMoved = b.lifeMoved[:0]
+	b.heldMoved = b.heldMoved[:0]
 	b.poolMoved = b.poolMoved[:0]
 	b.used = b.used[:0]
 	b.changing = map[int]*BoardChange{}

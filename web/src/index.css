@@ -4240,6 +4240,21 @@ button:hover .tarot-fan-card {
   --arena-blood-lit: #a8332c;
   --arena-blood: #7e2420;
   --arena-blood-deep: #4a1310;
+  /* Phyrexia's two, for the poison bead in the trench. Verdigris is the dim
+     patina one counter puts on the dial and glisten is the lit oil at ten, so
+     the arc mixes between them as it fills.
+     **It brightens as it fills, and the first draft had it the other way.**
+     Rot-toward-black is the truer Phyrexian colour and it made the most
+     dangerous state on the board the hardest to see: at ten counters the ring
+     is at its longest and was very nearly the same value as the stone behind
+     it. A gauge that disappears exactly when it matters is the wrong gauge.
+     Life can afford to darken because what it is saying is said by the arc
+     going *away*; poison's arc arrives, so it has to arrive visibly.
+     Kept beside the blood because they are the same kind of token — a material
+     the arena is allowed to use, named once so that a second surface cannot
+     invent a slightly different green. */
+  --arena-verdigris: #3f7a52;
+  --arena-glisten: #8fe053;
 }
 
 .btn-arena {
@@ -7208,6 +7223,103 @@ button:hover .tarot-fan-card {
 /* Bigger than the panel could give it, which was the ask. The ring is drawn
    from `--life-size` in one place so the figure inside it scales with it. */
 .field-plate-figures .field-life { --life-size: 66px; }
+
+/* ------------------------------------------------ poison, as a thing
+ *
+ * **The second dial the row above was holding room for.** It is built out of
+ * the life ring on purpose and it runs the other way: life is an arc that
+ * empties toward nought, poison is an arc that fills toward ten, and both ends
+ * are the same end. A player can read which way trouble is coming from the
+ * shape alone, without knowing the rule yet.
+ *
+ * Deliberately smaller than life. Life is on the board every game and poison is
+ * on it almost never, so the two are not peers — a bead beside a dial says
+ * "and also this", where two dials of a size would ask which one to read
+ * first. It only exists at all when there is a count to put in it.
+ *
+ * The colour is Phyrexian rather than the room's brass: a sick green that goes
+ * to oil-black as it fills, which is the one palette Magic has already spent
+ * thirty years teaching people means *this is spreading*. */
+.field-bead {
+  --bead-size: 40px;
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--bead-size);
+  height: var(--bead-size);
+  display: grid;
+  place-items: center;
+}
+.field-bead svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Twelve o'clock, for the life ring's reason. */
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.field-bead circle {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.field-bead-track {
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 6.5;
+}
+/* r=20 again, so the whole way round is 125.66 — but the dash is what has
+   *arrived* rather than what is left, which is the whole inversion. */
+.field-bead-arc {
+  stroke: color-mix(in oklab,
+    var(--arena-glisten) var(--bead-gone, 0%), var(--arena-verdigris));
+  stroke-dasharray: calc(var(--bead-full, 0) * 125.66) 125.66;
+  /* The glow grows with the count as well as the colour, so the last two
+     counters read from across the room rather than only up close. */
+  filter: drop-shadow(0 0 calc(2px + var(--bead-full, 0) * 5px)
+    color-mix(in oklab, var(--arena-glisten) var(--bead-gone, 0%),
+      var(--arena-verdigris)));
+  transition: stroke-dasharray 420ms cubic-bezier(0.16, 1, 0.3, 1),
+              stroke 420ms ease;
+}
+.field-bead-n {
+  position: relative;
+  font-size: calc(var(--bead-size) * 0.4);
+  font-weight: 700;
+  line-height: 1;
+  /* Brightening with the ring rather than against it. Near-white at one
+     counter, lit at ten. */
+  color: color-mix(in oklab,
+    var(--arena-glisten) calc(var(--bead-gone, 0%) * 0.35), #eef6e4);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  transition: color 300ms ease;
+}
+/* **Ten is the whole point, so ten does something.** Everything above is a
+   gauge and a gauge can be read as "nearly there" right up until it is not;
+   the breath is the board saying the threshold has actually been crossed. Slow
+   — this is a state, not an event, and it may be true for several beats. */
+.field-bead.is-lethal .field-bead-arc { animation: bead-breathe 2.4s ease-in-out infinite; }
+@keyframes bead-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.62; }
+}
+/* Energy, experience, and whatever else a game puts on a person: counted, and
+   taking no view. `.field-counter.is-flat` on a card is this same decision —
+   brass is the house's own metal and it argues nothing. */
+.field-bead.is-flat {
+  --bead-size: 30px;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1a1409;
+  background: var(--field-brass);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-bead-arc { transition: none; }
+  .field-bead.is-lethal .field-bead-arc { animation: none; }
+}
 
 /* ------------------------------------------------ life, as a thing
  *
