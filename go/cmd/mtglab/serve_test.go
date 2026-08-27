@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -25,17 +26,35 @@ import (
 //
 // `serve` is the single most important function in the binary -- it is the
 // whole app coming up -- and it had never been run by a test. What that costs
-// is specific: the ladder, the configuration summary, the maintainer
-// reconciliation, the door, the listener and the shutdown are six things in a
-// fixed order, and an ordering mistake among them is a boot that half works.
-// The deployed instance is where those were found the first four times
-// (CLAUDE.md's "faults live below seams"), which is exactly the loop worth
-// closing here.
+// is specific: the signal handler, the ladder, the configuration summary, the
+// maintainer reconciliation, the door, the listener and the shutdown are seven
+// things in a fixed order, and an ordering mistake among them is a boot that
+// half works. The deployed instance is where those were found the first four
+// times (CLAUDE.md's "faults live below seams"), which is exactly the loop
+// worth closing here.
 //
 // The signal path is driven for real rather than simulated. **The test
 // installs its own `signal.Notify` first**, so the runtime can never take
 // SIGTERM's default action and kill the test binary if `serve` returns before
 // its own handler is up.
+//
+// **And that ordering was the bug, one function over.** `serveOn` used to arm
+// its own handler three statements *after* it started serving, so between the
+// bind and that call the process was reachable and deaf: a SIGTERM landing
+// there was taken by the runtime's default action, which is to kill the
+// process. On CI this test hung on it five times in a single day, on branches
+// that touched no server code at all. The signature was the same every time
+// and misread every time — a FAIL at the test's whole budget, and printed
+// above it an ERROR reading `accept tcp ...: use of closed network
+// connection`. That ERROR looks like a shutdown that started and stalled. It
+// is the opposite: `slog` writes straight to an unbuffered `os.Stderr` while
+// `testing` holds a test's own output until the test ends, so the two lines
+// appear in the wrong order, and the line is `Serve` returning because
+// [heldPort]'s **cleanup** closed the listener after `t.Fatal`. Read the
+// embedded `time=` fields instead and the gap is the test's budget exactly.
+// The goroutine dump settled it in one look: `serveOn` parked in its select,
+// `Serve` still in `Accept`, and nothing anywhere inside `Shutdown`. Which is
+// why the timeout branch below now takes that dump itself.
 
 // atoi is a port number as an int, failing the test rather than the boot.
 func atoi(t *testing.T, port string) int {
@@ -73,6 +92,20 @@ func atoi(t *testing.T, port string) int {
 // Holding the port closes both halves at once: nothing can take it, and a
 // probe against a bound port is accepted into the backlog immediately and
 // then **waits for the boot rather than racing it**. No timeout moved.
+//
+// **That closed the boot half, and only the boot half** — which this comment
+// used to read as though it had closed the bug class. It had not. The stop
+// half kept its own flat wall clock and went on failing on exactly the shape
+// described above: a constant in a test standing against something in the
+// product that no constant bounds.
+//
+// The difference between the halves is worth stating, because it decided both
+// fixes. A boot's cost has no ceiling anywhere in the product, so no number in
+// a test could ever have been the right one and the clock had to go. A
+// **stop's** cost does have a ceiling in the product — `shutdownGrace` — so a
+// clock is honest there, provided it is derived from that ceiling rather than
+// guessed a few seconds above it.
+// [TestTheServerBootsAnswersAndStopsOnASignal] does that now.
 func heldPort(t *testing.T) net.Listener {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -141,7 +174,23 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 		if err != nil {
 			t.Errorf("a clean shutdown reported %v", err)
 		}
-	case <-time.After(25 * time.Second):
+	// **Derived from the product's own ceiling, not chosen near it.** This was
+	// a flat 25 seconds against a `shutdownGrace` of 20, and five seconds is
+	// not a margin — the first stop to legitimately spend its whole grace
+	// draining would have decided this test by coin flip. Doubling the grace
+	// means the only thing that can expire this is a stop that overran the
+	// product's own budget, which is a bug worth failing for rather than a
+	// flake to re-run.
+	case <-time.After(2 * shutdownGrace):
+		// The dump, because the four CI failures cost a day between them and
+		// every one of them was diagnosed from two log lines in the wrong
+		// order (see this file's opening comment). A stack says in one look
+		// what is holding the stop: parked in the select is a signal that
+		// never arrived, and anything inside `Shutdown` or `Door.Close` is a
+		// genuinely blocked drain. They want opposite fixes.
+		buf := make([]byte, 1<<20)
+		n := runtime.Stack(buf, true)
+		t.Logf("every goroutine at the moment the stop was given up on:\n%s", buf[:n])
 		t.Fatal("the server did not stop on SIGTERM")
 	}
 
@@ -256,6 +305,70 @@ func TestAHeldPortIsHeld(t *testing.T) {
 	if err == nil {
 		_ = second.Close()
 		t.Fatal("the address was free to take, so the boot it is handed to is racing for it")
+	}
+}
+
+// **The stop half's fix, in one assertion**, and the sibling of
+// [TestAHeldPortIsHeld] above: a stop that arrives while the process is still
+// coming up is heard, because the handler is armed before the boot rather than
+// after it.
+//
+// This is not a timing test and it does not want a loaded machine. The seam it
+// uses is the listener callback — the instant `serveOn` reaches for the port —
+// and it does two things there. It sends the process a SIGTERM, and then it
+// **waits on the test's own guard channel** before returning the listener.
+// That second half is what makes this a fact rather than a race: the runtime
+// hands a signal to every channel registered at the moment it dispatches, so
+// once the guard has it, dispatch has happened, and a `signal.Notify` that has
+// not run by then has missed the signal for good.
+//
+// So the two orderings give two different outcomes with nothing in between.
+// Armed before the bind, `serveOn` already holds the stop in its buffer, and
+// finds it waiting the moment it reaches the select. Armed after, as it was,
+// the stop is gone: measured 3 of 3 against the old shape, where the server
+// went on serving until this test's own cleanup pulled the listener out from
+// under it — which is precisely the shape CI kept failing in.
+//
+// The budget below is not racing anything. The signal is delivered before the
+// ladder even runs, so what is being waited for is a boot and an immediate
+// shutdown with no connection open to drain.
+func TestAStopArrivingDuringTheBootIsNotLost(t *testing.T) {
+	// **Serial**, for [TestTheServerBootsAnswersAndStopsOnASignal]'s reason:
+	// the SIGTERM goes to the whole process, so any other `serve` alive beside
+	// it would stop too and the failure would land on that test instead.
+	d := scratchDeployment(t)
+
+	// Ours first, as ever -- without it the runtime's default action ends the
+	// test binary, which is the production behaviour this test is about.
+	guard := make(chan os.Signal, 1)
+	signal.Notify(guard, syscall.SIGTERM)
+	defer signal.Stop(guard)
+
+	l := heldPort(t)
+	// Taken here rather than in the goroutine: `t.TempDir` belongs to the test.
+	webDist, tarot := t.TempDir(), t.TempDir()
+	done := make(chan error, 1)
+	go func() {
+		done <- serveOn(d.Config, tier3.Settings{}, webDist, tarot,
+			func() (net.Listener, error) {
+				if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+					return nil, err
+				}
+				<-guard
+				return l, nil
+			})
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("a stop taken during the boot reported %v", err)
+		}
+	case <-time.After(2 * shutdownGrace):
+		buf := make([]byte, 1<<20)
+		n := runtime.Stack(buf, true)
+		t.Logf("every goroutine at the moment the stop was given up on:\n%s", buf[:n])
+		t.Fatal("a stop that arrived while the process was binding was never heard")
 	}
 }
 

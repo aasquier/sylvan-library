@@ -141,6 +141,18 @@ func configComplaints(cfg config.Config) []string {
 	return out
 }
 
+// shutdownGrace is how long a stop waits for the requests already in flight
+// before it drops them and goes.
+//
+// It is a named constant rather than a number at the call site because the
+// boot test waits on this same stop, and that test's budget used to be a
+// **peer** of this one — 25 seconds against 20. Five seconds apart is not a
+// margin: it means the first stop that legitimately spends its whole grace
+// draining a connection decides the test by coin flip. The test derives its
+// wait from this constant now (`serve_test.go`), so the two cannot drift back
+// into being peers without somebody moving them both on purpose.
+const shutdownGrace = 20 * time.Second
+
 // serve is the whole app coming up on `host:port` and serving until a signal
 // stops it.
 func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot string) error {
@@ -157,7 +169,9 @@ func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot s
 // serveOn is [serve] with the listener supplied rather than named, acquired at
 // exactly the point in the boot where the listener has always been acquired —
 // after the ladder, the summary, the reconciliation and the door, so the fixed
-// order this package's comment argues for is unchanged.
+// order this package's comment argues for is unchanged. One thing now precedes
+// all of it, and deliberately: the signal handler, argued at its own call
+// below.
 //
 // **The listener is a parameter because an address is not a reservation.** A
 // caller that can only say "port 41019" has to let this function bind it, and
@@ -175,6 +189,46 @@ func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot s
 func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	listen func() (net.Listener, error)) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+	// **The stop is armed before anything it could have to interrupt** — the
+	// one ordering in this function that is not about the boot.
+	//
+	// This call used to sit at the bottom, three statements below
+	// `server.Serve`, and everything above it therefore ran unguarded: the
+	// ladder, the reconciliation, the door, the bind, and the first requests
+	// answered over that listener. [signal.Notify] is the only thing that
+	// takes SIGTERM away from the runtime, whose default action is to kill the
+	// process where it stands, so a stop arriving in that window was not
+	// *delayed*, it was **gone**. The boot test hung on it four times in one
+	// day on CI, and the goroutine dump was unambiguous: `serveOn` parked in
+	// the select below, `Serve` still accepting, nothing inside `Shutdown`.
+	//
+	// The buffered channel is the other half. A signal taken during the boot
+	// is **held**, so `auth.Migrate` — a forward-only ladder that runs on
+	// every deploy (ADR 23) — finishes rather than dying halfway, and the
+	// select finds the stop already waiting. The cost is stated rather than
+	// hidden: a boot that genuinely wedges can no longer be SIGTERMed, and
+	// SIGKILL is the right tool for that.
+	//
+	// **Here and not in `main`.** Measured against the built binary, a SIGTERM
+	// inside the first ~50ms still takes the default action — the process is
+	// in runtime and CGO start-up and flag parsing — and from ~100ms it stops
+	// cleanly. That window is the right one to leave open: nothing in it has
+	// bound a port or touched the volume, so dying there is a process that
+	// never started. Arming in `main` would close it by suppressing the
+	// default action for the **whole binary**, and a `sim` run that ignores
+	// Ctrl-C is a worse bug than this one.
+	//
+	// Stopped on the way out: the registration is process-wide, and un-stopped
+	// every call left a channel registered for the life of the process. That
+	// does mean the two tests driving `serve` into an early refusal now touch
+	// a process-global; they stay parallel, because delivery is a broadcast to
+	// every registered channel rather than a handoff to one, so no
+	// registration can take a signal away from another.
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
+
 	// The schema ladder, before anything opens the file: creating `app.db`
 	// and bringing it to `auth.SchemaVersion` is this command's job, and a
 	// ladder that cannot be applied is a refusal to serve, not a warning — a
@@ -249,9 +303,9 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	errs := make(chan error, 1)
 	go func() { errs <- server.Serve(listener) }()
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-
+	// Whichever comes first, and the signal channel above may already be
+	// holding one from during the boot — which is the point of arming it up
+	// there rather than here.
 	var serveErr error
 	select {
 	case sig := <-signals:
@@ -263,9 +317,20 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 	defer cancel()
-	_ = server.Shutdown(ctx)
+	// **A stop that ran out of grace says so.** This used to be discarded, so
+	// a process that gave up on connections still in flight logged exactly
+	// what a process that drained cleanly logged — nothing — and the one
+	// question a deploy actually wants answered ("did it go quietly?") had no
+	// answer anywhere. It stays a warning rather than a returned error: the
+	// process is going down either way, and turning an ordinary drain
+	// timeout into a non-zero exit would make every crowded deploy read as a
+	// crash.
+	if err := server.Shutdown(ctx); err != nil {
+		log.Warn("the stop ran out of grace with requests still in flight",
+			"grace", shutdownGrace, "error", err)
+	}
 	return serveErr
 }
 
