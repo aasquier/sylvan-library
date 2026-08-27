@@ -26,7 +26,8 @@
   "defense",
   "game_changer",
   "flavor_text",
-  "artist"
+  "artist",
+  "all_parts"
  ],
  "oracle_cards": [
   [
@@ -61,7 +62,8 @@
    null,
    false,
    "His pride denied him; his brother did not.",
-   "Chris Rallis"
+   "Chris Rallis",
+   "[{\"object\":\"related_card\",\"id\":\"f897d650-f1a2-4366-a025-f12c10310d96\",\"component\":\"combo_piece\",\"name\":\"Ajani, Nacatl Pariah // Ajani, Nacatl Avenger\",\"type_line\":\"Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani\",\"uri\":\"https://api.scryfall.com/cards/f897d650-f1a2-4366-a025-f12c10310d96\"},{\"object\":\"related_card\",\"id\":\"ce5c5bcf-1fdd-4d73-a92b-223292da00ca\",\"component\":\"token\",\"name\":\"Cat Warrior\",\"type_line\":\"Token Creature — Cat Warrior\",\"uri\":\"https://api.scryfall.com/cards/ce5c5bcf-1fdd-4d73-a92b-223292da00ca\"}]"
   ],
   [
    "900ca697-ad38-4b2b-bc74-2ff7eb6ea951",
@@ -94,7 +96,8 @@
    null,
    false,
    null,
-   "Mark Tedin"
+   "Mark Tedin",
+   null
   ],
   [
    "0f1b5cea-2035-444c-9f63-87dcb9782c74",
@@ -132,7 +135,8 @@
    null,
    false,
    null,
-   "Steve Prescott"
+   "Steve Prescott",
+   "[{\"object\":\"related_card\",\"id\":\"c48d1586-23e9-4b0e-91ff-01bd6f32427c\",\"component\":\"combo_piece\",\"name\":\"Gyome, Master Chef\",\"type_line\":\"Legendary Creature — Troll Warlock\",\"uri\":\"https://api.scryfall.com/cards/c48d1586-23e9-4b0e-91ff-01bd6f32427c\"},{\"object\":\"related_card\",\"id\":\"965bef73-eb93-4512-91b4-bf2ce7d27d42\",\"component\":\"token\",\"name\":\"Food\",\"type_line\":\"Token Artifact — Food\",\"uri\":\"https://api.scryfall.com/cards/965bef73-eb93-4512-91b4-bf2ce7d27d42\"}]"
   ],
   [
    "6ad8011d-3471-4369-9d68-b264cc027487",
@@ -163,7 +167,8 @@
    null,
    false,
    "\"The subject of innovation will always be near and dear to my heart.\"\n—Tony Stark",
-   "Myles Wohl"
+   "Myles Wohl",
+   null
   ],
   [
    "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
@@ -196,7 +201,8 @@
    null,
    false,
    null,
-   "Bastien Grivet"
+   "Bastien Grivet",
+   null
   ],
   [
    "ae83ef2c-960f-4c5b-97cc-52465c687c18",
@@ -231,7 +237,8 @@
    null,
    false,
    "When nature calls, *run*.",
-   "Aleksi Briclot"
+   "Aleksi Briclot",
+   null
   ],
   [
    "153376c9-dffd-458c-8ce3-a4c8269bc4e9",
@@ -272,7 +279,8 @@
    null,
    true,
    "\"I await your donation.\"\n—Dasha, Orzhov priest",
-   "Mark Behm"
+   "Mark Behm",
+   null
   ],
   [
    "befb211f-37ca-4083-98d4-9ff1f28be3f2",
@@ -305,7 +313,8 @@
    null,
    false,
    "You don't want to know how she got that name.",
-   "Svetlin Velinov"
+   "Svetlin Velinov",
+   null
   ],
   [
    "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
@@ -338,7 +347,8 @@
    null,
    false,
    null,
-   "Bastien Grivet"
+   "Bastien Grivet",
+   null
   ],
   [
    "92acb789-0e42-465c-ac16-40fefec48805",
@@ -373,7 +383,8 @@
    null,
    false,
    null,
-   "Philip Straub"
+   "Philip Straub",
+   null
   ],
   [
    "4d8505d3-c8a1-4850-95d4-5ddb8ad49770",
@@ -408,7 +419,8 @@
    null,
    false,
    null,
-   "Antonio José Manzanedo"
+   "Antonio José Manzanedo",
+   null
   ],
   [
    "53236dd7-845a-444c-96d5-f41ed7325d8f",
@@ -441,7 +453,8 @@
    null,
    true,
    "\"I'll teach you the leyline paratrigonometrics, no problem. But you need to show me how to make that fiery swirly thing.\"\n—Zimone, to Rootha",
-   "Tatiana Kirgetova"
+   "Tatiana Kirgetova",
+   null
   ],
   [
    "b1544f21-7e98-461b-aed5-e748b0168c52",
@@ -474,7 +487,8 @@
    null,
    false,
    "\"Gotta get that corn planted before the world ends again.\"\n—Clint Barton",
-   "Greg Smallwood"
+   "Greg Smallwood",
+   null
   ],
   [
    "5089ec1a-f881-4d55-af14-5d996171203b",
@@ -509,7 +523,8 @@
    null,
    false,
    null,
-   "Chris Rahn"
+   "Chris Rahn",
+   null
   ],
   [
    "2522a9dd-bcf3-4b84-abff-52b9e6dbde34",
@@ -542,7 +557,8 @@
    null,
    false,
    null,
-   "Dmitry Burmak"
+   "Dmitry Burmak",
+   "[{\"object\":\"related_card\",\"id\":\"028f284b-4b4c-44e2-8ded-bc59ec71250f\",\"component\":\"combo_piece\",\"name\":\"Bag End Banquet\",\"type_line\":\"Artifact\",\"uri\":\"https://api.scryfall.com/cards/028f284b-4b4c-44e2-8ded-bc59ec71250f\"},{\"object\":\"related_card\",\"id\":\"276dedb8-3d41-499c-8804-bb1471fcb06f\",\"component\":\"token\",\"name\":\"Food\",\"type_line\":\"Token Artifact — Food\",\"uri\":\"https://api.scryfall.com/cards/276dedb8-3d41-499c-8804-bb1471fcb06f\"}]"
   ],
   [
    "797c2b1c-c373-4735-b397-f561559c7c61",
@@ -583,7 +599,8 @@
    null,
    false,
    null,
-   "Jakub Kasper"
+   "Jakub Kasper",
+   null
   ],
   [
    "8c52bd39-0586-48ca-b263-17210cf9feb6",
@@ -618,7 +635,8 @@
    null,
    false,
    "\"Some days, you wish you were fighting a dragon.\"\n—Eshki Dragonclaw",
-   "Magali Villeneuve"
+   "Magali Villeneuve",
+   null
   ],
   [
    "17975a20-2c13-4325-be1e-0bcda5063a2d",
@@ -651,7 +669,8 @@
    null,
    false,
    null,
-   "Lars Grant-West"
+   "Lars Grant-West",
+   "[{\"object\":\"related_card\",\"id\":\"2853ba8b-650e-49e3-ab12-86b76e02743b\",\"component\":\"token\",\"name\":\"Elephant\",\"type_line\":\"Token Creature — Elephant\",\"uri\":\"https://api.scryfall.com/cards/2853ba8b-650e-49e3-ab12-86b76e02743b\"},{\"object\":\"related_card\",\"id\":\"63195796-197e-47ec-85f0-d4ec0065f6e6\",\"component\":\"combo_piece\",\"name\":\"Terastodon\",\"type_line\":\"Creature — Elephant\",\"uri\":\"https://api.scryfall.com/cards/63195796-197e-47ec-85f0-d4ec0065f6e6\"}]"
   ],
   [
    "2f70f1bb-29fa-4abb-afc2-653acd0a08b9",
@@ -687,7 +706,8 @@
    null,
    false,
    null,
-   "Adam Rex"
+   "Adam Rex",
+   null
   ],
   [
    "dbf0ad03-ab31-49d2-89b1-05b45948a61f",
@@ -728,7 +748,8 @@
    null,
    false,
    null,
-   "Karl Kopinski"
+   "Karl Kopinski",
+   null
   ],
   [
    "id-etali",
@@ -766,7 +787,8 @@
    null,
    false,
    null,
-   "Ryan Pancoast"
+   "Ryan Pancoast",
+   null
   ],
   [
    "28ca9176-6d8a-41fa-8be5-4b12fc73f1a2",
@@ -794,6 +816,7 @@
    null,
    null,
    false,
+   null,
    null,
    null
   ]
@@ -1133,6 +1156,51 @@
    "707504",
    "Bilbo was just then sitting down for a nice little second breakfast by the open window, when in walked Gandalf.",
    "Ben Wootten"
+  ],
+  [
+   "965bef73-eb93-4512-91b4-bf2ce7d27d42",
+   "a468338f-635e-4206-89d6-72d723071d45",
+   "Food",
+   "tc21",
+   "Commander 2021 Tokens",
+   "24",
+   "common",
+   "2021-04-23",
+   false,
+   false,
+   [
+    "nonfoil"
+   ],
+   "https://cards.scryfall.io/normal/front/9/6/965bef73-eb93-4512-91b4-bf2ce7d27d42.jpg?1783927196",
+   null,
+   null,
+   null,
+   null,
+   null,
+   "Steve Prescott"
+  ],
+  [
+   "276dedb8-3d41-499c-8804-bb1471fcb06f",
+   "a468338f-635e-4206-89d6-72d723071d45",
+   "Food",
+   "sld",
+   "Secret Lair Drop",
+   "2551",
+   "common",
+   "2026-08-17",
+   false,
+   false,
+   [
+    "nonfoil",
+    "foil"
+   ],
+   "https://cards.scryfall.io/normal/front/2/7/276dedb8-3d41-499c-8804-bb1471fcb06f.jpg?1786586750",
+   28.98,
+   null,
+   null,
+   "707509",
+   "\"And raspberry jam and apple tart,\" said Bifur.\n\"And mince-pies and cheese,\" said Bofur.\n\"And pork-pie and salad,\" said Bombur.",
+   "Raymond Bonilla"
   ]
  ]
 }

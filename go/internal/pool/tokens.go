@@ -29,13 +29,21 @@ import (
 // Ixalan's for Treasure, Shadows over Innistrad's for Clue. Recognisable beats
 // recent, and deterministic beats both.
 //
-// **What this cannot do, stated because it is a real limit.** A generic token
-// name — Spirit, Soldier, Zombie — names a dozen different bodies, and
-// `printings` carries no power or toughness to tell them apart (those live in
-// `oracle_cards`, which is exactly where tokens are not). So a 1/1 white
-// flying Spirit may be drawn with some other Spirit's painting. The fix is a
-// chosen printing per token rather than a rule, which is the deck-side token
-// sideboard's job; a board is not the place to invent one.
+// **A name is not an identity, which is why there are two ways in here.** A
+// generic token name — Spirit, Soldier, Zombie — names a dozen different
+// bodies, and `printings` carries no power or toughness to tell them apart
+// (those live in `oracle_cards`, which is exactly where tokens are not). So
+// [Conn.TokenArtFor], which has only a name to go on, may draw a 1/1 white
+// flying Spirit with some other Spirit's painting. It is the right method
+// anyway for a board mid-match, where Forge has said a word and a plate has to
+// be painted now.
+//
+// [Conn.TokensMade] is the other way, and the answer to that limit: it asks
+// the *cards* what they make. Scryfall's `all_parts` names a particular
+// printing for every token a card creates, so Elspeth's Soldier is that
+// Soldier and no other. This is the chosen printing per token that the earlier
+// argument here promised, and the deck page's token section is what it was
+// promised for.
 
 // TokenArt is one token's painting.
 type TokenArt struct {

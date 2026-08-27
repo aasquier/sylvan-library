@@ -10,14 +10,14 @@ import (
 
 // Token art, and the one ruling it exists to enforce.
 //
-// The fixture carries the two real Food printings that make the case: Throne
-// of Eldraine's from 2019, painted by Randy Gallegos — the pie everybody who
-// has played with a Food would recognise — and a Secret Lair from 2026 whose
-// flavour text is about Bilbo's second breakfast. Both are Scryfall rows read
-// out of the real pool. Answering "Food" with the second one is the same
-// mistake that put Teenage Mutant Ninja Turtles art on the Grand Coliseum,
-// and it is what `GetCards` would do, because `GetCards` answers with a card's
-// newest printing.
+// The fixture carries four real Food printings, and the two that make the case
+// are Throne of Eldraine's from 2019, painted by Randy Gallegos — the pie
+// everybody who has played with a Food would recognise — and a Secret Lair from
+// 2026 whose flavour text is about Bilbo's second breakfast. All four are
+// Scryfall rows read out of the real pool. Answering "Food" with the newest is
+// the same mistake that put Teenage Mutant Ninja Turtles art on the Grand
+// Coliseum, and it is what `GetCards` would do, because `GetCards` answers with
+// a card's newest printing.
 
 func TestATokenIsAnsweredWithItsOriginalArt(t *testing.T) {
 	t.Parallel()
