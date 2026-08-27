@@ -6442,12 +6442,30 @@ button:hover .tarot-fan-card {
  * the same width and the same offset, which is what combat will need when two
  * creature rows have to line up across the seam. */
 .field-side {
+  /* **The tile the corner cluster is built out of, declared here rather than
+     on the cluster**, because the half's own grid now has to do arithmetic
+     with it. `.field-zone-l` inherits it and is otherwise unchanged. */
+  --zone-tile: 78px;
+  /* **One width for both halves' corners, and the wider one sets it.**
+   *
+   * This column used to be `auto` — as wide as whatever was in it. A companion
+   * adds 0.72 of a tile to the command zone, so a deck running one drew its
+   * own lanes **56 pixels** narrower than the deck across the seam (Aaron,
+   * 2026-08-27). Neither half was wrong alone; they disagreed, and two
+   * creature rows that have to line up across the trench cannot start in
+   * different places.
+   *
+   * `--zone-seats` is the larger of the two seat counts, worked out in
+   * `board.tsx` where both halves are in hand — CSS cannot ask a sibling how
+   * wide it is. The rest is the cluster's own grid restated: the command zone,
+   * one tile for the graveyard/exile column, and the 5px between them. */
+  --zone-col: calc(var(--zone-tile) * (var(--zone-seats, 1) + 1) + 5px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) var(--zone-col);
   grid-template-rows: repeat(3, var(--lane-h));
   align-items: stretch;
   gap: 8px 10px;
-  padding: 8px 10px;
+  padding: 8px var(--side-pad-x);
 }
 /* **The box hugs its tiles, and the grid puts the box in the corner.**
    `align-self: end` rather than the default stretch, and it is load-bearing
@@ -6460,6 +6478,13 @@ button:hover .tarot-fan-card {
 .field-side .field-zone-l {
   grid-area: 1 / 2 / 4 / 3;
   align-self: end;
+  /* **Hugging the outer edge, so the slack becomes sand.** The column is now
+     sized for the wider of the two halves, so the half that needs less has
+     room to spare in it. Stretched, that spare width would be handed to the
+     cluster's own `auto` column and widen the command zone — which is the
+     exact disagreement this is fixing, moved one level in. Ended, the cluster
+     keeps its natural size and the leftover is corner nobody plays in. */
+  justify-self: end;
 }
 .field-side-far .field-row-land       { grid-area: 1 / 1; }
 .field-side-far .field-row-other      { grid-area: 2 / 1; }
@@ -6542,6 +6567,13 @@ button:hover .tarot-fan-card {
   --field-card-full: 58px;
   --lane-lean: 9px;
   --lane-turn: 14px;
+  /* The gap between two cards in a lane, and the padding a half keeps around
+     its lanes. Both are declared here rather than where they are used, because
+     the combat arrows have to land on the same ruler the lanes are laid out
+     with — see `.field-arrow`, which reaches a slot's position by arithmetic
+     because it is drawn in the trench and cannot ask a lane. */
+  --lane-gap: 7px;
+  --side-pad-x: 10px;
   --lane-h: calc(var(--field-card-full) * 81 / 58 + var(--lane-lean) * 2);
   /* **What a half is worth**: three lanes, the two gaps between them, and its
    * own padding. Only the wide layout is told this, and the reason is worth
@@ -6631,7 +6663,6 @@ button:hover .tarot-fan-card {
  * zone takes `--seats` of them, which is how a pairing gets two chairs without
  * the graveyard paying for them (see the seats block further down). */
 .field-zone-l {
-  --zone-tile: 78px;
   display: grid;
   grid-template-columns: auto var(--zone-tile);
   gap: 5px;
@@ -6665,7 +6696,6 @@ button:hover .tarot-fan-card {
    * lane has the whole width. Read left to right they are the L read left to
    * right, so nothing learned on a laptop has to be relearned here. */
   .field-zone-l {
-    --zone-tile: 58px;
     gap: 4px;
     grid-template-columns: auto var(--zone-tile) var(--zone-tile);
     align-content: stretch;
@@ -6678,6 +6708,10 @@ button:hover .tarot-fan-card {
      phone and a laptop put a player's graveyard in the same *place* even
      though they draw it in a different shape. */
   .field-side {
+    /* The narrow tile, and the column arithmetic above goes with the corner:
+       here the zones lie in a strip at the foot and every lane already has the
+       whole width, so both halves share an origin without being told to. */
+    --zone-tile: 58px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: repeat(3, var(--lane-h)) auto;
   }
@@ -8135,7 +8169,6 @@ button:hover .tarot-fan-card {
  * in padding rather than in the gap is what lets the lane scroll sideways
  * without shearing the corners off every turned card in it. */
 .field-row {
-  --lane-gap: 7px;
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
@@ -8147,6 +8180,35 @@ button:hover .tarot-fan-card {
   overflow-y: hidden;
   scrollbar-width: thin;
 }
+/* **The two front lines are laid against one ruler.**
+ *
+ * `alignLanes` puts a blocker in the same *slot* as the attacker it stopped,
+ * and a slot only becomes a position if every slot is the same width. Under
+ * the flex rule above it is not: `.field-gear` reserves 7px of margin per
+ * attachment so a suited-up creature does not lie over its neighbour, which
+ * means a lane carrying two Equipment runs 14 pixels longer than the lane
+ * across the trench and the pair meant to be facing each other drift apart.
+ * Measured at five pixels on one real board with one Aura in play, and it
+ * accumulates.
+ *
+ * So the creature lanes — and only these two, because only these two have to
+ * agree with anything — are a grid of fixed columns. Slot n is at
+ * `n * (card + gap)` on both halves whatever is standing in it.
+ *
+ * **What that costs is the reservation, and the gap absorbs most of it.** A
+ * margin does not move a grid column, so a creature's tuck now overhangs
+ * instead of pushing: the first attachment's 7px lands exactly in the lane's
+ * own 7px gap and is invisible, and only a second one reaches the card beside
+ * it. That is the right way round — a creature carrying two Equipment is rare,
+ * and two front lines that do not line up were on the board every combat. */
+.field-row-creatures {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--field-card-full);
+  justify-content: start;
+  align-items: end;
+}
+
 .field-row-empty {
   font-size: 0.72rem;
   font-style: italic;
@@ -8180,6 +8242,25 @@ button:hover .tarot-fan-card {
  * a width that moved while the height stood still would stretch somebody's
  * painting, which is the one thing ADR 32 and Scryfall's own guidelines both
  * say not to do to it. */
+/* **Sand held open where a blocker used to stand.**
+ *
+ * `alignLanes` slides each blocker under the attacker it stopped and leaves the
+ * slot it came from empty, so the two front lines are laid against one ruler
+ * and the pair actually in a fight are opposite each other. This is that empty
+ * slot: a card's width of nothing, drawn only while a combat is on and gone the
+ * beat it ends.
+ *
+ * It has to be an element rather than a margin. The lane is a flex row and the
+ * gap may fall anywhere in it, including between two cards that would otherwise
+ * be neighbours — and a slot that is *there* keeps the row's own `gap` on both
+ * sides of it, which is what makes the arithmetic upstairs come out as pixels
+ * down here. */
+.field-slot {
+  flex: 0 0 auto;
+  width: var(--field-card-full);
+  aspect-ratio: 58 / 81;
+}
+
 .field-card {
   position: relative;
   flex: 0 0 auto;
@@ -9539,6 +9620,10 @@ button:hover .tarot-fan-card {
  * turn is the fixed point of this band and it stays put whatever it is
  * standing between. */
 .field-seam {
+  /* The containing block for the combat arrows, which are absolutely placed
+     across it. It spans the same column as both halves, which is the whole
+     reason they can be positioned by arithmetic — see `.field-arrow`. */
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -9552,6 +9637,245 @@ button:hover .tarot-fan-card {
     inset 0 1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent);
 }
+/* ------------------------------------------- who is fighting whom
+ *
+ * **An arrow across the trench, one per clash** (Aaron, 2026-08-27: *"draw
+ * stylized arrows attacker -> blocker"*).
+ *
+ * Lining the two lanes up puts a blocker opposite the attacker it stopped, and
+ * that is worth doing — but two creatures standing across a seam is what every
+ * creature on this board is doing, so the arrangement alone says nothing. This
+ * is the sentence: it leaves the attacker, crosses the trench, and lands on
+ * what stopped it.
+ *
+ * **Placed by arithmetic rather than by measurement**, because it is drawn in
+ * the trench and the thing it points at is in a lane. A lane cannot lend it the
+ * room — `.field-row` scrolls sideways when a board outgrows it, and
+ * `overflow-x: auto` means `overflow-y: auto` as well, which is the rule that
+ * once clipped a card preview out of a 42px row. So it reaches a slot the way
+ * the lane's own grid reaches one: the half's padding, the clearance a lane
+ * keeps for a turned card, and one pitch per slot. All three are named on
+ * `.field`, so the arrows and the lanes read the same ruler and cannot drift.
+ *
+ * **Under the plates and over the stone.** It passes behind the two name
+ * plates and the turn, which is what a thing crossing a room does — and drawn
+ * above them it would run a red line through the one number both players look
+ * at. First child of the seam, no z-index games needed.
+ *
+ * The red is the gate's own blood, the same red the attack mark uses: the
+ * control that starts a fight, the mark that shows one and the line that says
+ * who it is with are all one colour. */
+.field-arrows {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Out of the trench far enough to touch both front lines: the lean a lane
+     keeps for a turned card, plus the half's own padding. */
+  top: calc(-1 * var(--lane-lean) - 8px);
+  bottom: calc(-1 * var(--lane-lean) - 8px);
+  z-index: 0;
+  pointer-events: none;
+}
+.field-arrow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--field-card-full);
+  left: calc(var(--side-pad-x) + var(--lane-turn)
+    + var(--slot, 0) * (var(--field-card-full) + var(--lane-gap)));
+  animation: arrow-thrust 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* It grows *from* the attacker, so the origin is the attacker's edge — which
+   is the top of the trench when the far half swings and the bottom when the
+   near half does. A line that grew from the middle would read as arriving from
+   nowhere. */
+.field-arrows.is-from-far .field-arrow { transform-origin: 50% 0; }
+.field-arrows.is-from-near .field-arrow { transform-origin: 50% 100%; }
+@keyframes arrow-thrust {
+  0%   { opacity: 0; transform: scaleY(0.08); }
+  60%  { opacity: 1; transform: scaleY(1.03); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+/* **The shaft is a lance, not a line.**
+ *
+ * The first version of this was a three-pixel bar with a small triangle on the
+ * end, and Aaron's note on it was two words long: bolder, and more stylized.
+ * He is right, and the fault is the one commandment 17 names for controls — a
+ * rule is a *diagram* of a thing pointing, where the rest of this room draws
+ * the thing. Everything else that lands on a card here is an object with a
+ * material: the sword is steel, the shield is bronze, the headstone is stone.
+ *
+ * So it tapers. `clip-path` cuts a haft that is a couple of pixels at the
+ * attacker's end and seven at the blocker's — a shape that is *going*
+ * somewhere, which a constant-width bar can never be — and the metal runs from
+ * a dark blood at the tail to a hot lit edge at the point. One polygon, drawn
+ * widening downward, and flipped for the half that swings the other way.
+ *
+ * **The glint travels, and it travels the way the arrow points.** A band of
+ * light runs the length of the haft every two and a bit seconds, from the
+ * creature that swung to the creature that stopped it. That is the direction
+ * said a second time, in motion rather than in shape, for the newcomer this
+ * room is built for (commandment 2) — and it is what keeps the arrow alive
+ * across the several beats a combat lasts instead of being a mark that arrived
+ * and then sat there. Drawn by moving a `background-position` rather than by
+ * transforming the layer, for the reason the token materials found out the
+ * hard way: a transform takes the clip along with it and the light never
+ * arrives. */
+.field-arrow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  bottom: 9px;
+  clip-path: polygon(46.5% 0%, 53.5% 0%, 60% 100%, 40% 100%);
+  /* Three layers, and the middle one is the reason this reads as metal rather
+     than as a coloured sliver: a specular strip down the centre *rounds* the
+     haft, the way the loupe's glass and the buttons' glint do. The first
+     draft had the metal fade toward transparent at the tail, which was a
+     tapered idea and an invisible one — over the trench's dark band a dark
+     blood at forty per cent alpha is nothing at all. The metal is solid the
+     whole way now and the *lightness* does the tapering. */
+  background-image:
+    linear-gradient(180deg,
+      transparent 0%,
+      color-mix(in srgb, #ffd9c4 82%, transparent) 6%,
+      color-mix(in srgb, #fff3e8 96%, transparent) 9%,
+      transparent 16%),
+    linear-gradient(90deg,
+      rgba(255, 214, 186, 0) 20%,
+      rgba(255, 228, 206, 0.52) 50%,
+      rgba(255, 214, 186, 0) 80%),
+    linear-gradient(180deg,
+      var(--arena-blood-deep) 0%,
+      var(--arena-blood) 44%,
+      var(--arena-blood-lit) 100%);
+  background-size: 100% 300%, 100% 100%, 100% 100%;
+  background-position: 50% 130%, 50% 50%, 50% 50%;
+  background-repeat: no-repeat;
+  filter:
+    drop-shadow(0 0 6px color-mix(in srgb, var(--arena-blood-lit) 76%, transparent))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
+  animation: arrow-glint 2300ms linear infinite;
+}
+/* The half that swings the other way takes the same haft upside down: the
+   taper, the metal and the glint all reverse together, which is one flip
+   rather than three mirrored declarations to keep in step. */
+.field-arrows.is-from-near .field-arrow::before { transform: scaleY(-1); }
+@keyframes arrow-glint {
+  /* Starts off the tail and finishes off the point, so the loop's return is
+     over before it is on the metal — there is nothing to fade. The two layers
+     under it are named in both frames because a keyframe replaces the whole
+     property: leave them out and the round of the haft slides too. */
+  0%   { background-position: 50% 130%, 50% 50%, 50% 50%; }
+  100% { background-position: 50% -30%, 50% 50%, 50% 50%; }
+}
+
+/* **The flights, at the tail.** An arrow is three shapes and this is the one
+ * that says which end it came from — a haft with a point on it is a spear.
+ * Two swept vanes cut from one box, dark where the haft is dark so they read
+ * as part of the same object rather than as a mark on top of it.
+ *
+ * It rides the taper's own end, and it is the one piece drawn small enough
+ * that the drop shadow matters more than the fill: at eighteen pixels across a
+ * dark trench, the separation is what makes it a shape at all. */
+.field-arrow-fletch {
+  position: absolute;
+  left: 50%;
+  width: 26px;
+  height: 16px;
+  margin-left: -13px;
+}
+/* **Two vanes with the haft between them, and the first draft was one chevron.**
+ *
+ * A single V-shaped band is the same silhouette as the head, so turned upside
+ * down for the other half it *became* one: an arrow with a point at each end,
+ * which at twelve pixels is an arrow pointing nowhere. Seen on the board, not
+ * reasoned out — the near-half version read as double-headed immediately.
+ *
+ * Real fletching is two feathers either side of the shaft, swept back, with
+ * the shaft showing between them. Two vanes cannot be cut from one polygon —
+ * `clip-path` has no disjoint shapes — so the flights are the fletch's own two
+ * pseudo-elements, mirrored. The gap down the middle is what tells them apart
+ * from a point at a glance. */
+.field-arrow-fletch::before,
+.field-arrow-fletch::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--arena-blood) 88%, #000) 0%,
+    var(--arena-blood-deep) 100%);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+/* Swept back and outward: the edge beside the haft sits low, the outer edge
+   rides high, so each vane leans away from the direction of travel. */
+.field-arrow-fletch::before {
+  left: 0;
+  clip-path: polygon(100% 30%, 100% 100%, 0% 68%, 0% 0%);
+}
+.field-arrow-fletch::after {
+  right: 0;
+  clip-path: polygon(0% 30%, 0% 100%, 100% 68%, 100% 0%);
+}
+.field-arrows.is-from-far .field-arrow-fletch { top: 0; }
+/* Turned rather than re-cut, as the head is. */
+.field-arrows.is-from-near .field-arrow-fletch {
+  bottom: 0;
+  transform: rotate(180deg);
+}
+
+/* **The head is barbed**, which is the whole difference between an arrow and a
+ * caret. Two swept-back points and a notch between them: the outline every
+ * heraldic arrow in Magic's frame has, cut rather than typed, because at
+ * twenty pixels a glyph is whatever the reader's font decides it is.
+ *
+ * Sized in pixels rather than as a fraction of the slot, so the point stays
+ * the same weight when the card size changes under it. */
+.field-arrow::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 26px;
+  height: 22px;
+  margin-left: -13px;
+  clip-path: polygon(50% 0%, 100% 100%, 50% 74%, 0% 100%);
+  background: linear-gradient(180deg,
+    #ffcdb4 0%,
+    var(--arena-blood-lit) 34%,
+    var(--arena-blood) 100%);
+  filter:
+    drop-shadow(0 0 7px color-mix(in srgb, var(--arena-blood-lit) 78%, transparent))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+.field-arrows.is-from-far .field-arrow::after { bottom: 0; }
+/* Turned rather than re-cut, so there is one outline in this file and not two
+   that have to be kept identical. */
+.field-arrows.is-from-near .field-arrow::after {
+  top: 0;
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The arrow is the whole of what this says, so stillness may not answer it
+     with nothing: it arrives at full length instead of travelling there, and
+     the haft keeps its metal with the light standing still on it. */
+  .field-arrow {
+    animation: arrow-still 520ms ease-out both;
+  }
+  .field-arrow::before {
+    animation: none;
+    background-position: 50% 50%, 50% 50%, 50% 50%;
+  }
+  @keyframes arrow-still {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+}
+
 /* The turn, on its own plinth in the middle of the trench. The two hairlines
    that used to flank it are gone with the flex row that stretched them: the
    plates either side are the thing that separates it now, and a rule between a

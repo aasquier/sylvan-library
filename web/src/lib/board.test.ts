@@ -12,8 +12,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ForgeBoard } from './api'
-import type { BoardCard } from './board'
-import { fightingStats, foldBoard, stackRow } from './board'
+import type { BoardCard, BoardStack } from './board'
+import { alignLanes, fightingStats, foldBoard, stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -903,5 +903,164 @@ describe('what a beat says beyond where the cards are', () => {
     const creatures = foldBoard(b, 1).sides[0]!.creatures
     expect(creatures.find((c) => c.id === 212)?.copiedBy).toBe(158)
     expect(creatures.find((c) => c.id === 210)?.copiedBy).toBe(0)
+  })
+})
+
+/**
+ * **Which creature is fighting which, said by where they are standing.**
+ *
+ * The two front lines face each other across the trench and both were packed
+ * left, so the pair actually in a fight could be four cards apart. `alignLanes`
+ * slides each blocker under the attacker it stopped.
+ *
+ * Held here rather than in a rendered test for the reason this whole board
+ * keeps relearning: jsdom has no layout, so nothing that renders can see where
+ * a card *is*. The alignment is a pure function over slots for exactly that —
+ * the arrangement is decided in arithmetic, where it can be asked.
+ */
+describe('lining the two creature lanes up for a fight', () => {
+  const beast = (id: number, name: string, over: Partial<BoardCard> = {})
+  : BoardCard => ({
+    id, name, token: false, types: 'Creature - Beast',
+    image: '', art: '', artist: '', zone: 'battlefield', seat: 1, tapped: false,
+    mana: false, makes: [], keywords: [], leaving: null, power: 2,
+    toughness: 2, counters: [], counterHistory: [], combat: '',
+    attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+    live: [], granted: [], fate: '', copiedBy: 0, ...over,
+  })
+  const attacker = (id: number, name: string) =>
+    beast(id, name, { combat: 'attacking', attacking: 2 })
+  const blocker = (id: number, name: string, stops: number) =>
+    beast(id, name, { combat: 'blocking', blocking: stops })
+  const named = (lane: (BoardStack | null)[]) =>
+    lane.map((s) => s?.card.name ?? null)
+
+  it('slides the blocker under its attacker and moves nothing else', () => {
+    // Aaron's own rule, chosen over pulling clashes to the left: *"only a clash
+    // realigns; an unblocked attacker stays put"*. A2 is blocked by B; A1 and
+    // A3 do not budge, and C keeps the slot it already had.
+    const cards = [attacker(1, 'A1'), attacker(2, 'A2'), attacker(3, 'A3'),
+      blocker(4, 'B', 2), beast(5, 'C')]
+    const far = stackRow(cards.slice(0, 3))
+    const near = stackRow(cards.slice(3))
+    const out = alignLanes(far, near, cards)
+    expect(named(out.far)).toEqual(['A1', 'A2', 'A3'])
+    // B was first in its lane and is now second, under A2. The gap it left is
+    // sand: C did not slide into it.
+    expect(named(out.near)).toEqual([null, 'B', 'C'])
+    expect(out.clashes).toEqual([1])
+  })
+
+  it('leaves both lanes alone when nobody is blocking', () => {
+    // The ordinary case, and the one that matters most: a board must not grow
+    // holes in it every beat. Same arrays back, and no arrow to draw.
+    const cards = [attacker(1, 'A1'), attacker(2, 'A2'), beast(3, 'C')]
+    const far = stackRow(cards.slice(0, 2))
+    const near = stackRow(cards.slice(2))
+    const out = alignLanes(far, near, cards)
+    expect(out.far).toBe(far)
+    expect(out.near).toBe(near)
+    expect(out.clashes).toEqual([])
+  })
+
+  it('stands two blockers side by side under the one they gang up on', () => {
+    const cards = [attacker(1, 'A1'), attacker(2, 'A2'),
+      blocker(3, 'B1', 2), blocker(4, 'B2', 2)]
+    const far = stackRow(cards.slice(0, 2))
+    const near = stackRow(cards.slice(2))
+    const out = alignLanes(far, near, cards)
+    // A2 stands at slot 1; the second blocker takes the next slot along, so
+    // the pair is still standing together under it. One arrow, from A2.
+    expect(named(out.near)).toEqual([null, 'B1', 'B2'])
+    expect(out.clashes).toEqual([1])
+  })
+
+  it('says nothing about a wall that is not facing one way', () => {
+    // Five Saprolings across three attackers are one pile — `stackRow` merges
+    // on the role, not the target — so the pile has no single attacker to
+    // stand under. It stays where it is and gets no arrow, which is the board
+    // declining to say something it cannot support.
+    const wall = [
+      blocker(10, 'Saproling', 1), blocker(11, 'Saproling', 2),
+    ]
+    const cards = [attacker(1, 'A1'), attacker(2, 'A2'), ...wall]
+    const far = stackRow(cards.slice(0, 2))
+    const near = stackRow(wall)
+    expect(near).toHaveLength(1)
+    expect(near[0]?.count).toBe(2)
+    const out = alignLanes(far, near, cards)
+    expect(out.clashes).toEqual([])
+    expect(out.near).toBe(near)
+  })
+
+  it('moves a unanimous wall as one, because it can be spoken for', () => {
+    const wall = [
+      blocker(10, 'Saproling', 2), blocker(11, 'Saproling', 2),
+    ]
+    const cards = [attacker(1, 'A1'), attacker(2, 'A2'), ...wall]
+    const out = alignLanes(stackRow(cards.slice(0, 2)), stackRow(wall), cards)
+    expect(named(out.near)).toEqual([null, 'Saproling'])
+    expect(out.clashes).toEqual([1])
+  })
+
+  it('finds the attacker a blocker names even when a pile draws another', () => {
+    // The trap the ids exist for. Two identical attackers merge into one pile
+    // drawn as id 1; the blocker stopped id 2, which is *in* that pile and is
+    // not the card it draws. Reading `card.id` alone finds no attacker at all
+    // and the clash silently disappears.
+    const cards = [attacker(1, 'Twin'), attacker(2, 'Twin'),
+      blocker(5, 'B', 2)]
+    const far = stackRow(cards.slice(0, 2))
+    expect(far).toHaveLength(1)
+    const out = alignLanes(far, stackRow(cards.slice(2)), cards)
+    expect(out.clashes).toEqual([0])
+    expect(named(out.near)).toEqual(['B'])
+  })
+
+  it('aligns the far lane onto the near one when the near seat swings', () => {
+    // Either seat attacks, and the lane that moves is always the blocker's.
+    const cards = [blocker(1, 'B', 3), beast(2, 'C'), attacker(3, 'A')]
+    const far = stackRow(cards.slice(0, 2))
+    const near = stackRow(cards.slice(2))
+    const out = alignLanes(far, near, cards)
+    expect(named(out.near)).toEqual(['A'])
+    expect(named(out.far)).toEqual(['B', 'C'])
+    expect(out.clashes).toEqual([0])
+  })
+})
+
+describe('a gang block stands around the creature it stopped', () => {
+  const beast = (id: number, name: string, over: Partial<BoardCard> = {})
+  : BoardCard => ({
+    id, name, token: false, types: 'Creature - Beast',
+    image: '', art: '', artist: '', zone: 'battlefield', seat: 1, tapped: false,
+    mana: false, makes: [], keywords: [], leaving: null, power: 2,
+    toughness: 2, counters: [], counterHistory: [], combat: '',
+    attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+    live: [], granted: [], fate: '', copiedBy: 0, ...over,
+  })
+
+  it('centres three blockers on the attacker in the middle of them', () => {
+    // **Found on a real board, not reasoned out.** Three cats stopped a 14/14
+    // Ghalta standing fifth in its lane; under "first one takes the slot, the
+    // rest follow", the commander sat opposite Ghalta and the other two stood
+    // over empty sand to the right of it — one block and two bystanders. The
+    // attacker belongs in the middle of what stopped it.
+    const cards = [
+      beast(1, 'A1', { combat: 'attacking', attacking: 2 }),
+      beast(2, 'Ghalta', { combat: 'attacking', attacking: 2 }),
+      beast(3, 'B1', { combat: 'blocking', blocking: 2 }),
+      beast(4, 'B2', { combat: 'blocking', blocking: 2 }),
+      beast(5, 'B3', { combat: 'blocking', blocking: 2 }),
+    ]
+    const out = alignLanes(stackRow(cards.slice(0, 2)), stackRow(cards.slice(2)),
+      cards)
+    // Ghalta stands at slot 1, so the three sit at 0, 1 and 2 with it opposite
+    // the middle one.
+    expect(out.near.map((s) => s?.card.name ?? null))
+      .toEqual(['B1', 'B2', 'B3'])
+    // **One arrow, from the creature that was stopped.** Three would rise out
+    // of the two slots either side of Ghalta, where nothing is attacking.
+    expect(out.clashes).toEqual([1])
   })
 })
