@@ -162,3 +162,18 @@ Why committed rather than hotlinked: The same argument the gold beside it makes:
 
 Why committed rather than hotlinked: The same argument as the skull and the shield beside it. This is drawn on the beat that says a permanent was exiled and it is gone about a second and a half later, so fetching it from somebody else's host would mean a road that arrives after the card has already left down it. It is also a photograph released into the public domain by an individual rather than by an institution, which is the category where a file most quietly changes licence or disappears — a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end via -->
+
+<!-- animist:begin cippus -->
+## cippus.webp
+
+- **Source**: "Marble funerary altar of Cominia Tyche MET DP138727.jpg", <https://commons.wikimedia.org/wiki/File:Marble_funerary_altar_of_Cominia_Tyche_MET_DP138727.jpg>, found via Commons, searching `Roman funerary altar MET` and `Roman grave marker MET` and keeping only CC0 and public-domain results -- the plain search for Roman steles is mostly CC BY-SA, an attribution obligation a decoration must not carry. Of the free ones this is the only Roman grave marker photographed square-on, whole, on a clean sweep and with nothing else in frame; the other funerary altars are all three-quarter views, which read as a box on a table rather than as a stone standing up. The object is the Met's 38.27, Roman, ca. A.D. 90-100.
+.
+- **Licence**: CC0. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build cippus.recipe.yaml`):
+  - `crop`: frac_box=[0.233, 0.204, 0.79, 0.902].
+  - `matte_backdrop`: tolerance=28, soft=20, border=2.
+  - `resize`: width=360.
+  - Encoded WEBP, quality 80.
+
+Why committed rather than hotlinked: It arrives in the same breath as the wreath, at the end of a match, and the two are read against each other -- a stone that turns up a beat after the crown has landed does not merely appear late, it breaks the comparison the panel exists to make. That is the gauntlet's argument and it survives the object being swapped. The second reason is the licence: a photograph of an ancient object re-hosted by a third party is precisely the category where somebody else's copy quietly changes terms or moves, and a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end cippus -->

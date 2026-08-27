@@ -1,0 +1,118 @@
+# The stone raised over the deck that did not walk out.
+#
+# It replaces a gauntlet, and Aaron's reading of that gauntlet is the whole
+# brief: "the 'Leaves the Sand' icon, mega lame, I can't even tell what it is
+# ... we should lean into something more traditionally a losers like a
+# headstone". The gauntlet's own recipe argued -- well, and correctly -- that a
+# hand-shaped object with no hand in it is already a whole sentence about
+# abandonment. What it did not test is whether the sentence is *legible*. Read
+# cold, at a hundred and fifty pixels, beside a gold wreath, a rust-eaten
+# fourteenth-century arm guard is a brown shape. Everybody knows what a grave
+# marker is, and nobody has to be told.
+#
+# **A Roman one, because the room is Roman.** The wreath beside it is a Roman
+# gold crown and the ground under both is arena sand; a Victorian churchyard
+# slab in that company is a costume change mid-sentence. This is a *cippus* --
+# the Met's own word for it -- a marble funerary altar cut in Rome around A.D.
+# 90-100 for Cominia Tyche, by the husband who buried her. Moulded cornice,
+# portrait in its niche, six lines of Latin, plinth. It is the object the
+# metaphor is made of rather than a picture of one.
+#
+# **This overturns a rejection recorded one directory over, and the reversal is
+# the point.** `memento.recipe.yaml` tried a gladiator's funerary stele first
+# and refused it in two sentences: photographed in situ, bolted to a museum
+# wall with brackets in frame, and "a Roman stele's silhouette is a plain
+# rectangle, which at thirty pixels is a grey box rather than a grave". Both
+# halves of that are true and neither one applies here. The size is different
+# -- this is drawn at 120-190px in a verdict panel, not at 30 on a card -- and
+# so is the photograph: a studio plate on a sweep, face-on, nothing else in
+# frame. The earlier note was a fact about *that plate at that size*, and it
+# was read for years as a fact about steles.
+#
+# **What makes it read as a grave and not as a box is the carving.** A blank
+# slab was the tempting choice -- a clear face to set a deck's name on, mirror
+# to the wreath's opening -- and it is exactly the grey rectangle the memento
+# note warned about. The portrait and the inscription are what carry the
+# silhouette: a pale upright stone with a face in a niche and rows of cut
+# letters under it is unmistakable at any size a browser will draw it. So the
+# fallen deck's name goes *under* the stone rather than on it, and the stone is
+# allowed to be the thing it is.
+#
+# The inscription opens `DIS MANIBVS` -- to the spirits of the dead -- and
+# names her *sanctissima*, *castissima*, twenty-seven years and eleven months
+# and twenty-eight days. Nothing on the page quotes it and nothing needs to.
+# It is the reason the object carries what it carries.
+animist: 1
+
+why_committed: >
+  It arrives in the same breath as the wreath, at the end of a match, and the
+  two are read against each other -- a stone that turns up a beat after the
+  crown has landed does not merely appear late, it breaks the comparison the
+  panel exists to make. That is the gauntlet's argument and it survives the
+  object being swapped. The second reason is the licence: a photograph of an
+  ancient object re-hosted by a third party is precisely the category where
+  somebody else's copy quietly changes terms or moves, and a copy confirmed
+  once and committed is a copy whose provenance stays true.
+
+sources:
+  # CC0, confirmed through the Commons API: `LicenseShortName` is `CC0` and
+  # `AttributionRequired` is `false`. The Met's own Open Access API would be
+  # the shorter hop and it is refusing every request from this machine today
+  # (an edge network answering 403 to the object endpoint as well as to
+  # search), so the file is taken from the Met's own donation to Commons --
+  # 2882x3842, which is the museum plate rather than an aggregator's downsized
+  # derivative, and the accession is recorded below either way.
+  cippus:
+    provider: wikimedia
+    title: "Marble funerary altar of Cominia Tyche MET DP138727.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Marble_funerary_altar_of_Cominia_Tyche_MET_DP138727.jpg
+    found_via: >
+      Commons, searching `Roman funerary altar MET` and `Roman grave marker
+      MET` and keeping only CC0 and public-domain results -- the plain search
+      for Roman steles is mostly CC BY-SA, an attribution obligation a
+      decoration must not carry. Of the free ones this is the only Roman grave
+      marker photographed square-on, whole, on a clean sweep and with nothing
+      else in frame; the other funerary altars are all three-quarter views,
+      which read as a box on a table rather than as a stone standing up. The
+      object is the Met's 38.27, Roman, ca. A.D. 90-100.
+    licence: CC0
+
+outputs:
+  # 360 wide for something drawn at 120-190 in the verdict panel, and tall
+  # rather than wide -- which is the shape the object is and the shape a
+  # headstone has to be. Narrower than the gauntlet's 440 it replaces, because
+  # this one is twice as tall: the size curve (`animist measure`, 280 to 480 in
+  # steps of 40) runs 51, 65, 79, 95, 113, 132 KB and puts the knee here. Past
+  # it the file grows faster than the picture does, and 360 is still twice the
+  # widest a phone will draw it.
+  #
+  # **The crop comes first and that ordering is load-bearing.** `matte_backdrop`
+  # takes ONE colour, the median of the frame edge, and this plate's sweep runs
+  # 67 at the top to 157 at the bottom left: measured on the whole frame, no
+  # tolerance exists that swallows both ends without walking into the marble --
+  # at 40 a third of the ground survives, at 52 the top of the stone goes. Cut
+  # to the object with about two percent of margin all round, the sweep in
+  # frame spans 91-154 and one median with a tolerance of 28 covers it.
+  #
+  # **`matte_neutral` is the wrong op here and it says so itself.** Its
+  # docstring names marble as the case a chroma key erases along with the
+  # ground, and the proof sheet is exactly that: the silhouette was perfect and
+  # the stone came out full of holes -- every grey passage on a weathered white
+  # marble keyed straight through. It is invisible over paper and swiss cheese
+  # over the dark theme, which is the worst way for a matte to fail.
+  #
+  # `soft: 20` is for the cast shadow: the plinth's own shadow sits about 30
+  # below the sweep, so it lands mid-ramp and fades out instead of surviving as
+  # a grey wedge under the stone.
+  #
+  # The bottom edge is cut at the plinth's own bottom rather than below it, so
+  # the stone stands flush on the frame's edge and the panel can plant it in
+  # the sand instead of floating it.
+  - file: cippus.webp
+    from: cippus
+    ops:
+      - crop: {frac_box: [0.2330, 0.2040, 0.7900, 0.9020]}
+      - matte_backdrop: {tolerance: 28, soft: 20, border: 2}
+      - resize: {width: 360}
+    encode: {format: webp, quality: 80}
+    expect: {width: 360, height: 601, budget_kb: 84, metadata: none}

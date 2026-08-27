@@ -38,7 +38,7 @@ function result(wins: number[]): ForgeResult {
 it('crowns the deck with the most wins and names the other as fallen', () => {
   render(<MatchVerdict result={result([7, 5])} />)
   expect(screen.getByText('Takes the wreath')).toBeTruthy()
-  expect(screen.getByText('Leaves the sand')).toBeTruthy()
+  expect(screen.getByText('Left on the sand')).toBeTruthy()
   expect(screen.getByText('Gyome, Master Chef')).toBeTruthy()
   expect(screen.getByText('Trostani, Selesnya\'s Voice')).toBeTruthy()
 })
@@ -58,9 +58,11 @@ it('crowns nobody on a tie, and puts no deck on the sand', () => {
   expect(screen.queryByText('Takes the wreath')).toBeNull()
   // The half that would name a loser is not rendered at all: a drawn match has
   // no fallen deck, and inventing one is the room taking a view the games did
-  // not support.
-  expect(screen.queryByText('Leaves the sand')).toBeNull()
+  // not support. No stone is cut either — the marker is raised *for* somebody,
+  // and a drawn match has nobody to raise it for.
+  expect(screen.queryByText('Left on the sand')).toBeNull()
   expect(screen.queryByText('Gyome, Master Chef')).toBeNull()
+  expect(document.querySelector('.verdict-stone')).toBeNull()
 })
 
 it('goes away when the sand is cleared, and does not come back on its own', () => {

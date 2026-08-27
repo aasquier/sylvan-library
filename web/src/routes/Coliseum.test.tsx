@@ -386,13 +386,34 @@ describe('the gates', () => {
     // to read a status off yet.
     vi.mocked(api.simForge).mockReturnValue(new Promise(() => {}))
     show()
-    const button = await screen.findByText('Send them in') as HTMLButtonElement
-    expect(button.disabled).toBe(false)
-    fireEvent.click(button)
+    // By role rather than by text: the label lives in a span inside the
+    // button now, because the painting behind it has to be a layer of its own
+    // and the words have to sit above it. The role query is the one that
+    // still finds the control rather than the sentence.
+    const gate = () => screen.getByRole('button', {
+      name: /Send them in|Lighting the forge/,
+    }) as HTMLButtonElement
+    await screen.findByText('Send them in')
+    expect(gate().disabled).toBe(false)
+    fireEvent.click(gate())
     await waitFor(() =>
       expect(screen.getByText('Lighting the forge…')).toBeTruthy())
-    expect((screen.getByText('Lighting the forge…') as HTMLButtonElement)
-      .disabled).toBe(true)
+    expect(gate().disabled).toBe(true)
+  })
+
+  it('lets the gate go on without its painting', async () => {
+    // The picture is hotlinked and somebody else's host can decline to serve
+    // it. When the browser says so the control drops back to the face it has
+    // always had — blood, brass and the swords — and nothing about opening
+    // the gates depended on the painting.
+    show()
+    await screen.findByText('Send them in')
+    const art = document.querySelector('.btn-arena-art')
+    expect(art).toBeTruthy()
+    fireEvent.error(art as Element)
+    expect(document.querySelector('.btn-arena-art')).toBeNull()
+    expect(document.querySelector('.btn-arena')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Send them in/ })).toBeTruthy()
   })
 })
 
@@ -474,7 +495,7 @@ describe('the shuffle', () => {
     vi.mocked(api.simForge).mockResolvedValue(DONE)
     show()
     fireEvent.click(await screen.findByText('Send them in'))
-    await screen.findByText('Gyome Food wins')
+    await screen.findByText('The tale of the tape')
     // `RESULT.seed` is 7 and the badge that used to print it is gone. What a
     // watcher gets instead is the thing the number was ever worth to them.
     expect(screen.queryByText(/shuffle/i)).toBeNull()
@@ -509,7 +530,7 @@ describe('walking back into a match', () => {
   it('shows the record when it finished while the page was away', async () => {
     vi.mocked(api.job).mockResolvedValue(DONE)
     show('/coliseum?a=aaron/gyome&b=aaron/arahbo&m=j1')
-    await screen.findByText('Gyome Food wins')
+    await screen.findByText('The tale of the tape')
   })
 
   it('says so kindly when the arena no longer holds it', async () => {
@@ -600,16 +621,45 @@ describe('the tale of the tape', () => {
     vi.mocked(api.simForge).mockResolvedValue(DONE)
     show()
     fireEvent.click(await screen.findByText('Send them in'))
-    await screen.findByText('Gyome Food wins')
-    expect(screen.getByText('Arahbo Cats wins')).toBeTruthy()
-    // The tile pair the distinction lives in — a game called off at the clock
-    // is the measurement giving up, not a game that ended level.
-    expect(screen.getByText('Hit the clock')).toBeTruthy()
-    expect(screen.getByText('Draws')).toBeTruthy()
-    // And per game: the clocked row is neither a draw nor a win.
-    expect(screen.getByText('hit the clock')).toBeTruthy()
+    await screen.findByText('The tale of the tape')
+    // Both totals are printed, facing each other. `getAllByText` because a
+    // name that took bouts is named again on each one it took.
+    expect(screen.getAllByText('Gyome Food').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Arahbo Cats').length).toBeGreaterThan(0)
+    // The two notes the distinction lives in — a bout called off at the clock
+    // is the measurement giving up, not a bout that ended level. Separate
+    // lines, separate segments, and stated even at zero.
+    expect(screen.getByText(/hit the clock — called off at/)).toBeTruthy()
+    expect(screen.getByText('No draws')).toBeTruthy()
+    // And per bout: the clocked row names nobody at all.
+    expect(screen.getByText('Stopped by the clock')).toBeTruthy()
     // The wall-clock line speaks Magic, not machinery.
-    expect(screen.getByText(/lighting\s+the forge/)).toBeTruthy()
+    expect(screen.getByText(/lighting the forge/)).toBeTruthy()
+  })
+
+  it('reads a length in minutes rather than in a machine\'s seconds', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    // The clock is 300 on the wire and five minutes to a person; the wall is
+    // 71 seconds and a minute and eleven. Nobody has ever thought about a
+    // limit in seconds (commandment 2).
+    expect(await screen.findByText(/called off at 5m/)).toBeTruthy()
+    expect(screen.getByText(/fought in 1m 11s/)).toBeTruthy()
+    // Under a minute stays in seconds, because "0m 5s" is a worse sentence.
+    expect(screen.getByText(/Middling bout 5s, longest 38s/)).toBeTruthy()
+  })
+
+  it('prints the result even when the coliseum\'s own prose never arrived', async () => {
+    // The regression the move fixed: the result used to render *inside* the
+    // arena block, so `/api/coliseum` failing took the score of a match
+    // somebody had just watched down with it. The match is not the room.
+    vi.mocked(api.coliseum).mockRejectedValue(new Error('no room'))
+    vi.mocked(api.simForge).mockResolvedValue(DONE)
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    expect(await screen.findByText('The tale of the tape')).toBeTruthy()
+    expect(screen.getByText('Takes the wreath')).toBeTruthy()
   })
   /** The house's voices — the `.btn-*` classes in `index.css` that actually
    *  define a hover, a press and a pressed state. Written down here rather
