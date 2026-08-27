@@ -1106,8 +1106,20 @@ export default function DeckDetail() {
         </p>
       )}
 
-      {/* tabs */}
-      <div className="flex gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
+      {/* **The tabs wrap, and that is the whole of the phone fix.** Six of
+          them want 432px of row and a 375px phone has 327 to give, so without
+          `flex-wrap` History hung 81px off the right and this page scrolled
+          sideways to reach it — the widest overflow measured anywhere in the
+          app.
+
+          Wrapping rather than `overflow-x: auto`, deliberately. A strip that
+          scrolls hides Artifacts and History behind a gesture nobody is told
+          about, and a newcomer does not go looking for a tab they have never
+          seen (commandment 2). Two rows show all six. Rather than a
+          breakpoint, too: `sm:` has guessed Aaron's phone wrong before, and a
+          strip that wraps is right at every width without anybody having to
+          have guessed one. `Coliseum` and `Admin` already wear this. */}
+      <div className="flex flex-wrap gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
                   className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${

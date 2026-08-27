@@ -5217,12 +5217,28 @@ button:hover .tarot-fan-card {
   opacity: 1;
 }
 
+/* **`overflow-x: clip` is what keeps a phone from scrolling sideways.** This
+ * box is the full width of the viewport, and two things inside it move past
+ * its right edge: the sway below translates the leaf band 4px, and a shed leaf
+ * is placed at the x of the tap that shook it loose — a thumb on the theme
+ * button lands within 12px of the edge, and the leaf is 26 to 42px wide and
+ * drifts another 24 while it falls. Measured at 375px: 5px of horizontal
+ * scroll from the sway alone, on every route, on a 13-second cycle, and more
+ * for the second and a half a leaf is falling. Nothing in the DOM says so and
+ * no test could see it; `documentElement.scrollWidth - clientWidth` is the
+ * only honest witness.
+ *
+ * `clip` rather than `hidden`, and only the one axis: `overflow-x: hidden`
+ * would force `overflow-y` to `auto` and trap the leaves in an 84px box they
+ * are supposed to fall 150px out of. `clip` pairs with a `visible` cross axis,
+ * which is exactly the asymmetry wanted — cut at the sides, open at the foot. */
 .header-canopy {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
   height: var(--canopy-drop);
+  overflow-x: clip;
   pointer-events: none;
   opacity: 0.9;
   transform-origin: 50% 0;
@@ -5242,9 +5258,15 @@ button:hover .tarot-fan-card {
   opacity: 0;
 }
 
+/* Wider than the box it hangs in, by the 4px the sway carries it and a little
+ * over. `inset: 0` and a `translateX(4px)` bare a 4px strip of nothing at the
+ * left edge at one end of every cycle — invisible on a desktop where the vine
+ * runs 1400px, obvious on a 375px phone where it is one percent of the width.
+ * The band repeats on x, so overhanging it costs a few more tiles of leaf and
+ * nothing else; the parent clips what hangs over. */
 .canopy-photo {
   position: absolute;
-  inset: 0;
+  inset: 0 -6px;
   background-repeat: repeat-x;
   background-size: auto 100%;
   transform-origin: 50% 0;

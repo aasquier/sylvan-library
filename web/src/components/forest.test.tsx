@@ -31,6 +31,33 @@ import { HeaderCanopy, SceneBackdrop } from './forest'
 
 const ART = 'https://cards.scryfall.io/art_crop/front/0/a/test.jpg'
 
+/**
+ * The stylesheet, opened off the disk rather than imported.
+ *
+ * `import '../index.css?raw'` resolves to the **empty string** under vitest,
+ * so the obvious guard reads nothing, finds nothing wrong and passes forever.
+ * `lib/tokens.test.ts` carries the full argument for this escape hatch and for
+ * why the path is relative to `web/`; this is the same three lines, doing the
+ * same job for the one declaration below that no rendering test can reach.
+ */
+// @ts-expect-error -- node's types are out of scope for `src`; argued above.
+const nodeFs = await import('node:fs')
+const CSS: string = nodeFs.readFileSync('src/index.css', 'utf8')
+
+/** The body of the first rule that lists `sel` and declares `prop`. */
+function declares(sel: string, prop: string): string {
+  const css = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selectors = (m[1] ?? '').split(',').map((s: string) => s.trim())
+    const found = new RegExp(`(?:^|;|\\n)\\s*${prop}\\s*:([^;}]*)`, 'i')
+      .exec(m[2] ?? '')
+    if (selectors.includes(sel) && found) {
+      return (found[1] ?? '').replace(/\s+/g, ' ').trim()
+    }
+  }
+  return ''
+}
+
 beforeEach(() => {
   localStorage.clear()
 })
@@ -146,4 +173,38 @@ it('arrives retracted when the page is restored mid-scroll', () => {
   expect(document.querySelector('.header-canopy')?.className)
     .toContain('is-retracted')
   window.scrollY = 0
+})
+
+/*
+ * **The vine was widening every page on the site, and only arithmetic in a
+ * live browser could say so.** The canopy box is the full width of the
+ * viewport and two things inside it reach past its right edge: the sway
+ * translates the leaf band 4px, and a shed leaf is placed at the x of the tap
+ * that shook it loose — a thumb on the theme button lands within 12px of the
+ * edge, and the leaf is 26 to 42px wide and drifts another 24 as it falls.
+ * Measured at 375px: 5px of horizontal scroll from the sway alone, on every
+ * route, on a 13-second cycle. A page that rubber-bands sideways is the first
+ * thing anybody notices on a phone and the thing that makes the rest of it
+ * feel cheap.
+ *
+ * This file's opening lesson said the guard for that class of bug "is the
+ * comment in `index.css`, not an assertion here". For the one property the
+ * whole fix rests on, it can be both — and the assertion is the half that
+ * fails when somebody tidies the declaration away.
+ */
+it('clips the vine sideways, so nothing it holds can widen the page', () => {
+  // `clip` and not `hidden`, and that is not a preference. `overflow-x: hidden`
+  // forces the cross axis to `auto`, which would trap the shed leaves in an
+  // 84px box they are supposed to fall 150px out of; `clip` is the one value
+  // that pairs with a `visible` cross axis. Cut at the sides, open at the foot.
+  expect(declares('.header-canopy', 'overflow-x')).toBe('clip')
+})
+
+it('hangs the leaf band wider than the box it sways inside', () => {
+  // `inset: 0` plus the sway's `translateX(4px)` bares a 4px strip of nothing
+  // at the left edge at one end of every cycle — one percent of a 375px phone,
+  // and invisible on the 1400px desktop it was written on. The band repeats on
+  // x, so the overhang costs a few more tiles of leaf and nothing else.
+  const inset = declares('.canopy-photo', 'inset')
+  expect(inset).toMatch(/-\d/)
 })

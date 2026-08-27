@@ -496,10 +496,17 @@ export default function Library() {
       {/* Offered only when there is somebody to browse. On a laptop, and on an
           instance where nobody else has shared anything, this is one tab
           labelling itself — which is exactly the "something in the way" ADR 22
-          asked the browse view not to be. */}
+          asked the browse view not to be.
+
+          `flex-wrap` for the reason `DeckDetail`'s strip carries it: two tabs
+          and a pair of counts fit a 375px phone today, and the day a third
+          shelf or a longer word arrives they wrap onto a second row instead of
+          hanging off the right and making the whole page scroll sideways. The
+          same one word is the difference, and it costs nothing while there are
+          only two. */}
       {players.length > 0 && (
         <div role="tablist" aria-label="Whose decks"
-             className="flex gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
+             className="flex flex-wrap gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
           {([
             ['mine', 'My decks', mine.length],
             ['players', 'Other players', players.length],
