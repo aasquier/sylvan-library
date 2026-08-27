@@ -318,6 +318,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/stats", Handler: a.deckStats},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/suggestions", Handler: a.suggestions},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/wheel", Handler: a.deckWheel},
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/opening-hand", Handler: a.deckOpeningHand},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/commander", Handler: a.commanderDossier},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/printings", Handler: a.commanderPrintings},
 		{Method: http.MethodGet, Pattern: "/api/decks/{owner}/{slug}/log", Handler: a.deckLog},

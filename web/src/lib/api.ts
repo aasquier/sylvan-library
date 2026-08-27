@@ -309,6 +309,54 @@ export interface WheelSpin {
   } | null
 }
 
+/** One card as it lies on the table in a dealt opening hand. `turn` is the
+ *  earliest turn it could be cast off the lands in that same hand, or null
+ *  when those lands never pay for it — and always null for a land, which is
+ *  played rather than cast. */
+export interface DealtCard {
+  name: string
+  mana_cost: string | null
+  type_line: string
+  image: string | null
+  mana_value: number
+  is_land: boolean
+  turn: number | null
+}
+
+/** The counting beside a dealt hand. Arithmetic and nothing else: there is
+ *  deliberately no verdict field, no score and no keep-or-mulligan call
+ *  (ADR 14, and the argument is in `go/internal/sim/opening`). */
+export interface HandReading {
+  lands: number
+  spells: number
+  /** The commander's colours, split by whether a land in the hand makes them. */
+  colors_covered: string[]
+  colors_missing: string[]
+  /** Earliest turn any spell here could be cast, or null for none of them. */
+  first_spell_turn: number | null
+  castable_by_horizon: number
+  /** The turn `castable_by_horizon` counts through — served, never assumed. */
+  horizon: number
+}
+
+/** Seven cards off a real shuffle of this deck, and the counting beside
+ *  them. There is no seed on this wire in either direction: the shuffle is
+ *  the server's and a practice hand is not a fortune anybody replays. */
+export interface OpeningHand {
+  pool_available: boolean
+  cards: DealtCard[]
+  reading?: HandReading
+  /** How many cards were actually shuffled — the 99, never the commander. */
+  deck_size?: number
+  declared_size?: number
+  /** Names the pool did not know, which is why `deck_size` can be short. */
+  unresolved_count?: number
+  commander?: DealtCard | null
+  answered_by?: string
+  caveat?: string
+  message?: string
+}
+
 export interface TurnRow {
   turn: number
   lands: number
@@ -2481,6 +2529,13 @@ export const api = {
   wheelSpin: (ref: DeckRef, seed?: number) =>
     post<WheelSpin>(deckPath(ref, '/wheel'),
                     seed === undefined ? {} : { seed }),
+  /** Shuffle this deck and turn over seven. A POST for the Wheel's reason —
+   *  every press is a fresh deal, not a resource a browser may repeat — and
+   *  read-only with respect to the deck, so a reader may deal from a shared
+   *  one. **It takes no seed and reports none**: the shuffle is the
+   *  server's, and a practice hand has nothing to replay. */
+  dealOpeningHand: (ref: DeckRef) =>
+    post<OpeningHand>(deckPath(ref, '/opening-hand'), {}),
   suggestions: (ref: DeckRef) =>
     get<Suggestions>(deckPath(ref, '/suggestions')),
   // What has been done to this deck, newest first (ADR 28). As reachable as

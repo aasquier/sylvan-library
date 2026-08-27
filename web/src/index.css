@@ -4319,6 +4319,354 @@ button:hover .tarot-fan-card {
 .btn-arena:active:not(:disabled) .glyph-sword-a { transform: rotate(4deg); }
 .btn-arena:active:not(:disabled) .glyph-sword-b { transform: rotate(-4deg); }
 
+/* ------------------------------------------------------- the opening hand
+ *
+ * `components/openinghand.tsx` — Ancestral Recall, folded on the deck page,
+ * and a table you deal seven cards onto. The component's own comment argues
+ * why that card and what it beat; this is the material.
+ *
+ * **This block sits below `.btn`, and that is a requirement rather than a
+ * filing decision.** `.btn` writes the `border` *shorthand*, which resets
+ * `border-color` to transparent, and `.btn` and `.btn-deal` are both one
+ * class — so source order is the whole of the cascade between them. Written
+ * above `.btn`, `.btn-deal`'s gold rule vanished and the plate rendered with
+ * no edge at all, which is why `.btn-arena` lives down here too.
+ *
+ * **The room is the painting's, not the chart palette's.** Pancoast's
+ * Vintage Masters plate is deep sea under a lilac sky with cold blue stone
+ * standing out of it, so the plate below is sea-blue with a gold rule, and
+ * the three colours are declared once rather than per theme — `.btn-arena`'s
+ * argument, and it holds here for the same reason: a card table lit from
+ * above is the same object in daylight as it is at night.
+ *
+ * **The layout wraps on its own and has no breakpoint in it.** Seven cards
+ * on a phone at a kitchen table is the case this was built for, and `sm:`
+ * has guessed Aaron's phone wrong here before. `auto-fit` over a track that
+ * clamps between 4.5rem and 7rem gives four columns on a phone and seven on
+ * a laptop with nobody deciding a pixel width — and because it is a grid,
+ * the second row's three cards are the same size as the first row's four,
+ * which a flex row could not promise.
+ *
+ * **The motion is the deal itself.** Nothing here idles for decoration: the
+ * cards fly in one after another on a stagger the component also schedules
+ * the table sound against, the fan on the button spreads while the shuffle
+ * is in the air, and the face-down deck breathes while it waits to be dealt
+ * from. Under reduced motion the cards are simply already on the table,
+ * which is the honest still version of dealing.
+ */
+:root {
+  --recall-deep: #0e2138;
+  --recall-mid: #1b3c66;
+  /* The lit end of the plate, and the one the ink has to clear: #eef3fb over
+     this is 5.7:1, which is AA at the button's size and better everywhere
+     further down the gradient. */
+  --recall-lit: #35619b;
+  --recall-rule: #c9a227;
+  --recall-ink: #eef3fb;
+}
+
+/* Folded, this is the card it came from — the Wheel's idiom, because a toy
+   that costs a click to open should cost nothing to ignore. */
+.hand-folded {
+  display: block;
+  width: 136px;
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(90, 140, 200, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hand-folded:hover,
+.hand-folded:focus-visible {
+  transform: translateY(-3px) rotate(1.2deg);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(120, 180, 255, 0.35),
+    0 0 0 1px rgba(140, 190, 245, 0.55);
+}
+.hand-folded img {
+  display: block;
+  width: 100%;
+}
+
+.hand-frame {
+  border-color: color-mix(in srgb, var(--recall-mid) 30%, var(--hairline));
+}
+
+/* ---- the deal button (commandment 17)
+ *
+ * A member of the `.btn` family, so focus is the shared vine ring and the
+ * disabled state is the shared one; everything else is this room's. The face
+ * is not a fill: a lit top edge, a shaded lower one and a drop beneath put
+ * the plate *above* the card rather than printed on it. The hover is a card
+ * lifting off a deck — it rises, the gold rule warms, and a glint runs
+ * across the way light runs off a sleeve. The press puts it back down. */
+.btn-deal {
+  background: linear-gradient(
+    180deg,
+    var(--recall-lit) 0%,
+    var(--recall-mid) 52%,
+    var(--recall-deep) 100%
+  );
+  border-color: color-mix(in srgb, var(--recall-rule) 55%, var(--recall-deep));
+  color: var(--recall-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(226, 240, 255, 0.28),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.32),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+  --glyph-ground: var(--recall-deep);
+}
+.btn-deal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    112deg,
+    transparent 32%,
+    rgba(255, 240, 200, 0.34) 47%,
+    rgba(255, 240, 200, 0.1) 56%,
+    transparent 68%
+  );
+  transform: translateX(-135%);
+  pointer-events: none;
+}
+.btn-deal:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--recall-rule);
+  box-shadow:
+    inset 0 1px 0 rgba(226, 240, 255, 0.38),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.26),
+    0 5px 16px rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(201, 162, 39, 0.25);
+}
+.btn-deal:hover:not(:disabled)::after {
+  transform: translateX(135%);
+  transition: transform 620ms ease;
+}
+.btn-deal:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- the deck, waiting */
+.hand-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+.hand-deck {
+  position: relative;
+  width: 72px;
+  height: 100px;
+  flex: none;
+}
+.hand-deck-plate {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: linear-gradient(
+    155deg,
+    var(--recall-mid) 0%,
+    var(--recall-deep) 70%
+  );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--recall-rule) 42%, transparent),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  animation: hand-deck-settle 7s ease-in-out infinite;
+}
+.hand-deck-plate.is-back {
+  transform: rotate(-4deg) translate(-3px, 2px);
+  animation-delay: -2.4s;
+}
+.hand-deck-plate.is-mid {
+  transform: rotate(2deg) translate(2px, 1px);
+  animation-delay: -1.2s;
+}
+.hand-deck-plate.is-top {
+  transform: rotate(-1deg);
+}
+@keyframes hand-deck-settle {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -2px; }
+}
+
+/* ---- the table
+ *
+ * **The flexible max is load-bearing, and it was measured rather than
+ * guessed.** `repeat(auto-fit, …)` counts its repetitions off the track's
+ * *maximum* whenever that maximum is a definite length, so a first draft of
+ * `minmax(clamp(4.5rem, 12.5%, 7rem), 7rem)` counted at 7rem and put **two**
+ * columns on a 375px phone — read off a real browser at 375px, where the
+ * suite has no layout engine and could never have seen it. With `1fr` the
+ * maximum is flexible, the count falls back to the 4.5rem minimum, and the
+ * tracks then share whatever is left: three columns on a phone, seven in one
+ * row on a laptop, and no breakpoint anywhere in it. `auto-fit` collapses
+ * the tracks nothing landed in, which is what stops a wide panel from
+ * spreading seven cards across eleven columns; the cap keeps the cards
+ * card-sized on a very wide one. */
+.hand-table {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+  gap: 0.75rem 0.5rem;
+  max-width: 56rem;
+}
+.hand-card {
+  margin: 0;
+  min-width: 0;
+  transform: rotate(var(--tilt, 0deg));
+  animation: hand-deal 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--deal-i, 0) * 90ms);
+}
+@keyframes hand-deal {
+  from {
+    opacity: 0;
+    transform: translate(6px, -26px) rotate(calc(var(--tilt, 0deg) - 9deg)) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--tilt, 0deg)) scale(1);
+  }
+}
+.hand-card-face {
+  display: block;
+  width: 100%;
+  border-radius: 5px;
+  cursor: help;
+  box-shadow:
+    0 1px 5px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.hand-card-face.is-blank {
+  aspect-ratio: 488 / 680;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  text-align: center;
+  font-size: 0.625rem;
+  background: var(--gridline);
+  color: var(--text-muted);
+}
+.hand-card-foot {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: center;
+  text-align: center;
+}
+.hand-card-name {
+  font-size: 0.625rem;
+  line-height: 1.2;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.hand-card-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+/* What a card is waiting on. Three states, three voices: a land is ready,
+   a spell has a turn, and a spell these lands never pay for says so rather
+   than showing a blank a reader would have to interpret. */
+.hand-mark {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  border-radius: 9999px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+  border: 1px solid color-mix(in srgb, var(--recall-mid) 45%, transparent);
+  color: var(--text-secondary);
+}
+.hand-mark.is-land {
+  border-color: color-mix(in srgb, var(--vine) 55%, transparent);
+  color: var(--vine);
+}
+.hand-mark.is-far {
+  border-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  color: var(--text-muted);
+}
+
+/* ---- the counting */
+.hand-reading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.6rem;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+}
+.hand-commander {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  cursor: help;
+}
+.hand-commander img {
+  width: 34px;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.hand-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.hand-facts > li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.hand-facts strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.hand-colors {
+  gap: 0.5rem;
+}
+.hand-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  cursor: help;
+}
+.hand-color.is-covered {
+  color: var(--vine);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Stillness means the hand is already on the table and the deck is
+     squared up — the honest still version of both, rather than a hand that
+     never arrives. */
+  .hand-card,
+  .hand-deck-plate {
+    animation: none;
+  }
+  .hand-folded,
+  .btn-deal {
+    transition: none;
+  }
+}
+
 /* ------------------------------------------------- the glossary's two hands
  *
  * `components/term.tsx` renders both: a word in a sentence with its
