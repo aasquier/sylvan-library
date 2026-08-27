@@ -1741,7 +1741,12 @@ function commandSeats(side: BoardSide): number {
 /** How long the strongbox takes the weight of a price that just went up.
  *
  *  Long enough to be seen from across a board that is doing several other
- *  things, and short enough that it is over before the next beat arrives. */
+ *  things, and short enough that it is over before the next beat arrives.
+ *
+ *  **Written once and handed to the stylesheet**, the way `--mark-life-*` is
+ *  further down this file: the timer that takes the class off and the
+ *  animation that plays under it are the same duration, and two places holding
+ *  one number is two places for it to drift. */
 const TAX_RISE = 900
 
 /**
@@ -1802,6 +1807,7 @@ function FieldTax({ n }: { n: number }) {
   }, [n])
   return (
     <span className={`field-tax${risen ? ' is-risen' : ''}`}
+          style={{ '--tax-rise': `${TAX_RISE}ms` } as CSSProperties}
           title={`Commander tax: it costs ${n} more to cast this from the `
             + 'command zone'}>
       <StrongboxGlyph />

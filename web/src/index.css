@@ -8358,10 +8358,18 @@ button:hover .tarot-fan-card {
    zone, which is the moment somebody paid it — so the box takes the load,
    dips, and settles, and the figure catches the light on the way. It is the
    one thing in this corner that ever moves, which is what makes a change to
-   a small number in a small tile noticeable at all. */
-.field-tax.is-risen svg { animation: field-tax-load 900ms ease-out both; }
+   a small number in a small tile noticeable at all.
+
+   `--tax-rise` is `TAX_RISE` in `components/board.tsx`, handed here the way
+   `--mark-life-*` is: the same duration governs the timer that takes the class
+   off and the animation that plays under it, and a number written in both
+   places is a number that drifts. The fallback is what it is set to today, so
+   the rule is still legible on its own. */
+.field-tax.is-risen svg {
+  animation: field-tax-load var(--tax-rise, 900ms) ease-out both;
+}
 .field-tax.is-risen .field-tax-n {
-  animation: field-tax-struck 900ms ease-out both;
+  animation: field-tax-struck var(--tax-rise, 900ms) ease-out both;
 }
 @keyframes field-tax-load {
   0%   { transform: translateY(-3px) scale(1.06); }
