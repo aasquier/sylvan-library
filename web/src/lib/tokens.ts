@@ -1,18 +1,31 @@
 /**
  * Which tokens the board gives a *material* to.
  *
- * **The list lives here and the materials live in `index.css`**, on the gold
- * edge a token already wears — `.field-card-token.is-treasure` and its two
- * siblings. This file stays one function and no pictures even though each
- * material now stands a real object on the card, and that is deliberate: the
- * three objects are museum plates cut and committed under ADR 29, and CSS
- * reaches them by `url()` out of `assets/coliseum` without a name in any
- * module. So a fourth material is still exactly two edits — a name below, and
- * a rule beside the gold edge — and neither of them is here.
+ * **The material is a moment, not a coat of paint**, and that is the one thing
+ * to know before changing anything here. Each of the three used to stand a
+ * museum plate — a goblet, a dish, a magnifying glass — on the card for as
+ * long as the token was on the battlefield, with a slow light walking across
+ * it. Aaron, 2026-08-27: *"why do I still see them overlayed on the card
+ * statically? They should only appear as the animation when they are being
+ * sacrificed. Like how the shield or sword appear"*. He is right twice over: a
+ * Treasure sitting on the sand is not doing anything, so an object announcing
+ * it every moment is decoration over Wizards' own painting; and spending the
+ * object's whole presence on the idle state left the beat that actually
+ * *matters* — the token being cracked — with almost nothing left to say.
  *
- * The board still draws Wizards' own painting under all of it. The object
- * stands *on* the card and the light lies on the object; nothing filters,
- * blurs or recolours the art, which is the line ADR 32 draws.
+ * So the three objects are **marks** now, raised by the sacrifice beat and
+ * drawn by `components/board.tsx` beside the sword, the shield and the skull.
+ * What this file decides is unchanged and is asked one beat later:
+ * `tokenMaterial` answers *what a token is made of*, and `markOf` turns that
+ * answer into which picture falls across the card.
+ *
+ * A fourth material is still two edits — a name below, and a
+ * `.field-mark-<verb>` rule beside the other marks — plus the arm of `markOf`
+ * that names the verb.
+ *
+ * The board draws Wizards' own painting untouched underneath, and now for
+ * rather longer: nothing filters, blurs or recolours the art at any point,
+ * which is the line ADR 32 draws.
  *
  * **Three, because three is what the pool says is common.** Counting printings
  * that carry art, in the pool this app already ships against: Treasure 98,
@@ -33,12 +46,12 @@
  */
 
 /** In no particular order; this array is a spelling, not a priority. Every
- *  name here must have a `.field-card-token.is-<name>` rule beside the gold
- *  edge in `index.css`, and that rule must stand an object on the card and
- *  clip its light to the same object — `tokens.test.ts` reads the stylesheet
- *  off disk and holds the two halves equal, because a mask that has drifted
- *  from its background is a light falling next to the thing it is lighting
- *  and nothing whatever says so. */
+ *  name here must reach a mark: `markOf` in `components/board.tsx` turns it
+ *  into a verb, and that verb must have a `.field-mark-<verb>` rule that draws
+ *  a committed object and times it from its own `--mark-life-*`.
+ *  `tokens.test.ts` reads the stylesheet off disk and holds those halves
+ *  together, because a material with no rule behind it is a sacrifice that
+ *  animates nothing and nothing whatever says so. */
 export const TOKEN_MATERIALS = ['treasure', 'food', 'clue'] as const
 
 export type TokenMaterial = (typeof TOKEN_MATERIALS)[number]
@@ -78,12 +91,17 @@ export function tokenMaterial(
 /**
  * The class list for the edge a token wears.
  *
- * Always `field-card-token`, so every token keeps the thin gold edge it has
- * always had; a material is one more class on the same element. A token this
- * file has no opinion about comes back exactly as it went in, which is what
- * makes adding a material here unable to regress the others.
+ * **One class, for every token, and it takes no arguments any more.** It used
+ * to add `is-treasure` and its two siblings so that the stylesheet could stand
+ * an object on the card; with the objects moved to the marks there is nothing
+ * left for a per-material class to do, and a class that selects nothing is the
+ * kind of thing that survives three refactors and then gets a rule written
+ * against it by mistake.
+ *
+ * Kept as a function rather than folded into a string literal at the call site
+ * because the gold edge is a *decision about tokens* — one place says which
+ * class a token wears, and `tokens.test.ts` holds it.
  */
-export function tokenSigil(name: string, types?: string | null): string {
-  const material = tokenMaterial(name, types)
-  return material ? `field-card-token is-${material}` : 'field-card-token'
+export function tokenSigil(): string {
+  return 'field-card-token'
 }

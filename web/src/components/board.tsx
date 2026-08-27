@@ -58,13 +58,16 @@ import { KeywordMarks } from './keywords'
 import { ManaPip } from './manasymbol'
 import { producedColors, producedName } from '../lib/mtg'
 import aegisArt from '../assets/coliseum/aegis.webp'
+import aurumArt from '../assets/coliseum/aurum.webp'
 import ensisArt from '../assets/coliseum/ensis.webp'
+import ferculumArt from '../assets/coliseum/ferculum.webp'
+import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardSide, type BoardStack, fightingStats,
   foldBoard, sameCard, stackRow } from '../lib/board'
 import { drawableKeywords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
-import { tokenSigil } from '../lib/tokens'
+import { tokenMaterial, tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 import { CenterStage } from './stage'
@@ -107,7 +110,7 @@ function counterSign(kind: string): 'up' | 'down' | 'flat' {
  *
  * What a mark no longer does is *end* when its beat does. See [MARK_LIFE].
  */
-type Mark = 'attacks' | 'blocks' | 'dies'
+type Mark = 'attacks' | 'blocks' | 'dies' | 'spent' | 'eaten' | 'cracked'
 
 /** A legend's name as a player says it: the part before the title.
  *
@@ -129,11 +132,32 @@ function calledBy(name: string): string {
   return /^\S+ the /.exec(short) ? short.split(' ')[0] ?? short : short
 }
 
-function markOf(kind: string): Mark | null {
-  return kind === 'attack' ? 'attacks'
-    : kind === 'block' ? 'blocks'
-    : kind === 'dies' ? 'dies'
-    : null
+/**
+ * Which mark a beat raises, if any.
+ *
+ * **A sacrifice is three marks and not one**, because a Treasure, a Food and a
+ * Clue do not go the same way — one is spent, one is eaten, one is cracked —
+ * and `Mark` is what carries both the picture and the length. Anything else
+ * sacrificed falls through to null on purpose: a creature given up for a cost
+ * raises `dies` on the same instant and already has a skull coming, and two
+ * marks for one departure is the board asking to be read twice.
+ *
+ * `tokenMaterial` is asked with the name alone. Forge writes "Treasure Token",
+ * which is the spelling that function is built around, and the type line is
+ * not on a beat — it is on the card. The name is enough for exactly these
+ * three and the material list is closed, so the fallback is not a guess.
+ */
+function markOf(kind: string, card?: string): Mark | null {
+  if (kind === 'attack') return 'attacks'
+  if (kind === 'block') return 'blocks'
+  if (kind === 'dies') return 'dies'
+  if (kind !== 'sacrificed') return null
+  switch (card ? tokenMaterial(card) : null) {
+    case 'treasure': return 'spent'
+    case 'food': return 'eaten'
+    case 'clue': return 'cracked'
+    default: return null
+  }
 }
 
 /**
@@ -173,6 +197,14 @@ const MARK_LIFE: Record<Mark, number> = {
      register, which was already the argument for its hold; it now gets the
      hold it was written for. */
   dies: 2000,
+  /* The three materials, and they are all one number because the thing being
+     timed is the same gesture at three angles: an object arrives, does what it
+     does, and is gone. Longer than an attack because it is rarer — measured
+     across six real matches, 38 of these tokens entered and 5 left — and
+     shorter than a death because nothing is at stake in it. */
+  spent: 1400,
+  eaten: 1400,
+  cracked: 1400,
 }
 
 /** The most beats a mark may outlive its own.
@@ -760,12 +792,22 @@ function FieldCard({ card, count, inPlay = false }: {
           // been refreshed, and a match is worth watching either way.
           <span className="field-card-plate">{card.name}</span>
         )}
-        {/* The gold edge belongs to the card, so it turns with the card — and
-            so does the material on it, for the same reason: light lies on gold
-            at whatever angle the gold is sitting. `lib/tokens.ts` decides
-            which material, or none. */}
-        {card.token && <span className={tokenSigil(card.name, card.types)}
-                             aria-hidden="true" />}
+        {/* The gold edge belongs to the card, so it turns with the card.
+            **And nothing else does.** A goblet, a dish and a magnifying glass
+            used to stand on every Treasure, Food and Clue for as long as it
+            was on the battlefield, lit by a slow sweep — which put a museum
+            plate over the bottom half of Wizards' own painting on tokens that
+            were doing nothing at all, and left the moment one was *used*
+            saying almost nothing by comparison (Aaron, 2026-08-27: *"why do I
+            still see them overlayed on the card statically? They should only
+            appear as the animation when they are being sacrificed. Like how
+            the shield or sword appear"*).
+            So the three objects are marks now, in the same family as the sword
+            and the shield and on the same clock: raised by the beat that
+            sacrifices the token, held for their own length, gone. `markOf`
+            above chooses which one; `lib/tokens.ts` still owns the question of
+            what a token is made of. */}
+        {card.token && <span className={tokenSigil()} aria-hidden="true" />}
       </div>
       {/* **The arm: everything written in the card's corners.**
 
@@ -926,6 +968,15 @@ function FieldCard({ card, count, inPlay = false }: {
           )}
           {mark.mark === 'dies' && (
             <img src={mementoArt} alt="" draggable={false} />
+          )}
+          {mark.mark === 'spent' && (
+            <img src={aurumArt} alt="" draggable={false} />
+          )}
+          {mark.mark === 'eaten' && (
+            <img src={ferculumArt} alt="" draggable={false} />
+          )}
+          {mark.mark === 'cracked' && (
+            <img src={lensArt} alt="" draggable={false} />
           )}
         </span>
       )}
@@ -2232,7 +2283,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // and identity is not what governs replay here anyway — every mark is keyed
   // on `beat.key`, so a fresh object with the same key reconciles onto the
   // same element and does *not* restart an animation that is already running.
-  const mark = beat ? markOf(beat.kind) : null
+  const mark = beat ? markOf(beat.kind, beat.card) : null
   const live = mark && beat?.card
     ? { card: beat.card, mark, key: beat.key }
     : null
@@ -2253,6 +2304,9 @@ export function MatchBoard({ board, shown, game, name, running, beat,
     '--mark-life-attacks': `${markLife('attacks', speed)}ms`,
     '--mark-life-blocks': `${markLife('blocks', speed)}ms`,
     '--mark-life-dies': `${markLife('dies', speed)}ms`,
+    '--mark-life-spent': `${markLife('spent', speed)}ms`,
+    '--mark-life-eaten': `${markLife('eaten', speed)}ms`,
+    '--mark-life-cracked': `${markLife('cracked', speed)}ms`,
   } as CSSProperties
 
   if (!board || !far || !near) {

@@ -8378,343 +8378,27 @@ button:hover .tarot-fan-card {
 
 /* ------------------------------------------ what a token is made of
  *
- * **Treasure, Food and Clue, and nothing else.** Counted in the pool this app
- * ships against: 98 printings of Treasure, 63 of Food, 51 of Clue — and then a
- * cliff, to Blood at 9 and Powerstone and Map at 2 apiece. `lib/tokens.ts`
- * holds the list and argues the cut; what is here is the light.
+ * **The three materials used to live here and they are marks now.** A goblet,
+ * a dish and a magnifying glass stood on every Treasure, Food and Clue for as
+ * long as it was on the battlefield, each with a light clipped to its own
+ * alpha and walking across it on a prime-numbered period. It was carefully
+ * built and it was answering the wrong question (Aaron, 2026-08-27: *"why do I
+ * still see them overlayed on the card statically? They should only appear as
+ * the animation when they are being sacrificed. Like how the shield or sword
+ * appear"*).
  *
- * **Each one is a thing, and the light is what lies on it.** The first pass at
- * this was light alone — a gold sweep, a warm glow, a cold pulse, over card
- * art — and Aaron's reading of it was the shortest possible review: "our
- * treasure/clue/food token animations are lame. I was thinking more photo
- * realistic like a pot of gold for treasure, magnifying glass for clue and
- * something better for food like a plate of some food" (2026-08-26). He is
- * right, and the reason is commandment 5 rather than taste. A sweep of light
- * across a rectangle is not an object; it is a rectangle that got brighter.
- * *What* is made of gold was never drawn, so at fifty-eight pixels the three
- * materials differed only in hue, which is the same as saying they differed
- * in nothing a newcomer could name.
+ * Two faults, and the second is the one that matters. A museum plate over the
+ * bottom half of Wizards' painting is decoration on a token that is *doing
+ * nothing* — a Treasure on the sand is a Treasure waiting. And spending the
+ * object on the waiting left the moment it is actually cracked with only a
+ * flare to say so, which is the beat the whole thing was built for.
  *
- * So each material now stands a real object on the card: an Avar goldsmith's
- * goblet, a gilt magnifying glass, a Flemish bowl of wild strawberries — three
- * museum plates, cut out and committed under ADR 29 with their recipes beside
- * them in `assets/coliseum`. They are photographs of ordinary objects, not
- * derivatives of anybody's card art, which is the line ADR 32 draws and the
- * reason this is allowed to be a committed file at all.
- *
- * **The painting underneath is still not touched.** The object stands *on* the
- * card the way a Treasure stands on a table — its own drop shadow, the bottom
- * half of the frame, the top half left to the art — and there is still no
- * `filter` anywhere near `.field-card-art`. Scryfall's imagery guidelines
- * forbid distorting, blurring, desaturating or colour-shifting card imagery;
- * standing something in front of it does none of those.
- *
- * **The light is masked to the object.** That is the whole difference between
- * this and the version it replaces: the specular sweep is clipped by the
- * object's own alpha, so what brightens is the gold of the cup, not the card
- * behind it. It is drawn by moving a gradient's `background-position` rather
- * than by transforming the layer, because the mask travels with a transform —
- * a translated layer takes its own silhouette along and the light never
- * arrives. The repaint is a 58×81 box; a dozen of them is a rounding error.
- *
- * **They are in step within a material and out of step across the three**, and
- * that is deliberate rather than lazy. One lamp hangs over one table, so when
- * the light catches the gold it catches *all* the gold — six Treasures glinting
- * at six random moments is six private suns, which reads as twinkling. What
- * would read as a blink is all three materials pulsing as one, so the periods
- * are 7.3s, 5.9s and 8.9s: prime numbers of tenths, so the three rhythms drift
- * against each other and never line up twice in a sitting.
- *
- * The event is `.is-leaving` — the departure every sacrifice already raises
- * (see `card-leaving` further down, whose 1200ms these flares deliberately
- * share; a Treasure spent for mana and the card letting go are one event, and
- * two clocks for one event is how they end up out of step). A Treasure is
- * spent, a Food is eaten, a Clue is cracked, and each goes differently. */
-
-/* Two background layers on the element itself: the object, and the shadow it
-   casts on what it is standing on. The shadow is a small dark ellipse under
-   the foot rather than a halo around the outline — that is the difference
-   between a thing on a table and a sticker — and it is dark rather than
-   light because the ground here is an unknown painting, which is bright
-   about as often as it is not. `overflow` is what keeps a spend flare and a
-   sweeping highlight off the neighbouring card. */
-.field-card-token.is-treasure,
-.field-card-token.is-food,
-.field-card-token.is-clue {
-  overflow: hidden;
-  background-repeat: no-repeat;
-}
-
-.field-card-token.is-treasure::before,
-.field-card-token.is-food::before,
-.field-card-token.is-clue::before,
-.field-card-token.is-treasure::after,
-.field-card-token.is-food::after,
-.field-card-token.is-clue::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 2px;
-  pointer-events: none;
-  background-repeat: no-repeat;
-}
-
-/* Every ambient layer is clipped to the object it belongs to. `::before` is
-   light and nothing else; the object is on the element below it, and the two
-   are given the same size and position so the mask lands exactly on the
-   thing it is masking. Change one and change the other — there are three
-   pairs here and they are the only numbers in this block that have to
-   agree. */
-.field-card-token.is-treasure::before,
-.field-card-token.is-food::before,
-.field-card-token.is-clue::before {
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
-
-/* Gold — a goblet an Avar goldsmith raised in the 700s, and one streak of
-   light walking across it at the angle the buttons use. The streak is three
-   card-widths of gradient dragged across one card-width of box, so its
-   bright band is off the metal at both ends of the travel and the loop's
-   return is invisible; there is nothing to fade. */
-.field-card-token.is-treasure {
-  background-image:
-    url('./assets/coliseum/aurum.webp'),
-    radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.5) 0%,
-      rgba(0, 0, 0, 0.24) 48%, transparent 78%);
-  background-size: auto 46%, 54% 11%;
-  background-position: 50% 90%, 50% 95%;
-}
-.field-card-token.is-treasure::before {
-  background-image: linear-gradient(
-    115deg,
-    transparent 45.5%,
-    rgba(255, 232, 176, 0.34) 49%,
-    rgba(255, 248, 224, 0.6) 50%,
-    rgba(255, 226, 168, 0.22) 51%,
-    transparent 54.5%
-  );
-  background-size: 300% 100%;
-  background-position: 100% 50%;
-  -webkit-mask-image: url('./assets/coliseum/aurum.webp');
-  mask-image: url('./assets/coliseum/aurum.webp');
-  -webkit-mask-size: auto 46%;
-  mask-size: auto 46%;
-  -webkit-mask-position: 50% 90%;
-  mask-position: 50% 90%;
-  animation: token-treasure-glint 7.3s linear infinite;
-}
-@keyframes token-treasure-glint {
-  0%, 82%   { background-position: 100% 50%; }
-  94%, 100% { background-position: 0% 50%; }
-}
-
-/* Food — a Wanli bowl of wild strawberries, cut from Osias Beert's tabletop
-   and turned face-on so it reads as a dish rather than an ellipse. Warmth
-   off a served thing, rising through it and settling: the glow climbs from
-   under the bowl into the fruit and sinks again, which is what heat does and
-   is also the one direction a plate's light can move without looking like a
-   torch. Slow, and never at full strength — the strawberries carry the
-   colour; this only has to say they are worth eating. */
-.field-card-token.is-food {
-  background-image:
-    url('./assets/coliseum/ferculum.webp'),
-    radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.5) 0%,
-      rgba(0, 0, 0, 0.24) 48%, transparent 78%);
-  background-size: auto 44%, 60% 10%;
-  background-position: 50% 90%, 50% 95%;
-}
-.field-card-token.is-food::before {
-  background-image: radial-gradient(60% 50% at 50% 50%,
-    rgba(255, 198, 126, 0.58) 0%,
-    rgba(255, 156, 78, 0.26) 46%,
-    transparent 74%);
-  background-size: 150% 78%;
-  background-position: 50% 128%;
-  -webkit-mask-image: url('./assets/coliseum/ferculum.webp');
-  mask-image: url('./assets/coliseum/ferculum.webp');
-  -webkit-mask-size: auto 44%;
-  mask-size: auto 44%;
-  -webkit-mask-position: 50% 90%;
-  mask-position: 50% 90%;
-  opacity: 0.24;
-  animation: token-food-warm 5.9s ease-in-out infinite;
-}
-@keyframes token-food-warm {
-  0%, 100% { opacity: 0.18; background-position: 50% 128%; }
-  50%      { opacity: 0.52; background-position: 50% 46%; }
-}
-
-/* Clue — a gilt magnifying glass, and the lens really is a hole: the chroma
-   key that took the studio grey took the glass with it, because glass is
-   grey too, and the accident is better than the intention. A Clue you can
-   see the card through is a Clue doing its job. So the gleam is drawn where
-   glass catches a light, over the rim and across the empty disc, and it is a
-   question rather than an answer: two short cold pulses and then a long
-   wait, which is a thing signalling rather than a thing breathing. */
-.field-card-token.is-clue {
-  background-image:
-    url('./assets/coliseum/lens.webp'),
-    radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.5) 0%,
-      rgba(0, 0, 0, 0.24) 48%, transparent 78%);
-  background-size: auto 57%, 40% 8%;
-  background-position: 50% 88%, 50% 95%;
-}
-.field-card-token.is-clue::before {
-  background-image: radial-gradient(88% 68% at 34% 26%,
-    rgba(214, 244, 255, 0.86) 0%,
-    rgba(126, 196, 240, 0.34) 46%,
-    transparent 74%);
-  -webkit-mask-image: url('./assets/coliseum/lens.webp');
-  mask-image: url('./assets/coliseum/lens.webp');
-  -webkit-mask-size: auto 57%;
-  mask-size: auto 57%;
-  -webkit-mask-position: 50% 88%;
-  mask-position: 50% 88%;
-  opacity: 0;
-  animation: token-clue-gleam 8.9s ease-in-out infinite;
-}
-@keyframes token-clue-gleam {
-  0%, 100%  { opacity: 0.14; }
-  6%        { opacity: 0.72; }
-  12%       { opacity: 0.16; }
-  18%       { opacity: 0.62; }
-  26%, 92%  { opacity: 0.14; }
-}
-
-/* --- spent, eaten, cracked ------------------------------------------------
- *
- * The `::after` is dark until the card leaves, so at rest it costs a layer
- * and nothing else. */
-.field-card-token.is-treasure::after,
-.field-card-token.is-food::after,
-.field-card-token.is-clue::after { opacity: 0; }
-
-/* The ambient light stops when the card is going. A glint still walking the
-   face during the spend is two things asking to be watched at once. */
-.field-card.is-leaving .field-card-token::before { animation: none; }
-
-/* **The object leaves too, and it leaves differently from the light.** The
-   `::after` flares below are what the spending *looks like* from across the
-   table; these three are the thing itself. A cup is raised and drained, so
-   the gold lifts and thins; a dish is eaten, so the bowl sinks out of the
-   bottom of the frame it came in through; a Clue is cracked, so the glass
-   shivers once and is gone. They share the departure's own 1200ms, because a
-   Treasure spent for mana and the card letting go are one event. */
-.field-card.is-leaving .field-card-token.is-treasure {
-  animation: token-object-spent 1200ms ease-out both;
-}
-@keyframes token-object-spent {
-  0%   { opacity: 1; transform: none; }
-  28%  { opacity: 1; transform: translateY(-1.5px) scale(1.04); }
-  100% { opacity: 0; transform: translateY(-4px) scale(0.9); }
-}
-
-.field-card.is-leaving .field-card-token.is-food {
-  animation: token-object-eaten 1200ms ease-in both;
-}
-@keyframes token-object-eaten {
-  0%   { opacity: 1; transform: none; }
-  22%  { opacity: 1; transform: scale(1.03); }
-  100% { opacity: 0; transform: translateY(14%) scale(0.9); }
-}
-
-.field-card.is-leaving .field-card-token.is-clue {
-  animation: token-object-cracked 1200ms cubic-bezier(0.1, 0.8, 0.25, 1) both;
-}
-@keyframes token-object-cracked {
-  0%   { opacity: 1; transform: none; }
-  7%   { opacity: 1; transform: translateX(0.8px) rotate(1.4deg); }
-  15%  { opacity: 1; transform: translateX(-0.7px) rotate(-1deg); }
-  24%  { opacity: 0.9; transform: none; }
-  100% { opacity: 0; transform: scale(1.08); }
-}
-
-/* Gold cashed in: a bloom that opens and is gone, brightest at the middle of
-   the beat rather than the start — a coin turns before it goes. */
-.field-card.is-leaving .field-card-token.is-treasure::after {
-  background: radial-gradient(76% 64% at 50% 46%,
-    rgba(255, 248, 222, 0.92) 0%,
-    rgba(255, 208, 118, 0.6) 38%,
-    rgba(214, 150, 44, 0.16) 66%,
-    transparent 80%);
-  animation: token-spent 1200ms ease-out both;
-}
-@keyframes token-spent {
-  0%   { opacity: 0; transform: scale(0.86); }
-  26%  { opacity: 1; transform: scale(1.04); }
-  100% { opacity: 0; transform: scale(1.22); }
-}
-
-/* Eaten: the warmth swells and sinks out of the bottom of the card, which is
-   where it came from. */
-.field-card.is-leaving .field-card-token.is-food::after {
-  background: radial-gradient(96% 74% at 50% 62%,
-    rgba(255, 226, 178, 0.82) 0%,
-    rgba(246, 158, 74, 0.44) 42%,
-    transparent 76%);
-  animation: token-eaten 1200ms ease-in both;
-}
-@keyframes token-eaten {
-  0%   { opacity: 0; transform: translateY(0) scale(0.94); }
-  22%  { opacity: 0.95; transform: translateY(0) scale(1.02); }
-  100% { opacity: 0; transform: translateY(34%) scale(0.9); }
-}
-
-/* Cracked: the one that snaps. A hard, cold arrival on the first frames and a
-   long cold decay — the others open, this one breaks. */
-.field-card.is-leaving .field-card-token.is-clue::after {
-  background:
-    linear-gradient(114deg, transparent 46%,
-      rgba(226, 248, 255, 0.85) 49.4%, transparent 53%),
-    radial-gradient(84% 70% at 50% 50%,
-      rgba(186, 232, 255, 0.7) 0%,
-      rgba(96, 174, 226, 0.28) 48%,
-      transparent 78%);
-  animation: token-cracked 1200ms cubic-bezier(0.1, 0.8, 0.25, 1) both;
-}
-@keyframes token-cracked {
-  0%   { opacity: 0; transform: scale(1.14); }
-  9%   { opacity: 1; transform: scale(1); }
-  30%  { opacity: 0.6; transform: scale(1.02); }
-  100% { opacity: 0; transform: scale(1.1); }
-}
-
-/* Reduced motion keeps the *material* and loses the movement, the same ruling
-   the marks further down are held to: somebody who asked for a still board
-   still has to be able to tell a Treasure from a Clue at a glance. That used
-   to be a hard promise to keep, because all three were made of nothing but
-   moving light and a hue — take the movement away and what is left is a
-   tinted rectangle. **Now the object is the material and the object never
-   moved**, so this branch costs almost nothing: the goblet, the glass and the
-   bowl stand exactly where they stand for everybody else, the ambient layer
-   freezes at a legible strength part-way through its own travel, and the
-   departures — decoration on a leaving the board already draws — do not run
-   at all. */
-@media (prefers-reduced-motion: reduce) {
-  .field-card-token.is-treasure::before,
-  .field-card-token.is-food::before,
-  .field-card-token.is-clue::before { animation: none; }
-  /* Mid-travel rather than at either end: the sweep parks on the metal and
-     the warmth parks in the fruit, which is the frame each was drawn for. */
-  .field-card-token.is-treasure::before {
-    background-position: 50% 50%;
-    opacity: 0.8;
-  }
-  .field-card-token.is-food::before {
-    background-position: 50% 60%;
-    opacity: 0.4;
-  }
-  .field-card-token.is-clue::before { opacity: 0.4; }
-  .field-card.is-leaving .field-card-token.is-treasure,
-  .field-card.is-leaving .field-card-token.is-food,
-  .field-card.is-leaving .field-card-token.is-clue,
-  .field-card.is-leaving .field-card-token.is-treasure::after,
-  .field-card.is-leaving .field-card-token.is-food::after,
-  .field-card.is-leaving .field-card-token.is-clue::after {
-    animation: none;
-  }
-}
+ * So the objects moved to the marks block below, beside the sword, the shield
+ * and the skull, on the clock those already run: raised by the beat that
+ * sacrifices the token, held for their own length, gone. What survives here is
+ * the gold edge every token wears, which is a fact about the card rather than
+ * an event — see `.field-card-token` above. `lib/tokens.ts` still owns which
+ * material a token is; `markOf` turns that into which picture falls. */
 /* ---------------------------------------------- a stack, and its fan
  *
  * **A stack of identical cards, made of the card it is a stack of.**
@@ -9532,6 +9216,144 @@ button:hover .tarot-fan-card {
   100% { opacity: 0; transform: scaleY(1); }
 }
 
+/* --- spent, eaten, cracked: the three materials -------------------------
+ *
+ * **A Treasure, a Food and a Clue, at the one moment they are worth drawing.**
+ * These three objects used to stand on their tokens permanently — see the note
+ * at "what a token is made of" for what that cost and why it went. Here they
+ * are marks, which is what Aaron asked for in the first place: *"they should
+ * only appear as the animation when they are being sacrificed. Like how the
+ * shield or sword appear"*.
+ *
+ * Raised by the `sacrificed` beat and nothing else, which is a decision made
+ * one file over in `markOf` and worth restating: a creature given up as a cost
+ * raises this beat too, and gets no material — it is already getting a skull
+ * from its own `dies` on the same instant.
+ *
+ * **Each one goes the way its object goes**, which is the whole reason there
+ * are three rules instead of one with three pictures. A cup is raised and
+ * drained, so the gold lifts and thins. A dish is eaten, so the bowl settles
+ * and sinks out of the bottom of the frame. A Clue is cracked, so the glass
+ * shivers once and flares. The three verbs were Aaron's own words for them and
+ * they survived the move.
+ *
+ * All three arrive *already moving*, for `mark-strike`'s reason: an object
+ * that fades up in place is a diagram, and an object that falls into frame is
+ * an event. The drop shadow is stated on the image rather than animated,
+ * because under reduced motion the animation never runs and an object with no
+ * shadow sits *in* the painting instead of on it. */
+
+.field-mark-spent img,
+.field-mark-eaten img,
+.field-mark-cracked img {
+  /* Sized by width for `.field-mark-attacks img`'s reason, argued in full
+     there: `.field-mark` is a grid sized from its own item, so a percentage
+     height is cyclic and resolves against the wrong box. */
+  height: auto;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.72));
+}
+
+/* Gold, raised and drained. The bloom behind it is the mana arriving — it is
+   on `::before` so the cup's own curve and the light's can be timed apart,
+   which is the lesson the sword's lamp taught. */
+.field-mark-spent img {
+  width: 62%;
+  animation: mark-drained var(--mark-life-spent, 1400ms)
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes mark-drained {
+  0%   { opacity: 0; transform: translateY(16%) rotate(-9deg) scale(0.86); }
+  14%  { opacity: 1; transform: translateY(0) rotate(0deg) scale(1.04); }
+  24%  { transform: translateY(0) rotate(0deg) scale(1); }
+  62%  { opacity: 1; transform: translateY(-6%) rotate(4deg) scale(1); }
+  100% { opacity: 0; transform: translateY(-22%) rotate(11deg) scale(0.92); }
+}
+.field-mark-spent::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: radial-gradient(72% 60% at 50% 52%,
+    rgba(255, 248, 222, 0.9) 0%,
+    rgba(255, 208, 118, 0.56) 38%,
+    rgba(214, 150, 44, 0.14) 66%,
+    transparent 82%);
+  animation: mark-cashed var(--mark-life-spent, 1400ms) ease-out both;
+}
+/* Brightest at the middle rather than the start — a coin turns before it goes. */
+@keyframes mark-cashed {
+  0%   { opacity: 0; transform: scale(0.86); }
+  30%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.24); }
+}
+
+/* Eaten: the dish settles, then sinks out through the bottom edge it came in
+   through. Warm rather than gold, and it goes *down*, which is the one
+   direction that separates this from a Treasure at a glance. */
+.field-mark-eaten img {
+  width: 68%;
+  animation: mark-eaten var(--mark-life-eaten, 1400ms) ease-in both;
+}
+@keyframes mark-eaten {
+  0%   { opacity: 0; transform: translateY(-14%) scale(0.9); }
+  15%  { opacity: 1; transform: translateY(0) scale(1.04); }
+  26%  { transform: translateY(0) scale(1); }
+  60%  { opacity: 1; transform: translateY(4%) scale(0.99); }
+  100% { opacity: 0; transform: translateY(30%) scale(0.9); }
+}
+.field-mark-eaten::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: radial-gradient(92% 72% at 50% 62%,
+    rgba(255, 226, 178, 0.8) 0%,
+    rgba(246, 158, 74, 0.4) 42%,
+    transparent 78%);
+  animation: mark-warmed var(--mark-life-eaten, 1400ms) ease-in both;
+}
+@keyframes mark-warmed {
+  0%   { opacity: 0; transform: translateY(0) scale(0.94); }
+  24%  { opacity: 0.95; transform: translateY(0) scale(1.02); }
+  100% { opacity: 0; transform: translateY(18%) scale(1.06); }
+}
+
+/* Cracked: the glass shivers on arrival and then goes bright and away. The
+   shiver is two frames and deliberately early — it is the sound of the thing
+   breaking, and a break that eases is not one. */
+.field-mark-cracked img {
+  width: 60%;
+  animation: mark-cracked var(--mark-life-cracked, 1400ms)
+    cubic-bezier(0.1, 0.8, 0.25, 1) both;
+}
+@keyframes mark-cracked {
+  0%   { opacity: 0; transform: translate(-12%, -12%) rotate(-16deg) scale(1.14); }
+  13%  { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  19%  { transform: translateX(2.5%) rotate(3deg); }
+  25%  { transform: translateX(-2%) rotate(-2.4deg); }
+  32%  { transform: none; }
+  70%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+.field-mark-cracked::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: radial-gradient(70% 58% at 50% 48%,
+    rgba(222, 244, 255, 0.78) 0%,
+    rgba(140, 196, 232, 0.4) 40%,
+    transparent 76%);
+  animation: mark-gleamed var(--mark-life-cracked, 1400ms) ease-out both;
+}
+/* Nothing until the shiver, then all at once: the flash is the break, so it
+   may not precede it. `mark-cracked` lands the glass at 13%. */
+@keyframes mark-gleamed {
+  0%, 14% { opacity: 0; transform: scale(0.9); }
+  26%     { opacity: 1; transform: scale(1.06); }
+  100%    { opacity: 0; transform: scale(1.2); }
+}
+
 /* --- the ghost, rising off the grave ------------------------------------
  *
  * Two beats, two pictures. The skull lands on the creature *as it dies*, held
@@ -9639,6 +9461,27 @@ button:hover .tarot-fan-card {
   }
   .field-mark-dies img {
     animation: mark-still var(--mark-life-dies, 2000ms) ease-out both;
+  }
+  /* The three materials still *appear* — the object is the whole of what these
+     marks say, so stillness may not answer them with nothing. `transform` is
+     reset by name because each moving version parks its arrival in one, and
+     dropping only the animation would leave a goblet sixteen percent below the
+     card wearing a nine-degree tilt. Their blooms are held too, at the same
+     duration, so the light and the object still arrive together. */
+  .field-mark-spent img,
+  .field-mark-spent::before {
+    transform: none;
+    animation: mark-still var(--mark-life-spent, 1400ms) ease-out both;
+  }
+  .field-mark-eaten img,
+  .field-mark-eaten::before {
+    transform: none;
+    animation: mark-still var(--mark-life-eaten, 1400ms) ease-out both;
+  }
+  .field-mark-cracked img,
+  .field-mark-cracked::before {
+    transform: none;
+    animation: mark-still var(--mark-life-cracked, 1400ms) ease-out both;
   }
   /* **The dark still falls; it just does not climb.** This is the half of a
      death that carries the *information* — that this creature, of the forty on

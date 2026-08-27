@@ -1324,15 +1324,26 @@ it('hands the stylesheet the length a mark is actually watched for', () => {
   // if the stylesheet is *told* rather than asked to remember. So this reads
   // what a browser would read, which is the question a test about a duration
   // can honestly ask without a layout engine.
-  const read = (el: Element | null) => ({
-    attacks: (el as HTMLElement | null)?.style.getPropertyValue('--mark-life-attacks'),
-    blocks: (el as HTMLElement | null)?.style.getPropertyValue('--mark-life-blocks'),
-    dies: (el as HTMLElement | null)?.style.getPropertyValue('--mark-life-dies'),
-  })
+  //
+  // **All six, and the three newest are here because one of them was silently
+  // lost once.** A material's length reaching the stylesheet is invisible to
+  // the typechecker: the CSS falls back to the literal in `var(--mark-life-spent,
+  // 1400ms)` and the mark still draws, at full length, deaf to the transport.
+  // Nothing but this reads the wiring.
+  const read = (el: Element | null) => {
+    const of = (name: string) =>
+      (el as HTMLElement | null)?.style.getPropertyValue(`--mark-life-${name}`)
+    return {
+      attacks: of('attacks'), blocks: of('blocks'), dies: of('dies'),
+      spent: of('spent'), eaten: of('eaten'), cracked: of('cracked'),
+    }
+  }
+  const materials = (ms: string) => ({ spent: ms, eaten: ms, cracked: ms })
 
   const watch = replay(null)
   expect(read(watch.container.querySelector('.field-stage')))
-    .toEqual({ attacks: '1250ms', blocks: '1800ms', dies: '2000ms' })
+    .toEqual({ attacks: '1250ms', blocks: '1800ms', dies: '2000ms',
+      ...materials('1400ms') })
   cleanup()
 
   // Fast is 150ms a beat, and the cap is what stops a skull sitting on a board
@@ -1340,14 +1351,16 @@ it('hands the stylesheet the length a mark is actually watched for', () => {
   // mark to a flicker.
   const skim = replay(null, { speed: 'fast' })
   expect(read(skim.container.querySelector('.field-stage')))
-    .toEqual({ attacks: '750ms', blocks: '750ms', dies: '750ms' })
+    .toEqual({ attacks: '750ms', blocks: '750ms', dies: '750ms',
+      ...materials('750ms') })
   cleanup()
 
   // Paused is not a slow pace, it is the absence of one: nothing is draining,
   // so there is nothing to cap a mark against and each keeps its full length.
   const still = replay(null, { speed: 'paused' })
   expect(read(still.container.querySelector('.field-stage')))
-    .toEqual({ attacks: '1250ms', blocks: '1800ms', dies: '2000ms' })
+    .toEqual({ attacks: '1250ms', blocks: '1800ms', dies: '2000ms',
+      ...materials('1400ms') })
 })
 
 it('lights the half of the table whose turn it is, and only that half', () => {
@@ -2016,4 +2029,98 @@ it('says so when the tenth counter has landed', () => {
   expect(bead?.textContent).toBe('12')
   expect(bead?.className).toContain('is-lethal')
   expect(bead?.getAttribute('title')).toContain('ten is lethal')
+})
+
+/* ---------------------------------------------- the three materials
+ *
+ * **A Treasure, a Food and a Clue, at the one moment they are worth drawing.**
+ *
+ * These three used to stand a committed object on their token for as long as
+ * it was on the battlefield. They are marks now, raised by the beat that
+ * sacrifices the token (Aaron, 2026-08-27: *"they should only appear as the
+ * animation when they are being sacrificed. Like how the shield or sword
+ * appear"*), and that move is worth a gate rather than a screenshot for two
+ * reasons that both bite.
+ *
+ * The first is that **the chain cannot be typechecked**: `tokenMaterial`
+ * answers a string, `markOf` turns it into another string, and that string is
+ * a CSS class. Every link is `string`.
+ *
+ * The second is that **the beat is rare on a real board**. Measured across six
+ * matches while this was built: 38 of these tokens entered play and 5 left. A
+ * regression here would survive any amount of watching.
+ */
+const MATERIALS: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'gyome', name: 'Gyome — Food', life: 40 },
+    { seat: 2, slug: 'lannery', name: 'Lannery — Treasure', life: 40 },
+  ],
+  cards: [
+    // Forge's own spelling, which is the whole point of `tokenMaterial` and
+    // the one a Scryfall-shaped matcher would miss.
+    { id: 60, name: 'Treasure Token', types: 'Artifact - Treasure', seat: 1,
+      token: true, image: 'https://example.test/treasure.jpg' },
+    { id: 61, name: 'Food Token', types: 'Artifact - Food', seat: 1,
+      token: true, image: 'https://example.test/food.jpg' },
+    { id: 62, name: 'Clue Token', types: 'Artifact - Clue', seat: 1,
+      token: true, image: 'https://example.test/clue.jpg' },
+    { id: 63, name: 'Servo Token', types: 'Artifact Creature - Servo', seat: 1,
+      token: true, image: 'https://example.test/servo.jpg' },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 60, zone: 'battlefield', seat: 1 },
+      { id: 61, zone: 'battlefield', seat: 1 },
+      { id: 62, zone: 'battlefield', seat: 1 },
+      { id: 63, zone: 'battlefield', seat: 1, power: 1, toughness: 1 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+function materials(beat: StagedBeat | null) {
+  return render(
+    <MatchBoard board={MATERIALS} shown={1} game={1} running={false} beat={beat}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('stands no object on a token that is only sitting there', () => {
+  // **The regression this file exists to stop coming back.** The objects were
+  // painted by `.field-card-token.is-treasure` and its two siblings, on the
+  // card, permanently — over the bottom half of Wizards' own painting on a
+  // token that was doing nothing at all.
+  const { container } = materials(null)
+  expect(container.querySelectorAll('.field-mark')).toHaveLength(0)
+  for (const material of ['treasure', 'food', 'clue']) {
+    expect(container.querySelector(`.field-card-token.is-${material}`),
+      `a ${material} is wearing its object at rest`).toBeNull()
+  }
+  // The gold edge is a fact about the card rather than an event, so it stays.
+  expect(container.querySelectorAll('.field-card-token').length)
+    .toBeGreaterThan(0)
+})
+
+it.each([
+  ['Treasure Token', 'spent'],
+  ['Food Token', 'eaten'],
+  ['Clue Token', 'cracked'],
+])('draws %s its own mark when it is sacrificed', (card, verb) => {
+  const { container } = materials(said({ kind: 'sacrificed', card }))
+  const token = container.querySelector(`img[alt="${card}"]`)
+    ?.closest('.field-card')
+  expect(token?.querySelector(`.field-mark-${verb} img`),
+    `no ${verb} mark on the ${card}`).toBeTruthy()
+  // One mark, on the token the beat is about. The other two materials are on
+  // the same board and are not being sacrificed.
+  expect(container.querySelectorAll('.field-mark')).toHaveLength(1)
+})
+
+it('gives a sacrificed creature no material, because it is getting a skull', () => {
+  // A creature given up as a cost raises `sacrificed` *and* `dies` on the same
+  // instant. Two marks for one departure is the board asking to be read twice,
+  // so `markOf` answers null here and the death is what draws.
+  const { container } = materials(said({ kind: 'sacrificed',
+    card: 'Servo Token' }))
+  expect(container.querySelectorAll('.field-mark')).toHaveLength(0)
 })

@@ -77,16 +77,6 @@ function declaration(block: string, prop: string): string {
   return (m?.[1] ?? '').replace(/\s+/g, ' ').trim()
 }
 
-/** The first background/mask layer of a comma-separated list. */
-function firstLayer(block: string, prop: string): string {
-  return (declaration(block, prop).split(',')[0] ?? '').trim()
-}
-
-/** The file a `url('...')` names, or `''` if there is none. */
-function assetIn(value: string): string {
-  return /url\('([^']+)'\)/.exec(value)?.[1] ?? ''
-}
-
 describe('the material a token is made of', () => {
   it('reads Forge\'s spelling, which is the one that actually arrives', () => {
     // **The bug this file exists for.** `go/internal/api/forge.go` puts token
@@ -134,88 +124,84 @@ describe('the material a token is made of', () => {
 })
 
 describe('the edge a token wears', () => {
-  it('always keeps the gold edge, material or not', () => {
-    // A material is one more class on the element that already draws the
-    // edge — never a replacement for it. This is what makes adding a fourth
-    // material unable to regress the tokens that have none.
-    expect(tokenSigil('Spirit Token')).toBe('field-card-token')
-    expect(tokenSigil('Treasure Token'))
-      .toBe('field-card-token is-treasure')
+  it('is the gold edge and nothing else, for every token alike', () => {
+    // **The material no longer rides the card**, so no token gets a second
+    // class here — see `tokenSigil`. A Treasure and a Spirit wear the same
+    // edge, and what a Treasure is made of is asked one beat later, by the
+    // mark.
+    expect(tokenSigil()).toBe('field-card-token')
   })
 
-  it('names a class for every material on the list', () => {
-    // The CSS half cannot be typechecked, so this is the closest thing to a
-    // gate on "somebody added a name and forgot to draw it": at minimum the
-    // class has to be well-formed and distinct.
-    const classes = TOKEN_MATERIALS.map((m) => tokenSigil(m))
-    expect(new Set(classes).size).toBe(TOKEN_MATERIALS.length)
-    for (const c of classes) expect(c).toMatch(/^field-card-token is-\w+$/)
+  it('leaves no stylesheet rule selecting a material on a card', () => {
+    // The static objects were removed; a rule left behind selecting one would
+    // put a goblet back on the sand and typecheck perfectly on the way.
+    for (const material of TOKEN_MATERIALS) {
+      expect(CSS, `.field-card-token.is-${material} still has a rule`)
+        .not.toContain(`.field-card-token.is-${material}`)
+    }
   })
 })
 
 /**
- * **The object and the light that is clipped to it.**
+ * **The mark each material is drawn as.**
  *
- * Each material stands a committed cutout on the card and then masks its
- * ambient layer to that cutout's own alpha, so what brightens is the gold of
- * the cup rather than the card behind it. That only works while four values
- * agree across two rules: the same file, the same size, the same position, in
- * the element's `background-*` and in the `::before`'s `mask-*`.
+ * Every name on `TOKEN_MATERIALS` has to reach a picture. The chain is
+ * `tokenMaterial` -> `markOf` -> a `.field-mark-<verb>` rule, and only the
+ * first link can be typechecked: the verb is a string in one file and a
+ * selector in another, and a material whose rule was never written animates
+ * nothing at all on a real sacrifice. jsdom has no layout, so no rendering
+ * test can see it either — the only witness is a screenshot of a beat that
+ * happens about five times in six games.
  *
- * Nothing else can notice when they stop agreeing. jsdom has no layout, so
- * the suite cannot see it; a browser does not error, it just draws the light
- * beside the thing — a highlight sliding through empty space next to a
- * goblet, which is exactly the kind of fault that ships because it looks like
- * a rendering quirk rather than a bug. So the numbers are held equal here,
- * where a diff has to change both or fail.
+ * So the stylesheet is opened and the three halves held together here: the
+ * verb has a rule, the rule draws a committed object, and the rule times that
+ * object from its own `--mark-life-*` rather than a hard-coded duration —
+ * which is what keeps a mark honest when somebody changes the pace.
  */
-describe('the object a material stands on the card', () => {
-  it.each(TOKEN_MATERIALS)('gives %s an object and a shadow', (material) => {
-    const block = ruleFor(`.field-card-token.is-${material}`, 'background-image')
-    expect(block, `no rule for is-${material}`).not.toBe('')
-    const image = declaration(block, 'background-image')
-    // A committed cutout, not a hotlink and not a gradient standing in for a
-    // thing — commandment 5, and ADR 29 for where it may come from.
-    expect(image).toMatch(/url\('\.\/assets\/coliseum\/[a-z]+\.webp'\)/)
-    // Two layers: the object, and the contact shadow under its foot. One
-    // layer means somebody deleted the shadow and the object is a sticker.
-    expect(declaration(block, 'background-size').split(',')).toHaveLength(2)
-    expect(declaration(block, 'background-position').split(',')).toHaveLength(2)
-  })
+const MARK_VERBS: Record<string, string> = {
+  treasure: 'spent', food: 'eaten', clue: 'cracked',
+}
 
-  it.each(TOKEN_MATERIALS)('clips %s\'s light to that same object', (material) => {
-    const object = ruleFor(`.field-card-token.is-${material}`, 'background-image')
-    const light = ruleFor(`.field-card-token.is-${material}::before`, 'mask-image')
-    expect(light, `no ::before for is-${material}`).not.toBe('')
-
-    const asset = assetIn(declaration(object, 'background-image'))
-    expect(asset, 'the object has no picture').not.toBe('')
-    expect(assetIn(declaration(light, 'mask-image')),
-      'the mask is a different picture').toBe(asset)
-
-    // The object is always the *first* background layer; the shadow is second.
-    const size = firstLayer(object, 'background-size')
-    const at = firstLayer(object, 'background-position')
-    expect(declaration(light, 'mask-size')).toBe(size)
-    expect(declaration(light, 'mask-position')).toBe(at)
-
-    // Safari still wants the prefix, and a mask that only one engine applies
-    // is a light that lands on the whole card in the other one.
-    expect(declaration(light, '-webkit-mask-image')).toBe(
-      declaration(light, 'mask-image'))
-    expect(declaration(light, '-webkit-mask-size')).toBe(size)
-    expect(declaration(light, '-webkit-mask-position')).toBe(at)
-  })
-
-  it('never moves a masked layer by transform', () => {
-    // A `transform` takes the mask along with it, so the light would travel
-    // with its own silhouette and never arrive on the object. The sweep is
-    // drawn by moving `background-position` for exactly this reason, and this
-    // is the note that survives the next person who reaches for translateX.
+describe('the mark a material is sacrificed as', () => {
+  it('names a verb for every material on the list', () => {
+    // If a fourth material is added and this map is not, the tests below
+    // cannot even ask the question — so it is asked here first.
     for (const material of TOKEN_MATERIALS) {
-      const light = ruleFor(`.field-card-token.is-${material}::before`, 'mask-image')
-      expect(declaration(light, 'transform'),
-        `is-${material}::before transforms a masked layer`).toBe('')
+      expect(MARK_VERBS[material], `no verb for ${material}`).toBeDefined()
+    }
+  })
+
+  it.each(TOKEN_MATERIALS)('draws %s a committed object', (material) => {
+    const verb = MARK_VERBS[material]
+    const block = ruleFor(`.field-mark-${verb} img`, 'animation')
+    expect(block, `no .field-mark-${verb} img rule`).not.toBe('')
+    // Sized by width, never by height: `.field-mark` is a grid sized from its
+    // own item, so a percentage height is cyclic. Argued at
+    // `.field-mark-attacks img`, and this is the guard on it.
+    expect(declaration(block, 'width')).toMatch(/%$/)
+  })
+
+  it.each(TOKEN_MATERIALS)('times %s from its own mark life', (material) => {
+    const verb = MARK_VERBS[material]
+    const block = ruleFor(`.field-mark-${verb} img`, 'animation')
+    // A hard-coded duration here is a mark that ignores the transport: the
+    // room hands the length down as a custom property precisely so that Fast
+    // does not leave an object sitting on a board thirteen beats past its own.
+    expect(declaration(block, 'animation'))
+      .toContain(`var(--mark-life-${verb}`)
+  })
+
+  it('gives every material an object that is a committed webp', () => {
+    // The three pictures are museum plates cut and committed under ADR 29.
+    // They are imported by `components/board.tsx` rather than reached from CSS
+    // now, so what is checked here is that the files are still the ones the
+    // recipes describe — a hotlink or a gradient standing in for a thing would
+    // be commandment 5 going quietly.
+    for (const art of ['aurum', 'ferculum', 'lens']) {
+      expect(nodeFs.existsSync(`src/assets/coliseum/${art}.webp`),
+        `${art}.webp is missing`).toBe(true)
+      expect(nodeFs.existsSync(`src/assets/coliseum/${art}.recipe.yaml`),
+        `${art} has no recipe beside it`).toBe(true)
     }
   })
 })
