@@ -111,7 +111,10 @@ public final class Main {
             // the Game and its bus; `startGame` runs it. Between them is the
             // only moment a listener can be attached.
             Game game = match.createGame();
-            scribe.nextGame(number);
+            // The game goes over with the number: the scribe reaches back
+            // through it for `Card.wasCast()`, which is the one question a
+            // `CardView` cannot answer. See `Scribe#entered`.
+            scribe.nextGame(number, game);
             game.subscribeToEvents(scribe);
 
             long began = System.nanoTime();

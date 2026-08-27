@@ -54,7 +54,7 @@ game (Gyome/Food against Atla/Eggs, seed 11, 2026-08-25):
 
 | `t` | lines | what it carries |
 |---|---|---|
-| `zone` | 268 | a card entering or leaving a zone: which zone, whose, id, name, whether it is a token, its type line and stats |
+| `zone` | 268 | a card entering or leaving a zone: which zone, whose, id, name, whether it is a token, its type line and stats — and on a battlefield arrival, `entered`: `cast` or `put` |
 | `tapped` | 131 | a card tapping or untapping |
 | `stats` | 23 | power, toughness or type actually changing |
 | `attack` | 16 | an attacker, and the player or planeswalker it was sent at |
@@ -73,7 +73,7 @@ game (Gyome/Food against Atla/Eggs, seed 11, 2026-08-25):
 | `mana` | — | a seat's whole floating pool, as symbols: `"GGW"`, or `""` |
 | `sacrificed` | — | a permanent its controller sacrificed, and which seat that is |
 | `combat_end` | — | Forge saying combat is over |
-| `ability` | — | an ability on the stack: its source, that source's zone, and whether the game raised it |
+| `ability` | — | an ability on the stack: its source, that source's zone, whether the game raised it, and `targets` — the ids it was aimed at |
 
 The last four arrived later (ADR 45) and are not in that game's counts. On a
 separate recorded match — a Kaheera deck against itself, 2026-08-26 — a
@@ -81,6 +81,46 @@ fourteen-turn game raised 50 `mana`, 13 `combat_end`, 4 `ability` and 1
 `sacrificed`, and a forty-six-turn game raised 10 `ability`. Two card fields
 came with them: `keywords`, the instance's **live** set rather than its
 printing's, and `copied_by`, set only on a card made as a copy.
+
+**Two more fields arrived on 2026-08-27**, both answering questions this pipe
+had been assumed unable to answer, and both measured on one match (Atla
+Palani/Dinosaurs against Arahbo/Cats, seed 11).
+
+The counts below are that one run. A second run of the same seed an hour later
+reproduced game 1 exactly and **diverged on game 2** — the machine was at load
+135 on eight cores, and a starved Forge AI plays different Magic rather than the
+same Magic slowly. `docs/FORGE.md` has both sets. Read the ratios rather than
+the integers: what held across both is that every arrival got an answer, no
+ability had more than one target, and no ability targeted a player.
+
+`entered` says how a permanent reached the battlefield — `cast`, or `put` there
+by something else. It is Forge's own `Card.wasCast()`, which lives on the model
+rather than the view, so the scribe reaches it with `Game.findById` on the id
+the event just named; that lookup missed **zero times in fifty-nine arrivals**.
+A *missing* `entered` is a third state and means nobody said, which is what an
+older worker image sends: a reader that folded it into `put` would tell a room
+that every creature in every past match appeared out of thin air. Nineteen of
+the fifty-nine were cast; of the forty that were not, twenty-six were lands (a
+land is played, never cast) and thirteen were tokens, leaving one real spell —
+an End-Raze Forerunners put onto the battlefield off an Atla Palani egg.
+
+`targets` is what an ability was aimed at, by id, comma-joined the way
+`keywords` is. **Seventeen of seventy-five abilities were aimed at anything at
+all**, and none at more than one thing — the list is a list anyway, because the
+first ability with two targets would otherwise be silently narrowed to its
+first. All three of Arahbo's command-zone eminence triggers named their target,
+which is the whole reason this exists; the same commander's *attack* pump names
+none, because it picks its creature with `Defined$` rather than targeting it.
+`getTargetPlayers()` is wired and was used **zero** times in that match.
+
+**Do not reach for `GameEventZone.sa()` to learn what put a card somewhere.**
+It is the fifth component of that record and reads exactly like the spell
+responsible for the move, which is why it is called out here rather than left
+to be discovered. Forge's four-argument constructor passes `null` into that
+slot, and `Zone.add`, `Zone.remove` and `Zone.setCards` are all that
+constructor. Measured over two whole games: `sa()` was non-null **98 times and
+every one was a `Stack in`** — the one zone the far side drops whole. On a
+battlefield arrival it is null forever, and null reads as "nothing cast this".
 
 **Two encodings in those four are worth knowing before reading the code**, and
 both are argued in `Scribe.java` against the bytecode. `GameEventCombatUpdate`

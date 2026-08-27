@@ -238,8 +238,25 @@ type forgeBeat struct {
 	// Trigger is whether an `ability` beat was raised by the game rather than
 	// activated by a player: "triggers" against "activates".
 	Trigger bool `json:"trigger,omitempty"`
-	// Target is the card on the other end: blocked, or damaged.
+	// Target is the card on the other end: blocked, damaged, or — on an
+	// `ability` beat — the creature an eminence trigger made bigger.
 	Target string `json:"target,omitempty"`
+	// Entered is how an `enters` beat's permanent reached the battlefield —
+	// `cast`, or `put` there by something else.
+	//
+	// **Only `put` is news.** A creature that was cast has already had its
+	// moment a beat earlier, and the room showed somebody paying for it; a
+	// creature *put* onto the battlefield — Atla Palani cracking an egg into a
+	// seven-mana Boar — arrived with nothing said, and looked identical.
+	//
+	// **The empty string is a third state and it is not `put`.** A match played
+	// by the prose parser cannot answer this at all, and neither can a worker
+	// image built before the scribe learned to ask, so every game already in
+	// the ledger sends nothing here. A room that read absence as `put` would
+	// tell a newcomer that every creature in every older match appeared out of
+	// thin air — which is the exact distinction this field exists to draw, run
+	// backwards. See [tier3.GameEvent.Entered].
+	Entered string `json:"entered,omitempty"`
 	// Against is the deck on the other end: attacked, or damaged.
 	Against *string `json:"against"`
 	Amount  int     `json:"amount,omitempty"`
@@ -758,7 +775,8 @@ func newForgeBeats(log tier3.EventLog, seats map[int]string,
 			Kind: string(e.Kind), Turn: e.Turn, Who: slug(e.Seat),
 			Card: e.Card, ID: e.ID, Zone: e.Zone, Trigger: e.Trigger,
 			Target: e.Target, Against: slug(e.TargetSeat),
-			Amount: e.Amount, Life: e.Life, Note: e.Note})
+			Amount: e.Amount, Life: e.Life, Note: e.Note,
+			Entered: e.Entered})
 	}
 	return out
 }

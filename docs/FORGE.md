@@ -55,7 +55,9 @@ what it costs and why it is never on by default.
 
 ## What the bridge had to work around
 
-Seven things, each established by running Forge rather than by reading its wiki.
+Ten things, each established by running Forge rather than by reading its wiki.
+(There were eight under a heading that said seven, which is this file's own
+demonstration of why a count in prose is a claim to re-check.)
 
 **`sim` still initialises AWT, and dies silently without a display.** Found on
 the first live worker machine (2026-08-20): `forge.view.Main` touches fonts
@@ -172,6 +174,70 @@ stolen permanent. The card handed to the event is the last-known-battlefield
 copy, so reading `getController()` off the view gives the controller it had
 while it was still in play. Measured: three sacrifices in one game, three
 correct seats.
+
+**Whether a permanent was cast is not on the view, and is one lookup below it.**
+The bus hands over `CardView`s, and a view is a projection: it carries
+`isToken()`, `getZone()` and `hasSickness()`, and `TrackableProperty` has
+`Token` and `TokenCard` and nothing general for *was this cast*. The model has
+the answer — `Card.wasCast()`, with `getCastFrom()` beside it — and the scribe
+runs inside the JVM, so `Game.findById(id)` on the id the event just named
+reaches it. **That lookup missed zero times in fifty-nine battlefield arrivals**
+across two games, which is why `Scribe.entered` has no third word for "could not
+tell".
+
+Do not try to get there from the zone event's own fields. `GameEventZone` is a
+five-component record whose fifth is a `SpellAbilityView`, which reads exactly
+like *the spell responsible for this move* — but the four-argument constructor
+passes `aconst_null` into that slot, and `Zone.add`, `Zone.remove` and
+`Zone.setCards` are all that constructor. Only the three-argument form fills it
+and nothing but the stack raises that: measured over two whole games, `sa()` was
+non-null **98 times and every one was a `Stack in`**, the one zone the board
+drops. A reader reaching for it on a battlefield arrival finds null forever and
+reads that as "nothing cast this".
+
+Cross-checked before it was believed, because two encodings on this bus have
+already been decoded wrongly in a way that looked right.
+`GameEventCardChangeZone` carries the zone a card came *from*, and a permanent
+spell resolves off the stack — so "arrived from the Stack" and `wasCast` should
+be the same set. **They agreed on all fifty-nine, in both directions.** The
+boolean is what the scribe sends, because it answers the question rather than
+applying a rule to a neighbouring fact. Of the forty uncast arrivals, twenty-six
+were lands (a land is *played*, never cast — rule 305.1) and thirteen were
+tokens; the one real spell that entered without being cast was an End-Raze
+Forerunners off an Atla Palani egg.
+
+**An ability's targets are on the stack item, and always were.**
+`StackItemView` carries `getTargetCards()` and `getTargetPlayers()` alongside
+the `isTrigger()` that was the only thing ever read off it, so eminence reached
+the browser saying a commander in the command zone had done *something* with no
+way to say which creature grew. Measured over two games: **seventeen of
+seventy-five abilities were aimed at anything at all, and never at more than one
+thing** — but the wire carries a list anyway, because the first ability with two
+targets would otherwise be silently narrowed to its first. The fifty-eight with
+none are the shape of the data rather than a gap: a surveil trigger targets
+nothing, and Arahbo's *attack* pump picks its creature with `Defined$` instead
+of targeting it, so the same commander produces both kinds. All three
+command-zone eminence triggers in that match named their target.
+
+Not observed at all, and wired on the strength of the accessor rather than of
+having been watched working: **zero of the seventy-five targeted a player.**
+
+**Every count in those three paragraphs is one recorded run, and a second run of
+the same seed will not reproduce them.** Two runs of Atla Palani against Arahbo
+on seed 11 were played an hour apart on 2026-08-27: game 1 came out
+bit-identical both times, and **game 2 diverged** — the machine was at load 135
+on eight cores, and a starved Forge AI plays different Magic rather than the
+same Magic slowly. The second run saw 68 arrivals rather than 59, 21 cast
+rather than 19, and three uncast real spells rather than one (Zacama and
+Zopandrel joined End-Raze Forerunners, all three off Atla Palani).
+
+So read the ratios, not the integers. What held identically across both runs is
+the whole of what the design rests on: **`entered` was answered on every single
+battlefield arrival** — 127 of 127 across the two, no misses — no ability ever
+had **more than one** target, none ever targeted a player, and every
+command-zone eminence trigger named what it pumped. If a re-run gives different
+totals, nothing has broken; if it gives an ability with two targets or an
+arrival with no answer, something has.
 
 ## Narrating a game
 
