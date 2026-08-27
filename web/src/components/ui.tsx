@@ -225,11 +225,31 @@ interface SelectProps {
   help?: React.ReactNode
 }
 
+/**
+ * **`max-w-full` on both halves, and it is a phone fix rather than tidiness.**
+ * A `<select>` is as wide as its widest `<option>` and will not wrap, so the
+ * deck picker on `/simulate` — whose options are deck names — measured 384px
+ * inside a 293px column and pushed 49px of horizontal scroll onto a 375px
+ * phone. Every route that scrolls sideways does it for somebody else's
+ * element; this one does it for a control the page cannot see the end of.
+ *
+ * The cap belongs on the `<label>`, and that is the half that is easy to get
+ * wrong. These sit in `flex flex-wrap` filter rows, where a flex item's
+ * automatic minimum size is its content — so a label capped at nothing still
+ * refuses to shrink below the widest option. A definite `max-width` clamps
+ * that automatic minimum (Flexbox §4.5), which is why `max-w-full` here does
+ * the work that `min-w-0` is usually reached for, without `min-w-0`'s habit of
+ * crushing a row that should have wrapped. The `<select>`'s own cap is for the
+ * blocks these are used in outside a flex row, where the label is not the
+ * thing being measured. Wrapping is untouched: a flex line still breaks on
+ * base sizes, so a row of six short filters wraps exactly as before and only a
+ * control too wide for a line of its own ever shrinks.
+ */
 export function Select({
   label, value, onChange, options, className = '', help,
 }: SelectProps) {
   return (
-    <label className={`flex flex-col gap-1 ${className}`}>
+    <label className={`flex max-w-full flex-col gap-1 ${className}`}>
       <span className="flex items-center text-[11px] font-medium uppercase tracking-wide"
             style={{ color: 'var(--text-muted)' }}>
         {label}{help}
@@ -237,7 +257,7 @@ export function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2"
+        className="h-9 max-w-full rounded-md px-2 text-sm outline-none focus:ring-2"
         style={{
           background: 'var(--surface-1)',
           color: 'var(--text-primary)',

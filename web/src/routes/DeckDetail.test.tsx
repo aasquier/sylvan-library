@@ -2126,6 +2126,43 @@ describe('the 99 rolls up', () => {
     // group and its count, so nothing is lost, only quiet.
     expect(screen.queryByText('Primeval Titan')).toBeNull()
   })
+})
+
+describe('the tabs on a phone', () => {
+  /*
+   * **The widest horizontal overflow in the app, and nothing in this file
+   * could see it.** Six tabs want 432px of row; a 375px phone has 327 to give
+   * inside the page gutters, so History hung 81px off the right edge and the
+   * whole page scrolled sideways — measured in a real browser as
+   * `documentElement.scrollWidth - clientWidth`, which is the only honest
+   * witness there is. jsdom has no layout engine, so what follows holds the
+   * class and not one pixel of the consequence; the pixels are Aaron's walk
+   * (commandment 16) and the numbers are in the pull request.
+   *
+   * Worth pinning even so, because the class is the whole fix and it is one
+   * word long. A tidy-up that folds these utilities into a shared string, or a
+   * copy-paste from a strip that never needed it, drops that word in silence
+   * and the bug comes back with a green suite behind it.
+   */
+  it('wraps rather than running off the side', async () => {
+    renderDeck()
+    const history = await screen.findByRole('button', { name: 'History' })
+    const strip = history.parentElement
+
+    expect(strip?.className).toContain('flex-wrap')
+    // Both halves: `flex-wrap` on something that is not a flex row does
+    // nothing at all, and would still pass an assertion about the one word.
+    expect(strip?.className).toContain('flex ')
+    // And all six are still in the row that wraps. A strip that "fixed" this
+    // by dropping tabs on a phone would be the worse bug — a newcomer does
+    // not go looking for a tab they have never seen (commandment 2) — and so
+    // would one that solved it by scrolling, which hides the last two behind
+    // a gesture nobody is told about.
+    for (const name of ['The 99', 'Stats', 'Validation', 'Notes', 'Artifacts',
+      'History']) {
+      expect(screen.getByRole('button', { name }).parentElement).toBe(strip)
+    }
+  })
 
   it('folds and unfolds everything from one control', async () => {
     renderUnfolded()

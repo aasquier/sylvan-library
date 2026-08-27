@@ -17,7 +17,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
-import { CardHover, CardSheet, ErrorNote, Spinner } from './ui'
+import { CardHover, CardSheet, ErrorNote, Select, Spinner } from './ui'
 
 afterEach(cleanup)
 
@@ -284,4 +284,24 @@ it('drops an attachment the pool gave no painting rather than drawing a blank', 
 
   expect(document.querySelector('.card-sheet-rail')).toBeNull()
   expect(screen.getByAltText(CARD.name)).toBeTruthy()
+})
+
+it('caps a dropdown at its column, whatever the longest option says', () => {
+  // A `<select>` is as wide as its widest `<option>` and will not wrap, so the
+  // deck picker on `/simulate` — whose options are deck names — measured 384px
+  // inside a 293px column and pushed 49px of horizontal scroll onto a 375px
+  // phone. Both caps are the fix, and the one on the `<label>` is the half
+  // that does the work: these sit in `flex flex-wrap` filter rows, where a
+  // definite `max-width` is what clamps a flex item's content-based automatic
+  // minimum (Flexbox §4.5) and lets it shrink at all.
+  //
+  // jsdom has no layout, so nothing here can measure the box — the widths
+  // above came out of a real browser. What this holds is that both caps are
+  // still declared, which is the whole of the change.
+  const { container } = render(
+    <Select label="Deck" value="a" onChange={() => {}}
+            options={[{ value: 'a', label: 'Arahbo, Roar of the World — Cats' }]} />)
+
+  expect(container.querySelector('label')?.className).toContain('max-w-full')
+  expect(container.querySelector('select')?.className).toContain('max-w-full')
 })
