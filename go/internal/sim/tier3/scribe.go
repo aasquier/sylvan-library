@@ -127,6 +127,22 @@ type scribeLine struct {
 	AgainstSeat int    `json:"against_seat"`
 	Amount      int    `json:"amount"`
 	Combat      bool   `json:"combat"`
+	// Commander is the board id of the commander a blow is credited to, and
+	// CommanderDamage is that commander's **running total** against this
+	// player — not the blow, which is [scribeLine.Amount] beside it.
+	//
+	// Both are absent unless there is something to say, and absence is the
+	// third state again: a worker image built before the scribe learned to ask
+	// sends neither, and so does every ordinary blow from a creature nobody
+	// put in the command zone. The far side reads that as "no commander damage
+	// known", never as nought, which is the same degradation `entered` chose.
+	//
+	// **The id is not always the card that dealt the damage.** Forge credits a
+	// blow to `Card.getRealCommander()`, so a commander merged or melded into
+	// another permanent is credited under its own id while the damage arrives
+	// from the host's. `Scribe.java` argues it where it is read.
+	Commander       int `json:"commander"`
+	CommanderDamage int `json:"commander_damage"`
 
 	Milliseconds int    `json:"ms"`
 	Winner       string `json:"winner"`
@@ -586,6 +602,20 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// attack.
 		p.raise(GameEvent{Kind: EventUnblocked, Seat: l.Seat, Card: l.Card, ID: l.ID})
 	case "damage":
+		// **The commander clock, folded before the beat is raised.** Twenty-one
+		// from one commander is the other way a game of this format ends
+		// (rule 903.10a), and it moves on this line and nowhere else — Forge
+		// credits the damage inside the same method that fires this event, and
+		// the scribe reads the running total out of Forge's own tracker rather
+		// than summing blows here. No beat of its own, for `player_counters`'
+		// reason: the sentence has already been said by the combat that caused
+		// it, and the dial climbs while the room reads it.
+		//
+		// Silent on a blow that is not a commander's — the scribe sends no
+		// figure at all rather than a nought, so this never touches the fold.
+		if l.Commander != 0 && l.CommanderDamage > 0 {
+			p.board.commanderDamage(l.AgainstSeat, l.Commander, l.CommanderDamage)
+		}
 		p.raise(GameEvent{Kind: EventDamage, Card: l.Card, Amount: l.Amount,
 			Target: l.Target, TargetSeat: l.AgainstSeat})
 	case "outcome":

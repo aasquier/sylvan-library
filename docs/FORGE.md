@@ -206,6 +206,51 @@ were lands (a land is *played*, never cast — rule 305.1) and thirteen were
 tokens; the one real spell that entered without being cast was an End-Raze
 Forerunners off an Atla Palani egg.
 
+**Commander damage is a number Forge keeps and nobody was reading.** Twenty-one
+combat damage from a single commander ends a game whatever the life total says
+(rule 903.10a), and it is the one loss condition in this format that a life
+total cannot express — so a board that drew only life drew a player three swings
+from losing exactly like a player who was fine.
+
+`Player.addDamageAfterPrevention` maintains a `Map<Card, Integer>` of it, and
+the whole design rests on **where in that method the event is fired**, which is
+a bytecode fact rather than a hope. In order: the branch is entered on
+`isCommander() && isCombat` (and not in an Oathbreaker, Tiny Leaders or Brawl
+game); `addCommanderDamage(source.getRealCommander(), n)`; then
+`view.updateCommanderDamage(this)`; then the triggers; and only then
+`fireEvent(new GameEventPlayerDamaged(...))`. **Both the tracker and the view are
+already current when a listener sees the event**, so the total the scribe reads
+includes the blow being announced, and it rides the `damage` line rather than
+needing a second event.
+
+`getRealCommander()` is why the source's own id is not the key.
+`PlayerView.updateCommanderDamage` copies the model's map keyed by
+`Card.getId()` of *that* card, so a commander merged or melded into another
+permanent is credited under its own id while the blow arrives from the host's.
+The model answers it and the scribe is inside the JVM holding the `Game`, which
+is `entered`'s lesson a second time; for every commander not part of a merge —
+all of them, nearly always — it returns the card itself.
+
+Measured on a real match on this laptop, Goreclaw/Stompy against Gyome/Food,
+seed 11, 2026-08-27, two games. **Thirty-six player-damage blows, all combat,
+seven of them a commander's.** Cross-checked in both directions before it was
+believed, because this bus has three times now carried a value whose wrong
+reading looks exactly like its right one: every blow from a card seen in the
+command zone carried a figure and **none was missed**; **no figure came from a
+card that was never in the command zone**; and the totals equal the running sum
+of the blows on every one, **thirty-five of thirty-five cumulative checks**,
+which is what makes "total, not delta" a measurement rather than a reading of
+the bytecode alone. Gyome's dial against seat 1 read 5, 10, 15, 20 — and that
+game then ended on life, with a player one swing from *two* different deaths.
+
+**Combat only, and that gate is Forge's rather than ours.** A commander throwing
+a Fireball moves a life total and not this figure, which is rule 903.10a
+exactly. Nothing on our side checks for it: the number is read, and a blow Forge
+did not credit is a number that has not moved. The one thing the scribe cannot
+see is the tracker moving *without* a damage event —
+`updateMergedCommanderDamage` shifts a total between two cards on a merge — which
+is a corner nobody's deck has yet and is written down rather than guessed at.
+
 **An ability's targets are on the stack item, and always were.**
 `StackItemView` carries `getTargetCards()` and `getTargetPlayers()` alongside
 the `isTrigger()` that was the only thing ever read off it, so eminence reached

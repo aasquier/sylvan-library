@@ -58,7 +58,7 @@
 
 import type { ReactElement } from 'react'
 
-import { type DrawnKeyword, drawableKeywords, keywordWords }
+import { type DrawnKeyword, drawableKeywords, keywordMeaning, keywordWords }
   from '../lib/keywords'
 
 /** One mark, drawn on `currentColor` in a 20-unit box like the rest of the
@@ -416,6 +416,15 @@ const MOST = 4
  * printed or lent, because a creature gains and loses granted keywords all
  * game and a band that regrouped itself every time something entered play
  * would move the mark a player was reading.
+ *
+ * **Two tooltips, at two grains, and that is deliberate.** The band carries the
+ * scannable list — `flying, vigilance (granted)` — because it is the whole
+ * accessible account of a row of `aria-hidden` pictures and a paragraph there
+ * would be unreadable. Each mark carries the *sentence*: what the sign means,
+ * and whether the card came with it. Aaron asked for the second one on a
+ * granted keyword, where a player has nowhere else to look — lifting the card
+ * face out shows a Bronzehide Lion with no vigilance printed on it — and every
+ * mark gets it, because a viper is a viper whoever put it there.
  */
 export function KeywordMarks(
   { keywords, granted = [] }: { keywords: string[]; granted?: string[] },
@@ -427,6 +436,9 @@ export function KeywordMarks(
   // call with the lending written in — so the mark and the words about it can
   // never fall out of step, and the phrasing is spelled in one place.
   const words = keywordWords(keywords, granted)
+  // The band's list stays short; each mark gets the sentence. Both are spelled
+  // in `lib/keywords.ts` so the phrasing lives in one place.
+  const means = drawn.map((key) => keywordMeaning(key, lent.has(key)))
   const shown = drawn.slice(0, MOST)
   const rest = drawn.length - shown.length
   return (
@@ -436,7 +448,7 @@ export function KeywordMarks(
         return (
           <span key={key}
                 className={`field-keyword${lent.has(key) ? ' is-granted' : ''}`}
-                title={words[i]}>
+                title={means[i]}>
             <svg viewBox="0 0 20 20" aria-hidden focusable="false">
               <Mark />
             </svg>

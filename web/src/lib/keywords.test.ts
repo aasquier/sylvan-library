@@ -10,7 +10,9 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { DRAWN_KEYWORDS, drawableKeywords } from './keywords'
+import {
+  DRAWN_KEYWORDS, KEYWORD_MEANS, drawableKeywords, keywordMeaning,
+} from './keywords'
 
 describe('the keywords a board can draw', () => {
   it('matches whatever case the wire happens to carry', () => {
@@ -84,5 +86,53 @@ describe('the keywords a board can draw', () => {
       expect(word, `${word} would never match`).toBe(word.toLowerCase())
       expect(word.trim(), `${word} has stray space`).toBe(word)
     }
+  })
+})
+
+/**
+ * What a mark means, said in words.
+ *
+ * **Aaron's ask on the walk** (2026-08-27): a keyword a card was *given* is the
+ * one a player cannot look up. The mark is thirteen pixels and the card face
+ * behind it does not carry the word, so a newcomer sees a symbol appear on a
+ * creature with nothing anywhere to explain it.
+ *
+ * The sentences themselves are prose and a suite cannot mark them right. What
+ * it can hold is that there is one for every mark, that none of them smuggles
+ * in a number the sign does not draw, and that the granted case says the thing
+ * the card's own text would otherwise contradict.
+ */
+describe('what a keyword mark means', () => {
+  it('has a sentence for every mark the board draws', () => {
+    // The type already forces this and the type is the real gate. Held here as
+    // well because a `Record` is satisfied by an empty string, and an empty
+    // string renders as `vigilance — ` with nothing after the dash.
+    for (const word of DRAWN_KEYWORDS) {
+      expect(KEYWORD_MEANS[word]?.trim(), `${word} says nothing`)
+        .toBeTruthy()
+    }
+  })
+
+  it('says no numbers, the way the marks do not draw them', () => {
+    // Ward and toxic both carry an amount, and the wire does not: Scryfall
+    // spells them bare. A sentence promising "two poison counters" would be
+    // the one place in this room quietly inventing a figure nobody sent.
+    for (const word of DRAWN_KEYWORDS) {
+      expect(KEYWORD_MEANS[word], `${word} quotes a number`)
+        .not.toMatch(/\d/)
+    }
+  })
+
+  it('tells a player the card is not wrong when the keyword was lent', () => {
+    // The whole point. A Bronzehide Lion wearing vigilance has no vigilance
+    // printed on it, and a player who checks will find the card and the mark
+    // disagreeing — so the mark is the one that has to explain itself.
+    const lent = keywordMeaning('vigilance', true)
+    expect(lent).toContain('attacking does not tap it')
+    expect(lent).toContain('not printed on this card')
+    // And the ordinary case does not claim anything about where it came from.
+    const printed = keywordMeaning('vigilance', false)
+    expect(printed).toContain('attacking does not tap it')
+    expect(printed).not.toContain('granted')
   })
 })

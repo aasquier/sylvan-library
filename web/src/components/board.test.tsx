@@ -2001,6 +2001,10 @@ const POISONED: ForgeBoard = {
     // The numbers a real Skithiryx match produced: totals, not arrivals.
     { turn: 2, seat: 1, counters: [{ seat: 2, counters: [{ kind: 'Poison', n: 4 }] }] },
     { turn: 3, seat: 1, counters: [{ seat: 2, counters: [{ kind: 'Poison', n: 12 }] }] },
+    // Wound back to nine for the warning tier — a real Skithiryx match jumps
+    // four at a time and never lands on nine, so this beat is a fixture rather
+    // than a recording and says so.
+    { turn: 4, seat: 1, counters: [{ seat: 2, counters: [{ kind: 'Poison', n: 9 }] }] },
   ],
 } as unknown as ForgeBoard
 
@@ -2008,7 +2012,7 @@ function poisoned(shown: number) {
   return render(
     <MatchBoard board={POISONED} shown={shown} game={1} running={false}
                 name={(_slug, fallback) => fallback}
-                speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                speed="play" setSpeed={vi.fn()} of={4} seek={vi.fn()}
                 games={[1]} playing={1} chooseGame={vi.fn()} />)
 }
 
@@ -2028,6 +2032,18 @@ it('puts the count on the poisoned seat and nowhere else', () => {
   expect(beads[0]?.className).not.toContain('is-lethal')
 })
 
+it('spreads rather than reddens two counters out', () => {
+  // **Eight is the warning and it stays green.** The other two clocks go red at
+  // their thresholds because red is this room's blood; a player two counters
+  // from a Phyrexian death is not dying of blood, and saying so in the wrong
+  // colour would be a confident little lie.
+  const { container } = poisoned(4)
+  const bead = container.querySelector('.field-bead')
+  expect(bead?.textContent).toBe('9')
+  expect(bead?.className).toContain('is-dire')
+  expect(bead?.className).not.toContain('is-lethal')
+})
+
 it('says so when the tenth counter has landed', () => {
   // Twelve, because Skithiryx swings for four and a player really does go
   // straight past ten. The arc clamps; the class and the figure do not.
@@ -2036,6 +2052,162 @@ it('says so when the tenth counter has landed', () => {
   expect(bead?.textContent).toBe('12')
   expect(bead?.className).toContain('is-lethal')
   expect(bead?.getAttribute('title')).toContain('ten is lethal')
+})
+
+/* ------------------------------------- the crown's clock, in the trench
+ *
+ * **Twenty-one from one commander ends a game whatever the life total says**
+ * (rule 903.10a), and the board could not see it: a player three swings from
+ * losing was drawn identically to one who was fine.
+ *
+ * Two of these are gates on claims no screenshot catches failing. That an
+ * absent figure draws *absence* — a `0` here would say somebody's commander had
+ * connected, and in most matches none has. And that **two commanders are two
+ * clocks**: a player who has taken twenty from each is not dead, and a room
+ * that summed them would show forty against a ceiling of twenty-one and call a
+ * live player finished. The numbers below are from a real match on this
+ * laptop — Gyome hit seat 1 four times for five, and the seat then lost on life
+ * with the dial reading twenty.
+ */
+const BEATEN: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'goreclaw-stompy', name: 'Goreclaw — Stompy', life: 40 },
+    { seat: 2, slug: 'gyome-food', name: 'Gyome — Food', life: 40 },
+  ],
+  cards: [
+    { id: 201, name: 'Gyome, Master Chef', types: 'Creature - Troll', seat: 2 },
+    { id: 100, name: 'Goreclaw, Terror of Qal Sisma', types: 'Creature - Bear',
+      seat: 1 },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [{ id: 201, zone: 'battlefield', seat: 2 }] },
+    { turn: 2, seat: 2, generals: [{ seat: 1, from: [{ id: 201, damage: 5 }] }] },
+    { turn: 3, seat: 2, generals: [{ seat: 1, from: [{ id: 201, damage: 20 }] }] },
+    // Both commanders have connected, and neither is lethal.
+    { turn: 4, seat: 2, generals: [
+      { seat: 1, from: [{ id: 201, damage: 20 }, { id: 100, damage: 20 }] }] },
+  ],
+} as unknown as ForgeBoard
+
+function beaten(shown: number) {
+  return render(
+    <MatchBoard board={BEATEN} shown={shown} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={4} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('draws no dial in a match where no commander has connected', () => {
+  const { container } = beaten(1)
+  expect(container.querySelectorAll('.field-bead.is-general')).toHaveLength(0)
+})
+
+it('names the commander that dealt it, from the board dictionary', () => {
+  const { container } = beaten(2)
+  const dials = container.querySelectorAll('.field-bead.is-general')
+  expect(dials).toHaveLength(1)
+  expect(dials[0]?.textContent).toBe('5')
+  // **The sentence says who was struck before it says by whom.** Aaron read
+  // the dial as his own commander's tally (2026-08-27) — it is the opposite,
+  // and the wording is half of the fix for that; the broken crown is the other
+  // half, and the half that works without a pointer.
+  expect(dials[0]?.getAttribute('title'))
+    .toBe('Struck for 5 by Gyome, Master Chef. Twenty-one from one commander '
+      + 'loses the game.')
+  expect(dials[0]?.className).not.toContain('is-dire')
+})
+
+it('sounds the alarm two swings out, and not before', () => {
+  const { container } = beaten(3)
+  const dial = container.querySelector('.field-bead.is-general')
+  expect(dial?.textContent).toBe('20')
+  expect(dial?.className).toContain('is-dire')
+  // Nineteen is a warning and twenty-one is the end; twenty is not both.
+  expect(dial?.className).not.toContain('is-lethal')
+  expect(dial?.getAttribute('title')).toContain('Twenty-one from one commander')
+  expect(dial?.getAttribute('title'), 'twenty is not yet a death')
+    .not.toContain('and this one has')
+})
+
+// **Nothing in a dial is styled by being an `svg`**, and Aaron caught why.
+//
+// The ring is turned `-90deg` to put twelve o'clock at the top, and the rule
+// doing it used to be `.field-bead svg` — a descendant *type* selector. The
+// moment a second `svg` went inside a bead for the crown, that rule caught it
+// too, and at one class plus one type it outweighed `.field-bead-crown`: the
+// crown took the rotation, the `inset: 0` and the full 40px, and lay on its
+// side. Every check in this file passed while it did, and so did every other
+// one — jsdom applies no stylesheet, so the cascade is not a thing this suite
+// can see at all.
+//
+// So the gate is on the **structure that made it possible** rather than on the
+// pixel: an `svg` inside a bead with no class of its own is one a type selector
+// can still reach. That is checkable here, it is the actual precondition, and
+// it fails for the next decoration somebody adds as well as for this one.
+it('gives every mark in a dial a class a stylesheet can aim at', () => {
+  const { container } = beaten(2)
+  const bare: string[] = []
+  for (const bead of container.querySelectorAll('.field-bead, .field-life')) {
+    for (const mark of bead.querySelectorAll('svg')) {
+      if (!mark.getAttribute('class')) bare.push(bead.className)
+    }
+  }
+  expect(bare).toEqual([])
+})
+
+it('holds two commanders apart rather than summing them into a death', () => {
+  const { container } = beaten(4)
+  const dials = container.querySelectorAll('.field-bead.is-general')
+  expect(dials).toHaveLength(2)
+  // Forty points of commander damage and a live player: neither dial has
+  // reached twenty-one, and none of them says it has.
+  for (const dial of dials) {
+    expect(dial.textContent).toBe('20')
+    expect(dial.className).not.toContain('is-lethal')
+  }
+})
+
+/* --------------------------------------------- the life dial's own alarm
+ *
+ * Under five, every creature on a Commander board is lethal — so the ring stops
+ * being a gauge and starts being a countdown. Dead is deliberately *not* dire:
+ * a player on nought has stopped being in danger, and a scoreboard still
+ * pulsing at them is a scoreboard nobody reads.
+ */
+const DYING: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'goreclaw-stompy', name: 'Goreclaw — Stompy', life: 40 },
+    { seat: 2, slug: 'gyome-food', name: 'Gyome — Food', life: 40 },
+  ],
+  cards: [],
+  steps: [
+    { turn: 1, seat: 1, life: [{ seat: 2, life: 9 }] },
+    { turn: 2, seat: 1, life: [{ seat: 2, life: 3 }] },
+    { turn: 3, seat: 1, life: [{ seat: 2, life: 0 }] },
+  ],
+} as unknown as ForgeBoard
+
+function dying(shown: number) {
+  const { container } = render(
+    <MatchBoard board={DYING} shown={shown} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  return container.querySelectorAll('.field-life')
+}
+
+it('leaves a life total alone while there is room to breathe', () => {
+  for (const ring of dying(1)) expect(ring.className).not.toContain('is-dire')
+})
+
+it('sounds the alarm under five life', () => {
+  const dire = [...dying(2)].filter((r) => r.className.includes('is-dire'))
+  expect(dire).toHaveLength(1)
+  expect(dire[0]?.getAttribute('title')).toContain('one good swing')
+})
+
+it('stops pulsing at a player who is already dead', () => {
+  for (const ring of dying(3)) expect(ring.className).not.toContain('is-dire')
 })
 
 /* ---------------------------------------------- the three materials
@@ -2299,9 +2471,18 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
   const cat = container.querySelector('img[alt="Leonin Skyhunter"]')
     ?.closest('.field-card') as HTMLElement
   const marks = [...cat.querySelectorAll('.field-keyword')]
+  // **Each mark says what it means, and the lent one says the card is not
+  // wrong.** Aaron, on this exact pair (2026-08-27): *"even if we can't say who
+  // bestowed it, we can say what the icon means since it is not native to that
+  // card"*. A player who reads the Skyhunter looking for vigilance will not
+  // find it, so the mark is the one that has to explain itself.
   expect(marks.map((m) => m.getAttribute('title')),
     'flying is printed on the Skyhunter; the vigilance is Kaheera’s')
-    .toEqual(['flying', 'vigilance (granted)'])
+    .toEqual([
+      'flying — can only be blocked by creatures with flying or reach',
+      'vigilance — attacking does not tap it, so it can still block '
+        + '(granted; not printed on this card)',
+    ])
   expect(marks.filter((m) => m.classList.contains('is-granted')).length,
     'exactly one of the two marks stands on the other plate').toBe(1)
   expect(marks[1]?.classList.contains('is-granted')).toBe(true)
@@ -2316,6 +2497,10 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
   expect(cat.getAttribute('title')).toContain('flying, vigilance (granted)')
   for (const giver of ['Kaheera', 'Gwyn', 'Caracal', 'from']) {
     expect(band?.getAttribute('title'), `the band names a giver: ${giver}`)
+      .not.toContain(giver)
+    // The sentence on the mark is under the same rule — it explains the sign,
+    // it never guesses at a culprit.
+    expect(marks[1]?.getAttribute('title'), `the mark names a giver: ${giver}`)
       .not.toContain(giver)
     expect(cat.getAttribute('title'), `the card names a giver: ${giver}`)
       .not.toContain(giver)

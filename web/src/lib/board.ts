@@ -260,6 +260,19 @@ export interface BoardSide {
    *  this match is doing, and almost no match is. The trench draws a bead only
    *  when there is one to draw. */
   counters: { kind: string; n: number }[]
+  /** How much commander damage this player has taken, kept apart by the
+   *  commander that dealt it and largest first.
+   *
+   *  **Twenty-one from one commander kills, and that is why this is a list.**
+   *  Rule 903.10a counts per commander, so a player who has taken twenty from
+   *  each of two is not dead and a single sum would draw them as though they
+   *  were. The trench reads the head of this list — the worst one clock — and
+   *  never a total.
+   *
+   *  Empty is the ordinary state and it is not a zero, for `counters`' reason:
+   *  a commander has to connect in combat to put anything here, and most
+   *  matches never see it. */
+  generals: { id: number; name: string; damage: number }[]
   /** The front line. */
   creatures: BoardCard[]
   /** Planeswalkers, and anything a future set invents that is none of the
@@ -387,7 +400,7 @@ export interface BoardState {
 function emptySide(seat: ForgeBoardSeat): BoardSide {
   return {
     seat: seat.seat, slug: seat.slug, name: seat.name, life: seat.life,
-    counters: [],
+    counters: [], generals: [],
     creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
     hand: [], graveyard: [], exile: [], thrones: [], companion: null,
     command: [], commanders: [], pool: '', raised: '', gained: '',
@@ -420,6 +433,9 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   // step published is what they are holding. Nobody starts with any, so an
   // absent seat here is a seat that has never been given one.
   const held = new Map<number, { kind: string; n: number }[]>()
+  // Commander damage, folded the same way: the last set a step published is
+  // what that player has taken. An absent seat has never been hit by one.
+  const generals = new Map<number, { id: number; damage: number }[]>()
   // Each seat's floating mana, and the two transients that belong to the beat
   // being drawn rather than to the game so far — see `BoardState`.
   const pool = new Map<number, string>()
@@ -445,6 +461,7 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     if (step.seat) active = step.seat
     for (const moved of step.life ?? []) life.set(moved.seat, moved.life)
     for (const moved of step.counters ?? []) held.set(moved.seat, moved.counters)
+    for (const moved of step.generals ?? []) generals.set(moved.seat, moved.from)
     // **The pool folds to its last value and the movement is kept only for the
     // beat being drawn now.** A seat appears more than once in one step — mana
     // arriving and being spent — so the last entry is where the pool came to
@@ -608,6 +625,21 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
   for (const [seat, on] of held) {
     const side = bySeat.get(seat)
     if (side) side.counters = on
+  }
+  for (const [seat, from] of generals) {
+    const side = bySeat.get(seat)
+    if (!side) continue
+    // **Sorted worst-first here rather than in the trench**, because the only
+    // question a scoreboard asks of this list is which clock is furthest along
+    // — and a component that had to search for that would be a component that
+    // could forget to. The name comes out of the dictionary the same way an
+    // ability's targets do; a commander has been on the battlefield to have
+    // dealt combat damage, so it is always in there.
+    side.generals = from
+      .map((one) => ({
+        id: one.id, damage: one.damage, name: named.get(one.id)?.name ?? '',
+      }))
+      .sort((a, b) => b.damage - a.damage)
   }
   for (const [seat, held] of pool) {
     const side = bySeat.get(seat)

@@ -7670,7 +7670,14 @@ button:hover .tarot-fan-card {
   display: grid;
   place-items: center;
 }
-.field-bead svg {
+/* **Named, not typed**, and that is the whole of a bug Aaron caught on the
+   screen. This rule used to be `.field-bead svg`, which is a descendant *type*
+   selector — so the moment a second `svg` went inside a bead for the crown, it
+   was caught by this too, and at one class plus one type it outweighed
+   `.field-bead-crown`. The crown took this rotation, this `inset` and this
+   full size, and lay on its side at 40px. A class costs nothing and cannot
+   reach a sibling it was never meant to. */
+.field-bead-ring {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -7723,6 +7730,90 @@ button:hover .tarot-fan-card {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.62; }
 }
+/* ---- the crown's clock: commander damage, per commander
+ *
+ * **The third dial, and the last of the three ways to die.** Built on the bead
+ * above so the grammar is one grammar — an arc that fills toward the number
+ * that kills — and turned to blood, because that is what this room means by
+ * combat damage and the disease beside it has green. The two are never
+ * confusable at a glance for a third reason as well: this one wears a crown.
+ *
+ * Only the palette is redeclared. Everything about the geometry is inherited,
+ * which is the point: three clocks, one shape, and whichever one a newcomer
+ * learns first teaches them the other two. */
+.field-bead.is-general .field-bead-arc {
+  stroke: color-mix(in oklab,
+    var(--arena-blood-lit) var(--bead-gone, 0%), var(--field-brass));
+  filter: drop-shadow(0 0 calc(2px + var(--bead-full, 0) * 5px)
+    color-mix(in oklab, var(--arena-blood-lit) var(--bead-gone, 0%),
+      var(--field-brass)));
+}
+.field-bead.is-general .field-bead-n {
+  color: color-mix(in oklab,
+    var(--arena-blood-lit) calc(var(--bead-gone, 0%) * 0.4), #f4e8cc);
+}
+/* The crown sits on the ring's shoulder, small enough to be a mark rather than
+   a picture. It brightens with the count the way the arc does, so the whole
+   dial reads as one object getting worse instead of a ring with a badge. */
+.field-bead-crown {
+  position: absolute;
+  top: -13%;
+  left: 50%;
+  width: 46%;
+  transform: translateX(-50%);
+  overflow: visible;
+  fill: color-mix(in oklab,
+    var(--arena-blood-lit) var(--bead-gone, 0%), var(--field-brass));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+  transition: fill 420ms ease;
+}
+
+/* ---- two away, on every clock
+ *
+ * **The gauges say how far along; this says the next thing could end it.** A
+ * gradient reads as "getting worse" right up until it is over, so each of the
+ * three clocks gets one state where it stops describing and starts warning:
+ * nineteen commander damage, eight poison, under five life. All one beat, so
+ * two plates in trouble pulse together rather than beating against each other.
+ *
+ * Faster than `bead-breathe` and it does not go all the way down. Lethal is a
+ * state that may be true for the rest of the game and breathes slowly; this is
+ * a countdown, and a countdown has a pulse. */
+@keyframes clock-alarm {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%      { opacity: 0.72; transform: scale(1.06); }
+}
+.field-bead.is-dire .field-bead-arc,
+.field-bead.is-dire .field-bead-crown {
+  animation: clock-alarm 1.15s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+/* **Red on the two that mean blood, and louder green on the one that does
+   not.** Poison at eight is still poison: turning it red would say a player was
+   dying of the wrong thing, and this room would rather be quieter than wrong.
+   So the disease spreads instead — brighter, and glowing further out. */
+.field-bead.is-poison.is-dire .field-bead-arc {
+  stroke: var(--arena-glisten);
+  filter: drop-shadow(0 0 9px var(--arena-glisten));
+}
+.field-bead.is-general.is-dire .field-bead-arc {
+  stroke: var(--arena-blood-lit);
+  filter: drop-shadow(0 0 9px var(--arena-blood-lit));
+}
+.field-bead.is-general.is-dire .field-bead-crown {
+  fill: var(--arena-blood-lit);
+}
+/* Life runs the other way — it is the arc that is nearly *gone* — so the alarm
+   goes on the whole dial rather than on what is left of the stroke. */
+.field-life.is-dire {
+  animation: clock-alarm 1.15s ease-in-out infinite;
+}
+.field-life.is-dire .field-life-arc {
+  stroke: var(--arena-blood-lit);
+  filter: drop-shadow(0 0 9px var(--arena-blood-lit));
+}
+.field-life.is-dire .field-life-n { color: #ffd9d2; }
+
 /* Energy, experience, and whatever else a game puts on a person: counted, and
    taking no view. `.field-counter.is-flat` on a card is this same decision —
    brass is the house's own metal and it argues nothing. */
@@ -7739,7 +7830,13 @@ button:hover .tarot-fan-card {
 }
 @media (prefers-reduced-motion: reduce) {
   .field-bead-arc { transition: none; }
+  .field-bead-crown { transition: none; }
   .field-bead.is-lethal .field-bead-arc { animation: none; }
+  /* The colour and the glow survive; only the pulse goes. Somebody who has
+     asked for less motion still needs to be told the game is nearly over. */
+  .field-bead.is-dire .field-bead-arc,
+  .field-bead.is-dire .field-bead-crown,
+  .field-life.is-dire { animation: none; }
 }
 
 /* ------------------------------------------------ life, as a thing
@@ -7763,7 +7860,9 @@ button:hover .tarot-fan-card {
   display: grid;
   place-items: center;
 }
-.field-life svg {
+/* Named for `.field-bead-ring`'s reason, before this one grows a second
+   child too. */
+.field-life-ring {
   position: absolute;
   inset: 0;
   width: 100%;

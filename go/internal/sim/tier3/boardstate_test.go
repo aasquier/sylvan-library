@@ -808,3 +808,160 @@ func TestAPlayerCounterThatDidNotMoveIsNotAStep(t *testing.T) {
 			"same three counters and only the first of them was news", steps)
 	}
 }
+
+// ------------------------------------------------------- the commander clock
+//
+// The sixth thing this file covers. Twenty-one combat damage from a single
+// commander ends a game regardless of life (rule 903.10a), so it is a death
+// clock of its own — and unlike life and poison it is **per source**, which is
+// the whole reason it cannot be folded into one number. It arrives on the
+// `damage` line, because Forge credits the damage inside the same method that
+// fires that event and the total is already current when it lands.
+
+// generalLine is one Forge player-damage event carrying a commander's running
+// total, exactly as the scribe writes it. `total` is what that commander has
+// dealt this player altogether, never the blow.
+func generalLine(seat, commander, blow, total int) string {
+	return fmt.Sprintf(`{"t":"damage","game":1,"amount":%d,"combat":true,`+
+		`"against":"A player","against_seat":%d,"commander":%d,`+
+		`"commander_damage":%d,"id":%d,"card":"Syr Gwyn, Hero of Ashvale"}`,
+		blow, seat, commander, total, commander)
+}
+
+// generalsOn folds one seat's commander damage the way a browser folds it: the
+// last set that seat was given.
+func generalsOn(log tier3.EventLog, seat int) []tier3.BoardGeneral {
+	var out []tier3.BoardGeneral
+	for _, step := range log.Board.Steps {
+		for _, moved := range step.Generals {
+			if moved.Seat == seat {
+				out = moved.From
+			}
+		}
+	}
+	return out
+}
+
+// Commander damage crosses as a running total, and the wrong reading is the
+// plausible one — [TestAPlayersPoisonIsATotalAndNotAnArrival]'s trap exactly.
+//
+// The `damage` line carries both figures: `amount` is the blow and is genuinely
+// a delta, and `commander_damage` beside it is the total. A reader that summed
+// the totals would have this player dead after three swings of seven.
+func TestCommanderDamageIsATotalAndNotABlow(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		generalLine(2, 77, 7, 7),
+		turnLine(2, 2),
+		generalLine(2, 77, 7, 14),
+		turnLine(3, 1),
+		generalLine(2, 77, 6, 20),
+		turnLine(4, 2),
+		endGame)
+	from := generalsOn(logs[0], 2)
+	if len(from) != 1 || from[0].ID != 77 || from[0].Damage != 20 {
+		t.Errorf("the beaten seat has taken %v; twenty from one commander is "+
+			"what Forge said, and summed blows would read forty-one", from)
+	}
+	if other := generalsOn(logs[0], 1); len(other) != 0 {
+		t.Errorf("the other seat was dealt %v and no commander ever hit them",
+			other)
+	}
+}
+
+// **Two commanders are two clocks, and summing them kills a live player.**
+//
+// This is the whole reason the wire is a set keyed by the commander rather than
+// one figure per seat. A player who has taken twenty from each of two
+// commanders is on forty points of commander damage and is not dead — neither
+// has reached twenty-one. A board holding the sum would have called that game
+// nineteen points early, and a partner pair makes it an ordinary board state
+// rather than a corner case.
+func TestTwoCommandersAreTwoClocksAndNotOne(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		generalLine(2, 77, 20, 20),
+		turnLine(2, 2),
+		generalLine(2, 88, 20, 20),
+		// The other seat is being hit back in the same game, which a real
+		// match does — measured on Goreclaw against Gyome, where both
+		// commanders connected in game one. Two seats and two clocks each.
+		generalLine(1, 99, 4, 4),
+		turnLine(3, 1),
+		endGame)
+	if back := generalsOn(logs[0], 1); len(back) != 1 || back[0].Damage != 4 {
+		t.Errorf("the seat swinging back has taken %v; a clock is kept per "+
+			"player as well as per commander", back)
+	}
+	from := generalsOn(logs[0], 2)
+	if len(from) != 2 || from[0].ID != 77 || from[0].Damage != 20 ||
+		from[1].ID != 88 || from[1].Damage != 20 {
+		t.Fatalf("the beaten seat has taken %v, want twenty from each of two "+
+			"commanders held apart by id", from)
+	}
+	for _, general := range from {
+		if general.Damage >= 21 {
+			t.Errorf("commander %d is credited with %d, which is lethal; the "+
+				"two clocks have been summed into one", general.ID,
+				general.Damage)
+		}
+	}
+}
+
+// A blow from something that is not a commander moves nothing.
+//
+// The scribe sends no figure at all on those — a nought would be a claim — so
+// this proves the reader treats the silence as silence rather than folding a
+// zero into a seat that has never been hit.
+func TestAnOrdinaryBlowLeavesTheCommanderClockAlone(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		`{"t":"damage","game":1,"amount":9,"combat":true,`+
+			`"against":"A player","against_seat":2,"id":41,`+
+			`"card":"Bronzehide Lion"}`,
+		turnLine(2, 2),
+		endGame)
+	if from := generalsOn(logs[0], 2); len(from) != 0 {
+		t.Errorf("a creature nobody put in the command zone dealt nine and "+
+			"the seat is holding %v; absence has been read as nought", from)
+	}
+}
+
+// The clock never walks backwards, which is a fact about the format rather than
+// a defensive crouch: commander damage is not healed, and Forge's own tracker
+// only climbs within a game. A line arriving with a smaller total is a stream
+// being re-read, and honouring it would drop a dial under a room watching it.
+func TestTheCommanderClockNeverWalksBackwards(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		generalLine(2, 77, 18, 18),
+		turnLine(2, 2),
+		generalLine(2, 77, 3, 6),
+		turnLine(3, 1),
+		endGame)
+	if from := generalsOn(logs[0], 2); len(from) != 1 || from[0].Damage != 18 {
+		t.Errorf("the seat is holding %v after a smaller total arrived; "+
+			"eighteen is the high-water mark and commander damage is never "+
+			"healed", from)
+	}
+}
+
+// A step that changed nothing publishes nothing, for [board.lives]' reason: a
+// scoreboard that flinches on every re-send is a scoreboard nobody trusts.
+func TestARepeatedCommanderTotalIsNotNews(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		generalLine(2, 77, 5, 5),
+		turnLine(2, 2),
+		generalLine(2, 77, 0, 5),
+		turnLine(3, 1),
+		endGame)
+	published := 0
+	for _, step := range logs[0].Board.Steps {
+		published += len(step.Generals)
+	}
+	if published != 1 {
+		t.Errorf("the same total crossed twice and %d steps carried it; only "+
+			"the beat it actually moved on is news", published)
+	}
+}

@@ -915,6 +915,22 @@ export interface ForgeBoardStep {
    *  deltas and drifting the first time one is dropped. **An empty array is a
    *  real answer** — a player who has just had every counter taken off. */
   counters?: { seat: number; counters: { kind: string; n: number }[] }[]
+  /** Every seat whose **commander damage** moved at this step, kept apart by
+   *  the commander that dealt it.
+   *
+   *  **The third clock a player can die on, and the only one that is per
+   *  source.** Twenty-one combat damage from a single commander ends a game
+   *  whatever the life total says (rule 903.10a) — so twenty from each of two
+   *  commanders is a player still standing, and a reader that summed them
+   *  would call a game nineteen points early. Take the largest, never the
+   *  total.
+   *
+   *  `id` is a board id and resolves through `cards`; `damage` is a running
+   *  total from Forge's own tracker, so nothing here adds anything up.
+   *  **Absent is not nought** — a match played by a worker built before the
+   *  scribe learned to ask carries none of this, and drawing a `0` would claim
+   *  the question had been answered. */
+  generals?: { seat: number; from: { id: number; damage: number }[] }[]
   changes?: ForgeBoardChange[]
   /** Every value a mana pool took during this step, in order — `'GGW'` is two
    *  green and one white, and `''` is a pool that has drained.
