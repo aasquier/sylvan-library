@@ -2107,7 +2107,13 @@ it('names the commander that dealt it, from the board dictionary', () => {
   const dials = container.querySelectorAll('.field-bead.is-general')
   expect(dials).toHaveLength(1)
   expect(dials[0]?.textContent).toBe('5')
-  expect(dials[0]?.getAttribute('title')).toContain('Gyome, Master Chef')
+  // **The sentence says who was struck before it says by whom.** Aaron read
+  // the dial as his own commander's tally (2026-08-27) — it is the opposite,
+  // and the wording is half of the fix for that; the broken crown is the other
+  // half, and the half that works without a pointer.
+  expect(dials[0]?.getAttribute('title'))
+    .toBe('Struck for 5 by Gyome, Master Chef. Twenty-one from one commander '
+      + 'loses the game.')
   expect(dials[0]?.className).not.toContain('is-dire')
 })
 
@@ -2118,7 +2124,9 @@ it('sounds the alarm two swings out, and not before', () => {
   expect(dial?.className).toContain('is-dire')
   // Nineteen is a warning and twenty-one is the end; twenty is not both.
   expect(dial?.className).not.toContain('is-lethal')
-  expect(dial?.getAttribute('title')).toContain('twenty-one')
+  expect(dial?.getAttribute('title')).toContain('Twenty-one from one commander')
+  expect(dial?.getAttribute('title'), 'twenty is not yet a death')
+    .not.toContain('and this one has')
 })
 
 // **Nothing in a dial is styled by being an `svg`**, and Aaron caught why.

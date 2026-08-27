@@ -1539,19 +1539,36 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
     <span className={`field-bead is-general${lethal ? ' is-lethal' : ''}${
             dire ? ' is-dire' : ''}`}
           style={{ '--bead-full': full, '--bead-gone': gone } as CSSProperties}
-          title={lethal
-            ? `${damage} commander damage from ${whose} — twenty-one is lethal`
-            : `${damage} commander damage from ${whose}, of the twenty-one `
-              + 'that are lethal'}>
+          // **Whose death this is, said first.** The old wording opened with a
+          // number and put the direction in a preposition, which left the one
+          // ambiguity the broken crown is drawn to settle sitting in the text
+          // as well. A sentence that starts "struck for" cannot be read as a
+          // tally of what this player has dealt.
+          title={`Struck for ${damage} by ${whose}. Twenty-one from one `
+            + `commander loses the game${lethal ? ', and this one has' : ''}.`}>
       <svg className="field-bead-ring" viewBox="0 0 48 48" aria-hidden="true"
            focusable="false">
         <circle className="field-bead-track" cx="24" cy="24" r="20" />
         <circle className="field-bead-arc" cx="24" cy="24" r="20" />
       </svg>
-      {/* The crown, drawn rather than fetched: three points and a band, sitting
-          on the ring's shoulder where it reads as a mark on the dial instead of
-          an ornament beside it. It is the one thing telling this apart from the
-          poison bead at a glance.
+      {/* A **broken** crown, and the break is the whole of what it says.
+
+          **A whole crown on your own plate reads as your own crown**, which is
+          the opposite of what this dial means. Aaron, looking at it on the
+          board (2026-08-27): *"it should be attached on your opponent, when it
+          gets to 21, they die, not you"* — and the number was already on the
+          right player, keyed by the *other* seat's commander, which the wire
+          and both recorded matches agree on. What was wrong was the reading: a
+          crown beside a name is a badge of whose it is, so the tally looked
+          like *what my commander has done* rather than *what a commander is
+          doing to me*. The tooltip said which, and a tooltip is hover-only —
+          no help on a phone, and no help to somebody who simply looked.
+
+          So it is a crown split down the middle with the right half knocked
+          off its line. Life is obviously yours because a draining ring can only
+          be a wound; this had to earn the same reading, and a struck crown is
+          the room's own vocabulary for it — #311 gave combat a lunge and a
+          shield, and this is the third of that family.
 
           **The ring above is turned to put twelve o'clock at the top, and this
           must not turn with it.** The first cut of this said so in a comment
@@ -1561,10 +1578,17 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
           `.field-bead-crown`, taking the rotation, the `inset: 0` and the full
           40px with it. Aaron saw a crown lying on its side. Both rings carry a
           class of their own now and nothing in this component is styled by
-          being an `svg`. */}
-      <svg className="field-bead-crown" viewBox="0 0 24 12" aria-hidden="true"
+          being an `svg`.
+
+          Drawn at 26x13 for an 18px mark, so the gap between the halves is
+          about two rendered pixels — the smallest break that survives being
+          this size, which is why it is a gap *and* a tilt rather than a hairline
+          crack that would close up on a phone. */}
+      <svg className="field-bead-crown" viewBox="0 0 26 13" aria-hidden="true"
            focusable="false">
-        <path d="M2 11 L2 3 L6 7 L12 1 L18 7 L22 3 L22 11 Z" />
+        <path d="M2 12 L2 3.5 L5.8 7.2 L11 1.5 L11.6 12 Z" />
+        <path d="M14.6 12 L14 3.8 L18.2 7.2 L22.4 3.5 L23.2 12 Z"
+              transform="rotate(11 18.8 12)" />
       </svg>
       <span className="field-bead-n tabular">{damage}</span>
     </span>
