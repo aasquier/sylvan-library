@@ -27,6 +27,16 @@ live in the ADRs and in git; this file is what you would open at a terminal.
   environment — there is no dotenv loading.
 - One machine and one volume means a deploy stops the instance and starts
   its replacement: **every deploy is a few seconds of downtime.**
+- **Stopping is a twenty-second budget the platform has to honour.** `serve`
+  gives requests already in flight `shutdownGrace` — 20s — and only then runs
+  `door.Close`, which flushes the visitor ledger and hands back `app.db` and
+  the card pool. Fly's default `kill_timeout` is **5 seconds**, so until
+  2026-08-27 the platform killed the app a quarter of the way into its drain
+  and the close work never ran at all: a busy deploy silently lost whatever
+  the ledger had counted since its last write. `fly.toml` sets `30s` now, and
+  `TestTheStopHasLongerThanItNeeds` parses both numbers and holds them in
+  order. It is a ceiling rather than a delay — the app exits the moment it has
+  drained — so it does not lengthen an ordinary deploy.
 
 ## Deploying
 
