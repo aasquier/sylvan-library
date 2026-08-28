@@ -15,8 +15,10 @@
 
 import { type CSSProperties, useEffect } from 'react'
 
+import arvaArt from '../assets/coliseum/arva.webp'
 import campusArt from '../assets/coliseum/campus.webp'
 import certamenArt from '../assets/coliseum/certamen.webp'
+import ossariumArt from '../assets/coliseum/ossarium.webp'
 import cryptaArt from '../assets/coliseum/crypta.webp'
 import fabricaArt from '../assets/coliseum/fabrica.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
@@ -28,8 +30,8 @@ import type { Speed, StagedBeat } from '../lib/reel'
 import { halfNamed } from '../lib/board'
 import { halfGlassFor } from '../lib/halves'
 import { ARCANA, boutAt, type BoutFighter, faceFor, mannerOf, plateNote,
-  plateWord, sceneFor, type Staged, stagedBout, stagedMana, stageLife,
-  type StagedBout, type StagedMana, useStaged, useStagedBout,
+  type Outcome, plateWord, sceneFor, type Staged, stagedBout, stagedMana,
+  stageLife, type StagedBout, type StagedMana, useStaged, useStagedBout,
   useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
@@ -465,6 +467,7 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
           scrubbing the timeline; a pool centred on the card separates it from
           the sand and leaves the rows either side perfectly readable. */}
       <span className="stage-veil" aria-hidden="true" />
+      {item.scene === 'arva' && <StageArva />}
       {item.scene === 'road' && <StageRoad />}
       {item.scene === 'crypt' && <StageCrypt />}
       {item.scene === 'field' && <StageField />}
@@ -588,23 +591,40 @@ function StageBout({ item }: { item: StagedBout }) {
   const life = { '--stage-life': `${item.life}ms` } as CSSProperties
   return (
     <span style={life} aria-hidden="true"
-          className={`stage-bout is-from-${item.facing}`}>
+          className={`stage-bout is-from-${item.facing}`
+        + (item.outcome ? ` is-${item.outcome}` : '')}>
       {/* The arena, which is a real place and the only scene in this room that
           is drawn behind more than one card. `certamen.recipe.yaml` argues the
           painting, the crop and why every other candidate lost. */}
+      {/* **Three arenas, and which one opens says how the fight ended.** The
+          declaration gets the arena itself; a fight that settled gets the
+          verdict — the ossuary if the creature that swung was cut down, the
+          arch if it went through. `certamen.recipe.yaml` and its two
+          neighbours argue the pictures and why eleven others lost.
+
+          The arch is a `background-image` rather than an `<img>` for the one
+          reason `templum` is: it is an etching, and line on white paper
+          arrives grey. `background-blend-mode` needs a background layer to
+          blend with, and grey is the one thing this arena is not. */}
       <span className="stage-bout-scene" aria-hidden="true">
-        <img className="stage-bout-art" src={certamenArt} alt=""
-             draggable={false} />
+        {item.outcome === 'held' ? (
+          <span className="stage-bout-art is-triumph" />
+        ) : (
+          <img className="stage-bout-art"
+               src={item.outcome === 'fell' ? ossariumArt : certamenArt}
+               alt="" draggable={false} />
+        )}
       </span>
       {/* Dust along the line where the two ranks meet — the valley's own
           device, and it is here for the same reason: a place where something
           has just happened is a place that has been disturbed. It is drawn in
           the gap rather than on either card, because the fight is the gap. */}
       <span className="stage-bout-seam" aria-hidden="true" />
-      <BoutCard fighter={item.attacker} role="att" />
+      <BoutCard fighter={item.attacker} role="att"
+                fallen={item.dying === item.attacker.id} />
       {item.blockers.map((b, i) => (
         <BoutCard key={b.id} fighter={b} role="blk"
-                  at={boutAt(i, n)} order={i} />
+                  at={boutAt(i, n)} order={i} fallen={item.dying === b.id} />
       ))}
       <span className="stage-plate-strip">
         <span className="stage-plate-word">{item.word}</span>
@@ -625,11 +645,13 @@ function StageBout({ item }: { item: StagedBout }) {
  *  it, which is the same fallback `StageFace` makes for the single-card
  *  stage. A gap in the rank would be a lie about how many creatures are in
  *  the fight. */
-function BoutCard({ fighter, role, at, order }: {
+function BoutCard({ fighter, role, at, order, fallen }: {
   fighter: BoutFighter
   role: 'att' | 'blk'
   at?: number
   order?: number
+  /** Whether this is the fighter the beat just buried. */
+  fallen?: boolean
 }) {
   const where = {
     ...(at != null ? { '--at': `${at * 100}%` } : {}),
@@ -640,16 +662,56 @@ function BoutCard({ fighter, role, at, order }: {
     ...(order != null ? { '--order': order } : {}),
   } as CSSProperties
   return (
-    <span className={`stage-bout-card is-${role}`} style={where}>
+    <span className={`stage-bout-card is-${role}`
+      + (fallen ? ' is-fallen' : '')} style={where}>
       {fighter.image ? (
         <img src={fighter.image} alt="" draggable={false} />
       ) : (
         <span className="stage-bout-blank">{fighter.name}</span>
       )}
+      {/* **The stone, on the card that took it.** The same two layers the
+          single-card death uses and for the same licence reason: the pall is
+          an element laid *on* the picture rather than a `filter`, because
+          Scryfall's guidelines forbid desaturating card imagery and ADR 32
+          bounds this room to motion and parallax over the artwork. */}
+      {fallen && (
+        <>
+          <span className="stage-bout-pall" aria-hidden="true" />
+          <img className="stage-bout-skull" src={mementoArt} alt=""
+               draggable={false} />
+        </>
+      )}
       {fighter.count > 1 && (
         <span className="stage-bout-count tabular">{fighter.count}<span
           className="stage-times">×</span></span>
       )}
+    </span>
+  )
+}
+
+/** **The country a land came from.**
+ *
+ *  Aaron, 2026-08-28: *"a good animation for when lands are played, like some
+ *  rolling hills or farmland maybe"*. This reverses a rule the room set
+ *  deliberately — land, planeswalker, battle and a few others drew nothing,
+ *  on the argument that a land arrives every turn and a scene on every drop is
+ *  the arena flashing at somebody for the most ordinary thing in Magic.
+ *
+ *  **That argument was right about the frequency and wrong about the remedy.**
+ *  Measured over two real ten-game matches: 11 land drops a game, and in one
+ *  of them more land drops than casts — the commonest beat that could carry a
+ *  scene. What keeps it from being a flash is *length and calm*, not silence.
+ *  It is the shortest moment on this stage (`STAGE_LIFE.land`, 780ms against a
+ *  cast's 1150, capped at two beats rather than four) and the quietest
+ *  picture in the room: no event in it, nothing struck, nothing conjured —
+ *  just distance. `arva.recipe.yaml` argues the plate.
+ *
+ *  No dust, no sparks, no ring of light. Every other scene here marks
+ *  something *happening*; a land is somewhere being. */
+function StageArva() {
+  return (
+    <span className="stage-arva" aria-hidden="true">
+      <img className="stage-arva-art" src={arvaArt} alt="" draggable={false} />
     </span>
   )
 }
@@ -680,7 +742,7 @@ function BoutCard({ fighter, role, at, order }: {
  * `beatLine` correct against exactly that day.
  */
 export function CenterStage({ board, beat, speed, game, dies, seat, gained,
-  at, clash }: {
+  at, clash, outcome }: {
   board: ForgeBoard | null
   beat: StagedBeat | null
   speed: Speed
@@ -703,7 +765,10 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   /** The seat the current beat belongs to, when the room knows it. Used only
    *  to prefer the caster's own copy of a card both seats run. */
   seat: number | null
-  /** The fight the board is showing, when this beat is a block.
+  /** How that fight ended, when this beat is the fight settling rather than
+   *  being declared. Picks which arena opens behind it. */
+  outcome: Outcome | null
+  /** The fight the board is showing, when this beat is a block or a death.
    *
    *  **Settled upstairs, because it cannot be settled here.** A clash is a
    *  fact about *both* seats — the attacker is on one side of the seam and the
@@ -743,7 +808,21 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // being replayed under three more keys. A beat the reel never counted has no
   // `run` at all, and that is a one rather than a nothing.
   const times = beat?.run ?? 1
-  const next: Staged | null = manner && name && beat && times > 0
+  // **One beat, one moment.** A combat death is the one beat two things both
+  // want: `mannerOf` calls it a death and opens the burial vault under the
+  // card, and the fight it settled wants the middle of the arena for its own
+  // verdict. Drawn together they are three scenes stacked — the ossuary, the
+  // vault, and the vault the beat before it is still parting from (Aaron,
+  // 2026-08-28: *"the victor and loser animations are overlapping with the
+  // loser being sent to the graveyard animation"*).
+  //
+  // **The fight wins, and nothing is lost by it.** The card the vault would
+  // have shown is the attacker, and the attacker is already standing in the
+  // bout — with the wall that killed it beside it, which the single card could
+  // never say. The skull still lands on the grave in its own row, because that
+  // is the board's mark and not this stage's.
+  const settling = clash != null && outcome != null
+  const next: Staged | null = !settling && manner && name && beat && times > 0
     ? {
       key: beat.key,
       manner,
@@ -779,8 +858,16 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // keyed on the beat because a gang arrives as several beats and each of them
   // has to reset the clock, or the third cat would land on a stage that was
   // already fading.
-  const bout = useStagedBout(
-    stagedBout(clash, board, beat?.key ?? '', speed), beat?.key ?? '', game)
+  const liveBout = stagedBout(clash, board, beat?.key ?? '', speed, outcome,
+    beat?.kind === 'dies' ? beat.id ?? null : null)
+  const heldBout = useStagedBout(liveBout, beat?.key ?? '', game)
+  // **Paused, the fight is the beat's own** — the marks' rule, and it is the
+  // same argument. Stepping and scrubbing both pause first, and those are
+  // exactly where holding a verdict past its beat is wrong: dragging through a
+  // combat would leave *"Cut down: Arahbo"* standing over twenty later beats
+  // that have nothing to do with it. Playing, the hold is what lets a fight be
+  // read at all.
+  const bout = speed === 'paused' ? liveBout : heldBout
   const farMana = useStagedMana(
     stagedMana(gained.far, 'far', key, speed), key, game)
   const nearMana = useStagedMana(
@@ -795,8 +882,19 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
           that just happened. Keyed on the attacker so a gang assembling
           re-uses this element rather than rebuilding it; see `StagedBout`. */}
       {bout && <StageBout key={bout.attacker.id} item={bout} />}
-      {parting && <StageCard key={parting.key} item={parting} parting />}
-      {showing && <StageCard key={showing.key} item={showing} />}
+      {/* **A verdict has the stage to itself.** A cast during a fight is drawn
+          over the bout on purpose — the fight is a state, the spell is the
+          thing that just happened — but a *verdict* is the loudest sentence
+          this stage says, and a burial vault fading out under an ossuary is
+          two graves in one frame. The card slot is not cleared, only hidden:
+          if it outlives the verdict it comes back, and a `dies` card and a
+          verdict have the same 2000ms so in practice it does not. */}
+      {!bout?.outcome && parting && (
+        <StageCard key={parting.key} item={parting} parting />
+      )}
+      {!bout?.outcome && showing && (
+        <StageCard key={showing.key} item={showing} />
+      )}
       {farMana && <StageMana key={farMana.key} item={farMana} />}
       {nearMana && <StageMana key={nearMana.key} item={nearMana} />}
     </div>

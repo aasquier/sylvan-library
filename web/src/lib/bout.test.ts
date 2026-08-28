@@ -142,3 +142,42 @@ describe('the fight the stage is handed', () => {
     expect(boutLife('fast')).toBeGreaterThanOrEqual(620)
   })
 })
+
+describe('a fight that has settled', () => {
+  const wall = [stack(beast(2, 'Regal Caracal'))]
+
+  it('says nothing about an outcome while it is only declared', () => {
+    // A block declares a fight; a death settles one, a median of thirty-five
+    // beats later. Between the two the room must not claim a result.
+    const out = stagedBout(clash(wall), null, 'k', 'play')
+    expect(out?.outcome).toBeNull()
+    expect(out?.word).toBe('Blocked')
+  })
+
+  it('changes tense once the damage has landed', () => {
+    // Three words for three moments, and the tense is the whole of it: a fight
+    // is *Blocked* while it is being declared and something that already
+    // happened once it is over.
+    expect(stagedBout(clash(wall), null, 'k', 'play', 'fell')?.word)
+      .toBe('Cut down')
+    expect(stagedBout(clash(wall), null, 'k', 'play', 'held')?.word)
+      .toBe('Broke through')
+  })
+
+  it('carries the outcome through so the arena can be chosen from it', () => {
+    // The scene is picked off this and nothing else — the ossuary if the
+    // creature that swung was cut down, the arch if it went through.
+    expect(stagedBout(clash(wall), null, 'k', 'play', 'fell')?.outcome)
+      .toBe('fell')
+    expect(stagedBout(clash(wall), null, 'k', 'play', 'held')?.outcome)
+      .toBe('held')
+  })
+
+  it('still names the whole wall when the fight is over', () => {
+    // The verdict answers for the attacker; the wall is still the sentence's
+    // subject matter, and a mixed result must not quietly drop the survivors.
+    const out = stagedBout(clash([stack(beast(2, 'Sacred Cat')),
+      stack(beast(3, 'Cat Token'), 3)]), null, 'k', 'play', 'held')
+    expect(out?.note).toBe('by Sacred Cat and Cat Token ×3')
+  })
+})

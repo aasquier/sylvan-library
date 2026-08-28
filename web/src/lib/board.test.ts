@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { ForgeBoard } from './api'
 import type { BoardCard, BoardSide, BoardStack } from './board'
-import { alignLanes, clashOf, fightingStats, foldBoard,
-  stackRow } from './board'
+import { alignLanes, clashOf, fightingStats, fightOf, foldBoard,
+  markedHere, stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -1187,5 +1187,95 @@ describe('reading one fight off the board', () => {
     // And an attacker that has left the board between the block and the beat
     // being read is a fight this has no business drawing.
     expect(clashOf(2, side(1, []), near)).toBeNull()
+  })
+})
+
+describe('which tile a beat marks', () => {
+  it('marks the pile holding the id, and only that one', () => {
+    // The fault this replaced: eight Cat Soldier Tokens swinging stand in
+    // several piles, because `stackRow` tells identical creatures apart by
+    // their counters and their Equipment. Matched on the spelling, every pile
+    // lit up at once — including the ones out of the fight.
+    const swinging = { card: 'Cat Soldier Token', id: 42 }
+    expect(markedHere(swinging, 'Cat Soldier Token', [40, 41, 42])).toBe(true)
+    expect(markedHere(swinging, 'Cat Soldier Token', [43, 44])).toBe(false)
+  })
+
+  it('answers for every card in a pile, not just the one it draws', () => {
+    // A tile draws one representative for eight identical creatures and the
+    // beat may name any of them — so a tile answering only for the card it
+    // happens to draw would mark nothing seven times out of eight.
+    for (const id of [10, 11, 12, 13]) {
+      expect(markedHere({ card: 'Saproling', id }, 'Saproling',
+        [10, 11, 12, 13])).toBe(true)
+    }
+  })
+
+  it('falls back to the name when the beat carries no id', () => {
+    // A match played without the scribe has no ids at all. There this marks
+    // every copy, which is what it did before and still beats marking none.
+    expect(markedHere({ card: 'Sacred Cat' }, 'Sacred Cat', [7])).toBe(true)
+    expect(markedHere({ card: 'Sacred Cat' }, 'Regal Caracal', [7])).toBe(false)
+    // Zero is "not said" rather than card zero, and reads as no id.
+    expect(markedHere({ card: 'Sacred Cat', id: 0 }, 'Sacred Cat', [7]))
+      .toBe(true)
+  })
+
+  it('marks a card whose beat named its other half', () => {
+    // `sameCard`'s ruling has to survive the fallback path: a split card is
+    // filed under "Wear // Tear" and a beat says "Wear".
+    expect(markedHere({ card: 'Wear' }, 'Wear // Tear', [3])).toBe(true)
+  })
+
+  it('marks nothing when no beat is up', () => {
+    expect(markedHere(null, 'Sacred Cat', [7])).toBe(false)
+  })
+})
+
+describe('asking about a fight from either end of it', () => {
+  const beast = (id: number, name: string, over: Partial<BoardCard> = {})
+  : BoardCard => ({
+    id, name, token: false, types: 'Creature - Beast',
+    image: '', art: '', artist: '', zone: 'battlefield', seat: 1, tapped: false,
+    mana: false, makes: [], keywords: [], leaving: null, power: 2,
+    toughness: 2, counters: [], counterHistory: [], combat: '',
+    attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+    live: [], granted: [], fate: '', copiedBy: 0, ...over,
+  })
+  const side = (seat: number, creatures: BoardCard[]): BoardSide => ({
+    seat, slug: null, name: `seat ${seat}`, life: 40, counters: [],
+    generals: [], creatures, walkers: [], artifacts: [], enchantments: [],
+    land: [], hand: [], graveyard: [], exile: [], thrones: [],
+    companion: null, command: [], commanders: [], pool: '', gained: '',
+    raised: '',
+  })
+  const far = side(1, [beast(1, 'Ghalta', { combat: 'attacking', attacking: 2 })])
+  const near = side(2, [beast(2, 'Cat', { combat: 'blocking', blocking: 1 })])
+
+  it('answers when the attacker asks, which clashOf cannot', () => {
+    // A block beat names the blocker, so the declaration only ever asks from
+    // that end. A *death* names whoever died, and an attacker's own `blocking`
+    // is 0 — so asking `clashOf` about a dying attacker answers null every
+    // time. A probe over a real match reported "attacker died 0 times", which
+    // was a fact about the door rather than about the match.
+    expect(clashOf(1, far, near)).toBeNull()
+    expect(fightOf(1, far, near)?.attacker.name).toBe('Ghalta')
+    expect(fightOf(1, far, near)?.blockers.map((s) => s.card.name)).toEqual(['Cat'])
+  })
+
+  it('still answers when the blocker asks', () => {
+    expect(fightOf(2, far, near)?.attacker.name).toBe('Ghalta')
+  })
+
+  it('keeps the narrow door narrow', () => {
+    // The declaration keeps `clashOf` because a block beat can only ever name
+    // a blocker, and a narrow door is one fewer way to be wrong.
+    expect(fightOf(1, far, near, 'blocker')).toBeNull()
+    expect(fightOf(2, far, near, 'blocker')?.attacker.name).toBe('Ghalta')
+  })
+
+  it('says nothing about a creature that is not in a fight at all', () => {
+    const idle = side(2, [beast(9, 'Bystander')])
+    expect(fightOf(9, far, idle)).toBeNull()
   })
 })

@@ -6952,8 +6952,27 @@ button:hover .tarot-fan-card {
    * the number that makes the board one size: three of these, twice, and the
    * arena is as tall as it will ever be. */
   --field-card-full: 58px;
-  --lane-lean: calc(var(--field-card-full) * 0.15);
-  --lane-turn: calc(var(--field-card-full) * 0.35);
+  /* **What a card leaning forty-five degrees sticks out by, plus a pixel.**
+     Both of these used to be 0.15 and 0.35, which are not wrong -- they are
+     the exact geometry, and that was the fault. A card of width `w` and the
+     board's 58:81 aspect turned 45 degrees overhangs its own box by
+     `w(cos45 + 1.3966 sin45 - 1)/2` sideways and `w(sin45 + 1.3966 cos45 -
+     1.3966)/2` vertically: 0.3474w and 0.1491w. Rounded to 0.35 and 0.15 that
+     left **0.13px and 0.04px** of clearance, measured on a real board, which
+     is no clearance at all -- a fractional card width, a scrollbar or a
+     device pixel ratio eats it and the leaning corner is cut off.
+
+     It showed at the right-hand end of a lane long enough to scroll, because
+     that is the one edge where a card can reach the boundary with nothing
+     beyond it (Aaron, 2026-08-28: *"when there are 10+ cards in a row and the
+     far right one taps and is clipped"*). The same fault at the *left* edge
+     was fixed once already by introducing these two numbers; what was missing
+     was slack, not arithmetic.
+
+     So: the true overhang, written out so it can be checked, and one pixel on
+     top of it that rounding cannot eat. */
+  --lane-lean: calc(var(--field-card-full) * 0.1491 + 1px);
+  --lane-turn: calc(var(--field-card-full) * 0.3474 + 1px);
   /* The gap between two cards in a lane, and the padding a half keeps around
      its lanes. Declared here rather than where they are used, from back when
      the combat arrows were drawn in the trench and had to reach a lane's slot
@@ -10383,6 +10402,36 @@ button:hover .tarot-fan-card {
   36%  { transform: translateY(calc(var(--lunge, 0px) * 0.7)) scale(1.02); }
   76%  { transform: translateY(calc(var(--lunge, 0px) * 0.55)); }
   100% { transform: none; }
+}
+
+/* **Double strike lunges twice** (Aaron, 2026-08-28), which is the one keyword
+   whose entire meaning is *this happens two times*. A creature that deals its
+   damage in two steps bumping once was the board flattening the difference.
+
+   **Two blows inside the mark's own length, not the animation played twice.**
+   An `animation-iteration-count: 2` would run the whole shape again —
+   including the long 36-to-76 per-cent settle, which is a creature coming to
+   rest and is exactly the part that must not happen in the middle. So the
+   first blow is compressed into the opening third and the second lands on top
+   of it, and only then does it settle. One event, one clock: the mark's
+   `--mark-life-attacks` still governs, so a double strike and a single one are
+   over at the same moment and the board keeps its pace.
+
+   The second blow is the harder of the two. A first strike creature deals its
+   damage before anything can answer, and the follow-through is the blow that
+   actually kills — so the shape rises to it rather than fading away from it. */
+@keyframes card-lunge-twice {
+  0%   { transform: none; }
+  6%   { transform: translateY(calc(var(--lunge, 0px) * -0.4)); }
+  15%  { transform: translateY(calc(var(--lunge, 0px) * 0.85)) scale(1.04); }
+  26%  { transform: translateY(calc(var(--lunge, 0px) * -0.3)) scale(1.01); }
+  38%  { transform: translateY(calc(var(--lunge, 0px) * 1.12)) scale(1.07); }
+  52%  { transform: translateY(calc(var(--lunge, 0px) * 0.7)) scale(1.02); }
+  80%  { transform: translateY(calc(var(--lunge, 0px) * 0.55)); }
+  100% { transform: none; }
+}
+.field-card.is-attacks.is-twice {
+  animation-name: card-lunge-twice;
 }
 
 /* --- blocked: the shield comes up -------------------------------------- */
@@ -15366,4 +15415,199 @@ button:hover .tarot-fan-card {
     animation-delay: 0s;
   }
   .stage-bout-seam { animation: none; opacity: 0.45; }
+}
+
+/* **The two verdicts, and which one opens says how the fight ended.**
+ *
+ * Aaron, 2026-08-28, asking for "winner and loser in the faceoff". A fight is
+ * declared and then, a median of thirty-five beats later, it settles — which
+ * is not a gap to design around but the combat step itself, the same wait
+ * somebody watching a real table sits through. So the bout re-opens with the
+ * verdict behind it.
+ *
+ * **Keyed on the attacker**, because a mixed wall has no single verdict: two
+ * blockers dead and one alive is not a result, but the creature that swung
+ * either went through or it did not. The skulls on the individual cards say
+ * who else fell.
+ *
+ * A fight where **nobody died** keeps the plain arena. That is not a quiet
+ * verdict, it is no verdict, and an arch over a wall still standing would be
+ * the room claiming something the game never said. */
+
+/* The ossuary — Kutná Hora, a thousand of the same thing, which is what a wall
+   of skulls is and what a graveyard full of chump blockers is. It ships as it
+   stands: `ossarium.recipe.yaml` measured it at mean 64 against a range this
+   room runs from 46 to 143, so it needs neither the blend below it nor the
+   hold-back `certamen` takes. A single skull is already spoken for — that is
+   `memento.webp`, on a card — and this is deliberately the other scale of it. */
+.stage-bout.is-fell .stage-bout-art {
+  aspect-ratio: 880 / 488;
+  opacity: 1;
+}
+
+/* The arch — Piranesi, 1748, and it is a background layer rather than an image
+   for exactly `templum`'s reason: an etching is line on white paper, it
+   arrives grey, and grey is the one thing this arena is not.
+   `background-blend-mode` needs a layer to blend *with*, which an `<img>`
+   cannot give it. Raw the plate is mean 121; over this ground it is 37, which
+   is the dark end of the range and the right end to pair with an ossuary. */
+.stage-bout-art.is-triumph {
+  width: min(100%, 940px);
+  aspect-ratio: 880 / 488;
+  background-color: #2c2118;
+  background-image: url('./assets/coliseum/triumphus.webp');
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: soft-light;
+  opacity: 1;
+  -webkit-mask-image: radial-gradient(ellipse 58% 60% at 50% 50%,
+    #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  mask-image: radial-gradient(ellipse 58% 60% at 50% 50%,
+    #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  animation: stage-field-rise var(--stage-life, 2000ms) ease-out both;
+}
+
+/* The light the cards wear when a fight has settled. The declaration keeps the
+   gate's red on the attacker and cool steel on the wall — that is who is
+   fighting whom. A verdict is a different question, so the colour answers the
+   *outcome*: the creature that went through takes the brass this room crowns
+   with, and the one that was cut down takes the grave's own green, which is
+   the light `.stage-card.is-dies` already dies in. One vocabulary, two
+   moments. */
+.stage-bout.is-held .stage-bout-card.is-att { --bout-glow: var(--field-brass); }
+.stage-bout.is-fell .stage-bout-card.is-att { --bout-glow: #8fb59a; }
+
+/* **The stone, on the fighter that took it** (Aaron, 2026-08-28: *"when two
+   things died in a clash, they both were losers, but only one showed the
+   graveyard animation and the skull icon"*).
+ *
+ * The verdict took the beat away from the single-card death moment, which
+ * stopped three scenes stacking and quietly stopped the creature that fell
+ * from being buried at all. It is buried here instead, on its own card inside
+ * the fight — which is also the only place a *mixed* wall can be told: two of
+ * three blockers dead is two stones and one card left standing, and no single
+ * backdrop can say that.
+ *
+ * The same two layers `.stage-pall` and `.stage-skull` use, at this rank's
+ * size, and an element rather than a `filter` for the same licence reason:
+ * Scryfall's guidelines forbid desaturating card imagery and ADR 32 bounds
+ * this room to motion and parallax over the artwork. */
+.stage-bout-pall {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 4.75% / 3.4%;
+  background: linear-gradient(0deg,
+    rgba(8, 12, 9, 0.86) 0%,
+    rgba(10, 16, 11, 0.66) 42%,
+    rgba(14, 20, 15, 0.34) 78%,
+    rgba(16, 22, 17, 0.2) 100%);
+  animation: stage-bout-pall var(--stage-life, 2000ms) ease-out both;
+}
+@keyframes stage-bout-pall {
+  0%   { opacity: 0; }
+  46%  { opacity: 0; }
+  70%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+/* Late, and after the card has arrived: the fight is shown first and the
+   verdict lands on it, which is the order it happened in. */
+.stage-bout-skull {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 52%;
+  height: auto;
+  border-radius: 2px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.86),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 42%, transparent);
+  animation: stage-bout-stone var(--stage-life, 2000ms) ease-out both;
+}
+@keyframes stage-bout-stone {
+  0%   { opacity: 0; transform: translate(-50%, -76%) scale(0.7); }
+  50%  { opacity: 0; transform: translate(-50%, -76%) scale(0.7); }
+  72%  { opacity: 1; transform: translate(-50%, -48%) scale(1.03); }
+  80%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+/* The light goes out of the card that fell, whichever end of the fight it was
+   standing at — so a triumph still shows its casualty. */
+.stage-bout-card.is-fallen { --bout-glow: #8fb59a; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The stone is the answer to a question and may not be answered with
+     nothing: it is simply there, for the whole of the beat. */
+  .stage-bout-pall,
+  .stage-bout-skull {
+    animation: stage-still var(--stage-life, 2000ms) linear both;
+  }
+  .stage-bout-skull { transform: translate(-50%, -50%); }
+}
+
+/* --------------------------------------------------- the country
+ *
+ * **Where a land came from** (Aaron, 2026-08-28: *"a good animation for when
+ * lands are played, like some rolling hills or farmland maybe"*).
+ *
+ * This reverses a rule the room set on purpose: land drew nothing, because a
+ * land arrives every turn and a scene on every drop is the arena flashing at
+ * somebody for the most ordinary thing in Magic. The frequency in that
+ * argument is real and was measured again before this shipped — **11 a game,
+ * and in one real match more land drops than casts**, the commonest beat that
+ * could carry a scene. What answers it is length and calm rather than
+ * silence.
+ *
+ * So this is the quietest thing in the room, three ways:
+ *
+ *  - **Shortest.** 780ms against a cast's 1150, capped at two beats where
+ *    everything else gets four (`STAGE_LIFE.land`, `LAND_BEATS`).
+ *  - **Stillest.** No dust, no sparks, no turning ring. Every other scene
+ *    marks something *happening*; a land is somewhere *being*, and the only
+ *    movement is the ground settling a few pixels as it arrives.
+ *  - **Softest.** Held back to 0.72 and masked wider than any other scene, so
+ *    it reads as distance behind the card rather than as a picture demanding
+ *    to be looked at. `via` at mean 128 is the brightest scene this room
+ *    ships; this plate is 116 and still gets the hold-back, because it is the
+ *    one that appears over and over. */
+.stage-card.is-land { --stage-glow: var(--vine); }
+.stage-arva {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-field-open var(--stage-life, 780ms) ease-out both;
+}
+.stage-arva-art {
+  width: min(100%, 940px);
+  aspect-ratio: 880 / 488;
+  object-fit: cover;
+  /* Wider and softer than the arrival scenes': there is no subject in this
+     picture to protect, and the point is that the edges are already gone. */
+  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 50%,
+    #000 0%, #000 52%, rgba(0, 0, 0, 0.45) 80%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 58% at 50% 50%,
+    #000 0%, #000 52%, rgba(0, 0, 0, 0.45) 80%, transparent 100%);
+  opacity: 0.72;
+  animation: stage-arva-settle var(--stage-life, 780ms) ease-out both;
+}
+/* The ground settling, and that is the whole of the motion. A few pixels of
+   rise where the other scenes push in from 1.06 — a field does not arrive. */
+@keyframes stage-arva-settle {
+  0%   { opacity: 0; transform: translateY(6px) scale(1.015); }
+  30%  { opacity: 0.72; transform: translateY(0) scale(1); }
+  74%  { opacity: 0.72; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Already almost still; what goes is the settle. `stage-still` rather than
+     `animation: none`, for the scenes' shared reason — the element's life is
+     the animation's length. */
+  .stage-arva { animation: stage-still var(--stage-life, 780ms) linear both; }
+  .stage-arva-art { animation: none; opacity: 0.72; }
 }

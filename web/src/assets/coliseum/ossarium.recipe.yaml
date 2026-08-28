@@ -1,0 +1,88 @@
+# Where a fight goes when the creature that started it does not walk away.
+#
+# Aaron, 2026-08-28: *"hunt one more time for two more animations, winner, and
+# loser in the faceoff. Can you find a picture we can use of the Paris
+# catacombs with all the skulls for instance?"* This is the loser's half. The
+# victor's is `triumphus.recipe.yaml` and the two were chosen together.
+#
+# **The bout has a second moment now**, and it is roughly seventeen seconds
+# after the first. Combat is declared for every attacker at once and then all
+# the damage resolves interleaved, so a fight's verdict lands a median of 35
+# beats after its own blocks (measured over a ten-game match). That gap is not
+# a fault in the room — it is the combat step, and somebody watching the field
+# waits exactly that long at a real table (Aaron). So the fight re-opens when
+# it settles, with this behind it if the attacker fell.
+#
+# **It is Sedlec and not Paris, and the reason is the same wall the arena
+# backdrop hit.** Paris's catacombs are a tourist site, so the good modern
+# photographs are CC BY-SA — an attribution obligation a decoration must not
+# carry. What is public domain of Paris is a *painting* of eighteenth-century
+# gentlemen in tricorn hats visiting the ossuary, which is the "no strong
+# non-Roman period figures at size" rule violated exactly as Panini's Grand
+# Tourists violated it; and the other one is the famous inscription, which is
+# French text on a flat wall rather than a place. The Capuchin Crypt in Rome
+# is closer to the room's own city and its free plate is a bright nineteenth
+# century print of robed skeletons standing up — grotesque-comic where this
+# beat wants solemn, and at mean 159 far outside the range besides.
+#
+# **Kutná Hora answers what Aaron actually asked for**: a wall of real skulls
+# with no single subject in it, filling the frame, dark enough to ship as it
+# stands. Measured at the bout's own band with the cards stood in it —
+# **mean 64, p90 128** — which needs neither the blend `triumphus` takes nor
+# the hold-back `certamen` takes. It is the rare plate that arrives correct.
+#
+# It is also the one scene in this room whose subject is *repetition*: a
+# thousand of the same thing, which is what a wall of skulls is and what a
+# graveyard full of chump blockers is. A single skull is already spoken for —
+# `memento.webp` is the death mark on a card — and this is deliberately the
+# other scale of the same idea.
+
+animist: 1
+why_committed: >
+  The seven scenes beside it, exactly. This is drawn on the beat that says a
+  fight settled badly and it is gone about two seconds later, so fetching it
+  from somebody else's host would mean an ossuary that opens after the
+  creature it is burying has already faded. The licence is the second reason
+  and it is sharper here than usual: this is an individual contributor's own
+  photograph released into the public domain, which `via.recipe.yaml` records
+  as precisely the category where a third party's copy quietly changes terms
+  or disappears. A copy confirmed once and committed is a copy whose
+  provenance stays true.
+sources:
+  # `LicenseShortName` and `UsageTerms` are both "Public domain" on Commons,
+  # confirmed through the API at fetch time (2026-08-28). This is an own-work
+  # release by the uploader rather than a term expiry, which is a *stronger*
+  # claim and a more fragile file -- hence the paragraph above about
+  # committing it.
+  ossarium:
+    provider: wikimedia
+    title: "Beinhaus Kutna Hora 1990.JPG"
+    landing: https://commons.wikimedia.org/wiki/File:Beinhaus_Kutna_Hora_1990.JPG
+    found_via: >
+      Commons, after two rounds. The first searched Paris by name and returned
+      three free files of which none was usable; the second widened to
+      `ossuaire`, `Beinhaus`, `Capuchin crypt Rome bones` and `Kutna Hora
+      ossuary interior`, which is where this came from. Nine free candidates in
+      all, four fetched and measured against the bout's own card footprint
+      before this was chosen.
+    licence: Public domain
+
+outputs:
+  # 880 wide, matching `certamen.webp` -- the two are drawn in the same band by
+  # the same component and a scene that changed size when the fight resolved
+  # would read as the picture jumping.
+  #
+  # Quality 80, and it is cheap: 58 KB, the second-smallest scene in this
+  # directory. A photograph of bone under flat light has no hard edges and
+  # almost no colour, which is the one combination a codec is happiest with.
+  - file: ossarium.webp
+    from: ossarium
+    ops:
+      # The whole plate. It is 1.59 and the band is 1.804, so the height is
+      # taken from its middle -- and there is nothing at the top or bottom of
+      # this picture that the middle does not also have, which is the point of
+      # a subject that is a thousand of the same thing.
+      - crop: {frac_box: [0.0, 0.0, 1.0, 1.0]}
+      - resize: {width: 880}
+    encode: {format: webp, quality: 80}
+    expect: {width: 880, height: 488, budget_kb: 75, metadata: none}

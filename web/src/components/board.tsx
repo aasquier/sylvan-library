@@ -67,15 +67,16 @@ import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
-  fightingStats, alignLanes, type Clash, clashOf, foldBoard, sameCard,
-  stackRow } from '../lib/board'
+  fightingStats, alignLanes, type Clash, clashOf, fightOf,
+  foldBoard, markedHere, sameCard, stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
-import { keywordWords } from '../lib/keywords'
+import { drawableKeywords, keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 import { CenterStage } from './stage'
+import type { Outcome } from '../lib/stage'
 
 /** One card on the field.
  *
@@ -231,7 +232,24 @@ function markLife(mark: Mark, speed: Speed): number {
 }
 
 /** A mark on a card: what happened to it, and which beat said so. */
-interface Struckdown { card: string; mark: Mark; key: string }
+interface Struckdown {
+  card: string
+  /** The board id of the card the beat named, when the beat carried one.
+   *
+   *  **A name cannot say which one**, and combat is where that stops being
+   *  theoretical: eight Cat Soldier Tokens swinging are eight beats with one
+   *  spelling between them, and the piles they stand in are told apart by
+   *  their counters and their Equipment rather than by their names. Matched on
+   *  the name alone, every tile sharing the spelling lit up at once —
+   *  including the ones that were not in the fight (Aaron, 2026-08-28).
+   *
+   *  Absent on a match played without the scribe, which has no ids to give;
+   *  the name is the fallback there, and it is the answer this had before the
+   *  id crossed the wire at all. */
+  id?: number
+  mark: Mark
+  key: string
+}
 
 /**
  * Hold a mark for its own length rather than for its beat's.
@@ -261,7 +279,7 @@ interface Struckdown { card: string; mark: Mark; key: string }
  * React re-runs a render that sets its own state before it commits anything,
  * so the beat and its mark still reach the screen together.
  */
-function useHeldMark(card: string | null, mark: Mark | null, key: string,
+function useHeldMark(raised: Struckdown | null, key: string,
   speed: Speed, game: number): Struckdown | null {
   const [held, setHeld] = useState<Struckdown | null>(null)
   const [wasGame, setWasGame] = useState(game)
@@ -271,7 +289,6 @@ function useHeldMark(card: string | null, mark: Mark | null, key: string,
   // rather than wait for the next one. `''` is a key `beat?.key ?? ''` can
   // really produce, so the sentinel has to be something a key cannot be.
   const [wasKey, setWasKey] = useState<string | null>(null)
-  const raised = card && mark ? { card, mark, key } : null
   if (game !== wasGame) {
     setWasGame(game)
     setWasKey(key)
@@ -745,8 +762,13 @@ function FieldPeek({ card, at, avoid }: {
  * many of one thing — lands, a dozen Treasures — were never the rows paying
  * for the width.
  */
-function FieldCard({ card, count, inPlay = false }: {
+function FieldCard({ card, count, inPlay = false, ids }: {
   card: BoardCard
+  /** Every board id this tile stands for — a stack's own `ids`.
+   *
+   *  Absent everywhere a card is drawn one at a time (a hand, a grave, a
+   *  tray), where the card's own id is the whole answer. */
+  ids?: number[]
   /** How many identical cards this one stands for. See `stackRow`. */
   count: number
   /** Whether this card is standing on the battlefield, as opposed to being
@@ -869,10 +891,21 @@ function FieldCard({ card, count, inPlay = false }: {
   // belongs to the card in front of it.
   const leads = useContext(Crowned).get(card.id) ?? null
   const struck = useContext(Struck)
-  // Matched on Forge's own spelling, which is what both ends of this carry.
-  // Two copies of one name is a token or a basic; marking both is a better
-  // wrong answer than marking neither, and in a singleton format it is rare.
-  const mark = struck && sameCard(card.name, struck.card) ? struck : null
+  // **Matched on the board id, and on the name only when there is no id.**
+  //
+  // This used to match on Forge's spelling alone, arguing that two copies of
+  // one name is a token or a basic and that marking both was a better wrong
+  // answer than marking neither. That was true when a beat had nothing else to
+  // offer. It does now — `StagedBeat.id` crosses the wire — and the wrong
+  // answer turned out not to be rare at all: eight Cat Soldier Tokens swinging
+  // stand in several piles, because `stackRow` tells them apart by their
+  // counters and their Equipment rather than by their names, and every one of
+  // those piles lit up at once. Including the ones not in the fight.
+  //
+  // **A pile answers for every card in it**, which is why this reads `ids`
+  // rather than `card.id`: the tile draws one representative for eight
+  // identical creatures, and the beat may name any of them.
+  const mark = markedHere(struck, card.name, ids ?? [card.id]) ? struck : null
   // **Matched on the id, which is the whole reason this is drawable.** A beat
   // names a card and two Egg Tokens are one name between them; an ability
   // names the board's own id, so the glow lands on the creature that was
@@ -928,6 +961,10 @@ function FieldCard({ card, count, inPlay = false }: {
    */
   const worn = card.live.length > 0
     ? card.live : [...card.keywords, ...card.granted]
+  // Only on an attack: double strike is a combat word, and a creature blocking
+  // with it is not swinging twice at anything.
+  const twice = mark?.mark === 'attacks'
+    && drawableKeywords(worn).includes('double strike')
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
@@ -973,7 +1010,15 @@ function FieldCard({ card, count, inPlay = false }: {
                     // exist — because what it draws is *departure*. Which
                     // departure it was is the mark's business.
                     + (card.leaving ? ' is-leaving' : '')
-                    + (mark ? ` is-${mark.mark}` : '')}
+                    + (mark ? ` is-${mark.mark}` : '')
+                    // **Double strike swings twice, so the lunge does**
+                    // (Aaron, 2026-08-28). It is the one keyword whose whole
+                    // meaning is *this happens two times*, and a creature that
+                    // deals its damage in two steps bumping once was the board
+                    // quietly flattening the difference. Read off `worn`, so a
+                    // double strike lent by an Equipment counts — which is how
+                    // most creatures on a Commander board ever get it.
+                    + (twice ? ' is-twice' : '')}
          ref={box} title={title} tabIndex={card.image ? 0 : -1}
          onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
          onPointerUp={(e) => {
@@ -1441,6 +1486,28 @@ function FieldRow({ label, cards, empty, lane, slots }: {
       ))}
     </div>
   )
+}
+
+/**
+ * The board **one step before** the beat being drawn, as two sides.
+ *
+ * **A dying creature has already left the fight by the time its death is
+ * announced.** Forge reports the death and the zone change on one line — the
+ * same fact that forces the skull onto the grave rather than onto the creature
+ * — so at the death's own step the card's `combat` and `blocking` are gone and
+ * the fight is unreadable. Measured before it was designed around: over a real
+ * game, *no* death resolved to a fight at its own step and every combat death
+ * resolved at the one before.
+ *
+ * So this folds one step short. It is a second walk of the board and it is
+ * paid only on death beats — 33 of them in a ten-game match, against some
+ * sixteen hundred beats — which is why it is a plain call rather than anything
+ * cleverer.
+ */
+function settled(board: ForgeBoard | null, shown: number):
+  [BoardSide | undefined, BoardSide | undefined] {
+  const before = foldBoard(board, Math.max(0, shown - 1))
+  return [before.sides[0], before.sides[1]]
 }
 
 /** Commander's starting life, which is what the ring below is a fraction of.
@@ -2087,7 +2154,7 @@ function FieldGeared({ stack }: {
 }) {
   const { card, count } = stack
   if (card.attachments.length === 0) {
-    return <FieldCard card={card} count={count} inPlay />
+    return <FieldCard card={card} count={count} ids={stack.ids} inPlay />
   }
   const worn = card.attachments.map((a) => a.name).join(', ')
   // **What the fan opens with**, host first — which is the order
@@ -2134,7 +2201,7 @@ function FieldGeared({ stack }: {
           <FieldCard card={a} count={1} inPlay />
         </span>
       ))}
-      <FieldCard card={card} count={count} inPlay />
+      <FieldCard card={card} count={count} ids={stack.ids} inPlay />
     </div>
     </Fanned.Provider>
     </GearFan>
@@ -2981,12 +3048,30 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // and identity is not what governs replay here anyway — every mark is keyed
   // on `beat.key`, so a fresh object with the same key reconciles onto the
   // same element and does *not* restart an animation that is already running.
-  const mark = beat ? markOf(beat.kind, beat.card) : null
+  // **A run of identical beats raises one mark, not eight** (Aaron,
+  // 2026-08-28: *"a stack of 8 tokens that is attacking show it 8 times"*).
+  //
+  // Forge announces combat one creature at a time, so eight Cat Tokens
+  // swinging is eight `attack` beats with the same words — and eight identical
+  // cards are **one pile** on the sand, because `stackRow` merged them before
+  // anything was drawn. So the sword was being re-raised on the same tile
+  // eight times in a row, each one restarting an animation that had not
+  // finished, which reads as a stutter rather than as eight creatures.
+  //
+  // `countRuns` already settled this for the centre stage and the board simply
+  // never asked: the first beat of a run carries the count and every follower
+  // is marked `run: 0`. A follower leaves the mark that is already up alone,
+  // which is exactly what the stage does with the card that is already up.
+  //
+  // **Absent is a one, not a zero** — a beat from a match the reel never
+  // counted has no `run` at all, and a board that read that as a follower
+  // would draw no marks whatsoever.
+  const repeat = beat?.run === 0
+  const mark = beat && !repeat ? markOf(beat.kind, beat.card) : null
   const live = mark && beat?.card
-    ? { card: beat.card, mark, key: beat.key }
+    ? { card: beat.card, id: beat.id, mark, key: beat.key }
     : null
-  const held = useHeldMark(live?.card ?? null, live ? mark : null,
-    beat?.key ?? '', speed, game)
+  const held = useHeldMark(live, beat?.key ?? '', speed, game)
   // **Paused, the mark is the beat's again.** Nothing is draining, so there is
   // nothing for a mark to outlive — and stepping or scrubbing pauses first
   // (both controls call `setSpeed('paused')`), which is exactly where holding
@@ -3054,14 +3139,41 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   //
   // Here rather than in `CenterStage` for `alignLanes`' own reason, one line
   // up: a clash spans the seam, and a component handed the card dictionary
-  // cannot see the folded state that knows who is blocking whom. Read from the
-  // *blocker* the beat names, because that is the direction Forge announces a
-  // block in — see `clashOf`, which argues the whole reading.
+  // cannot see the folded state that knows who is blocking whom.
   //
-  // Null on every beat that is not a block, which is nearly all of them, so
-  // this costs one map walk on the beats where a fight is being drawn.
+  // **Two moments, and they are seventeen seconds apart.** A block declares a
+  // fight; a death settles one. Combat is declared for every attacker at once
+  // and then all the damage resolves interleaved, so a fight's verdict lands a
+  // median of 35 beats after its own blocks — measured over a real ten-game
+  // match. That gap is the combat step rather than a fault: somebody watching
+  // the field waits exactly that long at a table (Aaron, 2026-08-28), so the
+  // fight simply re-opens when it settles.
+  //
+  // Null on every other beat, which is nearly all of them.
+  const dying = beat?.kind === 'dies' ? beat.id : undefined
+  const settling = dying ? fightOf(dying, ...settled(board, shown)) : null
+  // **How it ended, keyed on the attacker**, and the second half of this is
+  // the part a real board had to teach (Aaron, 2026-08-28: *"sometimes that
+  // will be mixed, like some blockers live, some die, so make sure the right
+  // things go in the right fields"*).
+  //
+  // The creature that swung either walked through the wall or it did not. But
+  // a blocker's death is only a triumph while the attacker is **still
+  // standing** — and blockers go on dying after an attacker has fallen. A real
+  // fight: Arahbo was cut down on one beat, a Wurm Token that had been
+  // blocking it died on the next, and reading "a blocker died" as a win told
+  // the room Arahbo broke through a wall that had just killed it.
+  //
+  // A card on its way out carries `leaving`, which is how the skull finds the
+  // grave; here it is how a verdict avoids contradicting the one before it.
+  // When the attacker has already gone there is **no second verdict** — its
+  // own death settled the fight, and the blocker's skull says the rest.
+  const stillUp = settling && settling.attacker.leaving == null
+  const outcome: Outcome | null = !settling ? null
+    : settling.attacker.id === dying ? 'fell' : stillUp ? 'held' : null
   const clash: Clash | null =
-    beat?.kind === 'block' ? clashOf(beat.id, far, near) : null
+    beat?.kind === 'block' ? clashOf(beat.id, far, near)
+      : outcome ? settling : null
 
   const lives = {
     '--zone-seats': zoneSeats,
@@ -3208,7 +3320,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           here and the skull on the card in its row stay one event. */}
       <CenterStage board={board} beat={beat ?? null} speed={speed} game={game}
                    dies={markLife('dies', speed)} seat={casting} at={shown}
-                   clash={clash}
+                   clash={clash} outcome={outcome}
                    gained={{ far: far.gained, near: near.gained }} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
