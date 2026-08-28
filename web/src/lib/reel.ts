@@ -57,6 +57,17 @@ export interface StagedBeat {
    *  about, and re-parsing English to get back a name it already had would be
    *  a fine way to introduce a bug. */
   card?: string
+  /** The **board id** of `card`, which is the half a name cannot carry.
+   *
+   *  A name says *which card* and never *which one*: two Egg Tokens are one
+   *  string between them, and a gang of five Saprolings blocking two different
+   *  attackers is two fights with one name in them. The centre stage reads a
+   *  block from this id up to the attacker it stopped (`clashOf`), and that
+   *  question is unanswerable from the spelling alone.
+   *
+   *  Absent on a match played without the scribe, which has no ids at all —
+   *  read a missing id as "not said", never as a card. */
+  id?: number
   /** The card on the other end — the attacker a blocker stepped in front of,
    *  or the permanent an Aura or Equipment was put on. */
   target?: string

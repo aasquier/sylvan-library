@@ -57,10 +57,11 @@
 import { useEffect, useState } from 'react'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
-import { halfNamed } from './board'
+import { type BoardCard, type Clash, halfNamed } from './board'
 import { type HalfGlass } from './halves'
 import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
+import { shortName } from './theater'
 
 /**
  * What is happening to the card on the stage.
@@ -919,6 +920,250 @@ export function useStagedMana(next: StagedMana | null, key: string,
   } else if (key !== wasKey) {
     setWasKey(key)
     // A beat with no mana leaves the last flash alone to finish its own life,
+    // exactly as a beat with no card leaves the stage alone.
+    if (next) setShowing(next)
+  }
+  useEffect(() => {
+    if (!showing) return
+    const done = window.setTimeout(() => setShowing(null),
+      showing.life + STAGE_TAIL)
+    return () => { window.clearTimeout(done) }
+  }, [showing])
+  return showing
+}
+
+/**
+ * The bout: one attacker, and the wall that stopped it.
+ *
+ * **This is what the arrows became** (Aaron, 2026-08-28). An arrow across the
+ * trench named a pair; it could not show them. The middle of the arena can, at
+ * the size this stage already draws a spell — so a block stops being a line
+ * between two small cards and becomes the one thing on the screen.
+ *
+ * **It keeps the board's own axis, which is why this shape was chosen over
+ * three others.** Four layouts were drawn at the real stage size and looked at
+ * (`the lists`, horizontal; `the ring`, an arc around a centred attacker; `the
+ * gauntlet`, a file receding into the picture; and this one). Aaron chose the
+ * charge: the attacker comes out of *its own seat's edge* and the wall ranks
+ * across the defender's, so a person who has just read the board does not have
+ * to re-learn which way the table faces. Far swings downward, near swings up.
+ *
+ * **Its cost is size and it is worth naming.** Two ranks in a 521-pixel arena
+ * means nobody is at full stage size — the attacker is drawn at 0.62 of a
+ * stage card and the wall at 0.52, which is smaller than anything else this
+ * stage puts up. That is the price of showing both halves of a fight at once,
+ * and it was paid deliberately.
+ *
+ * **The wall stacks** (Aaron: *"stacks of tokens can stay stacked with their x
+ * number"*), so twelve Saprolings are one card with a twelve on it. That is
+ * what a player sees across a table, and it is also what keeps the rank on the
+ * stage: see `boutPitch` for what happens when even the stacks run out of room.
+ */
+export interface BoutFighter {
+  /** The card's own board id.
+   *
+   *  **This is the identity that makes the wall assemble.** Forge announces a
+   *  block per blocker, so a gang of three arrives as three beats and this
+   *  moment is raised three times — each time with one more card in it. Keyed
+   *  on the id, the cards already standing keep their DOM nodes and only the
+   *  new one animates in, which is a wall being built rather than a wall being
+   *  redrawn three times. */
+  id: number
+  name: string
+  image: string | null
+  /** How many identical cards this one stands for; 1 for almost everything,
+   *  since Commander is singleton and only tokens repeat. */
+  count: number
+}
+
+export interface StagedBout {
+  /** The beat's own identity, so each block in a gang resets the clock and the
+   *  fight is still up when the last of them lands. */
+  key: string
+  attacker: BoutFighter
+  blockers: BoutFighter[]
+  /** Which seat's edge the attacker swings out of. */
+  facing: 'far' | 'near'
+  /** What the plate under the fight says. */
+  word: string
+  note: string | null
+  life: number
+}
+
+/** How long a fight is watched for, before any pace applies.
+ *
+ *  Longer than any single card, and the reason is arithmetic rather than
+ *  drama: there are `N + 1` cards to read here instead of one, and the plate
+ *  under them names all of them. It is also the rarest of these moments — a
+ *  game has sixty casts and a handful of blocks — so the cost of holding it is
+ *  paid a few times a game. */
+const BOUT_LIFE = 2000
+
+/** How long a fight is watched for, at this pace. `stageLife`'s pair of caps,
+ *  and its argument: a fast pace must not cut this to a strobe, and a slow one
+ *  must not leave a fight standing over four later beats. */
+export function boutLife(speed: Speed): number {
+  const beat = beatDelay(speed)
+  if (beat === 0) return BOUT_LIFE
+  return Math.max(STAGE_FLOOR, Math.min(BOUT_LIFE, beat * STAGE_BEATS))
+}
+
+/** A blocker's width, and the stage's, **as fractions of the stage** rather
+ *  than pixels.
+ *
+ *  A constant in pixels is a constant measured against one screen, which this
+ *  room has already paid for once: the arena is drawn at 940 on a laptop and
+ *  at whatever a phone gives it, and a rank laid out in pixels would be right
+ *  on exactly one of them. These are the same numbers the layout was drawn and
+ *  measured at, expressed against the box instead of against a monitor. */
+export const BOUT_BLOCKER_W = 112.84 / 940
+const BOUT_GAP = 14 / 940
+/** How much of the stage the rank may span before it must overlap. Short of
+ *  the full width on purpose: the mask fades the picture at the rim, and a
+ *  card standing out there is a card standing in the fade. */
+const BOUT_SPAN = 880 / 940
+
+/**
+ * How far apart the wall stands, as a fraction of the stage.
+ *
+ * **Overlap rather than shrink, and that was a choice.** Seven blockers at
+ * their natural pitch span 874 of 940 pixels and an eighth does not fit. The
+ * two ways out are to make every card smaller or to let them overlap, and
+ * shrinking is the worse one: it makes a rare board illegible to punish it for
+ * being rare, and it changes the size of a card for reasons that have nothing
+ * to do with the card. Overlapped, a big wall reads as exactly what it is —
+ * a rank closed up shoulder to shoulder — and every card in it stays the size
+ * it was.
+ *
+ * Stacking makes this rare on its own: the boards that field eight blockers
+ * are token boards, and twelve identical Saprolings arrive here as one card.
+ */
+export function boutPitch(n: number): number {
+  const natural = BOUT_BLOCKER_W + BOUT_GAP
+  if (n <= 1) return natural
+  return Math.min(natural, (BOUT_SPAN - BOUT_BLOCKER_W) / (n - 1))
+}
+
+/** Where the `i`th of `n` blockers stands: the **left edge** as a fraction of
+ *  the stage, so the rank is centred however wide it turns out to be. */
+export function boutAt(i: number, n: number): number {
+  return 0.5 + (i - (n - 1) / 2) * boutPitch(n) - BOUT_BLOCKER_W / 2
+}
+
+/** How many names the plate will read out before it stops. Three, because the
+ *  fourth is where a label stops being a label: at nine blockers the untrimmed
+ *  sentence ran the width of the arena and wrapped onto a second line under
+ *  the cards it was describing. */
+const WALL_NAMED = 3
+
+/**
+ * The wall, said the way a person says it.
+ *
+ * Three things, and each of them was a real fault in the first cut of this
+ * sentence:
+ *
+ * - **Short names.** A comma-joined list of legends is unreadable, because
+ *   half of them contain a comma: *"Brimaz, King of Oreskos, Arahbo, Roar of
+ *   the World"* is four names to a reader and two to the game. `shortName` is
+ *   the room's own cut and every other surface here already uses it.
+ * - **A count rather than a plural.** Only tokens ever repeat, and pluralising
+ *   a card's name is a guess about English that this project does not make
+ *   about card text anywhere else — *Zombie Army* does not take an `s`. The
+ *   board's own multiplication sign says the same thing and says it exactly.
+ * - **A stop.** Past three names the plate is a paragraph. What is left is
+ *   counted in *creatures* rather than in cards, because that is the question
+ *   somebody is asking: a stack of twelve Saprolings and one Bear is thirteen
+ *   creatures, not two.
+ *
+ * House style throughout: no Oxford comma, which is what the board's own
+ * `listed` uses.
+ */
+function walled(blockers: BoutFighter[]): string {
+  // **The cards stay apart and the sentence does not**, which is the one place
+  // this deliberately disagrees with the rank standing above it.
+  //
+  // A real gang on Blightsteel Colossus put three Cat Tokens in the wall and
+  // `stackRow` was right to draw all three: one was a 6/4 carrying Hammer of
+  // Nazahn, one a 3/3 with a Basilisk Collar, one a bare 3/3. Three separate
+  // cards, because a player can see all of that across a table. But the plate
+  // read *"by Cat Token, Cat Token, Elephant Token and 1 more"*, which looks
+  // like a fault however true it is. Nobody says a name twice; they say *three
+  // Cats and an Elephant*. So the sentence counts by name, and the pictures
+  // keep the distinction the sentence has no room for.
+  const byName = new Map<string, number>()
+  for (const b of blockers) {
+    byName.set(b.name, (byName.get(b.name) ?? 0) + b.count)
+  }
+  const said = [...byName].map(([name, n]) =>
+    n > 1 ? `${shortName(name)} ×${n}` : shortName(name))
+  if (said.length > WALL_NAMED) {
+    const rest = [...byName.values()].slice(WALL_NAMED)
+      .reduce((n, c) => n + c, 0)
+    return `${said.slice(0, WALL_NAMED).join(', ')} and ${rest} more`
+  }
+  if (said.length <= 1) return said[0] ?? ''
+  return `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}`
+}
+
+/**
+ * The fight the board is showing, if it is showing one.
+ *
+ * A pure reading of `clashOf`'s answer plus the card dictionary, which is the
+ * only place a painting lives. Null for every beat that is not a block, which
+ * is nearly all of them.
+ *
+ * **The plate says "Blocked" and not "blocks", and that is for a newcomer.**
+ * Every other plate on this stage is a sentence about a player doing something
+ * — *Gyome casts*, *Gyome sacrifices*. A block is the one beat where the
+ * interesting party is the creature being stopped rather than the person doing
+ * the stopping, and *"Blocked"* over the attacker's name says in one word what
+ * the picture is showing. The wall is named underneath, where the note goes.
+ */
+export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
+  key: string, speed: Speed): StagedBout | null {
+  if (!clash) return null
+  const fighter = (card: BoardCard, count: number): BoutFighter => ({
+    id: card.id,
+    name: card.name,
+    image: faceFor(board, card.name, null)?.image ?? null,
+    count,
+  })
+  const attacker = fighter(clash.attacker, 1)
+  const blockers = clash.blockers.map((s) => fighter(s.card, s.count))
+  return {
+    key,
+    attacker,
+    blockers,
+    facing: clash.swinging,
+    word: 'Blocked',
+    note: blockers.length ? `by ${walled(blockers)}` : null,
+    life: boutLife(speed),
+  }
+}
+
+/**
+ * Hold one fight for its own life.
+ *
+ * `useStagedMana`'s shape and its two rules — it can never strand a fight, and
+ * it never carries one across a game — with one difference that is the whole
+ * reason a gang assembles rather than flickering: **a new fight replaces the
+ * slot's value, and the component keyed on the attacker keeps its element.**
+ * Three cats on a Ghalta re-raise this three times with a bigger wall each
+ * time; because every one of them is the same attacker, React reconciles onto
+ * the same `StageBout` and only the arriving card is new.
+ */
+export function useStagedBout(next: StagedBout | null, key: string,
+  game: number): StagedBout | null {
+  const [showing, setShowing] = useState<StagedBout | null>(null)
+  const [wasGame, setWasGame] = useState(game)
+  const [wasKey, setWasKey] = useState<string | null>(null)
+  if (game !== wasGame) {
+    setWasGame(game)
+    setWasKey(key)
+    setShowing(next)
+  } else if (key !== wasKey) {
+    setWasKey(key)
+    // A beat that is not a block leaves the fight up to finish its own life,
     // exactly as a beat with no card leaves the stage alone.
     if (next) setShowing(next)
   }

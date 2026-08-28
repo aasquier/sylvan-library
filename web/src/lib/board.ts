@@ -973,6 +973,14 @@ export function fightingStats(card: BoardCard): string | null {
  * to do with it. Across a seam wide enough to hold the scoreboard, "who is
  * fighting whom" was a question you answered by hovering.
  *
+ * **This used to hand back the clash list too, and the arrows that read it are
+ * gone** — a fight is drawn on the centre stage now (`clashOf`, `StagedBout`).
+ * The arrangement stays, because it is not the arrows: it is the board setting
+ * itself up, so that a person who looks away from the stage and down at the
+ * sand finds the blocker standing under the creature it stopped (Aaron,
+ * 2026-08-28: *"the alignLanes is fine to stay, it prepares the board in a
+ * way"*).
+ *
  * **Only a clash moves anything, and only the blocker moves.** Aaron chose the
  * rule: the attacker lane is left exactly as it stands, each blocker slides to
  * sit under the attacker it stopped, and every other creature keeps the slot it
@@ -997,22 +1005,6 @@ export interface AlignedLanes {
   /** Both lanes, the same length, `null` where the slot is empty sand. */
   far: (BoardStack | null)[]
   near: (BoardStack | null)[]
-  /** The **attacker** slots that were blocked, ascending — one arrow each.
-   *
-   *  **The attacker's slot and not the blocker's**, which is the difference
-   *  between an arrow and a line in the sand. A gang puts three blockers at
-   *  slots 3, 4 and 5 around one attacker at 4; drawn at the blockers' slots,
-   *  two of the three arrows rise out of a creature that is not in the fight
-   *  and out of empty sand — seen on a real board, three cats on a Ghalta.
-   *  One arrow per fight, leaving the creature that started it.
-   *
-   *  Empty when nothing is blocking, which is what tells a caller not to
-   *  draw at all. */
-  clashes: number[]
-  /** Which half is swinging, and so which way an arrow points: from the
-   *  attacker's lane, across the trench, to the blocker standing under it.
-   *  `null` whenever `clashes` is empty. */
-  attacker: 'far' | 'near' | null
 }
 
 /** Which single attacker a stack is facing, or 0 when it is not unanimous. */
@@ -1031,7 +1023,7 @@ export function alignLanes(far: BoardStack[], near: BoardStack[],
   cards: BoardCard[]): AlignedLanes {
   const flat = new Map<number, BoardCard>()
   for (const card of cards) flat.set(card.id, card)
-  const dense: AlignedLanes = { far, near, clashes: [], attacker: null }
+  const dense: AlignedLanes = { far, near }
 
   // Which lane is swinging. In a two-player game exactly one is, and anything
   // else — nobody attacking, or a payload that says both are — is a board this
@@ -1053,11 +1045,8 @@ export function alignLanes(far: BoardStack[], near: BoardStack[],
   })
 
   const placed = new Map<number, BoardStack>()
-  // Where the blockers land, which is what decides the lane's own shape...
+  // Where the blockers land, which is what decides the lane's own shape.
   const filled = new Set<number>()
-  // ...and which attackers were stopped, which is what the arrows are drawn
-  // from. The two are the same slot only when a single creature blocks.
-  const clashes = new Set<number>()
   const free = (from: number) => {
     let slot = Math.max(0, from)
     while (placed.has(slot)) slot++
@@ -1088,7 +1077,6 @@ export function alignLanes(far: BoardStack[], near: BoardStack[],
   const moved = new Set<BoardStack>()
   for (const [slot, gang] of [...gangs].sort((a, b) => a[0] - b[0])) {
     let want = Math.max(0, slot - Math.floor((gang.length - 1) / 2))
-    clashes.add(slot)
     for (const stack of gang) {
       const put = free(want)
       placed.set(put, stack)
@@ -1124,7 +1112,85 @@ export function alignLanes(far: BoardStack[], near: BoardStack[],
   return {
     far: farSwings ? held : laid,
     near: farSwings ? laid : held,
-    clashes: [...clashes].sort((a, b) => a - b),
-    attacker: farSwings ? 'far' : 'near',
+  }
+}
+
+/**
+ * One fight on the sand: the attacker, and everything standing in its way.
+ *
+ * **This is what replaced the arrows** (Aaron, 2026-08-28: *"the
+ * attacker/blocker arrows go, replaced by a bout on the centre stage"*). An
+ * arrow across the trench could say *these two are fighting* and nothing more
+ * — it was a line drawn between two cards a person still had to find, on a
+ * board where a gang block put three of them in a row. The bout takes the
+ * middle of the arena instead and shows the fight at the size the stage draws
+ * a spell: the attacker out of its own seat's edge, the wall ranked across
+ * from it.
+ *
+ * **Read from the blocker up, because that is the direction the beat runs.**
+ * Forge announces a block per blocker — three cats on a Ghalta is three
+ * `block` beats, each naming one cat and carrying the attacker's id — so the
+ * one thing every such beat holds is *this creature stopped that one*. Asked
+ * from the blocker, the answer is exact; asked from the attacker, the room
+ * would have to guess which of several fights the beat meant.
+ *
+ * **And the gang is read off the board rather than accumulated.** Each beat
+ * re-asks the question and gets the whole wall as it stands at that step, so
+ * the second cat's beat returns two cats and the third's returns three. That
+ * is what makes the wall assemble on the stage without anything remembering
+ * anything: the fold already holds the state, and scrubbing backwards is a
+ * smaller gang rather than a gang that has to be un-built. It is the marks'
+ * own rule — a picture is a function of the beat — applied to a group.
+ *
+ * **The wall is stacked, not enumerated** (Aaron, 2026-08-28: *"stacks of
+ * tokens can stay stacked with their x number"*). Twelve Saprolings on one
+ * attacker are one card with a twelve on it, which is both what a player sees
+ * across a table and the only way the rank fits on a stage 940 pixels wide.
+ * `stackRow` decides what identical means, and it already distinguishes an
+ * attacking pile from a blocking one — filtered to this attacker first, so a
+ * wall facing somebody else is not counted into this fight.
+ *
+ * Null whenever the question has no answer: a beat with no id, a creature that
+ * is not blocking, an attacker that has left the board between the block and
+ * the beat being read. Every one of those is a board this has no business
+ * drawing a fight from.
+ */
+export interface Clash {
+  /** The creature being blocked. */
+  attacker: BoardCard
+  /** Everything blocking it, stacked — the count is on the stack. */
+  blockers: BoardStack[]
+  /** Which half the attacker swung out of, so the stage can put it on that
+   *  seat's own edge and rank the wall across from it. */
+  swinging: 'far' | 'near'
+}
+
+export function clashOf(blockerId: number | undefined,
+  far: BoardSide | null | undefined,
+  near: BoardSide | null | undefined): Clash | null {
+  if (!blockerId) return null
+  const sides: [BoardSide | null | undefined, 'far' | 'near'][] =
+    [[far, 'far'], [near, 'near']]
+  // Where every creature stands, and on whose side. Both halves in one map,
+  // because a fight is the one thing on this board that spans the seam.
+  const at = new Map<number, { card: BoardCard; side: 'far' | 'near' }>()
+  for (const [side, which] of sides) {
+    for (const card of side?.creatures ?? []) at.set(card.id, { card, side: which })
+  }
+  const blocker = at.get(blockerId)
+  if (!blocker || blocker.card.blocking === 0) return null
+  const attacker = at.get(blocker.card.blocking)
+  if (!attacker) return null
+  // Everything facing this attacker, in board order so the rank does not
+  // reshuffle itself as it grows.
+  const wall: BoardCard[] = []
+  for (const { card } of at.values()) {
+    if (card.blocking === attacker.card.id) wall.push(card)
+  }
+  if (wall.length === 0) return null
+  return {
+    attacker: attacker.card,
+    blockers: stackRow(wall),
+    swinging: attacker.side,
   }
 }
