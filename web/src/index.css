@@ -15476,3 +15476,73 @@ button:hover .tarot-fan-card {
    moments. */
 .stage-bout.is-held .stage-bout-card.is-att { --bout-glow: var(--field-brass); }
 .stage-bout.is-fell .stage-bout-card.is-att { --bout-glow: #8fb59a; }
+
+/* **The stone, on the fighter that took it** (Aaron, 2026-08-28: *"when two
+   things died in a clash, they both were losers, but only one showed the
+   graveyard animation and the skull icon"*).
+ *
+ * The verdict took the beat away from the single-card death moment, which
+ * stopped three scenes stacking and quietly stopped the creature that fell
+ * from being buried at all. It is buried here instead, on its own card inside
+ * the fight — which is also the only place a *mixed* wall can be told: two of
+ * three blockers dead is two stones and one card left standing, and no single
+ * backdrop can say that.
+ *
+ * The same two layers `.stage-pall` and `.stage-skull` use, at this rank's
+ * size, and an element rather than a `filter` for the same licence reason:
+ * Scryfall's guidelines forbid desaturating card imagery and ADR 32 bounds
+ * this room to motion and parallax over the artwork. */
+.stage-bout-pall {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 4.75% / 3.4%;
+  background: linear-gradient(0deg,
+    rgba(8, 12, 9, 0.86) 0%,
+    rgba(10, 16, 11, 0.66) 42%,
+    rgba(14, 20, 15, 0.34) 78%,
+    rgba(16, 22, 17, 0.2) 100%);
+  animation: stage-bout-pall var(--stage-life, 2000ms) ease-out both;
+}
+@keyframes stage-bout-pall {
+  0%   { opacity: 0; }
+  46%  { opacity: 0; }
+  70%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+/* Late, and after the card has arrived: the fight is shown first and the
+   verdict lands on it, which is the order it happened in. */
+.stage-bout-skull {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 52%;
+  height: auto;
+  border-radius: 2px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.86),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 42%, transparent);
+  animation: stage-bout-stone var(--stage-life, 2000ms) ease-out both;
+}
+@keyframes stage-bout-stone {
+  0%   { opacity: 0; transform: translate(-50%, -76%) scale(0.7); }
+  50%  { opacity: 0; transform: translate(-50%, -76%) scale(0.7); }
+  72%  { opacity: 1; transform: translate(-50%, -48%) scale(1.03); }
+  80%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+/* The light goes out of the card that fell, whichever end of the fight it was
+   standing at — so a triumph still shows its casualty. */
+.stage-bout-card.is-fallen { --bout-glow: #8fb59a; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The stone is the answer to a question and may not be answered with
+     nothing: it is simply there, for the whole of the beat. */
+  .stage-bout-pall,
+  .stage-bout-skull {
+    animation: stage-still var(--stage-life, 2000ms) linear both;
+  }
+  .stage-bout-skull { transform: translate(-50%, -50%); }
+}

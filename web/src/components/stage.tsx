@@ -618,10 +618,11 @@ function StageBout({ item }: { item: StagedBout }) {
           has just happened is a place that has been disturbed. It is drawn in
           the gap rather than on either card, because the fight is the gap. */}
       <span className="stage-bout-seam" aria-hidden="true" />
-      <BoutCard fighter={item.attacker} role="att" />
+      <BoutCard fighter={item.attacker} role="att"
+                fallen={item.dying === item.attacker.id} />
       {item.blockers.map((b, i) => (
         <BoutCard key={b.id} fighter={b} role="blk"
-                  at={boutAt(i, n)} order={i} />
+                  at={boutAt(i, n)} order={i} fallen={item.dying === b.id} />
       ))}
       <span className="stage-plate-strip">
         <span className="stage-plate-word">{item.word}</span>
@@ -642,11 +643,13 @@ function StageBout({ item }: { item: StagedBout }) {
  *  it, which is the same fallback `StageFace` makes for the single-card
  *  stage. A gap in the rank would be a lie about how many creatures are in
  *  the fight. */
-function BoutCard({ fighter, role, at, order }: {
+function BoutCard({ fighter, role, at, order, fallen }: {
   fighter: BoutFighter
   role: 'att' | 'blk'
   at?: number
   order?: number
+  /** Whether this is the fighter the beat just buried. */
+  fallen?: boolean
 }) {
   const where = {
     ...(at != null ? { '--at': `${at * 100}%` } : {}),
@@ -657,11 +660,24 @@ function BoutCard({ fighter, role, at, order }: {
     ...(order != null ? { '--order': order } : {}),
   } as CSSProperties
   return (
-    <span className={`stage-bout-card is-${role}`} style={where}>
+    <span className={`stage-bout-card is-${role}`
+      + (fallen ? ' is-fallen' : '')} style={where}>
       {fighter.image ? (
         <img src={fighter.image} alt="" draggable={false} />
       ) : (
         <span className="stage-bout-blank">{fighter.name}</span>
+      )}
+      {/* **The stone, on the card that took it.** The same two layers the
+          single-card death uses and for the same licence reason: the pall is
+          an element laid *on* the picture rather than a `filter`, because
+          Scryfall's guidelines forbid desaturating card imagery and ADR 32
+          bounds this room to motion and parallax over the artwork. */}
+      {fallen && (
+        <>
+          <span className="stage-bout-pall" aria-hidden="true" />
+          <img className="stage-bout-skull" src={mementoArt} alt=""
+               draggable={false} />
+        </>
       )}
       {fighter.count > 1 && (
         <span className="stage-bout-count tabular">{fighter.count}<span
@@ -813,7 +829,8 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // keyed on the beat because a gang arrives as several beats and each of them
   // has to reset the clock, or the third cat would land on a stage that was
   // already fading.
-  const liveBout = stagedBout(clash, board, beat?.key ?? '', speed, outcome)
+  const liveBout = stagedBout(clash, board, beat?.key ?? '', speed, outcome,
+    beat?.kind === 'dies' ? beat.id ?? null : null)
   const heldBout = useStagedBout(liveBout, beat?.key ?? '', game)
   // **Paused, the fight is the beat's own** — the marks' rule, and it is the
   // same argument. Stepping and scrubbing both pause first, and those are

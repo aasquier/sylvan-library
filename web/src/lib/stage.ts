@@ -1004,6 +1004,18 @@ export interface StagedBout {
   /** How it ended, when this is the fight settling rather than being declared.
    *  Picks the scene: the ossuary if the attacker fell, the arch if it held. */
   outcome: Outcome | null
+  /** The board id of the fighter that just died, so the bout can lay the stone
+   *  on it.
+   *
+   *  **Both losers have to look like losers** (Aaron, 2026-08-28: *"when two
+   *  things died in a clash, they both were losers, but only one showed the
+   *  graveyard animation and the skull icon"*). The verdict took the beat away
+   *  from the single-card death moment — which stopped three scenes stacking
+   *  and quietly stopped the creature that fell from being buried at all. It
+   *  is buried here instead, on its own card inside the fight, which is also
+   *  the only place that can show a mixed wall: two of three blockers dead is
+   *  two stones and one card standing. */
+  dying: number | null
   life: number
 }
 
@@ -1137,8 +1149,8 @@ function walled(blockers: BoutFighter[]): string {
  * the picture is showing. The wall is named underneath, where the note goes.
  */
 export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
-  key: string, speed: Speed, outcome: Outcome | null = null):
-  StagedBout | null {
+  key: string, speed: Speed, outcome: Outcome | null = null,
+  dying: number | null = null): StagedBout | null {
   if (!clash) return null
   const fighter = (card: BoardCard, count: number): BoutFighter => ({
     id: card.id,
@@ -1160,6 +1172,7 @@ export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
       : outcome === 'held' ? 'Broke through' : 'Blocked',
     note: blockers.length ? `by ${walled(blockers)}` : null,
     outcome,
+    dying,
     life: boutLife(speed),
   }
 }
