@@ -27,6 +27,22 @@ const MaxTitle = 200
 // none of the emblems, schemes, planes and vanguards that cannot be in one.
 const isCard = "json_extract_string(legalities, 'commander') IN ('legal', 'banned')"
 
+// titleScore is how alike a written name and a pool name are: jaro-winkler,
+// scored against the whole name *and* the front face, the better of the two,
+// because the thing doing the writing only ever sees one side of a
+// double-faced card -- a camera sees one face, and a person typing writes the
+// one they know.
+//
+// **A const rather than a copy in each query, and that is the point.** Three
+// callers score names now -- [ByTitle] for a photographed title, [Suggest]
+// for a name being typed, and `deckimport.Respell` for a name pasted in a
+// list, which reaches it through [ByTitle] -- and they must agree on what
+// "alike" means or the thresholds each one argues are arguing about different
+// numbers. Takes the query twice, once per side.
+const titleScore = `greatest(
+	jaro_winkler_similarity(lower(name), lower(?)),
+	jaro_winkler_similarity(lower(split_part(name, ' // ', 1)), lower(?)))`
+
 var (
 	faceNumber   = regexp.MustCompile(`^\s*([^/\s]+)`)
 	setCodeRe    = regexp.MustCompile(`^[A-Za-z0-9]{2,6}$`)
@@ -194,9 +210,7 @@ func ByTitle(ctx context.Context, c *pool.Conn, title string, limit int) ([]Cand
 		limit = 1
 	}
 	rows, err := c.DB().QueryContext(ctx,
-		`SELECT name, greatest(
-		           jaro_winkler_similarity(lower(name), lower(?)),
-		           jaro_winkler_similarity(lower(split_part(name, ' // ', 1)), lower(?))) AS score
+		`SELECT name, `+titleScore+` AS score
 		 FROM oracle_cards WHERE `+isCard+`
 		 ORDER BY score DESC, edhrec_rank NULLS LAST
 		 LIMIT ?`, text, text, limit)

@@ -68,6 +68,104 @@ func (a *API) search(w http.ResponseWriter, r *http.Request) {
 	wire.JSON(w, http.StatusOK, out)
 }
 
+// offeredCard is one card on the shortlist behind "add a card": enough to
+// draw a row, draw the whole card beside it, credit the painter, and say the
+// two things the write path would otherwise only say *after* somebody has
+// written a rationale -- that a card is banned, or outside this deck's
+// colours.
+//
+// `is_land` is here for the same reason the importer infers it: filing a card
+// under `land` is a card pool fact (`CardRecord.IsLand`, right about the
+// double-faced cards a type line is wrong about) and not an opinion. Every
+// other category is an opinion and stays the person's. **Nothing here carries
+// a rationale, and nothing ever will** -- rule 4, ADR 8, ADR 11.
+type offeredCard struct {
+	Name          string   `json:"name"`
+	ManaCost      *string  `json:"mana_cost"`
+	TypeLine      string   `json:"type_line"`
+	OracleText    string   `json:"oracle_text"`
+	ColorIdentity []string `json:"color_identity"`
+	Image         *string  `json:"image"`
+	// The painter, owed a credit wherever the painting renders (ADR 6's
+	// hot-link terms, ADR 32, commandment 9). A card image with no line under
+	// it is the violation, not a missing nicety.
+	Artist         *string `json:"artist"`
+	LegalCommander bool    `json:"legal_commander"`
+	IsLand         bool    `json:"is_land"`
+	// How alike the name is to what was typed, and which tier offered it:
+	// `opens`, `holds`, `words` or `near`. The interface says different things
+	// about a name it found and a name it is guessing at, and only the server
+	// knows which happened.
+	Score float64 `json:"score"`
+	Via   string  `json:"via"`
+}
+
+// suggest is `GET /api/cards/suggest` -- the typeahead behind "add a card".
+//
+// Private, like every other card route: nothing is added to the door's
+// allowlist, so it is refused without a session before routing.
+//
+// **It filters by neither legality nor the deck's colours, and that is the
+// decision worth recording.** Both would have been easy and both are wrong
+// here: a card hidden from the list is indistinguishable from a card that
+// does not exist, and the person is left retyping a name that was right all
+// along. The same argument as "an invalid deck is simulated, not refused" --
+// removing the diagnosis exactly when it is wanted. So a banned card is
+// listed and *marked*, the deck's identity is checked in the browser against
+// `color_identity` and *marked*, and the authoritative refusal stays where it
+// has always been: `playableCard`, one implementation of the rule.
+func (a *API) suggest(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var errs []wire.ValidationError
+	text := last(q, "q")
+	limit := boundedInt(q, "limit", 8, 1, cards.MaxSuggestions, &errs)
+	if len(errs) > 0 {
+		wire.Unprocessable(w, errs...)
+		return
+	}
+	out := []offeredCard{}
+	err := a.usePool(r.Context(), func(c *pool.Conn) error {
+		found, err := cards.Suggest(r.Context(), c, text, limit)
+		if err != nil {
+			return err
+		}
+		names := make([]string, 0, len(found))
+		for _, s := range found {
+			names = append(names, s.Name)
+		}
+		records, err := c.GetCards(r.Context(), names)
+		if err != nil {
+			return err
+		}
+		for _, s := range found {
+			rec := records[s.Name]
+			if rec == nil {
+				// The pool moved under the shortlist between the two queries.
+				// Dropped rather than half-rendered: a row with no card
+				// behind it is a row somebody would click.
+				continue
+			}
+			out = append(out, offeredCard{
+				Name: rec.Name, ManaCost: rec.ManaCost, TypeLine: rec.TypeLine,
+				OracleText: rec.OracleText, ColorIdentity: rec.ColorIdentity,
+				Image: rec.ImageNormal, Artist: rec.Artist,
+				LegalCommander: rec.LegalCommander, IsLand: rec.IsLand(),
+				Score: math.Round(s.Score*10000) / 10000, Via: s.Via,
+			})
+		}
+		return nil
+	})
+	if errors.Is(err, pool.ErrNoPool) {
+		wire.JSON(w, http.StatusOK, map[string]any{"cards": []any{}, "message": noPoolMessage})
+		return
+	}
+	if err != nil {
+		a.fail(w, "suggest", err)
+		return
+	}
+	wire.JSON(w, http.StatusOK, map[string]any{"cards": out})
+}
+
 // identifiedCard is `service._identified_card`: the compact card a camera
 // review list renders -- forty of them, each with a picture, on a phone.
 type identifiedCard struct {
@@ -267,6 +365,16 @@ func optionalFloat(q map[string][]string, name string, errs *[]wire.ValidationEr
 }
 
 // boundedInt is `Query(default, ge=lo, le=hi)` on an int.
+//
+// `name` is "limit" at every call site today, which `unparam` notices and
+// reports. It stays because this is one of a family -- `boundedFloat` and
+// `flag` beside it take the same `(q, name, ...)` shape, and `flag` really
+// does vary its name ("identity_exact", "commanders_only"). Dropping the
+// parameter here would buy one fewer argument and cost the reader the
+// symmetry that says these three are the same kind of thing; the error
+// messages below would also have to hardcode a name they currently quote.
+//
+//nolint:unparam // one of a family; see above
 func boundedInt(q map[string][]string, name string, fallback, lo, hi int, errs *[]wire.ValidationError) int {
 	vals := q[name]
 	if len(vals) == 0 {

@@ -301,12 +301,14 @@ func (a *API) Routes() []Route {
 		// alone is therefore a 404.
 		{Method: http.MethodGet, Pattern: "/api/claude", Handler: a.claudeStatus},
 		{Method: http.MethodGet, Pattern: "/api/tarot/reading", Handler: a.tarotReading},
-		// The pool behind the prose, and the pool's own two doors (the
+		// The pool behind the prose, and the pool's own three doors (the
 		// second family): a combination's champions and signature cards,
-		// the shelves' named cards, the search box, and the camera's reader.
+		// the shelves' named cards, the search box, the typeahead behind
+		// "add a card", and the camera's reader.
 		{Method: http.MethodGet, Pattern: "/api/colors/{key}", Handler: a.combination},
 		{Method: http.MethodGet, Pattern: "/api/lore", Handler: a.lore},
 		{Method: http.MethodGet, Pattern: "/api/cards/search", Handler: a.search},
+		{Method: http.MethodGet, Pattern: "/api/cards/suggest", Handler: a.suggest},
 		{Method: http.MethodPost, Pattern: "/api/cards/identify", Handler: a.identify},
 		// The deck reads (the third family): the shelf, the deck, the gate's
 		// verdict, the analysis, the suggestions, the tokens the deck makes,

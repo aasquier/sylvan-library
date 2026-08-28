@@ -17,13 +17,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  api, type Card, type ClaudeStatus, type DeckRef, type EditResult,
+  api, type Card, type CardOffer, type ClaudeStatus, type DeckRef, type EditResult,
   type InterviewReport, type SlotArgumentReport,
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { presetLabel } from '../lib/claudecopy'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { CardArt, CardHover, ErrorNote, ManaCost, ManaText, Select } from '../components/ui'
+import { CardFinder } from './cardfinder'
 import { SwapComposer } from './swap'
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS).filter((k) => k !== 'commander')
@@ -570,15 +571,39 @@ export function RationaleEditor({
   )
 }
 
-/** Add a card to the 99 or the swap board. */
-export function AddCardForm({ deck, stage, onDone }: {
+/**
+ * Add a card to the 99 or the swap board.
+ *
+ * The name is *found* rather than recalled — `CardFinder` holds that argument,
+ * and the sentence it replaced ("Exact name — checked against the pool") is
+ * quoted there as the specification of what was wrong.
+ *
+ * Two things follow here, and both are the same rule read in opposite
+ * directions. **The category may be filled in, once, and only from a card pool
+ * fact**: a land is filed under `land`, which is `CardRecord.IsLand` and the
+ * importer's own inference, right about the double-faced cards a type line is
+ * wrong about. **The rationale may never be filled in at all**, by this or by
+ * anything else — the textarea takes the user's keystrokes and nothing else
+ * (rule 4, ADR 8, ADR 11), and the finder has no path into it. The card's own
+ * rules text renders beside the box for the same reason it does in the
+ * rationale editor: so the thinking happens against what the card says.
+ */
+export function AddCardForm({ deck, stage, identity, onDone }: {
   deck: DeckRef
   stage: string
+  /** The deck's colour identity, so a card outside it is marked while it is
+   *  being chosen instead of refused after a rationale has been written. */
+  identity: string[]
   onDone: (result: EditResult) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
+  const [card, setCard] = useState<CardOffer | null>(null)
   const [category, setCategory] = useState('ramp')
+  // Whether the person has filed this card themselves. Until they do, picking
+  // a land re-files it — and picking anything else leaves their last choice
+  // alone, because "ramp" was as good a guess as any and losing a deliberate
+  // one on every keystroke would be worse than not guessing.
+  const [filed, setFiled] = useState(false)
   const [why, setWhy] = useState('')
   const [qty, setQty] = useState(1)
   const [to, setTo] = useState('cards')
@@ -589,17 +614,25 @@ export function AddCardForm({ deck, stage, onDone }: {
   // still to come (ADR 13), so the field is optional there and required here.
   const rationaleRequired = stage !== 'draft'
 
+  function pick(chosen: CardOffer | null) {
+    setCard(chosen)
+    setError(null)
+    if (chosen && !filed) setCategory(chosen.is_land ? 'land' : 'ramp')
+  }
+
   async function submit() {
+    if (!card) return
     setBusy(true)
     setError(null)
     try {
       const result = await api.addCard(deck, {
-        name: name.trim(), category, why: why.trim(), qty, to,
+        name: card.name, category, why: why.trim(), qty, to,
       })
       onDone(result)
-      setName('')
+      setCard(null)
       setWhy('')
       setQty(1)
+      setFiled(false)
       setOpen(false)
     } catch (e) {
       setError(String((e as Error).message ?? e))
@@ -618,17 +651,15 @@ export function AddCardForm({ deck, stage, onDone }: {
   }
 
   return (
-    <div className="card-surface space-y-3 rounded-lg p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide"
-                style={{ color: 'var(--text-muted)' }}>Card name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)}
-                 placeholder="Exact name — checked against the pool"
-                 className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2"
-                 style={inputStyle} />
-        </label>
-        <Select label="Category" value={category} onChange={setCategory}
+    <div className="card-surface w-full space-y-3 rounded-lg p-4">
+      {/* The finder gets the full width rather than a quarter of the grid: it
+          carries a painting and a list, and a card squeezed into a 25% column
+          is the thing this change exists to stop. */}
+      <CardFinder value={card} onChange={pick} identity={identity} />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Select label="Category" value={category}
+                onChange={(v) => { setCategory(v); setFiled(true) }}
                 options={CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))} />
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide"
@@ -655,16 +686,18 @@ export function AddCardForm({ deck, stage, onDone }: {
       </label>
 
       {error && <ErrorNote>{error}</ErrorNote>}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <PrimaryButton onClick={submit}
-                       disabled={busy || !name.trim() || (rationaleRequired && !why.trim())}>
+                       disabled={busy || !card || (rationaleRequired && !why.trim())}>
           {busy ? 'Adding…' : 'Add card'}
         </PrimaryButton>
         <QuietButton onClick={() => { setOpen(false); setError(null) }} disabled={busy}>
           Cancel
         </QuietButton>
         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          Legality and colour identity are checked against the pool before anything is written.
+          {card
+            ? 'Nothing is written until you press Add — and the rationale is yours to write.'
+            : 'Every card is checked against the library, and every card carries a reason.'}
         </span>
       </div>
     </div>

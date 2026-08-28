@@ -15909,6 +15909,291 @@ button:hover .tarot-fan-card {
   .stage-arva-art { animation: none; opacity: 0.72; }
 }
 
+/* ------------------------------------------------------- the card finder
+ *
+ * `components/cardfinder.tsx` — the combobox that replaced the "exact name"
+ * text box on a deck's 99. Three things are argued here rather than in the
+ * component, because they are all facts about layout and materials:
+ *
+ * **1. A container query, not a breakpoint.** This field lives in a form that
+ * is one column on a phone and four columns on a desk, so the viewport's
+ * width does not answer the only question that matters — how much room does
+ * *this field* have. `sm:` has guessed wrong about Aaron's phone once already
+ * and cost three rounds. `@container` asks the real question, and Safari
+ * 16.4 (the declared floor) has had it since 16.0.
+ *
+ * **2. The card sits below the list when it is narrow and beside it when it
+ * is wide**, and the DOM order is both. On a phone the list has to be the
+ * thing under the typing — a 460px card between the box and the first row
+ * pushes every option off the bottom of the screen with the keyboard up —
+ * and once a card is chosen the list is gone and the card is under the box
+ * anyway. So the order never changes and nothing needs `order` or
+ * `row-reverse` to move it; only the axis changes. The card is *bigger*
+ * where there is less room, which reads backwards and is not: narrow is
+ * where it is the only thing on its row.
+ *
+ * **3. Nothing filters the painting.** No blur, no grayscale, no opacity on
+ * the card itself (ADR 32, commandment 9). The only thing that ever sits over
+ * a card image here is the hover lift the whole tile takes, and the credit
+ * line, which is underneath it. */
+.finder {
+  position: relative;
+}
+.finder-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.finder-input {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 2rem 0 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--hairline);
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+.finder-input::placeholder {
+  color: var(--text-muted);
+}
+.finder-input:hover {
+  border-color: color-mix(in srgb, var(--vine) 55%, var(--hairline));
+}
+/* The vine ring, the same one every button focuses with — a keyboard should
+   find this field the way it finds everything else. */
+.finder-input:focus {
+  border-color: var(--vine);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vine) 26%, transparent);
+}
+.finder-clear {
+  position: absolute;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+.finder-clear:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--vine) 16%, transparent);
+  border-color: color-mix(in srgb, var(--vine) 40%, transparent);
+}
+.finder-clear:active {
+  transform: scale(0.92);
+}
+.finder-clear:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
+.finder-body {
+  container-type: inline-size;
+}
+.finder-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.finder-results {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.finder-preview {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+/* Wide enough for a column beside a column: the list and the rules text
+   stack on the left, the card stands to the right of both. A named grid
+   rather than a second flex axis, because the *order* differs between the
+   two layouts — narrow wants the card before the rules text, wide wants
+   them side by side — and areas say that once instead of three `order`s. */
+@container (min-width: 420px) {
+  .finder-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 158px;
+    grid-template-areas:
+      'results card'
+      'rules   card';
+    align-items: start;
+    column-gap: 1rem;
+  }
+  .finder-results { grid-area: results; }
+  .finder-preview { grid-area: card; }
+  .finder-rules { grid-area: rules; }
+  .finder-cardwrap {
+    width: 138px;
+  }
+}
+
+.finder-cardwrap {
+  display: block;
+  width: min(210px, 66%);
+  max-width: 100%;
+  border-radius: 0.7rem;
+  /* The lift is on the frame, never on the painting: a `filter` here would
+     be exactly the treatment ADR 32 forbids, and a `filter` also kills
+     `preserve-3d` on anything inside it. */
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+.finder-cardwrap:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+.finder-card {
+  display: block;
+  width: 100%;
+  border-radius: 0.7rem;
+}
+.finder-cardless {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 488 / 680;
+  padding: 0.5rem;
+  border-radius: 0.7rem;
+  background: var(--gridline);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+/* The licence made visible, not decoration. */
+.finder-credit {
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+
+.finder-list {
+  max-height: 17rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 0.6rem;
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+.finder-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  /* 44px of thumb, whatever the text does. */
+  min-height: 2.75rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.finder-row + .finder-row {
+  border-top: 1px solid var(--gridline);
+}
+.finder-row:hover,
+.finder-row.is-active {
+  background: color-mix(in srgb, var(--vine) 14%, transparent);
+  border-left-color: var(--vine);
+}
+.finder-row-name {
+  grid-column: 1;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  /* Wraps rather than truncates: a name is the thing being chosen, and half
+     of one with an ellipsis is not a choice. */
+  overflow-wrap: anywhere;
+}
+.finder-row-type {
+  grid-column: 1;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.finder-row-cost {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  white-space: nowrap;
+}
+/* Said once, above the first guessed row, rather than on every row. */
+.finder-guess {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vine);
+}
+
+.finder-note {
+  margin-top: 0.4rem;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.finder-warning,
+.finder-ok {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+.finder-warning {
+  background: color-mix(in srgb, var(--status-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-warning) 45%, transparent);
+}
+.finder-ok {
+  background: color-mix(in srgb, var(--vine) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vine) 34%, transparent);
+}
+.finder-rules {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finder-input,
+  .finder-clear,
+  .finder-cardwrap,
+  .finder-row {
+    transition: none;
+  }
+  .finder-cardwrap:hover {
+    transform: none;
+  }
+}
+
 /* ═══════════════════════════════════ clearing the table, and the phone's edges
  *
  * Aaron, 2026-08-28: "Can we do a fullscreen mode? I hate seeing all the web

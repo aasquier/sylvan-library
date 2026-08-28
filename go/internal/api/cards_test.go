@@ -173,6 +173,79 @@ func TestSearchAnswersAsServiceSearchCardsDoes(t *testing.T) {
 	}
 }
 
+// The typeahead behind "add a card". The tiers are `cards.Suggest`'s and are
+// tested there; what this asks is the half the browser depends on -- that
+// every row arrives whole, that the painting arrives with its painter, and
+// that the two things the write path would otherwise only say *after* a
+// rationale has been written are on the row before it.
+func TestSuggestAnswersWholeRowsWithTheirPainterNamed(t *testing.T) {
+	t.Parallel()
+	a := New(Config{Pool: pooltest.Open(t)})
+	status, body, raw := call(t, a, "GET", "/api/cards/suggest?q=Sol+Rng", "")
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	rows := body["cards"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("a misspelled name offered %d rows: %s", len(rows), raw)
+	}
+	row := rows[0].(map[string]any)
+	for _, key := range []string{"name", "mana_cost", "type_line", "oracle_text",
+		"color_identity", "image", "artist", "legal_commander", "is_land", "score", "via"} {
+		if _, ok := row[key]; !ok {
+			t.Errorf("an offered card lacks %q: %s", key, raw)
+		}
+	}
+	if row["name"] != "Sol Ring" || row["via"] != "near" {
+		t.Fatalf("Sol Rng: %v", row)
+	}
+	// **The painting and the painter travel together.** ADR 6 hot-links the
+	// image; ADR 32 and commandment 9 owe the artist a credit wherever it
+	// renders, and a row that carried a picture with no name to put under it
+	// would make that credit impossible in the browser.
+	if row["image"] == nil || row["artist"] == nil {
+		t.Fatalf("a picture with nobody credited for it: %v", row)
+	}
+	if !strings.HasPrefix(row["image"].(string), "https://") {
+		t.Fatalf("the image is not a hot-link: %v", row["image"])
+	}
+	// A banned card is offered and *marked*, never hidden -- hiding it is
+	// indistinguishable from it not existing, and search (which does filter)
+	// is exactly where that goes wrong today.
+	_, banned, rawBanned := call(t, a, "GET", "/api/cards/suggest?q=Black+Lotus", "")
+	lotus := banned["cards"].([]any)
+	if len(lotus) == 0 || lotus[0].(map[string]any)["name"] != "Black Lotus" {
+		t.Fatalf("a banned card was hidden: %s", rawBanned)
+	}
+	if lotus[0].(map[string]any)["legal_commander"] != false {
+		t.Fatalf("a banned card was not marked: %s", rawBanned)
+	}
+	// `is_land` is the one category a card pool fact can fill, and it is the
+	// importer's own rule rather than a second one.
+	_, lands, _ := call(t, a, "GET", "/api/cards/suggest?q=Llanowar", "")
+	if lands["cards"].([]any)[0].(map[string]any)["is_land"] != true {
+		t.Fatalf("Llanowar Reborn is a land: %v", lands)
+	}
+	_, notLand, _ := call(t, a, "GET", "/api/cards/suggest?q=Sol+Ring", "")
+	if notLand["cards"].([]any)[0].(map[string]any)["is_land"] != false {
+		t.Fatalf("Sol Ring is not a land: %v", notLand)
+	}
+	// Nothing like it is an empty list, never null -- the browser iterates it.
+	if _, _, empty := call(t, a, "GET", "/api/cards/suggest?q=zzzz-no-such-card", ""); string(empty) != `{"cards":[]}` {
+		t.Fatalf("nothing: %s", empty)
+	}
+	// And the limit is bounded the way every other route's is.
+	for _, target := range []string{"/api/cards/suggest?limit=abc", "/api/cards/suggest?limit=0",
+		"/api/cards/suggest?limit=21"} {
+		if status, _, raw := call(t, a, "GET", target, ""); status != 422 {
+			t.Errorf("%s: %d %s", target, status, raw)
+		}
+	}
+	if _, few, _ := call(t, a, "GET", "/api/cards/suggest?q=e&limit=2", ""); len(few["cards"].([]any)) != 2 {
+		t.Fatalf("limit=2: %v", few)
+	}
+}
+
 func TestSearchRefusesBadParametersWithTheValidationList(t *testing.T) {
 	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t)})
@@ -349,6 +422,10 @@ func TestWithoutAPoolTheAnswersDegradeToTheRecordedShapes(t *testing.T) {
 	}
 	if _, body, _ := call(t, a, "POST", "/api/cards/identify", `{"sightings": []}`); body["message"] == nil {
 		t.Fatalf("identify: %v", body)
+	}
+	if _, body, _ := call(t, a, "GET", "/api/cards/suggest?q=sol", ""); body["message"] == nil ||
+		len(body["cards"].([]any)) != 0 {
+		t.Fatalf("suggest: %v", body)
 	}
 	if _, body, _ := call(t, a, "GET", "/api/colors/G", ""); body["pool"] != false || body["exact_total"] != nil ||
 		len(body["champions"].([]any)) != 0 {

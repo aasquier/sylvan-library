@@ -1228,7 +1228,9 @@ export default function DeckDetail() {
 
           {deck.writable && (
             <div className="flex flex-wrap items-center gap-3">
-              <AddCardForm deck={deckRef} stage={deck.stage} onDone={() => void refresh()} />
+              <AddCardForm deck={deckRef} stage={deck.stage}
+                           identity={deck.color_identity}
+                           onDone={() => void refresh()} />
               {/* Bulk entombment is a mode, not a standing row of checkboxes:
                   entering it is the first deliberate step, the armed button
                   naming the count is the second, so a sweep is never one
