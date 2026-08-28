@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import Claim from './routes/Claim'
 import Library from './routes/Library'
 import Login from './routes/Login'
@@ -22,6 +22,7 @@ const AboutClaude = lazy(() => import('./routes/AboutClaude'))
 const Admin = lazy(() => import('./routes/Admin'))
 const CardSearch = lazy(() => import('./routes/CardSearch'))
 const Coliseum = lazy(() => import('./routes/Coliseum'))
+const ColorPage = lazy(() => import('./routes/ColorPage'))
 const DeckDetail = lazy(() => import('./routes/DeckDetail'))
 const DeckRedirect = lazy(() => import('./routes/DeckRedirect'))
 const Import = lazy(() => import('./routes/Import'))
@@ -473,6 +474,13 @@ export default function App() {
               nothing for a path segment to name. */}
           <Route path="/research" element={<Research />} />
           <Route path="/learn" element={<Learn />} />
+          {/* One page per colour combination, all 32 of them. The segment is
+              a name (`/colors/golgari`) or the letters (`/colors/wubrg`) —
+              `lib/colors.ts` argues which is which and what else each will
+              answer to. A bare `/colors` is the index, which is Learn's
+              colours tab, so it lands there rather than at the catch-all. */}
+          <Route path="/colors/:slug" element={<ColorPage />} />
+          <Route path="/colors" element={<Navigate to="/learn?tab=colors" replace />} />
           <Route path="/claude" element={<AboutClaude />} />
           {/* Declared unconditionally. A non-admin who types the URL gets the
               page's own 403 from the API rather than the catch-all's "nothing

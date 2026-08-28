@@ -36,7 +36,7 @@ function combo(key: string, name: string, tier: string, colors: string[]): Combi
     // The teaching fields. Empty here on purpose: the wheel is geometry and
     // labels, and nothing about the diagram should start depending on whether
     // a slot has a story or a creed attached.
-    creed: null, lore: '', champions: [], signature: [],
+    creed: null, sigil: null, lore: '', champions: [], signature: [],
   }
 }
 
@@ -127,16 +127,18 @@ describe('the colour wheel', () => {
     expect(onPick).toHaveBeenCalledTimes(2)
   })
 
-  it('captions what the pointer is on, and says a line changes tier', () => {
+  it('captions what the pointer is on, and names where the click goes', () => {
     draw()
     fireEvent.mouseEnter(target('Golgari'))
     expect(screen.getByText('Golgari')).toBeTruthy()
     expect(screen.getByText(/enemy pair/)).toBeTruthy()
-    // The click moves the tier selector underneath the user, so it says so.
-    expect(screen.getByText(/cross to the guilds/)).toBeTruthy()
+    // A click leaves the screen for that combination's own page now, so the
+    // caption names the destination rather than describing a panel opening
+    // below — which is what it used to do, and what it used to do it for.
+    expect(screen.getByText('Open Golgari.')).toBeTruthy()
 
     fireEvent.mouseEnter(target('Mono-W'))
-    expect(screen.getByText(/read Mono-W below/)).toBeTruthy()
+    expect(screen.getByText('Open Mono-W.')).toBeTruthy()
   })
 
   it('says nothing about a combination it cannot draw', () => {

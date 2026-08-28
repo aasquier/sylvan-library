@@ -394,14 +394,13 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
                  style={{ color: 'var(--text-secondary)' }}>
                 {captioned.tagline}
               </p>
-              {/* Says what the click does rather than what it is near. A
-                  guild sits in a different tier from the diagram it was
-                  clicked on, and a control that silently moves the tier
-                  selector under you should say so first. */}
+              {/* Says what the click does rather than what it is near. It
+                  used to say "below" and "cross to the guilds", because it
+                  opened a panel under the diagram; each of the 32 has a page
+                  of its own now, and a control that leaves the screen should
+                  say so before it does. */}
               <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                {captioned.tier === 'mono'
-                  ? `Click to read ${captioned.name} below.`
-                  : `Click to cross to the guilds, at ${captioned.name}.`}
+                Open {captioned.name}.
               </p>
             </>
           ) : (

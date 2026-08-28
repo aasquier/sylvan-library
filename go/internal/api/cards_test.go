@@ -357,8 +357,12 @@ func TestCombinationResolvesThroughThePoolAndDropsWhatItLacks(t *testing.T) {
 	if body["exact_total"].(float64) < 3 {
 		t.Fatalf("exact_total %v; the fixture has several mono-green legal cards", body["exact_total"])
 	}
+	// Every field the detail owes a reader, `creed` and `sigil` included: both
+	// pass through untouched by the pool lookup and both are `null` on most of
+	// the 32, which is a shape a renderer branches on -- and a shape a payload
+	// that silently stopped carrying the key would break without failing.
 	for _, key := range []string{"key", "name", "tier", "colors", "size", "tagline", "history", "lore",
-		"aliases", "verified_by", "pool", "champions", "signature", "dropped", "exact_total"} {
+		"aliases", "verified_by", "creed", "sigil", "pool", "champions", "signature", "dropped", "exact_total"} {
 		if _, ok := body[key]; !ok {
 			t.Errorf("combination lacks %q", key)
 		}
