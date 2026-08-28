@@ -2082,7 +2082,13 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
           second. */}
       {arriving && ghost && (
         <span key={arriving} className="field-pile-ghost" aria-hidden="true">
-          <img src={ghost.art.url} alt="" draggable={false} />
+          {/* The pallor is the sheet of light on the wrapper, not a filter
+              through the painting — `.field-pile-ghost-lit` in index.css
+              carries the argument. The wrapper exists because an `<img>` is
+              a replaced element and has no pseudo-element to lay light on. */}
+          <span className="field-pile-ghost-lit">
+            <img src={ghost.art.url} alt="" draggable={false} />
+          </span>
         </span>
       )}
       <span className="field-pile-label">{short}</span>

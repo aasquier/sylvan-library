@@ -80,15 +80,32 @@ it('renders the room onto the body, not inside its parent', () => {
   expect(backdrop?.closest('.page-enter')).toBeNull()
 })
 
-it('carries the page art and both gallery lanes', () => {
+it('carries both gallery lanes, and no third copy of the painting', () => {
   render(<SceneBackdrop art={ART} />)
 
   const images = [...document.querySelectorAll<HTMLImageElement>('.scene-backdrop img')]
-  // The wash plus the two lanes, all the same painting — the room adds no
-  // second source and so needs no second credit.
-  expect(images).toHaveLength(3)
+  // **Two, and it used to be three.** The third was the full-viewport wash,
+  // which was this painting again at `blur(11px)` — Scryfall's imagery
+  // guidelines name blur outright, and ADR 48 replaced the image with nine
+  // colours sampled out of it. The lanes are still the painting, and still
+  // the same one, so the room adds no second source and needs no second
+  // credit.
+  expect(images).toHaveLength(2)
   expect(images.every((img) => img.getAttribute('src') === ART)).toBe(true)
   expect(document.querySelectorAll('.scene-lane')).toHaveLength(2)
+})
+
+it('does without a wash rather than breaking when the art cannot be read', () => {
+  // jsdom has no canvas, so `useArtWash` takes the exact path a tainted or
+  // failed read takes in a browser. The assertion is the fallback contract:
+  // no wash element, no card image standing in for one, and the room's own
+  // loop still rendering underneath. A missing wash is a quieter page.
+  render(<SceneBackdrop art={ART} />)
+
+  expect(document.querySelector('.scene-backdrop-wash')).toBeNull()
+  expect(document.querySelector('.scene-backdrop')).not.toBeNull()
+  expect(document.querySelectorAll('.scene-mist source').length)
+    .toBeGreaterThan(0)
 })
 
 it('is decoration, so nothing in it reaches a screen reader', () => {

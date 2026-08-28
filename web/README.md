@@ -121,6 +121,23 @@ following the same geometry — there is no build step to run and nothing in
   under the title; the non-library pages draw on the Strixhaven Mystical
   Archive cycle (the argument is in `CardSearch.tsx`). Never commit an image
   (rule 5, ADR 6).
+- **Light goes ON a card, never through it** (commandment 19, ADR 48). No
+  `filter` may land on an element that is a Scryfall image or an ancestor of
+  one — not `brightness`, not `saturate`, not `blur`, not a `url(#…)`, and not
+  through a `@keyframes` the rule merely names. Scryfall's guidelines say
+  *"Do not blur, sharpen, desaturate, or color-shift card images"* and *"Do
+  not distort, skew, or stretch"*, and fifteen violations of that reached the
+  live site under an ADR that already forbade them. Draw the effect as a
+  layer instead: an `::after` on the box the card is already in for a shade,
+  `.art-lift` for a screened sheet of light, `.art-dimmed` when the card has
+  no box of its own. `.field-card-leaf::after` is the reference, and
+  index.css's "light lands ON a card" block carries the arithmetic for
+  converting an old `brightness(k)` into an alpha.
+  `go/cmd/mtglab/cardimagery_test.go` enforces it against the committed
+  bundle — **its stylesheet and its script**, so an inline `style={{ filter }}`
+  in JSX is caught too, and banned outright wherever it lands. Adding a class
+  to that file's `artBearing` with nothing else done fails immediately, which
+  is the right way round.
 - **A committed asset comes from a recipe.** The exception to the rule above
   is CC0/public-domain imagery that must be ours (the ivy under
   `src/assets/ambience/`), and it arrives only through `animist`
