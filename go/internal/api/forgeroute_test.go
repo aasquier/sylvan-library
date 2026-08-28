@@ -717,6 +717,7 @@ func TestAnOldShimAnswersFlatAndIsStillUnderstood(t *testing.T) {
 // `/api/claude` set: configuration is a fact of the environment, and
 // reachability is discovered when work is actually asked for.
 func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{}
 	a, _, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)

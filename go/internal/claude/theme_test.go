@@ -617,9 +617,9 @@ func TestWhatTheTwoChecksRefuse(t *testing.T) {
 func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
 	// **Serial, and measured rather than read**: `noEnvOverrides` calls
 	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and the helper is in `dossier_test.go`, a file away --
-	// which is why the audit adds the line and runs the test rather than
-	// reading for a reason.
+	// says so -- the call is one helper away, and that helper is in
+	// `dossier_test.go`, a file away -- which is why the audit adds the line
+	// and runs the test rather than reading for a reason.
 	//
 	// The blocker is `claude.Ceiling`, the last reader of
 	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
@@ -665,9 +665,9 @@ func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
 func TestEveryThemeProposalOutcomeAgreesWithTheCorpus(t *testing.T) {
 	// **Serial, and measured rather than read**: `noEnvOverrides` calls
 	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and the helper is in `dossier_test.go`, a file away --
-	// which is why the audit adds the line and runs the test rather than
-	// reading for a reason.
+	// says so -- the call is one helper away, and that helper is in
+	// `dossier_test.go`, a file away -- which is why the audit adds the line
+	// and runs the test rather than reading for a reason.
 	//
 	// The blocker is `claude.Ceiling`, the last reader of
 	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a

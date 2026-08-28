@@ -30,7 +30,7 @@ import (
 // because `call` sets `application/json` on every non-empty body -- which is
 // right, every real client does -- and half of what is below is about what
 // happens when a client does not.
-func wheelRaw(t *testing.T, a *API, contentType, body string) (int, string, string) {
+func wheelRaw(t *testing.T, a *API, contentType, body string) (int, string) {
 	t.Helper()
 	target := "/api/decks/local/mono-green-clean/wheel"
 	req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
@@ -41,7 +41,7 @@ func wheelRaw(t *testing.T, a *API, contentType, body string) (int, string, stri
 	req.SetPathValue("slug", "mono-green-clean")
 	rec := httptest.NewRecorder()
 	a.deckWheel(rec, req)
-	return rec.Code, rec.Body.String(), rec.Header().Get("Content-Type")
+	return rec.Code, rec.Body.String()
 }
 
 // A body that is not JSON -- by its content type, whatever its bytes say --
@@ -58,7 +58,7 @@ func TestABodyWithoutAJSONContentTypeIsRefusedWithItsOwnBytes(t *testing.T) {
 		"application",                       // no subtype
 		"application/json; charset",         // unparseable parameters
 	} {
-		status, body, _ := wheelRaw(t, a, ct, `{"seed":7}`)
+		status, body := wheelRaw(t, a, ct, `{"seed":7}`)
 		if status != http.StatusUnprocessableEntity {
 			t.Errorf("content type %q -> %d: %s", ct, status, body)
 			continue
@@ -76,7 +76,7 @@ func TestABodyWithoutAJSONContentTypeIsRefusedWithItsOwnBytes(t *testing.T) {
 	// discriminator rather than a blanket refusal.
 	for _, ct := range []string{"application/json", "application/json; charset=utf-8",
 		"application/vnd.api+json"} {
-		if status, body, _ := wheelRaw(t, a, ct, `{"seed":7}`); status != http.StatusOK {
+		if status, body := wheelRaw(t, a, ct, `{"seed":7}`); status != http.StatusOK {
 			t.Errorf("content type %q -> %d: %s", ct, status, body)
 		}
 	}
@@ -96,7 +96,7 @@ func TestJSONThatIsNotAnObjectIsRefusedWithTheValueItParsedTo(t *testing.T) {
 		{`"seed"`, `"input":"seed"`},
 		{`true`, `"input":true`},
 	} {
-		status, got, _ := wheelRaw(t, a, "application/json", row.body)
+		status, got := wheelRaw(t, a, "application/json", row.body)
 		if status != http.StatusUnprocessableEntity {
 			t.Errorf("%s -> %d: %s", row.body, status, got)
 			continue
@@ -120,7 +120,7 @@ func TestAnEmptyOrNullBodyIsAFreshSpinRatherThanARefusal(t *testing.T) {
 		{"application/json", "  null "}, // ...with whitespace around it
 		{"application/json", "{}"},      // and the empty object it stands for
 	} {
-		status, got, _ := wheelRaw(t, a, row.ct, row.body)
+		status, got := wheelRaw(t, a, row.ct, row.body)
 		if status != http.StatusOK {
 			t.Errorf("body %q (%q) -> %d: %s", row.body, row.ct, status, got)
 			continue
@@ -139,7 +139,7 @@ func TestASecondDocumentInTheBodyIsRefusedRatherThanIgnored(t *testing.T) {
 	t.Parallel()
 	a := wheelAPI(t)
 	for _, body := range []string{`{"seed":1}{"seed":2}`, `{} []`, `null null`} {
-		status, got, _ := wheelRaw(t, a, "application/json", body)
+		status, got := wheelRaw(t, a, "application/json", body)
 		if status != http.StatusUnprocessableEntity {
 			t.Errorf("%q -> %d: %s", body, status, got)
 			continue
@@ -151,7 +151,7 @@ func TestASecondDocumentInTheBodyIsRefusedRatherThanIgnored(t *testing.T) {
 	}
 	// And JSON that will not parse at all is the same family with the
 	// parser's own reason, so the two are told apart by `ctx.error`.
-	status, got, _ := wheelRaw(t, a, "application/json", `{"seed":`)
+	status, got := wheelRaw(t, a, "application/json", `{"seed":`)
 	if status != http.StatusUnprocessableEntity || !strings.Contains(got, `"type":"json_invalid"`) {
 		t.Errorf("a truncated body -> %d: %s", status, got)
 	}
@@ -168,7 +168,7 @@ func TestABodyPastTheCeilingIsCutAndTheRemainderIsRefused(t *testing.T) {
 	// One key whose value runs past 1MiB. The reader stops mid-string, so
 	// what the decoder sees is an unterminated document.
 	body := `{"seed":1,"pad":"` + strings.Repeat("x", 1<<20) + `"}`
-	status, got, _ := wheelRaw(t, a, "application/json", body)
+	status, got := wheelRaw(t, a, "application/json", body)
 	if status != http.StatusUnprocessableEntity {
 		t.Fatalf("a %d-byte body -> %d: %s", len(body), status, got)
 	}

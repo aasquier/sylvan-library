@@ -235,9 +235,18 @@ jobs:
       # binary and the two ways of folding those duplicates round differently.
       # `docs/polish/COVERAGE.md` explains it; this line is the one that gates,
       # so this is the formula to raise it against.
+      #
+      # The floor is set half a point or so **below** what the tree measures,
+      # not at it. Two things move the number without anybody changing a test:
+      # this runner is Linux and the machine it is raised on is a Mac, so
+      # `system_linux.go` is compiled here where `system_darwin.go` was
+      # compiled there, and the two folding orders above disagree by a tenth.
+      # A floor set at the measurement would go red on the first of those.
+      # 89.5 was set at a measured 90.1 and 90.0 at a measured 90.4; this is
+      # 90.5 at a measured 90.8.
       - name: Coverage floor
         env:
-          MINIMUM: "90.0"
+          MINIMUM: "90.5"
         run: |
           go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > /dev/null
           TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}' | tr -d '%')

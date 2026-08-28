@@ -56,14 +56,28 @@ lever and a grind is visible before the work starts.
 | | `go tool cover -func` | merged |
 |---|---|---|
 | PR #290 | 90.1% | 89.81% |
-| this pass | **90.4%** | 90.40% |
-| floor in `ci.yml` | **90.0** | |
+| #290's follow-up | 90.4% | 90.40% |
+| this pass | **90.8%** | 90.82% |
+| floor in `ci.yml` | **90.5** | |
 
-To reach 95%, roughly 740 more statements. Of what is left, about 210 needs a
-JVM or a live network (below). **This is now a grind and not a hunt**: the
-sweeps are spent, and what remains is one to six statements per function across
-a few hundred functions. Budget accordingly — this pass moved ~145 statements
-across nine test files, and that was the cheap end.
+To reach 95%, **752 more statements** out of 17,977. Of what is left, about
+184 needs a JVM or a live network (below), so the reachable remainder is
+around 570.
+
+**Budget from what a pass actually moves.** #290's follow-up moved ~145
+statements across nine test files and called that the cheap end; this pass
+moved **105 across eight**, and it was picking the named levers off the list
+below rather than sweeping. At that rate 95% is five or six more passes of
+this size, and every one of them is further into the tail than the last. It is
+reachable and it is not reachable in an afternoon; a session that promises the
+number will deliver tests that assert nothing instead.
+
+**Coverage is not the question worth asking at this altitude.** A statement
+that ran is not a statement anything checked, and the tail is full of one-line
+error returns where the difference is total. `gremlins unleash
+./internal/floats` answers the other question — whether a test would have
+*noticed* — and a pass spent on a LIVED mutant in code that already reads as
+covered buys more than a pass spent on the next tenth of a point.
 
 ## What the floor cannot reach
 
@@ -94,19 +108,26 @@ omitted:
 
 | miss | where | shape of the work |
 |---|---|---|
-| 19 | `internal/gate/validate.go:checkCompanion` | the companion-in-the-99 branch and the violation renderer, including the "and N more" truncation past six. `internal/gate/companioncheck_test.go` has the synthetic-record pattern to extend |
-| 18 | `internal/api/lifecycle.go:importDeck` | — |
+| 19 | `internal/api/lifecycle.go:importDeck` | — |
 | 18 | `internal/api/lifecycle.go:createDeck` | both need **a companion or a partner pair in the 21-card pool**, which it does not have. The fixture is `internal/pool/pooltest`'s embedded JSON; adding to it is a decision, not a patch, because other tests count what is in there |
-| 13 | `internal/deckyaml/deckyaml.go:orderedValue` | the value shapes the emitter has not been handed |
+| 13 | `internal/deckyaml/deckyaml.go:orderedValue` | **do not take this one.** Its two map cases carry a comment saying they are unreachable under `UseOrderedMap` and are kept as a loud failure if the decoder ever stops honouring the option. A test that reached them would have to call the unexported writer directly, and would prove that a branch nothing can enter still works |
 | 12 | `internal/pool/loaders.go:load` | — |
-| 12 | `internal/deckread/commander.go:CommanderDossier` | — |
-| 12 | `internal/claude/canonjson.go:writeValue` | the branches of the canonical encoder no fixture reaches |
-| 11 | `internal/api/wheel.go:readOptionalBody` | a malformed or absent body on the wheel route |
-| 10 | `internal/pool/refresh.go:DownloadBulkFrom` | the stub Scryfall exists; these are its failure shapes |
-| 10 | `internal/deck/deck.go:cardFrom` | — |
+| 12 | `internal/deckread/commander.go:CommanderDossier` | query-failure branches; `internal/api/failingpool_test.go`'s `schemalessPool` is the lever |
+| 12 | `internal/api/upkeep.go:gatherTheLibrary` | the refresh button's own job body |
+| 11 | `internal/pool/refresh.go:OpenWriterWaiting` | the writer's door: the wait, the poll, the give-up. Needs a second process holding the file — `internal/pool/writerlock_test.go` already builds one |
+| 10 | `internal/pool/tokensmade.go:TokensMade` | — |
+| 10 | `internal/api/adminstats.go:statsActivity` | — |
 | 10 | `internal/api/admin.go:inviteAccount` | invite failures with a stubbed sender |
-| ~9 each | `internal/api/jobruns.go:listJobs`, `internal/gate/validate.go:Validate`, `internal/claude/tools/handlers.go:searchCards` | — |
-| ~1,300 | everything else | one to six statements per function; the last four points live here |
+| ~9 each | `internal/api/jobruns.go:listJobs`, `internal/gate/validate.go:Validate`, `internal/claude/tools/handlers.go:searchCards`, `internal/api/forge.go:simForge`, `internal/api/coliseum.go:coliseum` | — |
+| ~1,250 | everything else | one to six statements per function; the last four points live here |
+
+Taken off this list by the pass that wrote this table, each with the test that
+did it: `gate:checkCompanion` (19 → `reportshape_test.go`),
+`claude/canonjson.go:writeValue` (12 → `canonjson_test.go`),
+`api/wheel.go:readOptionalBody` (11 → `wheelbody_test.go`),
+`pool/refresh.go:DownloadBulkFrom` (10 → `downloadfaults_test.go`),
+`deck/deck.go:cardFrom` (10 → `coercions_test.go`), and
+`api/lifecycle.go:didYouMean` (14 → `didyoumean_test.go`).
 
 ## Levers that worked
 
@@ -148,6 +169,19 @@ from #290; the rest are this pass.
    identity, `nil` normalises to empty, and an unreported Forge version crosses
    as absent rather than blank.
 
+10. **The guard, not the path.** `internal/claude/canonjson.go` refuses a
+    float and refuses a Go map without `SortKeys`, both by panicking, because
+    these bytes are a cache key and a plausible rendering is worse than a
+    crash. Four panics and a dozen type arms went from unreached to held by
+    one table in `canonjson_test.go`, and what it buys is not the coverage: a
+    silent `%g` where a float used to be refused would move every stored
+    dossier's key at once, with nothing failing.
+11. **The refusal a person reads.** Every "and N more" truncation, every
+    "did you mean", every sentence with a card's name in it. They are cheap
+    to reach, they are what commandment 2 actually consists of, and they were
+    uncovered almost without exception — `reportshape_test.go` and
+    `didyoumean_test.go` are the shape.
+
 ## Corrections to this file
 
 **A corrupt pool is not a failing pool.** #290 predicted that pointing
@@ -173,6 +207,23 @@ and `ci.yml` gated on the other.
 
 ## Traps hit on the way
 
+- **A plausible typo tests the resolver, not the shortlist.** The import
+  resolves a name on its own once it is close enough and clearly ahead of the
+  field, so `Cultivator Colossis` (0.9789) never reaches `didYouMean` at all —
+  it is simply read as the card, `unknown` comes back empty, and a test written
+  from it passes while proving nothing. What lands in the shortlist is the
+  narrow band between the resolver's bar and `mentionFloor`: **measure the
+  spelling before writing the assertion.** `didyoumean_test.go` carries the
+  three that work and the one at 0.8993 that deliberately does not.
+- **A branch whose comment says it is unreachable is not coverage to take.**
+  `deckyaml.orderedValue`'s map cases and `checkCompanion`'s `condition == ""`
+  are both guards standing behind something that already excludes them. The
+  only way to reach them is to call past the guard, which proves nothing and
+  leaves a test that will read as meaningful to whoever finds it next.
+- **A test-parallelism audit that greps for `t.Parallel()` counts comments.**
+  Writing "Go panics on a `t.Parallel()` here" into a serial test's body made
+  this pass's own audit report twelve serial tests as parallel. Match code
+  lines only.
 - **A parent's `defer` runs before its parallel subtests finish.** Use
   `t.Cleanup` for a fixture the subtests share.
 - **`-coverpkg` duplicates blocks.** Merge by block key before aggregating —
