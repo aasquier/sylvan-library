@@ -10404,6 +10404,36 @@ button:hover .tarot-fan-card {
   100% { transform: none; }
 }
 
+/* **Double strike lunges twice** (Aaron, 2026-08-28), which is the one keyword
+   whose entire meaning is *this happens two times*. A creature that deals its
+   damage in two steps bumping once was the board flattening the difference.
+
+   **Two blows inside the mark's own length, not the animation played twice.**
+   An `animation-iteration-count: 2` would run the whole shape again —
+   including the long 36-to-76 per-cent settle, which is a creature coming to
+   rest and is exactly the part that must not happen in the middle. So the
+   first blow is compressed into the opening third and the second lands on top
+   of it, and only then does it settle. One event, one clock: the mark's
+   `--mark-life-attacks` still governs, so a double strike and a single one are
+   over at the same moment and the board keeps its pace.
+
+   The second blow is the harder of the two. A first strike creature deals its
+   damage before anything can answer, and the follow-through is the blow that
+   actually kills — so the shape rises to it rather than fading away from it. */
+@keyframes card-lunge-twice {
+  0%   { transform: none; }
+  6%   { transform: translateY(calc(var(--lunge, 0px) * -0.4)); }
+  15%  { transform: translateY(calc(var(--lunge, 0px) * 0.85)) scale(1.04); }
+  26%  { transform: translateY(calc(var(--lunge, 0px) * -0.3)) scale(1.01); }
+  38%  { transform: translateY(calc(var(--lunge, 0px) * 1.12)) scale(1.07); }
+  52%  { transform: translateY(calc(var(--lunge, 0px) * 0.7)) scale(1.02); }
+  80%  { transform: translateY(calc(var(--lunge, 0px) * 0.55)); }
+  100% { transform: none; }
+}
+.field-card.is-attacks.is-twice {
+  animation-name: card-lunge-twice;
+}
+
 /* --- blocked: the shield comes up -------------------------------------- */
 
 /* **A shield that is raised, not a shield that appears.**

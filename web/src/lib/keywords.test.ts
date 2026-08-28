@@ -140,3 +140,30 @@ describe('what a keyword mark means', () => {
     expect(printed.note).toBeUndefined()
   })
 })
+
+describe('the one keyword that means "twice"', () => {
+  it('finds double strike however Forge or Scryfall spells it', () => {
+    // The attack lunge bumps twice for it (`card-lunge-twice`), so this is the
+    // read that decides whether a creature dealing damage in two steps looks
+    // like one. Scryfall writes "Double strike" and rules text writes "double
+    // strike"; which reaches a browser is not something a board should be
+    // sensitive to.
+    for (const spelling of ['Double strike', 'double strike', 'DOUBLE STRIKE']) {
+      expect(drawableKeywords([spelling])).toContain('double strike')
+    }
+  })
+
+  it('is not first strike, which strikes once and early', () => {
+    // Two words apart and one bump apart. A first striker deals its damage
+    // before anything can answer; it does not deal it twice.
+    expect(drawableKeywords(['First strike'])).not.toContain('double strike')
+    expect(drawableKeywords(['Double strike'])).not.toContain('first strike')
+  })
+
+  it('counts a double strike that was lent rather than printed', () => {
+    // Which is how most creatures on a Commander board ever get it — an
+    // Equipment, an aura, a lord. The board reads `live` when Forge reports it
+    // and the printing plus `granted` otherwise, and this is the tail of both.
+    expect(drawableKeywords(['Flying', 'Double strike'])).toContain('double strike')
+  })
+})

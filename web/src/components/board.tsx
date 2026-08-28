@@ -70,7 +70,7 @@ import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
   fightingStats, alignLanes, type Clash, clashOf, fightOf,
   foldBoard, markedHere, sameCard, stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
-import { keywordWords } from '../lib/keywords'
+import { drawableKeywords, keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
@@ -961,6 +961,10 @@ function FieldCard({ card, count, inPlay = false, ids }: {
    */
   const worn = card.live.length > 0
     ? card.live : [...card.keywords, ...card.granted]
+  // Only on an attack: double strike is a combat word, and a creature blocking
+  // with it is not swinging twice at anything.
+  const twice = mark?.mark === 'attacks'
+    && drawableKeywords(worn).includes('double strike')
   // A token's painting is a *chosen* printing (the earliest, which is the
   // original), so the painter is worth naming where a person can find them.
   const title = [
@@ -1006,7 +1010,15 @@ function FieldCard({ card, count, inPlay = false, ids }: {
                     // exist — because what it draws is *departure*. Which
                     // departure it was is the mark's business.
                     + (card.leaving ? ' is-leaving' : '')
-                    + (mark ? ` is-${mark.mark}` : '')}
+                    + (mark ? ` is-${mark.mark}` : '')
+                    // **Double strike swings twice, so the lunge does**
+                    // (Aaron, 2026-08-28). It is the one keyword whose whole
+                    // meaning is *this happens two times*, and a creature that
+                    // deals its damage in two steps bumping once was the board
+                    // quietly flattening the difference. Read off `worn`, so a
+                    // double strike lent by an Equipment counts — which is how
+                    // most creatures on a Commander board ever get it.
+                    + (twice ? ' is-twice' : '')}
          ref={box} title={title} tabIndex={card.image ? 0 : -1}
          onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
          onPointerUp={(e) => {
