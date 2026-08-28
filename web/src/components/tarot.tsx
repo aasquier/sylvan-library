@@ -48,7 +48,6 @@ import { deal as dealSound, flip as flipSound, riffle, shimmer }
   from '../lib/tablesounds'
 import { useTableSound } from '../lib/prefs'
 import { HandFanGlyph } from './glyphs'
-import { reducedMotion } from '../lib/motion'
 import { PERSONA_ART } from '../lib/personart'
 import backUrl from '../assets/seance/tarot-back.webp'
 import roomMp4Url from '../assets/seance/seance-room-loop.mp4'
@@ -426,9 +425,11 @@ function SeanceRoom({ children, vision, onKnock }: {
    *  no focus of its own. */
   onKnock?: () => void
 }) {
-  // Read once per mount, the way `VideoBackdrop` does: a live change of the
-  // OS setting lands on the next navigation.
-  const [still] = useState(() => reducedMotion())
+  // The reduced-motion read that used to live here is gone with the SVG
+  // filter it served: SMIL cannot hear a media query, so the `<animate>` had
+  // to be dropped from the tree by hand. The caustic that replaced it is a CSS
+  // animation, which the `prefers-reduced-motion` block in index.css stills
+  // like everything else in this room.
   return (
     <div className={`seance-room${onKnock ? ' is-knockable' : ''}`}
          onDoubleClick={onKnock}
@@ -449,30 +450,20 @@ function SeanceRoom({ children, vision, onKnock }: {
         <img className={`seance-vision${vision.reversed ? ' is-reversed' : ''}`}
              src={vision.image} alt="" aria-hidden="true" />
       )}
-      {/* What makes the picture read as suspended IN something rather than
-          shown on a screen: turbulence displacing its own pixels, so the
-          edges wander and the whole card breathes the way an image does
-          through moving glass. Width/height zero because this is a
-          definition, not a drawing; the seed is 1848, the year the
-          spiritualist craze began, as everywhere else in this room.
-          The animation is dropped rather than stilled under reduced
-          motion, because SMIL cannot hear a media query. */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}
-           aria-hidden="true">
-        <filter id="seance-ripple" x="-20%" y="-20%" width="140%"
-                height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.014 0.022"
-                        numOctaves="2" seed="1848" result="n">
-            {!still && (
-              <animate attributeName="baseFrequency"
-                       values="0.014 0.022;0.019 0.03;0.012 0.018;0.014 0.022"
-                       dur="11s" repeatCount="indefinite" />
-            )}
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="15"
-                             xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </svg>
+      {/* **What makes the picture read as suspended IN something.**
+          This used to be turbulence displacing the card's own pixels — an
+          `feDisplacementMap` at `scale="15"`, fifteen pixels of Wizards'
+          painting physically moved, which is Scryfall's *"Do not distort,
+          skew, or stretch card images"* as literally as that clause can be
+          broken. The card is untouched now and the *glass* is what moves:
+          two soft caustics crawling on the sphere, on a period that never
+          lines up with the vision's own sway. Same read, and the depth it
+          buys turns out to have been in the light all along.
+
+          Last of the three blended layers, so it lies on the fortune the way
+          a reflection lies on glass. Siblings rather than nested, for the
+          reason written above `.seance-glass-dim`. */}
+      <span className="seance-glass-caustic" aria-hidden="true" />
       {children}
     </div>
   )

@@ -118,6 +118,23 @@ load-bearing.
     and for this one room the first commandment runs the other way: when in
     doubt, ask Claude. Rules 1, 14 and 16 still govern what renders there and
     how a change lands.
+19. **Nothing reaches through a card and changes Wizards' painting.** Light
+    goes *on* a card as a layer of its own — a shade laid over it, a screened
+    sheet of light above it — never as a `filter` that re-renders the art on
+    its way to the screen. Scryfall name it plainly: *"Do not blur, sharpen,
+    desaturate, or color-shift card images"*, *"Do not distort, skew, or
+    stretch"*. And every card image is credited: the artist and the printing,
+    in words, in the same room the picture is in. The failure never looks like
+    carelessness — it looks like somebody reaching for the obvious CSS for
+    "this creature died" or "this painting is too dark on a black page", which
+    is how fourteen of them reached the live site under an ADR that already
+    forbade them (ADR 48). `go/cmd/mtglab/cardimagery_test.go` is this
+    commandment in code, with `.art-dimmed`, `.art-lift` and
+    `.field-card-leaf::after` in `web/src/index.css` as the shape every fix
+    takes; a `filter` on a pseudo-element is a filter on a layer you drew and
+    is fine, and a `filter` on the card is the card being altered. This is
+    commandment 9 at its sharpest — the art is lent to us, and compliance is
+    not a preference.
 
 ## Setup
 
