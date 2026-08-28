@@ -96,6 +96,7 @@ func corpus(t *testing.T) jobsCorpus {
 }
 
 func TestTheCorpusIsWholeEnoughToProveAnything(t *testing.T) {
+	t.Parallel()
 	// A corpus that quietly lost a section still passes every case left in
 	// it, which is the failure this project has been bitten by three times.
 	c := corpus(t)
@@ -121,6 +122,7 @@ func TestTheCorpusIsWholeEnoughToProveAnything(t *testing.T) {
 }
 
 func TestThePercentagesAreTheRecordedRounding(t *testing.T) {
+	t.Parallel()
 	for _, cse := range corpus(t).Percent {
 		if got := percent(cse.Done, cse.Total); got != cse.Want {
 			t.Errorf("percent(%d, %d) = %d, the corpus says %d",
@@ -130,6 +132,7 @@ func TestThePercentagesAreTheRecordedRounding(t *testing.T) {
 }
 
 func TestTheStampsAreIsoformat(t *testing.T) {
+	t.Parallel()
 	for _, cse := range corpus(t).Stamps {
 		at := cse.At
 		if len(at) != 7 {
@@ -192,6 +195,7 @@ func raw(text *string) any {
 }
 
 func TestThePayloadIsTheRecordedBytes(t *testing.T) {
+	t.Parallel()
 	for _, cse := range corpus(t).Payloads {
 		t.Run(cse.Name, func(t *testing.T) {
 			job := &Job{
@@ -254,6 +258,7 @@ func TestNeitherTheOwnerNorTheKeyEverSerialises(t *testing.T) {
 }
 
 func TestTheLaneNamesAndTheBoundsAreTheRecordedOnes(t *testing.T) {
+	t.Parallel()
 	c := corpus(t)
 	for name, want := range map[string]Lane{
 		"cpu": CPU, "net": NET, "forge": FORGE,
@@ -276,6 +281,7 @@ func TestTheLaneNamesAndTheBoundsAreTheRecordedOnes(t *testing.T) {
 }
 
 func TestTheRefusedLaneSaysWhatTheCorpusSays(t *testing.T) {
+	t.Parallel()
 	r := quietRegistry(t, Config{})
 	for _, cse := range corpus(t).UnknownLane {
 		if cse.Lane == "" {
@@ -311,6 +317,7 @@ func TestTheRefusedLaneSaysWhatTheCorpusSays(t *testing.T) {
 }
 
 func TestAnIDIsTwelveHexCharacters(t *testing.T) {
+	t.Parallel()
 	// Twelve lowercase hex characters, and the length is in the corpus so an
 	// implementation that
 	// reached for a full uuid or a base64 would be caught rather than merely

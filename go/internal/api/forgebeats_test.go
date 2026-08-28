@@ -47,6 +47,7 @@ func theBeats() []tier3.GameEvent {
 // A room that asked to watch is handed the beats, with the row of the same
 // game, in one partial.
 func TestTheBeatsReachThePartialBesideTheirOwnRow(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, hold: make(chan struct{}),
 		beats: theBeats(),
 		games: []tier3.WireGame{won(1, 5421, 1, 11), won(2, 4000, 2, 9)}}
@@ -132,6 +133,7 @@ func TestTheBeatsReachThePartialBesideTheirOwnRow(t *testing.T) {
 // quietly stopped sending the flag would still look green against a stub that
 // narrated regardless.
 func TestAMatchNobodyAskedToNarrateIsSilent(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, hold: make(chan struct{}),
 		beats: theBeats(),
 		games: []tier3.WireGame{won(1, 5421, 1, 11)}}
@@ -164,6 +166,7 @@ func TestAMatchNobodyAskedToNarrateIsSilent(t *testing.T) {
 // running silent match and would sit mute for the whole of it, for a reason
 // nothing on screen could explain.
 func TestASilentMatchAndANarratedOneAreNotTheSameMatch(t *testing.T) {
+	t.Parallel()
 	// The stream is held for the same reason [TestTwoIdenticalAsksAreOneMatch]
 	// holds it: the join under test is an *in-flight* one, and a stub that
 	// finishes instantly turns "a second job was correct" into what looks like

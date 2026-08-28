@@ -586,6 +586,12 @@ func TestAJavaThatWillNotAnswerIsNotACandidate(t *testing.T) {
 // and a candidate that could not be probed renders as `None`, the served
 // message's long-standing spelling of "could not tell".
 func TestNoJavaAnywhereListsWhatWasTried(t *testing.T) {
+	// **Serial**: it calls `t.Setenv("PATH", ...)`, which Go panics on inside
+	// a parallel test -- and here the process's own `PATH` is the point rather
+	// than the setup. The search this drives looks along it, so emptying it is
+	// the only way to ask what happens on a machine with no JVM from a machine
+	// that may well have one. Nothing can make this parallel; a second test
+	// running beside it would be running with no `PATH`.
 	// A file that exists and is not a JVM, so the probe fails rather than
 	// the stat.
 	fake := filepath.Join(t.TempDir(), "java")
@@ -614,6 +620,8 @@ func TestNoJavaAnywhereListsWhatWasTried(t *testing.T) {
 // With nothing on any candidate path at all, the refusal still reads as a
 // sentence rather than trailing off after "Checked:".
 func TestARefusalWithNothingToListStillReads(t *testing.T) {
+	// **Serial**, for its neighbour's reason: `t.Setenv("PATH", ...)`, and the
+	// emptied `PATH` is the fixture rather than an artefact of one.
 	t.Setenv("PATH", t.TempDir())
 
 	_, err := Settings{

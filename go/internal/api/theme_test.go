@@ -239,6 +239,7 @@ func TestTheProposalLabelCountsThingsKnown(t *testing.T) {
 // the marshalled bytes -- `never` is the last key and appears only because a
 // call was made.
 func TestTheThemeTurnIsAJobWhoseResultIsTheReport(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(themeTurnAnswer))}}
 	claudeSet := api.start(t)
 	rig := newJobRig(t, claudeSet)
@@ -285,6 +286,7 @@ func TestTheThemeTurnIsAJobWhoseResultIsTheReport(t *testing.T) {
 // paragraph: the invented source is dropped and counted, the mono-green legend
 // cannot lead a Golgari slot, and every commander shown carries pool text.
 func TestTheThemeProposalIsAJobWhoseResultIsTheProposal(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("The Real Page")+","+said(themeProposalAnswer))}}
 	api.start(t)
@@ -344,6 +346,7 @@ func TestTheThemeProposalIsAJobWhoseResultIsTheProposal(t *testing.T) {
 // The budget rides in the closing instruction as `$50`, not `$50.000000` --
 // the recorded general format, which Go's default `%g` is not.
 func TestTheBudgetReachesTheModelInTheRecordedFormat(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(themeProposalAnswer))}}
 	claudeSet := api.start(t)
@@ -372,6 +375,7 @@ func TestTheBudgetReachesTheModelInTheRecordedFormat(t *testing.T) {
 // transcript is client-held: a second tab is a second person's evening, and
 // collapsing them would hand one of them the other's question.
 func TestTwoIdenticalThemeTurnsAreTwoJobs(t *testing.T) {
+	t.Parallel()
 	reply := answer("end_turn", said(themeTurnAnswer))
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
@@ -395,6 +399,7 @@ func TestTwoIdenticalThemeTurnsAreTwoJobs(t *testing.T) {
 // could reach a deck, and the conversation half is offered no client tool at
 // all.
 func TestNeitherThemeModeIsOfferedADeckTool(t *testing.T) {
+	t.Parallel()
 	for _, row := range []struct {
 		at, body, reply string
 		want            string
@@ -514,6 +519,7 @@ func TestTheLabelsCountThingsTheRecordedWay(t *testing.T) {
 // response has been read, which makes "the handler returned first" a fact
 // rather than a race.
 func TestTheThemeJobOutlivesTheRequestThatMadeIt(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{hold: make(chan struct{}),
 		replies: []string{answer("end_turn", said(themeTurnAnswer))}}
 	claudeSet := api.start(t)

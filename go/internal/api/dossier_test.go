@@ -223,6 +223,7 @@ func TestAtStanceOffTheDossierIsAJobBornFinishedEvenWithNoKey(t *testing.T) {
 // ---- a real run ----------------------------------------------------------
 
 func TestWritingADossierIsAJobWhoseResultIsTheReport(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("The Real Page")+","+said(wholeDossier))}}
 	claudeSet := api.start(t)
@@ -325,6 +326,7 @@ func TestWritingADossierIsAJobWhoseResultIsTheReport(t *testing.T) {
 // behind a gate, and the second POST must be handed the same id rather than
 // starting a second paid search -- the 2026-08-13 double spend, closed.
 func TestTwoAsksInFlightAreOneDossierJob(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{hold: make(chan struct{}), replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(wholeDossier))}}
 	claudeSet := api.start(t)
@@ -396,6 +398,7 @@ func TestAnExhaustedDossierRecordsTheRecordedSentence(t *testing.T) {
 // ---- the accounting -------------------------------------------------------
 
 func TestTheDossierRecordsUnderItsOwnMode(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(wholeDossier))}}
 	claudeSet := api.start(t)
@@ -427,6 +430,7 @@ func TestTheDossierRecordsUnderItsOwnMode(t *testing.T) {
 // recorder every other test here uses never cancels, so it could not see
 // this; a real `httptest.Server` can.
 func TestTheDossierJobStoresAfterTheRequestHasGone(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("t")+","+said(wholeDossier))}}
 	claudeSet := api.start(t)

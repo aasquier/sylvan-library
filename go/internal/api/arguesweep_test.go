@@ -205,6 +205,7 @@ func TestTheSelectionIsNormalisedTheRecordedWay(t *testing.T) {
 // A whole sweep: one call per card, the reports in selection order, and the
 // progress the bar is drawn from.
 func TestASweepArguesEachSlotInTurn(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
@@ -253,6 +254,7 @@ func TestASweepArguesEachSlotInTurn(t *testing.T) {
 // results are the point of paying for a sweep -- one flaky call must not cost
 // the other answers.
 func TestOneFailedCardDoesNotCostTheSweep(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
@@ -359,6 +361,7 @@ func TestASweepWithNoCredentialIsRefusedBeforeItStarts(t *testing.T) {
 }
 
 func TestTheSameSelectionInADifferentOrderIsOneSweep(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	hold := make(chan struct{})

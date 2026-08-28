@@ -87,6 +87,7 @@ func TestAtStanceOffTheDroppedBlockHasTheRecordedFourKeys(t *testing.T) {
 // A whole argument, through the marshaller: charges kept and counted,
 // alternatives resolved against the real pool, and the five-key dropped block.
 func TestTheArgumentReachesTheWireWithItsAlternativesJudged(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(
 		`{"charges":[`+
 			`{"claim":"Ramp is already over target.","ground":"count","fact":"ramp holds 12 of 8-12.","strength":"serious"},`+
@@ -166,6 +167,7 @@ const claudeArgueNever = "This is the case against the card, and only that. " +
 // what the cap trimmed -- those are different numbers and only one of them is
 // about the model editorialising.
 func TestTheCaseIsCappedAtFiveCharges(t *testing.T) {
+	t.Parallel()
 	items := make([]string, 0, 8)
 	for i := 0; i < 8; i++ {
 		items = append(items, fmt.Sprintf(
@@ -196,6 +198,7 @@ func TestTheCaseIsCappedAtFiveCharges(t *testing.T) {
 // zone in the in-deck set it sails through every other filter and gets offered
 // as a replacement for a card in its own deck.
 func TestTheCommanderIsNotOfferedAsAnAlternative(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(
 		`{"charges":[],"alternatives":["Goreclaw, Terror of Qal Sisma"]}`))}}
 	claudeSet := api.start(t)
@@ -221,6 +224,7 @@ func TestTheCommanderIsNotOfferedAsAnAlternative(t *testing.T) {
 // interview's version of this test survived a mutation by driving a tool the
 // mode does not offer, and the lesson generalises.
 func TestTheArgumentsToolsSeeTheCallersOwnLibrary(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("tool_use", `{"type":"tool_use","id":"tu_1","name":"deck_stats","input":{"slug":"kaheera"}}`),
 		answer("end_turn", said(`{"charges":[],"alternatives":[]}`)),
@@ -249,6 +253,7 @@ func TestTheArgumentsToolsSeeTheCallersOwnLibrary(t *testing.T) {
 }
 
 func TestTheArgumentAsksTheSeatsOwnModel(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"charges":[],"alternatives":[]}`))}}
 	claudeSet := api.start(t)
@@ -266,6 +271,7 @@ func TestTheArgumentAsksTheSeatsOwnModel(t *testing.T) {
 }
 
 func TestTheArgumentRecordsUnderItsOwnMode(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"charges":[],"alternatives":[]}`))}}
 	claudeSet := api.start(t)

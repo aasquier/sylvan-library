@@ -169,6 +169,15 @@ func TestTheQuestionKeyLowercasesWhereFullFoldingDiffers(t *testing.T) {
 // ------------------------------------------------------------ the stance
 
 func TestResearchStanceForAgreesWithTheCorpus(t *testing.T) {
+	// **Serial**: it calls `t.Setenv(CeilingEnv)` once per corpus row, to drive the ceiling
+	// this mapping is read under, which Go
+	// panics on inside a parallel test -- the environment is one slot for the
+	// whole process, so two tests setting it at once are one test reading the
+	// other's deployment.
+	//
+	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
+	// than reading the process, which is what ADR 39/40 did for every other
+	// piece of configuration in this package.
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.StanceFor {
 		ceiling := ""
@@ -190,6 +199,15 @@ func TestResearchStanceForAgreesWithTheCorpus(t *testing.T) {
 // has been asked for a call. `Resolve(nil, nil)` would answer off, and that
 // is the bug `/api/claude` once had.
 func TestTheDefaultResearchStanceIsNotOff(t *testing.T) {
+	// **Serial**: it calls `t.Setenv(CeilingEnv)` to blank the ceiling, because what it asserts
+	// is the default and a ceiling on the machine would be a different question, which Go
+	// panics on inside a parallel test -- the environment is one slot for the
+	// whole process, so two tests setting it at once are one test reading the
+	// other's deployment.
+	//
+	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
+	// than reading the process, which is what ADR 39/40 did for every other
+	// piece of configuration in this package.
 	t.Setenv(CeilingEnv, "")
 	s, err := ResearchStanceFor(nil, nil)
 	if err != nil {
@@ -227,6 +245,18 @@ func TestTheResearchOpeningIsTheRecordedShape(t *testing.T) {
 // ------------------------------------------------------------- the runs
 
 func TestEveryResearchOutcomeMatchesTheGolden(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and the helper is in `dossier_test.go`, a file away --
+	// which is why the audit adds the line and runs the test rather than
+	// reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadResearchCorpus(t)
