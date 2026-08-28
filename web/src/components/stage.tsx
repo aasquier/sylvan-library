@@ -16,9 +16,10 @@
 import { type CSSProperties, useEffect } from 'react'
 
 import campusArt from '../assets/coliseum/campus.webp'
-import fabricaArt from '../assets/coliseum/fabrica.webp'
 import cryptaArt from '../assets/coliseum/crypta.webp'
+import fabricaArt from '../assets/coliseum/fabrica.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
+import velatioArt from '../assets/coliseum/velatio.webp'
 import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
@@ -351,6 +352,64 @@ function StageForge() {
 }
 
 /**
+ * **The fifth place, and the one an enchantment settles over.**
+ *
+ * Every other permanent in Magic is a thing you could pick up: a creature is a
+ * body, an artifact is an object, an Equipment is a sword. An enchantment is
+ * the one that is not — it is a condition laid on the *place*, and it stays
+ * until somebody takes it off. So it gets the place: Piranesi's Pantheon
+ * pronaos, sixteen granite monoliths holding up a roof that has held for
+ * nineteen hundred years. `templum.recipe.yaml` argues it, including the three
+ * subjects that were fetched and rejected first — among them the curse tablet
+ * Aaron chose, which turned out to be a museum object on a cream mount and so
+ * a *mark* rather than a place.
+ *
+ * No dust and no sparks. The two arrival scenes disturb their ground because
+ * something was put down on it; nothing is put down here. An enchantment
+ * arrives as a condition over a room that was already standing, and the room
+ * simply opens.
+ */
+function StageTemple() {
+  return (
+    <span className="stage-temple" aria-hidden="true">
+      {/* A `background-image` rather than an `<img>`, alone among the six.
+          The picture is an etching and arrives grey; the stylesheet blends it
+          `soft-light` into a warm ground the way the sand does with its own
+          plate, so what it contributes is the structure and the colour stays
+          the room's. A background is the only way to reach `background-blend-
+          mode`, and the path lives in the stylesheet for the same reason the
+          sand's does. */}
+      <span className="stage-temple-art" />
+    </span>
+  )
+}
+
+/**
+ * **The sixth, and it is a rite rather than a place.**
+ *
+ * An Aura is the one permanent that goes *on somebody*. It does not stand in a
+ * row of its own — the board draws it tucked under the creature it is riding —
+ * so the scene is not somewhere a card arrives, it is something being done to
+ * a person. The `velatio` is the Roman name for exactly that: a bride was
+ * veiled, and from that moment she was a different thing under the law. One
+ * person, one rite, one condition that stays.
+ *
+ * **A frieze, and this is the one beat where a frieze is right.** Three of
+ * these recipes rejected a frieze for having no depth to travel through. There
+ * is no travel here: nothing is arriving from anywhere, and the picture is a
+ * sentence read left to right — the water tested, the bride veiled, the
+ * musicians waiting. `velatio.recipe.yaml` has the rest.
+ */
+function StageVeiling() {
+  return (
+    <span className="stage-veiling" aria-hidden="true">
+      <img className="stage-veiling-art" src={velatioArt} alt=""
+           draggable={false} />
+    </span>
+  )
+}
+
+/**
  * Fetch both arcana once, before either is wanted.
  *
  * **A scene that arrives after the card it is behind is not a scene.** The
@@ -407,6 +466,8 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
       {item.scene === 'crypt' && <StageCrypt />}
       {item.scene === 'field' && <StageField />}
       {item.scene === 'forge' && <StageForge />}
+      {item.scene === 'temple' && <StageTemple />}
+      {item.scene === 'veiling' && <StageVeiling />}
       {(item.scene === 'tower' || item.scene === 'magician')
         && <StageArcanum scene={item.scene} />}
       <span className="stage-frame">

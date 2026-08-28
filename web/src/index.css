@@ -13125,6 +13125,144 @@ button:hover .tarot-fan-card {
   .stage-forge-sparks { opacity: 1; }
 }
 
+/* ------------------------------------- the standing place, for an enchantment
+ *
+ * **The fifth place, and the one an enchantment settles over.** Every other
+ * permanent in Magic is a thing you could pick up: a creature is a body, an
+ * artifact is an object, an Equipment is a sword. An enchantment is the one
+ * that is not — it is a condition laid on the *place*, and it stays until
+ * somebody takes it off. So it gets the place itself.
+ *
+ * Piranesi's `Veduta interna del Pronao del Panteon`: sixteen granite
+ * monoliths holding up a roof that has held for nineteen hundred years.
+ * `templum.recipe.yaml` argues it and records the three subjects fetched and
+ * rejected before it — the curse tablet Aaron chose among them, which turned
+ * out to be a museum object on a cream mount, and so a *mark* rather than a
+ * place. That distinction is worth keeping: an object can be a mark and a
+ * place can be a scene, and they do not swap.
+ *
+ * **Nothing is disturbed here, and that is the whole difference from the two
+ * arrival scenes.** The valley blooms dust and the forge throws sparks because
+ * something was put *down* on them. An enchantment is not put down anywhere —
+ * it settles over a room that was already standing — so the room opens and
+ * nothing else happens to it. What it gets instead is the same slow creep
+ * toward the eye the other two have, which reads here as the columns leaning
+ * in rather than as ground rising.
+ */
+.stage-temple {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-field-open var(--stage-life, 1150ms) ease-out both;
+}
+/* **The one scene that is blended into the palette rather than laid on it**,
+   and it is `harena`'s trick borrowed for a different reason.
+
+   The other five are paintings and photographs: they arrive with their own
+   colour and the room takes it. This is an *etching* — black line on white
+   paper — so it arrives grey, and grey is the one thing this arena is not. Set
+   down at full strength beside the forge's gold and the valley's brown it read
+   as a photocopy in a room lit by torches.
+
+   `soft-light` over a warm ground is what the sand already does with its own
+   plate, and for the identical reason stated there: what the picture
+   contributes is its *structure* — sixteen column shafts and the dark between
+   them — and what stays the room's is the colour. The asset itself is
+   untouched, which is the rule every recipe in that directory keeps; this is
+   the stylesheet laying its own dusk, which is the half the recipes explicitly
+   leave to it. */
+.stage-temple-art {
+  width: min(100%, 960px);
+  aspect-ratio: 700 / 392;
+  background-color: #2c2118;
+  background-image: url('./assets/coliseum/templum.webp');
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: soft-light;
+  /* The forge's ellipse, because this is the same kind of picture: a lit
+     interior whose own edges are already black, which can afford a softer
+     vignette than an open valley can — there is nothing out there to hide. */
+  -webkit-mask-image: radial-gradient(ellipse 56% 52% at 50% 50%,
+    #000 0%, #000 64%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  mask-image: radial-gradient(ellipse 56% 52% at 50% 50%,
+    #000 0%, #000 64%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  animation: stage-field-rise var(--stage-life, 1150ms) ease-out both;
+}
+
+/* ------------------------------------------------- the veiling, for an Aura
+ *
+ * **The sixth, and it is a rite rather than a place.** An Aura is the one
+ * permanent that goes *on somebody*: it does not stand in a row of its own —
+ * the board draws it tucked under the creature it is riding — so this is not
+ * somewhere a card arrives, it is something being done to a person. The
+ * `velatio` is the Roman name for exactly that, and the `Aldobrandini Wedding`
+ * is its surviving picture.
+ *
+ * **A frieze, and this is the one beat where a frieze is right.** Three
+ * recipes in this directory rejected a frieze for having no depth to travel
+ * through. There is no travel here — nothing is arriving from anywhere — and
+ * the picture is a sentence read left to right: the water tested, the bride
+ * veiled, the musicians waiting.
+ *
+ * **A tighter mask than any of the others, and it is arithmetic.** This is the
+ * palest picture in the room: mean luminance 152 against a shipped range
+ * topping out at the road's 128, because pale lime plaster is what a fresco
+ * *is* and no crop makes it darker. Levelling it is the one thing every recipe
+ * here refuses. So less of it reaches the sand — 46x40 against the temple's
+ * 56x52 — which trims the pale ground at the edges and leaves the figures.
+ */
+.stage-veiling {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-field-open var(--stage-life, 1300ms) ease-out both;
+}
+.stage-veiling-art {
+  width: min(100%, 900px);
+  aspect-ratio: 700 / 292;
+  object-fit: cover;
+  -webkit-mask-image: radial-gradient(ellipse 46% 40% at 50% 50%,
+    #000 0%, #000 52%, rgba(0, 0, 0, 0.45) 78%, transparent 100%);
+  mask-image: radial-gradient(ellipse 46% 40% at 50% 50%,
+    #000 0%, #000 52%, rgba(0, 0, 0, 0.45) 78%, transparent 100%);
+  /* Held back as well as masked, for the same reason and because one lever was
+     not enough: a fresco this pale still reads brighter than the card in front
+     of it at full strength, and the card is the subject. */
+  opacity: 0.82;
+  animation: stage-field-rise var(--stage-life, 1300ms) ease-out both;
+}
+
+/* The two of them share the arrival travel, for the reason the valley and the
+   forge do: scenes that each invented their own motion would be six
+   decorations, and scenes that share an approach and change only the ground
+   are one room with several doors. An Aura takes the same one — it is laid on
+   a creature, which is a thing coming down onto something. */
+.stage-card.has-temple,
+.stage-card.has-veiling {
+  perspective: 900px;
+  perspective-origin: 50% 30%;
+}
+.stage-card.has-temple .stage-frame,
+.stage-card.has-veiling .stage-frame {
+  animation: stage-alight var(--stage-life, 1300ms)
+    cubic-bezier(0.24, 0.86, 0.32, 1) both;
+}
+.stage-card.has-temple .stage-frame::before,
+.stage-card.has-veiling .stage-frame::before { animation: none; opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-temple-art,
+  .stage-veiling-art { animation: none; }
+  .stage-card.has-temple .stage-frame,
+  .stage-card.has-veiling .stage-frame { animation: none; }
+}
+
 /* -------------------------------------------- the arcanum behind a spell
  *
  * **The fourth kind of moment, and the first that is not a place.** The road,

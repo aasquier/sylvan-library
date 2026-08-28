@@ -1,0 +1,123 @@
+# The standing place an enchantment settles over.
+#
+# The fifth scene, and the one that took three rejections to find. Aaron
+# settled the subject on 2026-08-28 — a Roman **curse tablet**, a `defixio`, a
+# lead sheet inscribed with a binding spell and nailed through — and the object
+# turned out to be unusable for a reason nothing but a look could have
+# established. See the rejections below.
+#
+# **What an enchantment is, and why it gets the architecture.** Every other
+# permanent in Magic is a thing you could pick up: a creature is a body, an
+# artifact is an object, an Equipment is a sword. An enchantment is the one
+# that is not — it is a *condition laid on the place*, and it stays until
+# somebody takes it off. So it gets the place itself: standing columns holding
+# up a roof that has held for nineteen hundred years, which is the most
+# permanent thing this arena's own world contains.
+#
+# **Giovanni Battista Piranesi, `Veduta interna del Pronao del Panteon`, from
+# the `Vedute di Roma`.** The porch of the Pantheon from inside: sixteen
+# granite monoliths marching away into shadow, a coffered timber ceiling above
+# them, and figures at the base small enough to say how big it is. It is dark —
+# mean luminance 68 against the valley's 72 and the vault's 88, measured rather
+# than judged — because Piranesi bit his plates until the shadows are solid
+# black, and a bright scene behind a card is the one thing this room has no use
+# for.
+#
+# **The subject is distributed, which is now a rule.** Two scenes in a row have
+# had to be re-cropped because their one bright subject sat exactly where the
+# stage draws a card (`fabrica.recipe.yaml` records the arithmetic: the card
+# covers x 0.384 to 0.615 of the band). A colonnade has no such point. The card
+# lands between two shafts and everything the picture is about is still on
+# either side of it — the same property that made the valley work first time.
+#
+# ## Three rejected, and the third is the one Aaron chose
+#
+# - **The curse tablet itself** (British Museum 1934,1105.1, public domain,
+#   2316x1737) is a real defixio and a genuinely lovely object: corroded lead,
+#   nail holes still in it, the binding done. It is also *a museum object on a
+#   cream fabric mount*, which is a light rectangle with no depth, no
+#   inscription left to read, and a backing board that says "photographed in a
+#   case" louder than anything in it says "magic". `corona.webp` and
+#   `memento.webp` are objects like this and they are **marks**, drawn at
+#   twenty pixels on a card; a scene is a *place a card arrives in*, and a flat
+#   grey blob is not one. This is the distinction the punchlist did not have a
+#   word for, and it is worth keeping: an object can be a mark and a place can
+#   be a scene, and they do not swap.
+# - **Panini's `Interior of the Pantheon`** (Cleveland, public domain) is the
+#   same building painted rather than etched, and it fails on
+#   `campus.recipe.yaml`'s own rule. Its frieze reads `...IN SANCTIS EIUS ...
+#   LAUS EIUS IN ECC[LESIA]` — it is a church interior, and that file already
+#   rejected Giulio Romano's Milvian Bridge because *"a Christian miracle
+#   behind a Magic card is a worse register break than a Flemish brush"*. It is
+#   also full of large, unmistakable 1730s Grand Tourists in tricorn hats, and
+#   it is a portrait composition whose whole point is the vertical: any band
+#   wide enough for this stage throws the dome and the oculus away and keeps
+#   the half with the hoop skirts in it.
+# - **Piranesi's `Carceri d'invenzione`, plate XIV** is the most tempting of
+#   the three — vast vaults, chains, bridges, a picture of *being bound* — and
+#   it is white. Measured: p90 204, p99 254, against a shipped range whose
+#   brightest scene is the road at p90 186. Most of that plate is untouched
+#   paper, and untouched paper behind a card in a dark arena is a lamp.
+#
+# **No key, no duotone, no levels — crop and resize and nothing else**, which
+# is the restraint every picture in this directory keeps. The stylesheet lays
+# its own dusk over this.
+animist: 1
+
+why_committed: >
+  The four scenes beside it, exactly. This draws on the beat an enchantment
+  arrives and is gone about a second later, so fetching it from somebody
+  else's host would mean a colonnade that opens after the card standing in it
+  has faded. And the licence is the second reason: this is a PD-Art
+  photographic reproduction on Commons, which is the category where somebody
+  else's copy quietly moves or changes terms -- a copy confirmed once and
+  committed is a copy whose provenance stays true.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the
+  # API, with `AttributionRequired` explicitly false. Piranesi died in 1778, so
+  # the work is out of copyright everywhere the term is life plus 100 or fewer,
+  # and the photograph of it is a faithful reproduction of a two-dimensional
+  # public domain work. A term expiry rather than a dedication, which is the
+  # reason to re-confirm it on every build rather than trust this comment.
+  templum:
+    provider: wikimedia
+    title: "Piranesi-17003.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Piranesi-17003.jpg
+    found_via: >
+      Commons, searching the printmaker and the subject by name -- which is
+      the search that works for pictures and the one `campus.recipe.yaml`
+      recorded. Unrestricted phrasings (`Roman temple interior`, `colonnade
+      ruins`, `sacred precinct`) return modern photographs under CC BY-SA and
+      scanned guidebooks. Reached after the curse tablet, Panini's Pantheon
+      and the Carceri had each been fetched, cropped to a band with a card
+      stood in it, and rejected on sight -- see the header for all three.
+    licence: Public domain
+
+outputs:
+  # 700 wide, the second widest in this directory after the valley's 720, and
+  # for a related reason: the whole reading here is *those are columns and that
+  # is how far away the far one is*, and depth is carried by the small marks at
+  # the vanishing end. An etching is also the one medium in this directory with
+  # genuinely hard edges everywhere -- it is line, not paint -- so it is the
+  # least forgiving of under-sampling.
+  #
+  # Quality 80, the highest here after the mosaic's 82, and the same argument:
+  # cross-hatching is what a codec is worst at, and a plate that goes mushy
+  # stops being an etching and becomes a smudge.
+  - file: templum.webp
+    from: templum
+    ops:
+      # The plate's paper margin off all four sides, and the letterpress off
+      # the bottom -- four lines of Piranesi's own Italian caption, which names
+      # S. Pietro and Urbano VIII and would put a wall of eighteenth-century
+      # type behind a Magic card. What is left is the colonnade: capitals along
+      # the top, the shafts, the floor and the figures that give it its scale.
+      #
+      # Fitted by cropping the Commons thumbnail at three heights, rendering
+      # each with a card stood in it at the size the stage draws one, and
+      # looking at all three.
+      - crop: {frac_box: [0.045, 0.12, 0.955, 0.80]}
+      - resize: {width: 700}
+    encode: {format: webp, quality: 80}
+    expect: {width: 700, height: 392, budget_kb: 90, metadata: none}

@@ -343,7 +343,23 @@ export function castType(types: string | undefined): string | null {
  * for all of them until today — the card, its light and its plate, which is
  * complete on its own.
  */
-export type Scene = 'road' | 'crypt' | 'field' | 'forge' | 'tower' | 'magician'
+export type Scene = 'road' | 'crypt' | 'field' | 'forge' | 'temple' | 'veiling'
+  | 'tower' | 'magician'
+
+/** Whether a type line is an Aura, which is the one subtype this file reads.
+ *
+ *  **Subtypes are cut everywhere else and kept here**, and the exception earns
+ *  itself: `castType` answers *Enchantment* for a Bear Umbra and for a Rhystic
+ *  Study alike, and those are two different events. One is laid on a creature
+ *  and rides it; the other settles over the table. They get different scenes,
+ *  so the difference has to survive the read.
+ *
+ *  Forge writes `Enchantment - Aura` and Scryfall writes `Enchantment — Aura`;
+ *  both are matched, because which one reaches a browser is not something a
+ *  board should be sensitive to. */
+function isAura(types: string | undefined): boolean {
+  return !!types && /\bAura\b/.test(types)
+}
 
 export function sceneFor(manner: Manner, types: string | undefined):
 Scene | null {
@@ -351,16 +367,26 @@ Scene | null {
     // Departures: the manner decides, and the card's kind is not consulted.
     case 'exiled': case 'companion': return 'road'
     case 'dies': return 'crypt'
+    // **An Aura going onto a creature is an arrival like any other**, and it
+    // is the one manner where that is not obvious: `attach` is drawn on the
+    // beat the Aura reaches its host, which is the same beat it reaches the
+    // battlefield. An Equipment being strapped on is a genuinely different
+    // event — the sword already existed and has been picked up — so it falls
+    // through to `castType` below and lands on the forge, which is where a
+    // sword comes from.
+    case 'attach': return isAura(types) ? 'veiling' : null
     // Arrivals and castings: the kind decides.
     case 'cast': case 'put': case 'made': break
-    // An Aura being laid on a creature wants a scene of its own and does not
-    // have one yet; an Equipment being strapped on is a different event again.
-    // Both draw nothing rather than borrowing a picture about something else.
     default: return null
   }
   switch (castType(types)) {
     case 'Creature': return 'field'
     case 'Artifact': return 'forge'
+    // An Aura cast from a hand opens the same rite as one attached, because it
+    // is the same event: the difference between the two beats is which of them
+    // Forge happened to report, and a room that drew two scenes for one thing
+    // would be answering a question about the pipe.
+    case 'Enchantment': return isAura(types) ? 'veiling' : 'temple'
     case 'Instant': return 'tower'
     case 'Sorcery': return 'magician'
     default: return null

@@ -219,3 +219,31 @@ Why committed rather than hotlinked: The same argument as the road and the vault
 
 Why committed rather than hotlinked: The three scenes beside it, exactly. This draws on the beat an artifact arrives and is gone about a second later, so fetching it from somebody else's host would mean a forge that opens after the card standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end fabrica -->
+
+<!-- animist:begin templum -->
+## templum.webp
+
+- **Source**: "Piranesi-17003.jpg", <https://commons.wikimedia.org/wiki/File:Piranesi-17003.jpg>, found via Commons, searching the printmaker and the subject by name -- which is the search that works for pictures and the one `campus.recipe.yaml` recorded. Unrestricted phrasings (`Roman temple interior`, `colonnade ruins`, `sacred precinct`) return modern photographs under CC BY-SA and scanned guidebooks. Reached after the curse tablet, Panini's Pantheon and the Carceri had each been fetched, cropped to a band with a card stood in it, and rejected on sight -- see the header for all three.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build templum.recipe.yaml`):
+  - `crop`: frac_box=[0.045, 0.12, 0.955, 0.8].
+  - `resize`: width=700.
+  - Encoded WEBP, quality 80.
+
+Why committed rather than hotlinked: The four scenes beside it, exactly. This draws on the beat an enchantment arrives and is gone about a second later, so fetching it from somebody else's host would mean a colonnade that opens after the card standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end templum -->
+
+<!-- animist:begin velatio -->
+## velatio.webp
+
+- **Source**: "Aldobrandini wedding.JPG", <https://commons.wikimedia.org/wiki/File:Aldobrandini_wedding.JPG>, found via Commons, searching `Aldobrandini Wedding fresco` -- naming the work, which is the search that works here and the one `campus.recipe.yaml` recorded. Unrestricted phrasings (`Roman bride veiled fresco`, `Roman wedding painting`) return scanned Victorian handbooks almost exclusively, which is `lens.recipe.yaml`'s trap. Two other veiling subjects were considered and not fetched: the Villa of the Mysteries frieze, whose good wide photographs on Commons are all CC BY-SA rather than public domain, and the Pompeian `Nozze di Ercole`, which is a fragment.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build velatio.recipe.yaml`):
+  - `crop`: frac_box=[0.16, 0.08, 0.94, 0.92].
+  - `resize`: width=700.
+  - Encoded WEBP, quality 78.
+
+Why committed rather than hotlinked: The five scenes beside it, exactly. This draws on the beat an Aura goes onto a creature and is gone about a second later, so fetching it from somebody else's host would mean a rite that opens after the card in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end velatio -->

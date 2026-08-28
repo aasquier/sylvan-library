@@ -4,7 +4,8 @@ import { ARCANA, type Manner, type Scene, sceneFor } from './stage'
 
 /** Every scene the arena can open onto, so a new one cannot be added without
  *  this file deciding what reaches it. */
-const SCENES: Scene[] = ['road', 'crypt', 'field', 'forge', 'tower', 'magician']
+const SCENES: Scene[] = ['road', 'crypt', 'field', 'forge', 'temple',
+  'veiling', 'tower', 'magician']
 
 /** Forge's own spelling, which is what reaches this function on a real board:
  *  a hyphen rather than an em dash, and the subtypes still on the line. */
@@ -110,12 +111,13 @@ describe('what draws nothing, and means to', () => {
     expect(sceneFor('sacrificed', TYPES.rock)).toBeNull()
   })
 
-  it('leaves an attachment alone until it has a scene of its own', () => {
+  it('leaves an Equipment being strapped on alone', () => {
     // An Aura laid on a creature and an Equipment strapped to one are two
-    // different events and neither is an arrival. Borrowing the forge for a
-    // sword would say the sword was just made, which is not what happened.
-    expect(sceneFor('attach', TYPES.enchantment)).toBeNull()
+    // different events. The sword already existed and has been picked up —
+    // opening the forge for it would say it was just made, which is not what
+    // happened, and opening the rite would call a sword a blessing.
     expect(sceneFor('attach', TYPES.artifact)).toBeNull()
+    expect(sceneFor('attach', 'Artifact - Equipment')).toBeNull()
   })
 
   it('draws nothing for a card nobody recorded a type line for', () => {
@@ -125,10 +127,34 @@ describe('what draws nothing, and means to', () => {
     expect(sceneFor('put', '')).toBeNull()
   })
 
-  it('leaves an enchantment alone, for now', () => {
-    // The picture is chosen and not yet fetched — a Roman curse tablet, which
-    // is literally a persistent magical effect laid on somebody. This test is
-    // the reminder rather than the rule: when the art lands, change it.
-    expect(sceneFor('cast', 'Enchantment')).toBeNull()
+})
+
+describe('an enchantment and an Aura are two different events', () => {
+  it('opens the standing place for an enchantment', () => {
+    // The one permanent that is not a thing you could pick up: it is a
+    // condition laid on the place, so it gets the place.
+    expect(sceneFor('cast', 'Enchantment')).toBe('temple')
+    expect(sceneFor('cast', 'Legendary Enchantment')).toBe('temple')
+    expect(sceneFor('put', 'Enchantment - Shrine')).toBe('temple')
+  })
+
+  it('opens the rite for an Aura, whichever beat reports it', () => {
+    // **`castType` cannot tell these apart and that is why the subtype is
+    // read.** A Bear Umbra and a Rhystic Study are both *Enchantment* to it,
+    // and one is laid on a creature while the other settles over the table.
+    expect(sceneFor('cast', TYPES.enchantment)).toBe('veiling')
+    expect(sceneFor('attach', TYPES.enchantment)).toBe('veiling')
+    // Scryfall's em dash as well as Forge's hyphen: which one reaches a
+    // browser is not something a board should be sensitive to.
+    expect(sceneFor('cast', 'Enchantment — Aura')).toBe('veiling')
+  })
+
+  it('does not mistake a word that merely contains "aura"', () => {
+    // The guard is a word boundary rather than a substring, because Magic has
+    // a Minotaur, a Centaur and a Saurian, and every one of them would
+    // otherwise be married.
+    expect(sceneFor('cast', 'Creature - Minotaur')).toBe('field')
+    expect(sceneFor('cast', 'Creature - Centaur Druid')).toBe('field')
+    expect(sceneFor('cast', 'Enchantment Creature - Saurian')).toBe('field')
   })
 })
