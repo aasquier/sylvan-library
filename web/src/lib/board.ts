@@ -1202,7 +1202,30 @@ export interface Clash {
 export function clashOf(blockerId: number | undefined,
   far: BoardSide | null | undefined,
   near: BoardSide | null | undefined): Clash | null {
-  if (!blockerId) return null
+  return fightOf(blockerId, far, near, 'blocker')
+}
+
+/**
+ * The fight a creature is in, whichever end of it the creature is standing at.
+ *
+ * **`clashOf` reads up from a blocker, and that is the wrong door for half the
+ * questions.** A block beat names the blocker, so the declaration only ever
+ * asks from that end — but a *death* names whoever died, and an attacker's own
+ * `blocking` is 0, so asking `clashOf` about a dying attacker answers null
+ * every time. Measured before it was believed: a probe over a ten-game match
+ * reported "attacker died 0 times", which is not a fact about Cats and
+ * Dinosaurs but a fact about which end the question was asked from.
+ *
+ * So `side` says which end the id is: `'blocker'` reads up to the attacker it
+ * stopped, `'either'` accepts both and works out which. The declaration keeps
+ * the narrow door because a block beat can only ever name a blocker, and a
+ * narrow door is one fewer way to be wrong.
+ */
+export function fightOf(id: number | undefined,
+  far: BoardSide | null | undefined,
+  near: BoardSide | null | undefined,
+  side: 'blocker' | 'either' = 'either'): Clash | null {
+  if (!id) return null
   const sides: [BoardSide | null | undefined, 'far' | 'near'][] =
     [[far, 'far'], [near, 'near']]
   // Where every creature stands, and on whose side. Both halves in one map,
@@ -1211,9 +1234,13 @@ export function clashOf(blockerId: number | undefined,
   for (const [side, which] of sides) {
     for (const card of side?.creatures ?? []) at.set(card.id, { card, side: which })
   }
-  const blocker = at.get(blockerId)
-  if (!blocker || blocker.card.blocking === 0) return null
-  const attacker = at.get(blocker.card.blocking)
+  const here = at.get(id)
+  if (!here) return null
+  // Which end of the fight this id is standing at. A blocker names the card it
+  // stopped; an attacker is the fight itself and names nobody.
+  const attacker = here.card.blocking !== 0
+    ? at.get(here.card.blocking)
+    : side === 'either' && here.card.combat === ATTACKING ? here : undefined
   if (!attacker) return null
   // Everything facing this attacker, in board order so the rank does not
   // reshuffle itself as it grows.

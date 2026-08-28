@@ -17,6 +17,7 @@ import { type CSSProperties, useEffect } from 'react'
 
 import campusArt from '../assets/coliseum/campus.webp'
 import certamenArt from '../assets/coliseum/certamen.webp'
+import ossariumArt from '../assets/coliseum/ossarium.webp'
 import cryptaArt from '../assets/coliseum/crypta.webp'
 import fabricaArt from '../assets/coliseum/fabrica.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
@@ -28,8 +29,8 @@ import type { Speed, StagedBeat } from '../lib/reel'
 import { halfNamed } from '../lib/board'
 import { halfGlassFor } from '../lib/halves'
 import { ARCANA, boutAt, type BoutFighter, faceFor, mannerOf, plateNote,
-  plateWord, sceneFor, type Staged, stagedBout, stagedMana, stageLife,
-  type StagedBout, type StagedMana, useStaged, useStagedBout,
+  type Outcome, plateWord, sceneFor, type Staged, stagedBout, stagedMana,
+  stageLife, type StagedBout, type StagedMana, useStaged, useStagedBout,
   useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
@@ -588,13 +589,29 @@ function StageBout({ item }: { item: StagedBout }) {
   const life = { '--stage-life': `${item.life}ms` } as CSSProperties
   return (
     <span style={life} aria-hidden="true"
-          className={`stage-bout is-from-${item.facing}`}>
+          className={`stage-bout is-from-${item.facing}`
+        + (item.outcome ? ` is-${item.outcome}` : '')}>
       {/* The arena, which is a real place and the only scene in this room that
           is drawn behind more than one card. `certamen.recipe.yaml` argues the
           painting, the crop and why every other candidate lost. */}
+      {/* **Three arenas, and which one opens says how the fight ended.** The
+          declaration gets the arena itself; a fight that settled gets the
+          verdict — the ossuary if the creature that swung was cut down, the
+          arch if it went through. `certamen.recipe.yaml` and its two
+          neighbours argue the pictures and why eleven others lost.
+
+          The arch is a `background-image` rather than an `<img>` for the one
+          reason `templum` is: it is an etching, and line on white paper
+          arrives grey. `background-blend-mode` needs a background layer to
+          blend with, and grey is the one thing this arena is not. */}
       <span className="stage-bout-scene" aria-hidden="true">
-        <img className="stage-bout-art" src={certamenArt} alt=""
-             draggable={false} />
+        {item.outcome === 'held' ? (
+          <span className="stage-bout-art is-triumph" />
+        ) : (
+          <img className="stage-bout-art"
+               src={item.outcome === 'fell' ? ossariumArt : certamenArt}
+               alt="" draggable={false} />
+        )}
       </span>
       {/* Dust along the line where the two ranks meet — the valley's own
           device, and it is here for the same reason: a place where something
@@ -680,7 +697,7 @@ function BoutCard({ fighter, role, at, order }: {
  * `beatLine` correct against exactly that day.
  */
 export function CenterStage({ board, beat, speed, game, dies, seat, gained,
-  at, clash }: {
+  at, clash, outcome }: {
   board: ForgeBoard | null
   beat: StagedBeat | null
   speed: Speed
@@ -703,7 +720,10 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   /** The seat the current beat belongs to, when the room knows it. Used only
    *  to prefer the caster's own copy of a card both seats run. */
   seat: number | null
-  /** The fight the board is showing, when this beat is a block.
+  /** How that fight ended, when this beat is the fight settling rather than
+   *  being declared. Picks which arena opens behind it. */
+  outcome: Outcome | null
+  /** The fight the board is showing, when this beat is a block or a death.
    *
    *  **Settled upstairs, because it cannot be settled here.** A clash is a
    *  fact about *both* seats — the attacker is on one side of the seam and the
@@ -779,8 +799,15 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // keyed on the beat because a gang arrives as several beats and each of them
   // has to reset the clock, or the third cat would land on a stage that was
   // already fading.
-  const bout = useStagedBout(
-    stagedBout(clash, board, beat?.key ?? '', speed), beat?.key ?? '', game)
+  const liveBout = stagedBout(clash, board, beat?.key ?? '', speed, outcome)
+  const heldBout = useStagedBout(liveBout, beat?.key ?? '', game)
+  // **Paused, the fight is the beat's own** — the marks' rule, and it is the
+  // same argument. Stepping and scrubbing both pause first, and those are
+  // exactly where holding a verdict past its beat is wrong: dragging through a
+  // combat would leave *"Cut down: Arahbo"* standing over twenty later beats
+  // that have nothing to do with it. Playing, the hold is what lets a fight be
+  // read at all.
+  const bout = speed === 'paused' ? liveBout : heldBout
   const farMana = useStagedMana(
     stagedMana(gained.far, 'far', key, speed), key, game)
   const nearMana = useStagedMana(

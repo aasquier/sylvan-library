@@ -1,0 +1,92 @@
+# Where a fight goes when the creature that started it walks through the wall.
+#
+# The victor's half of Aaron's ask on 2026-08-28; `ossarium.recipe.yaml` is the
+# other, and the two were chosen together. It opens behind the bout when the
+# fight settles and the attacker is still standing.
+#
+# **Every picture of victory puts one object in the middle, which is where the
+# attacker's card stands.** That is the whole difficulty and it took two rounds
+# to get past. A triumphal arch photographed head-on is an arch dead centre; so
+# is the Arch of Titus in Macpherson's plate and in the Rijksmuseum's. The wide
+# Roman-triumph *paintings* fail differently and the repo had already recorded
+# how: Apollonio di Giovanni's `Triumph of Lucius Aemilius Paullus` and the
+# Marradi Master's `A Roman Triumph` are quattrocento cassone panels, and
+# `campus.recipe.yaml` rejected the `Battle of Zama` for being exactly that --
+# at this size the figures stop being figures and it reads as a strip of gold
+# and red ornament. One of them has its gilt frame in the scan.
+#
+# **Piranesi answers it by being a place rather than a monument.** The 1748
+# `Arco di Costantino` is not a picture *of* an arch; it is a picture of
+# standing among ruins with an arch in them. Cropped left of the arch, the
+# middle of the frame is broken masonry, statuary and depth -- no single
+# subject where the card lands -- and the arch itself sits at the right where
+# the mask is already fading. It recedes, which is what `via` and `crypta`
+# taught this room to look for.
+#
+# **An etching needs the palette applied**, and that rule is
+# `a-scene-is-measured-against-the-card`'s. Line on white paper arrives grey,
+# and grey is the one thing this arena is not. Raw this plate measures **mean
+# 121, p90 203** -- the `Carceri` fault exactly, mostly untouched paper.
+# `templum` already solved it for the one other etching in this directory:
+# `background-blend-mode: soft-light` over a dark ground, which is why that
+# scene is a background-image element rather than an `<img>` and why this one
+# is too. Blended over `#2c2118` it lands at **mean 37, p90 68** -- the dark
+# end of the shipped range, beside `fabrica`'s 46, and the right end for a
+# picture that has to pair with an ossuary.
+#
+# **The asset stays untouched**, which is every recipe's rule here. The dusk is
+# the stylesheet's.
+#
+# **No Christian iconography**: the arch carries Constantine's name and none of
+# his vision -- the crop is the pagan spolia and the ruins, and the standing
+# refusal that killed Giulio Romano for `campus` was checked against it.
+
+animist: 1
+why_committed: >
+  The seven scenes beside it, exactly. This is drawn on the beat that says a
+  fight settled well and it is gone about two seconds later, so fetching it
+  from somebody else's host would mean an arch that opens after the creature
+  walking through it has already faded. The licence is unusually clean here --
+  a CC0 dedication by the National Gallery of Art rather than a term expiry --
+  but the argument for committing is the timing rather than the terms.
+sources:
+  # `LicenseShortName` is CC0 and `UsageTerms` is "Creative Commons Zero,
+  # Public Domain Dedication", confirmed through the API at fetch time
+  # (2026-08-28). Donated to Commons by the National Gallery of Art, which is
+  # the strongest provenance any plate in this directory has: an institution's
+  # own scan under an explicit dedication, rather than a term expiry that has
+  # to be re-argued or an individual's own-work claim.
+  triumphus:
+    provider: wikimedia
+    title: "Giovanni Battista Piranesi, Arco di Costantino, 1748, NGA 125667.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Giovanni_Battista_Piranesi,_Arco_di_Costantino,_1748,_NGA_125667.jpg
+    found_via: >
+      Commons, searching `Piranesi Arco di Costantino` by name after an
+      unrestricted hunt for triumphs and arches had produced only cassone
+      panels and centred monuments. Naming the painter is the search that
+      works, which is the third time this directory has recorded that. Forty-
+      nine free and wide candidates were returned across seven phrasings; five
+      were fetched and measured against the bout's own card footprint.
+    licence: CC0
+
+outputs:
+  # 880 wide, matching `certamen.webp` and `ossarium.webp` -- the three are
+  # drawn in the same band by the same component, and a scene that changed size
+  # when the fight resolved would read as the picture jumping.
+  #
+  # **139 KB, and it is the largest scene in this directory by some way.** The
+  # encoder was swept 60 to 82 and the curve is a straight line with no knee at
+  # all: an etching is a quarter of a million hand-cut lines and there is
+  # nothing else for a codec to do with them. Quality 68 is the point where the
+  # blend above it has already crushed the finest hatching, so the bytes past
+  # it were buying detail the stylesheet throws away.
+  - file: triumphus.webp
+    from: triumphus
+    ops:
+      # Left of the arch and below the sky. The window is argued in the header:
+      # it puts ruins under the attacker's card instead of a monument, and
+      # leaves the arch at the right where the mask fades.
+      - crop: {frac_box: [0.0, 0.16, 0.70, 0.90]}
+      - resize: {width: 880}
+    encode: {format: webp, quality: 68}
+    expect: {width: 880, height: 488, budget_kb: 150, metadata: none}

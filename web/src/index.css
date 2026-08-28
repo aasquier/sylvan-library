@@ -15367,3 +15367,63 @@ button:hover .tarot-fan-card {
   }
   .stage-bout-seam { animation: none; opacity: 0.45; }
 }
+
+/* **The two verdicts, and which one opens says how the fight ended.**
+ *
+ * Aaron, 2026-08-28, asking for "winner and loser in the faceoff". A fight is
+ * declared and then, a median of thirty-five beats later, it settles — which
+ * is not a gap to design around but the combat step itself, the same wait
+ * somebody watching a real table sits through. So the bout re-opens with the
+ * verdict behind it.
+ *
+ * **Keyed on the attacker**, because a mixed wall has no single verdict: two
+ * blockers dead and one alive is not a result, but the creature that swung
+ * either went through or it did not. The skulls on the individual cards say
+ * who else fell.
+ *
+ * A fight where **nobody died** keeps the plain arena. That is not a quiet
+ * verdict, it is no verdict, and an arch over a wall still standing would be
+ * the room claiming something the game never said. */
+
+/* The ossuary — Kutná Hora, a thousand of the same thing, which is what a wall
+   of skulls is and what a graveyard full of chump blockers is. It ships as it
+   stands: `ossarium.recipe.yaml` measured it at mean 64 against a range this
+   room runs from 46 to 143, so it needs neither the blend below it nor the
+   hold-back `certamen` takes. A single skull is already spoken for — that is
+   `memento.webp`, on a card — and this is deliberately the other scale of it. */
+.stage-bout.is-fell .stage-bout-art {
+  aspect-ratio: 880 / 488;
+  opacity: 1;
+}
+
+/* The arch — Piranesi, 1748, and it is a background layer rather than an image
+   for exactly `templum`'s reason: an etching is line on white paper, it
+   arrives grey, and grey is the one thing this arena is not.
+   `background-blend-mode` needs a layer to blend *with*, which an `<img>`
+   cannot give it. Raw the plate is mean 121; over this ground it is 37, which
+   is the dark end of the range and the right end to pair with an ossuary. */
+.stage-bout-art.is-triumph {
+  width: min(100%, 940px);
+  aspect-ratio: 880 / 488;
+  background-color: #2c2118;
+  background-image: url('./assets/coliseum/triumphus.webp');
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: soft-light;
+  opacity: 1;
+  -webkit-mask-image: radial-gradient(ellipse 58% 60% at 50% 50%,
+    #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  mask-image: radial-gradient(ellipse 58% 60% at 50% 50%,
+    #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  animation: stage-field-rise var(--stage-life, 2000ms) ease-out both;
+}
+
+/* The light the cards wear when a fight has settled. The declaration keeps the
+   gate's red on the attacker and cool steel on the wall — that is who is
+   fighting whom. A verdict is a different question, so the colour answers the
+   *outcome*: the creature that went through takes the brass this room crowns
+   with, and the one that was cut down takes the grave's own green, which is
+   the light `.stage-card.is-dies` already dies in. One vocabulary, two
+   moments. */
+.stage-bout.is-held .stage-bout-card.is-att { --bout-glow: var(--field-brass); }
+.stage-bout.is-fell .stage-bout-card.is-att { --bout-glow: #8fb59a; }

@@ -976,6 +976,20 @@ export interface BoutFighter {
   count: number
 }
 
+/** How a fight ended, or `null` while it is only being declared.
+ *
+ *  **Keyed on the attacker** (Aaron, 2026-08-28), which is what makes a mixed
+ *  result answerable at all: a wall of three where two die and one lives has
+ *  no single verdict, but the creature that swung into it either walked
+ *  through or it did not. The backdrop answers for the attacker; the skulls on
+ *  the individual cards answer for everyone else.
+ *
+ *  `null` for the declaration, which is most of them, and for a fight where
+ *  **nobody died** — that one is not a quiet verdict, it is no verdict, and a
+ *  triumph over a wall that is still standing would be the room claiming
+ *  something the game did not say. */
+export type Outcome = 'fell' | 'held'
+
 export interface StagedBout {
   /** The beat's own identity, so each block in a gang resets the clock and the
    *  fight is still up when the last of them lands. */
@@ -987,6 +1001,9 @@ export interface StagedBout {
   /** What the plate under the fight says. */
   word: string
   note: string | null
+  /** How it ended, when this is the fight settling rather than being declared.
+   *  Picks the scene: the ossuary if the attacker fell, the arch if it held. */
+  outcome: Outcome | null
   life: number
 }
 
@@ -1120,7 +1137,8 @@ function walled(blockers: BoutFighter[]): string {
  * the picture is showing. The wall is named underneath, where the note goes.
  */
 export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
-  key: string, speed: Speed): StagedBout | null {
+  key: string, speed: Speed, outcome: Outcome | null = null):
+  StagedBout | null {
   if (!clash) return null
   const fighter = (card: BoardCard, count: number): BoutFighter => ({
     id: card.id,
@@ -1135,8 +1153,13 @@ export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
     attacker,
     blockers,
     facing: clash.swinging,
-    word: 'Blocked',
+    // **Three words for three moments**, and the tense is the whole of it: a
+    // fight is *Blocked* while it is being declared, and once the damage has
+    // landed it is something that already happened.
+    word: outcome === 'fell' ? 'Cut down'
+      : outcome === 'held' ? 'Broke through' : 'Blocked',
     note: blockers.length ? `by ${walled(blockers)}` : null,
+    outcome,
     life: boutLife(speed),
   }
 }

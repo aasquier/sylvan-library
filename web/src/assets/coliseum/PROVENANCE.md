@@ -260,3 +260,30 @@ Why committed rather than hotlinked: The five scenes beside it, exactly. This dr
 
 Why committed rather than hotlinked: The six scenes beside it, exactly. This draws on the beat a creature is blocked and is gone about two seconds later, so fetching it from somebody else's host would mean an arena that opens after the fight standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end certamen -->
+
+<!-- animist:begin ossarium -->
+## ossarium.webp
+
+- **Source**: "Beinhaus Kutna Hora 1990.JPG", <https://commons.wikimedia.org/wiki/File:Beinhaus_Kutna_Hora_1990.JPG>, found via Commons after two rounds — the first searched Paris by name, as Aaron asked, and returned three free files of which none was usable; the second widened to `ossuaire`, `Beinhaus`, `Capuchin crypt Rome bones` and `Kutna Hora ossuary interior`. Nine free candidates in all, four fetched and measured against the bout's own card footprint. Paris itself is the arena backdrop's licence wall again: its catacombs are a tourist site, so the good modern photographs are CC BY-SA, and what is public domain is either a painting of eighteenth-century gentlemen in tricorn hats visiting (the "no non-Roman figures at size" rule exactly) or the famous inscription, which is French text on a flat wall rather than a place. Rome's Capuchin Crypt is nearer the room's own city and its free plate is a bright nineteenth-century print of robed skeletons standing up, at mean 159 far outside the range.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-28) — `LicenseShortName` and `UsageTerms` both "Public domain". An own-work release by the uploader rather than a term expiry.
+- **Transformations** (Pillow, scripted — `animist build ossarium.recipe.yaml`):
+  - `crop`: frac_box=[0.0, 0.0, 1.0, 1.0]. The whole plate; it is 1.59 against a band of 1.804, so the height comes from its middle, and there is nothing at the top or bottom this picture's middle does not also have.
+  - `resize`: width=880, matching `certamen.webp` so the scene does not jump when a fight resolves.
+  - Encoded WEBP, quality 80. Measured at the bout's band with the cards stood in it: mean 64, p90 128 — in range as it stands, needing neither a blend nor a hold-back.
+
+Why committed rather than hotlinked: The seven scenes beside it, exactly — it is drawn on the beat that says a fight settled badly and is gone about two seconds later. The licence is the sharper reason here: this is an individual contributor's own photograph released into the public domain, which `via.recipe.yaml` records as precisely the category where a third party's copy quietly changes terms or disappears.
+<!-- animist:end ossarium -->
+
+<!-- animist:begin triumphus -->
+## triumphus.webp
+
+- **Source**: "Giovanni Battista Piranesi, Arco di Costantino, 1748, NGA 125667.jpg", <https://commons.wikimedia.org/wiki/File:Giovanni_Battista_Piranesi,_Arco_di_Costantino,_1748,_NGA_125667.jpg>, found via Commons, searching the painter by name after an unrestricted hunt for triumphs and arches produced only cassone panels and centred monuments — the third time this directory has recorded that naming the painter is the search that works. Forty-nine free wide candidates across seven phrasings; five fetched and measured. What the others failed on: every photograph of a triumphal arch puts the arch dead centre, which is where the attacker's card stands, and the wide Roman-triumph paintings (Apollonio di Giovanni's `Triumph of Lucius Aemilius Paullus`, the Marradi Master's `A Roman Triumph`) are quattrocento cassone panels — the same fault `campus.recipe.yaml` rejected the `Battle of Zama` for, one of them with its gilt frame in the scan.
+- **Licence**: CC0. Confirmed through the Wikimedia Commons API at fetch time (2026-08-28) — `UsageTerms` is "Creative Commons Zero, Public Domain Dedication". Donated to Commons by the National Gallery of Art: an institution's own scan under an explicit dedication, which is the strongest provenance any plate in this directory has.
+- **Transformations** (Pillow, scripted — `animist build triumphus.recipe.yaml`):
+  - `crop`: frac_box=[0.0, 0.16, 0.70, 0.90]. Left of the arch and below the sky, so the middle of the frame is ruins and depth rather than a monument, and the arch sits at the right where the mask fades.
+  - `resize`: width=880, matching `certamen.webp` and `ossarium.webp`.
+  - Encoded WEBP, quality 68 — swept 60 to 82, and the curve is a straight line with no knee: an etching is a quarter of a million hand-cut lines. 68 is where the stylesheet's blend has already crushed the finest hatching.
+  - **The stylesheet blends it**, as it does `templum`: `background-blend-mode: soft-light` over a dark ground. Raw the plate is mean 121 / p90 203 — line on white paper, the `Carceri` fault. Blended it lands at mean 37 / p90 68. The asset itself is untouched, which is every recipe's rule here.
+
+Why committed rather than hotlinked: The seven scenes beside it — drawn on the beat that says a fight settled well and gone about two seconds later, so a hotlinked copy would open after the creature walking through it had faded.
+<!-- animist:end triumphus -->

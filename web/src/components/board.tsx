@@ -67,8 +67,8 @@ import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
-  fightingStats, alignLanes, type Clash, clashOf, foldBoard, markedHere,
-  sameCard, stackRow } from '../lib/board'
+  fightingStats, alignLanes, type Clash, clashOf, fightOf,
+  foldBoard, markedHere, sameCard, stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
 import { keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
@@ -76,6 +76,7 @@ import { tokenMaterial, tokenSigil } from '../lib/tokens'
 import { stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 import { CenterStage } from './stage'
+import type { Outcome } from '../lib/stage'
 
 /** One card on the field.
  *
@@ -1473,6 +1474,28 @@ function FieldRow({ label, cards, empty, lane, slots }: {
       ))}
     </div>
   )
+}
+
+/**
+ * The board **one step before** the beat being drawn, as two sides.
+ *
+ * **A dying creature has already left the fight by the time its death is
+ * announced.** Forge reports the death and the zone change on one line — the
+ * same fact that forces the skull onto the grave rather than onto the creature
+ * — so at the death's own step the card's `combat` and `blocking` are gone and
+ * the fight is unreadable. Measured before it was designed around: over a real
+ * game, *no* death resolved to a fight at its own step and every combat death
+ * resolved at the one before.
+ *
+ * So this folds one step short. It is a second walk of the board and it is
+ * paid only on death beats — 33 of them in a ten-game match, against some
+ * sixteen hundred beats — which is why it is a plain call rather than anything
+ * cleverer.
+ */
+function settled(board: ForgeBoard | null, shown: number):
+  [BoardSide | undefined, BoardSide | undefined] {
+  const before = foldBoard(board, Math.max(0, shown - 1))
+  return [before.sides[0], before.sides[1]]
 }
 
 /** Commander's starting life, which is what the ring below is a fraction of.
@@ -3104,14 +3127,41 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   //
   // Here rather than in `CenterStage` for `alignLanes`' own reason, one line
   // up: a clash spans the seam, and a component handed the card dictionary
-  // cannot see the folded state that knows who is blocking whom. Read from the
-  // *blocker* the beat names, because that is the direction Forge announces a
-  // block in — see `clashOf`, which argues the whole reading.
+  // cannot see the folded state that knows who is blocking whom.
   //
-  // Null on every beat that is not a block, which is nearly all of them, so
-  // this costs one map walk on the beats where a fight is being drawn.
+  // **Two moments, and they are seventeen seconds apart.** A block declares a
+  // fight; a death settles one. Combat is declared for every attacker at once
+  // and then all the damage resolves interleaved, so a fight's verdict lands a
+  // median of 35 beats after its own blocks — measured over a real ten-game
+  // match. That gap is the combat step rather than a fault: somebody watching
+  // the field waits exactly that long at a table (Aaron, 2026-08-28), so the
+  // fight simply re-opens when it settles.
+  //
+  // Null on every other beat, which is nearly all of them.
+  const dying = beat?.kind === 'dies' ? beat.id : undefined
+  const settling = dying ? fightOf(dying, ...settled(board, shown)) : null
+  // **How it ended, keyed on the attacker**, and the second half of this is
+  // the part a real board had to teach (Aaron, 2026-08-28: *"sometimes that
+  // will be mixed, like some blockers live, some die, so make sure the right
+  // things go in the right fields"*).
+  //
+  // The creature that swung either walked through the wall or it did not. But
+  // a blocker's death is only a triumph while the attacker is **still
+  // standing** — and blockers go on dying after an attacker has fallen. A real
+  // fight: Arahbo was cut down on one beat, a Wurm Token that had been
+  // blocking it died on the next, and reading "a blocker died" as a win told
+  // the room Arahbo broke through a wall that had just killed it.
+  //
+  // A card on its way out carries `leaving`, which is how the skull finds the
+  // grave; here it is how a verdict avoids contradicting the one before it.
+  // When the attacker has already gone there is **no second verdict** — its
+  // own death settled the fight, and the blocker's skull says the rest.
+  const stillUp = settling && settling.attacker.leaving == null
+  const outcome: Outcome | null = !settling ? null
+    : settling.attacker.id === dying ? 'fell' : stillUp ? 'held' : null
   const clash: Clash | null =
-    beat?.kind === 'block' ? clashOf(beat.id, far, near) : null
+    beat?.kind === 'block' ? clashOf(beat.id, far, near)
+      : outcome ? settling : null
 
   const lives = {
     '--zone-seats': zoneSeats,
@@ -3258,7 +3308,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           here and the skull on the card in its row stay one event. */}
       <CenterStage board={board} beat={beat ?? null} speed={speed} game={game}
                    dies={markLife('dies', speed)} seat={casting} at={shown}
-                   clash={clash}
+                   clash={clash} outcome={outcome}
                    gained={{ far: far.gained, near: near.gained }} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}
