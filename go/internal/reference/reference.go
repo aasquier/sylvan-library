@@ -199,10 +199,42 @@ type Coliseum struct {
 	Zones  []ZoneArt `json:"zones"`
 }
 
+// Creed is a guild speaking for itself: one line of flavour text, printed on
+// a real card, with the speaker and the printing it was read off.
+//
+// **Every word of it was copied out of the card pool, never recalled.**
+// Nothing in the pool's flavour text is labelled as one of the ten guilds'
+// motto: the one Ravnican line carrying the word belongs to the Azorius
+// *Arresters* rather than to the Senate. So what this field can honestly hold
+// is the best creed-shaped thing the guild's own leadership actually says,
+// and `Card` and `Printing` are here so that claim is checkable rather than
+// trusted. Six of the ten come off the guild Charm cycle; Izzet's, Orzhov's
+// and Selesnya's Charms were printed with no flavour text at all in any
+// printing, and Boros's has a line but Aurelia says a better one elsewhere.
+//
+// `Card` is **not** resolved through the pool the way `Champions` and
+// `Signature` are, and that is deliberate: it is an attribution, not a
+// picture to draw, so a fresh clone with no pool still reads the whole
+// citation. Nothing about it should ever be rendered as a card.
+type Creed struct {
+	// Words is the sentence inside the card's quotation marks. The marks
+	// themselves are the flavour-text convention rather than part of the
+	// line, so the renderer supplies them and the data stays the sentence.
+	Words    string `json:"words"`
+	Speaker  string `json:"speaker"`
+	Card     string `json:"card"`
+	Printing string `json:"printing"`
+}
+
 // Combination is one of the 32. `Champions` and `Signature` are names; the
 // route that serves a combination resolves them through the pool and drops
 // and counts what does not resolve, exactly as `service.combination_detail`
 // does.
+//
+// `Creed` is a pointer because most of the 32 do not have one: the ten guilds
+// carry it and the other twenty-two serialise `null`, which is a shape a
+// renderer can branch on without having to decide whether an empty string
+// means "no creed" or "someone left it blank".
 type Combination struct {
 	Key        string     `json:"key"`
 	Name       string     `json:"name"`
@@ -213,6 +245,7 @@ type Combination struct {
 	History    string     `json:"history"`
 	Aliases    []string   `json:"aliases"`
 	VerifiedBy string     `json:"verified_by"`
+	Creed      *Creed     `json:"creed"`
 	Lore       string     `json:"lore"`
 	Champions  []Champion `json:"champions"`
 	Signature  []string   `json:"signature"`

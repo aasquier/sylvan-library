@@ -38,8 +38,8 @@ function combo(over: Partial<Combination> & { key: string; name: string }): Comb
   return {
     tier: 'guild', colors: over.key.split(''), size: over.key.length,
     tagline: `${over.name} tagline.`, history: `${over.name} history.`,
-    aliases: [], verified_by: 'a real card', lore: '', champions: [],
-    signature: [], ...over,
+    aliases: [], verified_by: 'a real card', creed: null, lore: '',
+    champions: [], signature: [], ...over,
   }
 }
 
@@ -60,6 +60,10 @@ const TAXONOMY: ColorTaxonomy = {
       key: 'BG', name: 'Golgari',
       lore: 'The Swarm holds the undercity and the whole decomposition '
           + 'contract, which is leverage nobody thinks about until it stops.',
+      creed: {
+        words: 'Let the rest of Ravnica sneer.', speaker: 'Jarad',
+        card: 'Golgari Charm', printing: 'Return to Ravnica',
+      },
       champions: [{ card: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.' },
                   { card: 'A Card That Does Not Exist', role: 'Dropped on the way.' }],
       signature: ["Assassin's Trophy"],
@@ -141,6 +145,27 @@ describe('the colours tab', () => {
     await screen.findByRole('heading', { name: 'Azorius', level: 2 })
     expect(screen.queryByText('What happened')).toBeNull()
     expect(screen.queryByText('Who they are')).toBeNull()
+  })
+
+  it('quotes the guild in its own words, and says which card they are printed on',
+     async () => {
+       renderLearn('/learn?c=BG')
+       await screen.findByRole('heading', { name: 'Golgari', level: 2 })
+       // The quotation marks are the renderer's, so the assertion is on the
+       // line inside them -- and the citation is beside it, because a creed
+       // nobody can check is a creed somebody remembered.
+       expect(screen.getByText(/Let the rest of Ravnica sneer\./)).toBeTruthy()
+       expect(screen.getByText('Jarad')).toBeTruthy()
+       expect(screen.getByText('Golgari Charm')).toBeTruthy()
+       expect(screen.getByText(/Return to Ravnica/)).toBeTruthy()
+     })
+
+  it('gives no creed plate to a combination that has no creed', async () => {
+    renderLearn('/learn?c=WU')
+    await screen.findByRole('heading', { name: 'Azorius', level: 2 })
+    // Not "renders an empty one": the twenty-two slots without a creed must
+    // draw nothing at all, the same rule the "What happened" heading follows.
+    expect(document.querySelector('.guild-creed')).toBeNull()
   })
 
   it('shows the champion the pool resolved and drops the one it did not',

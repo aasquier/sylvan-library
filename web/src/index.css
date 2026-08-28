@@ -15745,3 +15745,270 @@ button:hover .tarot-fan-card {
     transform: none;
   }
 }
+
+/* ===========================================================================
+   A guild says its piece — the creed plate on Learn's colours tab.
+
+   One line of printed flavour text per guild, set as an inscription in that
+   guild's own two colours. Three rules hold it together:
+
+   1. **The guild's colours are the light, never the ink.** `--mtg-w` and its
+      four siblings are washes (#f8f6d8, #c1d7e9 …), chosen to sit *under*
+      things; a route once shipped a whole page of muted text rendering pure
+      white because a colour that was never meant to be type was used as type.
+      So the pair tints the stone and inks the edge, and the words themselves
+      stay `--text-primary` — black on paper, white at night. All twenty plates
+      (ten guilds, two themes) were rendered and read back rather than assumed:
+      the creed sits at 7.7:1 at worst, 5.8:1 under the brightest frame of the
+      glint below.
+   2. **The edge mixes toward the ink, not toward a fixed dark.** One
+      expression, `color-mix(… var(--creed-a) 74%, var(--text-primary))`,
+      darkens the pair on the light theme and brightens it on the dark one
+      while keeping its hue, so there is no third colour to keep in step.
+   3. **The plate never resolves to the surface behind it.** White's wash over
+      a near-white card is invisible, so the stone is mixed into `--creed-base`
+      — a warm parchment on paper, a cold slate at night — which gives Azorius
+      body and gives the glint below something to lift.
+
+   The Fell types are the site's own letterform (the séance's, and the only
+   serif here). The italic face is one more font fetch, and it is paid for
+   only when a guild is actually on screen: nothing else on this page asks
+   for it, so the twenty-two other combinations cost nothing. */
+.guild-creed {
+  --creed-a: var(--mtg-c);
+  --creed-b: var(--mtg-c);
+  --creed-base: #efecdd;
+  --creed-wash: 46%;
+  --creed-glint: rgba(255, 255, 255, 0.62);
+  --creed-cut: rgba(0, 0, 0, 0.13);
+  --creed-lip: rgba(255, 255, 255, 0.5);
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 20px 0 0;
+  /* The right pad is the seal's gutter: it is what keeps the longest of the
+     ten off the stamp instead of a `max-width` that would also shorten the
+     short ones. It collapses on a phone, where the seal has already gone. */
+  padding: 17px clamp(20px, 8%, 104px) 15px 26px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--creed-a) 46%, var(--hairline));
+  /* `color-mix` in the declaration rather than behind an `@supports`: it is
+     Safari 16.2 and the declared floor is 16.4 (`browserfloor_test.go` argues
+     the number), so every browser this site claims to serve has it. A guard
+     for an engine the project has already decided not to support is a guard
+     with no reason left in it. */
+  background: linear-gradient(
+    112deg,
+    color-mix(in srgb, var(--creed-a) var(--creed-wash), var(--creed-base)) 0%,
+    color-mix(in srgb, var(--creed-b) var(--creed-wash), var(--creed-base)) 100%
+  );
+  /* Carved *into* the panel rather than laid on it: the shadow falls from
+     the top lip, the light catches the bottom one. Two inset lines, which is
+     the whole of the relief — an inscription is a recess, and a drop shadow
+     would have made it a card sitting on a card. */
+  box-shadow:
+    inset 0 1px 2px var(--creed-cut),
+    inset 0 -1px 0 var(--creed-lip);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .guild-creed {
+    --creed-base: #17171a;
+    --creed-wash: 27%;
+    --creed-glint: rgba(255, 255, 255, 0.12);
+    --creed-cut: rgba(0, 0, 0, 0.45);
+    --creed-lip: rgba(255, 255, 255, 0.09);
+  }
+}
+
+:root[data-theme='dark'] .guild-creed {
+  --creed-base: #17171a;
+  --creed-wash: 27%;
+  --creed-glint: rgba(255, 255, 255, 0.12);
+  --creed-cut: rgba(0, 0, 0, 0.45);
+  --creed-lip: rgba(255, 255, 255, 0.09);
+}
+
+/* The carved edge: the pair top to bottom, inked against whatever the page's
+   own type is inked with. */
+.guild-creed::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--creed-a) 74%, var(--text-primary)),
+    color-mix(in srgb, var(--creed-b) 74%, var(--text-primary))
+  );
+}
+
+/* Light walking across the stone, on the wheel's own lap: an oversized
+   gradient moved by `background-position`, screened so it lifts the plate
+   rather than painting a band on it. Slow and low — this is a page for
+   reading, and a stripe crossing a sentence every two seconds is a page
+   nobody finishes.
+
+   **The dark theme's 0.12 is a contrast budget, not a taste call.** Screening
+   white over the plate raises the stone every word on it is written against,
+   and the attribution is the thinnest ink here: at 0.16 the four guilds
+   carrying white took that line to 3.8:1 at the top of the sweep. The first
+   fix tried was a mask holding the light off the caption band, which needed a
+   pixel height for that band — and the citation wraps to two lines on a phone
+   and one on a desk, so the constant was wrong on one of them the moment it
+   was written. Spending the budget on the light itself has no such assumption
+   in it: 0.12 against an 88% caption is 4.9:1 at the worst frame of the worst
+   of the twenty plates, and still lifts the stone 21 levels as it passes,
+   which is plenty of movement to read. */
+.guild-creed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    104deg,
+    transparent 34%,
+    var(--creed-glint) 50%,
+    transparent 66%
+  );
+  background-size: 320% 100%;
+  animation: creed-glint-walk 19s ease-in-out 2.4s infinite;
+}
+
+@keyframes creed-glint-walk {
+  0%, 14% { background-position: 150% 0; opacity: 0; }
+  26% { opacity: 0.9; }
+  56% { background-position: 10% 0; opacity: 0.7; }
+  80% { opacity: 0; }
+  100% { background-position: -70% 0; opacity: 0; }
+}
+
+/* The seal: the guild's own two mana symbols, pressed large into the right of
+   the stone and running off its edge, at the strength of an impression rather
+   than a picture. Behind the glint, so the light crosses it; behind the words,
+   which the plate's right pad keeps clear of it.
+
+   It is the one mark on the plate that is a shape rather than a hue — Golgari
+   and Simic both carry green and both wash out the same way to an eye that
+   cannot take the difference, but one seal is a skull beside the tree and the
+   other is a water drop. */
+.guild-creed-seal {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: -18px;
+  transform: translateY(-50%) rotate(-7deg);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* Under 640px the seal would be sitting under the sentence rather than beside
+   it, and the plate's right pad has collapsed to make room for the words. */
+@media (max-width: 639px) {
+  .guild-creed-seal {
+    display: none;
+  }
+}
+
+/* The words. `clamp` so the same sentence is display type on a desk and still
+   fits a 375px phone without a horizontal rule anywhere: the longest of the
+   ten (Golgari's) is 84 characters, sets on one line at 1280px and wraps to
+   three at 375px, and that phone reading is the case the sizes were settled
+   against.
+
+   **No `text-wrap: balance`, and that is the second time.** It was written
+   here, `browserfloor_test.go` refused it in the committed bundle, and the
+   same refusal is already recorded on `.arena-gate-word` — Safari 17.4 against
+   a declared floor of 16.4. Twice now the property has been the obvious reach
+   for a ragged line, so: it is not available, and the reason is upstream of
+   taste. */
+.guild-creed-words {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.0625rem, 0.86rem + 0.9vw, 1.5rem);
+  line-height: 1.42;
+  letter-spacing: 0.006em;
+  color: var(--text-primary);
+  /* Hanging punctuation: the opening quote leans out into the margin so the
+     *letters* line up with the attribution below, rather than the mark. Only
+     the first line is indented, which is exactly the effect wanted. */
+  text-indent: -0.4em;
+  /* The inscription arriving. The panel is keyed on the combination, so this
+     replays every time a different guild is chosen — which is the moment it
+     is for. */
+  animation: creed-cut 820ms cubic-bezier(0.16, 0.84, 0.3, 1) both;
+}
+
+@keyframes creed-cut {
+  0% { opacity: 0; transform: translateY(7px); letter-spacing: 0.09em; }
+  100% { opacity: 1; transform: translateY(0); letter-spacing: 0.006em; }
+}
+
+/* Who said it, and where it is printed. Mixed from `--text-primary` rather
+   than reaching for a muted token: the ink has to hold up over ten different
+   tinted plates in two themes, and a fixed grey is only ever measured
+   against one of them.
+
+   **88%, and the number was measured rather than picked.** All twenty plates
+   were rendered and read back, under the brightest frame of the glint above:
+   at 66% the four guilds carrying white came out at 4.4:1 on the dark theme —
+   under the floor, and only on those four, which is exactly the kind of miss a
+   single spot-check walks past. 88% against a 0.12 glint puts the worst of the
+   twenty at 4.9:1. The speaker below takes the ink whole; it is the one word
+   here somebody might want to find at a glance. */
+.guild-creed-hand {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-primary) 88%, transparent);
+  animation: creed-hand-in 820ms ease-out 260ms both;
+}
+
+@keyframes creed-hand-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.guild-creed-speaker {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.guild-creed-speaker::before {
+  content: '—';
+  margin-right: 5px;
+  opacity: 0.65;
+}
+
+.guild-creed-source cite {
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The plate stays; the light stops walking and the inscription is simply
+     already cut. `animation: none` is safe on all three — none of them owns
+     an element's life the way the stage scenes do. */
+  .guild-creed::after,
+  .guild-creed-words,
+  .guild-creed-hand {
+    animation: none;
+  }
+
+  .guild-creed::after {
+    opacity: 0;
+  }
+}
