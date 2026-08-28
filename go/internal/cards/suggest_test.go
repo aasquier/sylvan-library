@@ -259,7 +259,10 @@ func TestADoubleFacedCardIsFoundByEitherFace(t *testing.T) {
 	}
 	// And misspelled, through the near tier, against the front face -- which
 	// is a whole 25 characters shorter than the name the row would score.
-	if names, via := suggest(t, "Etali, Primal Conquerer", 8); first(names) != dfc ||
+	// The name below is misspelled on purpose: it is the input under test
+	// rather than prose, so letting `misspell` correct it would quietly
+	// delete the assertion. Hence the directive on the line itself.
+	if names, via := suggest(t, "Etali, Primal Conquerer", 8); first(names) != dfc || //nolint:misspell // the misspelling is the test
 		via[dfc] != "near" {
 		t.Errorf("a misspelled front face offered %v %v", names, via)
 	}

@@ -365,6 +365,16 @@ func optionalFloat(q map[string][]string, name string, errs *[]wire.ValidationEr
 }
 
 // boundedInt is `Query(default, ge=lo, le=hi)` on an int.
+//
+// `name` is "limit" at every call site today, which `unparam` notices and
+// reports. It stays because this is one of a family -- `boundedFloat` and
+// `flag` beside it take the same `(q, name, ...)` shape, and `flag` really
+// does vary its name ("identity_exact", "commanders_only"). Dropping the
+// parameter here would buy one fewer argument and cost the reader the
+// symmetry that says these three are the same kind of thing; the error
+// messages below would also have to hardcode a name they currently quote.
+//
+//nolint:unparam // one of a family; see above
 func boundedInt(q map[string][]string, name string, fallback, lo, hi int, errs *[]wire.ValidationError) int {
 	vals := q[name]
 	if len(vals) == 0 {
