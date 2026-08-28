@@ -164,7 +164,9 @@ func fillPattern(pattern string) string {
 	if strings.Contains(pattern, "{") {
 		return "" // an OCR name, an oracle id, an effect: nothing to fill
 	}
-	if pattern == "/api/cards/search" {
+	// Both card doors answer nothing at all for an empty question, which
+	// would sweep the "you typed nothing" path instead of the pool's.
+	if pattern == "/api/cards/search" || pattern == "/api/cards/suggest" {
 		return pattern + "?q=sol"
 	}
 	return pattern

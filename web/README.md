@@ -145,6 +145,18 @@ them as separate steps on purpose, so a type error reports as a type error.
   dance as every other theme rule. `prefers-reduced-motion` removes the
   ambience outright rather than freezing it: frozen weather is a smudge.
   Decoration is `aria-hidden`, `pointer-events: none`, and never load-bearing.
+- **A card is picked, never spelled.** `components/cardfinder.tsx` is the
+  combobox behind "add a card": `/api/cards/suggest` finds a name from a
+  fragment *or a misspelling* (`internal/cards`' `Suggest`, whose doc comment
+  argues the tiers and the guess threshold against measured numbers), the
+  active row's whole card renders beside the list with its artist credited,
+  and a banned card or one outside the deck's colours is **marked rather than
+  hidden** — the server still owns the refusal. Anything else that asks
+  somebody to type a card name belongs here rather than in a second
+  `<input>`. Its layout is this app's **first container query** — `.finder-*`
+  in `index.css` — because the field sits in a form that is one column on a
+  phone and three on a desk, so the viewport's width is the wrong question;
+  Safari 16.0 has had `@container` and the floor is 16.4.
 
 ## Testing habits with a history behind them
 

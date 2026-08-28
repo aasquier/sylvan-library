@@ -152,6 +152,40 @@ export interface Card {
   printing?: { set_name: string | null; set_code: string } | null
 }
 
+/**
+ * One card the finder is offering, for a name somebody is still typing.
+ *
+ * Deliberately not a `Card`: a `Card` is a card *in a deck*, and carries the
+ * three fields that only exist once it is one — `category`, `why`, `qty`. A
+ * card that has not been added yet has none of them, and a shape that
+ * pretended otherwise would be one optional field away from a surface writing
+ * a rationale, which is the one thing no surface may do (rule 4, ADR 8).
+ */
+export interface CardOffer {
+  name: string
+  mana_cost: string | null
+  type_line: string
+  oracle_text: string
+  color_identity: string[]
+  /** The whole card, hot-linked (ADR 6). Never proxied, never re-hosted, and
+   *  never filtered, cropped or desaturated (ADR 32, commandment 9). */
+  image: string | null
+  /** Owed a credit line wherever the painting renders. */
+  artist: string | null
+  legal_commander: boolean
+  /** The one category a card pool fact can fill — the importer's own rule,
+   *  right about the double-faced cards a type line is wrong about. Every
+   *  other category is an opinion and stays the user's. */
+  is_land: boolean
+  /** How alike the name is to what was typed. */
+  score: number
+  /** Which tier offered it: the name is `exact`ly what was typed, `holds`
+   *  it somewhere, holds every one of its `words`, or is `near` it — the last
+   *  being the only one that is a guess, and the only one the interface says
+   *  so about. */
+  via: 'exact' | 'holds' | 'words' | 'near'
+}
+
 export interface DeckDetail extends DeckSummary {
   notes: Record<string, string>
   commander_card: Card | null
@@ -2656,6 +2690,16 @@ export const api = {
       `/api/cards/search?${qs}`,
     )
   },
+  /** The typeahead behind "add a card": a short ranked shortlist for a few
+   *  letters somebody is still typing, including the misspelled ones that
+   *  `searchCards` answers with nothing at all. `limit` is capped server-side.
+   *
+   *  Unlike `searchCards` this does **not** filter to legal cards: a banned
+   *  card is offered and marked, because a card hidden from the list is
+   *  indistinguishable from a card that does not exist. */
+  suggestCards: (q: string, limit = 8) =>
+    get<{ cards: CardOffer[]; message?: string }>(
+      `/api/cards/suggest?q=${encodeURIComponent(q)}&limit=${limit}`),
   swapCard: (ref: DeckRef, body: { out: string; into: string; why: string }) =>
     post<SwapResult>(deckPath(ref, '/swap'), body),
   addCard: (
