@@ -564,6 +564,14 @@ func TestADeckWithNoCardsIsRefusedWithoutWakingTheWorker(t *testing.T) {
 
 // TestAWorkerWithNoForgeIsA503 keeps the distribution's absence apart from a
 // deck's problem: one is the instance, the other is the request.
+//
+// **The status is the worker's and the words are the room's**, which is the
+// half of this that changed on 2026-08-28. This used to assert that the
+// worker's own account — "no Forge card data at ..." — reached the caller, and
+// that is precisely the fault: on the deployed site the same path recited a
+// control-plane URL, a machine id and raw JSON at a newcomer who had pressed
+// one button. The diagnosis is a log line now; `forgeTrouble` writes what a
+// person is handed, and `forgevoice_test.go` holds it to naming nothing.
 func TestAWorkerWithNoForgeIsA503(t *testing.T) {
 	shim := &stubShim{stream: true, failCoverage: true}
 	a, _, _ := forgeAPI(t, shim)
@@ -572,8 +580,12 @@ func TestAWorkerWithNoForgeIsA503(t *testing.T) {
 	if status != 503 {
 		t.Fatalf("answered %d, want 503 (%v)", status, payload)
 	}
-	if detail, _ := payload["detail"].(string); !strings.Contains(detail, "no Forge card data") {
-		t.Errorf("the 503 did not carry the worker's words: %q", detail)
+	detail, _ := payload["detail"].(string)
+	if strings.Contains(detail, "Forge") || strings.Contains(detail, "card data") {
+		t.Errorf("the 503 recited the installation at a player: %q", detail)
+	}
+	if !strings.Contains(detail, "decks") {
+		t.Errorf("the 503 left a player wondering about their decks: %q", detail)
 	}
 }
 
@@ -596,8 +608,21 @@ func TestAMatchThatFailsIsAJobInError(t *testing.T) {
 	if job.Status() != "error" {
 		t.Fatalf("the job ended %q, want error", job.Status())
 	}
-	if got := job.Payload().Error; got == nil || !strings.Contains(*got, "ResultsUntrustworthy") {
-		t.Errorf("the job's error lost the worker's words: %v", got)
+	// **Said in the room's words, not the run's.** The job's error is rendered
+	// verbatim under "The match failed:", so this is the last place a machine
+	// id or a Java class name can be stopped — and on the live site it was not.
+	// What a person is owed here is that the match broke and that sending the
+	// decks in again is worth doing; `ResultsUntrustworthy` is for the log.
+	got := job.Payload().Error
+	if got == nil {
+		t.Fatal("a failed match ended with nothing to say")
+	}
+	if strings.Contains(*got, "ResultsUntrustworthy") ||
+		strings.Contains(*got, "Forge") {
+		t.Errorf("the job recited the run at a player: %q", *got)
+	}
+	if !strings.Contains(*got, "again") {
+		t.Errorf("a recoverable failure does not invite another go: %q", *got)
 	}
 }
 

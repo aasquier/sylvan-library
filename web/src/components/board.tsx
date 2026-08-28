@@ -67,6 +67,7 @@ import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
   fightingStats, alignLanes, foldBoard, sameCard, stackRow } from '../lib/board'
+import { counterSaid, counterSign } from '../lib/counters'
 import { keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
@@ -81,25 +82,6 @@ import { CenterStage } from './stage'
  * creature that dies has to be the same DOM node in the graveyard or the
  * animation has nothing to animate.
  */
-/**
- * Which way a counter cuts.
- *
- * **The sign is on the kind, not on the number.** `n` is how many counters of
- * that kind are on the card and it is a count — it is never negative. A single
- * -1/-1 arrives as `{kind: '-1/-1', n: 1}`, and reading the sign off `n` drew
- * it as a cheerful green `+1`, which is the exact opposite of the news.
- *
- * Three answers rather than two, because most counters are neither: charge,
- * loyalty, quest and stun counters are not good or bad, they are just counters,
- * and colouring them green would be the board having an opinion it has no
- * basis for.
- */
-function counterSign(kind: string): 'up' | 'down' | 'flat' {
-  if (kind.startsWith('-')) return 'down'
-  if (kind.startsWith('+')) return 'up'
-  return 'flat'
-}
-
 /**
  * What the beat that just landed did, as a mark on the board.
  *
@@ -1228,16 +1210,34 @@ function FieldCard({ card, count, inPlay = false }: {
             for what is being taken away, which is the one colour convention
             every player already has, and brass for the ones that are neither.
             The count carries the sign in type as well, for anybody who does
-            not separate those two hues. */}
+            not separate those two hues.
+
+            **And every chip says what it means now**, which is the fourth time
+            this room has had to learn that a number is not an explanation
+            (Aaron, 2026-08-28: *"the card counters chip is still a number with
+            no sentence behind it"*). A `+3` on a creature answered one question
+            — how many — and left the two a newcomer actually has: what a +1/+1
+            counter *is*, and how this creature came by three of them. The
+            `title` it hung the first half on was hover-only and the marks were
+            `<span>`s, so it was the same fault the keyword marks had a day
+            earlier, in the same corner of the same card.
+
+            `FieldHint` is the mechanism and `lib/counters.ts` writes the words:
+            what the counter does in a sentence, and under it **the account of
+            how it got here** — "two on turn 4, one more on turn 6".
+            `BoardCard.counterHistory` has carried that account since #326 and
+            nothing had ever drawn a line of it. */}
         {counters.length > 0 && (
-          <span className="field-card-counters" aria-hidden="true">
+          <span className="field-card-counters">
             {counters.map((c) => {
               const way = counterSign(c.kind)
+              const said = counterSaid(c.kind, c.n, card.counterHistory)
               return (
-                <span key={c.kind} title={`${c.n} ${c.kind}`}
-                      className={`field-counter tabular is-${way}`}>
+                <FieldHint key={c.kind} name={said.name} says={said.says}
+                           note={said.note} onOpen={hide} onShut={unhinted}
+                           className={`field-counter tabular is-${way}`}>
                   {way === 'down' ? '-' : way === 'up' ? '+' : ''}{c.n}
-                </span>
+                </FieldHint>
               )
             })}
           </span>

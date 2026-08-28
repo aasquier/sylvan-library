@@ -69,6 +69,38 @@ func (e *notInstalled) Is(target error) bool {
 	return target == ErrForgeNotInstalled
 }
 
+// ErrWorkerNotReady is the *transient* half of [ErrForgeNotInstalled]: the
+// arena is configured and would work, and right now the machine that plays the
+// games is not answering. A cold image that has not finished booting, a start
+// that outran its budget, a shim that has not opened its port yet.
+//
+// **It exists so that two very different sentences can be said.** Every one of
+// these used to be a `NotInstalled`, which is a claim that this instance cannot
+// play games at all — true for a checkout with no Forge in it, and false for
+// the deployed arena a moment after a new image lands. The distinction the room
+// needs is exactly *come back in a minute* against *this will never work here*,
+// and nothing could tell them apart. See `forgeTrouble` in `internal/api`.
+//
+// **It answers to [ErrForgeNotInstalled] as well, on purpose.** Every caller
+// that maps that sentinel onto a 503 keeps working untouched — this narrows an
+// existing class rather than adding a branch to every switch that reads it, and
+// a transient fault and a missing installation really do deserve the same
+// status code. Only the words differ.
+var ErrWorkerNotReady = errors.New("the forge worker is not answering")
+
+// NotReady wraps a reason as [ErrWorkerNotReady]. The reason is for the log;
+// the room is handed a sentence of its own.
+func NotReady(format string, args ...any) error {
+	return &notReady{msg: fmt.Sprintf(format, args...)}
+}
+
+type notReady struct{ msg string }
+
+func (e *notReady) Error() string { return e.msg }
+func (e *notReady) Is(target error) bool {
+	return target == ErrWorkerNotReady || target == ErrForgeNotInstalled
+}
+
 // ErrCoverageFailed is `run.CoverageFailed`: a deck contains cards Forge does
 // not implement, so nothing may run.
 var ErrCoverageFailed = errors.New("coverage failed")

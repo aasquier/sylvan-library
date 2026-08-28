@@ -205,3 +205,17 @@ Why committed rather than hotlinked: The same argument as the road and the skull
 
 Why committed rather than hotlinked: The same argument as the road and the vault beside it. This is drawn on the beat that says a permanent arrived uncast and it is gone about a second and a half later, so fetching it from somebody else's host would mean a battlefield that opens after the creature standing on it has already faded. The licence is the second reason: this is a PD-Art photographic reproduction uploaded by an individual contributor, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end campus -->
+
+<!-- animist:begin fabrica -->
+## fabrica.webp
+
+- **Source**: "Joseph Wright - An Iron Forge - Google Art Project.jpg", <https://commons.wikimedia.org/wiki/File:Joseph_Wright_-_An_Iron_Forge_-_Google_Art_Project.jpg>, found via Commons, searching the painter and the painting by name -- which is the search that works here and the one `campus.recipe.yaml` recorded. Every unrestricted phrasing (`blacksmith anvil sparks`, `forge hammer glowing iron`, `smithy interior night`) returns modern photographs under CC BY-SA and scanned trade catalogues. Three candidates were fetched and cropped with a card stood in them before this one was chosen: Wright's own `A Blacksmith's Shop` (Yale, 4688x5975, rejected on the crop -- see the header), Velazquez's `La Fragua de Vulcano` (Prado, 2952x2293, a frieze with a god in it), and this. The Google Art Project scan is 2801x2572, which is nearly square and the reason a wide band comes out of it without throwing most of the painting away.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build fabrica.recipe.yaml`):
+  - `crop`: frac_box=[0.02, 0.3, 1.0, 0.92].
+  - `resize`: width=660.
+  - Encoded WEBP, quality 76.
+
+Why committed rather than hotlinked: The three scenes beside it, exactly. This draws on the beat an artifact arrives and is gone about a second later, so fetching it from somebody else's host would mean a forge that opens after the card standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end fabrica -->

@@ -58,6 +58,7 @@ import { useEffect, useState } from 'react'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
 import { halfNamed } from './board'
+import { type HalfGlass } from './halves'
 import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
 
@@ -303,6 +304,80 @@ export function castType(types: string | undefined): string | null {
  * second and a half is a room that has stopped to admire itself while the game
  * goes on behind it.
  */
+/**
+ * Which scene the arena opens onto for this moment.
+ *
+ * **The manner says what happened; the scene says what kind of thing it
+ * happened to** — and until now there was only one axis, so a creature that
+ * somebody paid seven mana for got a glow and a plate while an identical
+ * creature nobody cast got a whole battlefield (Aaron, 2026-08-28: *"I meant
+ * all creatures should get that animation when they enter the battlefield"*).
+ *
+ * ## The rule, in one line each
+ *
+ * **A departure is a departure whatever the card was.** Exile takes the Appian
+ * Way and death takes the columbaria, for every card alike — where a thing has
+ * gone is the whole of what those two beats are about, and a Bolt and a Dragon
+ * leave by the same door. Those two stay keyed on the manner and always will.
+ *
+ * **An arrival is about what arrived.** A creature walks into a fight already
+ * under way, an artifact is struck out on an anvil, an enchantment is bound
+ * over the world. Cast, put or conjured are three ways through the same door,
+ * and the door is what the scene draws — which is why a cast creature, an
+ * uncast one and a token creature all open the same valley.
+ *
+ * **A card that never lands gets an arcanum instead of a place** (Aaron's
+ * call, 2026-08-28, and his own suggestion for the first of them: *"maybe we
+ * could take the 'Tower' tarot card and use it for instants"*). An instant and
+ * a sorcery are events rather than objects — there is nowhere for them to
+ * arrive, so there is no place to draw — and the deck of the fortune-teller's
+ * table is already here, already public domain, and already the room this
+ * project keeps for things that are read rather than held. The Tower is
+ * lightning through a crown and two figures falling, which is an instant; the
+ * Magician is one hand raised and one lowered over a table of prepared tools,
+ * which is a sorcery. It happens to you, or you do it.
+ *
+ * Null is a real answer and the commonest one after the six: a land, a
+ * planeswalker, a battle, an Equipment strapped on, a sacrifice. Each of those
+ * is a scene nobody has drawn, and a beat with no scene is what this room did
+ * for all of them until today — the card, its light and its plate, which is
+ * complete on its own.
+ */
+export type Scene = 'road' | 'crypt' | 'field' | 'forge' | 'tower' | 'magician'
+
+export function sceneFor(manner: Manner, types: string | undefined):
+Scene | null {
+  switch (manner) {
+    // Departures: the manner decides, and the card's kind is not consulted.
+    case 'exiled': case 'companion': return 'road'
+    case 'dies': return 'crypt'
+    // Arrivals and castings: the kind decides.
+    case 'cast': case 'put': case 'made': break
+    // An Aura being laid on a creature wants a scene of its own and does not
+    // have one yet; an Equipment being strapped on is a different event again.
+    // Both draw nothing rather than borrowing a picture about something else.
+    default: return null
+  }
+  switch (castType(types)) {
+    case 'Creature': return 'field'
+    case 'Artifact': return 'forge'
+    case 'Instant': return 'tower'
+    case 'Sorcery': return 'magician'
+    default: return null
+  }
+}
+
+/** Which arcanum a scene draws, and null for the scenes that are places.
+ *
+ *  Served from `/tarot/`, which is where the reading room's own deck lives —
+ *  the same 78 files, the same provenance, and no second copy. That is also
+ *  why these are paths rather than bundler imports: the pictures are package
+ *  data on the server, not part of anybody's JavaScript. */
+export const ARCANA: Partial<Record<Scene, string>> = {
+  tower: '/tarot/16-tower.webp',
+  magician: '/tarot/01-magician.webp',
+}
+
 const STAGE_LIFE: Record<Manner, number> = {
   /* The commonest of them all by a wide margin — a game holds sixty or seventy
      casts and a dozen deaths — so it is the shortest, for the same reason
@@ -576,17 +651,21 @@ export interface Staged {
   /** The whole card face, or null when the match never painted one — see
    *  `faceFor`, and the plate that stands in for it. */
   image: string | null
-  /** **The half of the card this beat is about, when the card prints two on
-   *  one picture and the beat is about the second one.**
+  /** **Which scene the arena opens onto**, or null for a beat that draws the
+   *  card and nothing behind it. See [sceneFor], which decides it, and which
+   *  carries the argument for why this is not simply the manner. */
+  scene: Scene | null
+  /** **The glass over the half of the card this beat is about**, or null for
+   *  a card with one half — which is nearly every card.
    *
-   *  Only ever `'adventure'`, and that is a limit rather than an oversight: the
-   *  room draws a glass over the half being cast, and where that half *is* has
-   *  to be measured off a real card rather than reasoned about. It has been,
-   *  for an Adventure — the left of the text box, `.stage-adventure` carries
-   *  the numbers. A split card's halves and a flip card's have not been, so
-   *  those resolve to the right picture and get no glass, which is the whole
-   *  of the bug fixed and none of the guessing. */
-  half: 'adventure' | null
+   *  All four two-named layouts wear one now. It was only ever an Adventure's
+   *  second half, because that was the only box anybody had measured, and
+   *  a split card and a flip card resolved to the right picture and got
+   *  nothing (Aaron, 2026-08-28: *"split and flip cards find their picture now
+   *  but get no glass"*). `lib/halves.ts` holds the measurements and the
+   *  geometry; the numbers here are already in percentages of the frame, so
+   *  the drawing does no arithmetic of its own. */
+  half: HalfGlass | null
   /** How long this one is watched for, which is both the CSS duration and the
    *  element's life. One number, handed over rather than written twice. */
   life: number

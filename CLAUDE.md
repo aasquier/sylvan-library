@@ -329,6 +329,16 @@ real games: best at aggro/midrange, bad at combo — report per archetype,
 quote a median and a tail, never a mean. A card Forge lacks is silently
 dropped, which is why coverage is checked before and after.
 
+**Forge is named to the user on purpose, and it is commandment 10's one
+standing exception besides Claude** (Aaron, 2026-08-28, asked directly). The
+Coliseum's copy and the `tier-3` glossary entry both say the word; it reads as
+the in-world name of the thing that plays the games, and he is comfortable with
+it. Do not "fix" it. What is *not* excepted is everything underneath it — the
+host's control plane, machine ids, HTTP statuses, raw payloads, environment
+variable names — which is a separate fault that was live on the deployed site
+and is fixed: `api.forgeTrouble` is the one place a Forge failure becomes words
+a player sees, and the diagnosis goes to the log instead.
+
 ## Working style
 
 - Ask before large design decisions. Surgical trims over mass restructuring;

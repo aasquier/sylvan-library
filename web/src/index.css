@@ -7707,6 +7707,30 @@ button:hover .tarot-fan-card {
    with no position of its own. */
 .field-keyword.field-hint { position: relative; }
 
+/* **The counter chips grew a target the same way, and it is a different
+   arithmetic.**
+
+   They stack `column-reverse` up the card's bottom-left corner at a 13px pitch
+   — a 12px chip and a 1px gap — so the vertical room is half a pixel a side,
+   the same squeeze the keyword column is under and for the same reason: two
+   neighbours that overlap means the upper chip quietly eats the lower one's
+   tap. Sideways there is the whole painting, and the counters sit under the
+   keyword marks in the *other* corner, so nothing is in the band this runs out
+   into. Measured: 27x13, against 14x12.
+
+   `::before` rather than padding, again — padding would move the figure inside
+   its own plate, and the plate is what makes a `+3` legible over an arbitrary
+   photograph. */
+.field-counter.field-hint::before {
+  content: '';
+  position: absolute;
+  top: -0.5px;
+  bottom: -0.5px;
+  left: -2px;
+  right: -11px;
+}
+.field-counter.field-hint { position: relative; }
+
 /* The panel itself: portalled to the body, so it is measured against the
    window rather than against the lane it came out of. `lib/hint.ts` puts it
    somewhere; this is what it looks like when it gets there.
@@ -7884,12 +7908,27 @@ button:hover .tarot-fan-card {
 }
 /* The crown sits on the ring's shoulder, small enough to be a mark rather than
    a picture. It brightens with the count the way the arc does, so the whole
-   dial reads as one object getting worse instead of a ring with a badge. */
+   dial reads as one object getting worse instead of a ring with a badge.
+
+   **Grown from 46% to 58% on 2026-08-28** — Aaron, looking at the trench:
+   *"our crown icon on the commander damage meter needs to be a little bigger"*.
+   It was 18px wide on a 40px dial and reading as a smudge on the rim rather
+   than as a crown, which loses the one thing separating this clock from the
+   poison one at a glance. At 58% it is 23px and the two-pixel break down its
+   middle — the whole of what the mark says, see the drawing's own note — is
+   nearly three, so the struck half survives a phone.
+
+   **`top` moved with it and is not a taste.** The plate is twice as wide as it
+   is tall, so the height is half the width: the seat is where the crown's
+   *bottom* lands, and holding that still while the width grows means the top
+   has to climb by the same amount the height did. 46/-13 sat it 4px into the
+   dial; 58/-18 sits it 4.4px in, which is the same crown on the same shoulder,
+   larger. */
 .field-bead-crown {
   position: absolute;
-  top: -13%;
+  top: -18%;
   left: 50%;
-  width: 46%;
+  width: 58%;
   transform: translateX(-50%);
   overflow: visible;
   fill: color-mix(in oklab,
@@ -12833,11 +12872,227 @@ button:hover .tarot-fan-card {
     0 0 22px color-mix(in srgb, var(--stage-glow) 26%, transparent);
 }
 
+/* --------------------------------------------- the forge, for an artifact
+ *
+ * **The fourth place, and the one an object is made in.** Aaron, 2026-08-28,
+ * opening the entry scenes out from the single one they had: *"hopefully find
+ * a good image of a hammer hitting an anvil with sparks for artifacts
+ * entering"*.
+ *
+ * `fabrica.recipe.yaml` argues the picture — Wright of Derby's `An Iron Forge`,
+ * 1772, a helve hammer over an anvil with a bar of iron at white heat on it and
+ * every other thing in the frame lit by nothing else. It also records why it is
+ * not the `A Blacksmith's Shop` that was chosen first: that one puts its light
+ * source dead under where this stage draws a card, so the card buries the whole
+ * subject. A band rendered with a card standing in it said so in one look, and
+ * nothing about the painting itself would have.
+ *
+ * **Everything geometric here is the valley's**, deliberately. Same masked
+ * ellipse rather than a framed rectangle, same slow creep toward the eye, same
+ * bloom under the landing. Four scenes that each invented their own motion
+ * would be four decorations; four that share a grammar and change only their
+ * *material* are one room with four doors in it. The mask is a little tighter
+ * because this picture is a lit interior rather than an open valley — the
+ * darkness at its edges is already the vignette, and a soft ellipse over that
+ * is the second one.
+ */
+.stage-forge {
+  position: absolute;
+  inset: 0;
+  /* Under the card and over the veil, where all four scenes sit; the ordering
+     is by source position rather than by z-index, since all of them are 0. */
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-field-open var(--stage-life, 1150ms) ease-out both;
+}
+.stage-forge-art {
+  width: min(100%, 940px);
+  aspect-ratio: 660 / 383;
+  object-fit: cover;
+  -webkit-mask-image: radial-gradient(ellipse 48% 42% at 50% 50%,
+    #000 0%, #000 56%, rgba(0, 0, 0, 0.5) 80%, transparent 100%);
+  mask-image: radial-gradient(ellipse 48% 42% at 50% 50%,
+    #000 0%, #000 56%, rgba(0, 0, 0, 0.5) 80%, transparent 100%);
+  animation: stage-field-rise var(--stage-life, 1150ms) ease-out both;
+}
+
+/* **Sparks, and they are the landing.** The valley's dust, in iron.
+ *
+ * The one element in these scenes that is not a fact about the picture, for
+ * the valley's stated reason: a place with something put down in it has just
+ * been disturbed. What comes off a battlefield is dust and what comes off an
+ * anvil is sparks, so the material changes and nothing else does.
+ *
+ * **It is also the half of Aaron's sentence the painting could not answer.**
+ * He asked for a hammer, an anvil and sparks; `An Iron Forge` has the first
+ * two and a bar at white heat, and drawing the third is better than hunting
+ * for a painting with all three and no depth in it.
+ *
+ * Two layers rather than one: a hot bloom at the card's foot, and above it a
+ * scatter of small hard points that are the sparks themselves. A gradient
+ * alone reads as a glow, which is the forge; it takes discrete points to read
+ * as something *struck*. They are placed rather than random — a fixed spray
+ * is what a single frame of a real burst looks like, and the animation moves
+ * the whole spray outward rather than moving each point, which is both
+ * cheaper and closer to how sparks actually leave an anvil: together, in one
+ * direction, all at once. */
+.stage-forge-sparks {
+  position: absolute;
+  inset: 0;
+  background:
+    /* The sparks. Nine points, small and hard, thrown up and outward from the
+       card's foot — hotter and whiter nearer the middle, where the iron is. */
+    radial-gradient(circle 1.6px at 41% 66%, rgba(255, 244, 214, 0.95), transparent),
+    radial-gradient(circle 1.3px at 46% 61%, rgba(255, 226, 158, 0.9), transparent),
+    radial-gradient(circle 1.1px at 53% 59%, rgba(255, 236, 190, 0.9), transparent),
+    radial-gradient(circle 1.5px at 58% 64%, rgba(255, 214, 132, 0.85), transparent),
+    radial-gradient(circle 1.2px at 37% 71%, rgba(255, 206, 122, 0.8), transparent),
+    radial-gradient(circle 1.4px at 62% 70%, rgba(255, 232, 176, 0.85), transparent),
+    radial-gradient(circle 1px   at 49% 55%, rgba(255, 248, 226, 0.9), transparent),
+    radial-gradient(circle 1.1px at 33% 64%, rgba(255, 196, 104, 0.75), transparent),
+    radial-gradient(circle 1.3px at 66% 62%, rgba(255, 210, 128, 0.8), transparent),
+    /* And the heat under them, which is what makes nine dots read as one
+       event rather than as dirt on the screen. */
+    radial-gradient(ellipse 26% 15% at 50% 70%,
+      rgba(255, 198, 108, 0.55) 0%,
+      rgba(226, 132, 44, 0.28) 46%,
+      rgba(180, 96, 30, 0) 80%);
+  animation: stage-forge-sparks var(--stage-life, 1150ms) ease-out both;
+}
+@keyframes stage-forge-sparks {
+  /* Nothing until the card is nearly down — a spark before the blow is a spark
+     with no cause, which is the valley's rule about its dust. */
+  0%, 24% { opacity: 0; transform: scale(0.4); }
+  /* The strike: everything at once, which is what a hammer blow looks like. */
+  36%     { opacity: 1; transform: scale(1); }
+  /* And out, faster than dust settles and further, because that is the
+     difference between something thrown off hot metal and something kicked up
+     off the ground. */
+  100%    { opacity: 0; transform: scale(2.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-forge-art, .stage-forge-sparks { animation: none; }
+  .stage-forge-sparks { opacity: 1; }
+}
+
+/* --------------------------------------------- the arcanum beside a spell
+ *
+ * **The fourth kind of moment, and the first that is not a place.** The road,
+ * the vault, the valley and the forge are all answers to *where has this gone*
+ * or *where has this come from*. An instant and a sorcery have been nowhere:
+ * they are cast, they resolve, and they are in a graveyard. There is no
+ * arrival to draw, which is exactly why those two beats had no scene at all
+ * until now.
+ *
+ * What they have instead is a **shape**. Something sudden that happens to you,
+ * and something deliberate that you do. So they are drawn from the deck this
+ * project already keeps for things that are read rather than held: **The
+ * Tower** for an instant — lightning through a crown, two figures falling,
+ * which is what an instant does to somebody's plan — and **The Magician** for
+ * a sorcery, one hand raised and one lowered over a table of prepared tools,
+ * at your own pace on your own turn. Aaron suggested the first (2026-08-28)
+ * and settled the rule the pair of them make: a card that becomes an object on
+ * the table opens onto a real place; a card that is only ever an event is
+ * drawn from the arcana.
+ *
+ * **The 1909 Rider deck, served from `/tarot/` rather than committed again.**
+ * `assets/tarot/PROVENANCE.md` is the argument — public domain in both the US
+ * and the UK, checked per file through the Commons API — and the reading room
+ * already draws these exact bytes at that exact path. A second copy inside the
+ * bundle would be the same pictures with the provenance one directory further
+ * from them.
+ *
+ * ## It is beside the spell, and the first two attempts were behind it
+ *
+ * **Behind does not work, and the reason is the same one that chose the
+ * forge's painting.** A portrait tarot card standing behind a portrait Magic
+ * card of similar size reads as a printing fault — two rectangles nearly
+ * aligned — and turning it a few degrees does not rescue that. Made large
+ * enough to stop reading as a sibling card, it hides its own subject instead:
+ * The Tower's tower is dead centre, and dead centre is precisely where this
+ * stage draws a card. Both attempts were rendered with a card standing in them
+ * before either was believed, which is how the forge's picture was chosen and
+ * how this one was placed.
+ *
+ * So the arcanum is **laid down beside the spell**, at about two fifths of the
+ * arena's height and tilted, in the lower left. Both cards are legible whole;
+ * they are unmistakably two objects; and the reading is the one the fortune
+ * teller's table already teaches — a card turned over next to the question.
+ * Clear of the plate underneath, which is measured rather than hoped: at
+ * 1040x520 the card lands at 412-628 x 109-411 and this at 217-383 x 161-396,
+ * with the plate strip below both.
+ *
+ * **And it turns over rather than fading in**, which is the whole reason to
+ * have made it a card. `.stage-card` already carries a perspective for the
+ * spell's own lift, and this sits off to one side of that origin — so the turn
+ * is very slightly skewed, the way a card dealt to the left of a reader is.
+ */
+.stage-arcanum {
+  position: absolute;
+  inset: 0;
+  /* Under the card and over the veil, where all the scenes sit; the ordering
+     is by source position rather than by z-index, since all of them are 0. */
+  z-index: 0;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+.stage-arcanum-art {
+  position: absolute;
+  left: 23%;
+  bottom: 26%;
+  height: min(41%, 238px);
+  width: auto;
+  border-radius: 4px;
+  /* The room's own rim and lift, so a 1909 card printed on cream stock sits in
+     an arena rather than on top of one. Nearly opaque, unlike the places
+     behind a card: this one is not being looked *through*, it is being read. */
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.75),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 46%, transparent),
+    0 0 26px color-mix(in srgb, var(--stage-glow) 30%, transparent);
+  animation: stage-arcanum-turn var(--stage-life, 1150ms)
+    cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+/* The light it is read by, under and behind it rather than on it — the veil's
+   trick a second time, so the pair reads as two things lit by one lamp. */
+.stage-arcanum-glow {
+  position: absolute;
+  left: 16%;
+  bottom: 20%;
+  width: 28%;
+  height: 40%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side,
+    color-mix(in srgb, var(--stage-glow) 40%, transparent) 0%,
+    transparent 100%);
+  filter: blur(20px);
+  animation: stage-field-open var(--stage-life, 1150ms) ease-out both;
+}
+/* Edge-on, then face up, then held while the plate is read — and gone before
+   the beat is, like everything else on this stage. The tilt is inside every
+   frame because it is what the card *is*, and only the turn moves. */
+@keyframes stage-arcanum-turn {
+  0%   { opacity: 0; transform: rotate(-13deg) rotateY(-84deg) scale(0.95); }
+  12%  { opacity: 1; }
+  30%  { transform: rotate(-13deg) rotateY(0deg) scale(1); }
+  86%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-arcanum-art { animation-name: stage-arcanum-lie; }
+  .stage-arcanum-glow { animation: none; }
+  @keyframes stage-arcanum-lie {
+    0%, 100% { opacity: 1; transform: rotate(-13deg); }
+  }
+}
+
 /* ------------------------------------- the half of the card being cast
  *
- * **An Adventure is two spells on one card, and the room was showing
- * neither.** Forge renames a card the moment its Adventure goes on the stack —
- * a Bonecrusher Giant in hand becomes *Stomp* on the way to the stack — and
+ * **A card with two names on it is two spells, and the room was showing
+ * neither.** Forge renames a card the moment its second half goes on the stack
+ * — a Bonecrusher Giant in hand becomes *Stomp* on the way to the stack — and
  * nothing in the match answered to that name, so the middle of the arena drew
  * the fallback: a black card with a title set on it, in the one moment this
  * surface exists for (Aaron, 2026-08-28: *"when the 'adventure' part of a card
@@ -12859,61 +13114,79 @@ button:hover .tarot-fan-card {
  * plate does on the gate: the picture is a picture, and everything this room
  * needs to say sits above it.
  *
- * **The box was measured, not reasoned about.** Read off a real card face at
- * 488x680 (Bonecrusher Giant, CLB): the adventure's own frame runs x 30-252 and
- * y 424-608, which is 6.1% to 51.6% across and 62.4% to 89.4% down. Written as
- * percentages of `.stage-frame`, which *is* the card's box — `aspect-ratio:
- * 488 / 680` and nothing may argue with it — so the glass tracks the printed
- * box at every size the stage draws a card at.
+ * **Every box was measured, and all four layouts have one now.** `lib/halves`
+ * carries the numbers and the argument — read off real Scryfall faces at
+ * 488x680, several printings of each layout, agreeing to within half a per
+ * cent. It also carries the trap: a split card and an Aftermath card put their
+ * first-named half at opposite ends of the same picture, and Scryfall calls
+ * both of them `split`.
  *
- * Only an Adventure wears one. A split card and a flip card also print two
- * names on one picture and both are found now; where their halves sit has not
- * been measured, so they get the right card and no glass rather than a
- * rectangle over a guess. */
-.stage-adventure {
+ * **The magnification is a second copy of the card, scaled — not a background,
+ * and that is a correction.** The first cut of this was
+ * `background-size: 155% 155%` on the glass, and a background percentage
+ * resolves against the element it is on: 155% of a box that is itself 45% of
+ * the card drew the card at *seventy* per cent of its rendered size. A
+ * magnifier that made everything smaller, showing the art and the type line
+ * squashed into the adventure's box — squashed because 155% on both axes of a
+ * box that is not the card's shape scales the two axes differently, which is a
+ * distortion of a card image and one of the four words the licence names. It
+ * shipped in #374 and nothing could see it: no test can look, and the fault
+ * reads as a slightly odd lens rather than as arithmetic pointing backwards.
+ *
+ * A copy laid exactly over the real card and scaled uniformly about the half's
+ * own centre cannot go wrong in either direction. The shape is the card's
+ * shape by construction, and the glass box is that same half scaled about that
+ * same point — so the copy always covers the glass, and what shows through is
+ * the region underneath, larger. Every number below is computed in
+ * `halfGlass`; nothing here does arithmetic. */
+.stage-half {
   position: absolute;
   z-index: 2;
-  left: 6.1%;
-  right: 48.4%;
-  top: 62.4%;
-  bottom: 10.6%;
+  left: var(--glass-l);
+  top: var(--glass-t);
+  right: var(--glass-r);
+  bottom: var(--glass-b);
   pointer-events: none;
   /* The lift is what makes it read as glass held over the card rather than as
      a highlight printed on it — a shadow under the near edge, and the card's
-     own brass hairline round it. */
-  border-radius: 4px;
+     own brass hairline round it. On a wide half the box is wider than the card
+     and the rim stands out over the sand, which is what a real lens held over
+     a card looks like and is why the insets above are allowed to go negative. */
+  border-radius: 5px;
   box-shadow:
     0 3px 10px rgba(0, 0, 0, 0.55),
     0 0 0 1.5px color-mix(in srgb, var(--field-brass) 76%, transparent),
     0 0 14px color-mix(in srgb, var(--stage-glow) 40%, transparent);
-  animation: stage-adventure-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: stage-half-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: 180ms;
 }
-/* The magnification itself: the same region of the same picture, larger.
- *
- * `background-size` is the card at **1.55 times** and the position is the same
- * box, so what shows through the glass is the adventure's own frame with its
- * name, its cost and its type line legible — which at the stage's size is the
- * difference between reading *Instant — Adventure* and taking it on trust.
- *
- * A scale and nothing else. No blur, no desaturation, no colour-shift: those
- * are the three ADR 32 names, and a magnifier is the one transformation of a
- * picture that is only ever *more* of it. */
-.stage-adventure-glass {
+/* The window. Dark rather than transparent, because a lens whose rim overhangs
+   the card has corners with no card under them, and a hole there would read as
+   a gap in the picture instead of as the edge of the glass. */
+.stage-half-glass {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   overflow: hidden;
-  background-image: var(--half-art);
-  background-repeat: no-repeat;
-  /* 155% of the frame, aimed at the middle of the adventure box: 28.9% across
-     and 75.9% down, which is the centre of the numbers above. */
-  background-size: 155% 155%;
-  background-position: 28.9% 75.9%;
+  border-radius: inherit;
+  background: rgba(10, 8, 6, 0.92);
+}
+/* The card again, laid exactly over the one underneath and then taken up about
+   the half's own centre. `--card-*` place it; `--half-o*` is the point that
+   does not move. One uniform scale, so the card keeps its shape — no blur, no
+   desaturation, no colour shift, which are the other three words the licence
+   names alongside distortion. */
+.stage-half-card {
+  position: absolute;
+  left: var(--card-x);
+  top: var(--card-y);
+  width: var(--card-w);
+  height: var(--card-h);
+  transform-origin: var(--half-ox) var(--half-oy);
+  transform: scale(var(--half-zoom, 1.3));
 }
 /* A single specular streak across the glass, low and wide — the same one
    `.field-card-lens-glass::after` uses to stop a circle reading as a hole. */
-.stage-adventure-glass::after {
+.stage-half-glass::after {
   content: '';
   position: absolute;
   top: 6%;
@@ -12927,12 +13200,12 @@ button:hover .tarot-fan-card {
 /* It arrives after the card has, because it is an answer to the card rather
    than part of it: the Giant lands, and then the glass comes down on the half
    that was actually cast. */
-@keyframes stage-adventure-in {
+@keyframes stage-half-in {
   from { opacity: 0; transform: scale(1.14); }
   to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .stage-adventure { animation: none; }
+  .stage-half { animation: none; }
 }
 
 /* Up out of the sand, over-large for an instant, held, and then let go
@@ -13560,7 +13833,14 @@ button:hover .tarot-fan-card {
  * length is all coupling to a photograph's geometry, and there is none of that
  * to keep in step here.
  */
-.stage-card.is-put {
+/* **Both arrival places share this, and that is the grammar rather than a
+   saving.** A creature coming down into a fight and an artifact coming down
+   onto an anvil are the same journey with different ground under it — the card
+   starts high and far, comes forward, lands and rocks once. Four scenes that
+   each invented their own motion would be four decorations; scenes that share
+   an approach and change only the ground are one room with several doors. */
+.stage-card.has-field,
+.stage-card.has-forge {
   /* Shallower than the road's 1000, and aimed **above** the middle. A card
      starting at negative Z under an origin at 30% down begins high in the
      frame and comes down as it comes forward, so one translation is both the
@@ -13674,7 +13954,8 @@ button:hover .tarot-fan-card {
    shape and the same as the companion's, and for the same reason both of those
    give: this plate carries a second line, and a line nobody finishes reading
    is a line that was not worth drawing. */
-.stage-card.is-put .stage-frame {
+.stage-card.has-field .stage-frame,
+.stage-card.has-forge .stage-frame {
   animation: stage-alight var(--stage-life, 1600ms)
     cubic-bezier(0.24, 0.86, 0.32, 1) both;
 }
@@ -13698,7 +13979,8 @@ button:hover .tarot-fan-card {
    detail: the ring behind a card is what a cast looks like in this room, and
    the whole reason this scene exists is that there was no cast. The exile and
    the companion draw the same line for weaker reasons. */
-.stage-card.is-put .stage-frame::before { animation: none; opacity: 0; }
+.stage-card.has-field .stage-frame::before,
+.stage-card.has-forge .stage-frame::before { animation: none; opacity: 0; }
 /* Stillness is handled with everything else's, in the block at the foot of
    this section — a journey overridden in two places is a journey that comes
    back in one of them. */
@@ -14087,7 +14369,8 @@ button:hover .tarot-fan-card {
      be spared. The dust goes entirely rather than fading up: it is a bloom
      from an impact that no longer happens, and a puff of light in the middle
      of a still page has no cause a person could read. */
-  .stage-card.is-put .stage-frame {
+  .stage-card.has-field .stage-frame,
+  .stage-card.has-forge .stage-frame {
     transform: none;
     animation: stage-still var(--stage-life, 1600ms) linear both;
   }

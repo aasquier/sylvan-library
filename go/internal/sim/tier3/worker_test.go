@@ -188,7 +188,7 @@ func TestADirectWorkerURLSkipsTheMachinesAPI(t *testing.T) {
 	// `TestTheOverridesWinAndTheFallbacksAgreeOnTheLayout`.
 	base, err := (&Worker{
 		Settings: Settings{WorkerURL: "http://shim.internal:8080"},
-	}).BaseURL(context.Background())
+	}).BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if err != nil {
 		t.Fatalf("a direct URL was refused: %v", err)
 	}
@@ -721,7 +721,7 @@ func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
 	t.Parallel()
 	// The app name is asked for first, because there is no URL to call
 	// without one.
-	_, err := (&Worker{Settings: Settings{FlyAPIToken: "tok"}}).BaseURL(context.Background())
+	_, err := (&Worker{Settings: Settings{FlyAPIToken: "tok"}}).BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Errorf("no app name failed as %v", err)
 	}
@@ -729,7 +729,7 @@ func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
 		t.Errorf("no app name said %q", err)
 	}
 
-	_, err = (&Worker{Settings: Settings{FlyApp: "mtglab"}}).BaseURL(context.Background())
+	_, err = (&Worker{Settings: Settings{FlyApp: "mtglab"}}).BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Errorf("no token failed as %v", err)
 	}
@@ -768,7 +768,7 @@ func TestAMissingMachineIsReportedRatherThanCreated(t *testing.T) {
 
 	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
 		Machine: DefaultMachine})
-	_, err := w.BaseURL(context.Background())
+	_, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Fatalf("a missing machine failed as %v", err)
 	}
@@ -797,7 +797,7 @@ func TestAStoppedMachineIsStartedAndWaitedFor(t *testing.T) {
 
 	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
 		Machine: DefaultMachine, ShimPort: DefaultShimPort})
-	base, err := w.BaseURL(context.Background())
+	base, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if err != nil {
 		t.Fatalf("starting the machine: %v", err)
 	}
@@ -825,7 +825,7 @@ func TestAStartedMachineIsUsedAsIs(t *testing.T) {
 
 	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
 		Machine: DefaultMachine, ShimPort: DefaultShimPort})
-	base, err := w.BaseURL(context.Background())
+	base, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -853,7 +853,7 @@ func TestTheMachinesAPIsOwnWordsReachTheCaller(t *testing.T) {
 
 	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
 		Machine: DefaultMachine})
-	_, err := w.BaseURL(context.Background())
+	_, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if err == nil {
 		t.Fatal("a 401 was not raised")
 	}
@@ -874,7 +874,7 @@ func TestAnUnreadableMachineListIsSaidPlainly(t *testing.T) {
 
 	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
 		Machine: DefaultMachine})
-	_, err := w.BaseURL(context.Background())
+	_, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
 	if err == nil || !strings.Contains(err.Error(), "could not read") {
 		t.Errorf("an unreadable list said %q", err)
 	}
@@ -965,4 +965,134 @@ func (r rewriter) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	target.URL.Scheme, target.URL.Host = parsed.Scheme, parsed.Host
 	return http.DefaultTransport.RoundTrip(target)
+}
+
+// **A cold image takes longer than one wait, and that is not a failed match.**
+//
+// Fly's `wait?state=started` is a long poll with a ceiling of its own, and a
+// 408 from it means the machine has not reached the state *yet* — the start is
+// still running. `BaseURL` used to ask once and treat that answer as final,
+// which is why the first Tier 3 match after every deploy failed: merging swaps
+// the worker's image (ADR 23), and a cold one cannot be pulled and unpacked
+// inside a single poll. The second attempt then worked, because the first had
+// warmed the machine.
+//
+// Nothing here waits longer than it has to: the second ask is only made
+// because the first one said "not yet".
+func TestAMachineThatIsStillComingUpIsWaitedForAgain(t *testing.T) {
+	t.Parallel()
+	var waits int
+	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/machines"):
+			_, _ = io.WriteString(w, `[{"id":"d891","name":"forge-worker","state":"stopped"}]`)
+		case strings.Contains(r.URL.Path, "/wait"):
+			waits++
+			if waits < 3 {
+				w.WriteHeader(http.StatusRequestTimeout)
+				_, _ = io.WriteString(w, `{"error":"deadline_exceeded: machine `+
+					`failed to reach desired state, started, currently stopped"}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{}`)
+		default:
+			_, _ = io.WriteString(w, `{}`)
+		}
+	}))
+	defer fly.Close()
+
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine, ShimPort: DefaultShimPort})
+	base, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
+	if err != nil {
+		t.Fatalf("a machine that came up on the third ask: %v", err)
+	}
+	if base != "http://d891.vm.mtglab.internal:8080" {
+		t.Errorf("the base URL is %q", base)
+	}
+	if waits != 3 {
+		t.Errorf("the client waited %d times, want 3", waits)
+	}
+}
+
+// **And only "not yet" is asked again.** A token that expired is an answer, and
+// asking it repeatedly until the boot budget runs out would turn one clear
+// refusal into three minutes of silence — the opposite of the fault above.
+func TestAWaitThatIsRefusedForAnyOtherReasonIsNotAskedAgain(t *testing.T) {
+	t.Parallel()
+	var waits int
+	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/machines"):
+			_, _ = io.WriteString(w, `[{"id":"d891","name":"forge-worker","state":"stopped"}]`)
+		case strings.Contains(r.URL.Path, "/wait"):
+			waits++
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = io.WriteString(w, `{"error":"token expired"}`)
+		default:
+			_, _ = io.WriteString(w, `{}`)
+		}
+	}))
+	defer fly.Close()
+
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine, ShimPort: DefaultShimPort})
+	_, err := w.BaseURL(context.Background(), time.Now().Add(BootBudget))
+	if err == nil {
+		t.Fatal("a 401 on the wait was not raised")
+	}
+	if waits != 1 {
+		t.Errorf("a 401 was asked %d times, want 1", waits)
+	}
+}
+
+// A budget that has already run out asks nothing at all, and says so as a
+// transient fault rather than as a missing installation.
+func TestAMachineWaitPastItsDeadlineStopsAsking(t *testing.T) {
+	t.Parallel()
+	var waits int
+	fly := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/machines") {
+			_, _ = io.WriteString(w, `[{"id":"d891","name":"forge-worker","state":"stopped"}]`)
+			return
+		}
+		if strings.Contains(r.URL.Path, "/wait") {
+			waits++
+		}
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer fly.Close()
+
+	w := flyWorker(fly, Settings{FlyAPIToken: "tok", FlyApp: "mtglab",
+		Machine: DefaultMachine, ShimPort: DefaultShimPort})
+	_, err := w.BaseURL(context.Background(), time.Now().Add(-time.Second))
+	if !errors.Is(err, ErrWorkerNotReady) {
+		t.Fatalf("a spent budget failed as %v", err)
+	}
+	if waits != 0 {
+		t.Errorf("a spent budget still asked %d times", waits)
+	}
+}
+
+// **A machine that will not come up is not an arena that does not exist.**
+//
+// Both answer 503 and they are different news: one is "come back in a minute"
+// and the other is "this will never work here". The narrower sentinel answers
+// to the wider one on purpose, so every caller that maps [ErrForgeNotInstalled]
+// onto a status keeps working untouched — the split is only about the words.
+func TestATransientWorkerFaultIsStillAForgeRefusal(t *testing.T) {
+	t.Parallel()
+	transient := NotReady("the machine is still coming up")
+	if !errors.Is(transient, ErrWorkerNotReady) {
+		t.Error("a transient fault does not answer to its own sentinel")
+	}
+	if !errors.Is(transient, ErrForgeNotInstalled) {
+		t.Error("a transient fault stopped being a Forge refusal, which would " +
+			"change every status code that reads it")
+	}
+	// And not the other way round: a checkout with no Forge in it must never
+	// be reported as something that will work if you wait.
+	if errors.Is(NotInstalled("no Forge card data"), ErrWorkerNotReady) {
+		t.Error("a missing installation claims it is coming up")
+	}
 }
