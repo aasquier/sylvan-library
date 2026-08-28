@@ -325,8 +325,8 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
             {showing && rows.length === 0 && !asking && (
               <p className="finder-note">
                 No card in the library is spelled anything like that. Try a
-                word from the middle of the name — the search page can also
-                look inside a card&rsquo;s rules text.
+                word from the middle of the name — or look the card up on the
+                Card search page, which reads rules text as well as names.
               </p>
             )}
             {showing && asking && (
@@ -340,7 +340,7 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
             )}
             {shown && !warning && chosen && (
               <p className="finder-ok" role="status">
-                Legal here, and inside your commander&rsquo;s colours.
+                Legal in Commander, and inside your commander&rsquo;s colours.
               </p>
             )}
           </div>
