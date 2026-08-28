@@ -218,11 +218,19 @@ function LibraryMasthead({ decks, health }: {
 function FirstRun() {
   return (
     <section className="card-surface relative overflow-hidden rounded-xl">
-      {/* `hero-art` and `hero-scrim` live in index.css because the two themes
-          need opposite treatment — dark mode brightens the art rather than
-          dimming it, or a dark painting under a near-black scrim is mud. The
-          reasoning is written out there. */}
+      {/* `hero-art`, `hero-lift` and `hero-scrim` live in index.css because
+          the two themes need opposite treatment — dark mode lifts the art
+          rather than dimming it, or a dark painting under a near-black scrim
+          is mud. The reasoning is written out there.
+
+          **Three elements in this order and the order is the whole rule.**
+          The lift used to be `filter: brightness(1.3)` on the painting, which
+          is Scryfall's "color-shift" reaching Yeong-Hao Han's brushwork; it is
+          a screened sheet of light over the art now, and it has to sit above
+          the painting and below the scrim, which is exactly what writing it
+          second says. */}
       <img src={SYLVAN_LIBRARY_ART} alt="" aria-hidden className="hero-art" />
+      <div className="art-lift hero-lift" aria-hidden />
       <div className="hero-scrim" />
       <div className="relative px-6 py-14 sm:px-10 sm:py-20">
         <h2 className="max-w-lg text-2xl font-semibold tracking-tight">

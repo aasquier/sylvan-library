@@ -305,6 +305,12 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               <CardArt src={card.art_crop} alt="" ratio="deck-hero-frame"
                        className="rounded-none" position="center top" />
             } />
+          {/* The dark-mode lift, over the band rather than through it. One
+              layer for both tiers: the still and its derivative share this
+              box, so whichever is showing gets the same light and there is no
+              second rule to keep in step. Between the painting and the scrim,
+              because a scrim that got screened would stop being a scrim. */}
+          <div className="art-lift deck-hero-lift" aria-hidden />
           <div className="deck-hero-scrim" />
           {/* The deck page's room is its commander's painting (punch list
               item 10) — the same wash every masthead page gets, from the
@@ -1546,10 +1552,19 @@ export default function DeckDetail() {
                   <li key={card.name} className="card-surface rounded-lg p-2"
                       style={{ opacity: 0.85 }}>
                     <div className="flex flex-wrap items-center gap-3">
-                      {/* Desaturated by the wrapper, not the art component:
-                          a dead card's art dims with the row. */}
+                      {/* **This was `style={{ filter: 'grayscale(0.7)' }}`,
+                          and it is the reason the guard now reads the built
+                          bundle's script as well as its stylesheet.** An
+                          inline filter in JSX never appears in `index.css`, so
+                          `cardimagery_test.go` could not see it and did not,
+                          for as long as it stood. Scryfall's list names
+                          `desaturate` outright.
+                          The intent survives: a dead card's art dims with the
+                          row. It dims under a shade now (`.art-dimmed`), which
+                          is the graveyard's light falling on the painting
+                          rather than the painting being repainted grey. */}
                       <CardHover card={card}>
-                        <span className="shrink-0" style={{ filter: 'grayscale(0.7)' }}>
+                        <span className="art-dimmed shrink-0">
                           <CardArt src={card.art_crop} alt={card.name}
                                    ratio="aspect-[626/457]"
                                    className="w-16 cursor-help" />

@@ -504,9 +504,17 @@ export function PageMasthead({ art, alt, title, credit, children, mood, video }:
   // off by `object-cover` and the whole picture at a fifth of the band. That
   // is how the Simulator shipped a goldfish nobody could see move. A loop
   // gets its own shape and a share of the row instead (`masthead-loop`).
-  const artClass = video
-    ? 'masthead-art masthead-loop w-full sm:w-[46%] sm:max-w-[620px]'
-    : 'masthead-art w-full object-cover sm:w-[260px]'
+  // **The plate is the flex item now, and the painting sits inside it.**
+  // `.masthead-art` carried `brightness(1.12) saturate(1.1)` in dark mode --
+  // Scryfall's "color-shift" clause, on the one image every mastheaded route
+  // shows. The lift is a screened layer over the plate instead, which needs a
+  // positioned box to be `inset: 0` of, and an `<img>` cannot be one. So the
+  // width classes move out to the plate and the media fills it; what renders
+  // is what rendered before.
+  const plateClass = video
+    ? 'masthead-plate masthead-loop w-full sm:w-[46%] sm:max-w-[620px]'
+    : 'masthead-plate w-full sm:w-[260px]'
+  const artClass = 'masthead-art'
   return (
     <section className="card-surface overflow-hidden rounded-xl">
       <div className="flex flex-col sm:flex-row">
@@ -517,16 +525,21 @@ export function PageMasthead({ art, alt, title, credit, children, mood, video }:
             poster and its reduced-motion fallback; the `<video>` is
             aria-hidden, so the sr-only line keeps the alt where a screen
             reader will meet it. */}
-        {video ? (
-          <>
-            <span className="sr-only">{alt}</span>
-            <VideoBackdrop webmSrc={video.webm} mp4Src={video.mp4}
-                           poster={art} mode="art" className={artClass}
-                           fallback={<img src={art} alt="" className={artClass} />} />
-          </>
-        ) : (
-          <img src={art} alt={alt} className={artClass} />
-        )}
+        <span className={plateClass}>
+          {video ? (
+            <>
+              <span className="sr-only">{alt}</span>
+              <VideoBackdrop webmSrc={video.webm} mp4Src={video.mp4}
+                             poster={art} mode="art" className={artClass}
+                             fallback={<img src={art} alt="" className={artClass} />} />
+            </>
+          ) : (
+            <img src={art} alt={alt} className={artClass} />
+          )}
+          {/* Dark mode's lift, laid on the painting rather than mixed into
+              it. Nothing at all in light mode, where it was never wanted. */}
+          <span className="art-lift" aria-hidden="true" />
+        </span>
         <div className="flex min-w-0 flex-col justify-center gap-1 px-5 py-4 sm:px-6">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>

@@ -60,6 +60,7 @@ they differ.
 | [45](0045-the-scribe-listens-for-four-more-things-and-still-never-guesses.md) | The scribe listens for four more things, and the board still never guesses | Accepted — finishes the three events [44](0044-the-board-holds-state-and-never-holds-a-guess.md) left undone, and corrects its claim that `GameEventCombatUpdate` is the end-of-combat signal |
 | [46](0046-the-coliseum-runs-at-night.md) | The Coliseum runs at night | Proposed — the record is built, the night is designed |
 | [47](0047-one-architecture-and-a-required-check-gates-something-real.md) | One architecture, and a required check gates something real | Accepted — supersedes the *two-architecture check* clause of [23](0023-a-green-main-deploys-itself.md) |
+| [48](0048-light-lands-on-a-card-and-never-through-it.md) | Light lands on a card, and never through it | Accepted — widens [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) to every surface, and corrects its misquotation of Scryfall's imagery guidelines |
 
 **A note on the numbering.** There is no 41, and this table does not know why
 — the number was never used. The hole stays: renumbering would move a number

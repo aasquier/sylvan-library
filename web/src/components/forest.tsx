@@ -33,6 +33,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useArtWash } from '../lib/artwash'
 import { useCanopyScroll } from '../lib/canopy'
 import { useAmbience } from '../lib/prefs'
 import { VideoBackdrop } from './videofx'
@@ -344,11 +345,31 @@ export function SceneBackdrop({ art, mood = 'mist' }: {
 }) {
   // Same switch as the weather: a room is ambience too.
   const [ambience] = useAmbience()
+  // Before the early return, because a hook cannot be called conditionally.
+  // It costs nothing when ambience is off: `useArtWash` decodes on an effect,
+  // and the effect belongs to an element that is never rendered.
+  const wash = useArtWash(ambience ? art : undefined)
   if (!ambience) return null
   const loop = MOOD_LOOPS[mood]
   return createPortal(
     <div className="scene-backdrop" aria-hidden="true">
-      <img src={art} alt="" className="scene-backdrop-art" />
+      {/* **The wash used to be this painting again, blurred to eleven
+          pixels.** That is Scryfall's list in its own words — *"Do not blur,
+          sharpen, desaturate, or color-shift card images"* — and it is the one
+          finding in ADR 48's sweep where the violation WAS the effect: there
+          is no layer to move a blur to when the blurring is the whole idea.
+          So the picture goes and its palette stays. `useArtWash` reads the
+          same hot-linked image the masthead is already showing, averages it to
+          nine colours, and the stylesheet lays those out as overlapping lobes
+          of light. The room is still this page's room; there is simply no card
+          image in it any more.
+          Null while it is being read, and null forever if it cannot be — in
+          which case the mood loop below is the room on its own, which is what
+          every page was before backdrops existed. */}
+      {wash && (
+        <div className="scene-backdrop-wash"
+             style={{ '--scene-wash': wash } as React.CSSProperties} />
+      )}
       {/* The floor of the room: an ADR 31 procedural loop, seeded and
           loop-perfect by construction, chosen by the room's `mood` --
           forest mist by default, mana wisps at the fortune-teller's,
