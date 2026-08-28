@@ -9030,7 +9030,43 @@ button:hover .tarot-fan-card {
  * turn by exactly the same amount and each chip on it turn back by exactly
  * the same amount. Three places, one angle: change it here and the overlays
  * follow, which is the failure mode the first draft of this had. */
-.field-card { --turn: 45deg; --field-lens: 26px; --field-crown: 17px; }
+/* **The loupe is a fraction of the card, not a number of pixels**, and it was
+   the number that put two of them on top of each other.
+
+   A lane hands its cards whatever width it can afford, so `--field-card-full`
+   is 58px with room and 46px on a 375-wide phone — and the glass stayed 26
+   either way, taking 45% of a card at the desk and 57% of one in a hand. That
+   is what made a *turned* card's loupe collide with its neighbour's: the arm
+   swings the bottom-right corner down and to the left, the glass hangs off it
+   by `lens - (w/2 - |corner offset|)`, and at 46px wide that overhang is 9.4px
+   against a 7px gap. Measured on the live board at 375: Elder Gargaroth's
+   glass and a tapped Fauna Shaman's, overlapping 2.5x19.2px.
+
+   **A `min()` rather than a plain fraction, and the second number was measured
+   rather than chosen.** 26px stays the ceiling, so a desk is unchanged to the
+   pixel. Below it the glass takes half the card, which is the largest it can
+   be and still clear: the gap between two cards in a lane is 7px, so the
+   overhang has to stay under that, and `lens <= 23.6` is what that solves to
+   at a 46px card.
+
+   Half rather than the desktop's 0.448 because the type on the glass does not
+   scale with it — `.field-card-lens-pt` is a flat 0.6rem — so every pixel off
+   the glass is a pixel of margin gone. The first cut of this used 0.448
+   throughout, which gave a 20.6px glass, cleared the collision by 3px, and
+   **broke `12/12`**: measured overflowing its own circle by 4px on the live
+   board. A two-digit power and toughness is an ordinary Commander creature and
+   not an edge case. 23px keeps it inside and still clears.
+
+   **This is the same fault the counters had one change ago**, and worth saying
+   so: #363's fix reasoned "at 58x81 the card is still 56 pixels wide at the
+   height the chips sit", which is true and was never true on a phone. A
+   constant measured against one card size is a bug waiting for the next
+   breakpoint. */
+.field-card {
+  --turn: 45deg;
+  --field-lens: min(26px, calc(var(--field-card-full) * 0.5));
+  --field-crown: 17px;
+}
 .field-card.is-tapped .field-card-turn { transform: rotate(var(--turn)); }
 
 .field-card-art {
@@ -9691,13 +9727,25 @@ button:hover .tarot-fan-card {
   background: linear-gradient(180deg,
     rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0) 100%);
 }
+/* **The figures scale with the glass, and they used to be a flat `0.6rem` on a
+   circle that is not a flat size.** Measured at 375 on a live board: a 12/12
+   overflowed its own lens by two pixels *before* anything on this branch
+   moved, and the reason it was never noticed is that most creatures are one
+   digit a side and fit at any size. A twelve-twelve is an ordinary Commander
+   creature, not an edge case.
+
+   0.369 is 9.6/26 — what the desk has always rendered — so nothing changes
+   there, and below it the type comes down with the circle it is written on.
+   `min()` on `--field-lens` above means the pair moves together at every
+   width, which is the whole point: two constants that must agree, expressed
+   once. */
 .field-card-lens-pt {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: calc(var(--field-lens) * 0.369);
   font-weight: 700;
   color: #fff4dc;
   text-shadow:
