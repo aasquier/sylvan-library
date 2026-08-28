@@ -120,10 +120,14 @@ type Pool struct {
 	leases   int
 	lastUsed time.Time
 	reaping  bool
-	columns  map[string]map[string]bool // per open: table -> column set
-	cards    *cardCache                 // per open: get_cards memo
-	stale    *bool                      // per open: the staleness verdict
-	memos    map[string]*counts         // per open: each memo's hits and misses
+	// sealed is the library shut for a rewrite -- see [Pool.Seal]. Under mu
+	// like everything else here, because the goroutine that seals and the
+	// request goroutines that read it are never the same one.
+	sealed  bool
+	columns map[string]map[string]bool // per open: table -> column set
+	cards   *cardCache                 // per open: get_cards memo
+	stale   *bool                      // per open: the staleness verdict
+	memos   map[string]*counts         // per open: each memo's hits and misses
 }
 
 // The memo names `counts` are kept under. Named constants rather than
@@ -219,6 +223,13 @@ func (p *Pool) acquire(ctx context.Context) (*Conn, error) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// Sealed is not "no file yet" and it is answered with the same error on
+	// purpose: [ErrNoPool] is the state every read path in the app already
+	// degrades through, and a refresh in progress is exactly the case ADR 6
+	// says card lookups are briefly unavailable in.
+	if p.sealed {
+		return nil, ErrNoPool
+	}
 	if p.db != nil && p.stamp != now {
 		// The file moved under us -- a refresh finished. Let the old instance
 		// go once its leases drain; until then, new users still get it: a

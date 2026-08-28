@@ -189,6 +189,11 @@ type API struct {
 	setsDay  string
 	setsBody []byte
 
+	// gathering is the one-refresh-at-a-time latch on the library rebuild.
+	// Per process, because that is the scope the pool's write lock has --
+	// `upkeep.go` argues why the registry's own dedupe key cannot serve.
+	gathering refreshLatch
+
 	// bg tracks the work started after a response has gone, which one
 	// route needs (`POST /api/auth/reset`, whose
 	// whole timing argument is that the lookup happens where nobody is
@@ -454,6 +459,14 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/activity", Handler: a.statsActivity},
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/traffic", Handler: a.statsTraffic},
 		{Method: http.MethodGet, Pattern: "/api/admin/stats/fly", Handler: a.statsFly},
+		// Upkeep: the two things about this instance that go out of date on
+		// their own. `GET` is a reading of both; the one `POST` is ADR 6's
+		// long-specified "authenticated admin endpoint that starts a refresh
+		// as a background job", cashed in on 2026-08-28. There is deliberately
+		// no second POST beside it -- `upkeep.go` argues at length why the
+		// arena's rebuild cannot honestly be a button here.
+		{Method: http.MethodGet, Pattern: "/api/admin/upkeep", Handler: a.upkeep},
+		{Method: http.MethodPost, Pattern: "/api/admin/library/refresh", Handler: a.refreshLibrary},
 
 		// The sim family, and with it the two generic job routes.
 		{Method: http.MethodPost, Pattern: "/api/sim/mana", Handler: a.simMana},

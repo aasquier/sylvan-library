@@ -427,6 +427,24 @@ the ledger forward deliberately.
 The goldens under `sim/tier3/testdata/` record the version a match **was**
 played with and never move with an upgrade.
 
+**There is deliberately no button for this**, and the question has been asked
+(Aaron, 2026-08-28: "same question for refreshing and recutting the Java image
+we get from the Forge"). Three reasons, and the first one alone settles it:
+the serving process cannot cut an image — the worker is built by the delivery
+pipeline from `Dockerfile.forge`, and an app that could start a build would be
+an app holding a credential that can write to this repository. The second is
+the paragraph above: the version is the instrument, so moving it is a decision
+and not a refresh. The third is that the part which genuinely must not go
+stale already does not — every release re-cuts the worker, and `SECURITY_EPOCH`
+is a UTC date, so its base-image fixes are at most a day behind with nobody in
+the loop.
+
+What was missing was not a lever but a reading. `/admin` → **Upkeep** now says
+which Forge the last recorded match here was actually played with, out of the
+ledger ADR 36 fills. That is a stronger fact than anything an image could
+claim about itself, and it is the number to check before wondering whether the
+arena is current.
+
 ### Testing deploy skew on purpose
 
 Every release updates the app **before** the worker, by several minutes and

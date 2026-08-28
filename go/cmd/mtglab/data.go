@@ -71,10 +71,33 @@ func dataBackupCommand(cfg config.Config) *cobra.Command {
 // The line only appears when there is something to wait for, so an ordinary
 // refresh on a quiet instance looks exactly as it always has.
 func openTheWriter(ctx context.Context, out io.Writer, path string) (*sql.DB, error) {
-	return pool.OpenWriterWaiting(ctx, path, pool.WriterWait, func() {
-		fmt.Fprintf(out, "the app is reading the pool; waiting for it "+
-			"(up to %s) ...\n", pool.WriterWait)
-	})
+	return pool.OpenWriterWaiting(ctx, path, pool.WriterWait, func() { sayWaiting(out) })
+}
+
+// sayWaiting is that line, in one place, because `refresh` now reaches it
+// through `pool.Refresh`'s watcher and `snapshot` still reaches it through
+// [openTheWriter]. Two spellings of a sentence is one spelling that goes
+// stale.
+func sayWaiting(out io.Writer) {
+	fmt.Fprintf(out, "the app is reading the pool; waiting for it "+
+		"(up to %s) ...\n", pool.WriterWait)
+}
+
+// bulkLabel and rowsLabel are how `refresh` has always named the two bulk
+// files and the two row counts. The `(large)` is on the printings download
+// because it is 500MB and the operator is about to wait for it.
+func bulkLabel(kind string) string {
+	if kind == pool.PrintingsBulk {
+		return kind + " (large)"
+	}
+	return kind
+}
+
+func rowsLabel(kind string) string {
+	if kind == pool.PrintingsBulk {
+		return "printings"
+	}
+	return "oracle cards"
 }
 
 func dataRefreshCommand(cfg config.Config) *cobra.Command {
@@ -83,42 +106,28 @@ func dataRefreshCommand(cfg config.Config) *cobra.Command {
 		Use:   "refresh",
 		Short: "Download Scryfall's bulk data and rebuild the pool",
 		Args:  cobra.NoArgs,
+		// The sequence itself lives in `pool.Refresh`, because the admin page
+		// now starts the same work as a background job (ADR 6's last line,
+		// cashed in) and two spellings of it would be two things to keep in
+		// step. What is left here is the printing -- the same lines, in the
+		// same order, with the same words.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
-			ctx := cmd.Context()
-			db, err := openTheWriter(ctx, out, cfg.DBPath())
-			if err != nil {
-				return err
-			}
-			defer func() { _ = db.Close() }()
-
-			fmt.Fprintln(out, "downloading oracle_cards ...")
-			oracle, err := pool.DownloadBulk(ctx, "oracle_cards", cfg.ScryfallDir())
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "  %s\n", oracle)
-			n, err := pool.LoadOracle(ctx, db, oracle)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "  loaded %s oracle cards\n", commas(n))
-
-			if oracleOnly {
-				return nil
-			}
-			fmt.Fprintln(out, "downloading default_cards (large) ...")
-			printings, err := pool.DownloadBulk(ctx, "default_cards", cfg.ScryfallDir())
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "  %s\n", printings)
-			m, err := pool.LoadPrintings(ctx, db, printings)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "  loaded %s printings\n", commas(m))
-			return nil
+			_, err := pool.Refresh(cmd.Context(), pool.RefreshOptions{
+				DBPath:      cfg.DBPath(),
+				ScryfallDir: cfg.ScryfallDir(),
+				OracleOnly:  oracleOnly,
+			}, pool.RefreshWatcher{
+				Waiting: func() { sayWaiting(out) },
+				Gathering: func(kind string) {
+					fmt.Fprintf(out, "downloading %s ...\n", bulkLabel(kind))
+				},
+				Gathered: func(_, path string) { fmt.Fprintf(out, "  %s\n", path) },
+				Shelved: func(kind string, n int64) {
+					fmt.Fprintf(out, "  loaded %s %s\n", commas(n), rowsLabel(kind))
+				},
+			})
+			return err
 		},
 	}
 	cmd.Flags().BoolVar(&oracleOnly, "oracle-only", false,

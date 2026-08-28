@@ -16594,3 +16594,37 @@ button:hover .tarot-fan-card {
     opacity: 0;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The gathering bar (Admin -> Upkeep)
+
+   A library refresh takes several minutes and reports five beats, so the bar
+   spends most of its life at one of five widths and would otherwise sit
+   perfectly still for a minute at a time — which reads as hung rather than as
+   patient. The width is the honest progress; the travelling sheen is the
+   sign of life on top of it, and it carries no information at all, which is
+   exactly why it may keep moving while the number does not.
+   --------------------------------------------------------------------------- */
+.upkeep-gathering {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vine) 62%, transparent) 0%,
+    color-mix(in srgb, var(--vine) 100%, transparent) 45%,
+    color-mix(in srgb, #fff 55%, var(--vine)) 50%,
+    color-mix(in srgb, var(--vine) 100%, transparent) 55%,
+    color-mix(in srgb, var(--vine) 62%, transparent) 100%
+  );
+  background-size: 220% 100%;
+  animation: upkeep-gathering-sheen 2.4s linear infinite;
+  transition: width 420ms ease-out;
+}
+
+@keyframes upkeep-gathering-sheen {
+  from { background-position: 140% 0; }
+  to   { background-position: -40% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The sheen goes; the width still moves, because the width is the fact. */
+  .upkeep-gathering { animation: none; background-position: 50% 0; }
+}
