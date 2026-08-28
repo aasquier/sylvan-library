@@ -1,0 +1,100 @@
+# The veiling: a spell laid on one person, which is what an Aura is.
+#
+# The sixth scene and the last of the entry set, settled with Aaron on
+# 2026-08-28. An Aura is the one permanent that goes **on somebody** — it does
+# not stand in a row of its own, it rides a creature, and the board already
+# draws it tucked under the card it is riding. So the scene is not a place a
+# card arrives in; it is a thing being done to a person.
+#
+# **The `velatio` is the Roman name for it.** A bride was veiled — the
+# `flammeum`, the flame-coloured veil — and from that moment she was a
+# different thing under the law. One person, one rite, one condition that
+# stays. There is no closer Roman idea to an Aura, and unlike the enchantment's
+# subject (see `templum.recipe.yaml`, which took three rejections) this one has
+# a surviving picture.
+#
+# **The `Aldobrandini Wedding`, 1st century BC, Vatican Museums.** The most
+# famous surviving Roman wall painting that is not from Pompeii: found on the
+# Esquiline in 1601, ten figures across a plastered wall, the veiled bride
+# seated on the marriage bed with Venus beside her, an attendant testing the
+# bath water at one end and three women with a lyre at the other. It is
+# **1920x744 as photographed — 2.58 to 1** — which is to say it arrives in this
+# directory already the shape every one of these scenes has had to be cut down
+# to. A frieze is the shape three of these recipes rejected; this is the one
+# beat where a frieze is right, because nothing is arriving from anywhere.
+#
+# **The crop pushes the bride off centre, and by now that is a rule rather than
+# a fix.** `fabrica.recipe.yaml` records the arithmetic: the stage draws a card
+# over x 0.384 to 0.615 of the band, and two scenes running had their subject
+# inside it. The bride and Venus sit at about 0.38 of the whole fresco, which
+# is exactly under the card. Starting the crop at 0.16 moves them to 0.28 and
+# they are clear, with the water-testing attendant still on at the left edge
+# and the three musicians whole on the right.
+#
+# **It is the brightest picture in this directory and that is a real cost.**
+# Measured: mean luminance 152 against a shipped range that tops out at the
+# road's 128. Pale lime plaster is what a fresco *is*, and no crop makes it
+# darker; keying or levelling it is the one thing every file here refuses. What
+# answers it instead is the stylesheet — a tighter mask than the other scenes
+# get, so less of that pale ground reaches the sand at all.
+#
+# **No key, no duotone, no levels — crop and resize and nothing else.**
+animist: 1
+
+why_committed: >
+  The five scenes beside it, exactly. This draws on the beat an Aura goes onto
+  a creature and is gone about a second later, so fetching it from somebody
+  else's host would mean a rite that opens after the card in it has faded. And
+  the licence is the second reason: this is a PD-Art photographic reproduction
+  on Commons, which is the category where somebody else's copy quietly moves
+  or changes terms -- a copy confirmed once and committed is a copy whose
+  provenance stays true.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the
+  # API, with `AttributionRequired` explicitly false. Two independent grounds:
+  # the painting is from the 1st century BC, and the photograph of it is a
+  # faithful reproduction of a two-dimensional public domain work.
+  #
+  # **The upstream file is 1920x744, which is small for a source here** -- most
+  # of this directory starts from four thousand pixels or more. It is enough:
+  # the crop keeps 1498 of those and the output is 700, so this is still a
+  # reduction rather than an enlargement, which is the test that matters. A
+  # larger scan of this fresco does not appear to be on Commons under a licence
+  # this project can use; the Vatican's own is not released.
+  velatio:
+    provider: wikimedia
+    title: "Aldobrandini wedding.JPG"
+    landing: https://commons.wikimedia.org/wiki/File:Aldobrandini_wedding.JPG
+    found_via: >
+      Commons, searching `Aldobrandini Wedding fresco` -- naming the work,
+      which is the search that works here and the one `campus.recipe.yaml`
+      recorded. Unrestricted phrasings (`Roman bride veiled fresco`, `Roman
+      wedding painting`) return scanned Victorian handbooks almost exclusively,
+      which is `lens.recipe.yaml`'s trap. Two other veiling subjects were
+      considered and not fetched: the Villa of the Mysteries frieze, whose good
+      wide photographs on Commons are all CC BY-SA rather than public domain,
+      and the Pompeian `Nozze di Ercole`, which is a fragment.
+    licence: Public domain
+
+outputs:
+  # 700 wide, matching the temple beside it. The subject is figures at about a
+  # third of the band's height, which is the valley's argument for width --
+  # the moment a figure stops being a figure this is a strip of coloured
+  # plaster.
+  #
+  # Quality 78, the valley's number and for the valley's reason: a plastered
+  # wall photographed under gallery light is soft everywhere, and there is no
+  # hard edge in it for a codec to spend bytes on. What edges exist are the
+  # crack lines, and a crack that softens is a crack.
+  - file: velatio.webp
+    from: velatio
+    ops:
+      # The bride off the centre line, and the white mount off the top and
+      # bottom. The upstream photograph carries a band of gallery wall above
+      # and the fresco's own painted dado below; neither is the picture, and
+      # the top band is the palest thing in the frame.
+      - crop: {frac_box: [0.16, 0.08, 0.94, 0.92]}
+      - resize: {width: 700}
+    encode: {format: webp, quality: 78}
+    expect: {width: 700, height: 292, budget_kb: 70, metadata: none}

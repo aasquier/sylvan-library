@@ -2653,32 +2653,73 @@ function carrier(container: HTMLElement) {
     ?.closest('.field-card') as HTMLElement
 }
 
-it('names what a creature is carrying, and says how to see the rest', () => {
-  // **The carousel was built and nobody could find it** (Aaron, 2026-08-27:
-  // *"I still am not seeing the equipment or auras on a creature displayed in
-  // their hover? ... I thought we built a carousel for this but I haven't seen
-  // it yet."*). It opens on a click, deliberately — `lift` argues why a thing
-  // you step through cannot be a thing you must keep hovering to keep alive —
-  // and the fault was that nothing ever told a mouse the click was there. The
-  // tucked corners say *that* a creature is carrying something, never *what*.
+it('fans a creature\'s gear out on a hover, with no click anywhere', () => {
+  // **The click is gone, and that was the complaint** (Aaron, 2026-08-28:
+  // *"it requires some awkward clicking. I had envisioned a hover opens the
+  // stack of them into an actual live carousel you can thumb left or right
+  // through easily"*). Hovering the creature opens the whole assemblage —
+  // the creature and the two things on it — and crossing a card raises it.
   const { container } = suited()
-  fireEvent.mouseEnter(carrier(container))
+  fireEvent.pointerEnter(carrier(container), { pointerType: 'mouse' })
 
-  const worn = document.querySelector('.field-peek-worn') as HTMLElement
-  expect(worn, 'the preview says what the card is wearing').toBeTruthy()
-  // Said the way a person says it, not the way a database prints it.
-  expect(worn.querySelector('.field-peek-worn-list')?.textContent)
-    .toContain('Carrying Behemoth Sledge and Ethereal Armor')
-  // **Both hands that can ever read this are named.** A peek is `:hover` and
-  // keyboard focus and nothing else; a phone has neither and reaches the same
-  // carousel with one tap. Naming only the mouse is how this project has
-  // shipped a half-a-room affordance twice already.
-  const how = worn.querySelector('.field-peek-worn-how')?.textContent ?? ''
-  expect(how).toContain('Click')
-  expect(how).toContain('Enter')
-  // Three: the creature and the two things on it. The count is also what makes
-  // a clamped list honest — a name that got cut is still counted.
-  expect(how).toContain('3')
+  const fan = document.querySelector('.field-fan') as HTMLElement
+  expect(fan, 'the hover opened the fan').toBeTruthy()
+  // Three: the creature and the two things on it.
+  expect(fan.querySelectorAll('.field-fan-card')).toHaveLength(3)
+  // It opens on the creature, because that is what was hovered.
+  expect(fan.querySelector('.field-fan-name')?.textContent)
+    .toBe('Fleecemane Lion')
+  expect(fan.querySelector('.field-fan-on'),
+    'the creature is not on anything').toBeNull()
+
+  // **The pointer is the thumb.** Crossing the second card raises it, with no
+  // click, no rail and no drag in the gesture.
+  const cards = fan.querySelectorAll('.field-fan-card')
+  fireEvent.pointerEnter(cards[1] as Element, { pointerType: 'mouse' })
+  expect(fan.querySelector('.field-fan-name')?.textContent)
+    .toBe('Behemoth Sledge')
+  // And the caption carries the one fact three pictures cannot: which of them
+  // is the creature and which are riding on it.
+  expect(fan.querySelector('.field-fan-on')?.textContent)
+    .toContain('Fleecemane Lion')
+  expect(cards[1]?.className).toContain('is-up')
+})
+
+it('stands the single-card preview down while the fan is up', () => {
+  // Two previews cannot share one hover: the peek is a 272-pixel card face
+  // placed against this card, and the fan opens three of them in the same air
+  // on the same gesture. The fan already holds the host card at a readable
+  // size, so the peek has nothing left to add.
+  const { container } = suited()
+  fireEvent.pointerEnter(carrier(container), { pointerType: 'mouse' })
+  fireEvent.mouseEnter(carrier(container))
+  expect(document.querySelector('.field-peek'),
+    'the fan is the preview here').toBeNull()
+})
+
+it('keeps the fan up while the pointer crosses to it', () => {
+  // **The gap between the creature and its fan is ten pixels of nothing**, and
+  // a naive `mouseleave` closes the fan the instant the pointer sets off. Both
+  // ends hold it open: leaving either schedules a close, entering either
+  // cancels it.
+  vi.useFakeTimers()
+  try {
+    const { container } = suited()
+    fireEvent.pointerEnter(carrier(container), { pointerType: 'mouse' })
+    const group = carrier(container).closest('.field-fanned') as HTMLElement
+    fireEvent.pointerLeave(group)
+    fireEvent.pointerEnter(document.querySelector('.field-fan') as Element)
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(document.querySelector('.field-fan'),
+      'the pointer arrived, so it stayed').toBeTruthy()
+
+    // And leaving the fan itself does close it, after the same grace.
+    fireEvent.pointerLeave(document.querySelector('.field-fan') as Element)
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(document.querySelector('.field-fan')).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('leaves a card carrying nothing exactly as it was', () => {
@@ -2701,7 +2742,9 @@ it('says what a card is carrying in words as well as in corners', () => {
   const { container } = suited()
   expect(carrier(container).getAttribute('title'))
     .toContain('carrying Behemoth Sledge and Ethereal Armor')
-  expect(container.querySelector('.field-geared')?.getAttribute('aria-label'))
+  // The group's label moved up a level with the fan wrapper, which is the
+  // element that now owns the whole assemblage.
+  expect(container.querySelector('.field-fanned')?.getAttribute('aria-label'))
     .toContain('Behemoth Sledge')
 })
 

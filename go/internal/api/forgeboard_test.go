@@ -529,3 +529,46 @@ func TestEachHalfCarriesItsOwnTypeLine(t *testing.T) {
 		t.Fatalf("a type line that does not split became %v", got)
 	}
 }
+
+// **An Aftermath card is not a split card, however Scryfall files it.**
+//
+// Amonkhet's split-with-a-turn cards used to carry `layout: "aftermath"`;
+// Scryfall files them under `split` now and marks them with the `Aftermath`
+// keyword instead. The room needs the older distinction back, because the two
+// print their halves in different places *and in opposite order* — a split
+// card is read sideways so its first face is the lower one on the picture, and
+// an Aftermath card is read upright so its first face is the upper one. A room
+// told only "split" would draw its glass over the wrong half of exactly half of
+// them, and be right about the rest.
+func TestAnAftermathCardIsToldApartFromASplitCard(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		layout   string
+		keywords []string
+		want     string
+	}{
+		{"an aftermath card", "split", []string{"Aftermath"}, "aftermath"},
+		// The spelling is somebody else's, so it is matched without regard to
+		// case, like every other string that arrives from outside.
+		{"whatever case it arrives in", "split", []string{"aftermath"},
+			"aftermath"},
+		// Fuse is the other keyword a split card carries, and it is not this.
+		{"a fused split card", "split", []string{"Fuse"}, "split"},
+		{"an ordinary split card", "split", nil, "split"},
+		// The keyword only means this on a split card. Nothing else in Magic
+		// carries it, and a layout that grew one would still be its own layout.
+		{"an adventure", "adventure", []string{"Aftermath"}, "adventure"},
+		{"an ordinary card", "normal", nil, "normal"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := layoutOf(&pool.CardRecord{
+				Layout: tc.layout, Keywords: tc.keywords})
+			if got != tc.want {
+				t.Fatalf("%s with %v is %q, want %q",
+					tc.layout, tc.keywords, got, tc.want)
+			}
+		})
+	}
+}

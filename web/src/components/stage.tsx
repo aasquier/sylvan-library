@@ -13,17 +13,21 @@
  * file; neither is readable without the other.
  */
 
-import type { CSSProperties } from 'react'
+import { type CSSProperties, useEffect } from 'react'
 
 import campusArt from '../assets/coliseum/campus.webp'
 import cryptaArt from '../assets/coliseum/crypta.webp'
+import fabricaArt from '../assets/coliseum/fabrica.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
+import velatioArt from '../assets/coliseum/velatio.webp'
 import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
 import { halfNamed } from '../lib/board'
-import { faceFor, mannerOf, plateNote, plateWord, type Staged, stagedMana,
-  stageLife, type StagedMana, useStaged, useStagedMana } from '../lib/stage'
+import { halfGlassFor } from '../lib/halves'
+import { ARCANA, faceFor, mannerOf, plateNote, plateWord, sceneFor,
+  type Staged, stagedMana, stageLife, type StagedMana, useStaged,
+  useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
 /** The card itself, or the card set in type when there is no picture of it.
@@ -44,16 +48,16 @@ function StageFace({ item }: { item: Staged }) {
         <img className="stage-face" src={item.image} alt="" draggable={false} />
         {/* **The half of the card that is actually being cast, under glass.**
 
-            An Adventure is two spells on one piece of cardboard, and the room
-            was showing neither: Forge renames the card the moment the
-            Adventure goes on the stack, nothing in the match answered to
-            *Stomp*, and the middle of the arena drew a black card with a title
-            on it (Aaron, 2026-08-28). The card is found now — and finding it
-            raises the second question, which is that a player who has just
-            been told "Cast Instant" is looking at a Giant.
+            A card with two names on one picture is two spells, and the room
+            was showing neither: Forge renames the card the moment the second
+            one goes on the stack, nothing in the match answered to *Stomp*,
+            and the middle of the arena drew a black card with a title on it
+            (Aaron, 2026-08-28). The card is found now — and finding it raises
+            the second question, which is that a player who has just been told
+            "Cast Instant" is looking at a Giant.
 
             So the whole card arrives, whole, and a magnifier stands over the
-            adventure's own box. That is Aaron's ask and it is also the only
+            half that was cast. That is Aaron's ask and it is also the only
             move the licence allows: Scryfall's imagery guidelines forbid
             cropping, distorting, desaturating and watermarking a card image,
             and ADR 32 makes that a wall. Nothing here cuts the picture — the
@@ -62,14 +66,41 @@ function StageFace({ item }: { item: Staged }) {
             has been doing on the battlefield since #312 and the same argument
             `.arena-gate` settled for the gate.
 
-            Only an Adventure, and that is a measurement rather than a
-            shortcut: the box's position was read off a real card face rather
-            than reasoned about. A split card and a flip card get the right
-            picture and no glass. */}
-        {item.half === 'adventure' && (
-          <span className="stage-adventure" aria-hidden="true"
-                style={{ '--half-art': `url(${item.image})` } as CSSProperties}>
-            <span className="stage-adventure-glass" />
+            **All four two-named layouts wear one**, which they did not: the
+            glass belonged to an Adventure alone because an Adventure's box was
+            the only one anybody had measured, and a split card and a flip card
+            got the right picture and nothing over it. `lib/halves.ts` holds
+            the measurements now — read off real faces at 488x680, several
+            printings of each — and the arithmetic that turns a box into a
+            lens.
+
+            **The magnified copy is a second `<img>`, not a background**, and
+            that is the fix rather than a preference. See `halfGlass`: a
+            background percentage resolves against the glass rather than
+            against the card, so the shipped `background-size: 155%` drew the
+            card at seventy per cent — a magnifier that made things smaller —
+            and scaled the two axes differently while it did, which is a
+            *distortion* of a card image and one of the four words ADR 32 names
+            outright. A copy laid over the card and scaled uniformly about the
+            half's own centre cannot do either. */}
+        {item.half && (
+          <span className="stage-half" aria-hidden="true"
+                style={{
+                  '--glass-l': `${item.half.left}%`,
+                  '--glass-t': `${item.half.top}%`,
+                  '--glass-r': `${item.half.right}%`,
+                  '--glass-b': `${item.half.bottom}%`,
+                  '--card-x': `${item.half.cardLeft}%`,
+                  '--card-y': `${item.half.cardTop}%`,
+                  '--card-w': `${item.half.cardWidth}%`,
+                  '--card-h': `${item.half.cardHeight}%`,
+                  '--half-ox': `${item.half.originX}%`,
+                  '--half-oy': `${item.half.originY}%`,
+                } as CSSProperties}>
+            <span className="stage-half-glass">
+              <img className="stage-half-card" src={item.image} alt=""
+                   draggable={false} />
+            </span>
           </span>
         )}
       </>
@@ -254,23 +285,191 @@ function StageField() {
   )
 }
 
+/**
+ * **The fourth scene, and the first that is not a place.**
+ *
+ * An instant and a sorcery never land. There is nowhere for them to arrive, so
+ * there is nothing to open onto — the road, the vault and the valley are all
+ * answers to *where has this gone* or *where has this come from*, and a
+ * Lightning Bolt has been nowhere. What it has is a **shape**: something
+ * sudden that happens to you, or something deliberate that you do.
+ *
+ * So the two of them stand in front of an arcanum instead, and that is the
+ * vocabulary this room settled on (Aaron, 2026-08-28): a card that becomes an
+ * object on the table opens onto a picture of a real place; a card that is only
+ * ever an event is drawn from the deck of the fortune-teller's table. **The
+ * Tower** for an instant — lightning through a crown, two figures falling,
+ * which is what an instant does to somebody's plan — was his own suggestion.
+ * **The Magician** for a sorcery is its answer from the other side: one hand
+ * raised and one lowered over a table of prepared tools, on your own turn, at
+ * your own pace. It happens to you, or you do it.
+ *
+ * **The composition is deliberately not the other three's.** Those are wide
+ * bands laid across the sand, because a place is somewhere you look *into*.
+ * This is a single card standing upright behind the spell, taller than it and
+ * a little back, so the Magic card is held in front of the arcanum the way a
+ * reader holds one card over another. Two portrait cards is the one thing the
+ * three places could never draw, and it is the right thing here: nothing is
+ * receding, because nothing is going anywhere.
+ *
+ * **Served from `/tarot/`, and that is why there is no import.** The 1909
+ * Rider deck is package data on the server — 78 files with their provenance in
+ * `assets/tarot/PROVENANCE.md`, public domain in both the US and the UK, and
+ * already reachable at a path. Committing a second copy into the bundle would
+ * be the same pictures twice, and the reading room's copy is the one with the
+ * argument attached to it.
+ */
+/**
+ * **The fourth place, and the one an object is made in.**
+ *
+ * Aaron, 2026-08-28: *"hopefully find a good image of a hammer hitting an anvil
+ * with sparks for artifacts entering"*. Wright of Derby's `An Iron Forge` is
+ * the picture and `fabrica.recipe.yaml` argues it at length, including why it
+ * is not the Blacksmith's Shop he first chose — that one buries its own light
+ * source under exactly where this stage draws a card, which a proof sheet said
+ * and no amount of looking at the painting would have.
+ *
+ * **The sparks are the landing, and they are not in the painting.** The valley
+ * learned this first: the road and the vault are places that were already
+ * there and are simply opened, and a place with something *put down* in it has
+ * just been disturbed. Dust is what a battlefield throws up; an anvil throws
+ * sparks. Same element, same beat, different material — which is the whole of
+ * what makes these four scenes one vocabulary rather than four decorations.
+ *
+ * It is also the half of Aaron's sentence the picture could not answer. He
+ * asked for a hammer, an anvil **and sparks**; this painting has the first two
+ * and a bar at white heat, and drawing the third as motion is better than
+ * hunting for a painting that has all three and none of the depth.
+ */
+function StageForge() {
+  return (
+    <span className="stage-forge" aria-hidden="true">
+      <img className="stage-forge-art" src={fabricaArt} alt=""
+           draggable={false} />
+      <span className="stage-forge-sparks" />
+    </span>
+  )
+}
+
+/**
+ * **The fifth place, and the one an enchantment settles over.**
+ *
+ * Every other permanent in Magic is a thing you could pick up: a creature is a
+ * body, an artifact is an object, an Equipment is a sword. An enchantment is
+ * the one that is not — it is a condition laid on the *place*, and it stays
+ * until somebody takes it off. So it gets the place: Piranesi's Pantheon
+ * pronaos, sixteen granite monoliths holding up a roof that has held for
+ * nineteen hundred years. `templum.recipe.yaml` argues it, including the three
+ * subjects that were fetched and rejected first — among them the curse tablet
+ * Aaron chose, which turned out to be a museum object on a cream mount and so
+ * a *mark* rather than a place.
+ *
+ * No dust and no sparks. The two arrival scenes disturb their ground because
+ * something was put down on it; nothing is put down here. An enchantment
+ * arrives as a condition over a room that was already standing, and the room
+ * simply opens.
+ */
+function StageTemple() {
+  return (
+    <span className="stage-temple" aria-hidden="true">
+      {/* A `background-image` rather than an `<img>`, alone among the six.
+          The picture is an etching and arrives grey; the stylesheet blends it
+          `soft-light` into a warm ground the way the sand does with its own
+          plate, so what it contributes is the structure and the colour stays
+          the room's. A background is the only way to reach `background-blend-
+          mode`, and the path lives in the stylesheet for the same reason the
+          sand's does. */}
+      <span className="stage-temple-art" />
+    </span>
+  )
+}
+
+/**
+ * **The sixth, and it is a rite rather than a place.**
+ *
+ * An Aura is the one permanent that goes *on somebody*. It does not stand in a
+ * row of its own — the board draws it tucked under the creature it is riding —
+ * so the scene is not somewhere a card arrives, it is something being done to
+ * a person. The `velatio` is the Roman name for exactly that: a bride was
+ * veiled, and from that moment she was a different thing under the law. One
+ * person, one rite, one condition that stays.
+ *
+ * **A frieze, and this is the one beat where a frieze is right.** Three of
+ * these recipes rejected a frieze for having no depth to travel through. There
+ * is no travel here: nothing is arriving from anywhere, and the picture is a
+ * sentence read left to right — the water tested, the bride veiled, the
+ * musicians waiting. `velatio.recipe.yaml` has the rest.
+ */
+function StageVeiling() {
+  return (
+    <span className="stage-veiling" aria-hidden="true">
+      <img className="stage-veiling-art" src={velatioArt} alt=""
+           draggable={false} />
+    </span>
+  )
+}
+
+/**
+ * Fetch both arcana once, before either is wanted.
+ *
+ * **A scene that arrives after the card it is behind is not a scene.** The
+ * three places are bundled bytes and are on screen the frame they are asked
+ * for; these two are files on the server, and the first instant of a match
+ * would otherwise draw a Lightning Bolt against nothing and paint The Tower in
+ * behind it a moment later, once. `campus.recipe.yaml` records the same worry
+ * about hotlinking and answers it by committing; this answers it by asking
+ * early, which costs a hundred kilobytes to the browser cache and nothing to
+ * the bundle.
+ *
+ * Once per mount and never again — the images live in the browser's cache
+ * after the first ask, and this is the ask.
+ */
+function useArcana() {
+  useEffect(() => {
+    for (const src of Object.values(ARCANA)) {
+      const warm = new Image()
+      warm.src = src
+    }
+  }, [])
+}
+
+function StageArcanum({ scene }: { scene: 'tower' | 'magician' }) {
+  return (
+    <span className="stage-arcanum" aria-hidden="true">
+      <img className="stage-arcanum-art" src={ARCANA[scene]} alt=""
+           draggable={false} />
+      <span className="stage-arcanum-glow" />
+    </span>
+  )
+}
+
 /** One card on the stage: the light behind it, the card, what is happening to
  *  it, and the plate saying so. */
 function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
   const life = { '--stage-life': `${item.life}ms` } as CSSProperties
   return (
+    // **Two classes, because there are two questions.** `is-{manner}` is what
+    // happened — it colours the light and times the plate. `has-{scene}` is
+    // what the arena opened onto, and every rule about a scene hangs off it:
+    // the same valley has to be reachable by a cast creature, an uncast one
+    // and a token, which is three manners and one picture.
     <span style={life} aria-hidden="true"
           className={`stage-card is-${item.manner}`
+            + (item.scene ? ` has-${item.scene}` : '')
             + (parting ? ' is-parting' : '')}>
       {/* Light gathering behind the card, and only behind it. A rectangle of
           scrim over the whole arena would take the board away from somebody
           scrubbing the timeline; a pool centred on the card separates it from
           the sand and leaves the rows either side perfectly readable. */}
       <span className="stage-veil" aria-hidden="true" />
-      {(item.manner === 'exiled' || item.manner === 'companion')
-        && <StageRoad />}
-      {item.manner === 'dies' && <StageCrypt />}
-      {item.manner === 'put' && <StageField />}
+      {item.scene === 'road' && <StageRoad />}
+      {item.scene === 'crypt' && <StageCrypt />}
+      {item.scene === 'field' && <StageField />}
+      {item.scene === 'forge' && <StageForge />}
+      {item.scene === 'temple' && <StageTemple />}
+      {item.scene === 'veiling' && <StageVeiling />}
+      {(item.scene === 'tower' || item.scene === 'magician')
+        && <StageArcanum scene={item.scene} />}
       <span className="stage-frame">
         {item.count > 1 && <StagePile item={item} />}
         <StageFace item={item} />
@@ -403,6 +602,9 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
    *  to prefer the caster's own copy of a card both seats run. */
   seat: number | null
 }) {
+  // Both arcana asked for once, before the first spell of the match wants
+  // one — see `useArcana`.
+  useArcana()
   const name = beat?.card ?? null
   // **One lookup, three answers, and it now happens before the manner rather
   // than after it**: the painting to draw, the type line the plate reads, and
@@ -442,9 +644,17 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
       image: face?.image ?? null,
       // **Which half of the card this is, when the card has two on one
       // picture.** `halfNamed` is 0 for the face the card is filed under and 1
-      // for the other; only an Adventure's second half gets a glass, because
-      // only an Adventure's second half has been measured. See `Staged.half`.
-      half: face?.layout === 'adventure' && half === 1 ? 'adventure' : null,
+      // for the other, and `lib/halves.ts` turns that pair into the glass —
+      // null for a card with one half, an Adventure cast as its creature, or a
+      // layout nobody has measured. See `Staged.half`.
+      half: halfGlassFor(face?.layout, half),
+      // **Which scene opens behind the card.** The manner alone decided this
+      // until #375, which is why a creature nobody cast got a battlefield and
+      // an identical creature somebody paid seven mana for got a glow. See
+      // `sceneFor`: a departure is a departure whatever the card was, and an
+      // arrival is about what arrived. `kind` rather than the card's own type
+      // line, so a split card's half is judged as the half that was cast.
+      scene: sceneFor(manner, kind),
       life: stageLife(manner, speed, dies),
     }
     : null

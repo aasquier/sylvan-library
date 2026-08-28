@@ -205,3 +205,45 @@ Why committed rather than hotlinked: The same argument as the road and the skull
 
 Why committed rather than hotlinked: The same argument as the road and the vault beside it. This is drawn on the beat that says a permanent arrived uncast and it is gone about a second and a half later, so fetching it from somebody else's host would mean a battlefield that opens after the creature standing on it has already faded. The licence is the second reason: this is a PD-Art photographic reproduction uploaded by an individual contributor, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end campus -->
+
+<!-- animist:begin fabrica -->
+## fabrica.webp
+
+- **Source**: "Joseph Wright - An Iron Forge - Google Art Project.jpg", <https://commons.wikimedia.org/wiki/File:Joseph_Wright_-_An_Iron_Forge_-_Google_Art_Project.jpg>, found via Commons, searching the painter and the painting by name -- which is the search that works here and the one `campus.recipe.yaml` recorded. Every unrestricted phrasing (`blacksmith anvil sparks`, `forge hammer glowing iron`, `smithy interior night`) returns modern photographs under CC BY-SA and scanned trade catalogues. Three candidates were fetched and cropped with a card stood in them before this one was chosen: Wright's own `A Blacksmith's Shop` (Yale, 4688x5975, rejected on the crop -- see the header), Velazquez's `La Fragua de Vulcano` (Prado, 2952x2293, a frieze with a god in it), and this. The Google Art Project scan is 2801x2572, which is nearly square and the reason a wide band comes out of it without throwing most of the painting away.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build fabrica.recipe.yaml`):
+  - `crop`: frac_box=[0.22, 0.4, 1.0, 0.92].
+  - `resize`: width=660.
+  - Encoded WEBP, quality 76.
+
+Why committed rather than hotlinked: The three scenes beside it, exactly. This draws on the beat an artifact arrives and is gone about a second later, so fetching it from somebody else's host would mean a forge that opens after the card standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end fabrica -->
+
+<!-- animist:begin templum -->
+## templum.webp
+
+- **Source**: "Piranesi-17003.jpg", <https://commons.wikimedia.org/wiki/File:Piranesi-17003.jpg>, found via Commons, searching the printmaker and the subject by name -- which is the search that works for pictures and the one `campus.recipe.yaml` recorded. Unrestricted phrasings (`Roman temple interior`, `colonnade ruins`, `sacred precinct`) return modern photographs under CC BY-SA and scanned guidebooks. Reached after the curse tablet, Panini's Pantheon and the Carceri had each been fetched, cropped to a band with a card stood in it, and rejected on sight -- see the header for all three.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build templum.recipe.yaml`):
+  - `crop`: frac_box=[0.045, 0.12, 0.955, 0.8].
+  - `resize`: width=700.
+  - Encoded WEBP, quality 80.
+
+Why committed rather than hotlinked: The four scenes beside it, exactly. This draws on the beat an enchantment arrives and is gone about a second later, so fetching it from somebody else's host would mean a colonnade that opens after the card standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end templum -->
+
+<!-- animist:begin velatio -->
+## velatio.webp
+
+- **Source**: "Aldobrandini wedding.JPG", <https://commons.wikimedia.org/wiki/File:Aldobrandini_wedding.JPG>, found via Commons, searching `Aldobrandini Wedding fresco` -- naming the work, which is the search that works here and the one `campus.recipe.yaml` recorded. Unrestricted phrasings (`Roman bride veiled fresco`, `Roman wedding painting`) return scanned Victorian handbooks almost exclusively, which is `lens.recipe.yaml`'s trap. Two other veiling subjects were considered and not fetched: the Villa of the Mysteries frieze, whose good wide photographs on Commons are all CC BY-SA rather than public domain, and the Pompeian `Nozze di Ercole`, which is a fragment.
+.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
+- **Transformations** (Pillow, scripted -- `animist build velatio.recipe.yaml`):
+  - `crop`: frac_box=[0.16, 0.08, 0.94, 0.92].
+  - `resize`: width=700.
+  - Encoded WEBP, quality 78.
+
+Why committed rather than hotlinked: The five scenes beside it, exactly. This draws on the beat an Aura goes onto a creature and is gone about a second later, so fetching it from somebody else's host would mean a rite that opens after the card in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end velatio -->

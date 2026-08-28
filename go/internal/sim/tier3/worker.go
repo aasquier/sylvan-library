@@ -50,13 +50,43 @@ import (
 const MachinesAPI = "https://api.machines.dev/v1"
 
 // BootBudget is how long a cold start may take before the request is refused:
-// machine start (~1s measured shape), the shim's boot, and its first index
-// warm. Generous rather than tight, because the refusal is a 503 somebody
-// sees.
+// machine start, the shim's boot, and its first index warm. Generous rather
+// than tight, because the refusal is a 503 somebody sees.
 //
 // The name carries no unit because the
 // value carries one.
-const BootBudget = 90 * time.Second
+//
+// **It covers the machine start now, and it did not — which is the whole of a
+// fault that made the first match after every deploy fail.** This comment has
+// always said "machine start (~1s measured shape)", and the code never applied
+// the budget there: [Worker.BaseURL] asked Fly to wait sixty seconds for the
+// machine and treated the answer as final, while [Worker.Ready] spent this
+// number on the shim afterwards. One second is the measured shape of a *warm*
+// image. Merging deploys (ADR 23) swaps the worker's image, and a cold one has
+// to be pulled and unpacked before anything in it runs — which does not finish
+// in sixty seconds. So the sequence a person met was: a change lands, the first
+// person to send two decks in is told the match failed, and the second attempt
+// works because the first one warmed the machine (2026-08-25, found by playing
+// a real match on the deployed instance; Aaron asked for it fixed 2026-08-28).
+//
+// **A 408 from Fly's wait is "not yet", not "no".** The machine is still
+// coming up and asking again costs nothing — so `BaseURL` now asks repeatedly
+// until this budget is spent, and a warm machine still returns on the first
+// call in about a second. Nothing is kept awake and nothing is pre-pulled; the
+// only thing that changed is how long the room is willing to wait before
+// calling a boot a failure.
+//
+// **Three minutes is a dial, and it is Aaron's.** It is the honest cost of a
+// cold image on this shape, and it is also a long time to watch a spinner. The
+// alternative is to warm the worker as part of the deploy so nobody ever pays
+// it — which spends machine time on every merge, and that is a judgement about
+// somebody's money rather than about this package.
+const BootBudget = 180 * time.Second
+
+// machineWait is how long a single Fly `wait?state=started` call is asked to
+// block. Fly's own ceiling for that parameter is sixty seconds, so a longer
+// budget is spent as a series of these rather than as one request.
+const machineWait = 60 * time.Second
 
 // Worker is the client. A value rather than package functions so a test can
 // give it its own HTTP client and clock.
@@ -132,7 +162,7 @@ func (w *Worker) api(ctx context.Context, method, path string,
 
 	resp, err := w.client().Do(req)
 	if err != nil {
-		return nil, NotInstalled("forge worker: Machines API unreachable: %v", err)
+		return nil, NotReady("forge worker: Machines API unreachable: %v", err)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
@@ -140,13 +170,39 @@ func (w *Worker) api(ctx context.Context, method, path string,
 		// Truncated at 300 code points, not bytes -- the recorded cut is
 		// by character, so a multibyte rune is never split.
 		detail := truncate(string(raw), 300)
-		return nil, NotInstalled("forge worker: Machines API %s %s answered "+
-			"%d: %s", method, path, resp.StatusCode, detail)
+		return nil, &apiRefusal{code: resp.StatusCode,
+			err: NotReady("forge worker: Machines API %s %s answered "+
+				"%d: %s", method, path, resp.StatusCode, detail)}
 	}
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return nil, nil
 	}
 	return json.RawMessage(raw), nil
+}
+
+// apiRefusal is a Machines API answer with its status still attached, so a
+// caller can ask *which* refusal this was without reading the sentence.
+//
+// It exists for one question: [Worker.waitStarted] needs to know a 408 from
+// everything else. Fly answers a long poll that reached its own ceiling with
+// one, and that is the only answer worth asking again — a 401 asked again is a
+// 401 three minutes later.
+//
+// Wrapping rather than replacing, so `errors.Is(err, ErrWorkerNotReady)` and
+// `errors.Is(err, ErrForgeNotInstalled)` both still hold and every caller that
+// maps this onto a 503 is untouched.
+type apiRefusal struct {
+	code int
+	err  error
+}
+
+func (e *apiRefusal) Error() string { return e.err.Error() }
+func (e *apiRefusal) Unwrap() error { return e.err }
+
+// stillComing reports whether an answer means "not yet" rather than "no".
+func stillComing(err error) bool {
+	var refusal *apiRefusal
+	return errors.As(err, &refusal) && refusal.code == http.StatusRequestTimeout
 }
 
 type machine struct {
@@ -167,7 +223,7 @@ func (w *Worker) findMachine(ctx context.Context) (machine, string, error) {
 	var machines []machine
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &machines); err != nil {
-			return machine{}, "", NotInstalled(
+			return machine{}, "", NotReady(
 				"forge worker: the Machines API listed machines this could not read: %v", err)
 		}
 	}
@@ -189,7 +245,11 @@ func (w *Worker) shimHeaders(req *http.Request) {
 }
 
 // BaseURL is where the shim answers, waking the machine if it is asleep.
-func (w *Worker) BaseURL(ctx context.Context) (string, error) {
+//
+// The deadline is the caller's, so the machine coming up and the shim opening
+// its port are spent out of **one** budget rather than two — see [BootBudget]
+// for the fault that came of them being separate.
+func (w *Worker) BaseURL(ctx context.Context, by time.Time) (string, error) {
 	if w.Settings.WorkerURL != "" {
 		return w.Settings.WorkerURL, nil
 	}
@@ -204,23 +264,71 @@ func (w *Worker) BaseURL(ctx context.Context) (string, error) {
 		// state, not who set it.
 		_, _ = w.api(ctx, http.MethodPost,
 			fmt.Sprintf("/apps/%s/machines/%s/start", app, m.ID), nil, 30*time.Second)
-		if _, err := w.api(ctx, http.MethodGet,
-			fmt.Sprintf("/apps/%s/machines/%s/wait?state=started&timeout=60", app, m.ID),
-			nil, 70*time.Second); err != nil {
+		if err := w.waitStarted(ctx, app, m.ID, by); err != nil {
 			return "", err
 		}
 	}
 	return fmt.Sprintf("http://%s.vm.%s.internal:%d", m.ID, app, w.Settings.ShimPort), nil
 }
 
+// waitStarted blocks until the machine reports `started`, or until the
+// deadline.
+//
+// **A wait that runs out is asked again**, and that is the fix rather than the
+// retry-for-luck it looks like. Fly's `wait` is a long poll with a ceiling of
+// its own, and a 408 from it says the machine has not reached the state *yet* —
+// the start is still running. Treating that one answer as the whole verdict is
+// what made a cold image, which cannot be pulled and unpacked inside a single
+// poll, report as a failed match to whoever asked first.
+//
+// A warm machine leaves on the first pass in about a second, so nothing that
+// worked before waits any longer than it did.
+func (w *Worker) waitStarted(ctx context.Context, app, id string,
+	by time.Time) error {
+	var last error
+	for {
+		left := time.Until(by)
+		if left <= 0 {
+			if last != nil {
+				return last
+			}
+			return NotReady("forge worker: the machine did not start in time")
+		}
+		block := machineWait
+		if left < block {
+			block = left
+		}
+		_, err := w.api(ctx, http.MethodGet,
+			fmt.Sprintf("/apps/%s/machines/%s/wait?state=started&timeout=%d",
+				app, id, int(block.Seconds())),
+			nil, block+10*time.Second)
+		if err == nil {
+			return nil
+		}
+		// A context the caller cancelled is not a machine that is slow, and
+		// asking again would spin until the deadline for nothing.
+		if ctx.Err() != nil {
+			return err
+		}
+		// **Only "not yet" is asked again.** A wait that came back 408 is a
+		// machine still on its way; anything else — a token that expired, a
+		// machine that went away — is an answer, and asking it repeatedly for
+		// three minutes would turn one clear refusal into a long silence.
+		if !stillComing(err) {
+			return err
+		}
+		last = err
+	}
+}
+
 // Ready is a base URL whose shim has answered.
 func (w *Worker) Ready(ctx context.Context) (string, error) {
-	base, err := w.BaseURL(ctx)
+	deadline := time.Now().Add(w.boot())
+	base, err := w.BaseURL(ctx, deadline)
 	if err != nil {
 		return "", err
 	}
 	last := "no answer yet"
-	deadline := time.Now().Add(w.boot())
 	for time.Now().Before(deadline) {
 		ok, err := w.healthy(ctx, base)
 		if ok {
@@ -231,7 +339,7 @@ func (w *Worker) Ready(ctx context.Context) (string, error) {
 		}
 		w.sleep(time.Second)
 	}
-	return "", NotInstalled("forge worker: machine started but the shim "+
+	return "", NotReady("forge worker: machine started but the shim "+
 		"never answered (%s)", last)
 }
 

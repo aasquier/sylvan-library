@@ -1,0 +1,169 @@
+# The forge an artifact is struck out on.
+#
+# Aaron, 2026-08-28, opening the entry animations out from the one scene they
+# had: *"hopefully find a good image of a hammer hitting an anvil with sparks
+# for artifacts entering"*. This is the fourth place in the arena and the
+# second half of the rule that came out of that conversation — a card that
+# becomes an **object** on the table opens onto a picture of a real place, and
+# a card that is only ever an **event** is drawn from the tarot's arcana. An
+# artifact is the most object-like thing in Magic; it gets the most physical
+# place in the room.
+#
+# **A painting, for `campus.recipe.yaml`'s reason and not for its own.** The
+# road and the vault are photographs because the Via Appia and the Vigna Codini
+# columbaria are still there to stand in. A working charcoal forge under a
+# ruined brick vault, lit only by the iron in it, is not — the thing exists as
+# heritage demonstration and as an industrial museum, both of which photograph
+# as heritage demonstration. What survives of the real one is the picture
+# somebody painted while it was still ordinary.
+#
+# **Joseph Wright of Derby, `An Iron Forge`, 1772, Tate.** A water-driven helve
+# hammer over an anvil, a bar of iron at white heat on it, and every other
+# thing in the painting — the brick vault, the timbers, the six people watching
+# — lit by nothing but that bar. Wright is the painter of exactly this: light
+# with a source in the picture rather than off the top-left corner, which is
+# also the one composition that survives being six hundred pixels wide behind a
+# card. A bright core in darkness is still a bright core in darkness at any
+# size; a scene lit evenly is a grey field.
+#
+# **It is not Roman, and `campus.recipe.yaml` has already had that argument.**
+# The short of it: the register break happens the moment the subject is chosen,
+# because there is no Roman picture of this. Roman smithing survives as Vulcan
+# — Velázquez's `Fragua de Vulcano` is the famous one and it was fetched and
+# rejected — and every Vulcan is a frieze of figures across the front of the
+# frame with a god in it. A frieze is the shape this room has now rejected four
+# times (`via`, `crypta`, `campus`, this), and a god standing behind a Magic
+# card is a second subject competing with the first.
+#
+# ## What the proof sheet said, against what was expected
+#
+# **`A Blacksmith's Shop` was chosen first and the crops overturned it**, which
+# is the whole reason a band is rendered with a card standing in it before
+# anything is fetched at full size. Wright painted both, a year apart, and the
+# Blacksmith's Shop is the better answer to Aaron's sentence: men with hammers
+# actually raised, sparks visibly coming off the anvil. It is also portrait,
+# and its glowing bar sits at **centre-bottom** — dead under where the stage
+# draws a card. Cropped to a band and stood behind a card, the card lands
+# square on the two smiths and buries the entire light source, and what is left
+# either side is dark legs and a crowd of onlookers' faces competing with the
+# card for the eye.
+#
+# `An Iron Forge` puts its hot bar at **centre-left**. The card stands in the
+# light instead of on top of it, the helve hammer's timber drives in from the
+# left edge, and the brick vault recedes to the right — so this is a place with
+# depth in it rather than a wall of people, which is the property the other
+# three scenes were each chosen for.
+#
+# **Centre-left was still not left enough**, and the crop below is the second
+# correction. See its own note: the bar measured out at x 0.448 of the source
+# and the card covers 0.384 to 0.615, so the first cut of this put the anvil
+# four hundredths inside the card. Two more candidates were fetched and
+# proof-sheeted when Aaron reported it — Goya's `La fragua`, which is the most
+# literal answer to his sentence anybody will find (a hammer over a smith's
+# head, mid-swing, an anvil with red iron on it) and is a **portrait** panel
+# that cannot be cropped to this band without losing the hammer; and Menzel's
+# `Eisenwalzwerk`, which is a magnificent wide band about a rolling mill and
+# has no anvil in it at all.
+#
+# **The sparks come back as motion, not as pigment.** They are what Aaron
+# asked for and this painting has none — so they are drawn, bursting from under
+# the card on the beat it lands, the way `.stage-field-dust` blooms under a
+# creature arriving on the valley. That element is already the one thing in
+# these scenes that is not a fact about the picture, and for the same reason:
+# the picture is a place that was already there, and something has just been
+# put down in it.
+#
+# **No key, no duotone, no levels — crop and resize and nothing else**, which
+# is the restraint every picture in this directory keeps. This one is a
+# tenebrist oil and the temptation to lift its shadows is real; the stylesheet
+# lays its own dusk over this, and a level baked into the byte stream is a
+# decision `index.css` can no longer argue with.
+animist: 1
+
+why_committed: >
+  The three scenes beside it, exactly. This draws on the beat an artifact
+  arrives and is gone about a second later, so fetching it from somebody
+  else's host would mean a forge that opens after the card standing in it has
+  faded. And the licence is the second reason: this is a PD-Art photographic
+  reproduction on Commons, which is the category where somebody else's copy
+  quietly moves or changes terms -- a copy confirmed once and committed is a
+  copy whose provenance stays true.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the
+  # API, with `AttributionRequired` explicitly false. Two independent grounds:
+  # Wright died in 1797, so the work is out of copyright everywhere the term is
+  # life plus 100 or fewer, and the photograph of it is a faithful reproduction
+  # of a two-dimensional public domain work. A term expiry rather than a
+  # dedication, which is the reason to re-confirm it on every build rather than
+  # trust this comment.
+  fabrica:
+    provider: wikimedia
+    title: "Joseph Wright - An Iron Forge - Google Art Project.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Joseph_Wright_-_An_Iron_Forge_-_Google_Art_Project.jpg
+    found_via: >
+      Commons, searching the painter and the painting by name -- which is the
+      search that works here and the one `campus.recipe.yaml` recorded. Every
+      unrestricted phrasing (`blacksmith anvil sparks`, `forge hammer glowing
+      iron`, `smithy interior night`) returns modern photographs under CC BY-SA
+      and scanned trade catalogues. Three candidates were fetched and cropped
+      with a card stood in them before this one was chosen: Wright's own
+      `A Blacksmith's Shop` (Yale, 4688x5975, rejected on the crop -- see the
+      header), Velazquez's `La Fragua de Vulcano` (Prado, 2952x2293, a frieze
+      with a god in it), and this. The Google Art Project scan is 2801x2572,
+      which is nearly square and the reason a wide band comes out of it without
+      throwing most of the painting away.
+    licence: Public domain
+
+outputs:
+  # 660 wide, between the road's 560 and the valley's 720, and the number is
+  # about what is in the picture rather than about a budget.
+  #
+  # **It needs more than the road and less than the valley.** The road could be
+  # under-sampled because it is foliage; the valley needed 720 because its whole
+  # reading is *those are men and horses*, at the size of ants. Here the subject
+  # is one bright bar and a brick vault, and the figures are large and few — so
+  # the enlargement this can stand sits between the two.
+  #
+  # Quality 76, one below the valley's 78 and two above the road's 74. A
+  # tenebrist oil is mostly shadow with a small blazing core, which is the
+  # cheapest thing a codec ever meets: there is nothing in the dark two thirds
+  # for it to spend bytes on, and the core is a smooth gradient.
+  - file: fabrica.webp
+    from: fabrica
+    ops:
+      # **The left edge is where the work is, and this crop is about moving
+      # it out from under the card.**
+      #
+      # The first cut of this took the painting nearly whole and Aaron looked
+      # at it on the stage: *"really hard to make out the anvil in our artifact
+      # animation"*. He was right and the reason is arithmetic. The white-hot
+      # bar is the brightest thing in the painting by a distance — found by
+      # measurement rather than by eye, the hottest 0.4% of pixels centred at
+      # x 0.448 of the source — and the stage draws a card over the middle 23%
+      # of the band, which is x 0.384 to 0.615. The one thing worth seeing sat
+      # four hundredths inside the one thing that covers it.
+      #
+      # So the crop starts at 0.22 rather than 0.02. That puts the bar at 0.29
+      # of the band, clear of the card with room to spare, and the anvil under
+      # it with it. What goes is the man and child at the far left, which is
+      # the cheapest quarter of this painting: they are in shadow, they are the
+      # only part with no light on it, and they are the part a person watching
+      # a card land was never going to look at.
+      #
+      # **The bottom and top move too, and that is the aspect rather than
+      # taste.** A band drawn 940 wide inside an arena 520 tall has about 560
+      # pixels of height to spend; anything taller is thrown away by the mask.
+      # Cropping only from the left would have taken this to 1.35 and cut the
+      # hammer beam off the top. 1.63 keeps it.
+      #
+      # **And the window sits four hundredths lower than the first attempt**,
+      # which is about where the bar lands *inside* the band rather than about
+      # what is in it. A band 1.63 wide drawn across a 520-pixel arena hangs
+      # over both edges by design — the mask fades there — and at 0.36 the hot
+      # bar was at 0.75 of the band's height, which is in the part that hangs.
+      # At 0.40 it is at 0.67 and sits on the screen.
+      - crop: {frac_box: [0.22, 0.40, 1.0, 0.92]}
+      - resize: {width: 660}
+    encode: {format: webp, quality: 76}
+    expect: {width: 660, height: 404, budget_kb: 60, metadata: none}

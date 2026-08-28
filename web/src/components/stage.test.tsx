@@ -921,7 +921,7 @@ it('finds the card an Adventure is printed on, and puts the half under glass', (
   expect(shown?.querySelector('.stage-face')?.getAttribute('src'),
     'the whole card, uncut — Scryfall forbids cropping and ADR 32 makes it a '
     + 'wall').toBe('https://example.test/bonecrusher.jpg')
-  expect(shown?.querySelector('.stage-adventure'),
+  expect(shown?.querySelector('.stage-half'),
     'the half being cast is under glass').not.toBeNull()
   expect(shown?.querySelector('.stage-plate'),
     'and it is a card rather than a name set in type').toBeNull()
@@ -940,7 +940,7 @@ it('finds the card an Adventure is printed on, and puts the half under glass', (
   // at: the card *is* the Giant.
   then(said({ card: 'Bonecrusher Giant', key: 'adv2' }), { board: adventure })
   const giant = container.querySelector('.stage-card:not(.is-parting)')
-  expect(giant?.querySelector('.stage-adventure')).toBeNull()
+  expect(giant?.querySelector('.stage-half')).toBeNull()
   expect(giant?.querySelector('.stage-face')).not.toBeNull()
   expect(giant?.querySelector('.stage-plate-word')?.textContent)
     .toContain('Creature')

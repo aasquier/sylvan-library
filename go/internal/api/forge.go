@@ -497,7 +497,11 @@ type boardArt struct {
 // cast.
 //
 // `aftermath` is deliberately in: it is Amonkhet's split-with-a-turn, and both
-// halves are printed on the one face.
+// halves are printed on the one face. Scryfall files those under `split` now
+// and this map is asked with the pool's raw word, so that entry catches only an
+// older record — [layoutOf] is what puts the distinction *back* on the wire,
+// and it is a different question from this one. This map asks "are both names
+// on this picture"; that function asks "whereabouts".
 var oneCardTwoNames = map[string]bool{
 	"adventure": true, "split": true, "flip": true, "aftermath": true,
 }
@@ -524,6 +528,37 @@ func faceTypesOf(rec *pool.CardRecord, faces []string) []string {
 // because that is the same string `pool.Conn.GetCards` splits to *find* the
 // card by a face name — so the set of names that can reach this record and the
 // set of names it admits to are one list, read one way.
+// layoutOf is the word the room should use for how this card is printed —
+// Scryfall's own, except where Scryfall stopped making a distinction the room
+// still needs.
+//
+// **Aftermath is that exception, and it is the whole reason this function
+// exists.** Amonkhet's split-with-a-turn cards used to carry
+// `layout: "aftermath"`; Scryfall now files them under `split` and marks them
+// with the `Aftermath` keyword instead. The room does not care what the family
+// is called — it cares *where the two halves are printed*, and the two are not
+// in the same places at all. An ordinary split card's gutter is 47% down its
+// picture and an Aftermath card's is 54%, and, worse, they print their halves
+// in **opposite order**: a split card is read sideways so its first face is
+// the lower one, and an Aftermath card is read upright so its first face is
+// the upper one. A room told only "split" would draw its glass over Fire while
+// saying Ice, on exactly half the cards, and be right the other half.
+//
+// The keyword rather than the frame effect, because that is where Scryfall put
+// it: a real record for Cut // Ribbons carries `keywords: ["Aftermath"]` and no
+// `frame_effects` at all. Matched without regard to case for the reason every
+// string from outside this program is — the spelling is somebody else's.
+func layoutOf(rec *pool.CardRecord) string {
+	if rec.Layout == "split" {
+		for _, word := range rec.Keywords {
+			if strings.EqualFold(word, "Aftermath") {
+				return "aftermath"
+			}
+		}
+	}
+	return rec.Layout
+}
+
 func facesOf(rec *pool.CardRecord) []string {
 	if !oneCardTwoNames[rec.Layout] {
 		return nil
@@ -605,7 +640,7 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 					art.Art = *rec.ImageArtCrop
 				}
 				if faces := facesOf(rec); faces != nil {
-					art.Faces, art.Layout = faces, rec.Layout
+					art.Faces, art.Layout = faces, layoutOf(rec)
 					art.FaceTypes = faceTypesOf(rec, faces)
 				}
 				known[name] = art
@@ -1097,11 +1132,14 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 	// with no Forge answers 503 without ever asking the library who these
 	// people are.
 	if available, why := a.forgeStatus(); !available {
-		detail := ""
+		// Said in the room's words, for `forgeTrouble`'s reason — `why` is
+		// the installation's own account of itself and names paths and
+		// environment variables. The log keeps it.
 		if why != nil {
-			detail = *why
+			a.log.Error("no arena to play in", "why", *why)
 		}
-		wire.Detail(w, http.StatusServiceUnavailable, detail)
+		wire.Detail(w, http.StatusServiceUnavailable,
+			forgeTrouble(tier3.ErrForgeNotInstalled))
 		return
 	}
 
@@ -1162,10 +1200,16 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, tier3.ErrCoverageFailed):
 			wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 		case errors.Is(err, tier3.ErrForgeNotInstalled):
-			wire.Detail(w, http.StatusServiceUnavailable, err.Error())
+			// **The reason goes to the log and the room gets a sentence.**
+			// This branch is where the Machines API's own words used to reach
+			// a person: a URL, a status and raw JSON, in a room about Magic.
+			// `forgeTrouble` carries the whole argument; logging first is the
+			// half that makes it a redirection rather than a deletion.
+			a.log.Error("the Forge worker would not answer", "error", err)
+			wire.Detail(w, http.StatusServiceUnavailable, forgeTrouble(err))
 		default:
 			a.log.Error("the Forge pre-flight failed", "error", err)
-			wire.Detail(w, http.StatusInternalServerError, err.Error())
+			wire.Detail(w, http.StatusInternalServerError, forgeTrouble(err))
 		}
 		return
 	}
@@ -1355,7 +1399,13 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 				})
 			}
 			if runErr != nil {
-				return nil, runErr
+				// **The one that reached the live site.** A job's error is
+				// rendered by the room verbatim — "The match failed: ..." —
+				// so this is the last place a machine id and a status code
+				// can be stopped. See `forgeTrouble`.
+				a.log.Error("the Forge match failed", "error", runErr,
+					"decks", strings.Join(addresses, " vs "))
+				return nil, errors.New(forgeTrouble(runErr))
 			}
 			rep.Report(games, games)
 
