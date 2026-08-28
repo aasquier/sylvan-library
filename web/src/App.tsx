@@ -5,6 +5,7 @@ import Library from './routes/Library'
 import Login from './routes/Login'
 import { Spinner } from './components/ui'
 import { RouteErrorBoundary } from './components/boundary'
+import { ClearingButton } from './components/clearing'
 import { SettingsMenu } from './components/settings'
 import { ForestAmbience, HeaderCanopy, LibraryMark } from './components/forest'
 import { LibraryWhisper } from './components/whisper'
@@ -104,8 +105,30 @@ function useTheme(): [Theme, () => void] {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('mtglab-theme', theme)
+    paintTheEdges()
   }, [theme])
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
+}
+
+/**
+ * The colour the device paints the strip above the page — the status bar of a
+ * library launched from a home screen, and the browser's own top edge on
+ * Android.
+ *
+ * It is set from here rather than declared once in the shell because **the
+ * theme is a stored choice, not the system's**: a reader on a dark phone who
+ * picked the day forest would otherwise get a black bar over a cream page, and
+ * a media query in the markup could never know. Read back off `--page` instead
+ * of repeated as a hex, so the stylesheet stays the one place either colour is
+ * written; a browser that will not answer for a custom property leaves the
+ * declared default alone, which is the right one for the light theme.
+ */
+function paintTheEdges(): void {
+  const tag = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (!tag) return
+  const page = getComputedStyle(document.documentElement)
+    .getPropertyValue('--page').trim()
+  if (page) tag.content = page
 }
 
 function ThemeButton({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
@@ -390,6 +413,12 @@ export default function App() {
                 </button>
               </span>
             )}
+            {/* One tap to give the library the whole screen — and nothing at
+                all on a device that cannot, which is every iPhone. That is
+                not a gap: the phone's answer is the home screen, which the
+                settings panel points at and `web/index.html` makes work.
+                `lib/fullscreen.ts` carries the argument. */}
+            <ClearingButton />
             {/* Every preference behind one gear (second punch list, item 9):
                 theme, ambience, table sound, and — only where the instance
                 has it — the Claude stance slider. The logged-out screens
@@ -403,8 +432,13 @@ export default function App() {
       </SiteHeader>
 
       {/* `page-main` carries the top padding, keyed to how far the ivy hangs
-          (`--canopy-drop`); `pb-8` is the ordinary bottom. */}
-      <main className="page-main relative z-10 mx-auto max-w-7xl px-6 pb-8">
+          (`--canopy-drop`); `pb-8` is the ordinary bottom. The side gutters
+          are in the stylesheet rather than here as `px-6`, because on a phone
+          they are the site's own 1.5rem *plus* whatever the device is keeping
+          for its rounded corners — see the safe-area block at the end of
+          `index.css`. A utility class cannot say `env()`, and putting one back
+          here would silently win over that rule and delete the gutter. */}
+      <main className="page-main relative z-10 mx-auto max-w-7xl pb-8">
         {/* Keyed on the path: navigating re-mounts this wrapper, so every
             page enters the same way — a short rise out of the undergrowth
             (`.page-enter`), gone entirely under reduced motion.
@@ -461,7 +495,11 @@ export default function App() {
           and it never opens itself. */}
       <LibraryWhisper />
 
-      <footer className="relative z-10 mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs"
+      {/* Gutters and the bottom margin in the stylesheet for the reason above,
+          and the bottom one matters most: this is the last thing on the page,
+          so on a phone launched from the home screen it is what the home
+          indicator would otherwise lie across. */}
+      <footer className="page-footer relative z-10 mx-auto max-w-7xl pt-4 text-xs"
               style={{ color: 'var(--text-muted)' }}>
         Card data and images from Scryfall. Unofficial Fan Content permitted under
         the Wizards of the Coast Fan Content Policy. Not approved or endorsed by

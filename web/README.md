@@ -17,6 +17,23 @@ assets like the tarot art 404 in dev and only in dev).
 `npm --prefix web run check` = typecheck + oxlint + Vitest in one. CI runs
 them as separate steps on purpose, so a type error reports as a type error.
 
+`web/public/` is the one directory Vite copies **verbatim to the bundle root**,
+which is where a file has to be for the door to serve it by its own name and
+for a home screen to find it: the web app manifest and the four icons live
+there and nowhere else. Two consequences worth knowing before adding anything.
+Every byte in it is committed twice, here and in `web_dist/`, so it is for
+small files that must have a fixed URL and for nothing else. And it is
+*published* — an explanatory `PROVENANCE.md` dropped in here would be served
+to the world at `/PROVENANCE.md`, which is why this paragraph is here instead.
+
+The icons are the app's own `LibraryMark` (`components/forest.tsx`), whose
+geometry is repeated in three places already: the component, the inlined
+favicon in `index.html`, and these. They are flat PNGs because iOS accepts
+nothing else for a home-screen icon, they were rendered by flattening that
+SVG's beziers and filling them at 8x, and re-rendering them is a matter of
+following the same geometry — there is no build step to run and nothing in
+`tools/` to keep alive for four files that change when the logo does.
+
 ## Conventions that are load-bearing
 
 - **The browser floor is Safari 16.4** (declared 2026-08-19), and it is

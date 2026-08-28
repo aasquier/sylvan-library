@@ -6,8 +6,67 @@
          favicon cannot import a component, so this is the one place its
          geometry is repeated. Change them together. -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='11.5' r='8' fill='%232f6b3f'/><circle cx='12' cy='16' r='6.5' fill='%23285c36'/><circle cx='28' cy='16' r='6.5' fill='%23285c36'/><circle cx='20' cy='17' r='7.5' fill='%23357347'/><circle cx='16.5' cy='9.5' r='3.2' fill='%235c9c6c' opacity='0.9'/><path d='M18.8 21 C18.8 24.5 17.8 27 16.2 28.8 L20 28.2 L23.8 28.8 C22.2 27 21.2 24.5 21.2 21 Z' fill='%236e4e28'/><path d='M5.5 28.5 C10.5 27 15.5 27.5 20 29.8 C24.5 27.5 29.5 27 34.5 28.5 L34.5 33.5 C29.5 32 24.5 32.5 20 34.8 C15.5 32.5 10.5 32 5.5 33.5 Z' fill='%23c9a227'/><path d='M7.5 29.3 C11.5 28.2 16 28.6 20 30.6 C24 28.6 28.5 28.2 32.5 29.3 L32.5 32 C28.5 31 24 31.4 20 33.2 C16 31.4 11.5 31 7.5 32 Z' fill='%23f0e4c2'/></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- `viewport-fit=cover` lets the page reach the physical edges of a
+         phone, which is what makes a home-screen launch look like an app
+         rather than a page with a margin. It is only half of the deal: the
+         other half is `env(safe-area-inset-*)` in `index.css`, without which
+         the header sits under the notch and the corner sprout sits under the
+         home indicator. Do not add one without the other. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <!-- The strip above the page: a home-screen launch's status bar, and the
+         browser's own top edge on Android. Declared with the day forest's page
+         colour and then **rewritten from `--page` by `useTheme`** whenever the
+         theme changes, because the theme here is a stored choice and not the
+         system's — a media query in this file could only ever guess. -->
+    <meta name="theme-color" content="#f9f9f7" />
+
+    <!-- ============================ added to a home screen, this opens alone
+         Aaron, 2026-08-28: "Can we do a fullscreen mode? I hate seeing all the
+         web tabs and what not." On a laptop the header's own control answers
+         that by filling the screen. **On an iPhone there is no such call** —
+         `requestFullscreen` is not implemented for an arbitrary element on
+         that device in any spelling — so the only way to get the tabs and the
+         address bar off his screen is for the library to stop being a page in
+         a browser and become a thing on the home screen. These five lines are
+         that, and they are the whole of what a phone gets.
+
+         Three things about the manifest link that all look like details and
+         are not:
+
+         `.json` and not `.webmanifest`. The manifest is only read at all if
+         its content type is a JSON one, and that is a normative check with a
+         silent failure — a manifest served as plain text is simply ignored,
+         with no error anywhere. The door serves by extension from a fixed
+         table; `.json` is in it as `application/json`, which qualifies, and an
+         unlisted extension falls back to plain text, which does not.
+
+         No `crossorigin` attribute, and that is only safe because of where
+         this file sits. A manifest is fetched without cookies in practice, so
+         one behind a login never loads — but the door's allowlist passes
+         *everything outside `/api`*, this among it, so it is readable to a
+         browser that has not signed in. Move it under `/api` and it stops
+         working with no visible symptom.
+
+         And the Apple tags are not redundant with it. They are the pair iOS
+         has always read, they still decide the title and the status bar, and
+         `apple-touch-icon` takes precedence over the manifest's own icons. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- `default`, not `black-translucent`. Translucent would paint the page
+         under the status bar, which looks better — but it also forces the
+         clock and the battery to white, and this app has a light theme with a
+         near-white page behind them. An unreadable clock is not a trade. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- What sits under the icon on the home screen. Short, because iOS
+         truncates: "Sylvan Libraries" would not survive. -->
+    <meta name="apple-mobile-web-app-title" content="Sylvan" />
+    <!-- The home-screen icon. iOS reads this tag and not the manifest's
+         `icons`, and it does not accept SVG for it — which is why the drawn
+         mark above also exists as flat PNGs under `web/public`. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     <!-- Every card image on every screen hotlinks from this one host (rule 5:
          hotlink, never rehost), so warm the DNS+TCP+TLS handshake while the
          bundle is still parsing instead of paying it on the first painting. -->
