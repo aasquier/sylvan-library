@@ -15,6 +15,33 @@
 app = "sylvan-library"
 primary_region = "iad"          # change to the region nearest you
 
+# **How long the platform waits for a stop, and it has to outlast the app's own
+# grace.** `cmd/mtglab`'s `shutdownGrace` is 20 seconds — that is how long
+# `serve` gives the requests already in flight before it drops them — and Fly's
+# default `kill_timeout` is **5**. So the two disagreed by fifteen seconds, in
+# the direction where the platform wins: a deploy sent the signal, the app
+# began a twenty-second drain, and it was killed a quarter of the way through.
+#
+# **What that cost is not only the dropped connections.** `door.Close` runs
+# *after* `server.Shutdown` returns — it is the deferred close in `serveOn` —
+# and it is what flushes the visitor ledger and hands back `app.db` and the card
+# pool. A stop that never got past the drain never reached any of it, so a busy
+# deploy silently lost whatever the ledger had counted since its last write.
+#
+# Thirty rather than twenty-five: this is a ceiling and not a delay. The app
+# exits the moment it has drained — usually instantly, because this instance is
+# rarely mid-request — so the number costs nothing on an ordinary deploy and
+# only matters on the one that needs it. Ten seconds of headroom above the
+# drain leaves room for the close work to finish rather than racing the same
+# deadline it was waiting on.
+#
+# `kill_signal` is deliberately left at the default. Fly sends `SIGINT`, and
+# `serve` notifies on `SIGINT` and `SIGTERM` both, so the default already lands
+# where it should — and `docker-entrypoint.sh` `exec`s through to the binary,
+# so `mtglab` is PID 1 and receives it directly rather than through a shell
+# that would swallow it.
+kill_timeout = "30s"
+
 [build]
   dockerfile = "Dockerfile"
 

@@ -249,8 +249,26 @@ func (d *Door) Check(ctx context.Context) error {
 
 // Close releases what New opened — and flushes the visitor ledger, the
 // shutdown flush: a stopped door loses nothing it counted.
+//
+// **The card pool goes back too, and it used to be the one thing here that did
+// not.** This method closed `app.db` and left the DuckDB handle open, which is
+// an asymmetry rather than a decision: `cmd/mtglab`'s `ui` builds the pool
+// inside the `door.Config` literal and keeps no reference of its own, so the
+// door is the only thing that could ever hand it back. Every other command
+// that opens one defers a `Close`; the serving path, which holds it longest,
+// was the one that did not.
+//
+// **Handing it back is not destroying it**, which is what makes this safe to do
+// to a pool somebody else passed in. [pool.Pool.Close] is the same call
+// `ReapOnce` makes when the pool has gone idle — the handle is released and the
+// next lease re-opens it — so a `Door` closed and then somehow used again would
+// work, and a test sharing a pool across two doors is not damaged by one of
+// them stopping.
 func (d *Door) Close() error {
 	d.traffic.Flush()
+	if d.cfg.Pool != nil {
+		d.cfg.Pool.Close()
+	}
 	if d.db != nil {
 		return d.db.Close()
 	}
