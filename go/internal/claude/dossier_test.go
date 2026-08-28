@@ -221,6 +221,18 @@ func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
 // prompt bytes (data in modes.json), the schema's sorted-key canonical
 // rendering (canonjson.go), and the model id.
 func TestTheFingerprintsPartsAreEachTheRecordedOnes(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and the helper is the first line of this test --
+	// which is why the audit adds the line and runs the test rather than
+	// reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
 	noEnvOverrides(t)
 	corpus := loadDossierCorpus(t)
 	mode, err := GetMode(ModeCommanderDossier)
@@ -282,6 +294,22 @@ func TestTheBriefsOpeningMessageMatchesTheGoldenBytes(t *testing.T) {
 // --------------------------------------------------------------- the GET
 
 func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and the helper is the first line of this test --
+	// which is why the audit adds the line and runs the test rather than
+	// reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
+	//
+	// `freezeClock` on the next line is a second, independent blocker: it
+	// swaps the package-level `now` and puts it back in a `t.Cleanup`, which
+	// `-race` would report and Go would not.
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadDossierCorpus(t)
@@ -350,6 +378,18 @@ func TestTheHeadlessGetHasFiveKeysAndNoAnsweredBy(t *testing.T) {
 // compared as bytes. The order is the corpus's, because "served
 // from the store" can only follow "a whole dossier" having stored one.
 func TestEveryDossierOutcomeAgreesWithTheCorpus(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and the helper is the first line of this test --
+	// which is why the audit adds the line and runs the test rather than
+	// reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadDossierCorpus(t)
@@ -409,6 +449,18 @@ func TestEveryDossierOutcomeAgreesWithTheCorpus(t *testing.T) {
 // and the corpus covers each -- which is asserted here on its own because
 // the store is the one side effect the report bytes cannot show.
 func TestOnlyAWholeDossierIsStored(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and the helper is the first line of this test --
+	// which is why the audit adds the line and runs the test rather than
+	// reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
 	noEnvOverrides(t)
 	freezeClock(t)
 	corpus := loadDossierCorpus(t)

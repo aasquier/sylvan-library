@@ -76,6 +76,7 @@ func TestAtStanceOffResearchIsAJobBornFinishedEvenWithNoKey(t *testing.T) {
 }
 
 func TestResearchIsAJobWhoseResultIsTheReport(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", searchedPage("The Real Page")+","+said(groundedAnswer))}}
 	claudeSet := api.start(t)
@@ -142,6 +143,7 @@ func TestResearchIsAJobWhoseResultIsTheReport(t *testing.T) {
 // `ToolNotAllowed`, because the mode was never handed one -- and the tools the
 // request carried were `get_cards` and the hosted search, nothing else.
 func TestResearchCannotReachADeckThroughAnyTool(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("tool_use", `{"type":"tool_use","id":"tu_1","name":"get_deck","input":{"slug":"kaheera"}}`),
 		answer("end_turn", searchedPage("t")+","+said(groundedAnswer)),
@@ -176,6 +178,7 @@ func TestResearchCannotReachADeckThroughAnyTool(t *testing.T) {
 }
 
 func TestTwoIdenticalQuestionsInFlightAreOneJob(t *testing.T) {
+	t.Parallel()
 	// Two runs' worth of replies: alice's one job, and bob's own.
 	reply := answer("end_turn", searchedPage("t")+","+said(groundedAnswer))
 	api := &scriptedClaude{hold: make(chan struct{}), replies: []string{reply, reply}}

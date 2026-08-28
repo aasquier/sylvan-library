@@ -190,6 +190,17 @@ func TestParsingAStanceMatchesTheCorpusIncludingItsRefusals(t *testing.T) {
 // the decision — a typo in a deployment variable costs a feature, never opens
 // one — and it is one `return` away from failing open.
 func TestTheCeilingReadsTheEnvironmentAsRecorded(t *testing.T) {
+	// **Serial**: it calls `t.Setenv(CeilingEnv)` per corpus row, and `os.Unsetenv`s it
+	// for the rows where the variable is absent -- a raw process write with no
+	// `t.Cleanup` behind it at all, which Go
+	// panics on inside a parallel test -- the environment is one slot for the
+	// whole process, so two tests setting it at once are one test reading the
+	// other's deployment.
+	//
+	// It is also the one test that could not become parallel even if the
+	// ceiling were a value, because **the environment is what it is about**:
+	// the recorded reading of `MTGLAB_CLAUDE_STANCE_CEILING` is the subject,
+	// not the setup.
 	c := loadStanceCorpus(t)
 	for _, row := range c.Ceilings {
 		if row.Env == nil {
@@ -245,6 +256,15 @@ func TestTheDeckDefaultAgreesWithTheCorpus(t *testing.T) {
 // land at or below OFF's level on every axis. It is what makes "a malformed
 // request can only ever be quieter" a property rather than three coincidences.
 func TestOffIsTheFloorOfEveryFallback(t *testing.T) {
+	// **Serial**: it calls `t.Setenv(CeilingEnv)` to an unparseable value, which is one of
+	// the three fallbacks it holds to the same floor, which Go
+	// panics on inside a parallel test -- the environment is one slot for the
+	// whole process, so two tests setting it at once are one test reading the
+	// other's deployment.
+	//
+	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
+	// than reading the process, which is what ADR 39/40 did for every other
+	// piece of configuration in this package.
 	partial, err := StanceFromObj(json.RawMessage(`{"write":"applies"}`))
 	if err != nil {
 		t.Fatalf("partial mapping: %v", err)

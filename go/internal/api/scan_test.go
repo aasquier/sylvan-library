@@ -149,6 +149,7 @@ func TestACaptureThatIsNotTextIsA422(t *testing.T) {
 // The card is `Black Lotus`, which `tiny_pool` holds -- so this also proves the half
 // that matters most: the transcription is looked up rather than believed.
 func TestAScanTranscribesAndThePoolNamesTheCard(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
@@ -212,6 +213,7 @@ func TestAScanTranscribesAndThePoolNamesTheCard(t *testing.T) {
 // empty sighting hands the identifier an empty list, so no lookup
 // happens at all.
 func TestAnUnreadableCaptureIsANullReading(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{
@@ -241,6 +243,7 @@ func TestAnUnreadableCaptureIsANullReading(t *testing.T) {
 // **The dedupe is the picture.** Two presses on one shot are one paid call;
 // a different photograph is different work.
 func TestTwoPressesOnOnePhotographAreOneJob(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	hold := make(chan struct{})
@@ -274,6 +277,7 @@ func TestTwoPressesOnOnePhotographAreOneJob(t *testing.T) {
 // are one job. `YW==` and `YQ==` decode to the same byte and the digest is
 // over the re-encoding, never what arrived.
 func TestTwoSpellingsOfOnePhotographAreOneJob(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	hold := make(chan struct{})
@@ -294,6 +298,7 @@ func TestTwoSpellingsOfOnePhotographAreOneJob(t *testing.T) {
 // with a picture on it, and queueing it behind the simulator's single CPU
 // worker would be minutes of stall for nothing.
 func TestAScanWaitsOnTheNetworkLane(t *testing.T) {
+	t.Parallel()
 	rig := newJobRig(t, noCredential)
 	defer rig.close()
 	script := &scriptedClaude{replies: []string{

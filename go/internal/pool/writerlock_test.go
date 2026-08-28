@@ -45,6 +45,16 @@ const helperEnv = "MTGLAB_TEST_HOLD_POOL"
 // the pool read-only and sits on it, which is exactly what a running `mtglab
 // ui` does between requests.
 func TestAHolderIsASecondProcess(t *testing.T) {
+	// **No `t.Parallel()`, and it is not a serial test either** -- it is not a
+	// test. In the parent run it skips immediately; in the child it *is* the
+	// second process, and it sits on the pool file for thirty seconds on
+	// purpose. Parallelising it would mean a thirty-second sleep running
+	// alongside the package's real tests in every ordinary run, which is a
+	// suite that takes half a minute longer for nothing.
+	//
+	// It is spelled `TestX` because that is Go's only way to reach a function
+	// in a test binary from outside it; `-test.run` picks it out and
+	// `helperEnv` tells it which role it is playing.
 	path := os.Getenv(helperEnv)
 	if path == "" {
 		t.Skip("not the holder")

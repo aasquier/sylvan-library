@@ -171,10 +171,12 @@ now noise.
 
 ## Testing
 
-**A new test calls `t.Parallel` unless it is holding something shared.** Over
-1,100 of them do (ADR 39, ADR 40). Three things forbid it, and all three travel
-through helpers — including methods, in other files — so none is visible from
-the test itself:
+**A new test calls `t.Parallel` unless it is holding something shared.** As of
+2026-08-28 that is 1,485 of 1,523 top-level tests, and **every one of the 38
+that does not says why where it stands** — a claim to re-check, and one a
+script can re-check in a second rather than a claim to trust. Three things
+forbid it, and all three travel through helpers — including methods, in other
+files — so none is visible from the test itself:
 
 - **`t.Setenv`**, which Go panics on inside a parallel test. Configuration is a
   value: `config.Config` from `config.Load`, `tier3.Settings` from
@@ -196,6 +198,19 @@ ones. That answers *"does Go refuse this"*, which is not the same question as
 *"is this safe"* — `TestTheServerBootsAnswersAndStopsOnASignal` passes alone
 and sends SIGTERM to the whole process. Every serial test says why where it
 stands.
+
+**Measured over 79 undocumented serial tests, Go accepted 59 and refused 20**,
+and both halves carry a lesson. Of the twenty it refused, **seven reached
+`t.Setenv` through a helper and three of those from a different file**, so no
+reading of the test body could have found them — but the panic names the
+frame, so `go test -race -run '^TestX$'` and the stack is the whole diagnosis.
+Of the fifty-nine it accepted, **five were still blocked**: three swap
+`internal/api`'s package-level `scryfallSets` and two swap
+`internal/sim/cache`'s `engineSources`. Nothing but a reading finds those —
+`-race` sees a package-level swap only when two tests actually overlap, which
+is a coin toss rather than a gate. And **serialism outlives its cause**:
+forty-six of the fifty-five that parallelised were waiting on a shared stub
+ADR 39 had already deleted.
 
 Serial and parallel tests never overlap — Go finishes the serial ones before
 resuming the parallel ones — so mixing them in a package is safe.

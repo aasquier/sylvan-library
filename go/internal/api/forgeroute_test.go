@@ -261,6 +261,7 @@ func postForge(t *testing.T, srv *httptest.Server, body string) (int, map[string
 // fail with `context canceled` for every match anybody ever ran, which is a
 // failure a recorder-driven test cannot see at all.
 func TestAHostedMatchRunsAfterTheRequestHasGone(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, games: []tier3.WireGame{
 		won(1, 5421, 1, 11), won(2, 4000, 2, 9), won(3, 6800, 1, 12)}}
 	a, reg, _ := forgeAPI(t, shim)
@@ -305,6 +306,7 @@ func TestAHostedMatchRunsAfterTheRequestHasGone(t *testing.T) {
 // green. The stub holds the stream between games so the rows can be read
 // while they are the only answer there is.
 func TestTheBarTicksPerGame(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, hold: make(chan struct{}),
 		games: []tier3.WireGame{won(1, 5421, 1, 11), won(2, 4000, 2, 9)}}
 	a, reg, _ := forgeAPI(t, shim)
@@ -389,6 +391,7 @@ func awaitPartial(t *testing.T, reg *jobs.Registry, id string, n int) forgeParti
 // written from the job, on the app's own app.db, with the labels the decks
 // wore when they played.
 func TestAFinishedMatchIsRecorded(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, games: []tier3.WireGame{
 		won(1, 5421, 1, 11), won(2, 4000, 2, 9)}}
 	a, reg, dbPath := forgeAPI(t, shim)
@@ -441,6 +444,7 @@ func TestAFinishedMatchIsRecorded(t *testing.T) {
 // The four are kept apart on purpose — collapsing them tells somebody their
 // worker is missing when the deck simply is not theirs.
 func TestTheRefusalsHappenInTheRequest(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		note, body string
 		want       int
@@ -475,6 +479,7 @@ func TestTheRefusalsHappenInTheRequest(t *testing.T) {
 // winner that looks entirely normal, so the pre-flight refuses before a JVM
 // starts — and the refusal names the cards, because the message is the fix.
 func TestADeckForgeCannotPlayIsA422ThatNamesTheCards(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, coverage: []tier3.WireReport{
 		{Slug: "kaheera", Checked: 100, Resolved: map[string]string{}, Missing: []string{}},
 		{Slug: "mono-green", Checked: 99, Resolved: map[string]string{},
@@ -573,6 +578,7 @@ func TestADeckWithNoCardsIsRefusedWithoutWakingTheWorker(t *testing.T) {
 // one button. The diagnosis is a log line now; `forgeTrouble` writes what a
 // person is handed, and `forgevoice_test.go` holds it to naming nothing.
 func TestAWorkerWithNoForgeIsA503(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, failCoverage: true}
 	a, _, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)
@@ -593,6 +599,7 @@ func TestAWorkerWithNoForgeIsA503(t *testing.T) {
 // failure the request could not have known about arrives as a job in state
 // `error`, never as a status code, because the response has already gone.
 func TestAMatchThatFailsIsAJobInError(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true, games: []tier3.WireGame{won(1, 100, 1, 3)},
 		errorLine: "ResultsUntrustworthy: Forge reported problems that invalidate the run",
 		errorType: "ResultsUntrustworthy"}
@@ -633,6 +640,7 @@ func TestAMatchThatFailsIsAJobInError(t *testing.T) {
 // still move and `partial` simply stays sparse, because an app deployed a few
 // minutes before its worker must not break a match over a field.
 func TestAPreTheaterShimStillTicks(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/healthz":
@@ -686,6 +694,7 @@ func TestAPreTheaterShimStillTicks(t *testing.T) {
 // same skew: a shim from before the stream ignores the flag and answers one
 // plain JSON body. The Content-Type is what says which conversation this is.
 func TestAnOldShimAnswersFlatAndIsStillUnderstood(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: false, games: []tier3.WireGame{won(1, 100, 1, 3)}}
 	a, reg, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)
@@ -708,6 +717,7 @@ func TestAnOldShimAnswersFlatAndIsStillUnderstood(t *testing.T) {
 // `/api/claude` set: configuration is a fact of the environment, and
 // reachability is discovered when work is actually asked for.
 func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{}
 	a, _, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)
@@ -737,6 +747,7 @@ func TestTheGateAnswersOnConfigurationAlone(t *testing.T) {
 // so a second identical click must join the live job rather than queue a
 // second JVM behind the first.
 func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
+	t.Parallel()
 	// **The stub has to hold the stream, and that is the whole test.** The
 	// dedupe under test is an *in-flight* join: a second ask joins the first
 	// only while the first is still running. Without `hold` this stub finishes
@@ -780,6 +791,7 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 // `{"detail": "invalid literal ..."}` here, a divergence no golden could see
 // because the goldens record shape and no golden records this case at all.
 func TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred(t *testing.T) {
+	t.Parallel()
 	shim := &stubShim{stream: true}
 	a, _, _ := forgeAPI(t, shim)
 	srv := forgeServer(t, a)

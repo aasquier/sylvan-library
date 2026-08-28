@@ -498,6 +498,14 @@ func TestTheBudgetFormatMatchesTheGolden(t *testing.T) {
 }
 
 func TestThemeStanceForMatchesTheCorpus(t *testing.T) {
+	// **Serial**: it calls `t.Setenv(CeilingEnv)` per corpus row, which Go
+	// panics on inside a parallel test -- the environment is one slot for the
+	// whole process, so two tests setting it at once are one test reading the
+	// other's deployment.
+	//
+	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
+	// than reading the process, which is what ADR 39/40 did for every other
+	// piece of configuration in this package.
 	corpus := loadThemeCorpus(t)
 	for _, row := range corpus.Stances {
 		t.Setenv(CeilingEnv, row.Ceiling)
@@ -525,6 +533,7 @@ func TestThemeStanceForMatchesTheCorpus(t *testing.T) {
 // report -- a frame that quietly lost its spread changes what was asked and is
 // visible nowhere else.
 func TestThePromptsAreBytes(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 	freezeAngle(t, corpus.AngleIndex)
 
@@ -606,6 +615,18 @@ func TestWhatTheTwoChecksRefuse(t *testing.T) {
 // Every outcome of a conversation turn, driven with the corpus's recorded
 // Turn and compared as marshalled bytes.
 func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and that helper is in
+	// `dossier_test.go`, a file away -- which is why the audit adds the line
+	// and runs the test rather than reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
 	noEnvOverrides(t)
 	corpus := loadThemeCorpus(t)
 	freezeAngle(t, corpus.AngleIndex)
@@ -642,6 +663,18 @@ func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
 // Every outcome of a proposal, the same way -- and this one needs the pool,
 // because every commander named is resolved through it or dropped.
 func TestEveryThemeProposalOutcomeAgreesWithTheCorpus(t *testing.T) {
+	// **Serial, and measured rather than read**: `noEnvOverrides` calls
+	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
+	// says so -- the call is one helper away, and that helper is in
+	// `dossier_test.go`, a file away -- which is why the audit adds the line
+	// and runs the test rather than reading for a reason.
+	//
+	// The blocker is `claude.Ceiling`, the last reader of
+	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
+	// deployment still means installing one on the process here. When the
+	// ceiling becomes a value the way the model override already did (ADR
+	// 39/40), this test and its eight neighbours parallelise with nothing to
+	// change but the deletion of this comment.
 	noEnvOverrides(t)
 	corpus := loadThemeCorpus(t)
 	withPool(t, func(c *pool.Conn) {

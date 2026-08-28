@@ -73,6 +73,14 @@ func contains2(s, sub string) bool { return strings.Contains(s, sub) }
 // rendering, the app and org named — and the second ask served from the
 // cache.
 func TestFetchAnswersOnceAndCaches(t *testing.T) {
+	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
+	// panics on inside a parallel test.
+	//
+	// The token is the last piece of configuration in this module that is
+	// still read off the process rather than handed in -- `Panel` already
+	// takes its transport and its clock as fields, and the day it takes the
+	// token too, all four tests in this file become parallel and this comment
+	// goes with them.
 	t.Setenv("FLY_METRICS_TOKEN", "FlyV1 fm2_test")
 	hits := 0
 	now := time.Unix(1_000_000, 0)
@@ -109,6 +117,14 @@ func TestFetchAnswersOnceAndCaches(t *testing.T) {
 // a real zero, and with the witness absent nothing is known and every
 // counter stays null.
 func TestTheWitnessSettlesTheSilentCounters(t *testing.T) {
+	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
+	// panics on inside a parallel test.
+	//
+	// The token is the last piece of configuration in this module that is
+	// still read off the process rather than handed in -- `Panel` already
+	// takes its transport and its clock as fields, and the day it takes the
+	// token too, all four tests in this file become parallel and this comment
+	// goes with them.
 	t.Setenv("FLY_METRICS_TOKEN", "tok")
 	hits := 0
 	p := &Panel{Transport: stub(t, map[string][]byte{"edge_2xx": vector("9")}, &hits)}
@@ -132,6 +148,14 @@ func TestTheWitnessSettlesTheSilentCounters(t *testing.T) {
 // An unset token is `configured: false` and is NOT cached — configuring it
 // should take effect on the next look, not five minutes later.
 func TestUnconfiguredHidesAndIsNotCached(t *testing.T) {
+	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
+	// panics on inside a parallel test.
+	//
+	// The token is the last piece of configuration in this module that is
+	// still read off the process rather than handed in -- `Panel` already
+	// takes its transport and its clock as fields, and the day it takes the
+	// token too, all four tests in this file become parallel and this comment
+	// goes with them.
 	t.Setenv("FLY_METRICS_TOKEN", "  ")
 	hits := 0
 	p := &Panel{Transport: stub(t, nil, &hits)}
@@ -149,6 +173,14 @@ func TestUnconfiguredHidesAndIsNotCached(t *testing.T) {
 // A failure is `ok: false` with the reason — and cached, so a broken token
 // is not retried per tile.
 func TestAFailureIsCloudedGlassNotA500(t *testing.T) {
+	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
+	// panics on inside a parallel test.
+	//
+	// The token is the last piece of configuration in this module that is
+	// still read off the process rather than handed in -- `Panel` already
+	// takes its transport and its clock as fields, and the day it takes the
+	// token too, all four tests in this file become parallel and this comment
+	// goes with them.
 	t.Setenv("FLY_METRICS_TOKEN", "tok")
 	hits := 0
 	now := time.Unix(2_000_000, 0)

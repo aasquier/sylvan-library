@@ -148,6 +148,11 @@ func testDeck(slug string) *deck.Deck {
 // the same contract `/api/claude` set, where reachability is discovered when
 // work is actually asked for.
 func TestTheWorkerIsConfiguredByTheEnvironmentAlone(t *testing.T) {
+	// **Serial**: it calls `t.Setenv`, which Go panics on inside a parallel
+	// test -- and here that is the subject rather than the scaffolding. What
+	// it asserts is that the worker reads its configuration **from the
+	// environment alone**, so the environment is the input under test and
+	// there is no value-shaped version of this question to ask instead.
 	for _, c := range []struct {
 		what string
 		s    Settings
@@ -742,6 +747,11 @@ func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
 // for tests and for talking to the instance from a laptop. Which of the two
 // won is a question about the reader, so it is asked of the reader.
 func TestTheFlyAppOverrideWinsOverFlysOwnInjection(t *testing.T) {
+	// **Serial**: it calls `t.Setenv`, which Go panics on inside a parallel
+	// test -- and here that is the subject rather than the scaffolding. What
+	// it asserts is that the worker reads its configuration **from the
+	// environment alone**, so the environment is the input under test and
+	// there is no value-shaped version of this question to ask instead.
 	t.Setenv("FLY_APP_NAME", "mtglab")
 	t.Setenv("MTGLAB_FLY_APP", "")
 	if got := LoadSettings().FlyApp; got != "mtglab" {

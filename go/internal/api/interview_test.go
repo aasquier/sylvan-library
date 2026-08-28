@@ -294,6 +294,7 @@ func TestAtStanceOffNoCallIsMadeAndTheReportSaysSo(t *testing.T) {
 
 // The whole report, through the marshaller, in the recorded key order.
 func TestTheReportReachesTheWireInTheRecordedOrder(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{answer("end_turn", said(
 		`{"questions":[{"question":"What does it accelerate into?","angle":"curve","fact":"ramp holds 1 slot"},`+
 			`{"question":"Would a Signet do?","angle":"alternatives","fact":"colour identity is G"},`+
@@ -352,6 +353,7 @@ func TestTheReportReachesTheWireInTheRecordedOrder(t *testing.T) {
 // The brief goes into the opening message, so what the model is handed has to
 // be the deck the route resolved -- not a deck the mode went and found.
 func TestTheModelIsHandedTheDecksOwnFacts(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"questions":[]}`))}}
 	claudeSet := api.start(t)
@@ -403,6 +405,7 @@ func TestTheModelIsHandedTheDecksOwnFacts(t *testing.T) {
 // so a threat in a deck being interviewed about a ramp slot appears only if a
 // real deck read actually happened.
 func TestTheToolsSeeTheCallersOwnLibrary(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("tool_use", `{"type":"tool_use","id":"tu_1","name":"get_deck","input":{"slug":"kaheera"}}`),
 		answer("end_turn", said(`{"questions":[]}`)),
@@ -486,6 +489,7 @@ func TestAStanceMayArriveAsAnObjectOfAxes(t *testing.T) {
 // scope. It reached `auth.Scope` with this route: every earlier family
 // had no use for it, and the struct's comment said so.
 func TestATieredSeatIsAskedOfItsOwnModel(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"questions":[]}`))}}
 	claudeSet := api.start(t)
@@ -552,6 +556,7 @@ func TestAClientsTypoIsNotLoggedAsAFailure(t *testing.T) {
 // Every conversation lands in the ledger, and a conversation that never
 // happened does not.
 func TestTheInterviewRecordsWhatItSpent(t *testing.T) {
+	t.Parallel()
 	api := &scriptedClaude{replies: []string{
 		answer("end_turn", said(`{"questions":[]}`))}}
 	claudeSet := api.start(t)

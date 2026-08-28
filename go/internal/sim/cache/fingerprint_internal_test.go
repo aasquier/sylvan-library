@@ -66,8 +66,22 @@ func TestTheTimestampIsTheRecordedFormat(t *testing.T) {
 // each one is dropped in turn and the digest must move. This is the mutation
 // test for the mechanism ADR 18's consequence 2 rests on.
 func TestEveryEngineSourceMovesTheFingerprint(t *testing.T) {
-	// Snapshotted, because `digestOver` swaps the package-level list while it
-	// works. Ranging over the global and slicing it inside the loop reads the
+	// **Serial, and Go will not say so.** `digestOver` swaps three
+	// package-level values -- `engineSources`, `fingerprintVal` and
+	// `fingerprintOnce` -- and puts them back on the way out. Adding
+	// `t.Parallel()` panics at nothing and passes when this test is run alone;
+	// what it would do is let this test and its neighbour swap the same three
+	// while the other is reading them, and let any later test in the package
+	// read a fingerprint computed over a list this one was holding.
+	//
+	// This is the second of the three things CLAUDE.md names, and the one
+	// nothing but a reading catches: `-race` sees it only when the two
+	// actually overlap, which is a coin toss rather than a gate. The reason it
+	// cannot simply be fixed is in this file's own package comment -- both
+	// tests need `engineSources`, and exporting it would publish the one thing
+	// this package's callers must not depend on.
+	//
+	// Snapshotted below, because `digestOver` swaps the list while it works. Ranging over the global and slicing it inside the loop reads the
 	// swapped one, which is a panic on the second pass and would have been a
 	// silently narrower test if the lengths had happened to match.
 	real := append([]engineSource{}, engineSources...)
@@ -127,6 +141,11 @@ func digestOver(t *testing.T, sources []engineSource) string {
 // synthetic filesystems can, which is why `engineSource.fs` is an `fs.FS`
 // rather than an `embed.FS`.
 func TestTheFingerprintHashesNamesAsWellAsBytes(t *testing.T) {
+	// **Serial**, for `TestEveryEngineSourceMovesTheFingerprint`'s reason:
+	// `digestOver` swaps the package-level source list and the memo behind
+	// `Fingerprint`. Go accepts `t.Parallel()` here and the collision is
+	// silent -- and a fingerprint that came out wrong would not fail this
+	// test, it would fail whichever cache test ran next.
 	first := digestOver(t, []engineSource{{"pkg", fstest.MapFS{
 		"a.go": &fstest.MapFile{Data: []byte("alpha")},
 		"b.go": &fstest.MapFile{Data: []byte("beta")},
