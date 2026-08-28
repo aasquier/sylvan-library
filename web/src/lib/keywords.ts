@@ -73,10 +73,10 @@ export function drawableKeywords(keywords: string[]): DrawnKeyword[] {
  * Every keyword this board can draw for a creature, said in words, with the
  * lent ones saying so.
  *
- * **One phrasing, in one place.** The marks are pictures on an `aria-hidden`
- * arm, so a sentence is the whole accessible account of them *and* the whole
- * of what a pointer resting on one gets — and the card's own tooltip says the
- * same list one element up. Three places, one spelling: change it here.
+ * **One phrasing, in two places, spelled once.** The card's own tooltip says
+ * this list in prose, and the overflow chip says the tail of it that the
+ * corner had no room to draw. Each individual mark is named and explained by
+ * [keywordSaid] instead, which is the same words at a different grain.
  *
  * A bare parenthetical, with no room in the phrasing for a culprit. `granted`
  * is `BoardCard.granted`, which is the printing subtracted from the live set
@@ -151,8 +151,29 @@ export const KEYWORD_MEANS: Record<DrawnKeyword, string> = {
  * creature has it anyway. `granted` carries no source (it is the printing
  * subtracted from the live set), so *that* it was given stays the whole of
  * what may be claimed.
+ *
+ * **Three parts rather than one sentence**, because this stopped being a
+ * `title` attribute: `FieldHint` sets the word as a heading, the meaning as
+ * the body and the lending as a quieter line under it, and a panel that has
+ * to split a string back apart is a panel that will one day split it wrongly.
+ * The phrasing still lives here and only here.
  */
-export function keywordMeaning(word: DrawnKeyword, lent: boolean) {
-  const said = `${word} — ${KEYWORD_MEANS[word]}`
-  return lent ? `${said} (granted; not printed on this card)` : said
+export function keywordSaid(word: DrawnKeyword, lent: boolean): KeywordSaid {
+  return {
+    name: word,
+    says: KEYWORD_MEANS[word],
+    ...(lent ? { note: 'granted — not printed on this card' } : {}),
+  }
+}
+
+/** One mark's explanation, in the three parts a panel sets it in. */
+export interface KeywordSaid {
+  /** The keyword itself, which is the panel's heading and the mark's
+   *  accessible name. */
+  name: string
+  /** What it does, in one plain line. */
+  says: string
+  /** Present only when this creature was *lent* the keyword, which is the one
+   *  case where the card and the mark visibly disagree. */
+  note?: string
 }

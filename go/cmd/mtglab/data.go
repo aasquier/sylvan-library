@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -49,6 +52,31 @@ func dataBackupCommand(cfg config.Config) *cobra.Command {
 	}
 }
 
+// openTheWriter takes the pool read-write, waiting out the running app rather
+// than losing a race to it.
+//
+// **The failure this replaces read as a broken database and was a timing
+// problem.** `mtglab data refresh` on the live instance would report
+//
+//	Could not set lock on file "/data/mtg.duckdb":
+//	Conflicting lock is held in /usr/local/bin/mtglab (PID 654)
+//
+// and then succeed a minute later for no visible reason. It was the serving
+// process's read lease, held almost continuously by two health checks that did
+// not know about each other — [pool.Pool.UseWithoutHolding] is the fix for the
+// cause and this is the fix for the symptom, which is worth having on its own:
+// an operator refreshing a library somebody is *reading* should be told to wait
+// rather than told the file is broken.
+//
+// The line only appears when there is something to wait for, so an ordinary
+// refresh on a quiet instance looks exactly as it always has.
+func openTheWriter(ctx context.Context, out io.Writer, path string) (*sql.DB, error) {
+	return pool.OpenWriterWaiting(ctx, path, pool.WriterWait, func() {
+		fmt.Fprintf(out, "the app is reading the pool; waiting for it "+
+			"(up to %s) ...\n", pool.WriterWait)
+	})
+}
+
 func dataRefreshCommand(cfg config.Config) *cobra.Command {
 	var oracleOnly bool
 	cmd := &cobra.Command{
@@ -58,7 +86,7 @@ func dataRefreshCommand(cfg config.Config) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 			ctx := cmd.Context()
-			db, err := pool.OpenWriter(ctx, cfg.DBPath())
+			db, err := openTheWriter(ctx, out, cfg.DBPath())
 			if err != nil {
 				return err
 			}
@@ -106,7 +134,7 @@ func dataSnapshotCommand(cfg config.Config) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
-			db, err := pool.OpenWriter(cmd.Context(), cfg.DBPath())
+			db, err := openTheWriter(cmd.Context(), out, cfg.DBPath())
 			if err != nil {
 				return err
 			}

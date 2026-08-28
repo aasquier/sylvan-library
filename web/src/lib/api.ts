@@ -794,6 +794,22 @@ export interface ForgeBoardCard {
   art?: string
   /** Carried for tokens, whose printing is chosen rather than looked up. */
   artist?: string
+  /** The card's other name, for the cards that have one **and print both of
+   *  them on the one picture** — an Adventure, a split card, a flip card.
+   *  Absent for everything else, which is nearly every card.
+   *
+   *  Forge renames a card when its other half is cast, and this board learns a
+   *  name once; without this the beat says *Stomp* and nothing in the match is
+   *  called Stomp. See `halfNamed` in `lib/board.ts`. */
+  faces?: string[]
+  /** Each face's own type line, index-aligned with `faces`. A card's two halves
+   *  are two different kinds of spell — Locthwain Scorn is a Sorcery printed on
+   *  an Enchantment — and the plate has to name the half that was cast. */
+  face_types?: string[]
+  /** Scryfall's own word for how the card is printed — `adventure`, `split`,
+   *  `flip` — and only ever sent alongside `faces`. The one thing that reads
+   *  it is the room deciding *where on the picture* the half being cast is. */
+  layout?: string
   /** Whether the card makes mana, from Scryfall's `produced_mana`. A card
    *  fact, sent because a board keeps mana rocks back with the lands and
    *  reading rules text in a browser is how that judgement would rot. */

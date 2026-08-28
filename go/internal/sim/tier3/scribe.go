@@ -72,6 +72,30 @@ type scribeLine struct {
 	Zone   string `json:"zone"`
 	Mode   string `json:"mode"`
 	Tapped bool   `json:"tapped"`
+	// IsTapped is whether the card is turned **right now**, off Forge's view,
+	// and it is a different claim from `Tapped` above: that one is an event —
+	// something turned this card — and this one is a state, true on every line
+	// that names a card whether anything announced it or not.
+	//
+	// **It exists because Forge announces some taps and not others.**
+	// `Card.tap(...)` fires `GameEventCardTapped`; `Card.setTapped(boolean)`
+	// updates the view and fires nothing. Everything that enters the
+	// battlefield tapped takes the second road — `TapEffect`'s `ETB$ True`
+	// branch — because the permanent is not in play yet and there is no change
+	// to announce. So every surveil land, every temple, every guildgate arrived
+	// on this board standing up, with no event anywhere disagreeing.
+	// `Scribe.java` carries the bytecode and the card script.
+	//
+	// Read on a battlefield arrival and nowhere else, deliberately: that is the
+	// question this answers, and folding a state into a stream of events at
+	// every opportunity is how the two start disagreeing about a card neither
+	// is wrong about.
+	//
+	// **Absent is false, and here that is also "an older worker".** A worker
+	// image built before the scribe learned to ask sends no such field, and a
+	// board reading it as "arrived untapped" is exactly the behaviour it had
+	// before this existed.
+	IsTapped bool `json:"is_tapped"`
 	// Entered is how a permanent reached the battlefield — `cast` or `put`,
 	// Magic's own two words — and **the empty string is a third state**: it
 	// means nobody said, not that nothing was cast. A worker image built before
@@ -374,7 +398,7 @@ func (p *ScribeParser) fold(l scribeLine) {
 			// The zone it came *from* is what this asks about.
 			was = p.board.left[l.ID]
 		}
-		p.board.moved(l.ID, l.Zone, l.Mode, l.Seat)
+		p.board.moved(l.ID, l.Zone, l.Mode, l.Seat, l.IsTapped)
 		if !blankView(l) {
 			p.board.stats(l.ID, l.Power, l.Toughness, l.Types)
 		}

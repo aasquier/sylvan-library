@@ -46,9 +46,15 @@ import (
 )
 
 // IdleLease is how long the pool may go unwanted before it is handed back
-// (`service._KEEPER_IDLE`): spans a page load's burst, shorter than the
-// platform health check's interval, so a refresh started against an idle app
-// waits this long at worst.
+// (`service._KEEPER_IDLE`): long enough to span a page load's burst, short
+// enough that `mtglab data refresh` is not kept standing at the door.
+//
+// **The sentence that used to be here was the bug.** It read *"shorter than
+// the platform health check's interval, so a refresh started against an idle
+// app waits this long at worst"* — ten seconds against thirty, which is sound
+// arithmetic about one health check and this instance has two. See
+// [Pool.UseWithoutHolding], which is where that is measured and where it is
+// answered; the number itself never needed changing.
 const IdleLease = 10 * time.Second
 
 // ErrNoPool is `_connect()` returning None: the file is not there yet, or it
@@ -252,6 +258,83 @@ func (p *Pool) release() {
 	p.mu.Unlock()
 }
 
+// UseWithoutHolding runs fn against the pool **without the pool counting it as
+// having been wanted** — and hands the file straight back afterwards if
+// nothing else does want it.
+//
+// **This exists because a heartbeat is not a visitor, and treating it as one
+// locked the library against its own librarian.** The lease was designed
+// against one invariant, written down at [IdleLease]: it is *"shorter than the
+// platform health check's interval, so a refresh started against an idle app
+// waits this long at worst"*. Ten seconds against thirty. The invariant was
+// true of one health check, and this instance has **two** — Fly's, from
+// outside the container (`fly.toml`), and the image's own `HEALTHCHECK`, from
+// inside — both at thirty seconds and neither aware of the other's phase.
+// Fifteen seconds apart is the worst case and an ordinary one: each probe
+// opens the pool, uses it for a few milliseconds and leaves the lease standing
+// for ten more, and the reaper only looks every `idle/3`. So the file was held
+// for roughly thirteen seconds out of every fifteen, and `mtglab data refresh`
+// on a live instance had a window under two seconds wide to find, over and
+// over, with the failure reading as a broken database rather than as bad
+// timing:
+//
+//	Could not set lock on file "/data/mtg.duckdb":
+//	Conflicting lock is held in /usr/local/bin/mtglab (PID 654)
+//
+// **And a probe was never buying anything by holding it.** The lease is there
+// to span a page load's burst, which is a *person* asking for six things in
+// four seconds. A probe asks for two counts and goes away for half a minute;
+// the next real visitor would have re-opened the file either way. Measured on
+// the real 96MB pool, cross-process: open, `count(*)` over both tables and
+// close is **twenty milliseconds**. Two of those a minute is not a cost worth
+// a locked-out refresh.
+//
+// So a quiet use touches nothing the reaper reads, and then applies the
+// reaper's own test on the way out. An idle instance therefore holds the file
+// for the length of the probe's queries and no longer; a busy one is unchanged,
+// because a real request that arrives mid-probe takes an ordinary lease and
+// this steps over it.
+func (p *Pool) UseWithoutHolding(ctx context.Context, fn func(*Conn) error) error {
+	conn, err := p.acquireQuietly(ctx)
+	if err != nil {
+		return err
+	}
+	defer p.releaseQuietly()
+	return fn(conn)
+}
+
+// acquireQuietly is [Pool.acquire] with the one line that renews the lease
+// taken out.
+//
+// **`lastUsed` is deliberately left where it was**, including at the zero time
+// on a process whose pool nobody has yet asked for on their own account —
+// which reads as "wanted a very long time ago" and is exactly right: the file
+// should not be held for a probe that has already been answered.
+func (p *Pool) acquireQuietly(ctx context.Context) (*Conn, error) {
+	was := func() time.Time {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return p.lastUsed
+	}()
+	conn, err := p.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p.mu.Lock()
+	p.lastUsed = was
+	p.mu.Unlock()
+	return conn, nil
+}
+
+// releaseQuietly drops the lease and then asks the reaper's question a tick
+// early, so an idle pool is handed back now rather than in up to `idle/3`.
+func (p *Pool) releaseQuietly() {
+	p.mu.Lock()
+	p.leases--
+	p.reapLocked()
+	p.mu.Unlock()
+}
+
 // closeLocked drops the open database. Callers hold p.mu.
 func (p *Pool) closeLocked() {
 	if p.db != nil {
@@ -293,7 +376,21 @@ func (c *Conn) rememberStaleness(answer bool) {
 // never stopped -- it costs one timer, and a process that opened the pool
 // once will open it again.
 func (p *Pool) reap() {
-	ticker := time.NewTicker(p.idle / 3)
+	// **Read under the lock, because everything else about this field is.**
+	// `p.idle` is written once at construction in the app and never again — so
+	// this was latent rather than broken — but `SetIdle` exists for the tests
+	// and the moment one used it beside a running keeper, `-race` said so.
+	// That is the whole argument for the detector: a field guarded everywhere
+	// but one line is a field guarded nowhere, and the one line is never the
+	// one anybody reads.
+	//
+	// The value is taken once rather than per tick, which is what the ticker
+	// wants anyway: the pace is fixed at the pool's first open, and the
+	// decision itself — [Pool.reapLocked] — reads `idle` freshly every time.
+	p.mu.Lock()
+	every := p.idle / 3
+	p.mu.Unlock()
+	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 	for range ticker.C {
 		p.ReapOnce()
@@ -305,6 +402,12 @@ func (p *Pool) reap() {
 func (p *Pool) ReapOnce() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.reapLocked()
+}
+
+// reapLocked is the decision itself, so that the ticker and a quiet use ask it
+// in exactly the same words. Callers hold p.mu.
+func (p *Pool) reapLocked() bool {
 	if p.db != nil && p.leases == 0 && time.Since(p.lastUsed) > p.idle {
 		p.closeLocked()
 		return true

@@ -776,7 +776,7 @@ func magicZone(drawn string) string {
 // `mode` is the scribe's, "in" or "out". An `out` clears only the zone the
 // card is currently recorded in — ruling 4 — so a late `out` for a zone
 // already left cannot blank a card that has arrived somewhere else.
-func (b *board) moved(id int, forgeZone, mode string, seat int) {
+func (b *board) moved(id int, forgeZone, mode string, seat int, tapped bool) {
 	zone, drawn := drawnZone(forgeZone, b.types[id])
 	if !drawn {
 		return
@@ -827,13 +827,31 @@ func (b *board) moved(id int, forgeZone, mode string, seat int) {
 		c.Seat = seat
 	}
 	b.became(id, was, zone)
-	// A card arriving somewhere is a card nobody has tapped yet. Forge agrees
-	// — it raises no untap event for a permanent that leaves the battlefield —
-	// and without this a creature that dies tapped comes back tapped.
-	if b.tapped[id] {
-		b.tapped[id] = false
-		no := false
-		c.Tapped = &no
+	// **How it arrived, turned or standing.**
+	//
+	// This used to be "untapped, always", on the sound half of an argument: a
+	// card arriving somewhere is a new object (rule 400.7), Forge raises no
+	// untap event for a permanent that leaves the battlefield, and without a
+	// reset a creature that died tapped came back tapped.
+	//
+	// The unsound half is that *some permanents arrive turned*, and it is not
+	// an obscure case — every surveil land, every temple, every guildgate, a
+	// Sol Ring off a Grim Monolith, a token minted tapped and attacking. Forge
+	// says nothing about any of them, because "enters tapped" is a replacement
+	// effect that turns the card **before** it is in play, through
+	// `Card.setTapped` rather than `Card.tap`, and only the second one fires an
+	// event ([scribeLine.IsTapped] carries the bytecode). So the board drew a
+	// land the game had just tapped as untapped, and then drew it tapped a turn
+	// later when somebody actually used it — which reads as the board missing a
+	// beat rather than as a rule (Aaron, 2026-08-28).
+	//
+	// The reset survives inside this: `tapped` is the *arrival's* state, which
+	// is false for the dying creature and true for the surveil land, so the
+	// case this replaces is the case it still answers.
+	if b.tapped[id] != tapped {
+		b.tapped[id] = tapped
+		state := tapped
+		c.Tapped = &state
 	}
 }
 

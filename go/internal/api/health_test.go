@@ -61,6 +61,40 @@ func TestHealthReportsThePoolTheShelfAndTheDecks(t *testing.T) {
 	}
 }
 
+// **The probe reads the pool and does not keep it.**
+//
+// This is the deployment fault, written as the one thing about it a suite can
+// hold. `mtglab data refresh` on the live instance would report the card pool
+// as locked by the serving process and then succeed on a retry — because *two*
+// health checks poll this route every thirty seconds, from outside the
+// container and from inside it, and an ordinary lease keeps the file open for
+// ten seconds past each one. Out of phase, that is a file held roughly thirteen
+// seconds in every fifteen and a refresh with under two seconds to find.
+//
+// Asserted on the pool's own state rather than on which function the handler
+// called, because the outcome is the thing that matters and a spy on the call
+// would keep passing if the lease semantics changed underneath it.
+func TestHealthDoesNotHoldTheCardPoolOpen(t *testing.T) {
+	t.Parallel()
+	p := pooltest.Open(t)
+	a := New(Config{Pool: p, DecksDir: decksDir(t)})
+	for i := 0; i < 3; i++ {
+		if status, _, raw := call(t, a, http.MethodGet, "/api/health", ""); status != 200 {
+			t.Fatalf("%d: %s", status, raw)
+		}
+		if p.Held() {
+			t.Fatal("the health probe left the card pool's file open behind it, " +
+				"which is what locked `mtglab data refresh` out of the instance")
+		}
+	}
+	// And it is still a working read, not a probe that has learned to answer
+	// without looking.
+	_, body, raw := call(t, a, http.MethodGet, "/api/health", "")
+	if body["pool"] != true || body["oracle_cards"].(float64) < 20 {
+		t.Fatalf("the probe stopped reading the pool: %s", raw)
+	}
+}
+
 // A pool that predates the printed stats answers `pool_stale` and the
 // re-ingest message -- `pool.Stale`'s verdict on the route.
 func TestHealthReportsAStalePool(t *testing.T) {

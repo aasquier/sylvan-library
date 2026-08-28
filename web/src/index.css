@@ -7645,6 +7645,136 @@ button:hover .tarot-fan-card {
    from `--life-size` in one place so the figure inside it scales with it. */
 .field-plate-figures .field-life { --life-size: 66px; }
 
+/* ------------------------------------------------ a mark that explains itself
+ *
+ * **The `title` attribute is not an affordance, and three of these panels are
+ * what replaced it.** `components/hint.tsx` carries the argument in full; the
+ * short of it is that a `title` draws on hover and on nothing else — never on
+ * a phone, never on keyboard focus — so every sentence this board hung on one
+ * reached a mouse and nobody else. What was hidden that way was the meaning of
+ * the keyword marks and the direction of the commander clock: the two things a
+ * newcomer most needs and the two a mouse-owner is least likely to be.
+ *
+ * `.field-hint` is the *trigger*. It is a real `<button>` now, so this block is
+ * mostly undoing what a browser does to one — a button arrives with a border,
+ * a background, its own font and a centre-aligned box, and every one of those
+ * would fight the chip or the dial wearing it. Declared **above** `.field-bead`
+ * and `.field-life` and far above `.field-keyword` on purpose: those are single
+ * classes too, so on any property both set it is source order that decides, and
+ * the look has to beat the reset rather than the other way round.
+ */
+.field-hint {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: help;
+}
+/* **The drawing stays ten pixels; the target does not.**
+ *
+ * A keyword mark is a 13px chip because that is what fits in the corner of a
+ * 58px card, and 13px is not a thing a thumb can hit — the whole point of this
+ * change was reaching the hands a tooltip never reached, and handing a phone a
+ * target it cannot press would have missed by the same distance in the other
+ * direction.
+ *
+ * So the hit box is pushed out from under the chip without moving the chip.
+ * **Sideways much further than up and down**, and that asymmetry is the
+ * measurement rather than a taste: the marks are a *column* at a 14.5px pitch
+ * (13px chip, 1.5px gap), so more than 0.75px of vertical growth means two
+ * neighbours overlapping and the upper one quietly eating the lower one's tap.
+ * Horizontally there is a whole card to spend — the chips sit at the left edge
+ * of the painting and nothing else is in that band — so the target runs out to
+ * the right over the art, which is where a finger aiming at the chip lands
+ * anyway. Measured: 26x14.5, against 13x13.
+ *
+ * `::before` rather than padding, because padding would move the chip inside
+ * its own plate and the plate is the thing that makes a silhouette legible on
+ * an arbitrary photograph. */
+.field-keyword.field-hint::before {
+  content: '';
+  position: absolute;
+  top: -0.75px;
+  bottom: -0.75px;
+  left: -2px;
+  right: -11px;
+}
+/* The chip has to be the containing block for that, and it was `display: flex`
+   with no position of its own. */
+.field-keyword.field-hint { position: relative; }
+
+/* The panel itself: portalled to the body, so it is measured against the
+   window rather than against the lane it came out of. `lib/hint.ts` puts it
+   somewhere; this is what it looks like when it gets there.
+
+   The materials are `.field-peek-worn`'s — a dark plate with a brass hairline
+   — because that is what this room already uses for a caption that has to be
+   readable over an arbitrary painting, and a second vocabulary for a second
+   kind of caption would be two things to learn. */
+.field-hint-panel {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(14, 11, 7, 0.97) 0%, rgba(8, 6, 4, 0.97) 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--field-brass) 42%, transparent),
+    0 10px 26px rgba(0, 0, 0, 0.72);
+  animation: field-hint-in 120ms ease-out both;
+}
+/* It arrives from the side it is standing on, which is the smallest thing that
+   makes a panel read as belonging to the mark that raised it rather than as
+   something that appeared nearby. */
+@keyframes field-hint-in {
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.field-hint-panel.is-under { animation-name: field-hint-in-under; }
+@keyframes field-hint-in-under {
+  from { opacity: 0; transform: translate3d(0, -4px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-hint-panel { animation: none; }
+}
+/* The word, in the brass this room names things in. Capitalised here rather
+   than in the data, because `lib/keywords.ts` is keyed by the lower-case word
+   and a display capital is a display concern. */
+.field-hint-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--field-brass) 92%, #fff);
+}
+.field-hint-says {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #efe4cd;
+}
+/* **That the card and the mark do not disagree.** A Bronzehide Lion wearing a
+   borrowed vigilance has no vigilance printed on it, and a player who checks
+   finds exactly that; this line is the one that says the mark is still right.
+   Quieter than the sentence above it because it is a fact about this card
+   rather than about the keyword. */
+.field-hint-note {
+  margin-top: 1px;
+  font-size: 0.66rem;
+  font-style: italic;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--field-brass) 62%, transparent);
+}
+
 /* ------------------------------------------------ poison, as a thing
  *
  * **The second dial the row above was holding room for.** It is built out of
@@ -8149,8 +8279,15 @@ button:hover .tarot-fan-card {
   gap: 5px;
 }
 .field-tray-cards .field-card { width: 76px; height: 106px; }
-.field-tray-cards .field-card-lens { width: 26px; height: 26px; }
-.field-tray-cards .field-card-lens-pt { font-size: 0.6rem; }
+/* **One ruler, told the tray's number**, rather than three rules pulling in
+   different directions. A card in a tray is 76px wide whatever a lane can
+   afford, so it does not want the lane's glass — and this used to say so by
+   pinning the lens box and the type separately, which put the flat `0.6rem`
+   back on a circle that had just stopped being flat everywhere else. Setting
+   the ruler instead means the glass, the type and the figure-length rule above
+   all follow one number, so a `12/12` in a graveyard is sized by the same
+   arithmetic as a `12/12` on the sand. */
+.field-tray-cards .field-card { --field-lens: 26px; }
 
 @media (prefers-reduced-motion: reduce) {
   .field-tray,
@@ -8944,17 +9081,64 @@ button:hover .tarot-fan-card {
  * The offset is down and to the right on purpose. Up-and-left is where #314
  * put the keyword marks and where the loupe reads; the bottom-right corner of
  * a Magic card is the one place nothing else on this board has claimed. */
+/* **The step a tucked card takes out from under its host, as a fraction of the
+   card.** Seven pixels at 58, which is what it has always been at the desk,
+   and it comes down with the card on a phone instead of staying put — the
+   third thing on this board to be measured against one screen and written
+   down as a constant, after the loupe and the counters.
+
+   0.1207 is 7/58 exactly, so nothing moves at the size it was chosen at. What
+   it buys is that the step is now always *smaller* than the lane's own turning
+   clearance (`--lane-lean`, 0.15 of a card), which is what lets the first tuck
+   live inside the sand the lane already keeps for a leaning card rather than
+   asking the lane for room of its own. */
 .field-geared {
+  --gear-step: calc(var(--field-card-full) * 0.1207);
   position: relative;
   flex: 0 0 auto;
-  margin-right: calc(var(--gear, 0) * 7px);
-  margin-bottom: calc(var(--gear, 0) * 7px);
+  margin-right: calc(var(--gear, 0) * var(--gear-step));
 }
+/* **The `margin-bottom` that used to be here is the bug Aaron reported**
+   (2026-08-28: *"when cards are tapped their lower left corner is clipping
+   into the lane below and disappearing"*), and it is worth writing down
+   because it looked like the careful thing to do.
+
+   It was the mirror of the `margin-right` above: the tuck goes down as well as
+   right, so reserve for both. The right one is inert in a creature lane — that
+   lane is a grid of fixed columns, and a margin does not move a grid column.
+   **The bottom one is not inert; it sizes the row.** A grid row is as tall as
+   the tallest *margin box* in it, so one creature carrying one Equipment made
+   the implicit row 88px inside a lane whose content box is 81 — and with
+   `align-items: end` that put **every card in that lane** seven pixels lower
+   than the box it is clipped to. Measured on a live board at 1430: a tapped
+   Ocelot Pride's lower-left corner 6.94px past the padding edge, gone under
+   `overflow-y: hidden`, with the untapped cards beside it looking perfectly
+   fine because an unturned card has no corner down there to lose.
+
+   So it read as a bug about *tapped* cards and it was a bug about *equipped*
+   ones: the lane only breaks when something in it is carrying something, which
+   is why the far half was mangled and the near half was clean.
+
+   Nothing replaces it. The descent is bounded below instead — see the `min()`
+   — so the tuck lives in the clearance the lane already keeps for a leaning
+   card, and the lane's height goes back to being a fact nothing inside it can
+   change (#348's whole point).
+
+   The trade, stated: a creature carrying *two or more* things has the bottom
+   corner of the second step shaved by the lane edge, because the descent stops
+   at the clearance while the staircase keeps stepping right. That is a corner
+   of a corner on a rare board. The thing it replaces was every turned creature
+   in the lane losing its point on every combat. */
 .field-gear {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translate(calc(var(--i) * 7px), calc(var(--i) * 7px));
+  /* Right for as many steps as there are, **down only as far as the sand
+     allows**. `--lane-lean` is the clearance the lane keeps around a card that
+     leans forty-five degrees, and it is exactly the room a tuck has to fall
+     into: past it there is nothing to see, because the lane clips there. */
+  transform: translate(calc(var(--i) * var(--gear-step)),
+                       min(calc(var(--i) * var(--gear-step)), var(--lane-lean)));
 }
 /* The corner that shows is a corner of a real card, so it gets the same edge
    the card above it has — without it the steps read as a drop shadow that
@@ -8979,8 +9163,14 @@ button:hover .tarot-fan-card {
  *
  * The slide is *along the step*, down and to the right, so it never crosses
  * the host's face — and it is three pixels, which is enough to see move and
- * not enough to reach the neighbour, because `.field-geared` only reserves
- * seven per card.
+ * not enough to reach the neighbour, because `.field-geared` only reserves one
+ * step per card.
+ *
+ * **The downward half is bounded the same way the resting position is**, and
+ * has to be by the same argument: three pixels further down than the lane can
+ * show is three pixels of nothing. So the slide a hand gets is whatever of it
+ * is still on the sand, which on the deepest step is the sideways half alone —
+ * and sideways is the direction the edge being reached for actually runs.
  *
  * `:has(:focus-visible)` rather than `:focus-within`: a click focuses the
  * card too, and a corner that stayed slid out after a sheet was closed is the
@@ -8990,8 +9180,9 @@ button:hover .tarot-fan-card {
 }
 .field-gear:hover,
 .field-gear:has(:focus-visible) {
-  transform: translate(calc(var(--i) * 7px + 3px),
-                       calc(var(--i) * 7px + 3px));
+  transform: translate(calc(var(--i) * var(--gear-step) + 3px),
+                       min(calc(var(--i) * var(--gear-step) + 3px),
+                           var(--lane-lean)));
 }
 .field-gear:hover .field-card-turn,
 .field-gear:has(:focus-visible) .field-card-turn {
@@ -9727,25 +9918,44 @@ button:hover .tarot-fan-card {
   background: linear-gradient(180deg,
     rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0) 100%);
 }
-/* **The figures scale with the glass, and they used to be a flat `0.6rem` on a
-   circle that is not a flat size.** Measured at 375 on a live board: a 12/12
-   overflowed its own lens by two pixels *before* anything on this branch
-   moved, and the reason it was never noticed is that most creatures are one
-   digit a side and fit at any size. A twelve-twelve is an ordinary Commander
-   creature, not an edge case.
+/* **The figures scale with the glass, and with how many of them there are.**
+   Two separate faults, one line, and the second is the one Aaron asked about
+   (2026-08-28: *"a `12/12` overflows its own loupe by 2px at 375"*).
 
-   0.369 is 9.6/26 — what the desk has always rendered — so nothing changes
-   there, and below it the type comes down with the circle it is written on.
-   `min()` on `--field-lens` above means the pair moves together at every
-   width, which is the whole point: two constants that must agree, expressed
-   once. */
+   The first was a flat `0.6rem` on a circle that is not a flat size, so the
+   type stayed put while the glass came down on a phone. `0.369` is `9.6/26` —
+   what the desk has always rendered — and expressing it against `--field-lens`
+   means the pair moves together at every width. Two constants that must agree,
+   written once.
+
+   The second is that **a circle's budget is characters, not pixels**, and
+   nothing here was counting them. `5/5` is three characters and `12/12` is
+   five, and the same type size cannot be right for both: at 26px the short
+   figure uses about three fifths of the glass and the long one runs two pixels
+   past it. Most creatures are one digit a side, which is the whole reason this
+   went months unseen — a twelve-twelve is an ordinary Commander creature, not
+   an edge case.
+
+   So: **the ink never sets wider than a four-character figure.** Four is the
+   widest the glass was ever sized for and the widest that fits it — measured
+   on the live board at 58px, a `12/5` sets 23.1 wide inside a 26px circle,
+   which is the chord available at the height type sits and about as full as it
+   can honestly be. Anything longer keeps that width and comes down in size to
+   do it, so a `12/12`, a `20/20` and a Marit Lage all set the same width as a
+   `12/5` and every one of them is inside the glass.
+
+   **Nothing at four characters or fewer moves by a pixel**, which is what the
+   `min(1, …)` is for: a `5/5` is not a problem and does not want solving.
+   `--pt-len` is set on the element by `board.tsx`, the only place that knows
+   how long the string came out. */
 .field-card-lens-pt {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(var(--field-lens) * 0.369);
+  font-size: calc(var(--field-lens) * 0.369
+                  * min(1, 4 / var(--pt-len, 3)));
   font-weight: 700;
   color: #fff4dc;
   text-shadow:
@@ -12621,6 +12831,108 @@ button:hover .tarot-fan-card {
     0 14px 34px rgba(0, 0, 0, 0.72),
     0 0 0 1px color-mix(in srgb, var(--field-brass) 34%, transparent),
     0 0 22px color-mix(in srgb, var(--stage-glow) 26%, transparent);
+}
+
+/* ------------------------------------- the half of the card being cast
+ *
+ * **An Adventure is two spells on one card, and the room was showing
+ * neither.** Forge renames a card the moment its Adventure goes on the stack —
+ * a Bonecrusher Giant in hand becomes *Stomp* on the way to the stack — and
+ * nothing in the match answered to that name, so the middle of the arena drew
+ * the fallback: a black card with a title set on it, in the one moment this
+ * surface exists for (Aaron, 2026-08-28: *"when the 'adventure' part of a card
+ * is cast it shows as a black card with only a title, would be nice if we
+ * showed the entire card the adventure is attached to, but used a magnifying
+ * effect over the adventure portion"*).
+ *
+ * `faces` on the wire is what finds the card. This is the second half of his
+ * ask, and it is the half that answers the question finding it raises: a
+ * player told *Cast Instant* is now looking at a picture of a Giant, and the
+ * instant they were told about is eleven point of text in the corner of the
+ * rules box.
+ *
+ * **Nothing is cut, and that is compliance rather than restraint.** Scryfall's
+ * imagery guidelines forbid cropping, distorting, desaturating and
+ * watermarking a card image and ADR 32 makes that a wall — so the card arrives
+ * whole, at its own aspect ratio, and the glass is a layer *over* it. Exactly
+ * what `.field-card-lens` does on the battlefield and what `.arena-gate`'s
+ * plate does on the gate: the picture is a picture, and everything this room
+ * needs to say sits above it.
+ *
+ * **The box was measured, not reasoned about.** Read off a real card face at
+ * 488x680 (Bonecrusher Giant, CLB): the adventure's own frame runs x 30-252 and
+ * y 424-608, which is 6.1% to 51.6% across and 62.4% to 89.4% down. Written as
+ * percentages of `.stage-frame`, which *is* the card's box — `aspect-ratio:
+ * 488 / 680` and nothing may argue with it — so the glass tracks the printed
+ * box at every size the stage draws a card at.
+ *
+ * Only an Adventure wears one. A split card and a flip card also print two
+ * names on one picture and both are found now; where their halves sit has not
+ * been measured, so they get the right card and no glass rather than a
+ * rectangle over a guess. */
+.stage-adventure {
+  position: absolute;
+  z-index: 2;
+  left: 6.1%;
+  right: 48.4%;
+  top: 62.4%;
+  bottom: 10.6%;
+  pointer-events: none;
+  /* The lift is what makes it read as glass held over the card rather than as
+     a highlight printed on it — a shadow under the near edge, and the card's
+     own brass hairline round it. */
+  border-radius: 4px;
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.55),
+    0 0 0 1.5px color-mix(in srgb, var(--field-brass) 76%, transparent),
+    0 0 14px color-mix(in srgb, var(--stage-glow) 40%, transparent);
+  animation: stage-adventure-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 180ms;
+}
+/* The magnification itself: the same region of the same picture, larger.
+ *
+ * `background-size` is the card at **1.55 times** and the position is the same
+ * box, so what shows through the glass is the adventure's own frame with its
+ * name, its cost and its type line legible — which at the stage's size is the
+ * difference between reading *Instant — Adventure* and taking it on trust.
+ *
+ * A scale and nothing else. No blur, no desaturation, no colour-shift: those
+ * are the three ADR 32 names, and a magnifier is the one transformation of a
+ * picture that is only ever *more* of it. */
+.stage-adventure-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  background-image: var(--half-art);
+  background-repeat: no-repeat;
+  /* 155% of the frame, aimed at the middle of the adventure box: 28.9% across
+     and 75.9% down, which is the centre of the numbers above. */
+  background-size: 155% 155%;
+  background-position: 28.9% 75.9%;
+}
+/* A single specular streak across the glass, low and wide — the same one
+   `.field-card-lens-glass::after` uses to stop a circle reading as a hole. */
+.stage-adventure-glass::after {
+  content: '';
+  position: absolute;
+  top: 6%;
+  left: 4%;
+  width: 62%;
+  height: 30%;
+  border-radius: 50%;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 100%);
+}
+/* It arrives after the card has, because it is an answer to the card rather
+   than part of it: the Giant lands, and then the glass comes down on the half
+   that was actually cast. */
+@keyframes stage-adventure-in {
+  from { opacity: 0; transform: scale(1.14); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-adventure { animation: none; }
 }
 
 /* Up out of the sand, over-large for an instant, held, and then let go

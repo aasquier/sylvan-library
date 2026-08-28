@@ -24,6 +24,30 @@ import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
 import { MatchBoard } from './board'
 
+/**
+ * What a mark says when somebody who is not holding a mouse asks it.
+ *
+ * **The point of the helper is the `focus`.** Every one of these sentences used
+ * to be a `title` attribute, which a test can read off the DOM and a keyboard
+ * can never reach — so a suite that asserted the attribute was green for a
+ * board where the words were unavailable to two of the three hands that arrive
+ * here. Driving the trigger is the difference between checking the words exist
+ * and checking somebody can get at them ([[tests-must-drive-the-trigger]]).
+ *
+ * The panel is portalled to the body, so it is looked for there rather than in
+ * the render's container — which is also the assertion that it escaped the
+ * lane's `overflow` in the first place.
+ */
+function saidBy(mark: Element): string {
+  expect(mark.tagName, 'a mark that explains itself has to be operable')
+    .toBe('BUTTON')
+  fireEvent.focus(mark)
+  const panel = document.body.querySelector('[role="tooltip"]')
+  const said = panel?.textContent ?? ''
+  fireEvent.blur(mark)
+  return said
+}
+
 afterEach(cleanup)
 
 const BOARD: ForgeBoard = {
@@ -2051,7 +2075,10 @@ it('says so when the tenth counter has landed', () => {
   const bead = container.querySelector('.field-bead')
   expect(bead?.textContent).toBe('12')
   expect(bead?.className).toContain('is-lethal')
-  expect(bead?.getAttribute('title')).toContain('ten is lethal')
+  const said = bead ? saidBy(bead) : ''
+  expect(said).toContain('Poison')
+  expect(said, 'the rule, not just the tally').toContain('Ten of them loses')
+  expect(said).toContain('And this player has ten.')
 })
 
 /* ------------------------------------- the crown's clock, in the trench
@@ -2111,9 +2138,15 @@ it('names the commander that dealt it, from the board dictionary', () => {
   // the dial as his own commander's tally (2026-08-27) — it is the opposite,
   // and the wording is half of the fix for that; the broken crown is the other
   // half, and the half that works without a pointer.
-  expect(dials[0]?.getAttribute('title'))
-    .toBe('Struck for 5 by Gyome, Master Chef. Twenty-one from one commander '
-      + 'loses the game.')
+  //
+  // **And it is reachable without a pointer now**, which is the other half of
+  // the same fault: the sentence lived on a `title`, so the one explanation of
+  // a rule most players meeting this room have never heard of was available to
+  // a mouse and to nothing else (Aaron, three times over four days).
+  const said = dials[0] ? saidBy(dials[0]) : ''
+  expect(said).toContain('Commander damage')
+  expect(said).toContain('Struck for 5 by Gyome, Master Chef.')
+  expect(said).toContain('Twenty-one combat damage from a single commander')
   expect(dials[0]?.className).not.toContain('is-dire')
 })
 
@@ -2124,9 +2157,9 @@ it('sounds the alarm two swings out, and not before', () => {
   expect(dial?.className).toContain('is-dire')
   // Nineteen is a warning and twenty-one is the end; twenty is not both.
   expect(dial?.className).not.toContain('is-lethal')
-  expect(dial?.getAttribute('title')).toContain('Twenty-one from one commander')
-  expect(dial?.getAttribute('title'), 'twenty is not yet a death')
-    .not.toContain('and this one has')
+  const said = dial ? saidBy(dial) : ''
+  expect(said).toContain('Twenty-one combat damage from a single commander')
+  expect(said, 'twenty is not yet a death').not.toContain('And this one has')
 })
 
 // **Nothing in a dial is styled by being an `svg`**, and Aaron caught why.
@@ -2203,7 +2236,7 @@ it('leaves a life total alone while there is room to breathe', () => {
 it('sounds the alarm under five life', () => {
   const dire = [...dying(2)].filter((r) => r.className.includes('is-dire'))
   expect(dire).toHaveLength(1)
-  expect(dire[0]?.getAttribute('title')).toContain('one good swing')
+  expect(dire[0] ? saidBy(dire[0]) : '').toContain('One good swing')
 })
 
 it('stops pulsing at a player who is already dead', () => {
@@ -2476,13 +2509,23 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
   // bestowed it, we can say what the icon means since it is not native to that
   // card"*. A player who reads the Skyhunter looking for vigilance will not
   // find it, so the mark is the one that has to explain itself.
-  expect(marks.map((m) => m.getAttribute('title')),
-    'flying is printed on the Skyhunter; the vigilance is Kaheera’s')
-    .toEqual([
-      'flying — can only be blocked by creatures with flying or reach',
-      'vigilance — attacking does not tap it, so it can still block '
-        + '(granted; not printed on this card)',
-    ])
+  //
+  // **And the sentence is reachable by the hand that needs it.** It used to be
+  // a `title`, which draws on hover and on nothing else — so the one thing on
+  // this board that explains a keyword to somebody meeting Magic here was
+  // unavailable on a phone and unavailable from the keyboard, on a mark the
+  // keyboard could not reach in the first place. `saidBy` focuses it, which is
+  // the whole assertion.
+  const said = marks.map((m) => saidBy(m))
+  expect(said[0],
+    'flying is printed on the Skyhunter, and says what flying does')
+    .toContain('can only be blocked by creatures with flying or reach')
+  expect(said[0], 'nothing was lent, so nothing says it was')
+    .not.toContain('not printed on this card')
+  expect(said[1], 'the vigilance is Kaheera’s')
+    .toContain('attacking does not tap it, so it can still block')
+  expect(said[1], 'and the card is not wrong — the mark says so')
+    .toContain('not printed on this card')
   expect(marks.filter((m) => m.classList.contains('is-granted')).length,
     'exactly one of the two marks stands on the other plate').toBe(1)
   expect(marks[1]?.classList.contains('is-granted')).toBe(true)
@@ -2492,16 +2535,19 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
   // one would be the board making a reading of the game (Aaron: *"we don't
   // need to say who granted the ability if it is not traceable"*). Said once
   // on the mark a pointer rests on, and again in the card's own sentence.
-  const band = cat.querySelector('.field-keywords')
-  expect(band?.getAttribute('title')).toBe('flying, vigilance (granted)')
+  //
+  // **The band's own `title` is gone and the card's is not.** The list was on
+  // the band because the marks were `aria-hidden` pictures with no name of
+  // their own; they are named buttons now, so the band saying it again would
+  // be a screen reader hearing the same five words twice. The card still says
+  // it in prose, which is the one place it is a description of the *card*.
+  expect(cat.querySelector('.field-keywords')?.getAttribute('title'),
+    'the marks name themselves now').toBeNull()
   expect(cat.getAttribute('title')).toContain('flying, vigilance (granted)')
   for (const giver of ['Kaheera', 'Gwyn', 'Caracal', 'from']) {
-    expect(band?.getAttribute('title'), `the band names a giver: ${giver}`)
-      .not.toContain(giver)
     // The sentence on the mark is under the same rule — it explains the sign,
     // it never guesses at a culprit.
-    expect(marks[1]?.getAttribute('title'), `the mark names a giver: ${giver}`)
-      .not.toContain(giver)
+    expect(said[1], `the mark names a giver: ${giver}`).not.toContain(giver)
     expect(cat.getAttribute('title'), `the card names a giver: ${giver}`)
       .not.toContain(giver)
   }

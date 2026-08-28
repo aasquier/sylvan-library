@@ -57,7 +57,7 @@
 import { useEffect, useState } from 'react'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
-import { sameCard } from './board'
+import { halfNamed } from './board'
 import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
 
@@ -576,6 +576,17 @@ export interface Staged {
   /** The whole card face, or null when the match never painted one — see
    *  `faceFor`, and the plate that stands in for it. */
   image: string | null
+  /** **The half of the card this beat is about, when the card prints two on
+   *  one picture and the beat is about the second one.**
+   *
+   *  Only ever `'adventure'`, and that is a limit rather than an oversight: the
+   *  room draws a glass over the half being cast, and where that half *is* has
+   *  to be measured off a real card rather than reasoned about. It has been,
+   *  for an Adventure — the left of the text box, `.stage-adventure` carries
+   *  the numbers. A split card's halves and a flip card's have not been, so
+   *  those resolve to the right picture and get no glass, which is the whole
+   *  of the bug fixed and none of the guessing. */
+  half: 'adventure' | null
   /** How long this one is watched for, which is both the CSS duration and the
    *  element's life. One number, handed over rather than written twice. */
   life: number
@@ -595,10 +606,13 @@ export interface Staged {
  *
  * Two things it has to get right:
  *
- * - **The spelling.** Forge names a *face* and the board can carry Scryfall's
- *   combined `A // B`, which is why this uses `sameCard` rather than `===`. A
+ * - **The spelling, and there are two ways it can differ.** Forge names a
+ *   *face* and the board can carry Scryfall's combined `A // B` — a
  *   transforming card would otherwise be cast sixty times a match and found
- *   not once — silently, and only in the decks that play them.
+ *   not once, silently, and only in the decks that play them. And Forge
+ *   *renames* a card when its other half is cast, so a Bonecrusher Giant the
+ *   board has been calling Bonecrusher Giant arrives here as Stomp. Both are
+ *   `halfNamed`'s business rather than `===`'s.
  * - **Whose copy.** Two seats can each run a Swords to Plowshares, and in a
  *   singleton format that is the only way one name is two cards. Same printing,
  *   same picture, so this is very nearly cosmetic — but preferring the caster's
@@ -611,7 +625,7 @@ export function faceFor(board: ForgeBoard | null, name: string,
   seat: number | null): ForgeBoardCard | null {
   let best: ForgeBoardCard | null = null
   for (const card of board?.cards ?? []) {
-    if (!sameCard(card.name, name)) continue
+    if (halfNamed(card, name) < 0) continue
     // A card with a painting beats one without, and this seat's copy beats the
     // other seat's — in that order, because a picture is what this is for.
     if (!best || (card.image && !best.image)

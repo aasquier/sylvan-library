@@ -54,12 +54,20 @@
  * for a granted keyword, so there is nothing to name and inventing one would
  * be the board making a reading of the game (Aaron, 2026-08-27: *"we don't
  * need to say who granted the ability if it is not traceable"*).
+ *
+ * **Each mark is a button, and that is not decoration either.** A drawing this
+ * size cannot carry its own meaning to somebody meeting Magic here, so every
+ * one of them explains itself in a panel — see `components/hint.tsx` for why
+ * the `title` attribute it replaces was never an answer. The drawing is still
+ * ten pixels; the *target* under it is not, because a thirteen-pixel chip is
+ * not something a thumb can hit.
  */
 
 import type { ReactElement } from 'react'
 
-import { type DrawnKeyword, drawableKeywords, keywordMeaning, keywordWords }
+import { type DrawnKeyword, drawableKeywords, keywordSaid, keywordWords }
   from '../lib/keywords'
+import { FieldHint } from './hint'
 
 /** One mark, drawn on `currentColor` in a 20-unit box like the rest of the
  *  house's glyphs. */
@@ -417,48 +425,73 @@ const MOST = 4
  * game and a band that regrouped itself every time something entered play
  * would move the mark a player was reading.
  *
- * **Two tooltips, at two grains, and that is deliberate.** The band carries the
- * scannable list — `flying, vigilance (granted)` — because it is the whole
- * accessible account of a row of `aria-hidden` pictures and a paragraph there
- * would be unreadable. Each mark carries the *sentence*: what the sign means,
- * and whether the card came with it. Aaron asked for the second one on a
- * granted keyword, where a player has nowhere else to look — lifting the card
- * face out shows a Bronzehide Lion with no vigilance printed on it — and every
- * mark gets it, because a viper is a viper whoever put it there.
+ * **Every mark says what it means, and it stopped being a `title` to do it.**
+ * The sentence used to hang off the attribute — which draws on hover, and on
+ * nothing else. A phone never saw one; the keyboard never saw one either,
+ * because no browser renders `title` on focus; and the marks were not
+ * focusable in the first place, so a keyboard could not even reach the thing
+ * whose tooltip it was not going to get. That made the one explanation this
+ * board offers a newcomer available to a mouse and to nobody else, which is
+ * commandment 2 failing quietly (Aaron, 2026-08-28, for the third time in four
+ * days). `FieldHint` is the answer and carries the whole argument; each mark
+ * is a button now, and hover, focus and a tap all raise the same panel.
+ *
+ * Aaron asked for the sentence first on a *granted* keyword, where a player
+ * has nowhere else to look — lifting the card face out shows a Bronzehide Lion
+ * with no vigilance printed on it — and every mark gets one, because a viper is
+ * a viper whoever put it there.
+ *
+ * **The band's own `title` is gone with them.** It carried the scannable list
+ * because it was the whole accessible account of a row of `aria-hidden`
+ * pictures; the pictures now sit inside buttons that are named, so the list is
+ * said by the marks themselves. The card one level up still carries it in
+ * prose for anybody reading the card rather than the corner.
  */
 export function KeywordMarks(
-  { keywords, granted = [] }: { keywords: string[]; granted?: string[] },
+  { keywords, granted = [], onHint, onHintShut }: {
+    keywords: string[]
+    granted?: string[]
+    /** Passed through to every mark: the card these are standing on uses it to
+     *  put its own hover preview down while a panel is up. */
+    onHint?: () => void
+    onHintShut?: () => void
+  },
 ) {
   const drawn = drawableKeywords(keywords)
   if (drawn.length === 0) return null
   const lent = new Set(granted.map((k) => k.toLowerCase()))
-  // Index-aligned with `drawn` by construction — `keywordWords` is that same
-  // call with the lending written in — so the mark and the words about it can
-  // never fall out of step, and the phrasing is spelled in one place.
-  const words = keywordWords(keywords, granted)
-  // The band's list stays short; each mark gets the sentence. Both are spelled
-  // in `lib/keywords.ts` so the phrasing lives in one place.
-  const means = drawn.map((key) => keywordMeaning(key, lent.has(key)))
   const shown = drawn.slice(0, MOST)
-  const rest = drawn.length - shown.length
+  const spare = drawn.slice(MOST)
   return (
-    <span className="field-keywords" title={words.join(', ')}>
-      {shown.map((key, i) => {
+    <span className="field-keywords">
+      {shown.map((key) => {
         const Mark = MARKS[key]
+        const said = keywordSaid(key, lent.has(key))
         return (
-          <span key={key}
-                className={`field-keyword${lent.has(key) ? ' is-granted' : ''}`}
-                title={means[i]}>
+          <FieldHint key={key} name={said.name} says={said.says}
+                     note={said.note} onOpen={onHint} onShut={onHintShut}
+                     className={`field-keyword${
+                       lent.has(key) ? ' is-granted' : ''}`}>
             <svg viewBox="0 0 20 20" aria-hidden focusable="false">
               <Mark />
             </svg>
-          </span>
+          </FieldHint>
         )
       })}
-      {rest > 0 && (
-        <span className="field-keyword field-keyword-more tabular">
-          +{rest}
-        </span>
+      {/* **The overflow chip explains itself too**, which it could not while
+          it was a bare count. Four marks is where a column of chips stops
+          being a corner, and the fifth keyword was simply gone — a player
+          could see that *something* was not being drawn and had no way at all
+          to learn what. It is the same panel as its neighbours, saying the
+          words it is standing in for; `keywordWords` writes the lending in,
+          so a hidden granted keyword still says it was lent. */}
+      {spare.length > 0 && (
+        <FieldHint name={`${spare.length} more`}
+                   says={keywordWords(spare, granted).join(', ')}
+                   onOpen={onHint} onShut={onHintShut}
+                   className="field-keyword field-keyword-more tabular">
+          +{spare.length}
+        </FieldHint>
       )}
     </span>
   )
