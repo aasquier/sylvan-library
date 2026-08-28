@@ -1412,6 +1412,36 @@ export interface AdminStorage {
   decks: { count: number; bytes: number | null; trashed: number }
 }
 
+/** `GET /api/admin/upkeep` — the two things about this instance that go out
+ *  of date on their own.
+ *
+ *  The library half is a state as much as a reading: `refreshing` and
+ *  `job_id` are what let a page reloaded mid-gathering attach to the run
+ *  already going instead of offering to start a second one, which is the
+ *  thing ADR 6 asks be made hard.
+ *
+ *  The arena half is a reading and never a lever — `playing_with` is the
+ *  Forge the last recorded game here was actually played with, which is a
+ *  stronger fact than anything a build could claim about itself. There is no
+ *  button beside it on purpose; `go/internal/api/upkeep.go` argues why. */
+export interface AdminUpkeep {
+  library: {
+    /** False while a gathering holds the shelves, and on an instance that has
+     *  never gathered one. The counts read zero in both cases. */
+    present: boolean
+    cards: number
+    printings: number
+    /** The day the shelves were last written, `2026-08-24`, or null. */
+    gathered: string | null
+    refreshing: boolean
+    job_id: string | null
+  }
+  arena: {
+    here: boolean
+    playing_with: string | null
+  }
+}
+
 /** One mode's ledger roll-up (the server's Claude ledger): counters, a mode
  *  name, and nothing that could name a person, a deck or a question. */
 export interface ClaudeUsageRow {
@@ -2998,6 +3028,12 @@ export const api = {
   adminActivity: () => get<AdminActivity>('/api/admin/stats/activity'),
   adminTraffic: () => get<AdminTraffic>('/api/admin/stats/traffic'),
   adminFly: () => get<AdminFly>('/api/admin/stats/fly'),
+  adminUpkeep: () => get<AdminUpkeep>('/api/admin/upkeep'),
+  // ADR 6's long-specified admin refresh, cashed in. It answers 202 with the
+  // job to poll, or 409 with the id of the gathering already under way — one
+  // at a time, because the shelves can only be rewritten by one thing and
+  // because needless bulk traffic is exactly what we were asked not to make.
+  refreshLibrary: () => post<Job>('/api/admin/library/refresh', {}),
   inviteAccount: (body: { email: string; username?: string; is_admin?: boolean }) =>
     post<Account>('/api/admin/users', body),
   // One route for both levers, and both refusals come from the server: the

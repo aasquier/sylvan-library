@@ -43,6 +43,8 @@ var adminRoutes = []struct{ method, target, payload string }{
 	{"GET", "/api/admin/stats/activity", ""},
 	{"GET", "/api/admin/stats/traffic", ""},
 	{"GET", "/api/admin/stats/fly", ""},
+	{"GET", "/api/admin/upkeep", ""},
+	{"POST", "/api/admin/library/refresh", ""},
 }
 
 // The second check, on every route. 403 and **not** ADR 5's 404, which is the

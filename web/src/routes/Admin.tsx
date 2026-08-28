@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 // The five readout payload types are gone from this import on purpose: each
 // panel now gets its shape from `usePolled`'s inference over the client
 // function it was handed, so a renamed field is a type error at the tile
 // rather than at a hand-written annotation that had drifted. `AdminClaude`
 // stays because `ClaudePanel` takes one as a prop.
 import {
-  api, errorMessage, type Account, type AccountList, type AdminClaude,
-  type AdminStorage, type ModelTier,
+  api, errorMessage, followJob, type Account, type AccountList,
+  type AdminClaude, type AdminStorage, type AdminUpkeep, type Job,
+  type ModelTier,
 } from '../lib/api'
 import { Badge, ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { EditsChart, TrafficChart } from '../components/lazycharts'
@@ -556,6 +557,234 @@ function ActivityPanel() {
   )
 }
 
+/**
+ * Upkeep: the two things about this instance that go out of date on their
+ * own, and what can honestly be done about each from here.
+ *
+ * **The library can be gathered again from this page**, which is ADR 6's own
+ * plan finally cashed in: it always said the next step would be "an
+ * authenticated admin endpoint that starts a refresh as a background job",
+ * and only after refreshing by hand had been forgotten twice. It has been.
+ *
+ * The control is deliberately hard to press by accident, because what is on
+ * the other side of it is a very large download and several minutes during
+ * which nobody can look a card up:
+ *
+ * - It opens a confirmation that says both of those things in plain words
+ *   before there is anything to click, and says how rarely it is the right
+ *   button — the card data changes about weekly, so gathering it daily is
+ *   traffic nobody asked for.
+ * - Only one gathering runs at a time, and the server is what enforces that:
+ *   press it twice, or from two devices, and the second press attaches to the
+ *   first gathering instead of starting another.
+ * - A page reloaded mid-gathering finds the run and follows it, rather than
+ *   offering to start one on top of it.
+ *
+ * **The arena has a reading and no button, and that is the honest answer
+ * rather than a missing feature.** The machine that plays the games is built
+ * by the release that ships it — from a Forge that is pinned on purpose,
+ * because the games recorded here are all measured against whichever Forge
+ * played them, so changing it is a decision somebody takes and not a refresh
+ * anybody presses. What it takes automatically, it already takes: every
+ * release re-cuts it with the newest fixes underneath. So what this page adds
+ * is the fact nobody could see before — which Forge the last game here was
+ * actually played with.
+ */
+function UpkeepPanel() {
+  const [state, setState] = useState<AdminUpkeep | null>(null)
+  const [job, setJob] = useState<Job | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  // Which gathering this tab is already following, so the re-attach effect
+  // below fires once per run rather than on every reading that mentions it.
+  const following = useRef<string | null>(null)
+
+  const load = useCallback(
+    () => api.adminUpkeep()
+      .then(setState)
+      .catch((e: unknown) => { setError(errorMessage(e)) }),
+    [],
+  )
+  useEffect(() => { void load() }, [load])
+
+  // Three seconds and not the default four hundred milliseconds: this job is
+  // minutes long, so a fast poll would be several hundred requests to watch a
+  // bar move five times.
+  const watch = useCallback((id: string) => {
+    const { promise } = followJob(id, setJob, 3000)
+    promise
+      .then((done) => {
+        const shelves = done.result as { cards?: number; printings?: number } | null
+        setNote(`The shelves are full again — ${fmtCount(shelves?.cards)} cards`
+                + `, ${fmtCount(shelves?.printings)} printings.`)
+        setError(null)
+      })
+      .catch((e: unknown) => { setError(errorMessage(e)); setNote(null) })
+      .finally(() => { setJob(null); following.current = null; void load() })
+  }, [load])
+
+  // A gathering already under way when this page loaded — another tab, another
+  // device, or this one before a reload.
+  useEffect(() => {
+    const id = state?.library.job_id
+    if (!id || following.current === id) return
+    following.current = id
+    watch(id)
+  }, [state?.library.job_id, watch])
+
+  async function gather() {
+    setAsking(false)
+    setNote(null)
+    setError(null)
+    try {
+      const started = await api.refreshLibrary()
+      following.current = started.id
+      setJob(started)
+      watch(started.id)
+    } catch (e: unknown) {
+      setError(errorMessage(e))
+      void load()
+    }
+  }
+
+  const library = state?.library
+  const arena = state?.arena
+  const running = job !== null || library?.refreshing === true
+  const saying = (job?.partial as { saying?: string } | null)?.saying
+
+  return (
+    <section className="space-y-4">
+      {note && (
+        <div className="rounded-lg px-4 py-3 text-sm"
+             style={{ background: 'color-mix(in srgb, var(--status-good) 10%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--status-good) 35%, transparent)',
+                      color: 'var(--text-primary)' }}>
+          {note}
+        </div>
+      )}
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      {/* ---- the library ------------------------------------------------- */}
+      <div className="card-surface rounded-xl p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-tight">The library</h2>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {library?.gathered
+              ? `last gathered ${library.gathered}`
+              : 'never gathered here'}
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <StatTile label="Cards"
+                    value={library && library.present ? fmtCount(library.cards) : '—'}
+                    hint="every card the library knows by name" />
+          <StatTile label="Printings"
+                    value={library && library.present ? fmtCount(library.printings) : '—'}
+                    hint="each card as it was actually printed" />
+        </div>
+
+        {running ? (
+          <div className="mt-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                {saying ?? 'clearing the shelves'}…
+              </p>
+              <span className="text-[11px] tabular-nums"
+                    style={{ color: 'var(--text-muted)' }}>
+                {job ? `${job.percent}%` : 'under way'}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full"
+                 role="progressbar"
+                 aria-label="Gathering the library"
+                 aria-valuenow={job?.percent ?? 0}
+                 aria-valuemin={0}
+                 aria-valuemax={100}
+                 style={{ background: 'color-mix(in srgb, var(--text-muted) 22%, transparent)' }}>
+              <div className="h-full rounded-full upkeep-gathering"
+                   style={{ width: `${Math.max(job?.percent ?? 0, 4)}%` }} />
+            </div>
+            <p className="mt-2 text-xs leading-relaxed"
+               style={{ color: 'var(--text-muted)' }}>
+              Card lookups are shut while this runs, and it takes several
+              minutes. Nothing else on the site is affected, and you can leave
+              this page — the gathering is the instance’s work, not this tab’s,
+              and this page finds it again when you come back.
+            </p>
+          </div>
+        ) : asking ? (
+          <div className="mt-4 rounded-lg p-4"
+               style={{ border: '1px solid color-mix(in srgb, var(--status-warning) 40%, transparent)',
+                        background: 'color-mix(in srgb, var(--status-warning) 8%, transparent)' }}>
+            <p className="text-sm leading-relaxed"
+               style={{ color: 'var(--text-primary)' }}>
+              Gathering the library again fetches every card and every printing
+              from scratch. It takes several minutes and pulls down a great
+              deal, and <strong>while it runs nobody can look a card up</strong> —
+              deck pages, searches and simulations will all say the library is
+              away.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed"
+               style={{ color: 'var(--text-muted)' }}>
+              It is rarely the right button. The card data is published daily
+              but changes very little; once a week, or the day after a new set
+              arrives, is plenty. If the shelves were gathered recently there
+              is almost certainly nothing new to fetch.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn btn-danger btn-sm"
+                      onClick={() => { void gather() }}>
+                Gather it now
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm"
+                      onClick={() => setAsking(false)}>
+                Leave it
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" className="btn btn-quiet btn-sm"
+                    onClick={() => setAsking(true)}>
+              Gather the library again
+            </button>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Several minutes, and card lookups pause while it runs.
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ---- the arena --------------------------------------------------- */}
+      <div className="card-surface rounded-xl p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-tight">The arena</h2>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {arena?.here ? 'set up here' : 'not set up here'}
+          </span>
+        </div>
+        <p className="mt-3 text-sm" style={{ color: 'var(--text-primary)' }}>
+          {arena?.playing_with
+            ? <>The last game played here was judged by <strong>Forge {arena.playing_with}</strong>.</>
+            : 'No game has been played here yet, so there is nothing to report about who judged one.'}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed"
+           style={{ color: 'var(--text-muted)' }}>
+          There is no button here on purpose. The arena is rebuilt with every
+          release and takes the newest fixes each time, so the part that must
+          not go stale does not. Which Forge it plays with is a different
+          thing: every recorded game is measured against the one that played
+          it, so moving to a newer Forge changes the judge rather than
+          refreshing a part — it is a decision, taken deliberately, and one
+          nobody should be able to take by accident from a web page.
+        </p>
+      </div>
+    </section>
+  )
+}
+
 /** The ledger's own tab. `ClaudePanel` takes the payload rather than fetching
  *  it, because it is the piece with the window chips and no business knowing
  *  where its rows came from. */
@@ -945,6 +1174,10 @@ const TABS = [
   { id: 'machine', label: 'Machine' },
   { id: 'storage', label: 'Storage' },
   { id: 'activity', label: 'Activity' },
+  // The only readout tab with anything to *do* on it besides Accounts, which
+  // is why it is last rather than beside Storage: the five before it answer
+  // "how is the instance", and this one answers "does it need anything".
+  { id: 'upkeep', label: 'Upkeep' },
 ] as const
 type AdminTab = (typeof TABS)[number]['id']
 
@@ -1040,6 +1273,7 @@ export default function Admin() {
       {tab === 'machine' && <MachinePanel />}
       {tab === 'storage' && <StoragePanel />}
       {tab === 'activity' && <ActivityPanel />}
+      {tab === 'upkeep' && <UpkeepPanel />}
 
       {tab === 'accounts' && (
         <>
