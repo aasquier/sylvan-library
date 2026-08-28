@@ -180,6 +180,81 @@ body {
   border: 1px solid var(--hairline);
 }
 
+/* ============================================ light lands ON a card, never
+ *                                                       THROUGH it
+ *
+ * Scryfall's imagery guidelines, fetched verbatim 2026-08-28 from
+ * https://scryfall.com/docs/api ("Use of Scryfall Data and Images"):
+ *
+ *   "Do not blur, sharpen, desaturate, or color-shift card images."
+ *   "Do not distort, skew, or stretch card images."
+ *
+ * `brightness()` and `contrast()` are not enumerated by name -- "color-shift"
+ * is the umbrella they sit under, and ADR 32 committed this repo to the strict
+ * reading of it. Stricter than required is free, and commandment 9 asks for it.
+ *
+ * **So a grade is a LAYER, and the mechanism is the same one every time.**
+ * `.field-card-leaf::after` found it first and ADR 48 wrote it down: shade over
+ * a picture is a picture in shade, and a filter is a different picture. Two
+ * shapes, and between them they replace every filter the 2026-08-27 sweep
+ * found:
+ *
+ *   - **the shade** -- black over the art, which is what a `brightness(k)`
+ *     below 1 was doing: alpha = 1 - k. Usually a `::after` on the element
+ *     that already exists (`.card-sheet-slide`, `.field-fan-card`,
+ *     `.entombing`), because a card that needs shading is nearly always
+ *     inside something; `.art-dimmed` below is the wrapper for when it is
+ *     not. There is deliberately no standalone `.art-shade` class: every
+ *     site so far had a box already, and a class nothing uses is a class the
+ *     next session has to work out the purpose of.
+ *   - **the lift** -- a warm near-white at `--art-lift` alpha under
+ *     `mix-blend-mode: screen`, which is what a `brightness(k)` above 1 was
+ *     reaching for and is strictly better at it. A multiply scales every
+ *     channel, so it blows highlights out first -- exactly the bug written up
+ *     over `.hero-art`, where 1.75 bleached a bright forest to a flat haze.
+ *     Screen lifts shadows and leaves highlights nearly alone, which is what
+ *     "a dark painting against a near-black page is mud" actually wants.
+ *     Equivalence at a dark mid-tone (v = 0.25): alpha = (k - 1) * v / (1 - v).
+ *
+ * `saturate()` has no layer, and it does not get one: it is the clause by
+ * name. Every `saturate()` in the sweep was 1.05-1.15, a delta no eye finds
+ * and no painting needed.
+ *
+ * Both are `pointer-events: none` because a wash is not a target, and both
+ * inherit the radius so a rounded card is not washed square at its corners.
+ */
+.art-lift {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: screen;
+  /* Warm rather than neutral: card paintings are pigment, and a grey lift
+     greys them. This is the colour a low sun puts on one. */
+  background: rgb(255 246 230 / var(--art-lift, 0));
+}
+
+/* The shade with its own box, for the common case: a wrapper round one piece
+   of art that has to read as quieter than its neighbours. `--art-shade` tunes
+   it per site; the default is the graveyard's, which is where it started. */
+.art-dimmed {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  /* `CardArt`'s own `rounded-md`, so the shade ends where the picture does.
+     A square wash over a rounded thumbnail shows four dark corners, which is
+     how you can tell a shade was added by somebody who did not look. */
+  border-radius: 0.375rem;
+}
+.art-dimmed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: rgb(0 0 0 / var(--art-shade, 0.3));
+}
+
 /* Full-bleed art behind text, as on the empty library.
  *
  * The two themes need genuinely different treatment here, which is why this is
@@ -216,17 +291,44 @@ body {
  * that one is a wash behind text and can take a heavy hand, this one is the
  * picture itself and the same treatment bleached it. `Sylvan Library` is a
  * bright yellow-green forest to begin with — the assumption baked into the
- * 1.75 below, that card paintings are dark and vanish against a near-black
- * panel, is exactly wrong for this painting, which is the app's own and the
- * only one this rule was never checked against. */
+ * 1.75 the `.hero-art` block records, that card paintings are dark and vanish
+ * against a near-black panel, is exactly wrong for this painting, which is the
+ * app's own and the only one this rule was never checked against.
+ *
+ * **The plate is the box and the painting is what is in it.** This split is
+ * what the 2026-08-27 sweep cost here: `.masthead-art` used to carry
+ * `brightness(1.12) saturate(1.1)` in dark mode, on the one image that renders
+ * on every mastheaded route in the app. A lift has to be `inset: 0` of
+ * something, and a replaced element is not something — so the width classes
+ * moved out to the plate (`PageMasthead`, which is the only caller) and the
+ * media fills it. The still and the 16:9 loop both wear it; `.masthead-loop`
+ * below overrides the ratio for the loop and is *on the plate* for the same
+ * reason `align-self` was always on it. */
 .masthead-art {
-  aspect-ratio: 616 / 452;
-  filter: saturate(1.05);
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-
-:root[data-theme='dark'] .masthead-art,
-:root:where(:not([data-theme='light'])) .masthead-art {
-  filter: brightness(1.12) saturate(1.1);
+.masthead-plate {
+  position: relative;
+  display: block;
+  aspect-ratio: 616 / 452;
+  overflow: hidden;
+  /* **`flex: none`, and it is the whole cost of moving the width off the
+     image.** An `<img>` is a replaced element: its automatic minimum size is
+     its intrinsic size, so a flex row cannot shrink it below the width it was
+     given. A `<span>` has no intrinsic size, its automatic minimum is its
+     content's min-content — and the media inside is `width: 100%`, which is
+     zero. So the loop's `sm:w-[46%]` came out 325px of a 1230px row instead
+     of 566: the goldfish, which this class was created to stop being too
+     small, back to being too small. Measured in a real browser at 1400px,
+     because nothing in jsdom has a size. */
+  flex: none;
+}
+:root[data-theme='dark'] .masthead-plate > .art-lift,
+:root:where(:not([data-theme='light'])) .masthead-plate > .art-lift {
+  --art-lift: 0.04;
 }
 
 /* A masthead that MOVES, shown at the size a moving picture earns.
@@ -246,7 +348,6 @@ body {
  * would put the crop straight back. */
 .masthead-loop {
   aspect-ratio: 16 / 9;
-  object-fit: cover;
   align-self: center;
 }
 
@@ -261,15 +362,15 @@ body {
   );
 }
 
-/* 1.75 was tuned against the dark commander paintings on the deck page and
-   never checked against the one painting that is always here. On a bright
-   forest it blew the highlights out to a flat yellow-green haze — the failure
-   nobody caught, because the only screen that renders it is the one an
-   instance with decks on it never shows. 1.3 still lifts a dark painting off a
-   near-black page without bleaching a light one. */
-:root[data-theme='dark'] .hero-art,
-:root:where(:not([data-theme='light'])) .hero-art {
-  filter: brightness(1.3) saturate(1.1);
+/* The lift that used to be `brightness(1.3) saturate(1.1)` *on the painting*.
+   Same job, laid over it instead — and this is the rule whose own comment
+   recorded why a multiply is the wrong tool: at 1.75 it "blew the highlights
+   out to a flat yellow-green haze", which is what scaling every channel does
+   to a bright forest. A screen lifts the shadows and leaves the highlights
+   nearly where they were, so there is no value to tune down away from. */
+:root[data-theme='dark'] .hero-lift,
+:root:where(:not([data-theme='light'])) .hero-lift {
+  --art-lift: 0.1;
 }
 
 :root[data-theme='dark'] .hero-scrim,
@@ -310,13 +411,16 @@ body {
  * above `.hero-art`: most of these paintings are dark, and a dark painting
  * against a near-black panel is mud.
  */
-.deck-hero-band img {
-  filter: saturate(1.08);
-}
-
-:root[data-theme='dark'] .deck-hero-band img,
-:root:where(:not([data-theme='light'])) .deck-hero-band img {
-  filter: brightness(1.45) saturate(1.15);
+/* **The largest colour-shift in the app was here**: `brightness(1.45)` on the
+   commander's own painting, four tenths of the way to a different picture. It
+   is now a layer over the band, and one layer rather than two — the still and
+   ADR 32's derivative sit in the same box, so the lift covers whichever of
+   them is showing and there is nothing left to keep in step. It is a sibling
+   element rather than `.deck-hero-band::after` because the scrim has to paint
+   *over* the lift and DOM order is how that is said without a z-index. */
+:root[data-theme='dark'] .deck-hero-lift,
+:root:where(:not([data-theme='light'])) .deck-hero-lift {
+  --art-lift: 0.15;
 }
 
 /* Where the painting becomes the page. A fixed height rather than `inset: 0`
@@ -413,7 +517,6 @@ body {
   height: 100%;
   object-fit: cover;
   object-position: center top;
-  filter: saturate(1.08);
 }
 
 /* The gallery's anchor: a loop replacing a centre-cropped still keeps the
@@ -424,12 +527,8 @@ body {
   object-position: center;
 }
 
-:root[data-theme='dark'] .deck-hero-motion video,
-:root[data-theme='dark'] .deck-hero-motion canvas,
-:root:where(:not([data-theme='light'])) .deck-hero-motion video,
-:root:where(:not([data-theme='light'])) .deck-hero-motion canvas {
-  filter: brightness(1.45) saturate(1.15);
-}
+/* Nothing here any more: the band's own `.deck-hero-lift` covers the still and
+   the derivative alike, which is the point of their sharing a box. */
 
 /* The reading room (Learn's foot): Spitzweg's Bookworm in a gallery frame.
  * Wood and a thin gilt sight-edge, drawn rather than photographed -- the
@@ -1627,10 +1726,24 @@ button:hover .tarot-fan-card {
   pointer-events: none;
   mix-blend-mode: screen;
   opacity: 0;
-  /* The ripple first, then the grade. `url()` has to lead: a displacement
-     map moves pixels, and moving them after a blur smears the blur instead
-     of the picture. */
-  filter: url(#seance-ripple) saturate(1.05) brightness(1.12) blur(0.4px);
+  /* **Nothing reaches the card here, and this is the rule's hardest case.**
+     What stood here was `filter: url(#seance-ripple) saturate(1.05)
+     brightness(1.12) blur(0.4px)` -- a `feDisplacementMap` at `scale="15"`,
+     which is fifteen pixels of the painting physically moved, plus three of
+     the four verbs Scryfall names. Verbatim, fetched 2026-08-28:
+     *"Do not distort, skew, or stretch card images"* and *"Do not blur,
+     sharpen, desaturate, or color-shift card images."* The displacement is
+     the first clause exactly; the blur is the second by name.
+
+     And the tarot deck is 136 cards with 58 Magic crossovers weighted 1.5x,
+     so the thing in the glass is a Magic painting about half the time. This
+     is commandment 15's room; it does not get the loose reading.
+
+     **The shimmer did not have to go with it.** What made the fortune read
+     as suspended IN something was light moving over glass, and light moving
+     over glass is a layer -- `.seance-glass-caustic` below, drifting on its
+     own long period. The card underneath it is now exactly the card, and
+     what moves is the sphere. */
   /* A circle, and a LONG ramp. The card fitted in a square box only reaches
      57% of the circle's radius at its left and right edges, so a tight fade
      would leave two straight sides showing inside a round glow. Starting to
@@ -1673,6 +1786,57 @@ button:hover .tarot-fan-card {
   }
   50% {
     translate: -50% -52%;
+  }
+}
+
+/* **The glass moves now, instead of the card.**
+ *
+ * The ripple this replaces was a displacement map on the fortune itself, and
+ * it bought one real thing: the sense of looking *through* something. That
+ * sense lives in the light, not in the picture — a sphere of old glass throws
+ * caustics that crawl as the room's candles move, and an eye reads those as
+ * depth without ever being told the card is behind them.
+ *
+ * So: two soft lobes on the sphere's own circle, screened, drifting on a
+ * thirteen-second period that never lines up with the vision's nine-second
+ * sway. Between them the light on the glass is never twice the same, and the
+ * card under it is never once altered. Round, because the ball is.
+ *
+ * `background-position` rather than moving the element: the lobes have to
+ * slide *within* the sphere, and translating the whole layer would slide the
+ * sphere. Both, in fact — a whole-layer nudge for the room breathing, and the
+ * positions for the light crawling on the glass. */
+.seance-glass-caustic {
+  position: absolute;
+  left: var(--ball-x);
+  top: var(--ball-y);
+  width: calc(var(--ball-d) * 1.03);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse 58% 32% at 34% 29%,
+      rgba(206, 222, 255, 0.34) 0%, rgba(206, 222, 255, 0.1) 46%,
+      transparent 72%),
+    radial-gradient(ellipse 42% 24% at 69% 63%,
+      rgba(255, 226, 178, 0.24) 0%, transparent 70%);
+  opacity: 0.5;
+  animation: seance-caustic 13s ease-in-out infinite;
+}
+
+@keyframes seance-caustic {
+  0%,
+  100% {
+    opacity: 0.42;
+    translate: -50% -50%;
+    background-position: 0 0, 0 0;
+  }
+  50% {
+    opacity: 0.64;
+    translate: -50% -51.3%;
+    background-position: 5% -4%, -6% 4%;
   }
 }
 
@@ -1809,6 +1973,11 @@ button:hover .tarot-fan-card {
   .seance-vision {
     animation: none;
     opacity: 0.92;
+  }
+  /* The caustic's resting state is its own 0% frame, so unlike the vision it
+     only needs the animation dropped. */
+  .seance-glass-caustic {
+    animation: none;
   }
   .seance-scroll::after {
     animation: none;
@@ -4019,16 +4188,37 @@ button:hover .tarot-fan-card {
  * asked, so an entombment reads as "sent to the graveyard" rather than a row
  * blinking out. `forwards` holds the sunken frame until the refreshed list
  * arrives without the row. */
+/* **The row carried `grayscale(1) brightness(0.85)` and the row contains a
+   card.** A keyframe is the quietest way a filter reaches a painting — nothing
+   in the rule that names it mentions colour at all — which is the exact shape
+   `cardimagery_test.go` was written to catch, one surface over.
+   The grey is gone rather than relocated: there is no layer that desaturates,
+   and `desaturate` is in Scryfall's list by name. What is left is the sink
+   itself — a settle, a turn, a fade — plus a shade closing over the row, which
+   is a card going into the ground rather than a card being recoloured. */
 @keyframes entomb-sink {
   to {
     opacity: 0;
     transform: translateY(0.6rem) rotate(1.2deg) scale(0.97);
-    filter: grayscale(1) brightness(0.85);
   }
 }
+@keyframes entomb-shade {
+  to { background-color: rgb(0 0 0 / 0.4); }
+}
 .entombing {
+  position: relative;
   animation: entomb-sink 340ms ease-in forwards;
   pointer-events: none;
+}
+.entombing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: rgb(0 0 0 / 0);
+  animation: entomb-shade 340ms ease-in forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5364,13 +5554,32 @@ button:hover .tarot-fan-card {
  * now starts below that band and blooms toward the foot of the viewport,
  * so the room is at its most visible exactly where the page is at its most
  * text. */
-.scene-backdrop-art {
+/* **The painting is gone from here and its colours are not** (ADR 48). What
+ * stood in this rule was the masthead's own art again, at `blur(11px)
+ * saturate(1.02)` — the most-seen violation in the app, on every mastheaded
+ * route, and the only one on the sweep where the forbidden thing *was* the
+ * effect. Scryfall name it first: *"Do not blur, sharpen, desaturate, or
+ * color-shift card images."*
+ *
+ * `lib/artwash.ts` reads the painting into nine averaged colours and hands
+ * them over as overlapping lobes of light; this rule is what the old one was
+ * minus the image and minus the filter — the same inset, the same opacities
+ * per theme, the same mask holding the top of the page quiet. The `-24px`
+ * bleed outlived the blur it was hiding and is kept anyway: the outermost
+ * lobes fall off toward the viewport edge, and starting them just outside it
+ * is what stops a visible ring.
+ *
+ * Nine colours also fix the fault the old comment recorded rather than solved:
+ * a *sharp* clone bleeding out from behind the crisp masthead "read as a
+ * rendering mistake", which is why the mask starts at 15%. A colour field has
+ * no edges to catch, at any size, so the quiet top is now taste rather than
+ * damage control. */
+.scene-backdrop-wash {
   position: absolute;
   inset: -24px;
   width: calc(100% + 48px);
   height: calc(100% + 48px);
-  object-fit: cover;
-  filter: blur(11px) saturate(1.02);
+  background: var(--scene-wash, none);
   opacity: 0.3;
   mask-image: linear-gradient(
     180deg,
@@ -5381,12 +5590,12 @@ button:hover .tarot-fan-card {
   );
 }
 
-:root[data-theme='dark'] .scene-backdrop-art {
+:root[data-theme='dark'] .scene-backdrop-wash {
   opacity: 0.42;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme='light'])) .scene-backdrop-art {
+  :root:where(:not([data-theme='light'])) .scene-backdrop-wash {
     opacity: 0.42;
   }
 }
@@ -5414,7 +5623,15 @@ button:hover .tarot-fan-card {
   height: 100%;
   width: calc((100% - 80rem) / 2 + 5rem);
   object-fit: cover;
-  filter: blur(2px) saturate(1.05);
+  /* **The 2px of blur is gone and the walls are simply the painting.**
+     Scryfall's list, fetched verbatim 2026-08-28: *"Do not blur, sharpen,
+     desaturate, or color-shift card images."* Blur is named, and two pixels of
+     it is still it. This is the cheapest fix on the whole sweep, because the
+     rule's own comment already wanted what compliance gives — "near-sharp",
+     "not 18px to erase it". At zero it is sharp, and the opacity and the mask
+     do the sitting-behind-glass the blur was helping with. Neither of those is
+     an alteration: a painting at three tenths behind a fade is the painting,
+     composited, the way every image on every page is. */
   opacity: 0.3;
   mask-image: linear-gradient(90deg, #000 0%, #000 45%, transparent 96%);
 }
@@ -6366,17 +6583,15 @@ button:hover .tarot-fan-card {
   to   { opacity: 1; transform: none; }
 }
 
-/* Both themes, opposite treatment — the `.hero-art` rule, for its reason. */
-:root[data-theme='dark'] .arena-art,
-:root[data-theme='dark'] .coliseum-hero-art,
-:root:where(:not([data-theme='light'])) .arena-art,
-:root:where(:not([data-theme='light'])) .coliseum-hero-art {
-  filter: brightness(1.06) saturate(1.05);
-}
-:root[data-theme='light'] .arena-art,
-:root[data-theme='light'] .coliseum-hero-art {
-  filter: brightness(0.95) saturate(0.97);
-}
+/* **Both themes used to grade these paintings and neither does now.** They
+   were the smallest colour-shifts the 2026-08-27 sweep found — six per cent up
+   in dark, five per cent down in light — and small is not the same as allowed:
+   Scryfall's list says *"color-shift"* without a floor, and the two most-seen
+   paintings in the Coliseum are Carl Critchlow's Grand Coliseum and Rob
+   Alexander's Arena, credited by name under each of them.
+   Dropped rather than layered, for the reason written over `.field-pile-ground`
+   — under ten per cent there is nothing an eye can find to preserve. Over ten
+   per cent, `.art-lift` and `.art-shade` are how it is kept. */
 
 /* ------------------------------------------------------------- the gatehouse
  *
@@ -8138,11 +8353,18 @@ button:hover .tarot-fan-card {
    nothing else to say. */
 .field-pile.is-empty { opacity: 0.72; }
 
-/* The painting. Darkened and desaturated on purpose — it is a *ground*, and a
-   ground that competes with the card on top of it is a mistake wearing good
-   art. `object-position: 50% 35%` because a card's art box is landscape and a
+/* The painting — a *ground*, so it stays behind the card on top of it.
+   `object-position: 50% 45%` because a card's art box is landscape and a
    zone tile is portrait: the middle-upper band is where these four paintings
-   keep their subject. */
+   keep their subject.
+
+   **The `filter` that used to close this rule is gone and nothing replaces
+   it.** It read `saturate(1) brightness(0.94)`: a no-op followed by a six per
+   cent dim. Six per cent is below the threshold where an eye can find it and
+   well below the threshold where a layer earns a DOM node — and putting one
+   here would have meant an explicit z-index on all six of this tile's
+   siblings, since the shade has to land above the ground and below the card,
+   the label and the count. Deleted, measured, and the tile is unchanged. */
 .field-pile-ground {
   position: absolute;
   inset: 0;
@@ -8151,7 +8373,6 @@ button:hover .tarot-fan-card {
   object-fit: cover;
   object-position: 50% 45%;
   opacity: 1;
-  filter: saturate(1) brightness(0.94);
 }
 
 /* The wrapper is the hover target, and it holds the pile *and* the tray that
@@ -9266,12 +9487,32 @@ button:hover .tarot-fan-card {
     0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, rgba(0, 0, 0, 0.6));
   transition:
     transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 170ms ease,
-    filter 170ms ease;
-  /* The covered ones sit back a little: not dimmed to unreadable, because the
-     whole point is that you can see what is in the fan before you reach for
-     it, but enough that the raised card is unmistakably the one being read. */
-  filter: brightness(0.72) saturate(0.9);
+    box-shadow 170ms ease;
+}
+/* The covered ones sit back a little: not dimmed to unreadable, because the
+   whole point is that you can see what is in the fan before you reach for it,
+   but enough that the raised card is unmistakably the one being read.
+
+   **As shade over the card, which is the fifteenth of these and the last one
+   found.** It read `filter: brightness(0.72) saturate(0.9)` on a span holding
+   `<img src={c.image}>` — a whole printed card, credit and all — and it was
+   not on the 2026-08-27 audit at all. It turned up on the second pass, the one
+   that reads every altering filter in this file against the JSX that puts card
+   art on the class it names (ADR 48). That sweep is the thing to re-run; a
+   list is the thing that misses one.
+
+   `.card-sheet-slide::after` one room over is the same fix for the same
+   reason, down to the 3D: a filter flattens whatever it is applied to, and
+   `.field-fan-card.is-up` translates 42px in Z. A pseudo-element is a child,
+   so it comes forward with its parent instead of collapsing it. */
+.field-fan-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: rgb(0 0 0 / 0.28);
+  transition: background-color 170ms ease;
 }
 .field-fan-card img {
   display: block;
@@ -9285,11 +9526,14 @@ button:hover .tarot-fan-card {
    exactly where it was when the pointer arrives at the next card. */
 .field-fan-card.is-up {
   transform: translate3d(0, calc(-1 * var(--fan-lift, 16px)), 42px);
-  filter: none;
   box-shadow:
     0 14px 30px rgba(0, 0, 0, 0.72),
     0 0 0 1.5px color-mix(in srgb, var(--field-brass) 80%, transparent),
     0 0 22px color-mix(in srgb, var(--field-sun) 26%, transparent);
+}
+/* The shade comes all the way off the one being read. */
+.field-fan-card.is-up::after {
+  background-color: rgb(0 0 0 / 0);
 }
 /* The name of whatever is raised, on the room's own caption plate — the same
    dark plate with a brass hairline `.field-hint-panel` and `.field-peek-worn`
@@ -9346,6 +9590,7 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .field-fan { animation: none; }
   .field-fan-card,
+  .field-fan-card::after,
   .field-fanned { transition: none; }
 }
 
@@ -10975,15 +11220,46 @@ button:hover .tarot-fan-card {
   background: radial-gradient(ellipse at 50% 60%,
     rgba(150, 190, 210, 0.28) 0%, rgba(6, 8, 10, 0.62) 70%);
 }
-.field-pile-ghost img {
+/* **The one on this list where the violation WAS the intended effect.**
+   `saturate(0.6) brightness(1.25) contrast(1.05)` is "pale" spelled as a
+   filter, and pale is genuinely what a ghost has to be — so this could not be
+   deleted the way a six per cent grade could, and it could not be moved to a
+   pseudo-element either, because an `<img>` is a replaced element and has no
+   pseudo-element to move it to.
+
+   So the image got a box to live in, and the pallor is a sheet of light
+   screened over it (`.field-pile-ghost-lit::after`). Screen is what makes it
+   work rather than a coincidence: lifting every channel toward white *is*
+   desaturation as an eye reads it — the colours converge because they all
+   approach the same ceiling — which is the whole of `saturate(0.6)
+   brightness(1.25)` in one honest layer, and the card underneath still has
+   every colour Wizards printed on it.
+
+   The wrapper takes the animation as well as the width, so the light and the
+   painting rise and thin together. Two clocks for one event is how they end
+   up out of step, and that lesson is why the skull and the ghost share
+   `--mark-life-dies` in the first place. */
+.field-pile-ghost-lit {
+  position: relative;
+  display: block;
   width: 84%;
+  line-height: 0;
+  animation: grave-ghost var(--mark-life-dies, 2000ms) ease-out both;
+}
+.field-pile-ghost-lit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: rgb(226 238 255 / 0.3);
+}
+.field-pile-ghost img {
+  display: block;
+  width: 100%;
   height: auto;
   border-radius: 2px;
-  /* The same death times both: the skull on the card and the ghost off the
-     grave are one event drawn in two places, and two clocks for one event is
-     how they end up out of step. */
-  animation: grave-ghost var(--mark-life-dies, 2000ms) ease-out both;
-  filter: saturate(0.6) brightness(1.25) contrast(1.05);
 }
 @keyframes grave-ghost {
   0%   { opacity: 0; transform: translateY(5px) scale(0.9); }
@@ -10992,7 +11268,7 @@ button:hover .tarot-fan-card {
   100% { opacity: 0; transform: translateY(-7px) scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .field-pile-ghost img {
+  .field-pile-ghost-lit {
     animation: mark-still var(--mark-life-dies, 2000ms) ease-out both;
   }
 }
@@ -14653,16 +14929,36 @@ button:hover .tarot-fan-card {
   animation: none;
   max-width: min(70vw, 19rem);
   max-height: min(62vh, 26.5rem);
-  transition: filter 300ms ease, box-shadow 300ms ease;
+  transition: box-shadow 300ms ease;
 }
-/* On the art rather than on the slide: a filter flattens the 3D of whatever
-   it is applied to, and the slide's whole job is a rotateY. */
+/* **`brightness(0.6)` on a whole card face**, which is the one place the cost
+   is easy to see: the face carries the frame, the type line and the printed
+   "Illus. <artist>" along its foot, so dimming through it dimmed the credit
+   too. The depth is a shade *in front of* the neighbour now — a card standing
+   further back in the same light, which is what the carousel is drawing.
+
+   The shade rides the slide rather than the art, and the comment this replaces
+   had the reason a filter could not: a filter flattens the 3D of whatever it
+   is applied to, and the slide's whole job is a `rotateY`. A pseudo-element is
+   a *child*, so it turns with its parent instead of collapsing it. */
+.card-sheet-slide { position: relative; }
+.card-sheet-slide::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 4.75% / 3.4%;
+  background-color: rgb(0 0 0 / 0);
+  transition: background-color 300ms ease;
+}
+.card-sheet-slide:not(.is-front)::after {
+  background-color: rgb(0 0 0 / 0.4);
+}
 .card-sheet-slide:not(.is-front) .card-sheet-art {
-  filter: brightness(0.6) saturate(0.72);
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.55);
 }
-.card-sheet-slide:not(.is-front):hover .card-sheet-art {
-  filter: brightness(0.82) saturate(0.9);
+.card-sheet-slide:not(.is-front):hover::after {
+  background-color: rgb(0 0 0 / 0.18);
 }
 
 /* What you are looking at, in words. The painting answers for anybody who can
@@ -14791,6 +15087,7 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .card-sheet-stage { animation: none; }
   .card-sheet-slide,
+  .card-sheet-slide::after,
   .card-sheet.is-many .card-sheet-art,
   .card-sheet-step,
   .card-sheet-pip {
