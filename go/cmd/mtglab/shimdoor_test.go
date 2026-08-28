@@ -295,8 +295,15 @@ func TestTheIdleClockStopsWhileWorkIsInFlight(t *testing.T) {
 	state := newShimState()
 
 	// A request arrives, and however long it takes, the shim is not idle.
+	//
+	// **The sleep is the signal this test measures against**, which is why it
+	// is longer than it looks like it needs to be. Every bound below asks the
+	// same question — did the clock restart at `end`, or has it been running
+	// since `begin`? — and the two answers are only distinguishable by the
+	// distance between them. A short sleep makes that distance small enough
+	// for a loaded runner's scheduling to cross it.
 	state.begin()
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	if got := state.idleFor(); got != 0 {
 		t.Errorf("a shim with work in flight reported %v of idleness", got)
 	}
@@ -310,12 +317,23 @@ func TestTheIdleClockStopsWhileWorkIsInFlight(t *testing.T) {
 
 	// Only when the last one ends does the clock start, and it starts from
 	// the end rather than from the beginning.
+	//
+	// **The bound is generous on purpose, and it used to be 5ms.** What this
+	// has to tell apart is a clock that just started from one that has been
+	// running for the whole request -- nought against a hundred milliseconds.
+	// It does not have to tell 0.1ms from 6ms, and when it tried it failed on
+	// a loaded CI runner at 5.887ms and skipped a deploy: `idleFor` is called
+	// on the statement after `end`, so the reading is whatever the scheduler
+	// put between two adjacent lines, and under `-race` on a shared runner
+	// that is not always microseconds. Half the sleep is the widest bound that
+	// still catches a clock which never restarted.
 	state.end()
-	if got := state.idleFor(); got > 5*time.Millisecond {
+	if got := state.idleFor(); got > 50*time.Millisecond {
 		t.Errorf("the idle clock ran during the request: %v", got)
 	}
-	time.Sleep(15 * time.Millisecond)
-	if got := state.idleFor(); got < 10*time.Millisecond {
+	// And it really is running: a rest that clears the noise both ways.
+	time.Sleep(60 * time.Millisecond)
+	if got := state.idleFor(); got < 30*time.Millisecond {
 		t.Errorf("the idle clock is not running: %v", got)
 	}
 }
