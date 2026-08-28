@@ -1,26 +1,27 @@
 /**
  * The Learn page, and the properties that are easy to lose.
  *
- * Three of these are about honesty rather than layout, and each pins something
- * a screenshot would not catch:
+ * The colours tab is an **index** now — the depth moved to `/colors/:slug`
+ * and `ColorPage.test.tsx` went with it — so what is pinned here is what an
+ * index owes:
  *
- * - a combination that is **not** a faction must not render an empty "What
- *   happened" heading, because writing to fill a field is exactly how
- *   Mono-Blue ends up with a story;
- * - a named card that the pool does not have is **dropped and counted**,
- *   not drawn from its name;
- * - with no card pool at all the page still teaches — names and prose, and an
- *   honest note about what is missing.
- *
- * The fourth is the same rule the wheel is pinned by from both sides: nothing
- * here holds a second copy of the taxonomy, so renaming a guild in the data
- * renames it on the page.
+ * - all thirty-two are on it, each on the shelf it belongs to;
+ * - every entry is a **link out**, not a control that swaps a panel
+ *   underneath, which is what the old tab did and what made it look like
+ *   navigation while not being any;
+ * - the `?c=` links that were shared before the pages existed still land, and
+ *   land on the room rather than on an error;
+ * - nothing here holds a second copy of the taxonomy, so renaming a guild in
+ *   the data renames it on the page *and moves its address* — which is the
+ *   same rule the wheel is pinned by from both sides, with one more
+ *   consequence than it used to have.
  */
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ColorTaxonomy, Combination, CombinationDetail, Glossary } from '../lib/api'
+import type { ColorTaxonomy, Combination, Glossary } from '../lib/api'
+import { resetColorTaxonomyCache } from '../lib/colors'
 import { resetGlossaryCache } from '../lib/glossary'
 import Learn from './Learn'
 
@@ -38,7 +39,7 @@ function combo(over: Partial<Combination> & { key: string; name: string }): Comb
   return {
     tier: 'guild', colors: over.key.split(''), size: over.key.length,
     tagline: `${over.name} tagline.`, history: `${over.name} history.`,
-    aliases: [], verified_by: 'a real card', creed: null, lore: '',
+    aliases: [], verified_by: 'a real card', creed: null, sigil: null, lore: '',
     champions: [], signature: [], ...over,
   }
 }
@@ -49,13 +50,14 @@ const TAXONOMY: ColorTaxonomy = {
   })),
   tiers: [
     { key: 'mono', label: 'Mono-colour', blurb: 'One colour.' },
-    { key: 'guild', label: 'Guild', blurb: 'Two colours.' },
+    { key: 'guild', label: 'Guild — two colours', blurb: 'Two colours.' },
   ],
   eras: [{ name: 'Ravnica', setting: 'a city', named: 'the guilds',
            story: 'Ten of them, under a treaty.' }],
   combinations: [
-    ...['W', 'U', 'B', 'R', 'G'].map((c) =>
-      combo({ key: c, name: `Mono-${c}`, tier: 'mono' })),
+    ...Object.entries({ W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green' })
+      .map(([key, colour]) =>
+        combo({ key, name: `Mono-${colour}`, tier: 'mono' })),
     combo({
       key: 'BG', name: 'Golgari',
       lore: 'The Swarm holds the undercity and the whole decomposition '
@@ -64,31 +66,23 @@ const TAXONOMY: ColorTaxonomy = {
         words: 'Let the rest of Ravnica sneer.', speaker: 'Jarad',
         card: 'Golgari Charm', printing: 'Return to Ravnica',
       },
-      champions: [{ card: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.' },
-                  { card: 'A Card That Does Not Exist', role: 'Dropped on the way.' }],
+      champions: [{ card: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.' }],
       signature: ["Assassin's Trophy"],
     }),
     combo({ key: 'WU', name: 'Azorius', lore: '', champions: [], signature: ['Supreme Verdict'] }),
   ],
 }
 
-const GOLGARI_DETAIL: CombinationDetail = {
-  ...TAXONOMY.combinations.find((c) => c.key === 'BG')!,
-  pool: true,
-  champions: [{
-    name: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.',
-    mana_cost: '{B}{B}{G}{G}', type_line: 'Legendary Creature — Zombie Elf',
-    oracle_text: 'Sacrifice another creature: each opponent loses life.',
-    color_identity: ['B', 'G'], image: null, art_crop: null,
-  }],
-  signature: [{
-    name: "Assassin's Trophy", mana_cost: '{B}{G}', type_line: 'Instant',
-    oracle_text: 'Destroy target permanent an opponent controls.',
-    color_identity: ['B', 'G'], image: null, art_crop: null,
-  }],
-  // One champion name went in and did not come back.
-  dropped: 1,
-  exact_total: 812,
+/**
+ * Where each of the fixture's entries should link to, written out rather than
+ * computed. Computing them with `comboSlug` would be the index agreeing with
+ * itself; `lib/colors.test.ts` is where the scheme is checked against the
+ * table that actually ships.
+ */
+const SLUGS: Record<string, string> = {
+  W: '/colors/white', U: '/colors/blue', B: '/colors/black',
+  R: '/colors/red', G: '/colors/green',
+  BG: '/colors/golgari', WU: '/colors/azorius',
 }
 
 const GLOSSARY: Glossary = {
@@ -107,16 +101,28 @@ const GLOSSARY: Glossary = {
   ],
 }
 
+/** Stands in for a colour page, and reports the address it was reached at —
+ *  which is the half of a redirect that matters. */
+function ColourPageProbe() {
+  const { pathname } = useLocation()
+  return <p>a colour page{': '}<span>{pathname}</span></p>
+}
+
 function renderLearn(path = '/learn') {
   return render(
-    <MemoryRouter initialEntries={[path]}><Learn /></MemoryRouter>,
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/learn" element={<Learn />} />
+        <Route path="/colors/:slug" element={<ColourPageProbe />} />
+      </Routes>
+    </MemoryRouter>,
   )
 }
 
 beforeEach(() => {
   resetGlossaryCache()
+  resetColorTaxonomyCache()
   vi.mocked(api.colors).mockResolvedValue(TAXONOMY)
-  vi.mocked(api.combination).mockResolvedValue(GOLGARI_DETAIL)
   vi.mocked(api.glossary).mockResolvedValue(GLOSSARY)
 })
 
@@ -125,106 +131,73 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('the colours tab', () => {
-  it('opens on a combination named by the query string', async () => {
-    renderLearn('/learn?c=WU')
-    expect(await screen.findByRole('heading', { name: 'Azorius', level: 2 }))
-      .toBeTruthy()
-  })
-
-  it('tells a faction’s story and does not invent one for the rest', async () => {
-    renderLearn('/learn?c=BG')
-    expect(await screen.findByText(/holds the undercity/)).toBeTruthy()
-    expect(screen.getByText('What happened')).toBeTruthy()
-    // Ravnica's era paragraph rides along with the story, on the tiers that
-    // have one.
-    expect(screen.getByText(/under a treaty/)).toBeTruthy()
-
-    cleanup()
-    renderLearn('/learn?c=WU')
-    await screen.findByRole('heading', { name: 'Azorius', level: 2 })
-    expect(screen.queryByText('What happened')).toBeNull()
-    expect(screen.queryByText('Who they are')).toBeNull()
-  })
-
-  it('quotes the guild in its own words, and says which card they are printed on',
-     async () => {
-       renderLearn('/learn?c=BG')
-       await screen.findByRole('heading', { name: 'Golgari', level: 2 })
-       // The quotation marks are the renderer's, so the assertion is on the
-       // line inside them -- and the citation is beside it, because a creed
-       // nobody can check is a creed somebody remembered.
-       expect(screen.getByText(/Let the rest of Ravnica sneer\./)).toBeTruthy()
-       expect(screen.getByText('Jarad')).toBeTruthy()
-       expect(screen.getByText('Golgari Charm')).toBeTruthy()
-       expect(screen.getByText(/Return to Ravnica/)).toBeTruthy()
-     })
-
-  it('gives no creed plate to a combination that has no creed', async () => {
-    renderLearn('/learn?c=WU')
-    await screen.findByRole('heading', { name: 'Azorius', level: 2 })
-    // Not "renders an empty one": the twenty-two slots without a creed must
-    // draw nothing at all, the same rule the "What happened" heading follows.
-    expect(document.querySelector('.guild-creed')).toBeNull()
-  })
-
-  it('shows the champion the pool resolved and drops the one it did not',
-     async () => {
-       renderLearn('/learn?c=BG')
-       // Wait for the resolved cards rather than the name: before the fetch
-       // lands the page shows the taxonomy's own list, which is the no-pool
-       // rendering and legitimately includes every name.
-       expect(await screen.findByText('Legendary Creature — Zombie Elf'))
-         .toBeTruthy()
-       expect(screen.getByText('Jarad, Golgari Lich Lord')).toBeTruthy()
-       // The name that did not resolve is nowhere on the page...
-       expect(screen.queryByText('A Card That Does Not Exist')).toBeNull()
-       // ...and its absence is stated rather than silent.
-       expect(screen.getByText(/1 named card could not be found/)).toBeTruthy()
-     })
-
-  it('counts how many cards are exactly these colours', async () => {
-    renderLearn('/learn?c=BG')
-    expect(await screen.findByText('812')).toBeTruthy()
-  })
-
-  it('says the whole set is on screen when there are only a handful', async () => {
-    vi.mocked(api.combination).mockResolvedValue(
-      { ...GOLGARI_DETAIL, exact_total: 2, dropped: 0 })
-    renderLearn('/learn?c=BG')
-    expect(await screen.findByText(/the whole set/)).toBeTruthy()
-  })
-
-  it('teaches without a card pool, and says what is missing', async () => {
-    vi.mocked(api.combination).mockResolvedValue({
-      ...GOLGARI_DETAIL, pool: false, champions: [], signature: [],
-      dropped: 0, exact_total: null,
+describe('the colours tab, which is now an index', () => {
+  it('lists every combination, on the shelf it belongs to, as a link out',
+    async () => {
+      renderLearn()
+      expect(await screen.findByRole('heading', { name: 'Guild — two colours' }))
+        .toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Mono-colour' })).toBeTruthy()
+      // Every combination the table holds is on the page, and every one of
+      // them is a link out rather than a control that swaps a panel
+      // underneath — which is what the old tab did, and what made it look
+      // like navigation while not being any.
+      for (const c of TAXONOMY.combinations) {
+        const entry = screen.getByRole('link', { name: new RegExp(c.name) })
+        expect(entry.getAttribute('href')).toBe(SLUGS[c.key])
+      }
     })
+
+  it('sends a shared ?c= link to the room it names', async () => {
     renderLearn('/learn?c=BG')
-    // The names and the roles come from the taxonomy, which needs no card pool,
-    // so the page still says who Jarad is.
-    expect(await screen.findByText('Jarad, Golgari Lich Lord')).toBeTruthy()
-    expect(screen.getByText(/Dead, and in charge/)).toBeTruthy()
-    expect(screen.getByText(/pool is stocked/)).toBeTruthy()
+    // The redirect resolves through the served table, so it waits for that —
+    // and what matters is the address it lands on, which the probe reports.
+    expect(await screen.findByText('/colors/golgari')).toBeTruthy()
   })
 
-  it('renames the combination when the data renames it', async () => {
+  it('keeps the vocabulary tab out of it, ?c= and all', async () => {
+    renderLearn('/learn?tab=words&c=BG')
+    // A stale `c` on the words tab must not teleport a reader who asked for
+    // the glossary, which is what a redirect reading the query string without
+    // checking the tab would do.
+    expect(await screen.findByText('Mulligan')).toBeTruthy()
+    expect(screen.queryByText(/a colour page/)).toBeNull()
+  })
+
+  it('shrugs at a ?c= naming nothing, rather than showing an error', async () => {
+    renderLearn('/learn?c=NOPE')
+    expect(await screen.findByRole('heading', { name: 'Guild — two colours' }))
+      .toBeTruthy()
+    expect(screen.queryByText(/a colour page/)).toBeNull()
+  })
+
+  it('renames a combination when the data renames it', async () => {
     // The same property `pentagram.test.tsx` pins for the wheel: no second
-    // copy of the taxonomy lives in the component.
+    // copy of the taxonomy lives in the component — and now that the name is
+    // also the address, renaming moves the page too.
     vi.mocked(api.colors).mockResolvedValue({
       ...TAXONOMY,
       combinations: TAXONOMY.combinations.map(
         (c) => (c.key === 'BG' ? { ...c, name: 'The Swarm' } : c)),
     })
-    renderLearn('/learn?c=BG')
-    expect(await screen.findByRole('heading', { name: 'The Swarm', level: 2 }))
-      .toBeTruthy()
+    resetColorTaxonomyCache()
+    renderLearn()
+    const entry = await screen.findByRole('link', { name: /The Swarm/ })
+    expect(entry.getAttribute('href')).toBe('/colors/the-swarm')
   })
 
-  it('offers a way to start the deck it just described', async () => {
-    renderLearn('/learn?c=BG')
-    const build = await screen.findByRole('link', { name: /Build Golgari/ })
-    expect(build.getAttribute('href')).toBe('/new?c=BG')
+  it('carries every tier’s own blurb, so the shelf says what it is', async () => {
+    renderLearn()
+    expect(await screen.findByText('Two colours.')).toBeTruthy()
+    expect(screen.getByText('One colour.')).toBeTruthy()
+  })
+
+  it('says so when the guide itself will not open', async () => {
+    vi.mocked(api.colors).mockRejectedValue(new Error('nope'))
+    resetColorTaxonomyCache()
+    renderLearn()
+    await waitFor(() =>
+      expect(screen.getByText(/Could not load the colour guide/)).toBeTruthy())
   })
 })
 

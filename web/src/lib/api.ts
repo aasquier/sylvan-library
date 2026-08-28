@@ -1801,6 +1801,33 @@ export interface Creed {
   printing: string
 }
 
+/**
+ * A faction's heraldry as Wizards actually painted it: the mana rock its own
+ * block printed to carry its device, with the artist and printing that
+ * painting belongs to.
+ *
+ * **Twenty of the 32 have one and that is the finished design**, not a gap —
+ * Ravnica's ten Signets, Alara's five Obelisks, Tarkir's five Banners, which
+ * is every multicolour faction and no leftovers. The other twelve wear their
+ * own mana symbols at size instead, and need no card to do it.
+ *
+ * `art` is a hotlink to one exact printing, and `artist` and `printing` are
+ * the credit that printing is owed — a surface that draws the picture must
+ * name both in the same room (commandment 19). They travel together and were
+ * read out of the pool in one pass, so they cannot come apart.
+ *
+ * `flavor` is that printing's own flavour text, and it is a caption for the
+ * device rather than a second motto: a `creed` is what a faction *says*, this
+ * is what its emblem *means*.
+ */
+export interface Sigil {
+  card: string
+  artist: string
+  printing: string
+  art: string
+  flavor: string
+}
+
 /** One of the 32 colour combinations. Mirrors `mtglab.colors.Combination`. */
 export interface Combination {
   /** Canonical WUBRG-ordered key, or "C" for colourless. */
@@ -1828,6 +1855,11 @@ export interface Combination {
    * would be indistinguishable from someone leaving the field blank.
    */
   creed: Creed | null
+  /**
+   * The faction's device, painted. `null` for the twelve slots that are not a
+   * faction — see [Sigil], where the twenty and the twelve are argued.
+   */
+  sigil: Sigil | null
   /**
    * What happened to this faction. Empty for the twelve slots that are not
    * one — Mono-Red is not from anywhere, and does not get a story pretending

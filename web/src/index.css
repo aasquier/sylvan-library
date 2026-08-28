@@ -16692,3 +16692,403 @@ button:hover .tarot-fan-card {
   /* The sheen goes; the width still moves, because the width is the fact. */
   .upkeep-gathering { animation: none; background-position: 50% 0; }
 }
+
+/* ===========================================================================
+   A room for every combination — the 32 colour pages (/colors/:slug).
+
+   Learn's colours tab used to expand one combination in place, inside a
+   bordered box that already carried a name, two symbols, a creed plate, a
+   tagline, a history, champions, signature cards and a Build control. The
+   box is the index now and each of the 32 is a page, so the things that had
+   nowhere to go have somewhere: the faction's heraldry at size, the caption
+   Wizards wrote for it, and the history set as something worth reading
+   rather than as a paragraph in a panel.
+
+   The first two pieces are the emblem rule in CSS: twenty of the 32 have a
+   painting and twelve do not, and the twelve wear their own mana symbols
+   rather than a device somebody invented for them.
+   --------------------------------------------------------------------------- */
+
+/* The plate, which is `.masthead-plate`'s shape with two possible contents.
+   The ratio is the art crop's, so a page carrying a painting and a page
+   carrying symbols are the same silhouette at a glance — which is what makes
+   32 pages read as one set rather than as two designs. `flex: none` for
+   `.masthead-plate`'s reason: the media inside is `width: 100%`, so a flex
+   row that could shrink this would shrink it to nothing. */
+.combo-plate {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 616 / 452;
+  overflow: hidden;
+  flex: none;
+}
+
+@media (min-width: 640px) {
+  .combo-plate {
+    width: 300px;
+  }
+}
+
+/* Wizards' painting, shown whole and altered by nothing (commandment 19).
+   Any light it needs is `.art-lift` laid over it, which is the layer the
+   whole app brightens card art with. */
+.combo-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:root[data-theme='dark'] .combo-plate > .art-lift,
+:root:where(:not([data-theme='light'])) .combo-plate > .art-lift {
+  --art-lift: 0.04;
+}
+
+/* ---- the twelve without a painting -------------------------------------
+   Colourless, the five colours, the five four-colour sets and WUBRG. There
+   is no faction-emblem cycle for any of them, and inventing a fourth would
+   put a device in front of a newcomer that Magic never printed — so the
+   emblem is the official mana symbol, which is the mark those decks
+   genuinely wear.
+
+   The ground is the combination's own colours across the plate at the
+   strength a background can take, so Mono-Red's page is warm and Mono-Blue's
+   is cold before a word of either is read. */
+.combo-emblem {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background:
+    radial-gradient(
+      120% 100% at 50% 0%,
+      color-mix(in srgb, var(--emblem-a, var(--mtg-c)) 34%, transparent) 0%,
+      transparent 72%
+    ),
+    linear-gradient(
+      140deg,
+      color-mix(in srgb, var(--emblem-a, var(--mtg-c)) 22%, var(--surface-1)) 0%,
+      color-mix(in srgb, var(--emblem-b, var(--mtg-c)) 22%, var(--surface-1)) 100%
+    );
+}
+
+.combo-emblem-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Rows rather than a wrap: four symbols are two over two on every screen
+   there is, because a coat of arms is arranged by the herald and not by the
+   box it happens to be in this week. */
+.combo-emblem-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* One symbol on its colour's own disc — the same disc a mana pip wears
+   everywhere else in the app, at fifteen times the size. The ring keeps two
+   adjacent marks from merging into one blob, which is the 2px surface-gap
+   rule applied to a very large mark. */
+.combo-emblem-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    0 6px 18px rgb(0 0 0 / 0.18);
+  animation: combo-emblem-breathe 6.5s ease-in-out infinite;
+}
+
+.combo-emblem-mark > img,
+.combo-emblem-mark > svg {
+  border-radius: 999px;
+}
+
+/* Alive rather than static (commandment 6), and barely: a 2% rise over six
+   and a half seconds, staggered per mark from the component so five symbols
+   breathe out of step. `infinite` with no fill, deliberately — a filled
+   animation ending on a transform leaves the identity matrix applied and
+   makes the element a containing block for anything `position: fixed` under
+   it, which is the bug `fixedoverlay_test.go` exists for. */
+@keyframes combo-emblem-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combo-emblem-mark { animation: none; }
+}
+
+/* ---- the museum label ---------------------------------------------------
+   What the device MEANS, captioning the painting directly above it. Wizards
+   wrote the line about the emblem itself, and it is set as a caption rather
+   than as a second pull-quote: the creed below is a person speaking and
+   wears coloured stone; this is an object being explained and wears the
+   page's own ink. Two different jobs, two different materials, so the pair
+   can never read as the page saying the same thing twice.
+
+   The rule above it is the hairline every other caption in the app uses; the
+   kicker is the Fell small caps, which is the one letterform this page and
+   the séance share. */
+.combo-label {
+  max-width: 46rem;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.combo-label-kind {
+  display: block;
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  font-size: 12.5px;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.combo-label-words {
+  margin: 5px 0 0;
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: clamp(0.9375rem, 0.88rem + 0.28vw, 1.0625rem);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* The credit, and it is a requirement rather than a nicety: a surface that
+   draws card art names the painter and the printing in the same room. */
+.combo-label-hand {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ---- the history, illuminated -------------------------------------------
+   Aaron asked for this paragraph to be "reprinted in some stylized text",
+   and it is the one paragraph every single one of the 32 has — the five
+   four-colour pages and colourless have almost nothing else, so it is also
+   the paragraph carrying the thinnest pages on its own.
+
+   A drop cap in the combination's own two colours, the site's serif at
+   reading size, and a measure that stops well short of the page so the line
+   length is one somebody finishes.
+
+   **The drop cap is `float` and not `position: absolute`.** An absolutely
+   placed initial needs the text indented by a width nobody knows until the
+   font has loaded, and `font-display: swap` guarantees that width changes
+   once after first paint. A float is re-measured by the browser after the
+   swap, every time, for free. */
+.combo-history {
+  max-width: 46rem;
+  /* The cap's glyph rises above its own line box — that is what a `line-height`
+     under 1 is for — so the section's share of the page's gap is measured from
+     a line the letter is not in. Eight pixels, read off the ten guild pages
+     where the plate above it is the thing being crowded. */
+  padding-top: 8px;
+}
+
+.combo-history-words {
+  margin: 0;
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: clamp(1.0625rem, 0.99rem + 0.34vw, 1.25rem);
+  line-height: 1.62;
+  color: var(--text-primary);
+}
+
+.combo-history-words::first-letter {
+  float: left;
+  margin: 0.06em 0.09em 0 0;
+  font-size: 3.1em;
+  line-height: 0.82;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* The pair, top to bottom, inked into the letter itself — `background-clip`
+   rather than a coloured glyph, because the two ends have to be two different
+   colours and a letter has one `color`.
+
+   **Behind an `@supports`, and that is not ceremony.** `-webkit-text-fill-color:
+   transparent` is honoured by engines that do not clip a background to text,
+   and the result there is not a black initial — it is *no* initial, an
+   invisible capital at the head of the one paragraph all 32 pages have. The
+   guard makes the fallback the plain ink above, which is a perfectly good drop
+   cap. Unprefixed `background-clip` is Safari 14 and the declared floor is
+   16.4, so nothing this site claims to serve takes the fallback. */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .combo-history-words::first-letter {
+    background: linear-gradient(
+      170deg,
+      color-mix(in srgb, var(--hist-a, var(--mtg-c)) 62%, var(--text-primary)),
+      color-mix(in srgb, var(--hist-b, var(--mtg-c)) 62%, var(--text-primary))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* ---- what a colour wants ------------------------------------------------
+   The five colours' own two sentences, served since long before this page
+   and rendered by nothing until it. On Mono-Red's page they are the content:
+   no faction, no story, no champions, and "freedom through action" is the
+   whole reason somebody builds one. The bar down the left is the colour, so
+   a page carrying four of these reads as four voices rather than as a
+   list. */
+.combo-voice {
+  position: relative;
+  padding: 12px 14px 13px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--voice, var(--mtg-c)) 7%, var(--surface-1));
+}
+
+.combo-voice::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 10px 0 0 10px;
+  background: color-mix(in srgb, var(--voice, var(--mtg-c)) 78%, var(--text-primary));
+}
+
+/* The absent colour on a four-colour page. Dashed and unfilled, because it is
+   the one thing on the page that is NOT in the deck, and that difference has
+   to survive being read without colour. */
+.combo-voice-absent {
+  border-style: dashed;
+  background: transparent;
+}
+
+.combo-voice-fear {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  letter-spacing: 0.06em;
+}
+
+/* ---- the one control a colour page is for -------------------------------
+   "Build a Golgari deck", and it wears Golgari.
+
+   `.btn-primary` with `--series-1` is what stood here first, and it is the
+   `.btn-arena` complaint word for word: `--series-1` means "series one of a
+   line chart", and on a page whose whole subject is two colours it read as a
+   form's submit button in a colour neither of them is. A control wears the
+   room it serves (commandment 17), and this room's material is the pair
+   itself — the same two washes as the pips beside the title, the creed's
+   stone and the drop cap.
+
+   **The ink is fixed dark rather than themed**, for `ManaGlyph`'s reason:
+   the washes are the same pale colours in both themes, so ink that followed
+   the theme would turn white on parchment. Measured against the darkest of
+   the six (`--mtg-g`, #a3c095) it is 9.7:1, and the palest (#f8f6d8) is
+   higher still. */
+.btn-sigil {
+  background: linear-gradient(
+    105deg,
+    var(--sigil-a, var(--mtg-c)) 0%,
+    var(--sigil-b, var(--mtg-c)) 100%
+  );
+  border-color: color-mix(in srgb, var(--sigil-a, var(--mtg-c)) 58%, #000);
+  color: #141414;
+  font-weight: 600;
+}
+
+/* The glint, `.btn-primary`'s exactly: one light-sweep across the face, only
+   on hover, gone under reduced motion with the rest of them. */
+.btn-sigil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.5) 46%,
+    rgba(255, 255, 255, 0.16) 55%,
+    transparent 66%
+  );
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+
+.btn-sigil:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--sigil-a, var(--mtg-c)) 30%, #000);
+  box-shadow: 0 2px 12px
+    color-mix(in srgb, var(--sigil-a, var(--mtg-c)) 45%, transparent);
+}
+
+.btn-sigil:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+
+.btn-sigil:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ---- the index entry ----------------------------------------------------
+   One of the 32 on Learn's contents page. A link, and it has to look like
+   one before it is touched and reply when it is (commandment 17): the ink
+   comes up, the edge takes the vine, the tile lifts a pixel and settles
+   again under the press.
+
+   A transform is safe on this one and would not be on the card tiles further
+   in — `CardHover`'s preview is a `position: fixed` span rendered in place,
+   so a transformed ancestor would take the window away from it. There is no
+   card inside an index entry, which is why this may move and those may
+   not. */
+.combo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 13px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 11px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.combo-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--vine);
+  background: color-mix(in srgb, var(--vine) 6%, var(--surface-1));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--vine) 20%, transparent);
+}
+
+.combo-card:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.combo-card:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
+/* Two lines of tagline and then an ellipsis, so a shelf of ten is ten tiles
+   of the same height. Clamped rather than truncated at a character count:
+   the longest of the 32 is 62 characters and the shortest is 30, and a count
+   that suited both would have to be measured against a width that changes at
+   every breakpoint. */
+.combo-card-line {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}

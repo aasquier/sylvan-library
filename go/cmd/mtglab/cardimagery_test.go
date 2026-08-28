@@ -201,6 +201,21 @@ var artBearing = map[string]string{
 		"artist and copyright line included",
 	"token-plate": "components/tokens.tsx: the <li> that face sits in, and " +
 		"the element whose :hover lifts and turns it",
+
+	// --- the 32 colour pages, 2026-08-28 -----------------------------------
+	//
+	// Twenty of the 32 wear a faction's heraldry -- Ravnica's Signets,
+	// Alara's Obelisks, Tarkir's Banners -- as the art crop of one pinned
+	// printing, with the artist and printing credited in the same room
+	// (`.combo-label-hand`). Added by walking the JSX rather than in response
+	// to a violation: these two carry no filter and never have. The plate is
+	// here as well as the image because the plate is what a `:hover` or a
+	// theme rule would land on, and it is what `.art-lift` is `inset: 0` of.
+
+	"combo-art": "routes/ColorPage.tsx: <img className='combo-art' " +
+		"src={sigil.art}> in Nameplate -- the faction's own painted device",
+	"combo-plate": "routes/ColorPage.tsx: the span that painting sits in, " +
+		"which the dark theme's lift is inset:0 of",
 }
 
 // Anything that re-renders the pixels. `drop-shadow` is deliberately absent:

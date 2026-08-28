@@ -11,33 +11,32 @@
  *
  * Two tabs over two tables, and neither is a second copy of anything.
  *
- * - **The colours** reads `/api/colors` for the 32 and `/api/colors/{key}` for
- *   one of them with its cards resolved. The split matters: the first works on
- *   a fresh clone with no card pool, the second is where every card fact enters,
- *   and a name that does not resolve is dropped and counted rather than drawn
- *   as an empty card.
+ * - **The colours** reads `/api/colors` for the 32 and is now an *index*
+ *   rather than a reader: every combination has a page of its own at
+ *   `/colors/:slug` (`routes/ColorPage.tsx`), and the wheel and the tier
+ *   shelves below it are how you get there. It used to expand one combination
+ *   in place inside a bordered box that already held nine things, which is
+ *   what ran out of room.
  * - **Vocabulary** reads `/api/glossary`, the same table `<Term>` and
  *   `<HelpTip>` read a single sentence out of elsewhere in the app.
  *
- * Both tabs and the selected combination are in the query string, so a link to
- * Golgari is a link to Golgari.
+ * **`?c=BG` still works and always will.** Those links were shared before the
+ * pages existed, so the colours tab resolves the key and sends the reader to
+ * the room it names rather than 404ing a bookmark. The resolution needs the
+ * served table, which is why it happens after the fetch rather than in the
+ * router.
  */
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  api,
-  errorMessage,
   type ColorTaxonomy,
   type Combination,
-  type CombinationDetail,
-  type Creed,
-  type ReferenceCard,
   type Term as TermData,
 } from '../lib/api'
-import { COLOR_VAR } from '../lib/mtg'
+import { colorPath, slugForKey, useColorTaxonomy } from '../lib/colors'
 import {
-  CardHover, ColorRing, ErrorNote, ManaCost, ManaText, PageMasthead, Spinner,
+  ColorRing, ErrorNote, ManaText, PageMasthead, Spinner,
 } from '../components/ui'
 
 /** The card the whole project is named after, so the reference page wears it.
@@ -55,360 +54,116 @@ import bookwormWebm from '../assets/learn/bookworm-loop.webm'
 
 type Tab = 'colors' | 'words'
 
-/** The era whose story named a tier. Mirrors the create flow's own map. */
-const TIER_ERA: Record<string, string> = {
-  guild: 'Ravnica',
-  shard: 'Alara',
-  wedge: 'Tarkir',
-}
-
-/* ----------------------------------------------------------------- a card */
-
-/**
- * A real card, rendered from the pool and captioned with nothing.
- *
- * `note` is the champion's story role and is the only sentence attached to a
- * card anywhere in this page. The signature list passes none at all, which is
- * deliberate — what that list claims is that the card's identity is exactly
- * this combination, and that is checkable rather than editorial. The oracle
- * text below is the card's own, so a role that drifted from the card is
- * visible next to the evidence.
- */
-function RefCard({ card, note }: { card: ReferenceCard; note?: string }) {
-  return (
-    <CardHover card={card} className="block">
-      <article className="card-surface flex h-full flex-col overflow-hidden rounded-xl text-left">
-        {card.art_crop && (
-          <img src={card.art_crop} alt="" loading="lazy"
-               className="h-20 w-full object-cover" style={{ objectPosition: 'center 30%' }} />
-        )}
-        <div className="flex flex-1 flex-col gap-1 px-3 py-2.5">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-sm font-semibold">{card.name}</span>
-            <ManaCost cost={card.mana_cost} size={13} />
-          </div>
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            {card.type_line}
-          </p>
-          {note && (
-            <p className="mt-0.5 text-xs leading-relaxed"
-               style={{ color: 'var(--text-primary)' }}>
-              {note}
-            </p>
-          )}
-          {/* `whitespace-pre-line`, like the deck page and the rationale
-              editor: oracle text is newline-separated and collapsing it runs
-              a keyword line into the ability below it. The Gitrog Monster
-              read "Deathtouch At the beginning of your upkeep" without it. */}
-          {card.oracle_text && (
-            <p className="mt-auto whitespace-pre-line pt-1 text-[11px] leading-relaxed"
-               style={{ color: 'var(--text-secondary)' }}>
-              <ManaText size={11}>{card.oracle_text}</ManaText>
-            </p>
-          )}
-        </div>
-      </article>
-    </CardHover>
-  )
-}
-
-/* ------------------------------------------------------ the guild's words */
-
-/**
- * A guild's creed, set as an inscription in its own two colours.
- *
- * The line is printed flavour text read off a real card — never written here,
- * never paraphrased — so the plate carries its citation the way the panel's
- * last line carries `verified_by`. Six of the ten come off the guild Charm
- * cycle and four do not: Izzet's, Orzhov's and Selesnya's Charms were printed
- * with no flavour text at all in any printing, and Boros's has a line but
- * Aurelia says a better one somewhere else. That is why the card is a field
- * rather than something this component could work out from the guild.
- *
- * **The colours are light, not ink.** `--mtg-*` are washes — pale by design,
- * and pale type on a pale page is the bug a whole route once shipped. So the
- * guild's pair tints the stone and inks the edge (mixed toward `--text-primary`,
- * which darkens it on paper and brightens it at night in one expression), and
- * the words themselves stay the page's own high-contrast ink in both themes.
- *
- * The seal is the guild's real mana symbols, the same ones every cost in the
- * app draws, so Golgari and Azorius are told apart at a glance and by
- * something other than hue.
- */
-function GuildCreed({ creed, colors }: { creed: Creed; colors: string[] }) {
-  const first = COLOR_VAR[colors[0] ?? 'C'] ?? 'var(--mtg-c)'
-  const last = COLOR_VAR[colors[colors.length - 1] ?? 'C'] ?? 'var(--mtg-c)'
-  return (
-    <figure className="guild-creed"
-            style={{ '--creed-a': first, '--creed-b': last } as CSSProperties}>
-      {/* The guild's seal, pressed into the stone and running off its edge.
-          Decoration: the ColorRing in the header two lines up already names
-          these colours out loud, and a screen reader that heard them a second
-          time here would be hearing furniture. */}
-      <span className="guild-creed-seal" aria-hidden="true">
-        <ManaCost cost={colors.map((c) => `{${c}}`).join('')} size={82} />
-      </span>
-      <blockquote className="guild-creed-words">
-        {/* Curly quotes as real characters rather than generated content: it
-            is a quotation, and a reader listening to the page should hear
-            that it is one. */}
-        &ldquo;{creed.words}&rdquo;
-      </blockquote>
-      <figcaption className="guild-creed-hand">
-        <span className="guild-creed-speaker">{creed.speaker}</span>
-        <span className="guild-creed-source">
-          printed on <cite>{creed.card}</cite>, {creed.printing}
-        </span>
-      </figcaption>
-    </figure>
-  )
-}
-
 /* -------------------------------------------------------- the colours tab */
 
-function CombinationPanel({ combo, taxonomy }: {
-  combo: Combination
-  taxonomy: ColorTaxonomy
-}) {
-  const [detail, setDetail] = useState<CombinationDetail | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  // No clearing here, because there is nothing to clear: the call site keys
-  // this panel on the combination, so choosing another builds a new one whose
-  // detail starts empty. Clearing in the effect instead painted the *previous*
-  // combination's paragraph under the new one's name for a frame, which on
-  // the page that teaches the colours is the one mistake it must not make.
-  useEffect(() => {
-    let live = true
-    api.combination(combo.key)
-      .then((d) => { if (live) setDetail(d) })
-      .catch(() => { if (live) setFailed(true) })
-    return () => { live = false }
-  }, [combo.key])
-
-  const era = taxonomy.eras.find((e) => e.name === TIER_ERA[combo.tier])
-  const tier = taxonomy.tiers.find((t) => t.key === combo.tier)
-
+/**
+ * One combination as an index entry: what it is called, what colours it is,
+ * and the one line that says what the deck is for.
+ *
+ * A link and not a button, because it goes somewhere. That is the whole
+ * difference this branch made to this tab — the entries used to swap a panel
+ * underneath them, which is a control that looks like navigation and is not.
+ */
+function ComboLink({ combo }: { combo: Combination }) {
   return (
-    <article className="card-surface rounded-xl px-6 py-6"
-             style={{
-               backgroundImage: combo.colors.length
-                 ? `linear-gradient(135deg, ${combo.colors
-                     .map((c, i) => `color-mix(in srgb, ${COLOR_VAR[c]} 18%, transparent) ${
-                       (i / Math.max(combo.colors.length - 1, 1)) * 100}%`)
-                     .join(', ')})`
-                 : 'none',
-             }}>
-      <header className="flex flex-wrap items-center gap-4">
-        <ColorRing colors={combo.colors} />
-        <div className="min-w-0">
-          <h2 className="text-2xl font-semibold tracking-tight">{combo.name}</h2>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            {tier?.label}
-            {combo.aliases.length > 0 && ` · also called ${combo.aliases.join(', ')}`}
-          </p>
-        </div>
-        <Link to={`/new?c=${combo.key}`} className="ml-auto rounded-md px-3 py-1.5 text-sm font-medium"
-              style={{ background: 'var(--series-1)', color: '#fff' }}>
-          Build {combo.name}
-        </Link>
-      </header>
-
-      {/* The guild's own voice before ours. Only the ten guilds have one, so
-          the twenty-two other slots simply go straight to the tagline. */}
-      {combo.creed && <GuildCreed creed={combo.creed} colors={combo.colors} />}
-
-      <p className="mt-4 text-lg" style={{ color: 'var(--text-primary)' }}>
-        {combo.tagline}
-      </p>
-      <p className="mt-3 max-w-3xl text-sm leading-relaxed"
-         style={{ color: 'var(--text-secondary)' }}>
-        <ManaText>{combo.history}</ManaText>
-      </p>
-
-      {/* The story beat, and the field this page was built for. Only the
-          twenty slots that are an actual faction have one; the other twelve
-          simply do not render a heading with nothing under it. */}
-      {combo.lore && (
-        <section className="mt-5 max-w-3xl border-l-2 pl-4"
-                 style={{ borderColor: 'var(--baseline)' }}>
-          <h3 className="text-xs uppercase tracking-wide"
-              style={{ color: 'var(--text-muted)' }}>
-            What happened
-          </h3>
-          <p className="mt-1.5 text-sm leading-relaxed"
-             style={{ color: 'var(--text-secondary)' }}>
-            {combo.lore}
-          </p>
-          {era && (
-            <p className="mt-2 text-xs leading-relaxed"
-               style={{ color: 'var(--text-muted)' }}>
-              <strong style={{ color: 'var(--text-secondary)' }}>{era.name}</strong>
-              {' '}— {era.setting}. {era.story}
-            </p>
-          )}
-        </section>
+    <Link to={colorPath(combo)} className="combo-card">
+      <span className="flex items-center gap-2.5">
+        <ColorRing colors={combo.colors} size={22} />
+        <span className="text-sm font-semibold tracking-tight">{combo.name}</span>
+      </span>
+      <span className="combo-card-line">{combo.tagline}</span>
+      {combo.aliases.length > 0 && (
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          also called {combo.aliases.join(', ')}
+        </span>
       )}
-
-      {failed && (
-        <p className="mt-5 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Could not load the cards for this combination.
-        </p>
-      )}
-
-      {/* Names without a card pool, cards with one. The champion list is drawn
-          from the served taxonomy either way, so a fresh clone still learns who
-          Trostani is — it just does not get her card. */}
-      {combo.champions.length > 0 && (
-        <section className="mt-6">
-          <h3 className="text-xs uppercase tracking-wide"
-              style={{ color: 'var(--text-muted)' }}>
-            Who they are
-          </h3>
-          {detail?.pool ? (
-            <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {detail.champions.map((c) => (
-                <RefCard key={c.name} card={c} note={c.role} />
-              ))}
-            </div>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {combo.champions.map((c) => (
-                <li key={c.card} className="text-sm"
-                    style={{ color: 'var(--text-secondary)' }}>
-                  <strong style={{ color: 'var(--text-primary)' }}>{c.card}</strong>
-                  {' '}— {c.role}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
-      <section className="mt-6">
-        <h3 className="text-xs uppercase tracking-wide"
-            style={{ color: 'var(--text-muted)' }}>
-          Exactly these colours
-        </h3>
-        <p className="mt-1 max-w-3xl text-xs leading-relaxed"
-           style={{ color: 'var(--text-muted)' }}>
-          Cards whose colour identity is precisely {combo.name} — they can go in
-          this deck and in no narrower one.
-          {/* Counted over the pool rather than stored, and it is the
-              sharpest sentence available about a four-colour slot: two cards,
-              in the entire game. */}
-          {detail?.exact_total != null && (
-            <> The pool has <strong style={{ color: 'var(--text-secondary)' }}>
-              {detail.exact_total.toLocaleString()}</strong> of them
-              {detail.exact_total <= 5 && ' — the whole set'}.
-            </>
-          )}
-        </p>
-        {detail?.pool ? (
-          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {detail.signature.map((c) => <RefCard key={c.name} card={c} />)}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {combo.signature.join(' · ')}
-            <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
-              The cards themselves appear once the library&rsquo;s pool is stocked.
-            </span>
-          </p>
-        )}
-      </section>
-
-      <p className="mt-5 text-xs" style={{ color: 'var(--text-muted)' }}>
-        Colour identity comes from the printed cards, checked against{' '}
-        <em>{combo.verified_by}</em>.
-        {/* A dropped name is a bug in the reference table, not in the pool,
-            so it says so rather than failing quietly. */}
-        {detail && detail.dropped > 0
-          && ` ${detail.dropped} named card${detail.dropped === 1 ? '' : 's'} `
-             + 'could not be found in the pool and are not shown.'}
-      </p>
-    </article>
+    </Link>
   )
 }
 
-function ColorsTab({ taxonomy, selected, onSelect }: {
-  taxonomy: ColorTaxonomy
-  selected: string
-  onSelect: (key: string) => void
+/**
+ * One tier and everything in it.
+ *
+ * All seven are on the page at once rather than behind a selector, which is
+ * the same argument the old panel's own member list made and the reason it is
+ * kept: this screen is for reading rather than for choosing, and a control
+ * that hides six of seven shelves is the wrong shape for a contents page.
+ */
+function TierShelf({ tier, members }: {
+  tier: { key: string; label: string; blurb: string }
+  members: Combination[]
 }) {
-  // The fallback is itself an index, so it is `Combination | undefined` and not
-  // the safety net it looks like. The colors table holds all 32 and `/api/colors`
-  // serves them with no pool and no network, so an empty list means that
-  // endpoint answered with nothing — a broken deployment rather than a state
-  // this screen can render around. Say so once, here, instead of letting nine
-  // field reads downstream each decide what to do about it.
-  const combo = taxonomy.combinations.find((c) => c.key === selected)
-    ?? taxonomy.combinations[0]
-  if (!combo) {
+  return (
+    <section id={`tier-${tier.key}`} className="scroll-mt-24 space-y-3">
+      <div className="flex items-center gap-2.5">
+        <TierGlyph tier={tier.key} size={30} />
+        <h2 className="text-lg font-semibold tracking-tight">{tier.label}</h2>
+      </div>
+      <p className="max-w-3xl border-l-2 pl-4 text-sm leading-relaxed"
+         style={{ borderColor: 'var(--baseline)', color: 'var(--text-secondary)' }}>
+        {tier.blurb}
+      </p>
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        {members.map((c) => <ComboLink key={c.key} combo={c} />)}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The contents page for all thirty-two.
+ *
+ * The wheel stays at the top and stays the navigation device — every vertex
+ * and every line on it is one of the 32, so pointing at the shape and
+ * choosing from a shelf are the same act. What changed is where the act
+ * lands: it used to open a panel below and it now opens a page.
+ */
+function ColorsTab({ taxonomy }: { taxonomy: ColorTaxonomy }) {
+  const navigate = useNavigate()
+  const shelves = taxonomy.tiers
+    .map((tier) => ({
+      tier,
+      members: taxonomy.combinations.filter((c) => c.tier === tier.key),
+    }))
+    .filter((s) => s.members.length > 0)
+
+  if (!taxonomy.combinations.length) {
+    // The fallback is itself an index, so its absence is not a state this
+    // screen can render around: `/api/colors` is checked-in prose served with
+    // no card pool and no network, so an empty list means that endpoint
+    // answered with nothing. Say so once, here.
     return (
       <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        The colour taxonomy came back empty. `/api/colors` is served from
-        checked-in prose and needs neither the card pool nor a network, so this
-        is the endpoint failing rather than missing data.
+        The colour guide came back empty. It is checked-in prose and needs
+        neither the shelves nor the outside world, so this is the guide itself
+        failing rather than missing data.
       </p>
     )
   }
-  const tier = taxonomy.tiers.find((t) => t.key === combo.tier)
 
   return (
-    <div className="space-y-5">
-      {/* The wheel is the index, not an illustration. Every vertex and every
-          line on it is one of the 32, so pointing at the shape and choosing
-          from the list are the same act — which is the argument branch 3 made
-          for drawing it in the first place. */}
+    <div className="space-y-8">
       <section className="card-surface rounded-xl px-6 py-6">
         <ColorPentagram combinations={taxonomy.combinations}
-                        onPick={(c) => onSelect(c.key)} selected={combo.key} />
+                        onPick={(c) => navigate(colorPath(c))} />
       </section>
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-1.5">
-          {taxonomy.tiers.map((t) => {
-            const first = taxonomy.combinations.find((c) => c.tier === t.key)
-            const on = combo.tier === t.key
-            return (
-              <button key={t.key} onClick={() => first && onSelect(first.key)}
-                      aria-pressed={on}
-                      className={`chip-toggle flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium${
-                        on ? ' is-on' : ''}`}>
-                <TierGlyph tier={t.key} />
-                {t.label}
-              </button>
-            )
-          })}
-        </div>
+      {/* Jump links rather than a filter: seven shelves on one page, and the
+          reader who came for the clans should not have to scroll past the
+          guilds to find them. They are places, so they wear the chip. */}
+      <nav className="flex flex-wrap gap-1.5" aria-label="Jump to a shelf">
+        {shelves.map(({ tier }) => (
+          <a key={tier.key} href={`#tier-${tier.key}`}
+             className="chip-toggle flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium">
+            <TierGlyph tier={tier.key} />
+            {tier.label}
+          </a>
+        ))}
+      </nav>
 
-        {tier && (
-          <p className="max-w-3xl border-l-2 pl-4 text-sm leading-relaxed"
-             style={{ borderColor: 'var(--baseline)', color: 'var(--text-secondary)' }}>
-            {tier.blurb}
-          </p>
-        )}
-
-        {/* Every member of the tier at once rather than a carousel. This page
-            is for reading rather than for choosing, and an arrow control that
-            hides nine of ten guilds is the wrong shape for that. */}
-        <div className="flex flex-wrap gap-1.5">
-          {taxonomy.combinations.filter((c) => c.tier === combo.tier).map((c) => (
-            <button key={c.key} onClick={() => onSelect(c.key)}
-                    aria-pressed={c.key === combo.key}
-                    className={`chip-toggle flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm${
-                      c.key === combo.key ? ' is-on' : ''}`}>
-              <ColorRing colors={c.colors} size={14} />
-              {c.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Keyed on the combination: a different one is a different panel, so
-          its detail is fetched from empty rather than swapped underneath. */}
-      <CombinationPanel key={combo.key} combo={combo} taxonomy={taxonomy} />
+      {shelves.map(({ tier, members }) => (
+        <TierShelf key={tier.key} tier={tier} members={members} />
+      ))}
     </div>
   )
 }
@@ -574,19 +329,18 @@ const TABS: { key: Tab; label: string }[] = [
 
 export default function Learn() {
   const [params, setParams] = useSearchParams()
-  const [taxonomy, setTaxonomy] = useState<ColorTaxonomy | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { taxonomy, failed } = useColorTaxonomy()
 
   const tab: Tab = params.get('tab') === 'words' ? 'words' : 'colors'
-  const selected = params.get('c') ?? 'WG'
-
-  useEffect(() => {
-    api.colors().then(setTaxonomy).catch((e) => setError(errorMessage(e)))
-  }, [])
-
-  const select = useCallback((key: string) => {
-    setParams({ tab: 'colors', c: key }, { replace: true })
-  }, [setParams])
+  // The old colours tab kept its selection here, so links to `?c=BG` are out
+  // in the world and have to keep working. A key names a room now, so the
+  // answer is the room. Resolving it needs the served table, hence after the
+  // fetch rather than in the router — and a key nothing recognises falls
+  // through to the index rather than to an error, which is the kinder of the
+  // two answers to a mistyped bookmark.
+  const asked = tab === 'colors' ? params.get('c') : null
+  const crossing = asked && taxonomy ? slugForKey(taxonomy.combinations, asked) : null
+  if (crossing) return <Navigate to={`/colors/${crossing}`} replace />
 
   return (
     <div className="space-y-6">
@@ -611,9 +365,8 @@ export default function Learn() {
       <div className="flex flex-wrap gap-1">
         {TABS.map((t) => (
           <button key={t.key}
-                  onClick={() => setParams(
-                    t.key === 'words' ? { tab: 'words' } : { tab: 'colors', c: selected },
-                    { replace: true })}
+                  onClick={() => setParams({ tab: t.key }, { replace: true })}
+                  aria-pressed={tab === t.key}
                   className={`chip-toggle rounded-md px-3 py-1.5 text-sm font-medium${
                     tab === t.key ? ' is-on' : ''}`}>
             {t.label}
@@ -621,11 +374,17 @@ export default function Learn() {
         ))}
       </div>
 
-      {error && <ErrorNote>Could not load the colour guide: {error}</ErrorNote>}
+      {failed && (
+        <ErrorNote>
+          Could not load the colour guide. It is checked-in prose and needs
+          neither the shelves nor the outside world, so this is the guide
+          itself failing rather than missing data.
+        </ErrorNote>
+      )}
 
       {tab === 'words' ? <WordsTab /> : taxonomy ? (
-        <ColorsTab taxonomy={taxonomy} selected={selected} onSelect={select} />
-      ) : !error && (
+        <ColorsTab taxonomy={taxonomy} />
+      ) : !failed && (
         <Spinner label="Reading the colour guide…" />
       )}
 

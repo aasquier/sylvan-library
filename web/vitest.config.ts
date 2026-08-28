@@ -10,6 +10,18 @@ import { defineConfig } from 'vitest/config'
 // code from being able to reach a test global by accident.
 export default defineConfig({
   plugins: [react()],
+  // Reading one file from outside `web/`, and exactly one: the served colour
+  // table at `go/internal/reference/data/colors.json`. `lib/colors.test.ts`
+  // checks that the 32 combinations generate 32 distinct page addresses with
+  // no alias of one taking another's, and that is a question about **the data
+  // that ships** — a three-row fixture can only prove the code runs. The
+  // alternative was a copy of the table in `src/`, which is the one thing the
+  // reference prose may never have (a second copy drifts in silence).
+  //
+  // Vite's default `fs.allow` is the project root, which is `web/`; this opens
+  // the repo root to the *test* runner only. The build config is deliberately
+  // untouched — nothing in the shipped bundle reads outside `web/src`.
+  server: { fs: { allow: ['..'] } },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
