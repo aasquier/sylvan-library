@@ -213,7 +213,7 @@ Why committed rather than hotlinked: The same argument as the road and the vault
 .
 - **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-27).
 - **Transformations** (Pillow, scripted -- `animist build fabrica.recipe.yaml`):
-  - `crop`: frac_box=[0.02, 0.3, 1.0, 0.92].
+  - `crop`: frac_box=[0.22, 0.4, 1.0, 0.92].
   - `resize`: width=660.
   - Encoded WEBP, quality 76.
 

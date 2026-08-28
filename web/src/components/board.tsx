@@ -56,6 +56,7 @@ import { CardSheet } from './ui'
 import { CrownGlyph, HandFanGlyph, HornGlyph, StrongboxGlyph, ThroneGlyph }
   from './glyphs'
 import { FieldHint } from './hint'
+import { GearFan } from './gearfan'
 import { KeywordMarks } from './keywords'
 import { ManaPip } from './manasymbol'
 import { producedColors, producedName } from '../lib/mtg'
@@ -523,6 +524,25 @@ const Crowned = createContext<ReadonlyMap<number, Leads>>(new Map())
  */
 const Lifted = createContext<(() => void) | null>(null)
 
+/**
+ * Whether this card is standing inside a group that already opens a fan.
+ *
+ * **Two previews cannot share one hover.** `FieldCard`'s peek is a 272-pixel
+ * card face placed against the card the pointer is on; `GearFan` opens four of
+ * those in the same air, on the same hover, for a creature carrying things.
+ * Both would arrive, one over the other, and the fan already contains the host
+ * card at a size a person can read — so the peek has nothing left to add and
+ * simply stands down.
+ *
+ * A context rather than a prop, for [Lifted]'s reason directly above: the same
+ * `FieldCard` is drawn on the sand, in a hand, in a fan and in four kinds of
+ * tray, and threading "is something bigger already open over you" through all
+ * of them would be a prop that exists to restate what the tree already says.
+ * False everywhere but inside `FieldGeared`, which is a handful of creatures
+ * on a busy board and none at all on most.
+ */
+const Fanned = createContext(false)
+
 /** Every card on one side that wears a mark, by board id. */
 function crownedOn(side: BoardSide): ReadonlyMap<number, Leads> {
   const out = new Map<number, Leads>()
@@ -585,6 +605,8 @@ function FieldPeek({ card, at, avoid }: {
     : PEEK_W * PEEK_RATIO + 2 * PEEK_EDGE
   // What is written under the painting is part of what has to fit.
   const worn = card.attachments
+  // How many of them the sheet could actually riffle — see the panel below.
+  const paintedGear = worn.filter((a) => a.image).length
   const chrome = (card.artist ? PEEK_ARTIST : 0)
     + (worn.length > 0 ? PEEK_WORN : 0)
   const whole: Clear = { x0: PEEK_EDGE, x1: wide - PEEK_EDGE,
@@ -677,9 +699,23 @@ function FieldPeek({ card, at, avoid }: {
             <span className="field-peek-worn-list">
               Carrying {listed(worn.map((a) => a.name))}
             </span>
-            <span className="field-peek-worn-how">
-              Click or press Enter to look through all {worn.length + 1}
-            </span>
+            {/* **The sentence about stepping through them only appears when
+                there is something to step through**, which since the fan
+                landed is a narrower case than it looks.
+
+                A creature whose gear the match *painted* never reaches this
+                panel at all: it gets the fan instead, opened by the same
+                hover, and `Fanned` stands the peek down. What is left here is
+                the creature carrying something with no picture — where the
+                sentence above is still worth saying, because the corners alone
+                do not name it, and the offer below would be a lie. The sheet
+                can only riffle faces it has, so with none it opens as one card
+                and the rail never appears. */}
+            {paintedGear > 0 && (
+              <span className="field-peek-worn-how">
+                Click or press Enter to look through all {paintedGear + 1}
+              </span>
+            )}
           </span>
         )}
         {card.artist && (
@@ -742,8 +778,11 @@ function FieldCard({ card, count, inPlay = false }: {
   const coarse = useRef(false)
   // Null everywhere except inside an opened pile. See `Lifted`.
   const lifted = useContext(Lifted)
+  // See `Fanned`: a card inside a geared group has a fan opening over it on
+  // this very hover, and the fan is the preview.
+  const fanned = useContext(Fanned)
   const show = () => {
-    if (coarse.current || !card.image || !box.current) return
+    if (coarse.current || fanned || !card.image || !box.current) return
     // The panel this card is sitting in, if any. Asked of the DOM rather than
     // passed down: the same `FieldCard` is drawn on the sand, in a fan and in
     // four kinds of tray, and threading "are you in a tray" through all of
@@ -2050,10 +2089,39 @@ function FieldGeared({ stack }: {
     return <FieldCard card={card} count={count} inPlay />
   }
   const worn = card.attachments.map((a) => a.name).join(', ')
+  // **What the fan opens with**, host first — which is the order
+  // `BoardCard.attachments` is built in, and the order they went on. Cards
+  // with no painting are dropped rather than drawn as holes: the board only
+  // ever knew the ones the match painted, and a blank in a fan is a card that
+  // looks broken rather than absent.
+  const fanned = [{ id: card.id, name: card.name, image: card.image, on: null },
+    ...card.attachments.map((a) => ({
+      id: a.id, name: a.name, image: a.image, on: card.name,
+    }))].filter((c) => c.image)
   return (
+    <GearFan cards={fanned} label={`${card.name}, carrying ${worn}`}>
+    {/* **The fan suppresses the single-card peek underneath it**, and this is
+        the whole of how the two are kept from arriving on top of each other.
+        The peek is a 272-pixel card face placed against this card; the fan is
+        four of them placed in the same air, opened by the same hover. There is
+        no moment where somebody wants both, and the fan already contains the
+        host card at a readable size, so the peek has nothing left to add.
+
+        A context rather than a prop, for `Lifted`'s reason one component up:
+        the same `FieldCard` is drawn on the sand, in a hand, in a fan and in
+        four kinds of tray, and threading "is something bigger already open
+        over you" through every one of them would be a prop that exists to
+        restate what the tree already says.
+
+        **Conditional on the fan actually being able to open**, which is the
+        same test `GearFan` makes before it renders anything: a creature
+        carrying something the match never painted has fewer than two faces to
+        fan, so it keeps the peek it has always had. Suppressing
+        unconditionally would take the preview away and put nothing in its
+        place, which is a worse room than the one this replaced. */}
+    <Fanned.Provider value={fanned.length > 1}>
     <div className="field-geared"
-         style={{ '--gear': card.attachments.length } as CSSProperties}
-         role="group" aria-label={`${card.name}, carrying ${worn}`}>
+         style={{ '--gear': card.attachments.length } as CSSProperties}>
       {/* First in the DOM so the host paints over them: both are positioned,
           neither carries a z-index, and among positioned elements at auto the
           later one wins. A z-index here would be a stacking context fighting
@@ -2067,6 +2135,8 @@ function FieldGeared({ stack }: {
       ))}
       <FieldCard card={card} count={count} inPlay />
     </div>
+    </Fanned.Provider>
+    </GearFan>
   )
 }
 

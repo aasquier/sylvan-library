@@ -54,6 +54,17 @@
 # depth in it rather than a wall of people, which is the property the other
 # three scenes were each chosen for.
 #
+# **Centre-left was still not left enough**, and the crop below is the second
+# correction. See its own note: the bar measured out at x 0.448 of the source
+# and the card covers 0.384 to 0.615, so the first cut of this put the anvil
+# four hundredths inside the card. Two more candidates were fetched and
+# proof-sheeted when Aaron reported it — Goya's `La fragua`, which is the most
+# literal answer to his sentence anybody will find (a hammer over a smith's
+# head, mid-swing, an anvil with red iron on it) and is a **portrait** panel
+# that cannot be cropped to this band without losing the hammer; and Menzel's
+# `Eisenwalzwerk`, which is a magnificent wide band about a rolling mill and
+# has no anvil in it at all.
+#
 # **The sparks come back as motion, not as pigment.** They are what Aaron
 # asked for and this painting has none — so they are drawn, bursting from under
 # the card on the beat it lands, the way `.stage-field-dust` blooms under a
@@ -121,14 +132,38 @@ outputs:
   - file: fabrica.webp
     from: fabrica
     ops:
-      # The roof timbers off the top and the flagstones off the bottom: both
-      # are dark and neither has anything in it. What is left runs from the
-      # helve hammer's beam and the hot bar across the left, through the anvil
-      # and the smith, into the brick vault and the watchers on the right.
-      # Fitted by cropping the Commons thumbnail at four heights, rendering
-      # each with a card stood in it at the size the stage draws one, and
-      # looking at all four.
-      - crop: {frac_box: [0.02, 0.30, 1.0, 0.92]}
+      # **The left edge is where the work is, and this crop is about moving
+      # it out from under the card.**
+      #
+      # The first cut of this took the painting nearly whole and Aaron looked
+      # at it on the stage: *"really hard to make out the anvil in our artifact
+      # animation"*. He was right and the reason is arithmetic. The white-hot
+      # bar is the brightest thing in the painting by a distance — found by
+      # measurement rather than by eye, the hottest 0.4% of pixels centred at
+      # x 0.448 of the source — and the stage draws a card over the middle 23%
+      # of the band, which is x 0.384 to 0.615. The one thing worth seeing sat
+      # four hundredths inside the one thing that covers it.
+      #
+      # So the crop starts at 0.22 rather than 0.02. That puts the bar at 0.29
+      # of the band, clear of the card with room to spare, and the anvil under
+      # it with it. What goes is the man and child at the far left, which is
+      # the cheapest quarter of this painting: they are in shadow, they are the
+      # only part with no light on it, and they are the part a person watching
+      # a card land was never going to look at.
+      #
+      # **The bottom and top move too, and that is the aspect rather than
+      # taste.** A band drawn 940 wide inside an arena 520 tall has about 560
+      # pixels of height to spend; anything taller is thrown away by the mask.
+      # Cropping only from the left would have taken this to 1.35 and cut the
+      # hammer beam off the top. 1.63 keeps it.
+      #
+      # **And the window sits four hundredths lower than the first attempt**,
+      # which is about where the bar lands *inside* the band rather than about
+      # what is in it. A band 1.63 wide drawn across a 520-pixel arena hangs
+      # over both edges by design — the mask fades there — and at 0.36 the hot
+      # bar was at 0.75 of the band's height, which is in the part that hangs.
+      # At 0.40 it is at 0.67 and sits on the screen.
+      - crop: {frac_box: [0.22, 0.40, 1.0, 0.92]}
       - resize: {width: 660}
     encode: {format: webp, quality: 76}
-    expect: {width: 660, height: 383, budget_kb: 60, metadata: none}
+    expect: {width: 660, height: 404, budget_kb: 60, metadata: none}

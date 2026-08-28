@@ -9191,6 +9191,142 @@ button:hover .tarot-fan-card {
    a sword rotating out from under it is noise that reads as a bug. Forge taps
    equipment for its own reasons and nobody at a table turns the sword. */
 .field-gear .field-card.is-tapped .field-card-turn { transform: none; }
+/* ------------------------------------------------ the gear, fanned out
+ *
+ * **A creature's stack opens on a hover and riffles under the pointer.** What
+ * was here before was a modal: the tucked corners said *there is something
+ * under this*, and finding out what meant clicking, reading a sheet over the
+ * whole board, stepping it with a rail, and closing it (Aaron, 2026-08-28:
+ * *"it requires some awkward clicking. I had envisioned a hover opens the
+ * stack of them into an actual live carousel you can thumb left or right
+ * through easily"*).
+ *
+ * So the pointer is the thumb. `components/gearfan.tsx` carries the argument
+ * and the three traps; `lib/gearfan.ts` places it and sizes the cards.
+ * Everything below is what it looks like when it gets there.
+ *
+ * **The fan does not reflow as it is riffled, and that is deliberate.** Each
+ * card sits at a fixed step along the strip and the raised one *lifts out* of
+ * the line rather than pushing its neighbours along. A fan that changed width
+ * under the hand crossing it would move every card away from the pointer
+ * reaching for it — and pulling one card up out of a fan is what a hand does
+ * anyway.
+ *
+ * Portalled to the body, so `.field-row`'s `overflow` cannot clip it — the
+ * trap that has now eaten the card preview, the zone trays and the keyword
+ * panels, listed here a fourth time because it will be a fifth. */
+.field-fan {
+  position: fixed;
+  z-index: 72;
+  pointer-events: auto;
+  /* A depth for the cards to lift through, for `.stage-card`'s reason: a
+     rectangle that only scales is a decal, and one that turns a degree or two
+     out of the plane is an object being picked up. */
+  perspective: 900px;
+  animation: field-fan-open 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes field-fan-open {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
+}
+.field-fan-card {
+  position: absolute;
+  top: var(--fan-lift, 16px);
+  left: calc(var(--i) * var(--fan-slice));
+  z-index: var(--z);
+  width: var(--fan-card);
+  display: block;
+  border-radius: 4.4%;
+  /* The card's own edge and a lift off the ground, so a row of overlapping
+     rectangles reads as cards in a hand rather than as one striped object. */
+  box-shadow:
+    0 5px 14px rgba(0, 0, 0, 0.62),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 30%, rgba(0, 0, 0, 0.6));
+  transition:
+    transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 170ms ease,
+    filter 170ms ease;
+  /* The covered ones sit back a little: not dimmed to unreadable, because the
+     whole point is that you can see what is in the fan before you reach for
+     it, but enough that the raised card is unmistakably the one being read. */
+  filter: brightness(0.72) saturate(0.9);
+}
+.field-fan-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: inherit;
+}
+/* **Out of the fan, and toward the eye.** Up by its own lift and forward in
+   Z — one gesture, and the Z is what makes it read as *drawn out* rather than
+   as merely moved. It keeps its place in the line, so the fan behind it is
+   exactly where it was when the pointer arrives at the next card. */
+.field-fan-card.is-up {
+  transform: translate3d(0, calc(-1 * var(--fan-lift, 16px)), 42px);
+  filter: none;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.72),
+    0 0 0 1.5px color-mix(in srgb, var(--field-brass) 80%, transparent),
+    0 0 22px color-mix(in srgb, var(--field-sun) 26%, transparent);
+}
+/* The name of whatever is raised, on the room's own caption plate — the same
+   dark plate with a brass hairline `.field-hint-panel` and `.field-peek-worn`
+   wear, because they are all the same kind of caption over an arbitrary
+   painting and a second vocabulary would be a second thing to learn. */
+.field-fan-say {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 10px 4px;
+  border-radius: 4px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--field-brass) 44%, transparent);
+  background: linear-gradient(180deg, rgba(24, 18, 10, 0.95),
+    rgba(10, 8, 5, 0.96));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+}
+.field-fan-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #efe2c4;
+}
+/* Quieter, and the one fact four pictures cannot carry: which of them is the
+   creature and which are riding on it. */
+.field-fan-on {
+  font-size: 0.66rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+/* **The group answers the hand, because it opens something** (commandment 17).
+   The lift is the tucked corners' own gesture one step further: the whole
+   stack rises a little, the way a hand of cards does when you take hold of it.
+
+   **No tab stop of its own, deliberately.** Every card inside is already
+   focusable, and `focusin` bubbles — so tabbing to a geared creature opens its
+   fan without a second stop in the order, and the focus ring a keyboard user
+   sees is the card's own rather than a box drawn round the group. A tab stop
+   here would mean stopping twice on every creature carrying anything. */
+.field-fanned {
+  position: relative;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.field-fanned.is-open {
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-fan { animation: none; }
+  .field-fan-card,
+  .field-fanned { transition: none; }
+}
+
 /* **The corners answer the hand, because they are controls.**
  *
  * Each step is a whole card with its own preview and its own sheet, and until
@@ -12909,12 +13045,24 @@ button:hover .tarot-fan-card {
 }
 .stage-forge-art {
   width: min(100%, 940px);
-  aspect-ratio: 660 / 383;
+  aspect-ratio: 660 / 404;
   object-fit: cover;
-  -webkit-mask-image: radial-gradient(ellipse 48% 42% at 50% 50%,
-    #000 0%, #000 56%, rgba(0, 0, 0, 0.5) 80%, transparent 100%);
-  mask-image: radial-gradient(ellipse 48% 42% at 50% 50%,
-    #000 0%, #000 56%, rgba(0, 0, 0, 0.5) 80%, transparent 100%);
+  /* **Wider and flatter than the valley's, and the reason is the subject.**
+     The first cut of this borrowed the valley's ellipse exactly, and that mask
+     was doing the very thing the crop had just been fixed to stop: the hot bar
+     sits at 29% across and 75% down, which on a 48x42 ellipse is 0.74 of the
+     way to the edge — inside the fade, at about six tenths of full strength.
+     The crop moved the anvil out from under the card and the mask dimmed it
+     where it landed.
+
+     56x52 with the hold pushed out to 64% puts that point at 0.55, which is
+     inside the opaque core. The picture is a lit interior whose own edges are
+     already black, so it can afford a softer vignette than an open valley
+     can — there is nothing out there to hide. */
+  -webkit-mask-image: radial-gradient(ellipse 56% 52% at 50% 50%,
+    #000 0%, #000 64%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  mask-image: radial-gradient(ellipse 56% 52% at 50% 50%,
+    #000 0%, #000 64%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
   animation: stage-field-rise var(--stage-life, 1150ms) ease-out both;
 }
 
@@ -12977,57 +13125,45 @@ button:hover .tarot-fan-card {
   .stage-forge-sparks { opacity: 1; }
 }
 
-/* --------------------------------------------- the arcanum beside a spell
+/* -------------------------------------------- the arcanum behind a spell
  *
  * **The fourth kind of moment, and the first that is not a place.** The road,
  * the vault, the valley and the forge are all answers to *where has this gone*
  * or *where has this come from*. An instant and a sorcery have been nowhere:
  * they are cast, they resolve, and they are in a graveyard. There is no
- * arrival to draw, which is exactly why those two beats had no scene at all
- * until now.
+ * arrival to draw, which is exactly why those two beats had no scene at all.
  *
  * What they have instead is a **shape**. Something sudden that happens to you,
- * and something deliberate that you do. So they are drawn from the deck this
- * project already keeps for things that are read rather than held: **The
- * Tower** for an instant — lightning through a crown, two figures falling,
- * which is what an instant does to somebody's plan — and **The Magician** for
- * a sorcery, one hand raised and one lowered over a table of prepared tools,
- * at your own pace on your own turn. Aaron suggested the first (2026-08-28)
- * and settled the rule the pair of them make: a card that becomes an object on
- * the table opens onto a real place; a card that is only ever an event is
- * drawn from the arcana.
+ * and something deliberate that you do. **The Tower** for an instant —
+ * lightning through a crown, two figures falling — and **The Magician** for a
+ * sorcery, one hand raised and one lowered over a table of prepared tools, at
+ * your own pace on your own turn. Aaron suggested the first (2026-08-28) and
+ * settled the rule the pair make: a card that becomes an object on the table
+ * opens onto a real place; a card that is only ever an event is drawn from the
+ * arcana.
  *
  * **The 1909 Rider deck, served from `/tarot/` rather than committed again.**
  * `assets/tarot/PROVENANCE.md` is the argument — public domain in both the US
  * and the UK, checked per file through the Commons API — and the reading room
- * already draws these exact bytes at that exact path. A second copy inside the
- * bundle would be the same pictures with the provenance one directory further
- * from them.
+ * already draws these exact bytes at that exact path.
  *
- * ## It is beside the spell, and the first two attempts were behind it
+ * ## Behind and centred, and the occlusion is answered in TIME
  *
- * **Behind does not work, and the reason is the same one that chose the
- * forge's painting.** A portrait tarot card standing behind a portrait Magic
- * card of similar size reads as a printing fault — two rectangles nearly
- * aligned — and turning it a few degrees does not rescue that. Made large
- * enough to stop reading as a sibling card, it hides its own subject instead:
- * The Tower's tower is dead centre, and dead centre is precisely where this
- * stage draws a card. Both attempts were rendered with a card standing in them
- * before either was believed, which is how the forge's picture was chosen and
- * how this one was placed.
+ * **Three arrangements were built and looked at.** Behind at nearly the card's
+ * own size read as a printing fault — two rectangles almost aligned. Laid down
+ * *beside* the spell fixed that and Aaron rejected it on sight: *"they are odd
+ * off to the left like they are now"* — which is right, because the middle of
+ * the arena is the one place this room puts the thing being spoken about, and
+ * anything in the corner reads as furniture.
  *
- * So the arcanum is **laid down beside the spell**, at about two fifths of the
- * arena's height and tilted, in the lower left. Both cards are legible whole;
- * they are unmistakably two objects; and the reading is the one the fortune
- * teller's table already teaches — a card turned over next to the question.
- * Clear of the plate underneath, which is measured rather than hoped: at
- * 1040x520 the card lands at 412-628 x 109-411 and this at 217-383 x 161-396,
- * with the plate strip below both.
- *
- * **And it turns over rather than fading in**, which is the whole reason to
- * have made it a card. `.stage-card` already carries a perspective for the
- * spell's own lift, and this sits off to one side of that origin — so the turn
- * is very slightly skewed, the way a card dealt to the left of a reader is.
+ * So it is behind, centred, and **much bigger than the card** — big enough
+ * that its own head and feet are never covered, which is what stops it reading
+ * as a duplicate. The occlusion that argument was originally about is answered
+ * the other way: *"we need to flip the spell over them"*. The arcanum turns
+ * face-up **alone**, is held for a beat with nothing on it, and only then does
+ * the spell flip over onto it. Nothing about The Tower is hidden, because
+ * there is a third of a second where there is nothing in front of it — and the
+ * order is the sentence: the fate is drawn, then the spell resolves on it.
  */
 .stage-arcanum {
   position: absolute;
@@ -13035,56 +13171,109 @@ button:hover .tarot-fan-card {
   /* Under the card and over the veil, where all the scenes sit; the ordering
      is by source position rather than by z-index, since all of them are 0. */
   z-index: 0;
+  display: grid;
+  place-items: center;
+  /* **The row has to be definite, or the height below is a lie.** A percentage
+     height on a grid item whose row is `auto` is a cyclic dependency — the row
+     sizes to the item and the item sizes to the row — so CSS resolves the
+     percentage to `auto` and `min(88%, 500px)` quietly takes the 500. Measured
+     in a browser: the arcanum came out 500px tall in a 520px arena, hanging
+     eighty pixels past the bottom edge and taking its own title band with it,
+     which is the one part that says this is a tarot card at all. Nothing in
+     the suite can see this (jsdom lays nothing out), and it does not look like
+     a bug — it looks like a slightly large picture. */
+  grid-template-rows: 100%;
   pointer-events: none;
   transform-style: preserve-3d;
 }
+/* **Two thirds again the card's height**, which is the number that does the
+   work: `.stage-frame` is 58% of the arena and this is 96%, so about a hundred
+   pixels of arcanum stands clear above the spell and as much below. Its
+   numeral and its title band are never covered, and a tarot card you can read
+   the name of is unmistakably a different object from the card in front of it.
+
+   Three degrees off square, which is a tenth of what the beside-arrangement
+   needed. Centred and level it would look like a misregistered print; centred
+   and *turned* it looks like one card set down on another. */
 .stage-arcanum-art {
-  position: absolute;
-  left: 23%;
-  bottom: 26%;
-  height: min(41%, 238px);
+  /* **Eighty-eight per cent, and the number is the title band.** 96 was the
+     first cut and it hung the arcanum's own feet off the bottom of the arena —
+     which takes with it the one part that says *this is a tarot card* at all.
+     At 88 both ends are on the screen: about seventy pixels of arcanum above
+     the spell and as much below, with `THE TOWER` legible under it. */
+  height: min(88%, 500px);
   width: auto;
-  border-radius: 4px;
-  /* The room's own rim and lift, so a 1909 card printed on cream stock sits in
-     an arena rather than on top of one. Nearly opaque, unlike the places
-     behind a card: this one is not being looked *through*, it is being read. */
+  border-radius: 5px;
+  /* Held back, because the spell in front is the subject. The deck's aged
+     cream stock is the brightest thing in this arena at full strength, and a
+     backdrop brighter than its foreground is a backdrop that has taken over. */
+  opacity: 0.72;
   box-shadow:
-    0 12px 26px rgba(0, 0, 0, 0.75),
-    0 0 0 1px color-mix(in srgb, var(--field-brass) 46%, transparent),
-    0 0 26px color-mix(in srgb, var(--stage-glow) 30%, transparent);
+    0 16px 34px rgba(0, 0, 0, 0.78),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 42%, transparent);
   animation: stage-arcanum-turn var(--stage-life, 1150ms)
     cubic-bezier(0.22, 0.9, 0.3, 1) both;
 }
-/* The light it is read by, under and behind it rather than on it — the veil's
-   trick a second time, so the pair reads as two things lit by one lamp. */
+/* The light it is read by, behind it rather than on it — the veil's trick one
+   layer further back, so the pair reads as two things lit by one lamp. */
 .stage-arcanum-glow {
   position: absolute;
-  left: 16%;
-  bottom: 20%;
-  width: 28%;
-  height: 40%;
+  inset: 6% 26%;
   border-radius: 50%;
   background: radial-gradient(closest-side,
-    color-mix(in srgb, var(--stage-glow) 40%, transparent) 0%,
+    color-mix(in srgb, var(--stage-glow) 32%, transparent) 0%,
     transparent 100%);
-  filter: blur(20px);
+  filter: blur(24px);
   animation: stage-field-open var(--stage-life, 1150ms) ease-out both;
 }
-/* Edge-on, then face up, then held while the plate is read — and gone before
-   the beat is, like everything else on this stage. The tilt is inside every
-   frame because it is what the card *is*, and only the turn moves. */
+/* Edge-on, then face up, then held. It is the first thing on the stage and it
+   finishes its turn by 22% of the beat — well before the spell begins its own
+   at 26%, which is what buys the moment where the arcanum is the only thing
+   there. */
 @keyframes stage-arcanum-turn {
-  0%   { opacity: 0; transform: rotate(-13deg) rotateY(-84deg) scale(0.95); }
-  12%  { opacity: 1; }
-  30%  { transform: rotate(-13deg) rotateY(0deg) scale(1); }
-  86%  { opacity: 1; }
+  0%   { opacity: 0; transform: rotate(-3deg) rotateY(-84deg) scale(0.94); }
+  10%  { opacity: 0.72; }
+  22%  { opacity: 0.72; transform: rotate(-3deg) rotateY(0deg) scale(1); }
+  86%  { opacity: 0.72; }
   100% { opacity: 0; }
 }
+
+/* **And the spell flips over it**, which is Aaron's own phrase for the fix and
+   also the reason the arcanum is legible at all: the card is simply not there
+   for the first quarter of the beat.
+
+   It replaces `stage-rise` for these two beats only. A spell that rose out of
+   the sand in front of an arcanum would be two unrelated motions in one frame;
+   turning face-up onto it is one gesture with the card underneath, and it is
+   what a reader does — lay the fate down, then turn the card that answers it.
+
+   The overshoot at 44% is `stage-rise`'s own, kept deliberately: every card on
+   this stage settles with the same small rock, and a spell that arrived dead
+   still would read as a different kind of object from every other card here. */
+.stage-card.has-tower .stage-frame,
+.stage-card.has-magician .stage-frame {
+  animation: stage-turn-over var(--stage-life, 1150ms)
+    cubic-bezier(0.2, 0.85, 0.3, 1) both;
+}
+.stage-card.has-tower .stage-frame::before,
+.stage-card.has-magician .stage-frame::before { animation: none; opacity: 0; }
+@keyframes stage-turn-over {
+  /* Nothing at all while the arcanum is being turned over and read. */
+  0%, 26% { opacity: 0; transform: rotateY(-88deg) scale(0.9); }
+  34%     { opacity: 1; }
+  44%     { transform: rotateY(0deg) scale(1.05); }
+  52%     { transform: rotateY(0deg) scale(1); }
+  80%     { opacity: 1; transform: rotateY(0deg) scale(1); }
+  100%    { opacity: 0; transform: translateY(-9%) scale(1.06); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stage-arcanum-art { animation-name: stage-arcanum-lie; }
   .stage-arcanum-glow { animation: none; }
+  .stage-card.has-tower .stage-frame,
+  .stage-card.has-magician .stage-frame { animation: none; }
   @keyframes stage-arcanum-lie {
-    0%, 100% { opacity: 1; transform: rotate(-13deg); }
+    0%, 100% { opacity: 0.72; transform: rotate(-3deg); }
   }
 }
 
