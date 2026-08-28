@@ -16,7 +16,7 @@
 
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Account, AccountList } from '../lib/api'
+import { followJob, type Account, type AccountList, type Job } from '../lib/api'
 import Admin from './Admin'
 
 vi.mock('../lib/api', async () => {
@@ -37,7 +37,17 @@ vi.mock('../lib/api', async () => {
       adminActivity: vi.fn(),
       adminTraffic: vi.fn(),
       adminFly: vi.fn(),
+      adminUpkeep: vi.fn(),
+      refreshLibrary: vi.fn(),
+      job: vi.fn(),
     },
+    // `followJob` is stubbed rather than let through, and the reason is a
+    // module boundary rather than a preference: the real one closes over
+    // `api` *inside* `lib/api`, which `vi.mock` cannot reach, so it would
+    // poll the network from a jsdom test. The stub below drives the same
+    // contract off the mocked `api.job` — one tick, then settle or keep
+    // watching — which is exactly the part this panel depends on.
+    followJob: vi.fn(),
   }
 })
 
@@ -95,6 +105,12 @@ const SOLO: AccountList = {
   users: [account({ username: 'root', is_admin: true, sessions: 2 }),
           account({ username: 'friend' })],
 }
+
+/** The wards' own buttons, which are places rather than actions — the
+ *  "exactly one control here" assertion in the upkeep block has to be able to
+ *  tell the two apart. */
+const TABS_LABELS = ['Accounts', 'Claude', 'Machine', 'Storage', 'Activity',
+                     'Upkeep']
 
 function rowFor(username: string) {
   return screen.getByText(username).closest('tr') as HTMLElement
@@ -710,5 +726,165 @@ describe('the far-seeing glass', () => {
     expect(screen.getByText(/HTTP 401/)).toBeTruthy()
     // The rest of the ward is unaffected — the box's own numbers stay.
     expect(screen.getByText('120 MB')).toBeTruthy()
+  })
+})
+
+/**
+ * Upkeep: the one control on this page that is not about an account.
+ *
+ * What is worth pinning is the pair of rules the server owns and this panel
+ * only *reflects* — reflecting them wrongly is how a page offers a click that
+ * can only fail, or worse, one that starts a second five-hundred-megabyte
+ * download:
+ *
+ * - **The gathering is never one click.** The first press opens a warning
+ *   that says what it costs; only the second one starts anything.
+ * - **A gathering already under way is followed, not duplicated.** A page
+ *   loaded while one is running shows the run instead of the button.
+ */
+describe('upkeep', () => {
+  const QUIET = {
+    library: { present: true, cards: 34512, printings: 512000,
+               gathered: '2026-08-24', refreshing: false, job_id: null },
+    arena: { here: true, playing_with: '2.0.14' },
+  }
+
+  function job(over: Partial<Job> = {}): Job {
+    return {
+      id: 'gather1', kind: 'library.refresh', status: 'running',
+      done: 1, total: 5, percent: 20, label: 'the card library',
+      result: null, partial: { saying: 'gathering the cards' },
+      error: null, created_at: '2026-08-28T10:00:00+00:00',
+      ...over,
+    }
+  }
+
+  beforeEach(() => {
+    vi.mocked(api.adminUpkeep).mockResolvedValue(QUIET)
+    // One poll, then the job's own status decides: finished settles the
+    // watch, and a job still going leaves it open — which is what keeps the
+    // panel in its running state for the test that is about that state.
+    vi.mocked(followJob).mockImplementation((id, onTick) => ({
+      promise: new Promise<Job>((resolve, reject) => {
+        void api.job(id).then((asked) => {
+          onTick(asked)
+          if (asked.status === 'done') resolve(asked)
+          if (asked.status === 'error') {
+            reject(new Error(asked.error ?? 'the gathering failed'))
+          }
+        })
+      }),
+      cancel: () => {},
+    }))
+  })
+
+  it('reads the shelves, and says when they were last gathered', async () => {
+    render(<Admin />)
+    await openTab('Upkeep')
+
+    const cards = (await screen.findByText('Cards')).closest('div') as HTMLElement
+    expect(within(cards).getByText('34,512')).toBeTruthy()
+    expect(screen.getByText(/last gathered 2026-08-24/)).toBeTruthy()
+  })
+
+  it('does not gather on the first click — it says what it costs first', async () => {
+    render(<Admin />)
+    await openTab('Upkeep')
+
+    fireEvent.click(await screen.findByRole('button',
+      { name: /gather the library again/i }))
+
+    // The two facts somebody needs before committing: the library shuts, and
+    // this is rarely the right button.
+    expect(screen.getByText(/nobody can look a card up/i)).toBeTruthy()
+    expect(screen.getByText(/once a week/i)).toBeTruthy()
+    expect(api.refreshLibrary).not.toHaveBeenCalled()
+
+    // And it can be walked away from.
+    fireEvent.click(screen.getByRole('button', { name: /leave it/i }))
+    await waitFor(() =>
+      expect(screen.queryByText(/nobody can look a card up/i)).toBeNull())
+    expect(api.refreshLibrary).not.toHaveBeenCalled()
+  })
+
+  it('starts one gathering on the second click, and follows it', async () => {
+    vi.mocked(api.refreshLibrary).mockResolvedValue(job({ status: 'queued', percent: 0 }))
+    vi.mocked(api.job).mockResolvedValue(job({
+      status: 'done', percent: 100, partial: null,
+      result: { cards: 34600, printings: 513000 },
+    }))
+
+    render(<Admin />)
+    await openTab('Upkeep')
+    fireEvent.click(await screen.findByRole('button',
+      { name: /gather the library again/i }))
+    fireEvent.click(screen.getByRole('button', { name: /gather it now/i }))
+
+    await waitFor(() => expect(api.refreshLibrary).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText(/shelves are full again/i)).toBeTruthy()
+    expect(screen.getByText(/34,600 cards/)).toBeTruthy()
+  })
+
+  it('follows a gathering that was already under way, rather than offering another',
+     async () => {
+       vi.mocked(api.adminUpkeep).mockResolvedValue({
+         ...QUIET,
+         library: { ...QUIET.library, present: false, cards: 0, printings: 0,
+                    refreshing: true, job_id: 'gather1' },
+       })
+       // Still going when the page arrives, so the panel shows the run.
+       vi.mocked(api.job).mockResolvedValue(job())
+
+       render(<Admin />)
+       await openTab('Upkeep')
+
+       expect(await screen.findByText(/gathering the cards/i)).toBeTruthy()
+       expect(screen.getByRole('progressbar')).toBeTruthy()
+       // The button that would start a second one is not on the page at all.
+       expect(screen.queryByRole('button',
+         { name: /gather the library again/i })).toBeNull()
+       expect(api.refreshLibrary).not.toHaveBeenCalled()
+     })
+
+  it('reports a refusal in the room’s words and leaves the shelves alone', async () => {
+    vi.mocked(api.refreshLibrary).mockRejectedValue(
+      new Error('the library was busy being read and would not come free, '
+                + 'so nothing was changed. Try again in a few minutes'))
+
+    render(<Admin />)
+    await openTab('Upkeep')
+    fireEvent.click(await screen.findByRole('button',
+      { name: /gather the library again/i }))
+    fireEvent.click(screen.getByRole('button', { name: /gather it now/i }))
+
+    expect(await screen.findByText(/busy being read/i)).toBeTruthy()
+    // And the button is offered again: a refusal is not a dead control.
+    expect(screen.getByRole('button',
+      { name: /gather the library again/i })).toBeTruthy()
+  })
+
+  it('reads the arena and offers no button for it', async () => {
+    render(<Admin />)
+    await openTab('Upkeep')
+
+    // The one honest fact: what the last recorded game was judged by.
+    expect(await screen.findByText(/Forge 2.0.14/)).toBeTruthy()
+    expect(screen.getByText(/no button here on purpose/i)).toBeTruthy()
+    // Exactly one control in this ward, and it is the library's.
+    const buttons = screen.getAllByRole('button')
+      .filter((b) => !TABS_LABELS.includes(b.textContent ?? ''))
+    expect(buttons.map((b) => b.textContent))
+      .toEqual(['Gather the library again'])
+  })
+
+  it('says so plainly when no game has been played here', async () => {
+    vi.mocked(api.adminUpkeep).mockResolvedValue({
+      ...QUIET, arena: { here: false, playing_with: null },
+    })
+    render(<Admin />)
+    await openTab('Upkeep')
+
+    expect(await screen.findByText(/No game has been played here yet/)).toBeTruthy()
+    expect(screen.queryByText(/Forge 2/)).toBeNull()
   })
 })

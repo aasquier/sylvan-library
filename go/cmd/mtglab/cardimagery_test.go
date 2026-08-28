@@ -186,6 +186,21 @@ var artBearing = map[string]string{
 		"and it contains that card's CardArt",
 	"art-dimmed": "index.css: the shared wrapper that puts a shade over one " +
 		"piece of card art (DeckDetail's graveyard rows use it)",
+
+	// --- the token shelf, 2026-08-28 ---------------------------------------
+	//
+	// Not from ADR 48's sweep: these two carried no filter and still do not.
+	// They are here because the shelf is the newest surface in the app that
+	// puts a whole printed card face on the page, and the sweep's own lesson
+	// was that the list is kept by walking the JSX rather than by waiting for
+	// a violation. A plate lifts and turns on hover, which is exactly the
+	// gesture that reaches for `filter` next time.
+
+	"token-face": "components/tokens.tsx: <img className='token-face' " +
+		"src={token.image}> in TokenPlateCard -- a whole printed token face, " +
+		"artist and copyright line included",
+	"token-plate": "components/tokens.tsx: the <li> that face sits in, and " +
+		"the element whose :hover lifts and turns it",
 }
 
 // Anything that re-renders the pixels. `drop-shadow` is deliberately absent:

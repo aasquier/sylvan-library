@@ -15331,6 +15331,47 @@ button:hover .tarot-fan-card {
   font-size: 12px;
 }
 
+/* The mark that says what a token is — `FieldHint` wearing this section's
+   brass instead of the board's. It used to be a decoration inside the toggle
+   with a `title` doing the talking, which meant the one sentence a folded
+   section had reached a mouse and nobody else.
+
+   `.field-hint` under it is only a reset — a button arrives with a border, a
+   background and a font of its own — and it deliberately leaves *answering a
+   hand* to whatever is wearing it, because on the board that is a card chip
+   which already answers. Here there is nothing but the glyph, so commandment
+   17 is this block's job.
+
+   **A 12px glyph is not a 12px target.** The box goes to 28x28 without moving
+   the glyph a pixel, which is what a thumb needs; unlike the board's marks
+   this one has no neighbour at a 14px pitch for the bigger box to steal a tap
+   from, so it can simply be the size it should be rather than an asymmetric
+   `::before`. */
+.token-ask {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  opacity: 0.7;
+  transition: opacity 140ms ease, background-color 140ms ease,
+    transform 140ms ease;
+}
+.token-ask:hover,
+.token-ask:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--token-brass) 15%, transparent);
+}
+.token-ask:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.token-ask:active {
+  transform: scale(0.92);
+}
+
 /* A shelf rather than a list: these are objects somebody lays out beside the
    deck, and one per line would make four Foods look like four decisions.
    `auto-fill` at 16.5rem gives a phone one column and a laptop three or four
@@ -15341,8 +15382,25 @@ button:hover .tarot-fan-card {
   gap: 10px;
 }
 
-/* Each plate deals in rather than appearing (commandment 6). `both`, so the
-   stagger's delay holds it out of sight instead of flashing it first. */
+/* Each plate deals in rather than appearing (commandment 6). `backwards`, so
+   the stagger's delay holds it out of sight instead of flashing it first.
+
+   **`backwards` and not `both`, and that word is load-bearing.** A forwards
+   fill leaves the last keyframe applied for ever — and the last keyframe here
+   says `transform: none`, which a browser resolves to the *identity matrix*
+   rather than to nothing at all. An element whose computed transform is a
+   matrix is a containing block for every `position: fixed` descendant, so the
+   card preview a hovered face raises was being placed against this 340px
+   plate instead of against the window: measured at (122, 1058) in an 814px
+   tall window — off the bottom of the screen, and shrunk from 230px wide to
+   170px on the way. `backwards` fills only the *delay*, which is the half the
+   stagger actually needs, and hands the element back its own `transform: none`
+   the moment the deal is over. Read as `both` again and the preview leaves the
+   screen; nothing in the web suite can see it, because jsdom lays nothing out.
+
+   (The general form of that trap is `CardHover`'s cursor preview being
+   rendered in place rather than portalled — `CardSheet` beside it *is*
+   portalled, for this exact reason, and says so.) */
 .token-plate {
   display: flex;
   gap: 10px;
@@ -15351,7 +15409,7 @@ button:hover .tarot-fan-card {
   border-radius: 10px;
   background: var(--surface-1);
   border: 1px solid var(--hairline);
-  animation: token-deal 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation: token-deal 320ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .token-plate:hover {
@@ -15451,6 +15509,12 @@ button:hover .tarot-fan-card {
     animation: none;
   }
   .token-plate:hover .token-face {
+    transform: none;
+  }
+  /* The press stays visible — a control still has to answer — but as colour
+     rather than as travel. */
+  .token-ask,
+  .token-ask:active {
     transform: none;
   }
 }
@@ -16593,4 +16657,38 @@ button:hover .tarot-fan-card {
   .guild-creed::after {
     opacity: 0;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   The gathering bar (Admin -> Upkeep)
+
+   A library refresh takes several minutes and reports five beats, so the bar
+   spends most of its life at one of five widths and would otherwise sit
+   perfectly still for a minute at a time — which reads as hung rather than as
+   patient. The width is the honest progress; the travelling sheen is the
+   sign of life on top of it, and it carries no information at all, which is
+   exactly why it may keep moving while the number does not.
+   --------------------------------------------------------------------------- */
+.upkeep-gathering {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vine) 62%, transparent) 0%,
+    color-mix(in srgb, var(--vine) 100%, transparent) 45%,
+    color-mix(in srgb, #fff 55%, var(--vine)) 50%,
+    color-mix(in srgb, var(--vine) 100%, transparent) 55%,
+    color-mix(in srgb, var(--vine) 62%, transparent) 100%
+  );
+  background-size: 220% 100%;
+  animation: upkeep-gathering-sheen 2.4s linear infinite;
+  transition: width 420ms ease-out;
+}
+
+@keyframes upkeep-gathering-sheen {
+  from { background-position: 140% 0; }
+  to   { background-position: -40% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The sheen goes; the width still moves, because the width is the fact. */
+  .upkeep-gathering { animation: none; background-position: 50% 0; }
 }

@@ -94,6 +94,37 @@ predates a column the code now reads, and the affected surfaces degrade to
 fly ssh console -C "mtglab data refresh"
 ```
 
+**Or press the button.** `/admin` → **Upkeep** starts the same refresh as a
+background job on the instance, which is ADR 6's own plan for this ("an
+authenticated admin endpoint that starts a refresh as a background job") and
+runs the same `pool.Refresh` sequence the command above does. It is the right
+choice when you are away from a terminal and the wrong one when you want to
+watch the phases go by — the page shows five beats and a bar, the terminal
+shows the file names and the row counts.
+
+Three differences worth knowing before you press it:
+
+- **The page cannot pass `--oracle-only`.** The button always does the full
+  refresh, printings included. Use the command when you want the small one.
+- **The app shuts its own library first.** A refresh started from inside the
+  serving process cannot open the writer while that process holds the file
+  read-only — DuckDB refuses a same-process second open outright rather than
+  making it wait — so the job seals the pool, waits up to a minute for
+  readers already inside to finish, and hands the file back when it is done.
+  Card lookups answer "no pool" for the duration, which is ADR 6's expected
+  behaviour said out loud on the page before you commit.
+- **One at a time, whoever asks.** A second press, a second tab or a second
+  device is refused and pointed at the run already going; a page reloaded
+  mid-refresh follows it rather than offering to start another. That guard is
+  per process, which is the scope the write lock actually has.
+- **The job is the instance's, not the tab's**, and it dies with the process
+  rather than with the browser — jobs are in memory by design. Closing the tab
+  is safe today because the app machine is held up (`auto_stop_machines` is
+  off, `min_machines_running` is 1). **Re-read this bullet if that ever goes
+  back to `suspend`**: an idle machine with nobody polling could suspend
+  mid-gathering and resume it on the next request, which is a pause rather
+  than a loss, but "leave the page" would stop being the whole truth.
+
 **One reader does not raise `pool_stale`, and it is the newest one.** The
 deck page's token section reads `oracle_cards.all_parts` — what each card
 creates, which is how "what does this deck make" is answered from a chosen

@@ -49,8 +49,12 @@ func TestEveryAdminRouteFailsLoudlyWhenTheDatabaseStops(t *testing.T) {
 		case http.StatusOK:
 			// The stats views are answered from the box rather than from
 			// the database, and answering them is correct: they degrade to
-			// the shapes an empty database would give.
-			if !strings.HasPrefix(route.target, "/api/admin/stats/") {
+			// the shapes an empty database would give. The upkeep reading is
+			// the same kind of route for the same reason -- it reads the pool
+			// file and the match ledger, and reports `present: false` for a
+			// library it could not open rather than claiming one.
+			if !strings.HasPrefix(route.target, "/api/admin/stats/") &&
+				route.target != "/api/admin/upkeep" {
 				t.Errorf("%s %s answered 200 over a dead database: %s",
 					route.method, route.target, rec.Body.String())
 			}
