@@ -158,6 +158,15 @@ func TestEveryFactionShowsItsSigilAndNobodyElseDoes(t *testing.T) {
 			t.Errorf("%s: sigil %+v is missing a part", c.Name, *c.Sigil)
 			continue
 		}
+		// The flavour text is the caption for the painting and the reason the
+		// field exists at all (Aaron, 2026-08-28), so an empty one is a sigil
+		// that has stopped doing its job rather than a cosmetic gap. Every one
+		// of the twenty printings cited here carries a line; if a future
+		// repointing lands on a printing that does not, this says so before it
+		// reaches a page with a blank quote on it.
+		if c.Sigil.Flavor == "" {
+			t.Errorf("%s: sigil %q has no flavour text", c.Name, c.Sigil.Card)
+		}
 		// The likeliest authoring mistake by a distance is a row pasted onto
 		// its neighbour -- Gruul wearing Golgari's rock. Both halves of the
 		// card's name answer it: the faction is in the name, and the cycle

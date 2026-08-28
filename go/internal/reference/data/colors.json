@@ -240,9 +240,10 @@
       },
       "sigil": {
         "card": "Azorius Signet",
-        "artist": "Raoul Vitale",
-        "printing": "Tarkir: Dragonstorm Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/4/1/41c50b99-4a29-4bef-8d41-c548c8a61dac.jpg?1783907017"
+        "artist": "Greg Hildebrandt",
+        "printing": "Dissension",
+        "art": "https://cards.scryfall.io/art_crop/front/d/9/d91a527d-51f1-4fb1-9016-fc923fd43a6a.jpg?1783943383",
+        "flavor": "The maze-like design embodies the core of Azorius law—strict structure designed to test wills and stall change."
       },
       "lore": "The Guildpact that binds all ten guilds was written by an Azorius sphinx, Azor, who then left Ravnica entirely and never came back. The Senate has spent ten thousand years enforcing a document whose author walked away from it, which is either the purest expression of the guild or its standing indictment, depending which guild you ask.",
       "champions": [
@@ -286,9 +287,10 @@
       },
       "sigil": {
         "card": "Dimir Signet",
-        "artist": "Raoul Vitale",
-        "printing": "Ravnica: Clue Edition",
-        "art": "https://cards.scryfall.io/art_crop/front/c/3/c3af24ce-b1ab-4137-9222-a4080acae928.jpg?1783912511"
+        "artist": "Greg Hildebrandt",
+        "printing": "Ravnica: City of Guilds",
+        "art": "https://cards.scryfall.io/art_crop/front/9/a/9a9a1df5-a4e8-49a4-aebe-ca93894ccfcf.jpg?1783943598",
+        "flavor": "An emblem of a secret guild, the Dimir insignia is seen only by its own members—and the doomed."
       },
       "lore": "Dimir's parun broke the Guildpact. Szadek had been feeding on Ravnica for centuries, and when he was finally caught the magically binding treaty that held the city together turned out to be breakable after all — which is the event the rest of Ravnica's modern history proceeds from. The guild's own existence was a rumour for most of that time.",
       "champions": [
@@ -332,9 +334,10 @@
       },
       "sigil": {
         "card": "Rakdos Signet",
-        "artist": "Martina Pilcerova",
-        "printing": "Duskmourn: House of Horror Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/0/1/01cc9536-f710-4c47-9e3f-d7e83cc888f2.jpg?1783909583"
+        "artist": "Greg Hildebrandt",
+        "printing": "Dissension",
+        "art": "https://cards.scryfall.io/art_crop/front/1/7/17a3f95c-5a05-46ea-8dc6-b77b59324035.jpg?1783943381",
+        "flavor": "Made of bone and boiled in blood, a Rakdos signet is not considered finished until it has been used as a murder weapon."
       },
       "lore": "The guild is named after a demon who is asleep for most of Ravnica's history, and whose waking is treated by every other guild as a civic emergency. What the cult does in the meantime is put on shows. That is not a euphemism and it is not a cover: the performances are the guild, and the fact that people keep coming to them is the point Rakdos is making about everyone else.",
       "champions": [
@@ -378,9 +381,10 @@
       },
       "sigil": {
         "card": "Gruul Signet",
-        "artist": "Efrem Palacios",
-        "printing": "Ravnica: Clue Edition",
-        "art": "https://cards.scryfall.io/art_crop/front/e/d/ed1adca8-9386-42b0-ac6b-699394ac7969.jpg?1783912510"
+        "artist": "Greg Hildebrandt",
+        "printing": "Guildpact",
+        "art": "https://cards.scryfall.io/art_crop/front/1/b/1bb30340-96a4-49d8-838b-8788900401a0.jpg?1783943459",
+        "flavor": "Gruul territorial markings need not be legible. The blood, snot, and muck used to smear them are unmistakably Gruul."
       },
       "lore": "The Gruul are what the city displaced. When Ravnica grew to cover the world it grew over their land, and the Guildpact gave them a seat at the table in exchange for their range — a deal the clans have regarded ever since as the theft it was. They are the one guild whose stated goal is the end of the arrangement that keeps all ten of them alive.",
       "champions": [
@@ -424,9 +428,10 @@
       },
       "sigil": {
         "card": "Selesnya Signet",
-        "artist": "Raoul Vitale",
-        "printing": "Tarkir: Dragonstorm Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/4/e/4e21a028-0f06-4124-bd0f-04989a1f9481.jpg?1783907007"
+        "artist": "Greg Hildebrandt",
+        "printing": "Ravnica: City of Guilds",
+        "art": "https://cards.scryfall.io/art_crop/front/8/2/8296d86a-2c79-43c8-8a1c-1d4bb600bc6b.jpg?1783943595",
+        "flavor": "The symbol of the Conclave is one of unity, with tree supporting sun and sun feeding tree."
       },
       "lore": "Selesnya's founder is not a person. Mat'Selesnya is a shared consciousness the guild's members join, and its leadership speaks through Trostani — three dryads fused into one voice that says 'we'. Every other guild is run by somebody. This one is run by an agreement, which is exactly as reassuring and as unsettling as it sounds.",
       "champions": [
@@ -470,9 +475,10 @@
       },
       "sigil": {
         "card": "Orzhov Signet",
-        "artist": "Martina Pilcerova",
-        "printing": "Tarkir: Dragonstorm Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/9/0/90894726-1940-4291-a05c-b85cefbfa344.jpg?1783907008"
+        "artist": "Greg Hildebrandt",
+        "printing": "Guildpact",
+        "art": "https://cards.scryfall.io/art_crop/front/f/9/f9298a1d-5b41-46d8-929c-b6980d1e6eb7.jpg?1783943457",
+        "flavor": "The form of the sigil is just as important as the sigil itself. If it's carried on a medallion, its bearer is a master. If it's tattooed on the body, its bearer is a slave."
       },
       "lore": "The Orzhov are run by ten ghosts. The Obzedat are the syndicate's founding patriarchs, who declined to stop being in charge when they died and have held the seats ever since — which tells you what the guild thinks a contract is. Its workforce is largely made of people who died still owing, and it considers that an accounting matter.",
       "champions": [
@@ -516,9 +522,10 @@
       },
       "sigil": {
         "card": "Izzet Signet",
-        "artist": "Raoul Vitale",
-        "printing": "Tarkir: Dragonstorm Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/2/c/2c747a97-9070-4c1e-b7b7-52637fbb30e1.jpg?1783907010"
+        "artist": "Greg Hildebrandt",
+        "printing": "Guildpact",
+        "art": "https://cards.scryfall.io/art_crop/front/f/8/f823be95-bef4-4e86-a924-239be62394bf.jpg?1783943458",
+        "flavor": "The Izzet signet is redesigned often, each time becoming closer to a vanity portrait of Niv-Mizzet."
       },
       "lore": "Izzet is the one guild still run by its founder. Niv-Mizzet is a dragon, the most intelligent being on Ravnica, and he has been personally in charge for ten thousand years — a guild whose entire culture is 'try it and see' answering to somebody who has already worked out the answer. When the maze that reordered Ravnica's politics was finally run, the Guildpact was rebuilt inside him.",
       "champions": [
@@ -562,9 +569,10 @@
       },
       "sigil": {
         "card": "Golgari Signet",
-        "artist": "Raoul Vitale",
-        "printing": "Duskmourn: House of Horror Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/9/5/95103b4c-d0c0-40fa-9ddd-c7416455ca0c.jpg?1783909585"
+        "artist": "Greg Hildebrandt",
+        "printing": "Ravnica: City of Guilds",
+        "art": "https://cards.scryfall.io/art_crop/front/b/e/be03b002-1a3e-4b21-bc23-7f5a9cedb74f.jpg?1783943597",
+        "flavor": "Depending on your point of view, the seal represents a proud guardian of the natural cycle or one who has sold her soul to darkness for eternal life."
       },
       "lore": "The Swarm holds the undercity and Ravnica's whole decomposition contract, which is the leverage nobody else thinks about until it is withdrawn. Its succession is done the Golgari way: Savra ruled, then her brother Jarad, then Vraska, a gorgon planeswalker who took the guild by killing her way to the top of it. Nothing there is wasted either.",
       "champions": [
@@ -608,9 +616,10 @@
       },
       "sigil": {
         "card": "Boros Signet",
-        "artist": "Ron Spears",
-        "printing": "Tarkir: Dragonstorm Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/4/9/49c37c0e-d363-4033-a069-710241cd9923.jpg?1783907016"
+        "artist": "Greg Hildebrandt",
+        "printing": "Ravnica: City of Guilds",
+        "art": "https://cards.scryfall.io/art_crop/front/1/b/1bae1f86-4639-4424-b47b-fdc826bf6e97.jpg?1783943601",
+        "flavor": "\"Have you ever held a Boros signet? There's a weight to it that belies its size—a weight of strength and of pride.\"\n—Agrus Kos"
       },
       "lore": "Boros is an army of angels that believes in due process, and the tension between those two things is its whole story. Razia founded the Legion; Aurelia leads it now, and did not inherit it quietly. A guild whose answer to injustice is a charge is always one commander away from being the thing it fights, and it knows that about itself.",
       "champions": [
@@ -654,9 +663,10 @@
       },
       "sigil": {
         "card": "Simic Signet",
-        "artist": "Mike Sass",
-        "printing": "Duskmourn: House of Horror Commander",
-        "art": "https://cards.scryfall.io/art_crop/front/b/f/bf222c78-f12e-4857-93da-fade99c740b8.jpg?1783909583"
+        "artist": "Greg Hildebrandt",
+        "printing": "Dissension",
+        "art": "https://cards.scryfall.io/art_crop/front/9/0/90107d10-e2aa-4cb7-a000-039f0c581b47.jpg?1783943379",
+        "flavor": "For the Simic Combine, its sigil serves not as an emblem of honor but as a trademark. Its familiar image on any biological commodity attests to superb craftsmanship, ingenious innovation, and higher cost."
       },
       "lore": "The Combine began as Ravnica's research guild and stayed one long after the other nine turned political, which is why it is the guild the others notice last. Its signature product is the krasis — organisms assembled from whatever worked — and its signature failing is that it will not stop at the version that already works.",
       "champions": [
@@ -698,7 +708,8 @@
         "card": "Obelisk of Bant",
         "artist": "David Palumbo",
         "printing": "Shards of Alara",
-        "art": "https://cards.scryfall.io/art_crop/front/0/c/0cefe6ab-c018-4b87-8948-295a28f63cb1.jpg?1783942535"
+        "art": "https://cards.scryfall.io/art_crop/front/0/c/0cefe6ab-c018-4b87-8948-295a28f63cb1.jpg?1783942535",
+        "flavor": "Whether incorporated into the structure of castles or admired as lone symbols, the obelisks stand for Bant's values of loyalty, honor, and truth."
       },
       "lore": "Bant is what a society looks like when nobody has anything to be angry about. Angels sit at the top of a caste system, every caste knows its sigil and its duty, and the arrangement holds because the shard lost the two colours that would have questioned it. When the shards were forced back together, the first thing through Bant's border was Grixis's undead — a world with no experience of an enemy, meeting one.",
       "champions": [
@@ -735,8 +746,9 @@
       "sigil": {
         "card": "Obelisk of Esper",
         "artist": "Francis Tsai",
-        "printing": "Commander 2013",
-        "art": "https://cards.scryfall.io/art_crop/front/7/0/70b347b1-9277-4ad0-88c8-faacace08827.jpg?1783939637"
+        "printing": "Shards of Alara",
+        "art": "https://cards.scryfall.io/art_crop/front/1/9/19869e75-0925-45dc-b5d9-6968fbfb35b5.jpg?1783942535",
+        "flavor": "It is a monument as austere, unyielding, and inscrutable as Esper itself."
       },
       "lore": "Esper replaced itself. Etherium — a metal that improves whatever it is grafted to — was invented there, and the shard took that literally, until having flesh left was a statement about your standing. The catch was arithmetic: there was only ever so much etherium, and a society that measures worth in a finite substance has decided in advance who loses.",
       "champions": [
@@ -773,8 +785,9 @@
       "sigil": {
         "card": "Obelisk of Grixis",
         "artist": "Nils Hamm",
-        "printing": "Archenemy: Nicol Bolas",
-        "art": "https://cards.scryfall.io/art_crop/front/1/b/1bf29333-2fe4-4bd3-855b-8eef8d14c5d6.jpg?1783936136"
+        "printing": "Shards of Alara",
+        "art": "https://cards.scryfall.io/art_crop/front/5/2/5200e41f-fe10-4c39-ab12-c6e13fb81a3d.jpg?1783942535",
+        "flavor": "Like most features of Grixis, the obelisks that remain from the time of Alara now exist only for dark exploitation."
       },
       "lore": "Grixis is Nicol Bolas's shard, and the Conflux that put Alara back together is his doing: an elder dragon stripped of most of his power spent a very long time arranging for the five fragments to collide, because what that released was what he wanted back. The place had run out of living things long before. What is left rules by necromancy, because a corpse is the only resource that has not run out.",
       "champions": [
@@ -815,8 +828,9 @@
       "sigil": {
         "card": "Obelisk of Jund",
         "artist": "Brandon Kitkouski",
-        "printing": "Commander 2013",
-        "art": "https://cards.scryfall.io/art_crop/front/1/f/1fe43306-f48f-4812-8d40-1903cc6f19d2.jpg?1783939637"
+        "printing": "Shards of Alara",
+        "art": "https://cards.scryfall.io/art_crop/front/f/f/ffe1a49a-5c1c-4274-a2ed-9a8a44abfaa6.jpg?1783942535",
+        "flavor": "Volcanic ash-winds batter it, climbing vines overwhelm it, dragonfire roasts it, and yet it still stands as a testament to a forgotten world."
       },
       "lore": "Jund has no government, only a food chain, and the dragons are at the top of it. Everything else is arranged by what eats what: goblins scavenge, viashino raid, human warchiefs hold territory exactly as long as they can hold it. It is the shard that lost white and blue, so nothing on it has ever proposed a rule or thought a plan through.",
       "champions": [
@@ -854,7 +868,8 @@
         "card": "Obelisk of Naya",
         "artist": "Steve Prescott",
         "printing": "Shards of Alara",
-        "art": "https://cards.scryfall.io/art_crop/front/d/f/df6317b0-15fd-4924-9302-41bed2354546.jpg?1783942535"
+        "art": "https://cards.scryfall.io/art_crop/front/d/f/df6317b0-15fd-4924-9302-41bed2354546.jpg?1783942535",
+        "flavor": "Centuries have passed since the plane shattered, yet the obelisks of each shard faithfully serve their long-forgotten purpose."
       },
       "lore": "On Naya everything grew. The behemoths are the size of landmarks, the jungle is the size of the world, and the nacatl built a religion around calling them rather than a strategy for fighting them — which, at that scale, is the rational response. The shard's own peace was broken from inside by Marisi, and it has been arguing about whether he was right ever since.",
       "champions": [
@@ -892,7 +907,8 @@
         "card": "Abzan Banner",
         "artist": "Daniel Ljunggren",
         "printing": "Khans of Tarkir",
-        "art": "https://cards.scryfall.io/art_crop/front/7/8/7855528a-ede9-49a9-8749-795a004fd927.jpg?1783939049"
+        "art": "https://cards.scryfall.io/art_crop/front/7/8/7855528a-ede9-49a9-8749-795a004fd927.jpg?1783939049",
+        "flavor": "Stone to endure, roots to remember."
       },
       "lore": "The Abzan keep their dead on the roster. The kin-tree at the centre of a house is not a memorial, it is the household — ancestors are consulted, counted and expected to contribute, and a warrior who dies has changed department rather than left. In the timeline where the dragons won, the clan is gone and Dromoka's brood holds the same desert.",
       "champions": [
@@ -930,7 +946,8 @@
         "card": "Jeskai Banner",
         "artist": "Daniel Ljunggren",
         "printing": "Khans of Tarkir",
-        "art": "https://cards.scryfall.io/art_crop/front/6/8/684dc050-a66b-4364-9880-56f383db6c0a.jpg?1783939048"
+        "art": "https://cards.scryfall.io/art_crop/front/6/8/684dc050-a66b-4364-9880-56f383db6c0a.jpg?1783939048",
+        "flavor": "Discipline to persevere, insight to discover."
       },
       "lore": "The Jeskai are archivists who fight. Their monasteries kept Tarkir's records through a thousand years in which the plane's own history had been comprehensively rewritten by the people who won, and Narset is the one who read them and worked out what was missing. Decades of study, spent in a single strike, is the Way stated as a training regime.",
       "champions": [
@@ -968,7 +985,8 @@
         "card": "Sultai Banner",
         "artist": "Daniel Ljunggren",
         "printing": "Khans of Tarkir",
-        "art": "https://cards.scryfall.io/art_crop/front/1/6/1695cf35-8f7c-4674-bfd3-43520b13d084.jpg?1783939048"
+        "art": "https://cards.scryfall.io/art_crop/front/1/6/1695cf35-8f7c-4674-bfd3-43520b13d084.jpg?1783939048",
+        "flavor": "Power to dominate, cruelty to rule."
       },
       "lore": "The Sultai solved labour by declining to let it retire. The Brood's naga royalty raise the dead to work the rice paddies and hold the courts, and spend the surplus on a level of luxury that is itself the point — the clan's ambition is not power for its own sake but appetite, publicly satisfied. Under the dragons, Silumgar keeps the court and the decadence.",
       "champions": [
@@ -1006,7 +1024,8 @@
         "card": "Mardu Banner",
         "artist": "Daniel Ljunggren",
         "printing": "Khans of Tarkir",
-        "art": "https://cards.scryfall.io/art_crop/front/f/e/fe10c56d-a8e1-495d-a03a-0b920b44182f.jpg?1783939048"
+        "art": "https://cards.scryfall.io/art_crop/front/f/e/fe10c56d-a8e1-495d-a03a-0b920b44182f.jpg?1783939048",
+        "flavor": "Speed to strike, fury to smash."
       },
       "lore": "The Mardu measure worth in motion, and a horde that stops is a horde that has lost. It is also the clan with the format's best-loved moment of nerve: Alesha took her name in front of the whole horde and invited anyone who objected to say so, and then led them. Her card is a good lesson in rule 2 as well as in courage — she costs {2}{R}, and her identity is all three Mardu colours, because of two hybrid pips in her ability.",
       "champions": [
@@ -1044,7 +1063,8 @@
         "card": "Temur Banner",
         "artist": "Daniel Ljunggren",
         "printing": "Khans of Tarkir",
-        "art": "https://cards.scryfall.io/art_crop/front/9/9/9990bdff-c27a-447f-b530-d8b7614fe9a0.jpg?1783939048"
+        "art": "https://cards.scryfall.io/art_crop/front/9/9/9990bdff-c27a-447f-b530-d8b7614fe9a0.jpg?1783939048",
+        "flavor": "Savagery to survive, courage to triumph."
       },
       "lore": "The Temur live where the ice is, and their shamans' job is to read what the land is about to do before it does it. That is the whole clan in one sentence: green's endurance and red's ferocity, with just enough blue to see the avalanche coming. They do not out-think the frontier, they out-last it, and then grow to a size it stops being able to argue with.",
       "champions": [
