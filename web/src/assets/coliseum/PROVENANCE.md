@@ -247,3 +247,16 @@ Why committed rather than hotlinked: The four scenes beside it, exactly. This dr
 
 Why committed rather than hotlinked: The five scenes beside it, exactly. This draws on the beat an Aura goes onto a creature and is gone about a second later, so fetching it from somebody else's host would mean a rite that opens after the card in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end velatio -->
+
+<!-- animist:begin certamen -->
+## certamen.webp
+
+- **Source**: "Ave Caesar Morituri te Salutant (Gérôme) 01.jpg", <https://commons.wikimedia.org/wiki/File:Ave_Caesar_Morituri_te_Salutant_(G%C3%A9r%C3%B4me)_01.jpg>, found via Commons, searching `Ave Caesar Morituri te Salutant` by name -- the search that works here, as it was for the valley and the veiling. The unrestricted phrasings (`Roman amphitheatre interior`, `amphitheatre cavea arena floor`, `arena from the stands`) return CC BY-SA photographs of tourist sites and scanned nineteenth-century guidebooks and nothing else, which is `lens.recipe.yaml`'s trap for the third time. Twelve candidates were fetched and measured against the layout's own card footprint before this was chosen: nine amphitheatre photographs and three Piranesi plates. The two that got closest were rejected for stated reasons -- `Amphitheatre (Pula), interior 96` (CC0, structurally the best photograph, and it carries a modern steel safety railing and visitors in bright shirts that only grow if you crop closer) and Piranesi's `Veduta dell'Anfiteatro Flavio` (public domain, the cleanest register and the darkest of the three finalists, and it has no arena floor for the blocking rank to stand on). The painting is Yale University Art Gallery object 9187; the Commons file is the gallery's own reproduction at 3000x1881.
+- **Licence**: Public domain. Confirmed through the Wikimedia Commons API at fetch time (2026-08-28) -- `LicenseShortName` and `UsageTerms` both "Public domain". Gérôme died in 1904, and the photograph is a faithful reproduction of a two-dimensional public-domain work.
+- **Transformations** (Pillow, scripted -- `animist build certamen.recipe.yaml`):
+  - `crop`: frac_box=[0.38, 0.14, 1.0, 0.92]. The window puts the painting's dead gladiators out of frame, drops the attacker's card onto the packed cavea rather than the pale velarium, and leaves the blocking rank clean sand. The crop is narrower than the band, so the height is taken from its middle.
+  - `resize`: width=880.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: The six scenes beside it, exactly. This draws on the beat a creature is blocked and is gone about two seconds later, so fetching it from somebody else's host would mean an arena that opens after the fight standing in it has faded. And the licence is the second reason: this is a PD-Art photographic reproduction on Commons, which is the category where somebody else's copy quietly moves or changes terms -- a copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end certamen -->

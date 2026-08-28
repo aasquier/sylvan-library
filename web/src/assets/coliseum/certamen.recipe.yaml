@@ -1,0 +1,161 @@
+# The arena a bout is fought in, when one creature is blocked by several.
+#
+# Aaron, 2026-08-28: *"combat square-off: the attacker/blocker arrows go,
+# replaced by a bout on the centre stage against a real arena backdrop, with 1
+# to several blockers (in the case they gang block) ranked on the defending
+# side."* This is the backdrop half of that; `lib/stage.ts` is the layout half.
+#
+# **What the layout asks of a picture is not what one card asks**, and that is
+# the whole difficulty this file had to solve. Every other scene in this
+# directory was hunted under one rule -- the card covers x 0.384 to 0.615 of
+# the band, so keep the subject out of that stripe. The bout covers **two
+# horizontal bands**: the attacker at y 0.09-0.45 across the middle, and the
+# whole blocking rank at y 0.60-0.91 across most of the width. So the brief
+# inverts. The picture has to survive with its top-centre and its entire lower
+# band occluded, which means it wants structure and no single subject up where
+# the attacker lands, and clean ground where the rank stands.
+#
+# **Jean-Léon Gérôme, `Ave Caesar! Morituri te salutant`, 1859, Yale
+# University Art Gallery.** Gladiators salute the imperial box before they
+# fight; the cavea rises packed behind them and the sand runs open in front.
+# That is the charge's two bands exactly -- a crowd above to stand the attacker
+# against and a floor below to rank the wall on -- and of everything looked at
+# it was the only candidate that had both.
+#
+# **Two walls were hit first, and neither of them is about taste.** They are
+# recorded because the next hunt for a "real place" will hit them again.
+#
+# - **Licence.** `harena.recipe.yaml` already found that Wikimedia's Colosseum
+#   photography is almost entirely CC BY-SA, an attribution obligation a
+#   decoration must not carry. It generalises past the Colosseum: one
+#   amphitheatre search returned 58 public-domain results and not one of them
+#   was wide enough to use, because the free ones are book scans and
+#   engravings. The CC0 Pula interior batch is the one usable seam in modern
+#   amphitheatre photography anywhere in Commons.
+# - **Register, and it is structural rather than a matter of picking better.**
+#   An *intact* amphitheatre is a tourist site: `Amphitheatre (Pula), interior
+#   96` is CC0 and structurally the best photograph found -- arcade above, sand
+#   below, exactly the two bands -- and it has a modern steel safety railing
+#   across its middle and visitors in bright shirts on the floor. Cropping
+#   closer to lose them only makes them bigger; two tighter crops were tried
+#   and a woman in jeans photographing the wall came up to full size in both.
+#   A *ruined* amphitheatre has the opposite fault: the Colosseum interiors are
+#   walls, with no floor for a rank to stand on.
+#
+#   There is no photograph of a Roman arena with a crowd in it, and there never
+#   will be, for the reason `campus.recipe.yaml` gives about battles: the thing
+#   is two thousand years gone and the only surviving object is a picture
+#   somebody made of it. So a painting was always going to win this one, and
+#   the register break happens the moment the subject is chosen.
+#
+# **Also fetched, measured and rejected:**
+#
+# - **Piranesi, `Veduta dell'Anfiteatro Flavio`** (public domain, 6400x4255) is
+#   the real Colosseum, cleanest register of the three finalists and the
+#   darkest at mean 73 treated. It was rejected on the layout rather than on
+#   the picture: it has no arena floor in it, so the blocking rank stands
+#   against a wall. The two Piranesi sheets that scan widest are also *pages* --
+#   plate mark, caption and a lettered figure key in frame -- which is the
+#   mount fault `a-scene-is-measured-against-the-card` records for museum
+#   objects, arriving by a different route.
+# - **The 19th-century Colosseum photographs** are almost all stereograph
+#   cards: two identical half-images on an orange mount with a printed caption.
+#   `RP-F-F06856` (Rijksmuseum, CC0) is a genuine Colosseum interior and is one
+#   of those. Cropping to a single half leaves a roughly square picture, which
+#   the band throws away.
+# - **The Nîmes plates** (BnF, public domain) show the tiers beautifully and
+#   every one of them has a black scan seam down the middle of the frame,
+#   landing under the attacker.
+#
+# **The luminance rule this room has been using was measuring the wrong file,
+# and finding that out is what put this painting back in play.** Raw, every
+# candidate here measured mean 92-157 and p90 200+, all of them "too bright"
+# against the shipped range of 48-128 -- and this one was rejected on that
+# number. The room does not ship a raw plate. It blends it `soft-light` into
+# the field's palette, which is `harena`'s own trick and is the half every
+# recipe in this directory leaves to the stylesheet. Reproduce that treatment
+# on the crop and the same three plates come back at **mean 73-95, p90
+# 117-142** -- all of them in range, all along. This one lands at **mean 81,
+# p90 123** treated.
+#
+# > Measure the crop **after** the dusk, never before it. A raw p90 of 228 says
+# > nothing about a file that is never drawn.
+#
+# **The crop is doing three jobs and each was found by looking.** Six windows
+# were cut and every one had cards stood in it at the real geometry before any
+# of them was believed:
+#
+#  1. **The dead gladiators leave the frame.** They lie across the painting's
+#     bottom-left, which is where the blocking rank stands, and this room is
+#     built for somebody at their first game (commandment 2). Starting the crop
+#     at x 0.38 puts them out entirely.
+#  2. **The attacker lands on the packed cavea instead of the awning.** The
+#     first four windows all sat it on the pale velarium sweeping across the
+#     top -- flat, bright, and the single worst surface on the canvas to stand
+#     a card against. Dropping the top edge to y 0.14 puts the tiers, the
+#     white-robed spectators and the box's own architecture behind it instead.
+#  3. **The rank gets clean sand.** Everything below the parapet in this window
+#     is empty floor.
+#
+#  What survives at the left edge, where the mask is already fading, is the
+#  saluting file itself -- raised tridents and shields -- which is the one part
+#  of the painting that says *this is an arena men fight in* rather than *this
+#  is a large building*. It is at the rim on purpose and not by luck.
+#
+# **No Christian iconography and no non-Roman figures**, the two standing
+# refusals: everything in frame is the painting's own first-century staging.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, confirmed through the API
+  # at fetch time (2026-08-28), with `UsageTerms` also "Public domain". Two
+  # independent grounds, as with the valley: Gérôme died in 1904, so the work
+  # is out of copyright everywhere the term is life plus 100 or fewer, and the
+  # photograph is a faithful reproduction of a two-dimensional public-domain
+  # work. The Commons file credits Yale University Art Gallery object 9187,
+  # which holds the painting. A term expiry rather than a dedication, so it is
+  # re-confirmed on every build rather than trusted from this comment.
+  certamen:
+    provider: wikimedia
+    title: "Ave Caesar Morituri te Salutant (Gérôme) 01.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Ave_Caesar_Morituri_te_Salutant_(G%C3%A9r%C3%B4me)_01.jpg
+    found_via: >
+      Commons, searching `Ave Caesar Morituri te Salutant` by name after four
+      rounds of unrestricted searching had produced nothing usable. The
+      unrestricted phrasings -- `Roman amphitheatre interior`, `amphitheatre
+      cavea arena floor`, `arena from the stands` -- return either CC BY-SA
+      photographs of tourist sites or scanned nineteenth-century guidebooks,
+      which is `lens.recipe.yaml`'s trap again; the searches that work are the
+      ones that name a painter or a painting. Nine photographic candidates and
+      three Piranesi plates were fetched at 1700-2400px and measured against
+      the layout's own footprint before this was chosen. The source is Yale's
+      panel at 3000x1881.
+    licence: Public domain
+
+outputs:
+  # 880 wide, which is wider than anything else in this directory, and it is
+  # the layout that asks for it rather than the painting.
+  #
+  # **Two ranks of cards sit on this picture instead of one**, so there is far
+  # less of it left showing and every part that does show is beside a card
+  # rather than behind one -- the strip between the ranks is 81 pixels tall and
+  # it is the one place a person's eye has anywhere to go. The band is drawn at
+  # up to 940, so 880 is a 1.07x enlargement, against the valley's 1.44x.
+  # Under-sampling here would soften the one thing this picture is being asked
+  # for, which is the *texture of a crowd*: the cavea reads as thousands of
+  # people or it reads as a wall, and there is no third way it can read.
+  #
+  # Quality 84, above the valley's 78, for the same reason and one more: the
+  # dusk that makes this plate usable is a `soft-light` blend, and blending
+  # lifts codec noise out of the shadows where an untreated plate would hide
+  # it. The whole plate is 71 KB, which is inside the valley's own budget.
+  - file: certamen.webp
+    from: certamen
+    ops:
+      # The window argued in the header. The crop is wider than the band, so
+      # the height is taken from its middle -- the same centring `campus` gets
+      # from its own crop, stated here because this window was chosen knowing
+      # it would happen.
+      - crop: {frac_box: [0.38, 0.14, 1.0, 0.92]}
+      - resize: {width: 880}
+    encode: {format: webp, quality: 84}
+    expect: {width: 880, height: 488, budget_kb: 90, metadata: none}

@@ -1141,7 +1141,11 @@ export default function ColiseumRoom() {
           // ...and how a permanent arrived, for the same reason: the arena
           // opens a battlefield under a creature nothing cast, and this beat
           // is the only place that fact is said.
-          card: beat.card, target: beat.target, entered: beat.entered,
+          // ...and the id beside the name, because a block has to be read
+          // back to the exact attacker it stopped and two tokens share a
+          // spelling. See `StagedBeat.id`.
+          card: beat.card, id: beat.id, target: beat.target,
+          entered: beat.entered,
         }
       }),
     }

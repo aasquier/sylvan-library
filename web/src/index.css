@@ -6955,10 +6955,13 @@ button:hover .tarot-fan-card {
   --lane-lean: calc(var(--field-card-full) * 0.15);
   --lane-turn: calc(var(--field-card-full) * 0.35);
   /* The gap between two cards in a lane, and the padding a half keeps around
-     its lanes. Both are declared here rather than where they are used, because
-     the combat arrows have to land on the same ruler the lanes are laid out
-     with — see `.field-arrow`, which reaches a slot's position by arithmetic
-     because it is drawn in the trench and cannot ask a lane. */
+     its lanes. Declared here rather than where they are used, from back when
+     the combat arrows were drawn in the trench and had to reach a lane's slot
+     by arithmetic off the same three numbers. **The arrows are gone** — a
+     fight is drawn on the centre stage now — so nothing outside the lanes
+     reads these any more. They stay up here because a half's own width is
+     computed from them two rules below, which is a second caller and reason
+     enough on its own. */
   --lane-gap: 7px;
   --side-pad-x: 10px;
   --lane-h: calc(var(--field-card-full) * 81 / 58 + var(--lane-lean) * 2);
@@ -11087,10 +11090,6 @@ button:hover .tarot-fan-card {
  * turn is the fixed point of this band and it stays put whatever it is
  * standing between. */
 .field-seam {
-  /* The containing block for the combat arrows, which are absolutely placed
-     across it. It spans the same column as both halves, which is the whole
-     reason they can be positioned by arithmetic — see `.field-arrow`. */
-  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -11104,245 +11103,6 @@ button:hover .tarot-fan-card {
     inset 0 1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--field-brass) 40%, transparent);
 }
-/* ------------------------------------------- who is fighting whom
- *
- * **An arrow across the trench, one per clash** (Aaron, 2026-08-27: *"draw
- * stylized arrows attacker -> blocker"*).
- *
- * Lining the two lanes up puts a blocker opposite the attacker it stopped, and
- * that is worth doing — but two creatures standing across a seam is what every
- * creature on this board is doing, so the arrangement alone says nothing. This
- * is the sentence: it leaves the attacker, crosses the trench, and lands on
- * what stopped it.
- *
- * **Placed by arithmetic rather than by measurement**, because it is drawn in
- * the trench and the thing it points at is in a lane. A lane cannot lend it the
- * room — `.field-row` scrolls sideways when a board outgrows it, and
- * `overflow-x: auto` means `overflow-y: auto` as well, which is the rule that
- * once clipped a card preview out of a 42px row. So it reaches a slot the way
- * the lane's own grid reaches one: the half's padding, the clearance a lane
- * keeps for a turned card, and one pitch per slot. All three are named on
- * `.field`, so the arrows and the lanes read the same ruler and cannot drift.
- *
- * **Under the plates and over the stone.** It passes behind the two name
- * plates and the turn, which is what a thing crossing a room does — and drawn
- * above them it would run a red line through the one number both players look
- * at. First child of the seam, no z-index games needed.
- *
- * The red is the gate's own blood, the same red the attack mark uses: the
- * control that starts a fight, the mark that shows one and the line that says
- * who it is with are all one colour. */
-.field-arrows {
-  position: absolute;
-  left: 0;
-  right: 0;
-  /* Out of the trench far enough to touch both front lines: the lean a lane
-     keeps for a turned card, plus the half's own padding. */
-  top: calc(-1 * var(--lane-lean) - 8px);
-  bottom: calc(-1 * var(--lane-lean) - 8px);
-  z-index: 0;
-  pointer-events: none;
-}
-.field-arrow {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: var(--field-card-full);
-  left: calc(var(--side-pad-x) + var(--lane-turn)
-    + var(--slot, 0) * (var(--field-card-full) + var(--lane-gap)));
-  animation: arrow-thrust 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-/* It grows *from* the attacker, so the origin is the attacker's edge — which
-   is the top of the trench when the far half swings and the bottom when the
-   near half does. A line that grew from the middle would read as arriving from
-   nowhere. */
-.field-arrows.is-from-far .field-arrow { transform-origin: 50% 0; }
-.field-arrows.is-from-near .field-arrow { transform-origin: 50% 100%; }
-@keyframes arrow-thrust {
-  0%   { opacity: 0; transform: scaleY(0.08); }
-  60%  { opacity: 1; transform: scaleY(1.03); }
-  100% { opacity: 1; transform: scaleY(1); }
-}
-
-/* **The shaft is a lance, not a line.**
- *
- * The first version of this was a three-pixel bar with a small triangle on the
- * end, and Aaron's note on it was two words long: bolder, and more stylized.
- * He is right, and the fault is the one commandment 17 names for controls — a
- * rule is a *diagram* of a thing pointing, where the rest of this room draws
- * the thing. Everything else that lands on a card here is an object with a
- * material: the sword is steel, the shield is bronze, the headstone is stone.
- *
- * So it tapers. `clip-path` cuts a haft that is a couple of pixels at the
- * attacker's end and seven at the blocker's — a shape that is *going*
- * somewhere, which a constant-width bar can never be — and the metal runs from
- * a dark blood at the tail to a hot lit edge at the point. One polygon, drawn
- * widening downward, and flipped for the half that swings the other way.
- *
- * **The glint travels, and it travels the way the arrow points.** A band of
- * light runs the length of the haft every two and a bit seconds, from the
- * creature that swung to the creature that stopped it. That is the direction
- * said a second time, in motion rather than in shape, for the newcomer this
- * room is built for (commandment 2) — and it is what keeps the arrow alive
- * across the several beats a combat lasts instead of being a mark that arrived
- * and then sat there. Drawn by moving a `background-position` rather than by
- * transforming the layer, for the reason the token materials found out the
- * hard way: a transform takes the clip along with it and the light never
- * arrives. */
-.field-arrow::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 9px;
-  bottom: 9px;
-  clip-path: polygon(46.5% 0%, 53.5% 0%, 60% 100%, 40% 100%);
-  /* Three layers, and the middle one is the reason this reads as metal rather
-     than as a coloured sliver: a specular strip down the centre *rounds* the
-     haft, the way the loupe's glass and the buttons' glint do. The first
-     draft had the metal fade toward transparent at the tail, which was a
-     tapered idea and an invisible one — over the trench's dark band a dark
-     blood at forty per cent alpha is nothing at all. The metal is solid the
-     whole way now and the *lightness* does the tapering. */
-  background-image:
-    linear-gradient(180deg,
-      transparent 0%,
-      color-mix(in srgb, #ffd9c4 82%, transparent) 6%,
-      color-mix(in srgb, #fff3e8 96%, transparent) 9%,
-      transparent 16%),
-    linear-gradient(90deg,
-      rgba(255, 214, 186, 0) 20%,
-      rgba(255, 228, 206, 0.52) 50%,
-      rgba(255, 214, 186, 0) 80%),
-    linear-gradient(180deg,
-      var(--arena-blood-deep) 0%,
-      var(--arena-blood) 44%,
-      var(--arena-blood-lit) 100%);
-  background-size: 100% 300%, 100% 100%, 100% 100%;
-  background-position: 50% 130%, 50% 50%, 50% 50%;
-  background-repeat: no-repeat;
-  filter:
-    drop-shadow(0 0 6px color-mix(in srgb, var(--arena-blood-lit) 76%, transparent))
-    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
-  animation: arrow-glint 2300ms linear infinite;
-}
-/* The half that swings the other way takes the same haft upside down: the
-   taper, the metal and the glint all reverse together, which is one flip
-   rather than three mirrored declarations to keep in step. */
-.field-arrows.is-from-near .field-arrow::before { transform: scaleY(-1); }
-@keyframes arrow-glint {
-  /* Starts off the tail and finishes off the point, so the loop's return is
-     over before it is on the metal — there is nothing to fade. The two layers
-     under it are named in both frames because a keyframe replaces the whole
-     property: leave them out and the round of the haft slides too. */
-  0%   { background-position: 50% 130%, 50% 50%, 50% 50%; }
-  100% { background-position: 50% -30%, 50% 50%, 50% 50%; }
-}
-
-/* **The flights, at the tail.** An arrow is three shapes and this is the one
- * that says which end it came from — a haft with a point on it is a spear.
- * Two swept vanes cut from one box, dark where the haft is dark so they read
- * as part of the same object rather than as a mark on top of it.
- *
- * It rides the taper's own end, and it is the one piece drawn small enough
- * that the drop shadow matters more than the fill: at eighteen pixels across a
- * dark trench, the separation is what makes it a shape at all. */
-.field-arrow-fletch {
-  position: absolute;
-  left: 50%;
-  width: 26px;
-  height: 16px;
-  margin-left: -13px;
-}
-/* **Two vanes with the haft between them, and the first draft was one chevron.**
- *
- * A single V-shaped band is the same silhouette as the head, so turned upside
- * down for the other half it *became* one: an arrow with a point at each end,
- * which at twelve pixels is an arrow pointing nowhere. Seen on the board, not
- * reasoned out — the near-half version read as double-headed immediately.
- *
- * Real fletching is two feathers either side of the shaft, swept back, with
- * the shaft showing between them. Two vanes cannot be cut from one polygon —
- * `clip-path` has no disjoint shapes — so the flights are the fletch's own two
- * pseudo-elements, mirrored. The gap down the middle is what tells them apart
- * from a point at a glance. */
-.field-arrow-fletch::before,
-.field-arrow-fletch::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  width: 10px;
-  height: 100%;
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--arena-blood) 88%, #000) 0%,
-    var(--arena-blood-deep) 100%);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
-}
-/* Swept back and outward: the edge beside the haft sits low, the outer edge
-   rides high, so each vane leans away from the direction of travel. */
-.field-arrow-fletch::before {
-  left: 0;
-  clip-path: polygon(100% 30%, 100% 100%, 0% 68%, 0% 0%);
-}
-.field-arrow-fletch::after {
-  right: 0;
-  clip-path: polygon(0% 30%, 0% 100%, 100% 68%, 100% 0%);
-}
-.field-arrows.is-from-far .field-arrow-fletch { top: 0; }
-/* Turned rather than re-cut, as the head is. */
-.field-arrows.is-from-near .field-arrow-fletch {
-  bottom: 0;
-  transform: rotate(180deg);
-}
-
-/* **The head is barbed**, which is the whole difference between an arrow and a
- * caret. Two swept-back points and a notch between them: the outline every
- * heraldic arrow in Magic's frame has, cut rather than typed, because at
- * twenty pixels a glyph is whatever the reader's font decides it is.
- *
- * Sized in pixels rather than as a fraction of the slot, so the point stays
- * the same weight when the card size changes under it. */
-.field-arrow::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  width: 26px;
-  height: 22px;
-  margin-left: -13px;
-  clip-path: polygon(50% 0%, 100% 100%, 50% 74%, 0% 100%);
-  background: linear-gradient(180deg,
-    #ffcdb4 0%,
-    var(--arena-blood-lit) 34%,
-    var(--arena-blood) 100%);
-  filter:
-    drop-shadow(0 0 7px color-mix(in srgb, var(--arena-blood-lit) 78%, transparent))
-    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
-}
-.field-arrows.is-from-far .field-arrow::after { bottom: 0; }
-/* Turned rather than re-cut, so there is one outline in this file and not two
-   that have to be kept identical. */
-.field-arrows.is-from-near .field-arrow::after {
-  top: 0;
-  transform: rotate(180deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* The arrow is the whole of what this says, so stillness may not answer it
-     with nothing: it arrives at full length instead of travelling there, and
-     the haft keeps its metal with the light standing still on it. */
-  .field-arrow {
-    animation: arrow-still 520ms ease-out both;
-  }
-  .field-arrow::before {
-    animation: none;
-    background-position: 50% 50%, 50% 50%, 50% 50%;
-  }
-  @keyframes arrow-still {
-    0%   { opacity: 0; }
-    100% { opacity: 1; }
-  }
-}
-
 /* The turn, on its own plinth in the middle of the trench. The two hairlines
    that used to flank it are gone with the flex row that stretched them: the
    plates either side are the thing that separates it now, and a rule between a
@@ -15347,4 +15107,263 @@ button:hover .tarot-fan-card {
   .token-plate:hover .token-face {
     transform: none;
   }
+}
+
+/* --------------------------------------------------------- the bout
+ *
+ * **One creature blocked by several, drawn as a fight rather than as a line.**
+ *
+ * Aaron, 2026-08-28: *"the attacker/blocker arrows go, replaced by a bout on
+ * the centre stage against a real arena backdrop, with 1 to several blockers
+ * (in the case they gang block) ranked on the defending side."* The arrows
+ * this replaced were correct and unreadable — a stroke between two thumbnails
+ * that a person had to find first, and three strokes leaving one creature when
+ * a gang blocked. This takes the middle of the arena for two seconds instead.
+ *
+ * **The charge, chosen over three others by looking at all four at this size.**
+ * The attacker comes out of its own seat's edge and the wall ranks across the
+ * defender's, so the stage keeps the axis the board already seats its players
+ * on. `.is-from-far` swings downward and `.is-from-near` swings up; every rule
+ * below that differs between them is a `translate` sign and nothing else.
+ *
+ * **Its cost, stated because it was chosen knowingly**: two ranks in a 521px
+ * arena means nobody is at full stage size. The attacker is 0.62 of a stage
+ * card and the wall is 0.52, which is smaller than anything else this stage
+ * draws. Showing both halves of a fight at once is what that buys.
+ *
+ * **Everything horizontal is a percentage of the stage and nothing is a pixel
+ * constant.** The arena is 940 wide on a laptop and much less on a phone; a
+ * rank laid out in pixels would be right on exactly one machine, which is the
+ * fault `.field-card` paid for twice. `lib/stage.ts` owns the arithmetic —
+ * `boutAt` hands each blocker its own `--at`, and `boutPitch` is what makes a
+ * rank of eight overlap rather than shrink. */
+.stage-bout {
+  position: absolute;
+  inset: 0;
+  /* Under the single-card stage, which is drawn after it in the tree. An
+     instant cast during combat is the more urgent of the two: the fight is a
+     state the board is already in, and the spell is the thing that just
+     happened. */
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* The arena itself. `certamen.recipe.yaml` argues the painting, the crop, the
+   two walls the hunt hit and why the other eleven candidates lost.
+
+   **The mask is wider and shallower than any single-card scene's**, and that
+   is a fact about the layout rather than about the picture: two ranks of cards
+   sit on this, so what is left showing is the strip between them and the two
+   flanks. A mask tight enough to flatter one centred card would fade the only
+   parts of this one anybody can still see. */
+.stage-bout-scene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  animation: stage-field-open var(--stage-life, 2000ms) ease-out both;
+}
+.stage-bout-art {
+  width: min(100%, 940px);
+  aspect-ratio: 880 / 488;
+  object-fit: cover;
+  -webkit-mask-image: radial-gradient(ellipse 58% 60% at 50% 50%,
+    #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  mask-image: radial-gradient(ellipse 58% 60% at 50% 50%,
+    #000 0%, #000 62%, rgba(0, 0, 0, 0.5) 86%, transparent 100%);
+  /* **Held back as well as masked, and the number was measured rather than
+     picked.** This is `velatio`'s lever for `velatio`'s reason — a pale
+     nineteenth-century canvas still reads brighter than the cards in front of
+     it at full strength, and the cards are the subject.
+  
+     What is different here is that the fault is in the *highlights* and not in
+     the overall level. The plate's mean is 112, which is under `via`'s 128 and
+     `velatio`'s effective 143 and needs no help at all; its p90 of 228 and p99
+     of 249 are the brightest of any scene in this room, because a velarium
+     under a Mediterranean sky is the brightest thing anybody ever painted. A
+     hold-back compresses exactly that, toward the sand behind it. Swept
+     against the six shipped scenes: 0.82 leaves p90 at 205, above both `via`
+     and `velatio`; 0.76 lands p90 197.9 and p99 214.0, between the two of
+     them. A `soft-light` blend was tried first, because that is what `templum`
+     does, and it is the wrong tool here — it takes the mean to 36.7, darker
+     than every scene in the room including the forge.
+  
+     The brightest pixels themselves sit at x 0.438, y 0.148, which is inside
+     the attacker's own footprint. That is luck rather than aim, and it is
+     recorded so a future re-crop knows it is there to be kept. */
+  opacity: 0.76;
+  animation: stage-field-rise var(--stage-life, 2000ms) ease-out both;
+}
+
+/* **The line where the two ranks meet, which is the fight.**
+ *
+ * The valley's dust and the forge's sparks, in the one place this scene has
+ * that neither of them needed: a seam. It is drawn in the gap rather than on
+ * either card, because the gap is where the thing being described is
+ * happening — and it arrives *after* the ranks have closed, for the sparks'
+ * own reason. A flash before the blow is a flash with no cause. */
+.stage-bout-seam {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--field-sun) 55%, transparent) 20%,
+    color-mix(in srgb, #ffe9c0 85%, transparent) 50%,
+    color-mix(in srgb, var(--field-sun) 55%, transparent) 80%,
+    transparent 100%);
+  filter: blur(1px);
+  animation: stage-bout-seam var(--stage-life, 2000ms) ease-out both;
+}
+@keyframes stage-bout-seam {
+  0%, 20% { opacity: 0; transform: scaleX(0.25); }
+  46%     { opacity: 1; transform: scaleX(1); }
+  76%     { opacity: 0.5; transform: scaleX(1); }
+  100%    { opacity: 0; transform: scaleX(1); }
+}
+
+/* One fighter. The frame is `.stage-frame`'s aspect and never its size: a card
+   stretched by a pixel is the one thing a Magic player sees instantly. */
+.stage-bout-card {
+  position: absolute;
+  aspect-ratio: 488 / 680;
+  overflow: hidden;
+  border-radius: 8px;
+  outline: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.66),
+    0 0 18px color-mix(in srgb, var(--bout-glow) 26%, transparent);
+}
+.stage-bout-card > img { width: 100%; height: 100%; display: block; }
+
+/* The attacker: centred, larger, and lit the colour the attack mark already
+   uses — the gate's own red, so the control that starts a fight, the mark on
+   the creature and the card in the middle of the arena are one colour. */
+.stage-bout-card.is-att {
+  --bout-glow: var(--arena-blood-lit);
+  /* 0.62 of a stage card. A stage card is 217 wide in a band drawn at 940, so
+     134.5/940 — the same two numbers `.stage-frame` is measured against. */
+  width: 14.31%;
+  /* **Centred with a margin and not a transform**, which is the one place this
+     rule is not the obvious one: the arrival animates `transform`, and a
+     `translateX(-50%)` in the base rule is simply replaced by the keyframe's
+     own transform the moment it starts. A negative margin of half the width
+     centres it and nothing can overwrite it. */
+  left: 50%;
+  margin-left: -7.155%;
+  animation: stage-bout-lunge 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* The wall: smaller, ranked, and cool against the attacker's warm — two ranks
+   that read apart at a glance without anybody having to read a name. */
+.stage-bout-card.is-blk {
+  --bout-glow: #7fa9d8;
+  width: 12%;                    /* 0.52 of a stage card; `BOUT_BLOCKER_W` */
+  left: var(--at, 44%);
+  animation: stage-bout-brace 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Each card steps up a beat behind the one before it, so a wall that lands
+     in one beat still reads as several creatures arriving rather than as one
+     shape appearing. Capped, because a gang of eight must not spend three
+     quarters of a second finishing its own entrance. */
+  animation-delay: calc(min(var(--order, 0) * 90ms, 450ms));
+}
+
+/* Where each rank stands, and the whole of what `.is-from-*` changes.
+
+   The attacker sits at 27% of the arena's height from its own edge and the
+   wall at 75.5% — measured on the layout at 940x521 and kept as percentages
+   so the two ranks hold their relationship at any size. */
+.stage-bout.is-from-far .stage-bout-card.is-att { top: 9.0%; }
+.stage-bout.is-from-far .stage-bout-card.is-blk { top: 60.4%; }
+.stage-bout.is-from-near .stage-bout-card.is-att { bottom: 9.0%; }
+.stage-bout.is-from-near .stage-bout-card.is-blk { bottom: 60.4%; }
+/* Which way a fighter arrives from, which is the only thing the two directions
+   disagree about. */
+.stage-bout.is-from-far  { --bout-dir: 1; }
+.stage-bout.is-from-near { --bout-dir: -1; }
+
+@keyframes stage-bout-lunge {
+  0%   { opacity: 0;
+         transform: translateY(calc(-42px * var(--bout-dir, 1))) scale(0.9); }
+  60%  { opacity: 1;
+         transform: translateY(calc(10px * var(--bout-dir, 1))) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes stage-bout-brace {
+  0%   { opacity: 0;
+         transform: translateY(calc(30px * var(--bout-dir, 1))) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* A card the pool has no painting for. The frame is still drawn and the name
+   goes in it — a gap in the rank would be a lie about how many creatures are
+   in the fight. `.stage-face`'s own fallback, at this rank's size. */
+.stage-bout-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 6% 8%;
+  text-align: center;
+  font-size: 0.56rem;
+  line-height: 1.2;
+  color: var(--parchment);
+  background: linear-gradient(160deg, #2a2118, #14100a);
+}
+
+/* How many identical creatures this card stands for (Aaron, 2026-08-28:
+   *"stacks of tokens can stay stacked with their x number"*). Twelve
+   Saprolings are one card with a twelve on it, which is what a player sees
+   across a table and the only way a wall that size fits on this stage.
+
+   The board's own corner and the board's own brass, so a count here and a
+   count on a lane tile are plainly the same fact. */
+.stage-bout-count {
+  position: absolute;
+  right: 3%;
+  bottom: 3%;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  line-height: 1.15;
+  color: #1a1206;
+  background: color-mix(in srgb, var(--field-brass) 88%, #fff);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* The plate, at the foot of the arena rather than under a card — there is no
+   one card here for it to sit under. */
+.stage-bout .stage-plate-strip {
+  position: absolute;
+  bottom: 2.5%;
+  /* Centred by margin rather than by `translateX`, for the attacker's reason
+     one rule up: `stage-plate-up` animates `transform`, and a translate in the
+     base rule would be thrown away the instant the plate began to rise. */
+  left: 0;
+  right: 0;
+  width: fit-content;
+  margin: 0 auto;
+  max-width: 76%;
+  animation: stage-plate-up var(--stage-life, 2000ms) ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The fight is the answer to a question and may not be answered with
+     nothing: every card arrives, at once and without travelling, and the
+     arena opens without the push in. `stage-still` rather than
+     `animation: none`, for the scenes' own reason — the element's life is the
+     animation's length, so removing it would leave the fight up forever. */
+  .stage-bout-scene {
+    animation: stage-still var(--stage-life, 2000ms) linear both;
+  }
+  .stage-bout-art { animation: none; }
+  .stage-bout-card.is-att,
+  .stage-bout-card.is-blk {
+    animation: stage-still var(--stage-life, 2000ms) linear both;
+    animation-delay: 0s;
+  }
+  .stage-bout-seam { animation: none; opacity: 0.45; }
 }

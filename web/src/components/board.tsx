@@ -67,7 +67,8 @@ import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
-  fightingStats, alignLanes, foldBoard, sameCard, stackRow } from '../lib/board'
+  fightingStats, alignLanes, type Clash, clashOf, foldBoard, sameCard,
+  stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
 import { keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
@@ -2419,53 +2420,6 @@ function FieldZones({ side, facing }: {
 }
 
 /**
- * The arrows across the trench, one per clash.
- *
- * **Lining the two lanes up says a pair are opposite each other; it does not
- * say they are fighting** (Aaron, 2026-08-27: *"draw stylized arrows attacker
- * -> blocker"*). Two creatures standing across a seam wide enough to hold the
- * scoreboard is what every creature on the board is doing. The arrow is the
- * sentence.
- *
- * **Drawn in the trench, positioned by arithmetic.** It has to cross from one
- * lane to the other, and a lane cannot lend it the room: `.field-row` scrolls
- * sideways for a board with more creatures than fit, and `overflow-x: auto`
- * quietly means `overflow-y: auto` too — the same rule that once clipped a
- * 272px card preview out of a 42px row. So the arrows live in the seam, which
- * spans the same column as both halves, and reach a slot the way the lane's
- * own grid does: the half's padding, the lane's clearance for a turned card,
- * then one pitch per slot. Those three numbers are named on `.field` so that
- * this and the lanes cannot drift apart.
- *
- * It points *from* the attacker, so it runs down out of the far half or up out
- * of the near one — `alignLanes` says which, because it is the half that is
- * swinging that decides.
- */
-function CombatArrows({ slots, from }: {
-  slots: number[]
-  from: 'far' | 'near'
-}) {
-  return (
-    <span className={`field-arrows is-from-${from}`} aria-hidden="true">
-      {slots.map((slot) => (
-        // Keyed on the slot, which is the only identity a clash has: the same
-        // creature blocking again next turn is a different arrow and should
-        // arrive again rather than sit there already-arrived.
-        <span key={slot} className="field-arrow"
-              style={{ '--slot': slot } as CSSProperties}>
-          {/* **The fletching, at the attacker's end.** Two pseudo-elements were
-              already spent on the haft and the head, and the flights are what
-              make the silhouette an *arrow* rather than a spear — so they get
-              an element. It is the tail, so it is the one part that never
-              points at anything. */}
-          <span className="field-arrow-fletch" />
-        </span>
-      ))}
-    </span>
-  )
-}
-
-/**
  * One player, on the board's own scoreboard: who they are, and how they are
  * doing.
  *
@@ -3096,6 +3050,19 @@ export function MatchBoard({ board, shown, game, name, running, beat,
     stackRow(far?.creatures ?? []), stackRow(near?.creatures ?? []),
     [...far?.creatures ?? [], ...near?.creatures ?? []])
 
+  // **The fight the centre stage is showing**, on the beats where there is one.
+  //
+  // Here rather than in `CenterStage` for `alignLanes`' own reason, one line
+  // up: a clash spans the seam, and a component handed the card dictionary
+  // cannot see the folded state that knows who is blocking whom. Read from the
+  // *blocker* the beat names, because that is the direction Forge announces a
+  // block in — see `clashOf`, which argues the whole reading.
+  //
+  // Null on every beat that is not a block, which is nearly all of them, so
+  // this costs one map walk on the beats where a fight is being drawn.
+  const clash: Clash | null =
+    beat?.kind === 'block' ? clashOf(beat.id, far, near) : null
+
   const lives = {
     '--zone-seats': zoneSeats,
     '--mark-life-attacks': `${markLife('attacks', speed)}ms`,
@@ -3200,14 +3167,6 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           a person glances up to check, on the one strip both players are
           already looking at. `FieldPlate` argues the anchoring. */}
       <div className="field-seam">
-        {/* **First child, so it paints under the plates and over the stone.**
-            An arrow crossing the trench passes *behind* the two name plates and
-            the turn, which is what a thing crossing a room does — and putting
-            it above them would run a red line through the one number both
-            players glance at. */}
-        {lanes.attacker && lanes.clashes.length > 0 && (
-          <CombatArrows slots={lanes.clashes} from={lanes.attacker} />
-        )}
         <FieldPlate side={far} facing="far" name={farName} />
         <span className="field-seam-turn tabular">
           {/* **The light says which half; this says it in a second way.**
@@ -3249,6 +3208,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           here and the skull on the card in its row stay one event. */}
       <CenterStage board={board} beat={beat ?? null} speed={speed} game={game}
                    dies={markLife('dies', speed)} seat={casting} at={shown}
+                   clash={clash}
                    gained={{ far: far.gained, near: near.gained }} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}

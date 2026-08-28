@@ -16,17 +16,20 @@
 import { type CSSProperties, useEffect } from 'react'
 
 import campusArt from '../assets/coliseum/campus.webp'
+import certamenArt from '../assets/coliseum/certamen.webp'
 import cryptaArt from '../assets/coliseum/crypta.webp'
 import fabricaArt from '../assets/coliseum/fabrica.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import velatioArt from '../assets/coliseum/velatio.webp'
 import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
+import type { Clash } from '../lib/board'
 import type { Speed, StagedBeat } from '../lib/reel'
 import { halfNamed } from '../lib/board'
 import { halfGlassFor } from '../lib/halves'
-import { ARCANA, faceFor, mannerOf, plateNote, plateWord, sceneFor,
-  type Staged, stagedMana, stageLife, type StagedMana, useStaged,
+import { ARCANA, boutAt, type BoutFighter, faceFor, mannerOf, plateNote,
+  plateWord, sceneFor, type Staged, stagedBout, stagedMana, stageLife,
+  type StagedBout, type StagedMana, useStaged, useStagedBout,
   useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
@@ -553,6 +556,105 @@ function StageMana({ item }: { item: StagedMana }) {
 }
 
 /**
+ * A fight, in the middle of the arena: one attacker, and the wall facing it.
+ *
+ * **The arrows this replaced were a line between two cards a person still had
+ * to find.** They crossed the trench correctly and said nothing a newcomer
+ * could use: on a gang block three of them started from the same creature, and
+ * on any board with more than a few creatures a reader was tracing a stroke
+ * from one thumbnail to another. Drawn here the fight is the biggest thing on
+ * the screen for two seconds, and there is nothing to trace.
+ *
+ * **The attacker comes out of its own seat's edge**, which is the whole of why
+ * this layout was chosen over the three drawn beside it. The board seats the
+ * two players across a horizontal seam; a fight drawn on any other axis would
+ * make somebody re-learn which way the table faces at exactly the moment they
+ * most need to already know. `is-from-far` and `is-from-near` are that, and
+ * the stylesheet flips the whole scene on the one class.
+ *
+ * **Everything is placed as a fraction of the stage, never in pixels.** The
+ * arena is 940 wide on a laptop and much less on a phone, and a rank laid out
+ * in pixels would be right on exactly one of them — the trap
+ * `a-css-constant-is-measured-against-one-screen` records. `boutAt` returns
+ * fractions and the stylesheet turns them into percentages.
+ *
+ * **A card already standing keeps its element.** Every blocker is keyed on its
+ * board id, so when the second and third members of a gang arrive on their own
+ * beats they mount alone and the cards beside them do not replay their
+ * arrivals. That is the wall assembling, and it costs nothing but the key.
+ */
+function StageBout({ item }: { item: StagedBout }) {
+  const n = item.blockers.length
+  const life = { '--stage-life': `${item.life}ms` } as CSSProperties
+  return (
+    <span style={life} aria-hidden="true"
+          className={`stage-bout is-from-${item.facing}`}>
+      {/* The arena, which is a real place and the only scene in this room that
+          is drawn behind more than one card. `certamen.recipe.yaml` argues the
+          painting, the crop and why every other candidate lost. */}
+      <span className="stage-bout-scene" aria-hidden="true">
+        <img className="stage-bout-art" src={certamenArt} alt=""
+             draggable={false} />
+      </span>
+      {/* Dust along the line where the two ranks meet — the valley's own
+          device, and it is here for the same reason: a place where something
+          has just happened is a place that has been disturbed. It is drawn in
+          the gap rather than on either card, because the fight is the gap. */}
+      <span className="stage-bout-seam" aria-hidden="true" />
+      <BoutCard fighter={item.attacker} role="att" />
+      {item.blockers.map((b, i) => (
+        <BoutCard key={b.id} fighter={b} role="blk"
+                  at={boutAt(i, n)} order={i} />
+      ))}
+      <span className="stage-plate-strip">
+        <span className="stage-plate-word">{item.word}</span>
+        <span className="stage-plate-title">{item.attacker.name}</span>
+        {item.note && (
+          <span className="stage-plate-note">{item.note}</span>
+        )}
+      </span>
+    </span>
+  )
+}
+
+/** One fighter in the bout: the attacker, or one card of the rank.
+ *
+ *  **A card with no painting is still a card**, and it has to be — a match
+ *  played before the pool knew a printing, or a token the dictionary never
+ *  carried, still blocks. The frame is drawn either way and the name goes in
+ *  it, which is the same fallback `StageFace` makes for the single-card
+ *  stage. A gap in the rank would be a lie about how many creatures are in
+ *  the fight. */
+function BoutCard({ fighter, role, at, order }: {
+  fighter: BoutFighter
+  role: 'att' | 'blk'
+  at?: number
+  order?: number
+}) {
+  const where = {
+    ...(at != null ? { '--at': `${at * 100}%` } : {}),
+    // Each blocker arrives a beat behind the one before it, so a wall that
+    // lands in one beat still reads as several creatures stepping up rather
+    // than as one shape appearing. Only ever used by the first render of a
+    // card; the ones already standing are never re-mounted.
+    ...(order != null ? { '--order': order } : {}),
+  } as CSSProperties
+  return (
+    <span className={`stage-bout-card is-${role}`} style={where}>
+      {fighter.image ? (
+        <img src={fighter.image} alt="" draggable={false} />
+      ) : (
+        <span className="stage-bout-blank">{fighter.name}</span>
+      )}
+      {fighter.count > 1 && (
+        <span className="stage-bout-count tabular">{fighter.count}<span
+          className="stage-times">×</span></span>
+      )}
+    </span>
+  )
+}
+
+/**
  * The middle of the arena, and what is happening in it.
  *
  * Mounted inside `.field` rather than over the whole stage, which is three
@@ -578,7 +680,7 @@ function StageMana({ item }: { item: StagedMana }) {
  * `beatLine` correct against exactly that day.
  */
 export function CenterStage({ board, beat, speed, game, dies, seat, gained,
-  at }: {
+  at, clash }: {
   board: ForgeBoard | null
   beat: StagedBeat | null
   speed: Speed
@@ -601,6 +703,14 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   /** The seat the current beat belongs to, when the room knows it. Used only
    *  to prefer the caster's own copy of a card both seats run. */
   seat: number | null
+  /** The fight the board is showing, when this beat is a block.
+   *
+   *  **Settled upstairs, because it cannot be settled here.** A clash is a
+   *  fact about *both* seats — the attacker is on one side of the seam and the
+   *  wall is on the other — and this component is handed the card dictionary
+   *  rather than the folded state. `alignLanes` is decided in the same place
+   *  and for the same reason; see `clashOf`. */
+  clash: Clash | null
 }) {
   // Both arcana asked for once, before the first spell of the match wants
   // one — see `useArcana`.
@@ -663,13 +773,28 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // pools can move on one beat, and a shared slot would make the second seat's
   // mana silently delete the first's.
   const key = `${at}`
+  // **The fight rides the beat's own key and not the step's**, which is the
+  // opposite of the mana beside it. Mana is keyed on the step because dragging
+  // the scrubber through a turn should show the pool move again; a fight is
+  // keyed on the beat because a gang arrives as several beats and each of them
+  // has to reset the clock, or the third cat would land on a stage that was
+  // already fading.
+  const bout = useStagedBout(
+    stagedBout(clash, board, beat?.key ?? '', speed), beat?.key ?? '', game)
   const farMana = useStagedMana(
     stagedMana(gained.far, 'far', key, speed), key, game)
   const nearMana = useStagedMana(
     stagedMana(gained.near, 'near', key, speed), key, game)
-  if (!showing && !parting && !farMana && !nearMana) return null
+  if (!showing && !parting && !bout && !farMana && !nearMana) return null
   return (
     <div className="stage" aria-hidden="true">
+      {/* **The fight goes under the spell, not over it.** An instant cast in
+          the middle of a combat is a thing that happens constantly — a trick,
+          a removal spell, a pump — and it is the more urgent of the two: the
+          fight is a state the board is already in, and the spell is the thing
+          that just happened. Keyed on the attacker so a gang assembling
+          re-uses this element rather than rebuilding it; see `StagedBout`. */}
+      {bout && <StageBout key={bout.attacker.id} item={bout} />}
       {parting && <StageCard key={parting.key} item={parting} parting />}
       {showing && <StageCard key={showing.key} item={showing} />}
       {farMana && <StageMana key={farMana.key} item={farMana} />}

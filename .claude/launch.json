@@ -9,7 +9,16 @@
         "--port",
         "8765"
       ],
-      "port": 8765
+      "port": 8765,
+      "autoPort": false,
+      "// autoPort": [
+        "Pinned, and it must stay pinned. `web/vite.config.ts` proxies /api",
+        "and /tarot to a hardcoded 127.0.0.1:8765, so a reassigned port does",
+        "not fail loudly -- it serves a frontend whose every request 404s.",
+        "When the port is taken it is almost always an `mtglab ui` from an",
+        "earlier session still serving perfectly: attach to that rather than",
+        "killing it, and start `web-dev` for frontend work."
+      ]
     },
     {
       "name": "mtglab-ui-no-pool",
@@ -57,12 +66,21 @@
         "-c",
         "MTGLAB_SCRIBE_CLASSES=$(pwd)/scribe/out ./mtglab ui --port 8765"
       ],
-      "port": 8765
+      "port": 8765,
+      "autoPort": false,
+      "// autoPort": [
+        "Pinned, and it must stay pinned. `web/vite.config.ts` proxies /api",
+        "and /tarot to a hardcoded 127.0.0.1:8765, so a reassigned port does",
+        "not fail loudly -- it serves a frontend whose every request 404s.",
+        "When the port is taken it is almost always an `mtglab ui` from an",
+        "earlier session still serving perfectly: attach to that rather than",
+        "killing it, and start `web-dev` for frontend work."
+      ]
     },
     {
       "// web-dev": [
         "Vite with HMR, for visual work. `vite.config.ts` proxies /api to",
-        "127.0.0.1:8765, so `mtglab-ui` has to be running alongside it — this",
+        "127.0.0.1:8765, so `mtglab-ui` has to be running alongside it \u2014 this",
         "entry serves the frontend, that one serves the data.",
         "",
         "The other four entries serve the *committed* bundle out of",

@@ -12,8 +12,9 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ForgeBoard } from './api'
-import type { BoardCard, BoardStack } from './board'
-import { alignLanes, fightingStats, foldBoard, stackRow } from './board'
+import type { BoardCard, BoardSide, BoardStack } from './board'
+import { alignLanes, clashOf, fightingStats, foldBoard,
+  stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -980,7 +981,6 @@ describe('lining the two creature lanes up for a fight', () => {
     // B was first in its lane and is now second, under A2. The gap it left is
     // sand: C did not slide into it.
     expect(named(out.near)).toEqual([null, 'B', 'C'])
-    expect(out.clashes).toEqual([1])
   })
 
   it('leaves both lanes alone when nobody is blocking', () => {
@@ -992,7 +992,6 @@ describe('lining the two creature lanes up for a fight', () => {
     const out = alignLanes(far, near, cards)
     expect(out.far).toBe(far)
     expect(out.near).toBe(near)
-    expect(out.clashes).toEqual([])
   })
 
   it('stands two blockers side by side under the one they gang up on', () => {
@@ -1002,9 +1001,8 @@ describe('lining the two creature lanes up for a fight', () => {
     const near = stackRow(cards.slice(2))
     const out = alignLanes(far, near, cards)
     // A2 stands at slot 1; the second blocker takes the next slot along, so
-    // the pair is still standing together under it. One arrow, from A2.
+    // the pair is still standing together under it.
     expect(named(out.near)).toEqual([null, 'B1', 'B2'])
-    expect(out.clashes).toEqual([1])
   })
 
   it('says nothing about a wall that is not facing one way', () => {
@@ -1021,7 +1019,6 @@ describe('lining the two creature lanes up for a fight', () => {
     expect(near).toHaveLength(1)
     expect(near[0]?.count).toBe(2)
     const out = alignLanes(far, near, cards)
-    expect(out.clashes).toEqual([])
     expect(out.near).toBe(near)
   })
 
@@ -1032,7 +1029,6 @@ describe('lining the two creature lanes up for a fight', () => {
     const cards = [attacker(1, 'A1'), attacker(2, 'A2'), ...wall]
     const out = alignLanes(stackRow(cards.slice(0, 2)), stackRow(wall), cards)
     expect(named(out.near)).toEqual([null, 'Saproling'])
-    expect(out.clashes).toEqual([1])
   })
 
   it('finds the attacker a blocker names even when a pile draws another', () => {
@@ -1045,7 +1041,6 @@ describe('lining the two creature lanes up for a fight', () => {
     const far = stackRow(cards.slice(0, 2))
     expect(far).toHaveLength(1)
     const out = alignLanes(far, stackRow(cards.slice(2)), cards)
-    expect(out.clashes).toEqual([0])
     expect(named(out.near)).toEqual(['B'])
   })
 
@@ -1057,7 +1052,6 @@ describe('lining the two creature lanes up for a fight', () => {
     const out = alignLanes(far, near, cards)
     expect(named(out.near)).toEqual(['A'])
     expect(named(out.far)).toEqual(['B', 'C'])
-    expect(out.clashes).toEqual([0])
   })
 })
 
@@ -1093,6 +1087,105 @@ describe('a gang block stands around the creature it stopped', () => {
       .toEqual(['B1', 'B2', 'B3'])
     // **One arrow, from the creature that was stopped.** Three would rise out
     // of the two slots either side of Ghalta, where nothing is attacking.
-    expect(out.clashes).toEqual([1])
+  })
+})
+
+describe('reading one fight off the board', () => {
+  // The same three fixtures the lane tests use, plus a side to stand them on.
+  // `clashOf` reads `creatures` and nothing else, but the side is built whole
+  // rather than cast: a fixture that lies about its type is a fixture that
+  // stops catching the day the shape changes.
+  const beast = (id: number, name: string, over: Partial<BoardCard> = {})
+  : BoardCard => ({
+    id, name, token: false, types: 'Creature - Beast',
+    image: '', art: '', artist: '', zone: 'battlefield', seat: 1, tapped: false,
+    mana: false, makes: [], keywords: [], leaving: null, power: 2,
+    toughness: 2, counters: [], counterHistory: [], combat: '',
+    attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+    live: [], granted: [], fate: '', copiedBy: 0, ...over,
+  })
+  const attacker = (id: number, name: string) =>
+    beast(id, name, { combat: 'attacking', attacking: 2 })
+  const blocker = (id: number, name: string, stops: number) =>
+    beast(id, name, { combat: 'blocking', blocking: stops })
+  const side = (seat: number, creatures: BoardCard[]): BoardSide => ({
+    seat, slug: null, name: `seat ${seat}`, life: 40, counters: [],
+    generals: [], creatures, walkers: [], artifacts: [], enchantments: [],
+    land: [], hand: [], graveyard: [], exile: [], thrones: [],
+    companion: null, command: [], commanders: [], pool: '', gained: '',
+    raised: '',
+  })
+
+  it('reads from the blocker up to the attacker it stopped', () => {
+    // The direction is forced by the wire: Forge announces a block per
+    // blocker, and the id it carries is the blocker's own. Asked from the
+    // attacker, a beat could not say which of several fights it meant.
+    const far = side(1, [attacker(1, 'Ghalta'), attacker(2, 'Bear')])
+    const near = side(2, [blocker(3, 'Regal Caracal', 1)])
+    const out = clashOf(3, far, near)
+    expect(out?.attacker.name).toBe('Ghalta')
+    expect(out?.blockers.map((s) => s.card.name)).toEqual(['Regal Caracal'])
+    expect(out?.swinging).toBe('far')
+  })
+
+  it('hands back the whole gang, not just the blocker that was named', () => {
+    // The wall is read off the board rather than accumulated across beats,
+    // which is what lets it assemble on the stage without anything remembering
+    // anything — and what makes scrubbing backwards a smaller gang rather than
+    // a gang that has to be un-built.
+    const far = side(1, [attacker(1, 'Ghalta')])
+    const near = side(2, [blocker(2, 'Sacred Cat', 1),
+      blocker(3, 'Fleecemane Lion', 1), blocker(4, 'Leonin Warleader', 1)])
+    // Asked from the FIRST cat, and it still answers with all three.
+    const out = clashOf(2, far, near)
+    expect(out?.blockers.map((s) => s.card.name))
+      .toEqual(['Sacred Cat', 'Fleecemane Lion', 'Leonin Warleader'])
+  })
+
+  it('stacks identical blockers with a count rather than listing them', () => {
+    // Aaron, 2026-08-28: *"stacks of tokens can stay stacked with their x
+    // number"*. Five Saprolings are one card with a five on it — what a player
+    // sees across a table, and the only way a wall that size fits the stage.
+    const far = side(1, [attacker(1, 'Ghalta')])
+    const near = side(2, [2, 3, 4, 5, 6].map((id) =>
+      blocker(id, 'Saproling', 1)))
+    const out = clashOf(2, far, near)
+    expect(out?.blockers).toHaveLength(1)
+    expect(out?.blockers[0]?.count).toBe(5)
+  })
+
+  it('counts blockers on this attacker only, never the whole wall', () => {
+    // `stackRow` merges on the role and not on the target, so five tokens
+    // facing two attackers are one pile to look at. A fight is not: filtering
+    // to this attacker first is what keeps the other fight's blockers out of
+    // this one's count.
+    const far = side(1, [attacker(1, 'Ghalta'), attacker(2, 'Bear')])
+    const near = side(2, [blocker(3, 'Saproling', 1),
+      blocker(4, 'Saproling', 1), blocker(5, 'Saproling', 2)])
+    expect(clashOf(3, far, near)?.blockers[0]?.count).toBe(2)
+    expect(clashOf(5, far, near)?.blockers[0]?.count).toBe(1)
+  })
+
+  it('says which half swung, so the stage can use that seat\'s edge', () => {
+    // The charge keeps the board's own axis, so this is the fact the whole
+    // layout hangs off: a fight drawn on the wrong edge would seat the two
+    // players the opposite way round from the sand under it.
+    const far = side(1, [blocker(1, 'Regal Caracal', 2)])
+    const near = side(2, [attacker(2, 'Ghalta')])
+    expect(clashOf(1, far, near)?.swinging).toBe('near')
+  })
+
+  it('answers nothing rather than something wrong', () => {
+    const far = side(1, [attacker(1, 'Ghalta')])
+    const near = side(2, [blocker(2, 'Regal Caracal', 1), beast(3, 'Bystander')])
+    // A match played without the scribe carries no ids at all, and a missing
+    // id means "not said" rather than "card zero".
+    expect(clashOf(undefined, far, near)).toBeNull()
+    // A creature that is not blocking is not in a fight, however much of the
+    // board it is standing on.
+    expect(clashOf(3, far, near)).toBeNull()
+    // And an attacker that has left the board between the block and the beat
+    // being read is a fight this has no business drawing.
+    expect(clashOf(2, side(1, []), near)).toBeNull()
   })
 })
