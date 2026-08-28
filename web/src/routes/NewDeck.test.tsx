@@ -691,9 +691,23 @@ describe('the proposal', () => {
     await screen.findByText(READY.question)
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
 
+    // **The bound is sized against what it has to tell apart**, which is a
+    // clock reading the job's 90-second-old stamp against one that restarted
+    // at 0 with this tab. Those are ~90 and ~0; the margin is enormous.
+    //
+    // This used to assert `9\ds` -- an exact decade, so a ten-second window.
+    // The label ticks once a second from a live `Date.now()`, so any run that
+    // took longer than ten seconds to get here read 100s and failed. On a
+    // machine running several agents at once that is routine, and three
+    // separate lanes reported it on one afternoon. It was the deploy-skipping
+    // shape from #378 again, in the frontend: tight against the ideal rather
+    // than against the question.
     await waitFor(
-      () => expect(screen.getByRole('button', { name: /reading around… 9\ds/i }))
-        .toBeTruthy(),
+      () => {
+        const clock = screen.getByRole('button', { name: /reading around… \d+s/i })
+        const seconds = Number(/(\d+)s/.exec(clock.textContent ?? '')?.[1])
+        expect(seconds).toBeGreaterThanOrEqual(60)
+      },
       { timeout: 2000 })
   })
 
