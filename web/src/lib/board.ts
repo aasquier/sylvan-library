@@ -818,6 +818,40 @@ export function sameCard(onBoard: string, inBeat: string): boolean {
 }
 
 /**
+ * Whether a beat's mark belongs on this tile.
+ *
+ * **The id decides it, and the name only answers when there is no id.**
+ *
+ * A mark used to be matched on Forge's spelling alone, on the argument that
+ * two copies of one name is a token or a basic and that marking both was a
+ * better wrong answer than marking neither. That held while a beat had nothing
+ * else to offer. It does now — `StagedBeat.id` carries the board id — and the
+ * wrong answer was not rare: eight Cat Soldier Tokens swinging stand in
+ * *several* piles, because `stackRow` tells identical-looking creatures apart
+ * by their counters and their Equipment, and every pile sharing the spelling
+ * lit up at once. Including the ones standing out of the fight (Aaron,
+ * 2026-08-28: *"a stack of 8 tokens that is attacking show it 8 times"*).
+ *
+ * **A pile answers for every card in it.** One tile draws eight identical
+ * creatures and the beat may name any of them, so this takes the stack's whole
+ * `ids` rather than the representative's own — a tile that answered only for
+ * the card it happens to draw would mark nothing seven times out of eight.
+ *
+ * The name is still the answer for a match played without the scribe, which
+ * has no ids at all. There it marks every copy, which is exactly what it did
+ * before and is still better than marking none.
+ *
+ * **Here rather than in the component**, for `sameCard`'s reason one function
+ * up: a ruling written in two places is a ruling with two places to rot.
+ */
+export function markedHere(struck: { card: string; id?: number } | null,
+  name: string, ids: readonly number[]): boolean {
+  if (!struck) return false
+  if (struck.id) return ids.includes(struck.id)
+  return sameCard(name, struck.card)
+}
+
+/**
  * Which half of a card a beat named, or `-1` for a beat that named some other
  * card entirely.
  *

@@ -36,11 +36,14 @@ In order:
    door in a local browser with Aaron's eyes on them, then the full
    deployed walk-through. The Coliseum's gear fan is owed one too — it wants
    a live match with something equipped on the board.
-2. **The combat square-off**: the attacker/blocker arrows are the last
-   part of the arena Aaron is not happy with. They go, replaced by a bout
-   on the centre stage against a real arena backdrop, with several blockers
-   ranked on the defending side. A picture hunt plus a layout nobody has
-   drawn yet (N facing one), so it is its own session.
+2. **The bout's own follow-ups** (#376 landed the combat square-off: the
+   arrows are gone and a block opens a fight on the centre stage, the
+   attacker out of its own seat's edge and the wall ranked across the
+   defender's, against Gérôme's `Ave Caesar`). What it left open: nobody
+   has watched it run *at pace* in a browser, so the 2000ms hold is a
+   number picked by reasoning rather than by watching; and the faceoff
+   wants a resolution — which creatures lived and which died — where the
+   outcome is usually mixed.
 3. **The Simulator learns, continued**: deck ratings and land-count
    regression over the match ledger (ADR 36), then the Tier 2 question —
    adversarial simulation between decks — which starts as a design

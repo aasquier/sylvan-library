@@ -67,8 +67,8 @@ import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
-  fightingStats, alignLanes, type Clash, clashOf, foldBoard, sameCard,
-  stackRow } from '../lib/board'
+  fightingStats, alignLanes, type Clash, clashOf, foldBoard, markedHere,
+  sameCard, stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
 import { keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
@@ -231,7 +231,24 @@ function markLife(mark: Mark, speed: Speed): number {
 }
 
 /** A mark on a card: what happened to it, and which beat said so. */
-interface Struckdown { card: string; mark: Mark; key: string }
+interface Struckdown {
+  card: string
+  /** The board id of the card the beat named, when the beat carried one.
+   *
+   *  **A name cannot say which one**, and combat is where that stops being
+   *  theoretical: eight Cat Soldier Tokens swinging are eight beats with one
+   *  spelling between them, and the piles they stand in are told apart by
+   *  their counters and their Equipment rather than by their names. Matched on
+   *  the name alone, every tile sharing the spelling lit up at once —
+   *  including the ones that were not in the fight (Aaron, 2026-08-28).
+   *
+   *  Absent on a match played without the scribe, which has no ids to give;
+   *  the name is the fallback there, and it is the answer this had before the
+   *  id crossed the wire at all. */
+  id?: number
+  mark: Mark
+  key: string
+}
 
 /**
  * Hold a mark for its own length rather than for its beat's.
@@ -261,7 +278,7 @@ interface Struckdown { card: string; mark: Mark; key: string }
  * React re-runs a render that sets its own state before it commits anything,
  * so the beat and its mark still reach the screen together.
  */
-function useHeldMark(card: string | null, mark: Mark | null, key: string,
+function useHeldMark(raised: Struckdown | null, key: string,
   speed: Speed, game: number): Struckdown | null {
   const [held, setHeld] = useState<Struckdown | null>(null)
   const [wasGame, setWasGame] = useState(game)
@@ -271,7 +288,6 @@ function useHeldMark(card: string | null, mark: Mark | null, key: string,
   // rather than wait for the next one. `''` is a key `beat?.key ?? ''` can
   // really produce, so the sentinel has to be something a key cannot be.
   const [wasKey, setWasKey] = useState<string | null>(null)
-  const raised = card && mark ? { card, mark, key } : null
   if (game !== wasGame) {
     setWasGame(game)
     setWasKey(key)
@@ -745,8 +761,13 @@ function FieldPeek({ card, at, avoid }: {
  * many of one thing — lands, a dozen Treasures — were never the rows paying
  * for the width.
  */
-function FieldCard({ card, count, inPlay = false }: {
+function FieldCard({ card, count, inPlay = false, ids }: {
   card: BoardCard
+  /** Every board id this tile stands for — a stack's own `ids`.
+   *
+   *  Absent everywhere a card is drawn one at a time (a hand, a grave, a
+   *  tray), where the card's own id is the whole answer. */
+  ids?: number[]
   /** How many identical cards this one stands for. See `stackRow`. */
   count: number
   /** Whether this card is standing on the battlefield, as opposed to being
@@ -869,10 +890,21 @@ function FieldCard({ card, count, inPlay = false }: {
   // belongs to the card in front of it.
   const leads = useContext(Crowned).get(card.id) ?? null
   const struck = useContext(Struck)
-  // Matched on Forge's own spelling, which is what both ends of this carry.
-  // Two copies of one name is a token or a basic; marking both is a better
-  // wrong answer than marking neither, and in a singleton format it is rare.
-  const mark = struck && sameCard(card.name, struck.card) ? struck : null
+  // **Matched on the board id, and on the name only when there is no id.**
+  //
+  // This used to match on Forge's spelling alone, arguing that two copies of
+  // one name is a token or a basic and that marking both was a better wrong
+  // answer than marking neither. That was true when a beat had nothing else to
+  // offer. It does now — `StagedBeat.id` crosses the wire — and the wrong
+  // answer turned out not to be rare at all: eight Cat Soldier Tokens swinging
+  // stand in several piles, because `stackRow` tells them apart by their
+  // counters and their Equipment rather than by their names, and every one of
+  // those piles lit up at once. Including the ones not in the fight.
+  //
+  // **A pile answers for every card in it**, which is why this reads `ids`
+  // rather than `card.id`: the tile draws one representative for eight
+  // identical creatures, and the beat may name any of them.
+  const mark = markedHere(struck, card.name, ids ?? [card.id]) ? struck : null
   // **Matched on the id, which is the whole reason this is drawable.** A beat
   // names a card and two Egg Tokens are one name between them; an ability
   // names the board's own id, so the glow lands on the creature that was
@@ -2087,7 +2119,7 @@ function FieldGeared({ stack }: {
 }) {
   const { card, count } = stack
   if (card.attachments.length === 0) {
-    return <FieldCard card={card} count={count} inPlay />
+    return <FieldCard card={card} count={count} ids={stack.ids} inPlay />
   }
   const worn = card.attachments.map((a) => a.name).join(', ')
   // **What the fan opens with**, host first — which is the order
@@ -2134,7 +2166,7 @@ function FieldGeared({ stack }: {
           <FieldCard card={a} count={1} inPlay />
         </span>
       ))}
-      <FieldCard card={card} count={count} inPlay />
+      <FieldCard card={card} count={count} ids={stack.ids} inPlay />
     </div>
     </Fanned.Provider>
     </GearFan>
@@ -2981,12 +3013,30 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // and identity is not what governs replay here anyway — every mark is keyed
   // on `beat.key`, so a fresh object with the same key reconciles onto the
   // same element and does *not* restart an animation that is already running.
-  const mark = beat ? markOf(beat.kind, beat.card) : null
+  // **A run of identical beats raises one mark, not eight** (Aaron,
+  // 2026-08-28: *"a stack of 8 tokens that is attacking show it 8 times"*).
+  //
+  // Forge announces combat one creature at a time, so eight Cat Tokens
+  // swinging is eight `attack` beats with the same words — and eight identical
+  // cards are **one pile** on the sand, because `stackRow` merged them before
+  // anything was drawn. So the sword was being re-raised on the same tile
+  // eight times in a row, each one restarting an animation that had not
+  // finished, which reads as a stutter rather than as eight creatures.
+  //
+  // `countRuns` already settled this for the centre stage and the board simply
+  // never asked: the first beat of a run carries the count and every follower
+  // is marked `run: 0`. A follower leaves the mark that is already up alone,
+  // which is exactly what the stage does with the card that is already up.
+  //
+  // **Absent is a one, not a zero** — a beat from a match the reel never
+  // counted has no `run` at all, and a board that read that as a follower
+  // would draw no marks whatsoever.
+  const repeat = beat?.run === 0
+  const mark = beat && !repeat ? markOf(beat.kind, beat.card) : null
   const live = mark && beat?.card
-    ? { card: beat.card, mark, key: beat.key }
+    ? { card: beat.card, id: beat.id, mark, key: beat.key }
     : null
-  const held = useHeldMark(live?.card ?? null, live ? mark : null,
-    beat?.key ?? '', speed, game)
+  const held = useHeldMark(live, beat?.key ?? '', speed, game)
   // **Paused, the mark is the beat's again.** Nothing is draining, so there is
   // nothing for a mark to outlive — and stepping or scrubbing pauses first
   // (both controls call `setSpeed('paused')`), which is exactly where holding

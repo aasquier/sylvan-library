@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ForgeBoard } from './api'
 import type { BoardCard, BoardSide, BoardStack } from './board'
-import { alignLanes, clashOf, fightingStats, foldBoard,
+import { alignLanes, clashOf, fightingStats, foldBoard, markedHere,
   stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
@@ -1187,5 +1187,47 @@ describe('reading one fight off the board', () => {
     // And an attacker that has left the board between the block and the beat
     // being read is a fight this has no business drawing.
     expect(clashOf(2, side(1, []), near)).toBeNull()
+  })
+})
+
+describe('which tile a beat marks', () => {
+  it('marks the pile holding the id, and only that one', () => {
+    // The fault this replaced: eight Cat Soldier Tokens swinging stand in
+    // several piles, because `stackRow` tells identical creatures apart by
+    // their counters and their Equipment. Matched on the spelling, every pile
+    // lit up at once — including the ones out of the fight.
+    const swinging = { card: 'Cat Soldier Token', id: 42 }
+    expect(markedHere(swinging, 'Cat Soldier Token', [40, 41, 42])).toBe(true)
+    expect(markedHere(swinging, 'Cat Soldier Token', [43, 44])).toBe(false)
+  })
+
+  it('answers for every card in a pile, not just the one it draws', () => {
+    // A tile draws one representative for eight identical creatures and the
+    // beat may name any of them — so a tile answering only for the card it
+    // happens to draw would mark nothing seven times out of eight.
+    for (const id of [10, 11, 12, 13]) {
+      expect(markedHere({ card: 'Saproling', id }, 'Saproling',
+        [10, 11, 12, 13])).toBe(true)
+    }
+  })
+
+  it('falls back to the name when the beat carries no id', () => {
+    // A match played without the scribe has no ids at all. There this marks
+    // every copy, which is what it did before and still beats marking none.
+    expect(markedHere({ card: 'Sacred Cat' }, 'Sacred Cat', [7])).toBe(true)
+    expect(markedHere({ card: 'Sacred Cat' }, 'Regal Caracal', [7])).toBe(false)
+    // Zero is "not said" rather than card zero, and reads as no id.
+    expect(markedHere({ card: 'Sacred Cat', id: 0 }, 'Sacred Cat', [7]))
+      .toBe(true)
+  })
+
+  it('marks a card whose beat named its other half', () => {
+    // `sameCard`'s ruling has to survive the fallback path: a split card is
+    // filed under "Wear // Tear" and a beat says "Wear".
+    expect(markedHere({ card: 'Wear' }, 'Wear // Tear', [3])).toBe(true)
+  })
+
+  it('marks nothing when no beat is up', () => {
+    expect(markedHere(null, 'Sacred Cat', [7])).toBe(false)
   })
 })
