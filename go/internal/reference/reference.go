@@ -273,6 +273,21 @@ type Sigil struct {
 	Printing string `json:"printing"`
 	// Art is the art crop of that exact printing.
 	Art string `json:"art"`
+	// Flavor is that printing's flavour text, and it is here because it is
+	// the answer to the question the whole field was added for. Aaron asked
+	// for the heraldry because it "helps shed more light on each guild's
+	// identity", and every one of the twenty happens to be flavoured with a
+	// line *about the device itself* rather than about the guild in general:
+	// `Rakdos Signet` reads "Made of bone and boiled in blood, a Rakdos signet
+	// is not considered finished until it has been used as a murder weapon",
+	// and `Selesnya Signet` reads "The symbol of the Conclave is one of unity,
+	// with tree supporting sun and sun feeding tree." That is a caption for
+	// the painting beside it, written by Wizards, and it does a job [Creed]
+	// cannot: a creed is what a faction *says*, this is what its emblem
+	// *means*. It travels with the other four for the same reason they travel
+	// together -- flavour text is per-printing, so a line kept apart from the
+	// printing it was read from would eventually caption a different painting.
+	Flavor string `json:"flavor"`
 }
 
 // Combination is one of the 32. `Champions` and `Signature` are names; the
