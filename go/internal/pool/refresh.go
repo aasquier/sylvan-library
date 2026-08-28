@@ -58,6 +58,95 @@ var addedColumns = map[string][][2]string{
 	"printings": {{"flavor_text", "VARCHAR"}, {"artist", "VARCHAR"}},
 }
 
+// WriterWait is how long a refresh will stand at the door before giving up.
+//
+// **Sixty seconds because the door opens and shuts on somebody else's clock.**
+// A read-only handle held by the running app excludes a writer completely —
+// DuckDB's own words, measured: *"Could not set lock on file ...: Conflicting
+// lock is held in ... However, you would be able to open this database in
+// read-only mode"* — so `mtglab data refresh` on a live instance has always
+// been a race against [Pool]'s lease rather than a command. It usually won and
+// sometimes did not, and the failure looked like a broken database rather than
+// like bad timing, which is how it survived being reported twice.
+//
+// The lease is ten seconds and [Pool.UseWithoutHolding] now keeps a health
+// probe from renewing it, so an idle instance hands the file over on the first
+// try. This budget is for the other case: somebody is *actually* reading the
+// library while an operator refreshes it, and every page load pushes the lease
+// out another ten seconds. A minute of that and the honest answer is that the
+// instance is busy — which is what the error then says.
+const WriterWait = time.Minute
+
+// writerPoll is how often the door is tried. A refused open costs about nine
+// milliseconds (measured, cross-process, against a real 96MB pool), so this is
+// cheap enough to be generous with and short enough to catch the one-second
+// windows a busy instance leaves.
+const writerPoll = 250 * time.Millisecond
+
+// Locked reports whether an open failed because **another process is holding
+// the file**, as opposed to failing for a reason waiting will not fix.
+//
+// **The string is measured rather than remembered**, and `writerlock_test.go`
+// is what keeps it measured: it stands up a second process, takes a real
+// conflict, and asserts this answers true for it. That is the difference
+// between a classifier and a guess — if DuckDB rewords this message, the test
+// says so on the next run instead of `data refresh` quietly waiting a minute
+// for a permission error to fix itself.
+//
+// Two phrases rather than one, because the message names the file and the
+// holder and neither of those is stable: `Could not set lock` is the sentence,
+// and `Conflicting lock` is the diagnosis it carries.
+func Locked(err error) bool {
+	if err == nil {
+		return false
+	}
+	said := err.Error()
+	return strings.Contains(said, "Could not set lock") ||
+		strings.Contains(said, "Conflicting lock")
+}
+
+// OpenWriterWaiting is [OpenWriter], with the patience to outlast the running
+// app's read lease.
+//
+// `waiting` is called at most once, the first time the door is found shut, so
+// a caller can say what is happening — an operator watching a refresh sit
+// silent for forty seconds has no way to tell waiting from hung.
+//
+// **Anything that is not a lock fails immediately.** A missing directory, a
+// permission, a corrupt file: none of those improve with time, and spending a
+// minute on one before reporting it is worse than reporting it at once.
+func OpenWriterWaiting(ctx context.Context, path string, wait time.Duration,
+	waiting func()) (*sql.DB, error) {
+	db, err := OpenWriter(ctx, path)
+	if err == nil || !Locked(err) {
+		return db, err
+	}
+	if waiting != nil {
+		waiting()
+	}
+	// A deadline rather than a count of attempts: what matters is how long an
+	// operator is kept standing there, and a refused open's own cost is not
+	// fixed.
+	until := time.Now().Add(wait)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(writerPoll):
+		}
+		db, err = OpenWriter(ctx, path)
+		if err == nil || !Locked(err) {
+			return db, err
+		}
+		if !time.Now().Before(until) {
+			return nil, fmt.Errorf(
+				"the card pool is still held by another process after %s "+
+					"(the running app reads it, and lets go about %s after "+
+					"its last use): %w", wait, IdleLease, err)
+		}
+	}
+}
+
 // OpenWriter opens the pool file read-write, creating the schema if the file
 // is fresh and applying the added-column ladder if it is old — `db.connect`'s
 // write half. The one other read-write open in the repo is `pooltest`'s.

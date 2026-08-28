@@ -24,7 +24,16 @@ import (
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	var oracle, printings int64
 	var stale bool
-	err := a.usePool(r.Context(), func(c *pool.Conn) error {
+	// **A probe, not a visitor.** This route is what Fly polls from outside the
+	// container and what the image's own `HEALTHCHECK` polls from inside, both
+	// every thirty seconds and neither aware of the other — and an ordinary
+	// lease from either one keeps the card pool's file open for ten seconds
+	// after it has finished with it. Two of those, out of phase, held the file
+	// almost continuously and left `mtglab data refresh` racing for a window
+	// under two seconds wide. [pool.Pool.UseWithoutHolding] carries the
+	// measurement; the short of it is that the twenty milliseconds this costs
+	// is worth less than a refresh that cannot get in.
+	err := a.poolForAProbe(r.Context(), func(c *pool.Conn) error {
 		var countErr error
 		if oracle, countErr = pool.Count(r.Context(), c.DB(), "oracle_cards"); countErr != nil {
 			return countErr

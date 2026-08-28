@@ -55,6 +55,7 @@ import type { ColiseumZone, ForgeBoard } from '../lib/api'
 import { CardSheet } from './ui'
 import { CrownGlyph, HandFanGlyph, HornGlyph, StrongboxGlyph, ThroneGlyph }
   from './glyphs'
+import { FieldHint } from './hint'
 import { KeywordMarks } from './keywords'
 import { ManaPip } from './manasymbol'
 import { producedColors, producedName } from '../lib/mtg'
@@ -772,6 +773,20 @@ function FieldCard({ card, count, inPlay = false }: {
     })
   }
   const hide = () => setAt(null)
+  /** Put the preview back, but only for a hand that is still on the card.
+   *
+   *  **A mark's panel and this preview cannot both be up**: the preview is the
+   *  whole card face, three hundred pixels of it, placed against this same
+   *  card — so a keyword mark raising its own panel beside it puts two things
+   *  in one place. The mark says so (`FieldHint`'s `onOpen`), this stands
+   *  down, and this puts it back when the mark is done.
+   *
+   *  **Asked of `:hover` rather than remembered**, and that is the whole care
+   *  in it: a pointer that left the mark for the card wants the preview back,
+   *  and a pointer that left the card entirely — or a keyboard that tabbed
+   *  away — does not. Nothing else can tell those two apart, because leaving a
+   *  child for its parent fires no `mouseleave` on the parent at all. */
+  const unhinted = () => { if (box.current?.matches(':hover')) show() }
   /**
    * Hold the whole card up — the sheet, for every hand there is.
    *
@@ -1070,7 +1085,17 @@ function FieldCard({ card, count, inPlay = false }: {
           the *neighbour's* power and toughness. Turned, they leave the corner
           and stand on top of the loupe instead; the stylesheet's arm block
           argues it and the measurements are there. */}
-      <div className="field-card-arm" aria-hidden="true">
+      {/* **The arm is no longer hidden from the accessibility tree, and each
+          thing on it hides itself instead.** Blanket `aria-hidden` was right
+          while every chip here was a picture the card's own `title` already
+          said in words. It stopped being right the moment the keyword marks
+          became buttons: focusable content inside an `aria-hidden` subtree is
+          a contradiction — the keyboard can reach it and the screen reader is
+          told it does not exist — and it is one of the few accessibility
+          faults that is unambiguously a bug rather than a judgement. So the
+          crown, the loupe, the count and the counters carry their own, and the
+          marks are simply present. */}
+      <div className="field-card-arm">
         {/* **What the card does, in the one corner that was free.**
             A painting at fifty-eight pixels tells you this is a Dragon. It
             does not tell you the Dragon flies, and whether it flies is the
@@ -1094,7 +1119,8 @@ function FieldCard({ card, count, inPlay = false }: {
             there is no giver on the wire to point at. The plate under it
             changes instead; `keywords.tsx` argues why the plate rather than
             the mark, and the card's `title` says the same thing in words. */}
-        {inPlay && <KeywordMarks keywords={worn} granted={card.granted} />}
+        {inPlay && <KeywordMarks keywords={worn} granted={card.granted}
+                                 onHint={hide} onHintShut={unhinted} />}
         {/* **The crown, sitting on the top edge of the painting.**
 
             Aaron offered three: oversized, a golden aura, or a crown touching
@@ -1122,7 +1148,7 @@ function FieldCard({ card, count, inPlay = false }: {
             in the vine green that zone gives it — the same two signs in the
             same two colours, wherever the card happens to be standing. */}
         {inPlay && leads && (
-          <span className={`field-card-crown is-${leads}`}>
+          <span className={`field-card-crown is-${leads}`} aria-hidden="true">
             {leads === 'commander' ? <CrownGlyph /> : <HornGlyph size={14} />}
           </span>
         )}
@@ -1143,12 +1169,22 @@ function FieldCard({ card, count, inPlay = false }: {
             for is reading: *"the magnifying glass should always be upright
             and oriented so the viewer can read it"*. */}
         {stats && (
-          <span className="field-card-lens"
+          <span className="field-card-lens" aria-hidden="true"
                 style={card.image
                   ? ({ '--lens-art': `url(${card.image})` } as CSSProperties)
                   : undefined}>
             <span className="field-card-lens-glass" />
-            <span className="field-card-lens-pt tabular">{stats}</span>
+            {/* **How many characters have to fit across the glass**, which is
+                the one thing the stylesheet cannot work out for itself. A
+                `12/12` is five and a `5/5` is three, and the type has to be
+                sized for the figure it is actually setting rather than for the
+                commonest one — see `.field-card-lens-pt`. A value rather than
+                a state, like `--lens-art` above it and the dials in the
+                trench, so nothing here is a style a `:hover` cannot reach. */}
+            <span className="field-card-lens-pt tabular"
+                  style={{ '--pt-len': stats.length } as CSSProperties}>
+              {stats}
+            </span>
           </span>
         )}
         {/* **The bead that used to be here is gone, and the sentence it
@@ -1181,7 +1217,7 @@ function FieldCard({ card, count, inPlay = false }: {
             hover and a screen reader away and nothing is lost but the pixel.
             `BoardCard.makes` is still on the wire and still read, just above. */}
         {count > 1 && (
-          <span className="field-card-count tabular">{count}<span
+          <span className="field-card-count tabular" aria-hidden="true">{count}<span
             className="field-card-times">×</span></span>
         )}
         {/* Counters, one chip each rather than one sum. A creature carrying
@@ -1194,7 +1230,7 @@ function FieldCard({ card, count, inPlay = false }: {
             The count carries the sign in type as well, for anybody who does
             not separate those two hues. */}
         {counters.length > 0 && (
-          <span className="field-card-counters">
+          <span className="field-card-counters" aria-hidden="true">
             {counters.map((c) => {
               const way = counterSign(c.kind)
               return (
@@ -1420,16 +1456,21 @@ function LifeTotal({ life }: { life: number }) {
   // disagree about, and this is a colour nobody should have to debug.
   const spent = `${Math.round((1 - left) * 100)}%`
   return (
-    <span className={`field-life${hit ? ` is-${hit}` : ''}${dire ? ' is-dire' : ''}`}
-          style={{ '--life-left': left, '--life-spent': spent } as CSSProperties}
-          title={dire ? `${life} life — one good swing from nothing` : `${life} life`}>
+    <FieldHint name="Life" says={`${life} life. A player who reaches nought `
+                 + `loses the game.`}
+               note={dire ? 'One good swing from nothing — almost anything on '
+                 + 'this board can deal five.' : undefined}
+               className={`field-life${hit ? ` is-${hit}` : ''}${
+                 dire ? ' is-dire' : ''}`}
+               style={{ '--life-left': left,
+                 '--life-spent': spent } as CSSProperties}>
       <svg className="field-life-ring" viewBox="0 0 48 48" aria-hidden="true"
            focusable="false">
         <circle className="field-life-track" cx="24" cy="24" r="20" />
         <circle className="field-life-arc" cx="24" cy="24" r="20" />
       </svg>
       <span className="field-life-n tabular">{life}</span>
-    </span>
+    </FieldHint>
   )
 }
 
@@ -1536,16 +1577,26 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
   const dire = !lethal && damage >= GENERAL_IS_DIRE
   const whose = name || 'a commander'
   return (
-    <span className={`field-bead is-general${lethal ? ' is-lethal' : ''}${
-            dire ? ' is-dire' : ''}`}
-          style={{ '--bead-full': full, '--bead-gone': gone } as CSSProperties}
-          // **Whose death this is, said first.** The old wording opened with a
-          // number and put the direction in a preposition, which left the one
-          // ambiguity the broken crown is drawn to settle sitting in the text
-          // as well. A sentence that starts "struck for" cannot be read as a
-          // tally of what this player has dealt.
-          title={`Struck for ${damage} by ${whose}. Twenty-one from one `
-            + `commander loses the game${lethal ? ', and this one has' : ''}.`}>
+    // **Whose death this is, said first.** An earlier wording opened with a
+    // number and put the direction in a preposition, which left the one
+    // ambiguity the broken crown is drawn to settle sitting in the text as
+    // well. A sentence that starts "struck for" cannot be read as a tally of
+    // what this player has dealt.
+    //
+    // **And it is a panel rather than a `title` now**, which is the other half
+    // of the same fault: the crown was made to carry the direction *because*
+    // the tooltip saying it was hover-only, and a sentence nobody on a phone
+    // could read was doing the explaining for a rule most players meeting this
+    // room have never heard of. See `components/hint.tsx`.
+    <FieldHint name="Commander damage"
+               says={`Struck for ${damage} by ${whose}. Twenty-one combat `
+                 + `damage from a single commander loses the game, whatever `
+                 + `the life total says.`}
+               note={lethal ? 'And this one has.' : undefined}
+               className={`field-bead is-general${lethal ? ' is-lethal' : ''}${
+                 dire ? ' is-dire' : ''}`}
+               style={{ '--bead-full': full,
+                 '--bead-gone': gone } as CSSProperties}>
       <svg className="field-bead-ring" viewBox="0 0 48 48" aria-hidden="true"
            focusable="false">
         <circle className="field-bead-track" cx="24" cy="24" r="20" />
@@ -1591,7 +1642,7 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
               transform="rotate(11 18.8 12)" />
       </svg>
       <span className="field-bead-n tabular">{damage}</span>
-    </span>
+    </FieldHint>
   )
 }
 
@@ -1626,9 +1677,11 @@ function PlayerBead({ kind, n }: { kind: string; n: number }) {
   const deadly = kind.toLowerCase() === 'poison'
   if (!deadly) {
     return (
-      <span className="field-bead is-flat tabular" title={`${n} ${kind}`}>
+      <FieldHint name={kind} className="field-bead is-flat tabular"
+                 says={`${n} ${kind} counter${n === 1 ? '' : 's'} on this `
+                   + `player.`}>
         {n}
-      </span>
+      </FieldHint>
     )
   }
   const full = Math.max(0, Math.min(1, n / POISON_KILLS))
@@ -1645,19 +1698,22 @@ function PlayerBead({ kind, n }: { kind: string; n: number }) {
   // rather than changing colour into a different disease.
   const dire = !lethal && n >= POISON_IS_DIRE
   return (
-    <span className={`field-bead is-poison${lethal ? ' is-lethal' : ''}${
-            dire ? ' is-dire' : ''}`}
-          style={{ '--bead-full': full, '--bead-gone': gone } as CSSProperties}
-          title={lethal
-            ? `${n} poison counters — ten is lethal`
-            : `${n} poison counters, of the ten that are lethal`}>
+    <FieldHint name="Poison"
+               says={`${n} poison counters. Ten of them loses the game, `
+                 + `however much life is left.`}
+               note={lethal ? 'And this player has ten.'
+                 : dire ? 'Two more would end it.' : undefined}
+               className={`field-bead is-poison${lethal ? ' is-lethal' : ''}${
+                 dire ? ' is-dire' : ''}`}
+               style={{ '--bead-full': full,
+                 '--bead-gone': gone } as CSSProperties}>
       <svg className="field-bead-ring" viewBox="0 0 48 48" aria-hidden="true"
            focusable="false">
         <circle className="field-bead-track" cx="24" cy="24" r="20" />
         <circle className="field-bead-arc" cx="24" cy="24" r="20" />
       </svg>
       <span className="field-bead-n tabular">{n}</span>
-    </span>
+    </FieldHint>
   )
 }
 

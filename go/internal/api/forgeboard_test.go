@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
@@ -428,5 +429,103 @@ func TestASeatWithNoDeckClaimsNoShape(t *testing.T) {
 			t.Errorf("seat %d claimed the shape %q with no deck behind it",
 				seat.Seat, seat.Shape)
 		}
+	}
+}
+
+// **A card with two names on one picture answers to both of them.**
+//
+// Forge renames a card when its other half is cast — a Bonecrusher Giant in
+// hand is *Stomp* on the way to the stack — and the board learns a card's name
+// once. So the beat said Stomp, nothing in the match was called Stomp, and the
+// middle of the arena drew a black card with a title on it in the one moment
+// that surface exists for (Aaron, 2026-08-28).
+//
+// The names travel with the card now. **Only for the layouts that print both
+// of them on the picture being held up**, which is the whole of the ruling and
+// the only part that could go wrong quietly: a transforming card's back face
+// has a picture of its own that this record does not carry, so answering to
+// *its* name with *this* image would be the room showing a card that is not
+// the card that was cast — a worse fault than the plate it replaces, because it
+// looks right.
+func TestOnlyACardWithBothHalvesOnOnePictureAnswersToBoth(t *testing.T) {
+	t.Parallel()
+	for _, layout := range []struct {
+		name  string
+		card  string
+		kind  string
+		faces []string
+	}{
+		{"an Adventure", "Bonecrusher Giant // Stomp", "adventure",
+			[]string{"Bonecrusher Giant", "Stomp"}},
+		{"a split card", "Fire // Ice", "split", []string{"Fire", "Ice"}},
+		{"a flip card", "Erayo, Soratami Ascendant // Erayo's Essence",
+			"flip", []string{"Erayo, Soratami Ascendant", "Erayo's Essence"}},
+		{"an aftermath card", "Dusk // Dawn", "aftermath",
+			[]string{"Dusk", "Dawn"}},
+		// The back of a transforming card is a second picture, and this record
+		// carries the front. Nothing may answer to the back's name with it.
+		{"a transforming card", "Delver of Secrets // Insectile Aberration",
+			"transform", nil},
+		{"a modal double-faced card", "Agadeem's Awakening // Agadeem, the " +
+			"Undercrypt", "modal_dfc", nil},
+		{"a meld card", "Bruna, the Fading Light // Brisela, Voice of Nightmares",
+			"meld", nil},
+		// And the ordinary card, which is nearly every card: one name, and no
+		// list of one to make somebody wonder what it is for.
+		{"an ordinary card", "Sol Ring", "normal", nil},
+	} {
+		t.Run(layout.name, func(t *testing.T) {
+			t.Parallel()
+			got := facesOf(&pool.CardRecord{Name: layout.card, Layout: layout.kind})
+			if len(got) != len(layout.faces) {
+				t.Fatalf("%s (%s) answers to %v, want %v",
+					layout.card, layout.kind, got, layout.faces)
+			}
+			for i, want := range layout.faces {
+				if got[i] != want {
+					t.Fatalf("face %d is %q, want %q", i, got[i], want)
+				}
+			}
+		})
+	}
+}
+
+// A layout that says two names and a card that has one. Nothing sends a list
+// of one, because a room reading it would take the single entry for the second
+// half and point a magnifier at a card with nothing to point at.
+func TestAHalfLayoutWithOneNameSendsNothing(t *testing.T) {
+	t.Parallel()
+	if got := facesOf(&pool.CardRecord{Name: "Stomp", Layout: "adventure"}); got != nil {
+		t.Fatalf("one name became %v", got)
+	}
+}
+
+// **Each half's own type line, or none at all.**
+//
+// The moment the room could find a card by its second name it started naming
+// the *first* one's type: Locthwain Scorn is a Sorcery printed on an
+// Enchantment, and the plate under it read "casts Enchantment" — a confident
+// sentence about the wrong half, caught on a real board. So each name travels
+// with its own type line.
+//
+// The nil case is the one worth a test. A record whose type line does not split
+// into as many halves as it has names is a record nothing may index into, and
+// the honest answer is to send nothing and let the room fall back to the card's
+// own line — which is exactly what every single-faced card already gets.
+func TestEachHalfCarriesItsOwnTypeLine(t *testing.T) {
+	t.Parallel()
+	faces := []string{"Bonecrusher Giant", "Stomp"}
+	got := faceTypesOf(&pool.CardRecord{
+		TypeLine: "Creature — Giant // Instant — Adventure"}, faces)
+	if len(got) != 2 || got[0] != "Creature — Giant" ||
+		got[1] != "Instant — Adventure" {
+		t.Fatalf("two names, two type lines: %v", got)
+	}
+	// One type line for two names — a printing whose data does not line up.
+	// Nothing is sent, and the room says the card's own kind rather than
+	// guessing which half it is looking at.
+	if got := faceTypesOf(&pool.CardRecord{TypeLine: "Creature — Giant"},
+		faces); got != nil {
+		t.Fatalf("a type line that does not split became %v", got)
 	}
 }

@@ -389,6 +389,42 @@ type forgeBoardCard struct {
 	// Artist is carried for tokens, whose painting is chosen here rather than
 	// looked up — somebody painted it, and rule 9 says name them.
 	Artist string `json:"artist,omitempty"`
+	// Faces is the card's other name, for the cards that have one **and print
+	// both of them on the one picture** — an Adventure, a split card, a flip
+	// card. Absent for everything else, which is nearly every card.
+	//
+	// **It exists because Forge renames a card when it is cast as its other
+	// half, and this board only ever learns a card's name once.** Bonecrusher
+	// Giant is drawn into a hand as *Bonecrusher Giant*, and the moment its
+	// Adventure is cast Forge's view calls it *Stomp* — so the beat says Stomp,
+	// the middle of the arena goes looking for a card called Stomp among cards
+	// called Bonecrusher Giant, finds nothing, and sets the name in type on a
+	// dark plate. A whole black card with a title on it, in the one moment the
+	// room exists to show a spell (Aaron, 2026-08-28).
+	//
+	// **Only the layouts where the second name is on the picture we are
+	// holding up.** A transforming card's back face has a picture of its own
+	// that this record does not carry, so answering *Stomp* and answering
+	// *Withengar Unbound* are two different promises: the first shows the card
+	// the adventure is printed on, and the second would show the front of a
+	// card whose back was cast. `oneCardTwoNames` is that list and the argument
+	// is there.
+	Faces []string `json:"faces,omitempty"`
+	// FaceTypes is each face's own type line, index-aligned with Faces.
+	//
+	// **Because a card's two halves are two different kinds of spell**, and the
+	// moment the room could find the card by its second name it started naming
+	// the first one's type: Locthwain Scorn is a Sorcery and the plate under it
+	// read *"casts Enchantment"*, off Virtue of Persistence's type line — a
+	// confident sentence about the wrong half, caught on a real board before it
+	// landed. Taken from the same `A // B` split the names are, so the two
+	// lists cannot fall out of step.
+	FaceTypes []string `json:"face_types,omitempty"`
+	// Layout is Scryfall's own word for how the card is printed — `adventure`,
+	// `split`, `flip` — and it is carried only alongside `Faces`, because the
+	// only thing that reads it is the room deciding *where on the picture* the
+	// half being cast actually is.
+	Layout string `json:"layout,omitempty"`
 	// Mana is whether this card makes mana, from Scryfall's own
 	// `produced_mana` rather than from reading rules text here.
 	//
@@ -438,12 +474,65 @@ type forgeBoard struct {
 
 // boardArt is one card's painting, resolved once per match.
 type boardArt struct {
-	Image    string
-	Art      string
-	Artist   string
-	Mana     bool
-	Makes    []string
-	Keywords []string
+	Image     string
+	Art       string
+	Artist    string
+	Mana      bool
+	Makes     []string
+	Keywords  []string
+	Faces     []string
+	FaceTypes []string
+	Layout    string
+}
+
+// oneCardTwoNames is the layouts that print **two names on one picture**.
+//
+// Scryfall's own words for them, and the test is exactly the one the room
+// needs: given this record's single `image_normal`, is the other face's half
+// somewhere on it? For an Adventure it is the left of the text box, for a split
+// card it is one end, for a flip card it is the bottom half upside down. For
+// everything else — a transforming card, a modal double-faced card, a meld —
+// the other face is a different picture entirely, and answering to its name
+// with this one would be the room showing a card that is not the card that was
+// cast.
+//
+// `aftermath` is deliberately in: it is Amonkhet's split-with-a-turn, and both
+// halves are printed on the one face.
+var oneCardTwoNames = map[string]bool{
+	"adventure": true, "split": true, "flip": true, "aftermath": true,
+}
+
+// faceTypesOf is each face's own type line, index-aligned with `faces`, or nil
+// when the card's type line does not split into the same number of halves.
+//
+// **Nil rather than a best effort**, and the reason is what the caller does
+// with it: the room reads `faceTypes[half]` to say what kind of spell was cast,
+// and an index into a list that does not line up is a confident sentence about
+// the wrong card. Falling back to the card's own type line is right — it is
+// what every single-faced card gets — and it is what a nil produces.
+func faceTypesOf(rec *pool.CardRecord, faces []string) []string {
+	kinds := strings.Split(rec.TypeLine, " // ")
+	if len(kinds) != len(faces) {
+		return nil
+	}
+	return kinds
+}
+
+// facesOf is the names this card answers to, or nil for a card with one name.
+//
+// Taken from the record's own combined name rather than from `card_faces`,
+// because that is the same string `pool.Conn.GetCards` splits to *find* the
+// card by a face name — so the set of names that can reach this record and the
+// set of names it admits to are one list, read one way.
+func facesOf(rec *pool.CardRecord) []string {
+	if !oneCardTwoNames[rec.Layout] {
+		return nil
+	}
+	faces := strings.Split(rec.Name, " // ")
+	if len(faces) < 2 {
+		return nil
+	}
+	return faces
 }
 
 // resolveBoardArt fills `known` with the paintings for any card in `cards` it
@@ -514,6 +603,10 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 				}
 				if rec.ImageArtCrop != nil {
 					art.Art = *rec.ImageArtCrop
+				}
+				if faces := facesOf(rec); faces != nil {
+					art.Faces, art.Layout = faces, rec.Layout
+					art.FaceTypes = faceTypesOf(rec, faces)
 				}
 				known[name] = art
 			}
@@ -714,7 +807,9 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 			Types: card.Types, Seat: card.Seat, CopiedBy: card.CopiedBy,
 			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
 			Mana: painted.Mana, Makes: painted.Makes,
-			Keywords: painted.Keywords})
+			Keywords: painted.Keywords,
+			Faces:    painted.Faces, FaceTypes: painted.FaceTypes,
+			Layout: painted.Layout})
 	}
 	out.Steps = grantKeywords(out.Steps, printed)
 	return out

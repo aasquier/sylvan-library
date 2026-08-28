@@ -23,6 +23,17 @@ func zoneLine(id int, name, types, zone, mode string, seat int) string {
 		zone, mode, seat, id, name, types)
 }
 
+// turnedZoneLine is a zone event for a card the view already has turned —
+// which is how every "enters tapped" permanent in Magic arrives. The scribe
+// writes `is_tapped` on every line that names a card; `Json.java` drops a
+// `false`, so the helper above is the untapped case spelled by omission,
+// exactly as the wire spells it.
+func turnedZoneLine(id int, name, types, zone, mode string, seat int) string {
+	return fmt.Sprintf(`{"t":"zone","game":1,"zone":%q,"mode":%q,"seat":%d,`+
+		`"id":%d,"card":%q,"types":%q,"is_tapped":true,`+
+		`"power":2,"toughness":2}`, zone, mode, seat, id, name, types)
+}
+
 // counterLine is one Forge counter event, both totals, exactly as the scribe
 // writes them.
 func counterLine(id int, kind string, was, now int) string {
@@ -46,6 +57,10 @@ type standing struct {
 	attacking int
 	blocking  int
 	casts     int
+	tapped    bool
+	// turns is every value `Tapped` was given, in order, so a test can ask
+	// whether the board ever *said* anything rather than only where it landed.
+	turns []bool
 }
 
 func folded(log tier3.EventLog, id int) standing {
@@ -73,6 +88,10 @@ func folded(log tier3.EventLog, id int) standing {
 			}
 			if change.Casts != nil {
 				out.casts = *change.Casts
+			}
+			if change.Tapped != nil {
+				out.tapped = *change.Tapped
+				out.turns = append(out.turns, *change.Tapped)
 			}
 		}
 	}
@@ -963,5 +982,61 @@ func TestARepeatedCommanderTotalIsNotNews(t *testing.T) {
 	if published != 1 {
 		t.Errorf("the same total crossed twice and %d steps carried it; only "+
 			"the beat it actually moved on is news", published)
+	}
+}
+
+// **A land that enters tapped is drawn tapped**, and until now none of them
+// were.
+//
+// Aaron, 2026-08-28: *"some lands, like all the surveil lands amongst others,
+// enter the battlefield tapped, I don't think we are representing that action
+// correctly at all currently"*. He is right and the cause is a hole in Forge's
+// events rather than anything this board decided: `Card.tap(...)` fires
+// `GameEventCardTapped` and `Card.setTapped(boolean)` fires nothing, and
+// "enters tapped" is a replacement effect that runs `setTapped(true)` before
+// the permanent is in play — there is no change to announce because there is
+// nothing yet to have changed. Undercity Sewers' own Forge script is
+// `SVar:ETBTapped:DB$ Tap | Defined$ Self | ETB$ True`, and `TapEffect`'s
+// bytecode takes that branch straight to `setTapped`.
+//
+// So the state travels on the card block now, and the arrival reads it. The
+// three cases below are the whole of the rule, and the third is the one that
+// was right before and had to stay right.
+func TestAPermanentThatEntersTappedArrivesTapped(t *testing.T) {
+	t.Parallel()
+	const land = "Land - Island Swamp"
+	logs := played(t, openGame, seatOne, seatTwo,
+		turnedZoneLine(11, "Undercity Sewers", land, "Battlefield", "in", 1),
+		turnLine(2, 2),
+		endGame)
+	got := folded(logs[0], 11)
+	if !got.tapped {
+		t.Fatal("a surveil land entered the battlefield standing up; Forge " +
+			"turns it before the move and announces nothing, so the arrival " +
+			"is the only line that can carry it")
+	}
+	if len(got.turns) != 1 {
+		t.Fatalf("the board changed its mind about the land %d times: %v",
+			len(got.turns), got.turns)
+	}
+}
+
+// The ordinary land, which is most of them, and the half that has to not move.
+func TestAnOrdinaryPermanentStillArrivesUntapped(t *testing.T) {
+	t.Parallel()
+	logs := played(t, openGame, seatOne, seatTwo,
+		zoneLine(12, "Forest", "Land - Forest", "Battlefield", "in", 1),
+		turnLine(2, 2),
+		endGame)
+	got := folded(logs[0], 12)
+	if got.tapped {
+		t.Fatal("a Forest arrived turned")
+	}
+	// **And the board said nothing at all about it**, which is the half a
+	// "not tapped" check cannot see: a change published on every arrival would
+	// be a step for every card that ever entered play, and the browser draws
+	// steps.
+	if len(got.turns) != 0 {
+		t.Fatalf("the board announced %v for a card nobody touched", got.turns)
 	}
 }

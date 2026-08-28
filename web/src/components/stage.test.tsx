@@ -103,9 +103,10 @@ function said(over: Partial<StagedBeat> & { key: string }): StagedBeat {
 /** The board, drawn again with a different beat — which is the mechanism the
  *  stage is *made of*, so these drive it rather than a proxy for it. */
 function replay(first: StagedBeat | null,
-  opts: { speed?: Speed; game?: number; shown?: number } = {}) {
+  opts: { speed?: Speed; game?: number; shown?: number
+    board?: ForgeBoard } = {}) {
   const props = (beat: StagedBeat | null, over: typeof opts = {}) => ({
-    board: MATCH, shown: over.shown ?? opts.shown ?? 3,
+    board: over.board ?? opts.board ?? MATCH, shown: over.shown ?? opts.shown ?? 3,
     game: over.game ?? opts.game ?? 1, running: false, beat,
     name: (_slug: string | null, fallback: string) => fallback,
     speed: over.speed ?? opts.speed ?? ('play' as Speed), setSpeed: vi.fn(),
@@ -770,6 +771,11 @@ it('names the kind of card on the plate, in the word a player would use', () => 
   // this wire — and everything past either one is a subtype, which is the
   // card's own name said a second time.
   expect(castType('Creature — Human Wizard')).toBe('Creature')
+  // **An Adventure's own type line**, which is the one this wire started
+  // carrying when a card learned to answer to both its names. `Adventure` is a
+  // subtype and the spell is a Sorcery; the plate says the spell.
+  expect(castType('Sorcery — Adventure')).toBe('Sorcery')
+  expect(castType('Instant — Adventure')).toBe('Instant')
 
   // Absent is a real answer: a match that never described the card still gets
   // a plate, it just gets the shorter one.
@@ -876,4 +882,66 @@ it('names the target under the card, and the rule under a companion', () => {
     expect(plateNote(quiet, 'Fleecemane Lion'), `${quiet} is a whole sentence`)
       .toBeNull()
   }
+})
+
+it('finds the card an Adventure is printed on, and puts the half under glass', () => {
+  // **Forge renames a card when its other half is cast**, which is a second
+  // spelling problem on top of the combined `A // B` one above. Bonecrusher
+  // Giant is drawn into a hand under that name; the instant its Adventure goes
+  // on the stack Forge's view calls the same object *Stomp*, the beat says
+  // Stomp, and nothing in the match is called Stomp — so the middle of the
+  // arena drew its fallback, which is a black card with a title set on it, in
+  // the one moment this surface exists for (Aaron, 2026-08-28).
+  //
+  // `faces` is the wire's answer, and it is only sent for the layouts that
+  // print both names on the one picture, so answering to the second name is
+  // always answering with a picture that has it on.
+  const adventure = {
+    ...MATCH,
+    cards: [{ id: 60, name: 'Bonecrusher Giant', types: 'Creature - Giant',
+      seat: 1, image: 'https://example.test/bonecrusher.jpg',
+      faces: ['Bonecrusher Giant', 'Stomp'],
+      face_types: ['Creature — Giant', 'Instant — Adventure'],
+      layout: 'adventure' }],
+  } as unknown as ForgeBoard
+  expect(faceFor(adventure, 'Stomp', 1)?.image,
+    'the adventure half found the card it is printed on')
+    .toBe('https://example.test/bonecrusher.jpg')
+  expect(faceFor(adventure, 'Bonecrusher Giant', 1)?.id).toBe(60)
+
+  // **And the room says which half.** A player told "Cast Instant" is looking
+  // at a picture of a Giant, and the instant they were told about is eleven
+  // point of text in the corner of the rules box — so the glass stands over
+  // the Adventure's own frame. Where that frame *is* was measured off a real
+  // card and lives in the stylesheet; what a test can hold is that the whole
+  // card is drawn and the glass is over it rather than instead of it.
+  const { container, then } = replay(said({ card: 'Stomp', key: 'adv1' }),
+    { board: adventure })
+  const shown = container.querySelector('.stage-card:not(.is-parting)')
+  expect(shown?.querySelector('.stage-face')?.getAttribute('src'),
+    'the whole card, uncut — Scryfall forbids cropping and ADR 32 makes it a '
+    + 'wall').toBe('https://example.test/bonecrusher.jpg')
+  expect(shown?.querySelector('.stage-adventure'),
+    'the half being cast is under glass').not.toBeNull()
+  expect(shown?.querySelector('.stage-plate'),
+    'and it is a card rather than a name set in type').toBeNull()
+
+  // **And the plate names the half that was cast**, which is the sentence
+  // finding the card put at risk: the card's own type line says Creature, and
+  // saying *"casts Creature"* over an instant would be a confident statement
+  // about the wrong half. Caught on a real board — Locthwain Scorn is a
+  // Sorcery printed on an Enchantment, and the plate read "casts Enchantment".
+  expect(shown?.querySelector('.stage-plate-word')?.textContent)
+    .toContain('Instant')
+  expect(shown?.querySelector('.stage-plate-word')?.textContent)
+    .not.toContain('Creature')
+
+  // **The creature half wears no glass**, because there is nothing to point
+  // at: the card *is* the Giant.
+  then(said({ card: 'Bonecrusher Giant', key: 'adv2' }), { board: adventure })
+  const giant = container.querySelector('.stage-card:not(.is-parting)')
+  expect(giant?.querySelector('.stage-adventure')).toBeNull()
+  expect(giant?.querySelector('.stage-face')).not.toBeNull()
+  expect(giant?.querySelector('.stage-plate-word')?.textContent)
+    .toContain('Creature')
 })

@@ -431,7 +431,12 @@ const ARENA_CARD = {
    *  a byte of it arrives and the gatehouse does not jump when it does. */
   w: 488,
   h: 680,
-  printing: 'Time Spiral',
+  /** **Timeshifted, and the credit has to say so.** The set this face was
+   *  printed in is *Time Spiral Timeshifted* (TSB), which is a set of its own
+   *  and not Time Spiral (TSP) — a reader who went looking for this card in
+   *  Time Spiral would not find it. Re-checked against Scryfall rather than
+   *  recalled, 2026-08-28, along with everything the footnote below claims. */
+  printing: 'Time Spiral Timeshifted',
   artist: 'Rob Alexander',
 }
 

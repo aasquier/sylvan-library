@@ -479,5 +479,19 @@ func (a *API) usePool(ctx context.Context, fn func(*pool.Conn) error) error {
 	return a.pool.Use(ctx, fn)
 }
 
+// poolForAProbe is [API.usePool] for a caller that is a heartbeat rather than a
+// person: it reads the pool without renewing the lease, and hands the file back
+// on the way out if nobody else is holding it.
+//
+// One caller, deliberately — `GET /api/health`. Everything else on this router
+// is answering somebody who is looking at the app, and somebody looking at the
+// app is exactly who the lease is for.
+func (a *API) poolForAProbe(ctx context.Context, fn func(*pool.Conn) error) error {
+	if a.pool == nil {
+		return pool.ErrNoPool
+	}
+	return a.pool.UseWithoutHolding(ctx, fn)
+}
+
 // noPoolMessage is the sentence every degraded answer carries.
 const noPoolMessage = "no card pool yet -- run `mtglab data refresh`"

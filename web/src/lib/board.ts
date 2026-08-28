@@ -817,6 +817,32 @@ export function sameCard(onBoard: string, inBeat: string): boolean {
   return onBoard === inBeat || onBoard.split(' // ')[0] === inBeat
 }
 
+/**
+ * Which half of a card a beat named, or `-1` for a beat that named some other
+ * card entirely.
+ *
+ * **Forge renames a card when its other half is cast, and this board learns a
+ * card's name once.** Bonecrusher Giant is drawn into a hand under that name;
+ * the instant its Adventure goes on the stack Forge's view calls the same
+ * object *Stomp*, and the beat says Stomp. Nothing in `cards` is called Stomp,
+ * so the middle of the arena drew a black card with a title on it — in the one
+ * moment the room exists to show a spell (Aaron, 2026-08-28).
+ *
+ * `faces` is the answer and it comes from the pool: for the layouts that print
+ * both names on **one picture**, the server sends both names with the card, so
+ * a beat naming either of them finds it. Zero is the face the card is filed
+ * under and one is the other one — which is the half a room might want to point
+ * at.
+ *
+ * A card with no `faces` answers 0 or -1 and nothing else, which is nearly
+ * every card.
+ */
+export function halfNamed(card: ForgeBoardCard, inBeat: string): number {
+  if (sameCard(card.name, inBeat)) return 0
+  const at = (card.faces ?? []).indexOf(inBeat)
+  return at
+}
+
 /** A run of identical cards, drawn as one stack with a count on it. */
 export interface BoardStack {
   /** The first of them, which is what gets drawn. */

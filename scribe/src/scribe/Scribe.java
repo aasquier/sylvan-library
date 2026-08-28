@@ -976,6 +976,32 @@ public final class Scribe extends IGameEventVisitor.Base<Void> {
             line.put("copied_by", copier.getId())
                 .put("copied_by_card", copier.getName());
         }
+        // **Whether this permanent is turned, as the view has it right now.**
+        //
+        // A second name rather than the `tapped` key, and the distinction is
+        // load-bearing: `t:"tapped"` is an *event* — Forge announcing that
+        // something turned this card — and this is the card's *state*, which is
+        // true on every line whether anything announced it or not.
+        //
+        // **The reason it has to be here at all is a hole in Forge's own
+        // events.** `Card.tap(...)` fires `GameEventCardTapped`, and
+        // `Card.setTapped(boolean)` does not — it updates this view and stops.
+        // A land that enters the battlefield tapped goes through the second
+        // one: `TapEffect` has a branch for `ETB$ True` that calls
+        // `setTapped(true)` directly, because the card is not on the
+        // battlefield yet and there is nothing to announce a change *to*.
+        // Read off the bytecode and confirmed against a real card script — a
+        // surveil land is `SVar:ETBTapped:DB$ Tap | Defined$ Self | ETB$ True`
+        // — so every "enters tapped" land in Magic arrived on our board
+        // standing up, and no event anywhere said otherwise (Aaron,
+        // 2026-08-28: *"some lands, like all the surveil lands amongst others,
+        // enter the battlefield tapped, I don't think we are representing that
+        // action correctly at all"*).
+        //
+        // The replacement effect runs before the move, so by the time the zone
+        // event fires the view is already turned and this line is already
+        // right.
+        line.put("is_tapped", card.isTapped());
         CardView.CardStateView state = card.getCurrentState();
         if (state != null) {
             line.put("power", state.getPower()).put("toughness", state.getToughness());

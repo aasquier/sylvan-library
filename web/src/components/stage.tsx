@@ -21,6 +21,7 @@ import mementoArt from '../assets/coliseum/memento.webp'
 import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Speed, StagedBeat } from '../lib/reel'
+import { halfNamed } from '../lib/board'
 import { faceFor, mannerOf, plateNote, plateWord, type Staged, stagedMana,
   stageLife, type StagedMana, useStaged, useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
@@ -39,7 +40,39 @@ import { ManaPip } from './manasymbol'
 function StageFace({ item }: { item: Staged }) {
   if (item.image) {
     return (
-      <img className="stage-face" src={item.image} alt="" draggable={false} />
+      <>
+        <img className="stage-face" src={item.image} alt="" draggable={false} />
+        {/* **The half of the card that is actually being cast, under glass.**
+
+            An Adventure is two spells on one piece of cardboard, and the room
+            was showing neither: Forge renames the card the moment the
+            Adventure goes on the stack, nothing in the match answered to
+            *Stomp*, and the middle of the arena drew a black card with a title
+            on it (Aaron, 2026-08-28). The card is found now — and finding it
+            raises the second question, which is that a player who has just
+            been told "Cast Instant" is looking at a Giant.
+
+            So the whole card arrives, whole, and a magnifier stands over the
+            adventure's own box. That is Aaron's ask and it is also the only
+            move the licence allows: Scryfall's imagery guidelines forbid
+            cropping, distorting, desaturating and watermarking a card image,
+            and ADR 32 makes that a wall. Nothing here cuts the picture — the
+            card is laid out at its own aspect ratio, complete, and the glass
+            is a *layer over it*, which is the same thing `.field-card-lens`
+            has been doing on the battlefield since #312 and the same argument
+            `.arena-gate` settled for the gate.
+
+            Only an Adventure, and that is a measurement rather than a
+            shortcut: the box's position was read off a real card face rather
+            than reasoned about. A split card and a flip card get the right
+            picture and no glass. */}
+        {item.half === 'adventure' && (
+          <span className="stage-adventure" aria-hidden="true"
+                style={{ '--half-art': `url(${item.image})` } as CSSProperties}>
+            <span className="stage-adventure-glass" />
+          </span>
+        )}
+      </>
     )
   }
   return (
@@ -383,6 +416,15 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // card says whether the real spell standing on the sand was cast or put
   // there. `mannerOf` argues why an absent word draws nothing at all.
   const manner = beat ? mannerOf(beat.kind, face, beat.entered) : null
+  // **Which half's type line the plate should read.** A card with two names on
+  // one picture has two type lines with it, and they are two different kinds of
+  // spell: Locthwain Scorn is a Sorcery printed on an Enchantment, so a plate
+  // reading the card's own type line says *"casts Enchantment"* over a sorcery
+  // — a confident sentence about the wrong half. `halfNamed` says which half
+  // the beat was about; the card's own line is the fallback and is right for
+  // every card that has only one.
+  const half = face && name ? halfNamed(face, name) : -1
+  const kind = (half >= 0 ? face?.face_types?.[half] : undefined) ?? face?.types
   // **A beat that only repeats the one before it takes nothing.** Four tokens
   // conjured at once arrive as four identical beats, and `countRuns` marks the
   // followers `0` so this moment is drawn once, with a four on it, instead of
@@ -394,10 +436,15 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
       key: beat.key,
       manner,
       name,
-      word: plateWord(manner, face?.types, beat.who),
+      word: plateWord(manner, kind, beat.who),
       note: plateNote(manner, beat.target),
       count: times,
       image: face?.image ?? null,
+      // **Which half of the card this is, when the card has two on one
+      // picture.** `halfNamed` is 0 for the face the card is filed under and 1
+      // for the other; only an Adventure's second half gets a glass, because
+      // only an Adventure's second half has been measured. See `Staged.half`.
+      half: face?.layout === 'adventure' && half === 1 ? 'adventure' : null,
       life: stageLife(manner, speed, dies),
     }
     : null

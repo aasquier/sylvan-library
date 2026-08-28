@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  DRAWN_KEYWORDS, KEYWORD_MEANS, drawableKeywords, keywordMeaning,
+  DRAWN_KEYWORDS, KEYWORD_MEANS, drawableKeywords, keywordSaid,
 } from './keywords'
 
 describe('the keywords a board can draw', () => {
@@ -127,12 +127,16 @@ describe('what a keyword mark means', () => {
     // The whole point. A Bronzehide Lion wearing vigilance has no vigilance
     // printed on it, and a player who checks will find the card and the mark
     // disagreeing — so the mark is the one that has to explain itself.
-    const lent = keywordMeaning('vigilance', true)
-    expect(lent).toContain('attacking does not tap it')
-    expect(lent).toContain('not printed on this card')
+    const lent = keywordSaid('vigilance', true)
+    expect(lent.name).toBe('vigilance')
+    expect(lent.says).toContain('attacking does not tap it')
+    expect(lent.note).toContain('not printed on this card')
     // And the ordinary case does not claim anything about where it came from.
-    const printed = keywordMeaning('vigilance', false)
-    expect(printed).toContain('attacking does not tap it')
-    expect(printed).not.toContain('granted')
+    // **`note` absent rather than empty**: `FieldHint` draws that line whenever
+    // it is there at all, so an empty string would be a blank row under every
+    // printed keyword on the board.
+    const printed = keywordSaid('vigilance', false)
+    expect(printed.says).toContain('attacking does not tap it')
+    expect(printed.note).toBeUndefined()
   })
 })
