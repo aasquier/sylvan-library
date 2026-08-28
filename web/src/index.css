@@ -15611,3 +15611,137 @@ button:hover .tarot-fan-card {
   .stage-arva { animation: stage-still var(--stage-life, 780ms) linear both; }
   .stage-arva-art { animation: none; opacity: 0.72; }
 }
+
+/* ═══════════════════════════════════ clearing the table, and the phone's edges
+ *
+ * Aaron, 2026-08-28: "Can we do a fullscreen mode? I hate seeing all the web
+ * tabs and what not." Two halves answer that — the header's control on a
+ * machine that will fill the screen on request, and a home-screen launch on a
+ * phone, which is the only way an iPhone ever loses its address bar.
+ * `lib/fullscreen.ts` argues the split. This is what both halves need drawn.
+ *
+ * ── the edges ──
+ *
+ * `web/index.html` asks for `viewport-fit=cover`, which lets the page reach
+ * the physical edges of the device. That is the good half of a home-screen
+ * launch and the *entire* way this ships broken: with nothing else done, the
+ * bar goes under the notch and the corner sprout sits beneath the home
+ * indicator, where a thumb swipes it away instead of pressing it. Every
+ * `env(safe-area-inset-*)` below is one of those, and on a laptop every one
+ * resolves to `0px` — so these are the same numbers this app has always had,
+ * plus whatever the device says it is keeping.
+ *
+ * Two of them absorb a padding a utility class used to carry, and the utility
+ * was **removed from the element** rather than left to fight this. It is not a
+ * tidy-up: an unlayered rule in this file beats a Tailwind utility outright
+ * (layered styles lose to unlayered ones), so `padding-inline` here and
+ * `px-6` there is not "24px plus the inset", it is the inset *instead of* the
+ * 24px — a page flush against the glass on every phone in portrait, where the
+ * inset is zero. If you put `px-6` back on `.page-main` or the footer, put the
+ * numbers below back too. */
+.site-header {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+/* The 1.5rem was `px-6` on the element; `.page-main`'s padding-top lives
+ * further up this file, beside the ivy it is keyed to. */
+.page-main {
+  padding-inline:
+    calc(1.5rem + env(safe-area-inset-left, 0px))
+    calc(1.5rem + env(safe-area-inset-right, 0px));
+}
+/* The 1.5rem was `px-6` and the 2.5rem was `pb-10`. The bottom one is the one
+ * that matters: it is the last thing on the page, so it is what a home
+ * indicator would otherwise lie across. */
+.page-footer {
+  padding-inline:
+    calc(1.5rem + env(safe-area-inset-left, 0px))
+    calc(1.5rem + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
+}
+/* The corner sprout is `position: fixed` in the bottom-right corner, which on
+ * a phone in a standalone launch is exactly where the home indicator is. Its
+ * own 1.25rem is set further up; this adds the device's own margin to it. */
+.library-whisper {
+  right: calc(1.25rem + env(safe-area-inset-right, 0px));
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── the filled screen ──
+ *
+ * The whole document goes fullscreen, never a subtree — the shell portals
+ * `position: fixed` layers straight to the body, and a fixed element outside
+ * the fullscreen element is not painted at all, so anything smaller would take
+ * the forest and every panel off the screen at once.
+ *
+ * The root normally paints nothing and lets the body's colour propagate to the
+ * canvas. As the fullscreen element it is also what covers the black backdrop
+ * behind it, so it is given the page colour outright rather than borrowed.
+ *
+ * Unprefixed only, and not for want of trying: `:-webkit-full-screen` was
+ * written here beside it and the minifier rewrote it to `:fullscreen`, so the
+ * shipped sheet held the same selector twice and the prefixed one had never
+ * existed. It cannot be carried in CSS at all. The *API* still needs both
+ * spellings and `lib/fullscreen.ts` uses both — this is only the paint, only
+ * Safari before 16.4 lacks it, and what it loses is a background colour behind
+ * a page that is already painting its own. */
+:root:fullscreen {
+  background: var(--page);
+  overflow: auto;
+}
+
+/* ── the control ──
+ *
+ * Four corner brackets that say which way the room is about to go: facing out
+ * while the page is boxed in, facing in once it owns the screen. Commandment
+ * 17 — it answers the hand that reaches for it, and it answers *differently*
+ * depending on which of the two things a press would do, so the reply is a
+ * readout and not just a flourish.
+ *
+ * The lean is on `.clearing-corner` and never on the group above it: each
+ * bracket is rotated by an SVG `transform` attribute, and the attribute and
+ * the CSS property are one property — a rule on the rotated element would
+ * replace its rotation and stack all four in the same corner. Inside the
+ * rotated frame a single diagonal nudge is "outward" for every one of them. */
+.clearing-corner {
+  transition: transform 170ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.clearing-btn:hover:not(:disabled) .clearing-corner,
+.clearing-btn:focus-visible .clearing-corner {
+  transform: translate(-0.9px, -0.9px);
+}
+.clearing-btn[aria-pressed='true']:hover:not(:disabled) .clearing-corner,
+.clearing-btn[aria-pressed='true']:focus-visible .clearing-corner {
+  transform: translate(0.9px, 0.9px);
+}
+/* Pressed: the brackets snap back to rest under the finger, so the press has
+ * its own beat rather than sliding straight into the new state. */
+.clearing-btn:active:not(:disabled) .clearing-corner {
+  transform: none;
+}
+/* Held on: the vine, the same colour a focus ring uses, so a glance at the
+ * header says the screen is filled without reading anything. */
+.clearing-btn[aria-pressed='true'] {
+  border-color: var(--vine);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--vine) 14%, var(--page));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The brackets still turn around when the screen fills — that is the state
+     and not the animation — they just stop leaning towards it. Every selector
+     is repeated at its own weight rather than reset on `.clearing-corner`
+     alone: a bare class loses to `.clearing-btn:hover .clearing-corner` on
+     specificity no matter which comes last, so the short version would leave
+     the lean in place and merely make it jump. */
+  .clearing-corner {
+    transition: none;
+  }
+  .clearing-btn:hover:not(:disabled) .clearing-corner,
+  .clearing-btn:focus-visible .clearing-corner,
+  .clearing-btn[aria-pressed='true']:hover:not(:disabled) .clearing-corner,
+  .clearing-btn[aria-pressed='true']:focus-visible .clearing-corner {
+    transform: none;
+  }
+}

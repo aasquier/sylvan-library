@@ -27,7 +27,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ClaudeStatus } from '../lib/api'
+import { CLEARING_HINT, ClearingNote } from './clearing'
 import { presetLabel } from '../lib/claudecopy'
+import { useClearing } from '../lib/fullscreen'
 import { useAmbience, useTableSound } from '../lib/prefs'
 import { fetchClaudeStatus, useStance } from '../lib/stance'
 
@@ -92,6 +94,7 @@ export function SettingsMenu({ theme, onToggleTheme }: {
   const [open, setOpen] = useState(false)
   const [ambience, setAmbience] = useAmbience()
   const [sound, setSound] = useTableSound()
+  const clearing = useClearing()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -152,6 +155,18 @@ export function SettingsMenu({ theme, onToggleTheme }: {
           <Toggle label="Table sound"
                   hint="Shuffles, deals, and the wheel — synthesised, never recorded."
                   on={sound} onChange={setSound} />
+          {/* Where a browser will fill the screen on request, the header's own
+              control does it in one tap and this is the row that explains it.
+              Where it will not — every iPhone — the switch would be a switch
+              that does nothing, so the note takes its place and points at the
+              home screen, which gets there properly. Nothing at all when the
+              app was already launched from one. `lib/fullscreen.ts` argues the
+              split; `components/clearing.tsx` owns the copy. */}
+          {clearing.offered && (
+            <Toggle label="Clear the table" hint={CLEARING_HINT}
+                    on={clearing.on} onChange={clearing.toggle} />
+          )}
+          {!clearing.offered && !clearing.homescreen && <ClearingNote />}
           {claude && status && (
             <div className="mt-2 border-t pt-2"
                  style={{ borderColor: 'var(--hairline)' }}>
