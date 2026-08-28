@@ -226,6 +226,55 @@ type Creed struct {
 	Printing string `json:"printing"`
 }
 
+// Sigil is a faction's heraldry as Wizards actually painted it: the mana rock
+// its own block printed to carry its device, with the artist and printing that
+// painting belongs to.
+//
+// **Twenty of the 32 have one, and that is the finished design rather than a
+// gap somebody should helpfully close.** Three blocks each printed a
+// faction-emblem cycle and the three cover exactly the twenty multicolour
+// factions — Ravnica's ten guild *Signets*, Alara's five *Obelisks*, Tarkir's
+// five *Banners*. The other twelve (colourless, the five mono-colours, the
+// five four-colour sets and WUBRG) are not factions and no such cycle exists
+// for them; a page for one of those wears its own mana symbols at size
+// instead, which needs no card at all. So a fourth cycle bolted on here would
+// be an invention, which is the one thing this file may never hold.
+//
+// **The field is `Sigil` and not `Signet` because `Signet` is one third of
+// the answer** — naming the whole field after Ravnica's cycle would make an
+// Obelisk a signet. The obvious alternative is worse: *emblem* is a real
+// Magic type line, and the pool proves it rather than anybody remembering it
+// — `Liliana of the Dark Realms Emblem` is typed `Emblem — Liliana`, and 105
+// cards' text makes one. Spending that word on a data field mis-teaches it to
+// exactly the newcomer these pages are for. *Sigil* names no type and no rules
+// object, and it is the cards' own word for the thing: `Orzhov Signet` reads
+// "The sigil holds different meanings depending on its form and presentation"
+// and `Simic Signet` reads "its sigil serves not as an emblem of honor but as
+// a trademark" — which distinguishes the two words on the card itself. Read
+// off the pool, like everything else here.
+//
+// `Art` is stored rather than resolved through the pool at render time, which
+// is the one place this type departs from [Creed] and from `Champions`, and
+// it is a licensing decision rather than a convenience. The artist and the
+// printing credit *one* painting; Scryfall's default printing for an oracle
+// card moves when a card is reprinted, so a URL fetched later and a credit
+// written now would eventually name the wrong artist under the wrong picture
+// — which is the failure commandment 19 and Scryfall's terms both forbid.
+// Holding all four together, read out of the pool in one pass, makes them
+// unable to drift. The URL is a hot-link to `cards.scryfall.io`; no image is
+// ever committed (ADR 6, ADR 32).
+type Sigil struct {
+	// Card is the mana rock the device is painted on -- an attribution and a
+	// name a reader can look up, never a card to render as a card.
+	Card string `json:"card"`
+	// Artist and Printing are required, not decorative: a surface that draws
+	// Art must name both in the same room (commandment 19).
+	Artist   string `json:"artist"`
+	Printing string `json:"printing"`
+	// Art is the art crop of that exact printing.
+	Art string `json:"art"`
+}
+
 // Combination is one of the 32. `Champions` and `Signature` are names; the
 // route that serves a combination resolves them through the pool and drops
 // and counts what does not resolve, exactly as `service.combination_detail`
@@ -234,7 +283,9 @@ type Creed struct {
 // `Creed` is a pointer because most of the 32 do not have one: the ten guilds
 // carry it and the other twenty-two serialise `null`, which is a shape a
 // renderer can branch on without having to decide whether an empty string
-// means "no creed" or "someone left it blank".
+// means "no creed" or "someone left it blank". `Sigil` is a pointer for the
+// same reason and over a different twenty — see the type for which, and why
+// the twelve without one are not waiting for anybody.
 type Combination struct {
 	Key        string     `json:"key"`
 	Name       string     `json:"name"`
@@ -246,6 +297,7 @@ type Combination struct {
 	Aliases    []string   `json:"aliases"`
 	VerifiedBy string     `json:"verified_by"`
 	Creed      *Creed     `json:"creed"`
+	Sigil      *Sigil     `json:"sigil"`
 	Lore       string     `json:"lore"`
 	Champions  []Champion `json:"champions"`
 	Signature  []string   `json:"signature"`

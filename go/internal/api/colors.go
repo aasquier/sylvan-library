@@ -78,8 +78,11 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 	// Everything the taxonomy holds about one combination except the two
 	// lists this route replaces with resolved cards -- so a reader that has
 	// the detail never has to go back to `/api/colors` for a field. `Creed`
-	// is a name and a citation rather than a card to draw, so it passes
-	// through untouched by the pool lookup below.
+	// and `Sigil` both pass through untouched by the pool lookup below, for
+	// two different reasons: a creed is a citation rather than a card to
+	// draw, and a sigil already carries its own art URL and the credit that
+	// belongs to it, deliberately pinned together at authoring time so the
+	// two can never come apart (see reference.Sigil).
 	type base struct {
 		Key        string           `json:"key"`
 		Name       string           `json:"name"`
@@ -92,6 +95,7 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 		Aliases    []string         `json:"aliases"`
 		VerifiedBy string           `json:"verified_by"`
 		Creed      *reference.Creed `json:"creed"`
+		Sigil      *reference.Sigil `json:"sigil"`
 	}
 	type answer struct {
 		base
@@ -103,7 +107,8 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 	}
 	out := answer{base: base{Key: combo.Key, Name: combo.Name, Tier: combo.Tier, Colors: combo.Colors,
 		Size: combo.Size, Tagline: combo.Tagline, History: combo.History, Lore: combo.Lore,
-		Aliases: combo.Aliases, VerifiedBy: combo.VerifiedBy, Creed: combo.Creed},
+		Aliases: combo.Aliases, VerifiedBy: combo.VerifiedBy, Creed: combo.Creed,
+		Sigil: combo.Sigil},
 		Champions: []champion{}, Signature: []proseCard{}}
 	err := a.usePool(r.Context(), func(c *pool.Conn) error {
 		wanted := []string{}
