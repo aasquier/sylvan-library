@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../lib/api'
 import type { DeckRef, DeckTokens, TokenPlate } from '../lib/api'
-import { Spinner } from './ui'
+import { FieldHint } from './hint'
+import { CardHover, Spinner } from './ui'
 
 /**
  * What a deck makes: the tokens its 99 and its commanders put onto the
@@ -56,19 +57,54 @@ export function TokenShelf({ deckRef }: { deckRef: DeckRef }) {
   return (
     <section className="space-y-2 border-t pt-4"
              style={{ borderColor: 'var(--hairline)' }}>
-      <h3 className="text-sm font-semibold">
+      {/* **The brass mark moved out of the button and became the thing that
+          explains the section.** It used to sit inside the toggle as pure
+          decoration while a `title` carried the only words the header had —
+          and a `title` draws on hover and on nothing else: never on a phone,
+          never on keyboard focus (`components/hint.tsx` carries the full
+          argument, and this room has now found it out four times). Aaron's
+          only test surface today is a phone, so the sentence a folded section
+          shows was reaching precisely nobody who needed it.
+
+          The other half of what that `title` said — "Fold the tokens away" —
+          is not re-homed anywhere, because `aria-expanded` already says it to
+          every hand and said it better the whole time.
+
+          No new furniture: the header still carries a chevron, a mark and a
+          count. One of them answers now. */}
+      <h3 className="flex items-center gap-1 text-sm font-semibold">
+        {/* Commandment 2, at the one moment it is hardest to serve: folded,
+            this section is the word "Tokens" and nothing else, and somebody
+            meeting Magic this week has no idea whether that is a thing they
+            need. The paragraph inside says it at length once the fold opens;
+            this says it before.
+
+            **Beside the word rather than at the end of the row**, which is
+            where it was first put and where it read as a brass fleck 1,200
+            pixels from anything it was about. A mark that explains a heading
+            has to be next to the heading; the toggle keeps the rest of the
+            row, so nothing is taken away from the fold's own target.
+
+            Named for the question rather than for the section, because the
+            toggle beside it is already called Tokens, and two controls in one
+            heading answering to the same name is a reader being asked to
+            guess which is which. */}
+        <FieldHint name="What a token is" className="token-ask"
+                   says={'The creatures and other pieces this deck makes '
+                         + 'while you play. They are not cards in the deck '
+                         + 'itself.'}>
+          <span aria-hidden className="token-glyph">❖</span>
+        </FieldHint>
         <button type="button"
                 onClick={() => { setOpen((was) => !was) }}
                 aria-expanded={open}
-                title={open ? 'Fold the tokens away' : 'What this deck makes'}
-                className="disclosure-toggle flex w-full items-center gap-2 text-left">
+                className="disclosure-toggle flex flex-1 items-center gap-2 text-left">
           <span aria-hidden className="text-[10px]"
                 style={{
                   display: 'inline-block',
                   transition: 'transform 150ms',
                   transform: open ? 'none' : 'rotate(-90deg)',
                 }}>▾</span>
-          <span aria-hidden className="token-glyph">❖</span>
           <span style={{ color: 'var(--text-primary)' }}>Tokens</span>
           {count !== null && (
             <span className="tabular text-xs font-normal"
@@ -154,6 +190,24 @@ export function TokenShelf({ deckRef }: { deckRef: DeckRef }) {
  * at a real table — a blank card with the name written on it. That is a
  * likeness of the game rather than a hole in the page, and it is why the
  * missing case is a *style* here and not a `null`.
+ *
+ * **The face is held up on a hover or a tap** (Aaron, 2026-08-28: *"it would
+ * be nice if a hover in our token menu for a deck gave a card preview"*).
+ * `CardHover` is the mechanism the other twenty-three card thumbnails in this
+ * app already use, and it is not a hover: a mouse gets the picture beside the
+ * cursor, a thumb gets it centred over a dimmed room. That second half is the
+ * one that matters here, because a token face is drawn at 5.75rem and the
+ * only text this plate carries is the name, the type and who makes it —
+ * everything a token actually *does* is printed on the card, at a size a
+ * phone cannot read.
+ *
+ * **The blank plate is not wrapped, and that is the point of it.** There is
+ * no painting behind it to enlarge, so a preview would open on the same
+ * dashed rectangle at four times the size — a joke where a plate had been
+ * honest. It is `CardSheet`'s own rule one surface over: no painting opens no
+ * sheet. `CardHover` would in fact refuse on its own (every path in it tests
+ * `card.image` first), so this is the same answer said where a reader can
+ * see it rather than left to a guard two files away.
  */
 function TokenPlateCard({ token, rank }: { token: TokenPlate; rank: number }) {
   return (
@@ -165,10 +219,25 @@ function TokenPlateCard({ token, rank }: { token: TokenPlate; rank: number }) {
         style={{ animationDelay: `${String(Math.min(rank, 8) * 45)}ms` }}>
       {token.image
         ? (
-          // The card name alone, which is every other card thumbnail's alt on
-          // this page; the type line is read from the words beside it.
-          <img className="token-face" src={token.image} loading="lazy"
-               alt={token.name} />
+          // `contents`, so the wrapper generates no box at all: `.token-face`
+          // stays the plate's own flex item, at the width and the `flex: 0 0
+          // auto` the stylesheet gave it. A plain `span` would become the
+          // flex item instead, inherit `flex: 0 1 auto`, and start shrinking
+          // the face on a narrow phone — a layout change nothing in the web
+          // suite can see, because jsdom lays nothing out.
+          //
+          // `tapOpens` is left at its default `true`. The call sites that
+          // pass `false` wrap a real control whose tap is already spoken for
+          // — the commander picker, the reading room's tiles — and a plate is
+          // inert: nothing happens when it is tapped today, so the tap is
+          // free and it is the only way a thumb reaches the picture.
+          <CardHover className="contents"
+                     card={{ name: token.name, image: token.image }}>
+            {/* The card name alone, which is every other card thumbnail's alt
+                on this page; the type line is read from the words beside it. */}
+            <img className="token-face" src={token.image} loading="lazy"
+                 alt={token.name} />
+          </CardHover>
           )
         : (
           <div className="token-face token-face-blank" aria-hidden>
