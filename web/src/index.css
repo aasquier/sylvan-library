@@ -315,6 +315,16 @@ body {
   display: block;
   aspect-ratio: 616 / 452;
   overflow: hidden;
+  /* **`flex: none`, and it is the whole cost of moving the width off the
+     image.** An `<img>` is a replaced element: its automatic minimum size is
+     its intrinsic size, so a flex row cannot shrink it below the width it was
+     given. A `<span>` has no intrinsic size, its automatic minimum is its
+     content's min-content — and the media inside is `width: 100%`, which is
+     zero. So the loop's `sm:w-[46%]` came out 325px of a 1230px row instead
+     of 566: the goldfish, which this class was created to stop being too
+     small, back to being too small. Measured in a real browser at 1400px,
+     because nothing in jsdom has a size. */
+  flex: none;
 }
 :root[data-theme='dark'] .masthead-plate > .art-lift,
 :root:where(:not([data-theme='light'])) .masthead-plate > .art-lift {
