@@ -763,7 +763,21 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // being replayed under three more keys. A beat the reel never counted has no
   // `run` at all, and that is a one rather than a nothing.
   const times = beat?.run ?? 1
-  const next: Staged | null = manner && name && beat && times > 0
+  // **One beat, one moment.** A combat death is the one beat two things both
+  // want: `mannerOf` calls it a death and opens the burial vault under the
+  // card, and the fight it settled wants the middle of the arena for its own
+  // verdict. Drawn together they are three scenes stacked — the ossuary, the
+  // vault, and the vault the beat before it is still parting from (Aaron,
+  // 2026-08-28: *"the victor and loser animations are overlapping with the
+  // loser being sent to the graveyard animation"*).
+  //
+  // **The fight wins, and nothing is lost by it.** The card the vault would
+  // have shown is the attacker, and the attacker is already standing in the
+  // bout — with the wall that killed it beside it, which the single card could
+  // never say. The skull still lands on the grave in its own row, because that
+  // is the board's mark and not this stage's.
+  const settling = clash != null && outcome != null
+  const next: Staged | null = !settling && manner && name && beat && times > 0
     ? {
       key: beat.key,
       manner,
@@ -822,8 +836,19 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
           that just happened. Keyed on the attacker so a gang assembling
           re-uses this element rather than rebuilding it; see `StagedBout`. */}
       {bout && <StageBout key={bout.attacker.id} item={bout} />}
-      {parting && <StageCard key={parting.key} item={parting} parting />}
-      {showing && <StageCard key={showing.key} item={showing} />}
+      {/* **A verdict has the stage to itself.** A cast during a fight is drawn
+          over the bout on purpose — the fight is a state, the spell is the
+          thing that just happened — but a *verdict* is the loudest sentence
+          this stage says, and a burial vault fading out under an ossuary is
+          two graves in one frame. The card slot is not cleared, only hidden:
+          if it outlives the verdict it comes back, and a `dies` card and a
+          verdict have the same 2000ms so in practice it does not. */}
+      {!bout?.outcome && parting && (
+        <StageCard key={parting.key} item={parting} parting />
+      )}
+      {!bout?.outcome && showing && (
+        <StageCard key={showing.key} item={showing} />
+      )}
       {farMana && <StageMana key={farMana.key} item={farMana} />}
       {nearMana && <StageMana key={nearMana.key} item={nearMana} />}
     </div>

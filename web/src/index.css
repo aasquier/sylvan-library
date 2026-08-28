@@ -6952,8 +6952,27 @@ button:hover .tarot-fan-card {
    * the number that makes the board one size: three of these, twice, and the
    * arena is as tall as it will ever be. */
   --field-card-full: 58px;
-  --lane-lean: calc(var(--field-card-full) * 0.15);
-  --lane-turn: calc(var(--field-card-full) * 0.35);
+  /* **What a card leaning forty-five degrees sticks out by, plus a pixel.**
+     Both of these used to be 0.15 and 0.35, which are not wrong -- they are
+     the exact geometry, and that was the fault. A card of width `w` and the
+     board's 58:81 aspect turned 45 degrees overhangs its own box by
+     `w(cos45 + 1.3966 sin45 - 1)/2` sideways and `w(sin45 + 1.3966 cos45 -
+     1.3966)/2` vertically: 0.3474w and 0.1491w. Rounded to 0.35 and 0.15 that
+     left **0.13px and 0.04px** of clearance, measured on a real board, which
+     is no clearance at all -- a fractional card width, a scrollbar or a
+     device pixel ratio eats it and the leaning corner is cut off.
+
+     It showed at the right-hand end of a lane long enough to scroll, because
+     that is the one edge where a card can reach the boundary with nothing
+     beyond it (Aaron, 2026-08-28: *"when there are 10+ cards in a row and the
+     far right one taps and is clipped"*). The same fault at the *left* edge
+     was fixed once already by introducing these two numbers; what was missing
+     was slack, not arithmetic.
+
+     So: the true overhang, written out so it can be checked, and one pixel on
+     top of it that rounding cannot eat. */
+  --lane-lean: calc(var(--field-card-full) * 0.1491 + 1px);
+  --lane-turn: calc(var(--field-card-full) * 0.3474 + 1px);
   /* The gap between two cards in a lane, and the padding a half keeps around
      its lanes. Declared here rather than where they are used, from back when
      the combat arrows were drawn in the trench and had to reach a lane's slot
