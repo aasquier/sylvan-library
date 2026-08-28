@@ -35,8 +35,8 @@ function combo(key: string, name: string, tier: string, colors: string[]): Combi
     aliases: [], verified_by: 'a card',
     // The teaching fields. Empty here on purpose: the wheel is geometry and
     // labels, and nothing about the diagram should start depending on whether
-    // a slot has a story attached.
-    lore: '', champions: [], signature: [],
+    // a slot has a story or a creed attached.
+    creed: null, lore: '', champions: [], signature: [],
   }
 }
 

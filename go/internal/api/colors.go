@@ -75,17 +75,23 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusNotFound, "no colour combination "+wire.Quote(key))
 		return
 	}
+	// Everything the taxonomy holds about one combination except the two
+	// lists this route replaces with resolved cards -- so a reader that has
+	// the detail never has to go back to `/api/colors` for a field. `Creed`
+	// is a name and a citation rather than a card to draw, so it passes
+	// through untouched by the pool lookup below.
 	type base struct {
-		Key        string   `json:"key"`
-		Name       string   `json:"name"`
-		Tier       string   `json:"tier"`
-		Colors     []string `json:"colors"`
-		Size       int      `json:"size"`
-		Tagline    string   `json:"tagline"`
-		History    string   `json:"history"`
-		Lore       string   `json:"lore"`
-		Aliases    []string `json:"aliases"`
-		VerifiedBy string   `json:"verified_by"`
+		Key        string           `json:"key"`
+		Name       string           `json:"name"`
+		Tier       string           `json:"tier"`
+		Colors     []string         `json:"colors"`
+		Size       int              `json:"size"`
+		Tagline    string           `json:"tagline"`
+		History    string           `json:"history"`
+		Lore       string           `json:"lore"`
+		Aliases    []string         `json:"aliases"`
+		VerifiedBy string           `json:"verified_by"`
+		Creed      *reference.Creed `json:"creed"`
 	}
 	type answer struct {
 		base
@@ -97,7 +103,7 @@ func (a *API) combination(w http.ResponseWriter, r *http.Request) {
 	}
 	out := answer{base: base{Key: combo.Key, Name: combo.Name, Tier: combo.Tier, Colors: combo.Colors,
 		Size: combo.Size, Tagline: combo.Tagline, History: combo.History, Lore: combo.Lore,
-		Aliases: combo.Aliases, VerifiedBy: combo.VerifiedBy},
+		Aliases: combo.Aliases, VerifiedBy: combo.VerifiedBy, Creed: combo.Creed},
 		Champions: []champion{}, Signature: []proseCard{}}
 	err := a.usePool(r.Context(), func(c *pool.Conn) error {
 		wanted := []string{}

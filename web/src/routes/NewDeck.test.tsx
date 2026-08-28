@@ -64,7 +64,9 @@ const TAXONOMY = {
     aliases: ['Golgari'], verified_by: 'Scryfall',
     // The teaching fields, in the shape `/api/colors` serves them. Names and
     // a role only: the cards come from `/api/colors/{key}`, which this screen
-    // never calls — it shows the short version and links across.
+    // never calls — it shows the short version and links across. The creed is
+    // null for the same reason: it is the long version's, on Learn.
+    creed: null,
     lore: 'The Swarm holds the undercity, and the succession is a sacrifice.',
     champions: [{ card: 'Jarad, Golgari Lich Lord', role: 'Dead, and in charge.' }],
     signature: ["Assassin's Trophy"],

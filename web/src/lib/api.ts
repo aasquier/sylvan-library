@@ -1754,6 +1754,23 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return send<T>('POST', path, body)
 }
 
+/**
+ * A guild speaking for itself: one line of printed flavour text, the person
+ * who says it, and the card it is read off.
+ *
+ * `words` is the sentence inside the card's quotation marks and nothing else —
+ * the marks are the flavour-text convention rather than part of the line, so
+ * the renderer draws them. `card` is an attribution and never a card to
+ * render: `/api/colors` resolves no cards at all, and the citation is meant to
+ * read whole on a clone with no pool.
+ */
+export interface Creed {
+  words: string
+  speaker: string
+  card: string
+  printing: string
+}
+
 /** One of the 32 colour combinations. Mirrors `mtglab.colors.Combination`. */
 export interface Combination {
   /** Canonical WUBRG-ordered key, or "C" for colourless. */
@@ -1774,6 +1791,13 @@ export interface Combination {
   aliases: string[]
   /** A real card whose Scryfall colour identity proves this row. */
   verified_by: string
+  /**
+   * The guild's own words. `null` for the twenty-two slots that are not one
+   * of the ten guilds — the shards and clans have creed-shaped flavour of
+   * their own, but nobody has read it off the cards yet, and an empty string
+   * would be indistinguishable from someone leaving the field blank.
+   */
+  creed: Creed | null
   /**
    * What happened to this faction. Empty for the twelve slots that are not
    * one — Mono-Red is not from anywhere, and does not get a story pretending
