@@ -13121,8 +13121,19 @@ button:hover .tarot-fan-card {
   100%    { opacity: 0; transform: scale(2.1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .stage-forge-art, .stage-forge-sparks { animation: none; }
-  .stage-forge-sparks { opacity: 1; }
+  /* **The wrapper as well as what is in it**, which the first cut of this
+     missed and `TestEveryAnimationInTheBundleCanBeArrested` caught: the
+     opening fade lives on `.stage-forge` and the guard only reached its
+     children. `stage-still` rather than `animation: none`, because the scene
+     still has to arrive and leave on the beat's own clock — reduced, not
+     removed. */
+  .stage-forge { animation: stage-still var(--stage-life, 1150ms) linear both; }
+  .stage-forge-art { animation: none; }
+  /* The sparks go entirely, exactly as the valley's dust does and for its
+     stated reason: they are a burst from a blow that no longer happens, and a
+     scatter of hot points in the middle of a still page has no cause a person
+     could read. */
+  .stage-forge-sparks { animation: none; opacity: 0; }
 }
 
 /* ------------------------------------- the standing place, for an enchantment
@@ -13257,10 +13268,20 @@ button:hover .tarot-fan-card {
 .stage-card.has-veiling .stage-frame::before { animation: none; opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
+  /* The wrappers, for the forge's reason two blocks up. */
+  .stage-temple { animation: stage-still var(--stage-life, 1150ms) linear both; }
+  .stage-veiling { animation: stage-still var(--stage-life, 1300ms) linear both; }
   .stage-temple-art,
   .stage-veiling-art { animation: none; }
+  /* And the card's approach, which is `stage-alight` for both of these —
+     `stage-still` rather than nothing, so the card is *there* for the beat and
+     gone after it rather than appearing from nowhere and staying. The valley
+     and the forge take the same line, in the stage's own block. */
   .stage-card.has-temple .stage-frame,
-  .stage-card.has-veiling .stage-frame { animation: none; }
+  .stage-card.has-veiling .stage-frame {
+    transform: none;
+    animation: stage-still var(--stage-life, 1300ms) linear both;
+  }
 }
 
 /* -------------------------------------------- the arcanum behind a spell
@@ -13409,7 +13430,10 @@ button:hover .tarot-fan-card {
   .stage-arcanum-art { animation-name: stage-arcanum-lie; }
   .stage-arcanum-glow { animation: none; }
   .stage-card.has-tower .stage-frame,
-  .stage-card.has-magician .stage-frame { animation: none; }
+  .stage-card.has-magician .stage-frame {
+    transform: none;
+    animation: stage-still var(--stage-life, 1150ms) linear both;
+  }
   @keyframes stage-arcanum-lie {
     0%, 100% { opacity: 0.72; transform: rotate(-3deg); }
   }
@@ -14714,14 +14738,25 @@ button:hover .tarot-fan-card {
     animation: stage-still var(--stage-life, 1300ms) linear both;
   }
   .stage-card.is-parting { animation: stage-gone 200ms linear both; }
-  @keyframes stage-still {
-    0%, 100% { opacity: 0; }
-    8%, 86%  { opacity: 1; }
-  }
-  @keyframes stage-gone {
-    0%   { opacity: 1; }
-    100% { opacity: 0; }
-  }
+}
+
+/* **Hoisted out of the block above, and it had to be.** `stage-still` is the
+   stage's whole answer to reduced motion — a scene or a card that arrives and
+   leaves on the beat's own clock with no movement in between — and it is now
+   named by five separate blocks scattered down this file beside the scenes
+   they belong to. A `@keyframes` inside a media query is only *registered*
+   when that query matches, which happens to be true for all of them; relying
+   on that means a reader at any of those five sites has no way to find this,
+   and moving it one day would silently un-guard three scenes. Registering the
+   name unconditionally costs nothing, because the only rules that use it are
+   inside `prefers-reduced-motion` blocks. */
+@keyframes stage-still {
+  0%, 100% { opacity: 0; }
+  8%, 86%  { opacity: 1; }
+}
+@keyframes stage-gone {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ── The sheet's carousel: a creature and everything attached to it ───────
