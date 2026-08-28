@@ -34,20 +34,26 @@ In order:
 
 1. **The owed walks** (commandment 16): the Claude sweep and the camera
    door in a local browser with Aaron's eyes on them, then the full
-   deployed walk-through.
-2. **The Simulator learns, continued**: deck ratings and land-count
+   deployed walk-through. The Coliseum's gear fan is owed one too — it wants
+   a live match with something equipped on the board.
+2. **The combat square-off**: the attacker/blocker arrows are the last
+   part of the arena Aaron is not happy with. They go, replaced by a bout
+   on the centre stage against a real arena backdrop, with several blockers
+   ranked on the defending side. A picture hunt plus a layout nobody has
+   drawn yet (N facing one), so it is its own session.
+3. **The Simulator learns, continued**: deck ratings and land-count
    regression over the match ledger (ADR 36), then the Tier 2 question —
    adversarial simulation between decks — which starts as a design
    argument, not code.
-3. **Assisted refactor**: swap recommendations that argue from three
+4. **Assisted refactor**: swap recommendations that argue from three
    sources with three different epistemic statuses — the gate
    (reproducible), the simulator (seeded measurement), and Claude's slot
    argument (an opinion, ADR 25). The three problems to solve first are
    recorded in git history with the original design.
-4. **Open deck rulings**: two banned cards still need replacements chosen
+5. **Open deck rulings**: two banned cards still need replacements chosen
    (Goreclaw's is deliberate — the live invalid example stays). Deck facts
    are volume facts; verify before acting.
-5. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
+6. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
    (secret scanning, push protection), uptime watching, the wrong-painter
    credit (needs a pool schema change and a refresh), cache-write tokens
    (schema v11), the phone's touch targets, region-scoped motion (Syr
@@ -64,11 +70,12 @@ built or holding its place in line:
 3. **Real games against a real engine** — built: Forge, hosted worker, and
    the Coliseum, which is now the only room that starts a match (ADR 35,
    ADR 36). The Simulator kept the arithmetic; watching moved to the room
-   built for it, and the match narrates itself there — Forge's own beats,
-   paced for reading. **Open:** the board itself. Forge's event bus carries
-   tokens, counters, tapped state and every zone change; its *log* renders
-   none of them, so a battlefield needs a listener attached to the bus
-   rather than a parser pointed at the prose.
+   built for it. **The board is built too** — the listener on Forge's event
+   bus is ADR 42, and the arena draws two seats, three lanes a side, the
+   closed zones, the trench's three death clocks and a centre stage that
+   opens a scene chosen by what kind of card arrived. What is left here is
+   craft rather than capability: the combat square-off (below) is the one
+   named piece of it.
 4. **Shopping and swaps** — built: prices from Scryfall, swap boards, no
    checkout ever (out of scope by rule).
 5. **Five artifacts per deck** — built, generated only (ADR 8).
