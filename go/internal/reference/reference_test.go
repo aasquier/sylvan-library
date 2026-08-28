@@ -120,6 +120,79 @@ func TestEveryGuildSaysItsPieceAndNobodyElseDoes(t *testing.T) {
 	}
 }
 
+// The sigils are checked-in citations for real paintings, so this holds the
+// shape of the claim: twenty factions, twenty sigils, nobody else, each one
+// naming a card, an artist, a printing and the art crop those three belong to.
+//
+// **The twelve without one are the design, not a hole.** Three blocks printed
+// a faction-emblem cycle and between them they cover every multicolour faction
+// and nothing else; the remaining twelve combinations are not factions and
+// wear their own mana symbols instead. A later session that reads this test as
+// an unfinished list and goes looking for a mono-white mana rock to complete it
+// would be inventing a cycle Wizards never printed, which is the one thing the
+// reference data may never hold.
+func TestEveryFactionShowsItsSigilAndNobodyElseDoes(t *testing.T) {
+	t.Parallel()
+	// Each block's own cycle, and the word that has to be in the card's name
+	// for the row to belong to that tier at all.
+	cycle := map[string]string{"guild": "Signet", "shard": "Obelisk of", "wedge": "Banner"}
+	counts := map[string]int{}
+	cards, art := map[string]string{}, map[string]string{}
+	for _, c := range Colors().Combinations {
+		want, faction := cycle[c.Tier]
+		if !faction {
+			if c.Sigil != nil {
+				t.Errorf("%s is a %s and has a sigil; the field is the twenty factions'", c.Name, c.Tier)
+			}
+			continue
+		}
+		counts[c.Tier]++
+		if c.Sigil == nil {
+			t.Errorf("%s has no sigil", c.Name)
+			continue
+		}
+		// All four or none. An art URL with no credit beside it is the exact
+		// thing commandment 19 and Scryfall's terms forbid, and a credit with
+		// no card is a painting nobody can go and check.
+		if c.Sigil.Card == "" || c.Sigil.Artist == "" || c.Sigil.Printing == "" || c.Sigil.Art == "" {
+			t.Errorf("%s: sigil %+v is missing a part", c.Name, *c.Sigil)
+			continue
+		}
+		// The likeliest authoring mistake by a distance is a row pasted onto
+		// its neighbour -- Gruul wearing Golgari's rock. Both halves of the
+		// card's name answer it: the faction is in the name, and the cycle
+		// word says the row came from that faction's own block.
+		if !strings.Contains(c.Sigil.Card, c.Name) {
+			t.Errorf("%s: sigil is %q, which is not %s's", c.Name, c.Sigil.Card, c.Name)
+		}
+		if !strings.Contains(c.Sigil.Card, want) {
+			t.Errorf("%s: %q is not from the %s cycle (%s)", c.Name, c.Sigil.Card, c.Tier, want)
+		}
+		// Hot-linked to Scryfall and nowhere else: no committed image, no
+		// path this app would have to serve (ADR 6, ADR 32).
+		if !strings.HasPrefix(c.Sigil.Art, "https://cards.scryfall.io/art_crop/") {
+			t.Errorf("%s: art is not a Scryfall art crop: %q", c.Name, c.Sigil.Art)
+		}
+		if other := cards[c.Sigil.Card]; other != "" {
+			t.Errorf("%s and %s claim the same card %q", other, c.Name, c.Sigil.Card)
+		}
+		if other := art[c.Sigil.Art]; other != "" {
+			t.Errorf("%s and %s claim the same painting", other, c.Name)
+		}
+		cards[c.Sigil.Card], art[c.Sigil.Art] = c.Name, c.Name
+	}
+	if counts["guild"] != 10 || counts["shard"] != 5 || counts["wedge"] != 5 {
+		t.Fatalf("%d guilds, %d shards, %d wedges; want 10, 5, 5",
+			counts["guild"], counts["shard"], counts["wedge"])
+	}
+	// On the wire for all 32 and not only the twenty that fill it, for the
+	// reason the creed test argues above: the two colour routes must agree
+	// about whether a combination has the field.
+	if n := strings.Count(string(ColorsJSON()), `"sigil":`); n != 32 {
+		t.Fatalf(`%d combinations carry "sigil" on the wire, want all 32`, n)
+	}
+}
+
 func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
 	t.Parallel()
 	// The raw payload is the embedded document with insignificant
