@@ -1079,15 +1079,28 @@ const WALL_NAMED = 3
  * `listed` uses.
  */
 function walled(blockers: BoutFighter[]): string {
-  const say = (b: BoutFighter) =>
-    b.count > 1 ? `${shortName(b.name)} ×${b.count}` : shortName(b.name)
-  if (blockers.length > WALL_NAMED) {
-    const head = blockers.slice(0, WALL_NAMED)
-    const rest = blockers.slice(WALL_NAMED)
-      .reduce((n, b) => n + b.count, 0)
-    return `${head.map(say).join(', ')} and ${rest} more`
+  // **The cards stay apart and the sentence does not**, which is the one place
+  // this deliberately disagrees with the rank standing above it.
+  //
+  // A real gang on Blightsteel Colossus put three Cat Tokens in the wall and
+  // `stackRow` was right to draw all three: one was a 6/4 carrying Hammer of
+  // Nazahn, one a 3/3 with a Basilisk Collar, one a bare 3/3. Three separate
+  // cards, because a player can see all of that across a table. But the plate
+  // read *"by Cat Token, Cat Token, Elephant Token and 1 more"*, which looks
+  // like a fault however true it is. Nobody says a name twice; they say *three
+  // Cats and an Elephant*. So the sentence counts by name, and the pictures
+  // keep the distinction the sentence has no room for.
+  const byName = new Map<string, number>()
+  for (const b of blockers) {
+    byName.set(b.name, (byName.get(b.name) ?? 0) + b.count)
   }
-  const said = blockers.map(say)
+  const said = [...byName].map(([name, n]) =>
+    n > 1 ? `${shortName(name)} ×${n}` : shortName(name))
+  if (said.length > WALL_NAMED) {
+    const rest = [...byName.values()].slice(WALL_NAMED)
+      .reduce((n, c) => n + c, 0)
+    return `${said.slice(0, WALL_NAMED).join(', ')} and ${rest} more`
+  }
   if (said.length <= 1) return said[0] ?? ''
   return `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}`
 }

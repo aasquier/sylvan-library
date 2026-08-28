@@ -109,6 +109,21 @@ describe('the fight the stage is handed', () => {
     expect(out?.note).toBe('by Sacred Cat, Regal Caracal, Fleecemane Lion and 7 more')
   })
 
+  it('says one name once, however many cards carry it', () => {
+    // Found on a real board: a gang on Blightsteel Colossus put three Cat
+    // Tokens in the wall, and they are three separate CARDS on purpose — one a
+    // 6/4 carrying Hammer of Nazahn, one a 3/3 with a Basilisk Collar, one a
+    // bare 3/3. The rank draws all three, because a player can see that. The
+    // plate must not: "by Cat Token, Cat Token, Elephant Token and 1 more"
+    // looks like a fault however true it is.
+    const out = stagedBout(clash([
+      stack(beast(2, 'Cat Token')), stack(beast(3, 'Cat Token')),
+      stack(beast(4, 'Elephant Token')), stack(beast(5, 'Cat Token')),
+    ]), null, 'k', 'play')
+    expect(out?.blockers).toHaveLength(4)
+    expect(out?.note).toBe('by Cat Token ×3 and Elephant Token')
+  })
+
   it('carries each blocker its own board id', () => {
     // The identity that makes a gang assemble rather than redraw: keyed on the
     // id, a card already standing keeps its element when the next beat brings
