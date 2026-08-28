@@ -23,7 +23,7 @@
  * Golgari is a link to Golgari.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   api,
@@ -31,6 +31,7 @@ import {
   type ColorTaxonomy,
   type Combination,
   type CombinationDetail,
+  type Creed,
   type ReferenceCard,
   type Term as TermData,
 } from '../lib/api'
@@ -111,6 +112,58 @@ function RefCard({ card, note }: { card: ReferenceCard; note?: string }) {
   )
 }
 
+/* ------------------------------------------------------ the guild's words */
+
+/**
+ * A guild's creed, set as an inscription in its own two colours.
+ *
+ * The line is printed flavour text read off a real card — never written here,
+ * never paraphrased — so the plate carries its citation the way the panel's
+ * last line carries `verified_by`. Six of the ten come off the guild Charm
+ * cycle and four do not: Izzet's, Orzhov's and Selesnya's Charms were printed
+ * with no flavour text at all in any printing, and Boros's has a line but
+ * Aurelia says a better one somewhere else. That is why the card is a field
+ * rather than something this component could work out from the guild.
+ *
+ * **The colours are light, not ink.** `--mtg-*` are washes — pale by design,
+ * and pale type on a pale page is the bug a whole route once shipped. So the
+ * guild's pair tints the stone and inks the edge (mixed toward `--text-primary`,
+ * which darkens it on paper and brightens it at night in one expression), and
+ * the words themselves stay the page's own high-contrast ink in both themes.
+ *
+ * The seal is the guild's real mana symbols, the same ones every cost in the
+ * app draws, so Golgari and Azorius are told apart at a glance and by
+ * something other than hue.
+ */
+function GuildCreed({ creed, colors }: { creed: Creed; colors: string[] }) {
+  const first = COLOR_VAR[colors[0] ?? 'C'] ?? 'var(--mtg-c)'
+  const last = COLOR_VAR[colors[colors.length - 1] ?? 'C'] ?? 'var(--mtg-c)'
+  return (
+    <figure className="guild-creed"
+            style={{ '--creed-a': first, '--creed-b': last } as CSSProperties}>
+      {/* The guild's seal, pressed into the stone and running off its edge.
+          Decoration: the ColorRing in the header two lines up already names
+          these colours out loud, and a screen reader that heard them a second
+          time here would be hearing furniture. */}
+      <span className="guild-creed-seal" aria-hidden="true">
+        <ManaCost cost={colors.map((c) => `{${c}}`).join('')} size={82} />
+      </span>
+      <blockquote className="guild-creed-words">
+        {/* Curly quotes as real characters rather than generated content: it
+            is a quotation, and a reader listening to the page should hear
+            that it is one. */}
+        &ldquo;{creed.words}&rdquo;
+      </blockquote>
+      <figcaption className="guild-creed-hand">
+        <span className="guild-creed-speaker">{creed.speaker}</span>
+        <span className="guild-creed-source">
+          printed on <cite>{creed.card}</cite>, {creed.printing}
+        </span>
+      </figcaption>
+    </figure>
+  )
+}
+
 /* -------------------------------------------------------- the colours tab */
 
 function CombinationPanel({ combo, taxonomy }: {
@@ -160,6 +213,10 @@ function CombinationPanel({ combo, taxonomy }: {
           Build {combo.name}
         </Link>
       </header>
+
+      {/* The guild's own voice before ours. Only the ten guilds have one, so
+          the twenty-two other slots simply go straight to the tagline. */}
+      {combo.creed && <GuildCreed creed={combo.creed} colors={combo.colors} />}
 
       <p className="mt-4 text-lg" style={{ color: 'var(--text-primary)' }}>
         {combo.tagline}

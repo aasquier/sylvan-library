@@ -71,6 +71,55 @@ func TestEveryCombinationIsAddressable(t *testing.T) {
 	}
 }
 
+// The creeds are checked-in prose about real cards, so what a test can hold
+// is the shape of the claim rather than its truth: ten guilds, ten creeds,
+// nobody else, and every one of them citing something. The words themselves
+// were copied out of the card pool (`printings.flavor_text`) and the citation
+// beside each is how a later session re-checks one without trusting this file.
+func TestEveryGuildSaysItsPieceAndNobodyElseDoes(t *testing.T) {
+	t.Parallel()
+	guilds := 0
+	for _, c := range Colors().Combinations {
+		if c.Tier != "guild" {
+			if c.Creed != nil {
+				t.Errorf("%s is a %s and has a creed; the field is the ten guilds'", c.Name, c.Tier)
+			}
+			continue
+		}
+		guilds++
+		if c.Creed == nil {
+			t.Errorf("%s has no creed", c.Name)
+			continue
+		}
+		// All four or none. A creed with no citation is exactly the thing
+		// this field exists to refuse -- a line somebody remembered.
+		if c.Creed.Words == "" || c.Creed.Speaker == "" || c.Creed.Card == "" || c.Creed.Printing == "" {
+			t.Errorf("%s: creed %+v is missing a part", c.Name, *c.Creed)
+		}
+		// The renderer supplies the quotation marks, so the stored line is
+		// the sentence and never the flavour text's own punctuation around
+		// it -- and it is one line, because the attribution is a field.
+		if strings.ContainsAny(c.Creed.Words, "\"\n") {
+			t.Errorf("%s: creed carries the card's quoting rather than the sentence: %q", c.Name, c.Creed.Words)
+		}
+		if strings.HasPrefix(c.Creed.Speaker, "—") {
+			t.Errorf("%s: speaker keeps the card's dash: %q", c.Name, c.Creed.Speaker)
+		}
+	}
+	if guilds != 10 {
+		t.Fatalf("%d guilds, want 10", guilds)
+	}
+	// And the key is on the wire for all 32, not only the ten that fill it.
+	// `/api/colors` serves this file's own bytes while `/api/colors/{key}`
+	// marshals the struct, so a key present on only ten entries makes the two
+	// routes disagree about whether a combination even has the field -- which
+	// a typed reader of both cannot describe. The file already writes
+	// `"aliases":[]` and `"lore":""` everywhere for the same reason.
+	if n := strings.Count(string(ColorsJSON()), `"creed":`); n != 32 {
+		t.Fatalf(`%d combinations carry "creed" on the wire, want all 32`, n)
+	}
+}
+
 func TestTheServedBytesAreTheCompactedFiles(t *testing.T) {
 	t.Parallel()
 	// The raw payload is the embedded document with insignificant
