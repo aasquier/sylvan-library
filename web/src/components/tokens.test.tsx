@@ -45,9 +45,27 @@ function sheet(over: Partial<DeckTokens> = {}): DeckTokens {
   return { pool_available: true, read: true, tokens: [], ...over }
 }
 
+/** The section's own toggle. `/^Tokens/` rather than the whole name, because
+ *  the count rides on the end of it once the shelf has been read — and never
+ *  `getByTitle`, which is what this header used to be found by and is exactly
+ *  the attribute the header no longer has. */
+function toggle() {
+  return screen.getByRole('button', { name: /^Tokens/ })
+}
+
 function unfold() {
   render(<TokenShelf deckRef={ref} />)
-  fireEvent.click(screen.getByTitle('What this deck makes'))
+  fireEvent.click(toggle())
+}
+
+/** A tap, the way a phone makes one. jsdom has no PointerEvent of its own, so
+ *  the type rides on a plain Event — which is all `CardHover` reads. */
+function tap(el: Element) {
+  for (const type of ['pointerdown', 'pointerup']) {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'pointerType', { value: 'touch' })
+    fireEvent(el, ev)
+  }
 }
 
 // Folded is the default and folded costs nothing: no request, so no pictures
@@ -58,7 +76,7 @@ it('asks for nothing until it is opened', async () => {
   expect(read).not.toHaveBeenCalled()
   expect(screen.queryByText(/Made by/)).toBeNull()
 
-  fireEvent.click(screen.getByTitle('What this deck makes'))
+  fireEvent.click(toggle())
   await waitFor(() => { expect(read).toHaveBeenCalledTimes(1) })
 })
 
@@ -142,6 +160,84 @@ it('shows a refusal rather than an empty shelf', async () => {
   read.mockRejectedValue(new Error('the library could not answer that right now'))
   unfold()
   await screen.findByText(/could not answer/i)
+})
+
+// Aaron, 2026-08-28: "it would be nice if a hover in our token menu for a deck
+// gave a card preview". A token face is drawn at 5.75rem and everything the
+// token actually *does* is printed on it, at a size no phone can read.
+it('holds the whole token face up to a hover', async () => {
+  read.mockResolvedValue(sheet({ tokens: [plate('Food')] }))
+  unfold()
+  const face = await screen.findByAltText('Food')
+
+  fireEvent.mouseEnter(face, { clientX: 20, clientY: 20 })
+  // Two now: the plate's own face, and the card held beside the cursor.
+  expect(screen.getAllByAltText('Food')).toHaveLength(2)
+
+  fireEvent.mouseLeave(face)
+  expect(screen.getAllByAltText('Food')).toHaveLength(1)
+})
+
+// **And the half of the room with no cursor at all**, which is the half that
+// matters here: `tapOpens` is left at its default because a plate is inert,
+// so nothing is being stolen from a tap that already meant something.
+it('hands the token to a tap, for the half of the room with no cursor', async () => {
+  read.mockResolvedValue(sheet({ tokens: [plate('Food')] }))
+  unfold()
+  const face = await screen.findByAltText('Food')
+  expect(screen.queryByRole('dialog')).toBeNull()
+
+  tap(face)
+  expect(screen.getByRole('dialog', { name: 'Food' })).toBeTruthy()
+
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+// No painting opens no sheet — `CardSheet`'s own rule, one surface over. The
+// blank plate is the honest likeness of a token nobody printed; enlarging it
+// would be the same dashed rectangle at four times the size.
+it('opens nothing for a token it has no picture of', async () => {
+  read.mockResolvedValue(sheet({
+    tokens: [plate('Elephant', {
+      image: null, art_crop: null, artist: null,
+      set_code: null, set_name: null, made_by: ['Terastodon'],
+    })],
+  }))
+  unfold()
+  await waitFor(() => {
+    expect(document.querySelector('.token-face-blank')).not.toBeNull()
+  })
+  const blank = document.querySelector('.token-face-blank')
+  if (!blank) throw new Error('no blank plate')
+
+  tap(blank)
+  fireEvent.mouseEnter(blank, { clientX: 20, clientY: 20 })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('img')).toBeNull()
+})
+
+// **The header's sentence used to be a `title`**, which draws on hover and on
+// nothing else: never on a phone, never on keyboard focus. It is a real
+// control now, and this is the pin — a `title` coming back would pass every
+// other test in this file.
+it('explains what a token is to a hand that is not a mouse', () => {
+  read.mockResolvedValue(sheet({ tokens: [plate('Food')] }))
+  render(<TokenShelf deckRef={ref} />)
+
+  expect(toggle().getAttribute('title')).toBeNull()
+  const ask = screen.getByRole('button', { name: 'What a token is' })
+  expect(ask.getAttribute('title')).toBeNull()
+  expect(screen.queryByRole('tooltip')).toBeNull()
+
+  // A tap pins it up; the same press a thumb makes, and the same press Enter
+  // makes on a real button.
+  fireEvent.click(ask)
+  expect(screen.getByRole('tooltip').textContent)
+    .toContain('this deck makes while you play')
+
+  // And it does not fold the section on its way past.
+  expect(read).not.toHaveBeenCalled()
 })
 
 // The fold is not remembered, and that is the ask: "collapsed by default".
