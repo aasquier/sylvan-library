@@ -475,13 +475,22 @@ it('takes no pointer, so the timeline stays draggable underneath', () => {
 })
 
 it('gives the middle of the arena to what happened, and to nothing else', () => {
-  // **A land is played, not cast**, and this is the one Magic judgement in the
-  // file rather than a rendering one. A land does not use the stack, is not
-  // cast, and is the most routine thing that happens in a game — eight or ten
-  // a game, one almost every turn — so filling the arena with a Forest would
-  // spend the effect on the beat that needs it least. `resolve` is left alone
-  // from the other end: a spell cast and then resolving is *one* spell, and
-  // drawing it twice a beat apart would read as two.
+  // **A land is played, not cast**, and that Magic judgement still holds —
+  // `PLATE.land` says *plays* and never *casts*, which is the one thing about
+  // lands most often un-taught later.
+  //
+  // **What has changed is whether it draws at all** (Aaron, 2026-08-28). This
+  // used to refuse a land the middle of the arena on the argument that one
+  // arrives almost every turn, so filling the arena with a Forest spends the
+  // effect on the beat that needs it least. The frequency was right and
+  // measured again before the rule was lifted — 11 a game over two ten-game
+  // matches, and in one of them *more land drops than casts*. The remedy is
+  // length and calm rather than silence: the shortest life on the stage, half
+  // the beat-cap of everything else, and the stillest picture in the room.
+  //
+  // `resolve` is still left alone from the other end: a spell cast and then
+  // resolving is *one* spell, and drawing it twice a beat apart would read as
+  // two.
   //
   // **`enters` answers three ways rather than two**, and it cost three matches
   // and a decompiler to get there (Aaron, 2026-08-27, asked for a scene on
@@ -496,7 +505,8 @@ it('gives the middle of the arena to what happened, and to nothing else', () => 
   expect(mannerOf('exiled')).toBe('exiled')
   expect(mannerOf('attach')).toBe('attach')
   expect(mannerOf('companion')).toBe('companion')
-  for (const quiet of ['land', 'resolve', 'attack', 'block', 'turn', 'damage',
+  expect(mannerOf('land')).toBe('land')
+  for (const quiet of ['resolve', 'attack', 'block', 'turn', 'damage',
     'life', 'unblocked', 'mulligan', 'outcome', 'ability']) {
     expect(mannerOf(quiet), `${quiet} does not take the middle`).toBeNull()
   }
@@ -549,10 +559,36 @@ it('gives the middle of the arena to what happened, and to nothing else', () => 
     + 'guessed at').toBeNull()
 
   // And through the board, because a table of kinds is only a claim about what
-  // the room does with it.
+  // the room does with it. A land now takes the stage — quietly, and onto its
+  // own country rather than any of the spell scenes.
   const { container } = replay(said({ kind: 'land', card: 'Forest', key: 'f1' }))
-  expect(container.querySelector('.stage'), 'a land drop is not a spell')
-    .toBeNull()
+  expect(container.querySelector('.stage'), 'a land drop takes the middle')
+    .not.toBeNull()
+  expect(container.querySelector('.stage-card.is-land'),
+    'and it is drawn as a land, not as a spell').not.toBeNull()
+  expect(container.querySelector('.stage-arva'),
+    'onto the country it came from').not.toBeNull()
+  // The plate says Magic's own verb. A land does not use the stack and is
+  // never cast, and this room is the first Magic a lot of people will read.
+  expect(container.querySelector('.stage-plate-word')?.textContent)
+    .toMatch(/plays|Land/)
+})
+
+it('gives a land the shortest moment on the stage', () => {
+  // The whole answer to why a land may draw at all. It is the commonest beat
+  // that could carry a scene — 11 a game measured over two ten-game matches,
+  // and in one of them more land drops than casts — so what keeps it from
+  // being the arena flashing every turn is length, not silence.
+  expect(stageLife('land', 'paused', null))
+    .toBeLessThan(stageLife('cast', 'paused', null))
+  // And half the beat-cap of everything else, so a fast pace cuts it hardest:
+  // a beat that happens every turn must never still be on screen when the
+  // turn after it starts.
+  for (const pace of ['study', 'play', 'fast'] as const) {
+    expect(stageLife('land', pace, null),
+      `a land is the shortest thing on the stage at ${pace}`)
+      .toBeLessThanOrEqual(stageLife('cast', pace, null))
+  }
 })
 
 it('draws several tokens as one pile with a number on it', () => {

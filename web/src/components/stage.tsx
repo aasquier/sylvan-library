@@ -15,6 +15,7 @@
 
 import { type CSSProperties, useEffect } from 'react'
 
+import arvaArt from '../assets/coliseum/arva.webp'
 import campusArt from '../assets/coliseum/campus.webp'
 import certamenArt from '../assets/coliseum/certamen.webp'
 import ossariumArt from '../assets/coliseum/ossarium.webp'
@@ -466,6 +467,7 @@ function StageCard({ item, parting }: { item: Staged; parting?: boolean }) {
           scrubbing the timeline; a pool centred on the card separates it from
           the sand and leaves the rows either side perfectly readable. */}
       <span className="stage-veil" aria-hidden="true" />
+      {item.scene === 'arva' && <StageArva />}
       {item.scene === 'road' && <StageRoad />}
       {item.scene === 'crypt' && <StageCrypt />}
       {item.scene === 'field' && <StageField />}
@@ -683,6 +685,33 @@ function BoutCard({ fighter, role, at, order, fallen }: {
         <span className="stage-bout-count tabular">{fighter.count}<span
           className="stage-times">×</span></span>
       )}
+    </span>
+  )
+}
+
+/** **The country a land came from.**
+ *
+ *  Aaron, 2026-08-28: *"a good animation for when lands are played, like some
+ *  rolling hills or farmland maybe"*. This reverses a rule the room set
+ *  deliberately — land, planeswalker, battle and a few others drew nothing,
+ *  on the argument that a land arrives every turn and a scene on every drop is
+ *  the arena flashing at somebody for the most ordinary thing in Magic.
+ *
+ *  **That argument was right about the frequency and wrong about the remedy.**
+ *  Measured over two real ten-game matches: 11 land drops a game, and in one
+ *  of them more land drops than casts — the commonest beat that could carry a
+ *  scene. What keeps it from being a flash is *length and calm*, not silence.
+ *  It is the shortest moment on this stage (`STAGE_LIFE.land`, 780ms against a
+ *  cast's 1150, capped at two beats rather than four) and the quietest
+ *  picture in the room: no event in it, nothing struck, nothing conjured —
+ *  just distance. `arva.recipe.yaml` argues the plate.
+ *
+ *  No dust, no sparks, no ring of light. Every other scene here marks
+ *  something *happening*; a land is somewhere being. */
+function StageArva() {
+  return (
+    <span className="stage-arva" aria-hidden="true">
+      <img className="stage-arva-art" src={arvaArt} alt="" draggable={false} />
     </span>
   )
 }

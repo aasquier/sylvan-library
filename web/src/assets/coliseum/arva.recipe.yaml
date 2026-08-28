@@ -1,0 +1,110 @@
+# The country a land came from.
+#
+# Aaron, 2026-08-28: *"I think we need a good animation for when lands are
+# played, like some rolling hills or farmland maybe"*.
+#
+# **This reverses a rule the room set on purpose, and the rule was not wrong.**
+# Land, planeswalker, battle and a few others drew nothing, on the argument
+# that a land arrives every turn and a scene on every drop is the arena
+# flashing at somebody for the most ordinary thing in Magic. The frequency in
+# that argument was measured again before this shipped and it is worse than
+# the rule claimed: **11 land drops a game across two real ten-game matches,
+# and in one of them more land drops than casts.** This is the commonest beat
+# in the room that could carry a scene.
+#
+# So the remedy is length and calm rather than silence, and the picture is
+# chosen for it. Three things follow, and every one of them is a constraint on
+# what plate could work here:
+#
+#  1. **Nothing may be happening in it.** Every other scene in this directory
+#     is an event — a battle, a forge in use, a burial, a triumph. A land is
+#     not an event; it is somewhere *being*. A picture with an incident in it
+#     would demand to be read, eleven times a game.
+#  2. **It must have no subject at all.** Not "no subject under the card",
+#     which is every other recipe's rule — none anywhere, because this one is
+#     seen more than any of them and a thing to look at becomes a thing to
+#     look at *again*.
+#  3. **It must survive being dimmed.** It ships held back to 0.72, further
+#     than `velatio`'s 0.82, because distance behind a card is what it is for.
+#
+# **Lucas van Uden (1595-1672), `Panoramic landscape with shepherds and
+# peasants`.** Flemish pastoral: hedgerowed fields falling away to haze, a
+# village spire off at the edge, cattle small enough to be texture. It is the
+# only oil painting among the candidates and that is most of why it won.
+#
+# **Also fetched and rejected, and they failed the same way.** Panoramic
+# landscape is a genre of *drawings*, and a drawing is line on paper:
+# `Panoramic landscape near Bergen` (Met, CC0) is pencil at mean 203; `An
+# Extensive Panoramic Landscape with a Windmill` (Met, CC0) is red chalk at
+# 193; `A Panoramic Landscape with a Herdsman and His Flock` (Met, CC0) is
+# brown wash at 171; Cuyp's `Panoramic Landscape along the Rhine` (NGA, CC0)
+# is a pale wash at 168. All four are the `Carceri` fault -- mostly untouched
+# paper, which behind a card in a dark arena is a lamp. The one painting
+# besides this, `Rural Scene` (Nationalmuseum), is a grisaille packed with
+# horses, carts and figures at foreground size: an incident, which rule 1
+# above refuses.
+#
+# **The crop moves the spire out from under the card**, which is this
+# directory's oldest rule doing its ordinary work. Uncropped the card lands
+# squarely on a village steeple -- a single subject, and the one shape in the
+# picture that could be argued as iconography. Starting at x 0.42 puts it at
+# the far left where the mask is already fading, and gives the card open
+# receding fields instead. Four windows were cut and stood a card in before
+# this one was believed.
+#
+# **On the spire, since `campus.recipe.yaml` set the refusal**: that rule
+# turned down Giulio Romano for flying angels and a cross-standard, and
+# Panini's Pantheon for a frieze reading *LAUS EIUS IN ECCLESIA*. Those are
+# iconography -- images and words of the faith. A village steeple on a Flemish
+# horizon is a building, and it is at the rim, at perhaps twenty pixels. Kept,
+# and noted so the judgement is on the record rather than assumed.
+
+animist: 1
+why_committed: >
+  The eight scenes beside it, and more sharply than any of them: this is the
+  most frequently drawn picture in the room, eleven times a game, so a copy
+  fetched from somebody else's host would be the one asset whose latency a
+  player actually learns. It is also the smallest scene here at 37 KB, which
+  makes the request cost more than the bytes. The licence is the second
+  reason and it is weaker here than usual -- see the source note.
+sources:
+  # `LicenseShortName` and `UsageTerms` are both "Public domain", confirmed
+  # through the API at fetch time (2026-08-28). Van Uden died in 1672, so the
+  # work is out of copyright everywhere, and the photograph is a faithful
+  # reproduction of a two-dimensional public-domain work.
+  #
+  # **The provenance is weaker than the museum plates beside it**, and that is
+  # worth writing down: the Commons file credits an auction house rather than
+  # an institution, so there is no CC0 dedication behind it the way there is
+  # for `triumphus` (National Gallery of Art) -- only PD-Art over a term that
+  # has certainly expired. That is sound, and it is exactly the category
+  # `via.recipe.yaml` flags as most likely to move or change terms, which is
+  # the argument for holding a checked copy.
+  arva:
+    provider: wikimedia
+    title: "Lucas van Uden - Panoramic landscape with shepherds and peasants.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Lucas_van_Uden_-_Panoramic_landscape_with_shepherds_and_peasants.jpg
+    found_via: >
+      Commons, searching `Philips Koninck panoramic landscape`, `Ruisdael
+      panoramic landscape fields`, `Hobbema landscape countryside` and three
+      more phrasings -- naming the painter again, which is the fourth time
+      this directory has recorded that as the search that works. Fourteen free
+      and wide candidates; six fetched and measured with a card stood in them.
+    licence: Public domain
+
+outputs:
+  # 880 wide, matching the four scenes it stands beside, so nothing jumps.
+  #
+  # 37 KB at quality 80 -- the smallest picture in this directory, and it is a
+  # fact about the subject: a hazy Flemish distance has no hard edge anywhere
+  # in it for a codec to spend bytes on. That is convenient rather than lucky,
+  # since this is the plate drawn most often.
+  - file: arva.webp
+    from: arva
+    ops:
+      # From x 0.42 rightward: the spire goes to the rim and the card gets open
+      # fields. Argued in the header; four windows were compared.
+      - crop: {frac_box: [0.42, 0.0, 1.0, 1.0]}
+      - resize: {width: 880}
+    encode: {format: webp, quality: 80}
+    expect: {width: 880, height: 488, budget_kb: 55, metadata: none}

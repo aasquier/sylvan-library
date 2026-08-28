@@ -135,7 +135,7 @@ import { shortName } from './theater'
  *   is not one.
  */
 export type Manner = 'cast' | 'made' | 'put' | 'attach' | 'sacrificed'
-  | 'dies' | 'exiled' | 'companion'
+  | 'dies' | 'exiled' | 'companion' | 'land'
 
 /** Which beats get the middle of the arena.
  *
@@ -227,6 +227,13 @@ export function mannerOf(kind: string, card?: ForgeBoardCard | null,
   entered?: string): Manner | null {
   switch (kind) {
     case 'cast': return 'cast'
+    // **A land is the commonest beat in the room** — 11 a game, measured, and
+    // in one real match more land drops than casts. It drew nothing for
+    // exactly that reason, and that rule is lifted deliberately (Aaron,
+    // 2026-08-28) rather than forgotten. What keeps it from being the arena
+    // flashing at somebody every turn is length, not silence: see
+    // `STAGE_LIFE.land` and `LAND_BEATS`.
+    case 'land': return 'land'
     case 'dies': return 'dies'
     case 'exiled': return 'exiled'
     case 'attach': return 'attach'
@@ -344,7 +351,8 @@ export function castType(types: string | undefined): string | null {
  * for all of them until today — the card, its light and its plate, which is
  * complete on its own.
  */
-export type Scene = 'road' | 'crypt' | 'field' | 'forge' | 'temple' | 'veiling'
+export type Scene = 'arva' | 'road' | 'crypt' | 'field' | 'forge' | 'temple'
+  | 'veiling'
   | 'tower' | 'magician'
 
 /** Whether a type line is an Aura, which is the one subtype this file reads.
@@ -376,6 +384,11 @@ Scene | null {
     // through to `castType` below and lands on the forge, which is where a
     // sword comes from.
     case 'attach': return isAura(types) ? 'veiling' : null
+    // **A land opens the country it came from**, and it is the one manner that
+    // answers before the kind is consulted — a land is a land, and there is no
+    // sub-question to ask about what sort. The land row on the board is the
+    // only other place this room says anything about them at all.
+    case 'land': return 'arva'
     // Arrivals and castings: the kind decides.
     case 'cast': case 'put': case 'made': break
     default: return null
@@ -410,6 +423,13 @@ const STAGE_LIFE: Record<Manner, number> = {
      casts and a dozen deaths — so it is the shortest, for the same reason
      `MARK_LIFE` keeps the attack lamp shortest of its three. */
   cast: 1150,
+  /** **The shortest moment on this stage, and it has to be.** A cast is 1150
+   *  and a land is two thirds of it. Nobody needs to *read* a land: they need
+   *  to see the country it came from and get on with the turn, which is the
+   *  same argument the mana flash makes at 760 for the same reason — a row of
+   *  pips is counted, not read. Long enough to know a Forest from a Wastes;
+   *  gone before the next thing happens. */
+  land: 780,
   /* A cast plus a moment, and the moment is the number. A pile of tokens says
      one thing a single card does not — *how many* — and a count is read after
      the name rather than with it, so it needs the eye to come back. */
@@ -464,6 +484,12 @@ const STAGE_LIFE: Record<Manner, number> = {
  *  Lightning Bolt filling the arena while eight later beats went past behind
  *  it — which is the exact failure Aaron named, in reverse. */
 const STAGE_BEATS = 4
+/** How many beats a land may outlive its own, which is half what everything
+ *  else gets. At watching pace this binds at 960ms and the land is already
+ *  gone; at the fast end it cuts hard, which is the point — a beat that
+ *  happens every turn must never be the thing still on screen when the turn
+ *  after it starts. */
+const LAND_BEATS = 2
 /** ...and the floor under it, so no pace can cut a reveal down to a strobe. A
  *  card is either shown to somebody or it is not; half a fade is worse than
  *  nothing, because it draws the eye to a thing that is already gone. */
@@ -501,6 +527,10 @@ export function stageLife(manner: Manner, speed: Speed,
   dies: number | null): number {
   if (manner === 'dies') return dies ?? STAGE_LIFE.dies
   const beat = beatDelay(speed)
+  // A land keeps its own, tighter cap: see `LAND_BEATS`.
+  if (manner === 'land' && beat !== 0) {
+    return Math.max(STAGE_FLOOR, Math.min(STAGE_LIFE.land, beat * LAND_BEATS))
+  }
   // Paused is not a slow pace, it is the absence of one: nothing is draining,
   // so there is nothing for the card to outlive and nothing to cap it against.
   if (beat === 0) return STAGE_LIFE[manner]
@@ -564,6 +594,10 @@ export function stageLife(manner: Manner, speed: Speed,
 export const PLATE: Record<Manner, { by: ((who: string) => string) | null;
   alone: string }> = {
   cast: { by: (who) => `${who} casts`, alone: 'Cast' },
+  // Magic's own verb. A land is *played*, never cast — it does not use the
+  // stack, and a room that said "casts" here would be teaching a newcomer the
+  // one thing about lands that most often has to be un-taught.
+  land: { by: (who) => `${who} plays`, alone: 'Land' },
   made: { by: (who) => `${who} makes`, alone: 'Made' },
   /* The `alone` form carries the destination and the `by` form does not, which
      looks like an asymmetry and is one sentence read twice: "Gyome puts /

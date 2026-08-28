@@ -15546,3 +15546,68 @@ button:hover .tarot-fan-card {
   }
   .stage-bout-skull { transform: translate(-50%, -50%); }
 }
+
+/* --------------------------------------------------- the country
+ *
+ * **Where a land came from** (Aaron, 2026-08-28: *"a good animation for when
+ * lands are played, like some rolling hills or farmland maybe"*).
+ *
+ * This reverses a rule the room set on purpose: land drew nothing, because a
+ * land arrives every turn and a scene on every drop is the arena flashing at
+ * somebody for the most ordinary thing in Magic. The frequency in that
+ * argument is real and was measured again before this shipped — **11 a game,
+ * and in one real match more land drops than casts**, the commonest beat that
+ * could carry a scene. What answers it is length and calm rather than
+ * silence.
+ *
+ * So this is the quietest thing in the room, three ways:
+ *
+ *  - **Shortest.** 780ms against a cast's 1150, capped at two beats where
+ *    everything else gets four (`STAGE_LIFE.land`, `LAND_BEATS`).
+ *  - **Stillest.** No dust, no sparks, no turning ring. Every other scene
+ *    marks something *happening*; a land is somewhere *being*, and the only
+ *    movement is the ground settling a few pixels as it arrives.
+ *  - **Softest.** Held back to 0.72 and masked wider than any other scene, so
+ *    it reads as distance behind the card rather than as a picture demanding
+ *    to be looked at. `via` at mean 128 is the brightest scene this room
+ *    ships; this plate is 116 and still gets the hold-back, because it is the
+ *    one that appears over and over. */
+.stage-card.is-land { --stage-glow: var(--vine); }
+.stage-arva {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: stage-field-open var(--stage-life, 780ms) ease-out both;
+}
+.stage-arva-art {
+  width: min(100%, 940px);
+  aspect-ratio: 880 / 488;
+  object-fit: cover;
+  /* Wider and softer than the arrival scenes': there is no subject in this
+     picture to protect, and the point is that the edges are already gone. */
+  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 50%,
+    #000 0%, #000 52%, rgba(0, 0, 0, 0.45) 80%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 58% at 50% 50%,
+    #000 0%, #000 52%, rgba(0, 0, 0, 0.45) 80%, transparent 100%);
+  opacity: 0.72;
+  animation: stage-arva-settle var(--stage-life, 780ms) ease-out both;
+}
+/* The ground settling, and that is the whole of the motion. A few pixels of
+   rise where the other scenes push in from 1.06 — a field does not arrive. */
+@keyframes stage-arva-settle {
+  0%   { opacity: 0; transform: translateY(6px) scale(1.015); }
+  30%  { opacity: 0.72; transform: translateY(0) scale(1); }
+  74%  { opacity: 0.72; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Already almost still; what goes is the settle. `stage-still` rather than
+     `animation: none`, for the scenes' shared reason — the element's life is
+     the animation's length. */
+  .stage-arva { animation: stage-still var(--stage-life, 780ms) linear both; }
+  .stage-arva-art { animation: none; opacity: 0.72; }
+}
