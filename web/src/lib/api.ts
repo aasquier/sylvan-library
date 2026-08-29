@@ -3015,7 +3015,14 @@ export const api = {
   //
   // `rationales` is the only action the server can refuse outright: drafting a
   // `why` needs a stance whose write axis is above `none`, so the control for
-  // it is not offered below that and a 422 here means the page was stale.
+  // it is not offered below that.
+  //
+  // **A 422 here does NOT mean the page was stale**, which is what this said
+  // until 2026-08-29 and what made the real cause so hard to see. The server
+  // re-resolves the stance from `body.stance`, so the commoner reading is that
+  // the submit did not carry the stance the sheet made its decision with —
+  // which is exactly what the import page did from the day ADR 41 landed. A
+  // stale page is the *other* reading, and the rarer one.
   intake: (ref: DeckRef, body: IntakeSheet) =>
     post<Job>(deckPath(ref, '/intake'), body),
   // The commander dossier, in two halves that are deliberately different verbs.

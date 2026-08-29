@@ -7,6 +7,11 @@ vi.mock('../lib/api', async () => ({
   api: { claudeStatus: vi.fn() },
 }))
 
+// Written before `./intake` is pulled in, and that ordering is the point:
+// `lib/stance` reads the stored pin once, at module load, and keeps it outside
+// React. A `setItem` after the import would be a preference nothing had read.
+localStorage.setItem('mtglab-stance', 'collaborator')
+
 const { api } = await import('../lib/api')
 const { IntakeChoices } = await import('./intake')
 
@@ -197,5 +202,67 @@ describe('when the dial cannot be read', () => {
     await waitFor(() =>
       expect(screen.getByText(/exactly as you pasted it/)).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Sort the cards' })).toBeNull()
+  })
+})
+
+/**
+ * **The bug Aaron hit on 2026-08-29**: the sheet offered "Draft the reasons"
+ * and the server answered that his stance was set to change nothing.
+ *
+ * This component asked the dial with his pin and showed the toggle because the
+ * answer said that stance may write. The page that submits asked nothing and
+ * sent nothing, so the server resolved the deck's own default — `consultant`,
+ * write `none` — and refused. One gate, two different questions.
+ *
+ * `onStance` is what closes it: the sheet reports the value it asked with, and
+ * whoever submits carries that one rather than fetching a second answer. What
+ * these tests hold is the *equality* — what went to the dial is what comes
+ * back out — because a report of some other correct-looking value would rebuild
+ * the bug while passing any assertion about a literal.
+ */
+describe('the stance the sheet decided with', () => {
+  afterEach(cleanup)
+  beforeEach(() => vi.mocked(api.claudeStatus).mockReset())
+
+  it('reports the stance it asked the dial with', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(status(true))
+    const onStance = vi.fn<(stance: string | undefined) => void>()
+    render(<IntakeChoices value={{}} onChange={vi.fn()} onStance={onStance} />)
+    await waitFor(() => expect(api.claudeStatus).toHaveBeenCalled())
+
+    const asked = vi.mocked(api.claudeStatus).mock.calls.at(-1)![0]!.stance
+    // The premise: a real pin is in play, so the equality below is not two
+    // undefineds agreeing — which is the state the broken page was in.
+    expect(asked).toBe('collaborator')
+    expect(onStance).toHaveBeenCalledWith(asked)
+  })
+
+  // A dial that will not answer still leaves four actions on the sheet, and
+  // they run at the user's stance like everything else. Reporting only on a
+  // successful answer would send those four with no stance at all — the same
+  // silence that caused this, narrowed rather than fixed.
+  //
+  // Resolves null rather than rejecting, for the reason the describe above
+  // gives: `status === null` is the state the component branches on, and it is
+  // what a failed read leaves behind, without handing the runner a rejection
+  // to count as an escape.
+  it('reports it even when the dial cannot be read', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(null as never)
+    const onStance = vi.fn<(stance: string | undefined) => void>()
+    render(<IntakeChoices value={{}} onChange={vi.fn()} onStance={onStance} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
+    expect(onStance).toHaveBeenCalledWith('collaborator')
+  })
+
+  // The sheet works without anybody listening: `onStance` is optional because
+  // the four ungated actions predate it, and a component that threw on a
+  // missing callback would take the whole import screen down with it.
+  it('renders perfectly well with nobody listening', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(status(true))
+    render(<IntakeChoices value={{}} onChange={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Draft the reasons' })).toBeTruthy())
   })
 })
