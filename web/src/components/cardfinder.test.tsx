@@ -14,12 +14,16 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { act, useState } from 'react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { CardOffer } from '../lib/api'
+import { ApiError, type CardOffer } from '../lib/api'
 import { CardFinder } from './cardfinder'
 
-vi.mock('../lib/api', () => ({
+// `ApiError` is real rather than stubbed: the finder now asks whether a
+// failure was a 401, and `e instanceof undefined` throws a TypeError -- which
+// would turn a handled failure into an unhandled one inside the handler.
+vi.mock('../lib/api', async () => ({
+  ...(await vi.importActual<typeof import('../lib/api')>('../lib/api')),
   api: { suggestCards: vi.fn() },
 }))
 
@@ -234,4 +238,63 @@ it('says which rows are guesses, once', async () => {
   await type('cultivater')
   await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(3))
   expect(screen.getAllByText('did you mean')).toHaveLength(1)
+})
+
+// ---- a failure is not an absence -------------------------------------------
+
+// **The bug Aaron hit on 2026-08-29**, reported as "it said even Sol Ring was
+// not found". The box had one empty state and every failure fell into it: a
+// 401, a 500, a server restarting through a deploy and a genuinely unknown
+// card all produced "no card in the library is spelled anything like that".
+//
+// That sentence is a claim about the library, made by something that could not
+// reach the library. These tests are the guard: a failure has to say it was a
+// failure, and it must never say anything about the card that was typed.
+describe('when the library cannot be reached', () => {
+  it('does not claim the card does not exist', async () => {
+    suggestCards.mockRejectedValue(new Error('connection reset'))
+    render(<CardFinder value={null} onChange={() => {}} identity={[]} />)
+    await type('Sol Ring')
+
+    expect(screen.queryByText(/spelled anything like that/)).toBeNull()
+    expect(screen.getByText(/did not answer just then/)).toBeTruthy()
+    // Twice on purpose: the note somebody reads and the live region somebody
+    // hears. A failure that is only visible is a failure a screen reader meets
+    // as silence, which is the state this whole component exists to end.
+    expect(screen.getAllByText(/says nothing about the card you typed/))
+      .toHaveLength(2)
+  })
+
+  it('names a lost session, because that one has a next step in it', async () => {
+    suggestCards.mockRejectedValue(new ApiError('authentication required', 401))
+    render(<CardFinder value={null} onChange={() => {}} identity={[]} />)
+    await type('Sol Ring')
+
+    expect(screen.getByText(/signed out/)).toBeTruthy()
+    expect(screen.getByText(/nothing you typed here has been lost/)).toBeTruthy()
+    expect(screen.queryByText(/spelled anything like that/)).toBeNull()
+  })
+
+  it('still says nothing matched when the library really answered nothing', async () => {
+    suggestCards.mockResolvedValue({ cards: [] })
+    render(<CardFinder value={null} onChange={() => {}} identity={[]} />)
+    await type('qqqqzzz')
+
+    expect(screen.getByText(/spelled anything like that/)).toBeTruthy()
+    expect(screen.queryByText(/did not answer just then/)).toBeNull()
+  })
+
+  // A failure followed by a good answer must clear, or one blip poisons the
+  // box until it is closed.
+  it('recovers on the next answer', async () => {
+    suggestCards.mockRejectedValue(new Error('down'))
+    render(<CardFinder value={null} onChange={() => {}} identity={[]} />)
+    await type('Sol')
+    expect(screen.getByText(/did not answer just then/)).toBeTruthy()
+
+    suggestCards.mockResolvedValue({ cards: [SOL] })
+    await type('Sol Ring')
+    expect(screen.queryByText(/did not answer just then/)).toBeNull()
+    expect(screen.getByText('Sol Ring')).toBeTruthy()
+  })
 })
