@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type ClaudeStatus, type IntakeSheet } from '../lib/api'
 import { fetchClaudeStatus, useStance } from '../lib/stance'
 
@@ -22,6 +22,28 @@ import { fetchClaudeStatus, useStance } from '../lib/stance'
  * A disabled toggle would be the wrong answer twice over. It reads as "this is
  * broken" rather than "you turned this off", and a control nobody can reach is
  * a control that owes an explanation more than it owes a place in the row.
+ *
+ * ## Why the sheet hands its stance back up
+ *
+ * This component is the only thing that talks to the dial, and the dial's
+ * answer is what decides whether the drafting toggle is on the screen at all.
+ * The submit is a *different* request from a different file, and the server
+ * resolves the stance for it all over again — so unless one value reaches
+ * both, the sheet and the server hold two opinions about one permission.
+ *
+ * **They did, from the day ADR 41 landed.** The import page sent no stance at
+ * all, the server fell back to the deck's own default (`consultant`, which
+ * writes nothing), and every user whose dial permitted a write was offered the
+ * toggle here and refused by the server the moment they used it. Aaron hit it
+ * on 2026-08-29; nothing had ever drafted a rationale from this screen.
+ *
+ * So `onStance` reports the value this sheet asked the dial with, and the
+ * submit sends that one. Reported rather than read a second time on purpose: a
+ * parent that fetched the pin again would be answering a question this
+ * component has already asked, which is the same bug wearing a different file
+ * name and one refactor away from diverging again. `runIntake` takes the
+ * stance as a **required** parameter for the same reason — a call site can no
+ * longer forget it without the typechecker saying so.
  *
  * ## Why each one says what it does rather than what it is called
  *
@@ -78,12 +100,17 @@ const ACTIONS: {
   },
 ]
 
-export function IntakeChoices({ value, onChange, slug, owner }: {
+export function IntakeChoices({ value, onChange, onStance, slug, owner }: {
   value: IntakeSheet
   /** A functional update, and deliberately not a plain value: two chips
    *  toggled inside one frame would otherwise both read the same stale
    *  `value` prop and the first would be lost. Pass a `useState` setter. */
   onChange: (update: (prev: IntakeSheet) => IntakeSheet) => void
+  /** Told the stance this sheet asked the dial with, so the submit can carry
+   *  the same one. `undefined` is a position — "no pin, let the surface
+   *  default" — and not an absence. See the note above on why this travels
+   *  upward instead of being read again by whoever submits. */
+  onStance?: (stance: string | undefined) => void
   /** The deck this will run against, so the stance is the deck's own. Empty
    *  before a slug is chosen, which is fine: the dial answers without one. */
   slug?: string
@@ -93,7 +120,23 @@ export function IntakeChoices({ value, onChange, slug, owner }: {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [asked, setAsked] = useState(false)
 
+  // **The callback in a ref, and kept out of the effect below's dependencies.**
+  // It is reported from inside the effect that asks the dial, so a caller who
+  // passes an inline arrow would change its identity on every render and turn
+  // one question to the dial into an unbounded stream of them. A doc comment
+  // asking for a stable callback is not a mechanism; this is.
+  const report = useRef(onStance)
+  useEffect(() => { report.current = onStance })
+
   useEffect(() => {
+    // **Reported as the question is asked, not once the answer arrives.** This
+    // is the value the dial is being asked with, and the submit has to carry
+    // the same one whatever comes back — including when nothing does, because
+    // the four ungated actions still run and the user's dial still applies to
+    // them. `fetchClaudeStatus` may drop a pin this build no longer serves,
+    // which changes `pin` and re-runs this effect, so the parent is corrected
+    // by the same path that healed it.
+    report.current?.(pin ?? undefined)
     let live = true
     void (async () => {
       try {

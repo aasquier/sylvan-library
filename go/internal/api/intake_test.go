@@ -52,6 +52,59 @@ func TestDraftingARationaleNeedsAStanceThatAllowsAWrite(t *testing.T) {
 	}
 }
 
+// The same refusal, read as the person on the other end of it reads it.
+//
+// **It is still a refusal.** The client learning to send the stance it decided
+// with does not soften ADR 41's second gate by a hair -- a genuinely low dial
+// still gets nothing, which is what the test above holds. This one is about
+// the sentence, which was poor on two counts and both of them are
+// commandments.
+//
+// It said what was wrong and never what to do, so a person could read it
+// twice and still not know where to go (commandment 2) -- and the place to go
+// is a control the sheet already names in as many words, three lines away in
+// `web/src/components/intake.tsx`. And it rendered `why`, a field out of the
+// deck file, to somebody who came here to play Magic (commandment 10).
+//
+// It also lands on a red box under an Import button that has already
+// succeeded: the deck exists by the time this route runs. Saying so first is
+// not decoration.
+func TestTheRefusalSaysWhereToGoAndNamesNothingFromTheFile(t *testing.T) {
+	t.Parallel()
+	rig := newJobRig(t, noCredential)
+	defer rig.close()
+
+	_, payload, _ := intake(t, rig, `{"rationales":true,"stance":"consultant"}`)
+	detail := fmtDetail(payload)
+
+	// The deck is safe, said before anything else: this reaches somebody who
+	// has just pressed Import and is looking at an error.
+	if !strings.Contains(detail, "landed safely") {
+		t.Errorf("the refusal never says the deck itself is fine: %q", detail)
+	}
+	// Where the setting is and which way to move it. A refusal that names
+	// neither is a diagnosis, not an answer.
+	for _, want := range []string{"stance dial", "settings panel", "Raise it"} {
+		if !strings.Contains(detail, want) {
+			t.Errorf("the refusal never says %q, so it leaves no way out: %q",
+				want, detail)
+		}
+	}
+	// Commandment 10: nothing out of the deck file, and no identifier that
+	// only exists inside this repository.
+	//
+	// "rationale" is deliberately NOT on this list. It is a word the product
+	// says to players -- the deck page's own banner reads "every card carries
+	// a rationale" -- and banning it here would leave the next reader thinking
+	// the app's vocabulary was the problem. The problem was `why`, which is a
+	// key in a file nobody but us reads.
+	for _, leak := range []string{"`why`", "why_by", "MayWrite", "stance\":", "422"} {
+		if strings.Contains(detail, leak) {
+			t.Errorf("the refusal shows the machinery (%q): %q", leak, detail)
+		}
+	}
+}
+
 // The four actions that were always inside the rules are not gated on the
 // write axis, because they are not the thing ADR 41 narrowed. Filing a card
 // and describing a deck are fields a person sets; a rationale is a claim about

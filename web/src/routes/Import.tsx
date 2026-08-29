@@ -101,6 +101,17 @@ export default function Import() {
   // remembered its last state would be a standing permission rather than an
   // answer about this deck.
   const [sheet, setSheet] = useState<IntakeSheet>({})
+  // The stance the sheet asked the dial with, handed up by the sheet itself.
+  //
+  // **One value has to decide both halves of ADR 41's second gate.** The sheet
+  // shows the drafting toggle because the dial said this stance may write; the
+  // server refuses the drafting unless the stance it is *sent* says the same.
+  // This page used to send none, so the server resolved the deck's own default
+  // — `consultant`, which writes nothing — and refused work the sheet had just
+  // offered. Reading the pin again here would be this page answering a
+  // question the sheet has already asked, which is the same bug one refactor
+  // later; the sheet reports what it asked with and this carries it through.
+  const [sheetStance, setSheetStance] = useState<string | undefined>(undefined)
   const [intake, setIntake] = useState<Job | null>(null)
 
   // Typing a name fills the slug, until the slug is edited by hand.
@@ -188,7 +199,7 @@ export default function Import() {
         // them — ninety-nine rationales appearing one reload at a time, with
         // nothing on screen saying why.
         const started = await runIntake(
-          { owner: result.owner, slug: result.slug }, sheet)
+          { owner: result.owner, slug: result.slug }, sheet, sheetStance)
         if (started) {
           setIntake(started)
           await followJob(started.id, setIntake, 400, started).promise
@@ -415,7 +426,12 @@ export default function Import() {
                 deck". The `intake` surface exists precisely so the dial can
                 answer without a deck; passing a name that is not one yet
                 undoes that. */}
-            <IntakeChoices value={sheet} onChange={setSheet} />
+            {/* `onStance` is a `useState` setter, so its identity is stable —
+                the sheet holds it in a ref rather than in the dependency list
+                that drives the dial, but a stable callback is the right thing
+                to hand it regardless. */}
+            <IntakeChoices value={sheet} onChange={setSheet}
+                           onStance={setSheetStance} />
           </div>
         </section>
       </div>

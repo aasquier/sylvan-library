@@ -108,13 +108,33 @@ func (a *API) intakeDeck(w http.ResponseWriter, r *http.Request) {
 	//
 	// Refused rather than silently dropped: somebody who ticked the box and
 	// got a deck full of blanks back would reasonably conclude the feature is
-	// broken, and the honest answer names the setting that decided it. The UI
-	// does not offer the toggle at this stance, so reaching this is either a
-	// stale page or a direct call -- and both deserve the sentence.
+	// broken, and the honest answer names the setting that decided it.
+	//
+	// **There are three ways to arrive here, and this comment used to list
+	// two.** A stale page and a direct call were the ones anticipated; the
+	// third was a submit that never carried the stance its own sheet had
+	// decided with, and it was the only one that ever happened. The import
+	// page sent no `stance` at all from the day ADR 41 shipped, so this line
+	// resolved the deck's default -- `consultant`, write `none` -- and refused
+	// a control the sheet had just offered. Fixed on the client, where the
+	// fault was; the gate is unchanged and stays exactly this strict.
+	//
+	// The sentence is the reason it took so long to see. It said what was
+	// wrong and not what to do, and it named a field out of the deck file to a
+	// player (commandment 10), so it read as a malfunction rather than as a
+	// setting. What replaces it names the control, says where it lives, says
+	// which position the reader is on, and says what raising it does -- and it
+	// leads on the deck being safe, because this refusal reaches somebody who
+	// has just pressed Import and is looking at a red box (commandment 2).
 	if actions.Rationales && !effective.MayWrite() {
 		wire.Detail(w, http.StatusUnprocessableEntity,
-			"drafting rationales needs a stance that allows a write; yours is set "+
-				"to change nothing, so nothing here will write a `why` for you")
+			"Your deck landed safely, and nothing on the sheet ran: Claude may "+
+				"not draft the reasons for your cards while your settings say it "+
+				"may not change anything. That is the write setting on the stance "+
+				"dial, in the settings panel, and yours is on its lowest "+
+				"position — nothing; it talks, you type. Raise it and the "+
+				"drafting is offered on your next import; leave it and the "+
+				"reasons stay yours to write on the deck page.")
 		return
 	}
 

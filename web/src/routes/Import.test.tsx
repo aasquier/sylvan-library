@@ -10,7 +10,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ImportResult } from '../lib/api'
+import type { ClaudeStatus, ImportResult, Job, StanceView } from '../lib/api'
 import Import from './Import'
 
 const navigate = vi.fn()
@@ -26,11 +26,18 @@ vi.mock('../lib/api', async () => ({
   // would let this navigate to the pre-ADR-22 path with every test passing.
   deckUrl: (await vi.importActual<typeof import('../lib/api')>(
     '../lib/api')).deckUrl,
-  api: { importDeck: vi.fn() },
+  // `claudeStatus` and `intake` are the two halves of ADR 41's second gate as
+  // this page meets it: one decides what the sheet shows, the other carries
+  // the submit. They are mocked side by side because the question worth asking
+  // is whether the same value reaches both.
+  api: { importDeck: vi.fn(), claudeStatus: vi.fn(), intake: vi.fn() },
+  // Stubbed: this file asks what the page *sends*, and the real poller would
+  // put a timer between the click and the assertion for nothing.
+  followJob: vi.fn(),
   ApiError: class extends Error {},
 }))
 
-const { api } = await import('../lib/api')
+const { api, followJob } = await import('../lib/api')
 
 function result(overrides: Partial<ImportResult> = {}): ImportResult {
   return {
@@ -62,6 +69,30 @@ function result(overrides: Partial<ImportResult> = {}): ImportResult {
   }
 }
 
+function stanceView(preset: string, mayWrite: boolean): StanceView {
+  return { preset, allows_calls: true, may_write: mayWrite, axes: [] }
+}
+
+/** What the dial answers the intake sheet. `mayWrite` is the whole gate: it
+ *  decides whether "Draft the reasons" is on the screen at all. */
+function dial(mayWrite: boolean): ClaudeStatus {
+  return {
+    installed: true, configured: true, model: 'claude-sonnet-5',
+    stance: stanceView('collaborator', mayWrite),
+    ceiling: stanceView('collaborator', true),
+    default: stanceView('consultant', false),
+    presets: [], never: '', modes: [],
+  }
+}
+
+function job(): Job {
+  return {
+    id: 'j1', kind: 'claude.intake', status: 'done', done: 1, total: 1,
+    percent: 100, label: 'intake: cats', result: null, partial: null,
+    error: null, created_at: '2026-08-29T00:00:00Z',
+  }
+}
+
 function renderImport() {
   return render(<MemoryRouter><Import /></MemoryRouter>)
 }
@@ -70,9 +101,42 @@ function paste(text: string) {
   fireEvent.change(screen.getByLabelText('Decklist'), { target: { value: text } })
 }
 
+/**
+ * Pin the dial the way a person does, and wait until the sheet has heard.
+ *
+ * `lib/stance` keeps the pin outside React and re-reads it on a `storage`
+ * event, which is how a second tab corrects this one — so writing the
+ * preference and firing the event drives the real mechanism instead of
+ * reaching past it. It only works while something is subscribed, which is why
+ * every caller renders the page first.
+ *
+ * The wait is on the dial having been *re-asked* with the new pin, because
+ * that request is the one whose answer decides what the sheet shows. Anything
+ * asserted before it would be asserted against the previous answer.
+ */
+async function pinTheDial(preset: string) {
+  localStorage.setItem('mtglab-stance', preset)
+  window.dispatchEvent(new StorageEvent('storage', { key: 'mtglab-stance' }))
+  await waitFor(() => expect(
+    vi.mocked(api.claudeStatus).mock.calls.at(-1)?.[0]?.stance).toBe(preset))
+}
+
+/** What the dial was last asked with — the request whose answer is on screen. */
+function decidedWith(): string | undefined {
+  return vi.mocked(api.claudeStatus).mock.calls.at(-1)?.[0]?.stance
+}
+
 beforeEach(() => {
   navigate.mockReset()
   vi.mocked(api.importDeck).mockReset().mockResolvedValue(result())
+  // A dial that answers, and answers "may not write" — the position most
+  // people are on, and the one that keeps the drafting toggle off the screen
+  // for every test that is not about it.
+  vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(dial(false))
+  vi.mocked(api.intake).mockReset().mockResolvedValue(job())
+  vi.mocked(followJob).mockReset().mockReturnValue({
+    promise: Promise.resolve(job()), cancel: () => {},
+  })
 })
 
 afterEach(cleanup)
@@ -475,5 +539,98 @@ describe('names that were read', () => {
     await waitFor(() =>
       expect(screen.getByText(/85 cards still need a/)).toBeTruthy())
     expect(screen.queryByText(/arrived with your reason/)).toBeNull()
+  })
+})
+
+/**
+ * **The bug Aaron hit on 2026-08-29**, and the shape of the test that would
+ * have caught it.
+ *
+ * He set the dial to a stance that may write, ticked "Draft the reasons" on
+ * the import sheet, and was told his stance "is set to change nothing". It was
+ * not. The sheet asked the dial *with his pin* and showed the toggle because
+ * the answer said it may write; the submit sent no stance at all, so the
+ * server resolved the deck's own default — `consultant`, write `none` — and
+ * refused. Two requests, two different questions, one gate.
+ *
+ * So what is pinned here is not a value but an **equality**: the stance the
+ * sheet made its decision with is the stance the submit carries. Asserting
+ * against a literal would pass against a page that hardcoded one, which is why
+ * the last test changes the dial underneath the page and asks again — a page
+ * that captured the pin once, or that read it a second time for itself, gets
+ * through the first test and falls over on that one.
+ *
+ * Everything here drives the real mechanism: the real `IntakeChoices`, the
+ * real stance store, the real `runIntake`. Nothing is asserted about a call
+ * that was made by hand.
+ */
+describe('the stance that decided the sheet', () => {
+  async function pasteAndPin(preset: string) {
+    vi.mocked(api.importDeck).mockResolvedValue(result({ created: true }))
+    renderImport()
+    paste('1 Sol Ring')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    // Rendered first, so the store has a subscriber to tell.
+    await screen.findByRole('button', { name: 'Sort the cards' })
+    await pinTheDial(preset)
+  }
+
+  it('submits the drafting with the stance the sheet asked the dial with',
+     async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(dial(true))
+    await pasteAndPin('collaborator')
+
+    // The toggle exists only because the dial said this stance may write.
+    fireEvent.click(await screen.findByRole('button', { name: 'Draft the reasons' }))
+    fireEvent.click(screen.getByText('Import as draft'))
+    await waitFor(() => expect(api.intake).toHaveBeenCalled())
+
+    // The premise, stated so the equality below cannot be satisfied by two
+    // undefineds agreeing with each other — which is exactly what the broken
+    // version did on a page whose user had never touched the dial.
+    expect(decidedWith()).toBe('collaborator')
+
+    const sent = vi.mocked(api.intake).mock.calls[0]![1]
+    expect(sent.rationales).toBe(true)
+    expect(sent.stance).toBe(decidedWith())
+  })
+
+  // The miss path, which is the half a shallower test leaves out. Below the
+  // write axis there is nothing to tick — and the four actions that were never
+  // gated still travel with the same stance, because the dial is the user's
+  // and it applies to all five.
+  it('offers no drafting below the write axis, and still carries the stance',
+     async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(dial(false))
+    await pasteAndPin('consultant')
+
+    expect(screen.queryByRole('button', { name: 'Draft the reasons' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Sort the cards' }))
+    fireEvent.click(screen.getByText('Import as draft'))
+    await waitFor(() => expect(api.intake).toHaveBeenCalled())
+
+    const sent = vi.mocked(api.intake).mock.calls[0]![1]
+    expect(sent.rationales).toBeUndefined()
+    expect(sent.categories).toBe(true)
+    expect(decidedWith()).toBe('consultant')
+    expect(sent.stance).toBe(decidedWith())
+  })
+
+  // **One value, and it is the sheet's own.** The dial moves — another tab,
+  // the settings panel, a pin this build refused and dropped — the sheet asks
+  // again, and the submit has to follow it there. A page holding its own copy
+  // of the answer is the bug this whole file is about, one refactor later.
+  it('follows the dial when it moves under the page', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(dial(true))
+    await pasteAndPin('collaborator')
+    fireEvent.click(await screen.findByRole('button', { name: 'Draft the reasons' }))
+
+    await pinTheDial('second-opinion')
+    fireEvent.click(screen.getByText('Import as draft'))
+    await waitFor(() => expect(api.intake).toHaveBeenCalled())
+
+    const sent = vi.mocked(api.intake).mock.calls[0]![1]
+    expect(decidedWith()).toBe('second-opinion')
+    expect(sent.stance).toBe('second-opinion')
   })
 })
