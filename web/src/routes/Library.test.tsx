@@ -10,7 +10,7 @@
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DeckTile, Health } from '../lib/api'
+import type { DeckTile, EntombedDeck, Health } from '../lib/api'
 import Library from './Library'
 
 vi.mock('../lib/api', async () => ({
@@ -19,7 +19,8 @@ vi.mock('../lib/api', async () => ({
   // path while every assertion below still passed.
   deckUrl: (await vi.importActual<typeof import('../lib/api')>('../lib/api')).deckUrl,
   api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn(),
-         colors: vi.fn(), lore: vi.fn() },
+         colors: vi.fn(), lore: vi.fn(),
+         entombed: vi.fn(), returnEntombed: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
@@ -89,9 +90,17 @@ beforeEach(() => {
   vi.mocked(api.health).mockReset().mockResolvedValue(HEALTHY)
   vi.mocked(api.deleteDeck).mockReset().mockResolvedValue({
     slug: 'goreclaw', name: 'Goreclaw', deleted: true,
-    moved_to: 'decks/.trash/goreclaw-20260811T220000Z',
+    // Two fields, and the handle is opaque on purpose: it names an entry in
+    // the crypt and nothing else. This used to be `moved_to:
+    // 'decks/.trash/goreclaw-20260811T220000Z'` and the page printed it.
+    recoverable: true, crypt_id: 'a1b2c3d4e5f60718',
     total_cards: 99, stage: 'curated', status: 'built',
   })
+  // An empty crypt is the default, so the tests that are not about the crypt
+  // describe a library nobody has deleted anything from.
+  vi.mocked(api.entombed).mockReset().mockResolvedValue({ entombed: [] })
+  vi.mocked(api.returnEntombed).mockReset().mockResolvedValue(
+    { slug: 'goreclaw', name: 'Goreclaw', restored: true })
   // The shelf-fact strip is decorative and must never block the shelf, so
   // the default here is the shelves failing to load. The one test about the
   // strip supplies its own.
@@ -473,8 +482,16 @@ describe('Library mana pips', () => {
  * an "Are you sure?" is answered identically by someone who read it and
  * someone who clicked through it. These tests pin that the button stays
  * disabled until the answer matches, that cancelling calls nothing, and that
- * the response's `moved_to` is shown — a deletion is only survivable if you
- * can see where it went.
+ * **the way back is on screen** — a deletion is only survivable if you can get
+ * the deck back.
+ *
+ * That last clause used to be *"if you can see where it went"*, and it was
+ * satisfied by printing `decks/.trash/goreclaw-20260811T220000Z` on the page
+ * with the advice that the deletion was "reversible from the shell". The
+ * requirement was right and the answer was a leak (commandment 10) and, for
+ * anybody without a terminal, no answer at all. Same requirement, met with a
+ * button: `denies the player a path` holds the leak closed, and `offers the
+ * way back` holds the requirement it was standing in for.
  *
  * Two of them are regression tests for the same bug, and it is worth naming
  * because it did not look like a bug. The dialog used to demand the slug in a
@@ -548,16 +565,62 @@ describe('Library deck deletion', () => {
       expect.objectContaining({ owner: 'aasquier', slug: 'goreclaw' }), 'bury'))
   })
 
-  it('drops the deck from the shelf and says where it went', async () => {
-    const dialog = await openDialogFor('Goreclaw')
+  async function entomb(name: string) {
+    const dialog = await openDialogFor(name)
     fireEvent.change(within(dialog).getByRole('textbox'),
-                     { target: { value: 'goreclaw' } })
+                     { target: { value: 'bury' } })
     fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
+  }
+
+  it('drops the deck from the shelf and offers the way back', async () => {
+    await entomb('Goreclaw')
 
     await waitFor(() => expect(shownNames()).toEqual(['Arahbo', 'Tivit']))
     // "Deleted" and "recoverable" are separate facts, and the second one is
     // the reason anyone presses the button without dread.
-    expect(screen.getByText(/decks\/\.trash\/goreclaw-/)).toBeTruthy()
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toMatch(/rests in your crypt/i)
+    const back = within(notice).getByRole('button', { name: /return it/i })
+
+    fireEvent.click(back)
+    await waitFor(() =>
+      expect(api.returnEntombed).toHaveBeenCalledWith('a1b2c3d4e5f60718'))
+  })
+
+  // **The regression.** Nothing about a deletion tells the player where their
+  // deck is on a disk, or suggests they open a shell — not the dialog they
+  // read before pressing the button, and not the notice they read after.
+  it('denies the player a path, a trash directory or a shell', async () => {
+    const dialog = await openDialogFor('Goreclaw')
+    const forbidden = /\.trash|decks\/|shell|terminal|filesystem|file system|directory|folder/i
+    expect(dialog.textContent ?? '').not.toMatch(forbidden)
+
+    fireEvent.change(within(dialog).getByRole('textbox'),
+                     { target: { value: 'bury' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent ?? '').not.toMatch(forbidden)
+    // And the opaque handle is a handle, not a caption: it is passed to the
+    // server and never drawn.
+    expect(notice.textContent ?? '').not.toContain('a1b2c3d4e5f60718')
+  })
+
+  // A server that buried the deck but could not hand back a handle says so by
+  // omission, and the page says the true thing instead of offering a button
+  // that cannot work. The claim "there is no way back" would be false, and is
+  // not made.
+  it('points at the crypt when no handle came back', async () => {
+    vi.mocked(api.deleteDeck).mockResolvedValue({
+      slug: 'goreclaw', name: 'Goreclaw', deleted: true,
+      recoverable: false, crypt_id: '',
+      total_cards: 99, stage: 'curated', status: 'built',
+    })
+    await entomb('Goreclaw')
+
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toMatch(/raise it again from the Crypt tab/i)
+    expect(within(notice).queryByRole('button', { name: /return it/i })).toBeNull()
   })
 
   it('cancelling deletes nothing', async () => {
@@ -747,5 +810,152 @@ describe('Library, browsing by player', () => {
     await waitFor(() => expect(shownNames()).toEqual(['Their Goreclaw']))
     expect(api.deleteDeck).toHaveBeenCalledWith(
       expect.objectContaining({ owner: 'mitch', slug: 'goreclaw' }), 'bury')
+  })
+})
+
+/**
+ * The crypt.
+ *
+ * ADR 27 gave a *card* both halves — entomb, and a graveyard to return from.
+ * A *deck* had only the first, and what stood in for the second was a line of
+ * copy naming the folder it had been moved to. This is the missing half, and
+ * three of these tests are about what the page must not claim rather than
+ * about what it shows:
+ *
+ *  - a crypt that could not be read is **not** an empty crypt, and the tab
+ *    carries no count rather than a zero;
+ *  - a burial with no recorded time is not "just now";
+ *  - a refusal is shown rather than swallowed, and the deck stays buried.
+ *
+ * Every one of those is this repo's most-repeated bug — a fallback rendered as
+ * a confident claim — aimed at the one screen somebody opens to check that
+ * work they thought they had lost is still there.
+ */
+describe('Library crypt', () => {
+  const HANDLE = 'a1b2c3d4e5f60718'
+
+  /** A fixture built when the test runs, not when the file is collected.
+   *
+   * `entombed_at` is relative to *now*, and the suite takes a minute and a
+   * half to reach here — a constant fixed at module scope drifted from "5
+   * minutes ago" to "7 minutes ago" while the tests before it ran, which is a
+   * flake that would have arrived later and looked like a rendering bug. */
+  const buried = (over: Partial<EntombedDeck> = {}): EntombedDeck => ({
+    id: HANDLE,
+    slug: 'goreclaw',
+    name: 'Goreclaw',
+    total_cards: 99,
+    commander: ['Goreclaw, Terror of Qal Sisma'],
+    entombed_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+    ...over,
+  })
+
+  async function openCrypt() {
+    renderLibrary()
+    const tab = await screen.findByRole('tab', { name: /crypt/i })
+    fireEvent.click(tab)
+    return tab
+  }
+
+  it('offers no crypt tab when nothing is buried', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    expect(screen.queryByRole('tab', { name: /crypt/i })).toBeNull()
+  })
+
+  it('lists an entombed deck and brings it back', async () => {
+    vi.mocked(api.entombed).mockResolvedValue({ entombed: [buried()] })
+    await openCrypt()
+
+    expect(await screen.findByText(/99 cards/)).toBeTruthy()
+    expect(screen.getByText(/entombed 5 minutes ago/)).toBeTruthy()
+
+    // The shelf and the crypt are both re-read from the server afterwards
+    // rather than patched here: a deck tile carries the gate's counts and its
+    // art, and this page is not the authority on either.
+    vi.mocked(api.entombed).mockResolvedValue({ entombed: [] })
+    fireEvent.click(screen.getByRole('button', { name: /^return$/i }))
+    await waitFor(() => expect(api.returnEntombed).toHaveBeenCalledWith(HANDLE))
+    await waitFor(() => expect(api.decks).toHaveBeenCalledTimes(2))
+  })
+
+  // Found by walking it: returning the last buried deck empties the crypt, the
+  // tab that was only there because something was buried disappeared, and the
+  // player was left standing in "nothing rests here" with no way back to their
+  // shelf. A tab somebody is standing on is never taken away.
+  it('keeps the way out when returning the last deck empties the crypt', async () => {
+    vi.mocked(api.entombed).mockResolvedValue({ entombed: [buried()] })
+    await openCrypt()
+
+    vi.mocked(api.entombed).mockResolvedValue({ entombed: [] })
+    fireEvent.click(await screen.findByRole('button', { name: /^return$/i }))
+
+    expect(await screen.findByText(/nothing rests here/i)).toBeTruthy()
+    // Both tabs still there, and the empty count is honest — the crypt was
+    // read, and it is empty.
+    expect(screen.getByRole('tab', { name: /my decks/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /crypt/i }).textContent).toMatch(/0/)
+  })
+
+  it('says nothing about when a deck with no recorded burial went in', async () => {
+    vi.mocked(api.entombed).mockResolvedValue(
+      { entombed: [buried({ entombed_at: null })] })
+    await openCrypt()
+
+    expect(await screen.findByText(/99 cards/)).toBeTruthy()
+    // No date, no "just now", no "Invalid Date" — the row says the deck is
+    // entombed and still there, and claims nothing about when.
+    expect(screen.queryByText(/entombed \d/i)).toBeNull()
+    expect(screen.getByText(/entombed, and still here/i)).toBeTruthy()
+  })
+
+  // A count of zero is what the server sends when it could not read the deck
+  // file, and "0 cards" beside a deck somebody knows had 99 is the worst
+  // sentence available on the screen they came to for reassurance. The row
+  // leaves the count out instead.
+  it('does not claim a deck it could not measure is empty', async () => {
+    vi.mocked(api.entombed).mockResolvedValue(
+      { entombed: [buried({ total_cards: 0, commander: [] })] })
+    await openCrypt()
+
+    expect(await screen.findByText(/entombed 5 minutes ago/)).toBeTruthy()
+    // Read off the row, not off the page: the masthead says "35,000 cards in
+    // the local pool", and a loose `/0 cards/` matches *that* — which is how
+    // this assertion passed against the wrong element on the first run.
+    expect(screen.getByRole('listitem').textContent).not.toMatch(/cards/)
+  })
+
+  it('does not report a crypt it could not read as an empty one', async () => {
+    vi.mocked(api.entombed).mockRejectedValue(new Error('the library is asleep'))
+    const tab = await openCrypt()
+
+    // The tab is offered — something might be in there — but it makes no claim
+    // about how many, which a `0` would.
+    expect(tab.textContent).not.toMatch(/\d/)
+    expect(await screen.findByText(/could not be read/i)).toBeTruthy()
+    expect(screen.queryByText(/nothing rests here/i)).toBeNull()
+  })
+
+  it('shows a refusal and leaves the deck buried', async () => {
+    vi.mocked(api.entombed).mockResolvedValue({ entombed: [buried()] })
+    vi.mocked(api.returnEntombed).mockRejectedValue(
+      new Error('a deck called "goreclaw" is already on your shelf'))
+    await openCrypt()
+
+    fireEvent.click(await screen.findByRole('button', { name: /^return$/i }))
+    expect(await screen.findByText(/already on your shelf/)).toBeTruthy()
+    // Still listed: a refused return changed nothing.
+    expect(screen.getByText(/99 cards/)).toBeTruthy()
+  })
+
+  // The crypt names no path either — the leak was in the deletion's copy, and
+  // this is the room that replaced it.
+  it('names no path, no trash directory and no shell', async () => {
+    vi.mocked(api.entombed).mockResolvedValue({ entombed: [buried()] })
+    await openCrypt()
+    await screen.findByText(/99 cards/)
+    const page = document.body.textContent ?? ''
+    expect(page).not.toMatch(/\.trash|decks\/|shell|terminal|filesystem|directory|folder/i)
+    expect(page).not.toContain(HANDLE)
   })
 })

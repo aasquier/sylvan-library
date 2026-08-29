@@ -252,6 +252,13 @@ func (f *FileSource) Create(_ context.Context, slug, text string) error {
 // are generated from the deck file and a folder of primers for a deck that no
 // longer exists is worse than no folder at all. `.trash` is dot-prefixed so
 // `deckPaths` cannot see it.
+//
+// **The name it is given is read back**, by `crypt.go`: the stamp is how the
+// crypt says when a deck was buried, and the format is a constant both halves
+// share so that changing it here cannot quietly stop the list over there from
+// parsing. Where it went used to be the only way back and was shown to the
+// player as a path; the crypt is the way back now, and this return value is
+// the protocol's proof that a deck was moved rather than destroyed.
 func (f *FileSource) Delete(_ context.Context, slug string) (string, error) {
 	if !f.writable {
 		return "", ErrReadOnly{Slug: slug}
@@ -260,8 +267,8 @@ func (f *FileSource) Delete(_ context.Context, slug string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stamp := time.Now().UTC().Format("20060102T150405Z")
-	trash := filepath.Join(f.Root, ".trash", slug+"-"+stamp)
+	stamp := time.Now().UTC().Format(entombedStamp)
+	trash := filepath.Join(f.Root, trashDir, slug+"-"+stamp)
 	if err := os.MkdirAll(filepath.Dir(trash), 0o755); err != nil { //nolint:gosec // the deck's own directory mode
 		return "", fmt.Errorf("delete deck %q: %w", slug, err)
 	}

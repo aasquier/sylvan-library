@@ -57,7 +57,7 @@
 import { useEffect, useState } from 'react'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
-import { type BoardCard, type Clash, halfNamed } from './board'
+import { type BoardCard, type Clash, halfNamed, pictureOf } from './board'
 import { type HalfGlass } from './halves'
 import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
@@ -1186,12 +1186,22 @@ export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
   key: string, speed: Speed, outcome: Outcome | null = null,
   dying: number | null = null): StagedBout | null {
   if (!clash) return null
-  const fighter = (card: BoardCard, count: number): BoutFighter => ({
-    id: card.id,
-    name: card.name,
-    image: faceFor(board, card.name, null)?.image ?? null,
-    count,
-  })
+  // **A fighter fights in its own face's picture.** The dictionary paints a
+  // card once, under the face it was filed by, and a permanent standing on the
+  // other one — a modal double-faced card played as its land, a creature that
+  // turned over — has a painting of its own that is not that. `card.name` is
+  // the face the fold settled on, so asking `pictureOf` for the half that name
+  // is gets the picture the board is already showing rather than the front of
+  // a card whose back is in the fight.
+  const fighter = (card: BoardCard, count: number): BoutFighter => {
+    const face = faceFor(board, card.name, null)
+    return {
+      id: card.id,
+      name: card.name,
+      image: (face && pictureOf(face, halfNamed(face, card.name))) || null,
+      count,
+    }
+  }
   const attacker = fighter(clash.attacker, 1)
   const blockers = clash.blockers.map((s) => fighter(s.card, s.count))
   return {

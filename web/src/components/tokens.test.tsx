@@ -10,6 +10,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { DeckTokens, TokenPlate } from '../lib/api'
+import { MOST_OF_ONE_TOKEN } from '../lib/tokenshop'
 
 vi.mock('../lib/api', async (importOriginal) => {
   const real = await importOriginal<typeof import('../lib/api')>()
@@ -23,6 +24,7 @@ const read = vi.mocked(api.deckTokens)
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  Reflect.deleteProperty(navigator, 'clipboard')
 })
 
 const ref = { owner: 'local', slug: 'a-deck' }
@@ -56,6 +58,30 @@ function toggle() {
 function unfold() {
   render(<TokenShelf deckRef={ref} />)
   fireEvent.click(toggle())
+}
+
+/**
+ * A clipboard, or one that will not have it.
+ *
+ * jsdom ships neither, so both halves have to be installed by hand — and the
+ * refusing half is the one worth the trouble. A `catch` that quietly does
+ * nothing is the mistake this repo makes most often, and no green suite ever
+ * sees it, because nothing ever drives the failure path. This drives it.
+ */
+function clipboard(answer: 'takes' | 'refuses') {
+  const writeText = vi.fn(answer === 'takes'
+    ? () => Promise.resolve()
+    : () => Promise.reject(new Error('the document is not focused')))
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText }, configurable: true, writable: true,
+  })
+  return writeText
+}
+
+/** The one press this section has. Named for what it says at rest, because
+ *  what it says after the press is the thing half these tests are checking. */
+function shopButton() {
+  return screen.findByRole('button', { name: /shopping list/i })
 }
 
 /** A tap, the way a phone makes one. jsdom has no PointerEvent of its own, so
@@ -238,6 +264,100 @@ it('explains what a token is to a hand that is not a mouse', () => {
 
   // And it does not fold the section on its way past.
   expect(read).not.toHaveBeenCalled()
+})
+
+// ---------------------------------------------------------- the shopping list
+//
+// Aaron, 2026-08-29: "an 'Export' button in the token area that can give you a
+// TCGPlayer friendly list to help shop for tokens when needed."
+//
+// The list's own rules — the shop's name for a token, the merge across
+// printings, the cap — are `lib/tokenshop.test.ts`, because they are
+// arithmetic on a shape rather than anything a reader touches. What is here
+// is the touching: the press, its two answers, and the two states that must
+// offer nothing at all.
+
+// The press does the thing, and then shows its work: the same text on the
+// clipboard and on the page, and a sentence saying how much went across.
+it('copies the list and says what went across', async () => {
+  const wrote = clipboard('takes')
+  read.mockResolvedValue(sheet({
+    tokens: [
+      plate('Food', { made_by: ['Gyome, Master Chef', 'The Shire'] }),
+      plate('Treasure', { made_by: ['Smothering Tithe'] }),
+    ],
+  }))
+  unfold()
+  fireEvent.click(await shopButton())
+
+  await waitFor(() => {
+    expect(wrote).toHaveBeenCalledWith('2 Food Token\n1 Treasure Token\n')
+  })
+  await screen.findByText(/2 tokens to look for, 3 cards in all/)
+  // Shown as well as copied, so nobody pastes a surprise — and byte for byte
+  // the same text, not a prettier rendering of it.
+  expect(document.querySelector('.token-shop-list')?.textContent)
+    .toBe('2 Food Token\n1 Treasure Token\n')
+})
+
+// **A clipboard that says no must not read as a press that worked.** Nothing
+// is broken here and nothing is lost, so this is not a red box — but the
+// button may not sit there saying "Copied" over a clipboard that is empty,
+// and the list has to be on screen to be taken by hand.
+it('says so when the clipboard refuses, and leaves the list to be taken', async () => {
+  clipboard('refuses')
+  read.mockResolvedValue(sheet({
+    tokens: [plate('Food', { made_by: ['Gyome, Master Chef'] })],
+  }))
+  unfold()
+  fireEvent.click(await shopButton())
+
+  await screen.findByText(/clipboard would not take it/i)
+  expect(document.querySelector('.token-shop-list')?.textContent)
+    .toBe('1 Food Token\n')
+  expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull()
+  expect(document.body.textContent).not.toMatch(/Copied —/)
+})
+
+// Commandment 2, at the moment it bites hardest: a newcomer has no idea how
+// many of a token they need, and this is exactly where to tell them.
+//
+// **The cap is written twice — `4` in the rule and "four" in the sentence —
+// and nothing but this holds the two together.** A number recorded in prose
+// is a claim that rots, and the way it rots here is silent: the list would
+// quietly stop matching the paragraph explaining it. Change one and this
+// fails, which is the whole job.
+it('explains the number it chose, in words that match the rule', async () => {
+  expect(MOST_OF_ONE_TOKEN).toBe(4)
+  clipboard('takes')
+  read.mockResolvedValue(sheet({
+    tokens: [plate('Food', { made_by: ['Gyome, Master Chef'] })],
+  }))
+  unfold()
+  fireEvent.click(await shopButton())
+
+  await screen.findByText(/starting pile rather than a count/i)
+  expect(document.body.textContent)
+    .toContain('one for every card in your deck that makes it, up to four')
+})
+
+// **Absent, not disabled.** A deck that makes nothing has already been told so
+// in its own sentence; a greyed-out Copy button beside it would be a second,
+// worse way of saying the same thing.
+it('offers no shopping list to a deck that makes nothing', async () => {
+  read.mockResolvedValue(sheet())
+  unfold()
+  await screen.findByText(/Nothing in this deck makes a token/i)
+  expect(screen.queryByRole('button', { name: /shopping list/i })).toBeNull()
+})
+
+// And the deploy window, where the honest answer is that nobody has looked
+// yet — an empty list offered for sale there would be a claim about the deck.
+it('offers no shopping list before the pool has been read', async () => {
+  read.mockResolvedValue(sheet({ read: false }))
+  unfold()
+  await screen.findByText(/cannot say yet/i)
+  expect(screen.queryByRole('button', { name: /shopping list/i })).toBeNull()
 })
 
 // The fold is not remembered, and that is the ask: "collapsed by default".

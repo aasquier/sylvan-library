@@ -2,6 +2,7 @@ package pool
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -326,24 +327,43 @@ func TestTheRefreshCoercionsWriteNullRatherThanZero(t *testing.T) {
 	}
 }
 
-// A sub-document is stored as text, and anything unencodable falls back to
-// the caller's `empty` rather than to a NULL the reader would trip on.
-func TestASubDocumentStoresAsTextOrTheGivenEmpty(t *testing.T) {
+// A sub-document is handed over as the decoded document it already is, and
+// anything unencodable falls back to the caller's `empty` rather than to a
+// NULL the reader would trip on.
+//
+// **This test used to assert the bug.** It read `jsonText` back as a
+// `string` and checked the text — which is exactly what a JSON column must
+// not be given, and the assertion passed for as long as the library was
+// empty. What it should have been asking all along is what the value *is*,
+// because that is what the Appender writes.
+func TestASubDocumentIsHandedOverDecodedOrAsTheGivenEmpty(t *testing.T) {
 	t.Parallel()
-	got := jsonText(map[string]any{"commander": "legal"}, "{}")
-	text, ok := got.(string)
-	if !ok || text != `{"commander":"legal"}` {
-		t.Errorf("stored as %#v", got)
+	doc := map[string]any{"commander": "legal"}
+	got := jsonText(doc, map[string]any{})
+	if _, isText := got.(string); isText {
+		t.Errorf("stored as text %#v -- a JSON column takes a value, and a "+
+			"string becomes a JSON string that json_extract_string reads NULL from", got)
 	}
-	if got := jsonText(nil, "{}"); got != "{}" {
-		t.Errorf("nothing stored as %#v, want the given empty", got)
+	if m, ok := got.(map[string]any); !ok || m["commander"] != "legal" {
+		t.Errorf("stored as %#v, want the decoded document", got)
 	}
-	if got := jsonText(nil, "[]"); got != "[]" {
+	// The absent value is the caller's, and it is a document too.
+	if got := jsonText(nil, map[string]any{}); !reflect.DeepEqual(got, map[string]any{}) {
+		t.Errorf("nothing stored as %#v, want the given empty object", got)
+	}
+	if got := jsonText(nil, []any{}); !reflect.DeepEqual(got, []any{}) {
 		t.Errorf("the empty is not the caller's: %#v", got)
 	}
 	// Unencodable falls back rather than failing the whole row.
-	if got := jsonText(make(chan int), "{}"); got != "{}" {
+	if got := jsonText(make(chan int), map[string]any{}); !reflect.DeepEqual(got, map[string]any{}) {
 		t.Errorf("an unencodable value stored as %#v", got)
+	}
+	// `all_parts`' sibling keeps NULL for absent and passes the rest through.
+	if got := jsonOrNull(nil); got != nil {
+		t.Errorf("an absent all_parts stored as %#v, want NULL", got)
+	}
+	if got := jsonOrNull([]any{doc}); reflect.TypeOf(got).Kind() == reflect.String {
+		t.Errorf("all_parts stored as text %#v", got)
 	}
 
 	// And the row's own boolean, which is strict: only a real true is true.

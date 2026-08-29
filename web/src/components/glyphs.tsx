@@ -245,6 +245,53 @@ export function CrownGlyph({ size = 14 }: { size?: number }) {
 }
 
 /**
+ * A goldfish: the opponent the Simulator has always played against.
+ *
+ * The deck page offers two rooms a deck can be taken to, and the marks on those
+ * two controls are the whole of how a newcomer tells them apart before reading
+ * either label (commandment 2). One is [CrossedSwordsGlyph], which is a fight.
+ * This is the other one, and the joke is the oldest one in the game: playing a
+ * deck with nobody on the other side of the table is *goldfishing*, because for
+ * all the resistance you meet you might as well be playing against a goldfish.
+ * The Simulator's own nameplate already draws him — a fish idling in a glass
+ * bowl on a brass stand, waiting out your ten thousand shuffles — so the button
+ * that leads there wears the tenant of the room.
+ *
+ * **Filled, and that is [CrownGlyph]'s argument rather than a taste.** At
+ * fifteen pixels a hollow outline is four grey hairlines; solid is what
+ * survives. Three shapes and nothing else: a body, a forked tail and a dorsal
+ * fin. The fourth thing a fish needs is an eye, and an eye cannot be *drawn*
+ * here — a dot of some assumed background colour is a hole punched in the wrong
+ * paint the moment the plate under it changes. So the eye is a real hole:
+ * body and pupil are one path under `evenodd`, and what shows through it is
+ * whatever the button is actually made of.
+ *
+ * The tail carries its own class so a button can move it — `.glyph-fin`, the
+ * same mechanism `.glyph-sword` uses, with `fill-box` putting the pivot where
+ * the tail meets the body so it *swishes* rather than swinging bodily.
+ * `.btn-goldfish` in `index.css` does that on hover; nothing here animates on
+ * its own.
+ */
+export function GoldfishGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      {/* The tail, forked. Drawn first so the body's edge covers the join —
+          a fish is one animal, not a triangle parked next to an oval. */}
+      <path className="glyph-fin"
+            d="M 8.6 10 L 2.2 5.6 L 3.9 10 L 2.2 14.4 Z" fill="currentColor" />
+      {/* The dorsal fin, its base buried in the body for the same reason. */}
+      <path d="M 8.4 6.9 L 11.6 3.5 L 13.4 7.4 Z" fill="currentColor" />
+      {/* Body and eye as one path: two arcs make the ellipse, two more make
+          the pupil, and `evenodd` turns the inner ring into a hole. */}
+      <path fillRule="evenodd" fill="currentColor"
+            d="M 5.6 10 A 6 4.3 0 0 1 17.6 10 A 6 4.3 0 0 1 5.6 10 Z
+               M 15.5 8.7 A 1.05 1.05 0 1 1 13.4 8.7 A 1.05 1.05 0 1 1 15.5 8.7 Z" />
+    </svg>
+  )
+}
+
+/**
  * A strongbox: what a commander costs to call back.
  *
  * Commander tax was a bare red chip of digits, and a number alone is a fact

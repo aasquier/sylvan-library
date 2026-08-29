@@ -389,9 +389,8 @@ type forgeBoardCard struct {
 	// Artist is carried for tokens, whose painting is chosen here rather than
 	// looked up — somebody painted it, and rule 9 says name them.
 	Artist string `json:"artist,omitempty"`
-	// Faces is the card's other name, for the cards that have one **and print
-	// both of them on the one picture** — an Adventure, a split card, a flip
-	// card. Absent for everything else, which is nearly every card.
+	// Faces is every name this card answers to, for the cards with more than
+	// one. Absent for everything else, which is nearly every card.
 	//
 	// **It exists because Forge renames a card when it is cast as its other
 	// half, and this board only ever learns a card's name once.** Bonecrusher
@@ -402,13 +401,15 @@ type forgeBoardCard struct {
 	// dark plate. A whole black card with a title on it, in the one moment the
 	// room exists to show a spell (Aaron, 2026-08-28).
 	//
-	// **Only the layouts where the second name is on the picture we are
-	// holding up.** A transforming card's back face has a picture of its own
-	// that this record does not carry, so answering *Stomp* and answering
-	// *Withengar Unbound* are two different promises: the first shows the card
-	// the adventure is printed on, and the second would show the front of a
-	// card whose back was cast. `oneCardTwoNames` is that list and the argument
-	// is there.
+	// **This was once only the layouts printing both names on one picture, and
+	// a modal double-faced card drew that same black plate for it** (Aaron,
+	// 2026-08-29: *"MDF cards are not rendering intelligently... blanked out
+	// black card with just the text when it is played as a creature... and same
+	// deal when played as a land"*). The old rule was right while the record
+	// carried one painting: answering to a back face's name with a front face's
+	// picture looks correct and is worse than the plate. The record carries both
+	// paintings now — see `FaceImages` — so the two questions are separate, and
+	// `facesOf` and `facePicturesOf` are them.
 	Faces []string `json:"faces,omitempty"`
 	// FaceTypes is each face's own type line, index-aligned with Faces.
 	//
@@ -420,10 +421,33 @@ type forgeBoardCard struct {
 	// landed. Taken from the same `A // B` split the names are, so the two
 	// lists cannot fall out of step.
 	FaceTypes []string `json:"face_types,omitempty"`
+	// FaceImages is each face's own painting, index-aligned with Faces, and
+	// absent for the cards whose faces share one — an Adventure, a split card,
+	// a flip card, which is what `Image` already is.
+	//
+	// **Present is the room's permission to change the picture.** A card with
+	// this is a card the room may hold up by either face: the back of a modal
+	// double-faced card played as a land is a painting of a land, and drawing
+	// the sorcery on its front instead is the quiet version of the same bug the
+	// black plate was the loud version of. A card without it either has one
+	// picture, in which case `Image` is right for both names, or comes from a
+	// pool that cannot say — and both are answered by drawing what we have
+	// rather than by guessing which half we are looking at.
+	//
+	// **The credit rides the picture.** These are whole card images, so each
+	// carries its own artist and copyright line printed on it, which is how a
+	// card on this board has always been credited — see `Artist`, which is
+	// carried only for tokens, whose printing this program chose rather than
+	// looked up. Swapping to a back face therefore swaps in that face's own
+	// credit, which matters: eight double-faced cards in the pool are painted
+	// by two different artists.
+	FaceImages []string `json:"face_images,omitempty"`
 	// Layout is Scryfall's own word for how the card is printed — `adventure`,
 	// `split`, `flip` — and it is carried only alongside `Faces`, because the
 	// only thing that reads it is the room deciding *where on the picture* the
-	// half being cast actually is.
+	// half being cast actually is. A card with `FaceImages` has no such
+	// whereabouts: its halves are not on one picture, and the room draws the
+	// whole of the right one instead of a glass over part of the wrong one.
 	Layout string `json:"layout,omitempty"`
 	// Mana is whether this card makes mana, from Scryfall's own
 	// `produced_mana` rather than from reading rules text here.
@@ -474,36 +498,16 @@ type forgeBoard struct {
 
 // boardArt is one card's painting, resolved once per match.
 type boardArt struct {
-	Image     string
-	Art       string
-	Artist    string
-	Mana      bool
-	Makes     []string
-	Keywords  []string
-	Faces     []string
-	FaceTypes []string
-	Layout    string
-}
-
-// oneCardTwoNames is the layouts that print **two names on one picture**.
-//
-// Scryfall's own words for them, and the test is exactly the one the room
-// needs: given this record's single `image_normal`, is the other face's half
-// somewhere on it? For an Adventure it is the left of the text box, for a split
-// card it is one end, for a flip card it is the bottom half upside down. For
-// everything else — a transforming card, a modal double-faced card, a meld —
-// the other face is a different picture entirely, and answering to its name
-// with this one would be the room showing a card that is not the card that was
-// cast.
-//
-// `aftermath` is deliberately in: it is Amonkhet's split-with-a-turn, and both
-// halves are printed on the one face. Scryfall files those under `split` now
-// and this map is asked with the pool's raw word, so that entry catches only an
-// older record — [layoutOf] is what puts the distinction *back* on the wire,
-// and it is a different question from this one. This map asks "are both names
-// on this picture"; that function asks "whereabouts".
-var oneCardTwoNames = map[string]bool{
-	"adventure": true, "split": true, "flip": true, "aftermath": true,
+	Image      string
+	Art        string
+	Artist     string
+	Mana       bool
+	Makes      []string
+	Keywords   []string
+	Faces      []string
+	FaceTypes  []string
+	FaceImages []string
+	Layout     string
 }
 
 // faceTypesOf is each face's own type line, index-aligned with `faces`, or nil
@@ -522,12 +526,6 @@ func faceTypesOf(rec *pool.CardRecord, faces []string) []string {
 	return kinds
 }
 
-// facesOf is the names this card answers to, or nil for a card with one name.
-//
-// Taken from the record's own combined name rather than from `card_faces`,
-// because that is the same string `pool.Conn.GetCards` splits to *find* the
-// card by a face name — so the set of names that can reach this record and the
-// set of names it admits to are one list, read one way.
 // layoutOf is the word the room should use for how this card is printed —
 // Scryfall's own, except where Scryfall stopped making a distinction the room
 // still needs.
@@ -559,15 +557,69 @@ func layoutOf(rec *pool.CardRecord) string {
 	return rec.Layout
 }
 
+// facesOf is the names this card answers to, or nil for a card with one name.
+//
+// Taken from the record's own combined name rather than from `card_faces`,
+// because that is the same string `pool.Conn.GetCards` splits to *find* the
+// card by a face name — so the set of names that can reach this record and the
+// set of names it admits to are one list, read one way. The record's parsed
+// faces are asked only to *corroborate* it: a name that splits in two on a
+// record that does not carry two faces is a record this cannot describe, and
+// the honest answer to that is nothing at all.
+//
+// **This used to be gated on a list of layouts, and the list was answering the
+// wrong question.** It named `adventure`, `split`, `flip` and `aftermath` —
+// the layouts that print two names on *one picture* — because at the time the
+// record carried one picture, so "does this card answer to two names" and "are
+// both names on the picture we are holding up" had the same answer and one
+// gate could serve both. They are not the same question, and the moment
+// [pool.CardRecord.Faces] arrived they stopped having the same answer: a modal
+// double-faced card played as its land back really is on the board under the
+// back's name, and the room can now hold up the back's own painting to it.
+//
+// So the two questions are separated. This one is the names; [facePicturesOf]
+// is whether each of them has a picture of its own. A card that answers to a
+// name the room cannot paint is still better than a card that answers to
+// nothing — the beat's plate says *Agadeem, the Undercrypt* and *Land* rather
+// than a name the arena could not place at all.
 func facesOf(rec *pool.CardRecord) []string {
-	if !oneCardTwoNames[rec.Layout] {
-		return nil
-	}
 	faces := strings.Split(rec.Name, " // ")
-	if len(faces) < 2 {
+	if len(faces) < 2 || len(rec.Faces) != len(faces) {
 		return nil
 	}
 	return faces
+}
+
+// facePicturesOf is each face's own painting, index-aligned with `faces`, and
+// nil for a card whose faces are all printed on the one picture.
+//
+// **This is the question the old layout list was really asking**, and asking
+// it of the record rather than of a list of names is the point: Scryfall put
+// `image_uris` on the *card* when both names are on one piece of cardboard and
+// on the *faces* when each is a painting of its own, so the encoding states the
+// distinction outright. Six layouts carry an `A // B` name and exactly two of
+// them — `transform` and `modal_dfc` — paint each face; a `prepare` card, the
+// newest of the one-picture family, is handled by this without anybody having
+// heard of it.
+//
+// **All or nothing.** A half-filled list is an index that answers confidently
+// for the wrong face, which is the exact fault the old gate existed to prevent:
+// showing the front of a card whose back was played looks right, and is worse
+// than showing no picture. So one face without a painting stands the whole card
+// down to the card's own, which for a one-picture layout is the truth and for a
+// pool too old to know is the plate.
+func facePicturesOf(rec *pool.CardRecord, faces []string) []string {
+	if len(rec.Faces) != len(faces) {
+		return nil
+	}
+	out := make([]string, len(faces))
+	for i, face := range rec.Faces {
+		if face.ImageNormal == nil {
+			return nil
+		}
+		out[i] = *face.ImageNormal
+	}
+	return out
 }
 
 // resolveBoardArt fills `known` with the paintings for any card in `cards` it
@@ -642,6 +694,7 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 				if faces := facesOf(rec); faces != nil {
 					art.Faces, art.Layout = faces, layoutOf(rec)
 					art.FaceTypes = faceTypesOf(rec, faces)
+					art.FaceImages = facePicturesOf(rec, faces)
 				}
 				known[name] = art
 			}
@@ -842,9 +895,11 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 			Types: card.Types, Seat: card.Seat, CopiedBy: card.CopiedBy,
 			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
 			Mana: painted.Mana, Makes: painted.Makes,
-			Keywords: painted.Keywords,
-			Faces:    painted.Faces, FaceTypes: painted.FaceTypes,
-			Layout: painted.Layout})
+			Keywords:   painted.Keywords,
+			Faces:      painted.Faces,
+			FaceTypes:  painted.FaceTypes,
+			FaceImages: painted.FaceImages,
+			Layout:     painted.Layout})
 	}
 	out.Steps = grantKeywords(out.Steps, printed)
 	return out
