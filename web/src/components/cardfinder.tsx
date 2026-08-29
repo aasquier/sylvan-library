@@ -62,7 +62,7 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import { api, type CardOffer } from '../lib/api'
+import { api, ApiError, type CardOffer } from '../lib/api'
 import { cardWarning } from '../lib/cardoffer'
 import { CardHover, ManaCost, ManaText } from './ui'
 
@@ -102,7 +102,16 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
   // for what is in the box right now" is derived during render rather than
   // cleared from an effect. Clearing it in the effect meant a stale list
   // survived one paint after a backspace — long enough to be clicked.
-  const [answer, setAnswer] = useState<{ asked: string; cards: CardOffer[] } | null>(null)
+  //
+  // **`trouble` is why the box stopped lying.** Every failure used to land in
+  // the same `catch` and set `cards: []`, which the panel renders as "no card
+  // in the library is spelled anything like that" -- a confident claim about
+  // the library, produced by not being able to ask it. A session that had
+  // expired, a server restarting through a deploy and a genuinely unknown card
+  // were one sentence, and the first two are the ones somebody can act on.
+  const [answer, setAnswer] = useState<
+    { asked: string; cards: CardOffer[]; trouble?: 'signed-out' | 'unreachable' } | null
+  >(null)
   const [active, setActive] = useState(0)
   const [open, setOpen] = useState(false)
   const inputId = useId()
@@ -113,6 +122,7 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
   const query = typed.trim()
   const asked = query.length >= MIN_QUERY
   const offers = asked && answer?.asked === query ? answer.cards : null
+  const trouble = asked && answer?.asked === query ? answer.trouble : undefined
   const asking = asked && offers === null
 
   // **Debounced, and ordered.** The timer stops a request per keystroke; the
@@ -130,9 +140,17 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
           setAnswer({ asked: query, cards: r.cards })
           setActive(0)
         })
-        .catch(() => {
+        .catch((e: unknown) => {
           if (token.current !== mine) return
-          setAnswer({ asked: query, cards: [] })
+          // A 401 is the one failure with a next step in it, so it gets its
+          // own sentence. Everything else is "ask again in a moment", which
+          // is true of a restart, a blip and a fault alike -- and none of
+          // them is a fact about the card that was typed.
+          const signedOut = e instanceof ApiError && e.status === 401
+          setAnswer({
+            asked: query, cards: [],
+            trouble: signedOut ? 'signed-out' : 'unreachable',
+          })
           setActive(0)
         })
     }, SETTLE_MS)
@@ -274,9 +292,11 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
           the state the old box left everybody in. */}
       <span className="sr-only" role="status">
         {showing && offers !== null
-          ? (rows.length === 0
-              ? 'No cards match what you typed.'
-              : `${rows.length} card${rows.length === 1 ? '' : 's'} to choose from.`)
+          ? (trouble !== undefined
+              ? 'The library did not answer. This says nothing about the card you typed.'
+              : rows.length === 0
+                ? 'No cards match what you typed.'
+                : `${rows.length} card${rows.length === 1 ? '' : 's'} to choose from.`)
           : ''}
       </span>
 
@@ -326,11 +346,24 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
                 ))}
               </ul>
             )}
-            {showing && rows.length === 0 && !asking && (
+            {showing && rows.length === 0 && !asking && trouble === undefined && (
               <p className="finder-note">
                 No card in the library is spelled anything like that. Try a
                 word from the middle of the name — or look the card up on the
                 Card search page, which reads rules text as well as names.
+              </p>
+            )}
+            {showing && !asking && trouble === 'signed-out' && (
+              <p className="finder-note">
+                You have been signed out, so the library will not answer.
+                Sign in again — your deck is exactly as you left it, and
+                nothing you typed here has been lost.
+              </p>
+            )}
+            {showing && !asking && trouble === 'unreachable' && (
+              <p className="finder-note">
+                The library did not answer just then. This says nothing about
+                the card you typed — try it again in a moment.
               </p>
             )}
             {showing && asking && (

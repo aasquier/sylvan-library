@@ -8,7 +8,9 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
-// The nine operations. Each takes the file's text and hands back the text it
+// The operations -- ten since ADR 41 added `DraftRationale`, and the number
+// is written here only because the next reader will count them anyway. Each
+// takes the file's text and hands back the text it
 // would become -- never a file handle, which is what makes "a refused edit has
 // changed nothing" a fact about the signature rather than a promise.
 

@@ -110,7 +110,7 @@ func loadClaudePackages(t *testing.T) []*packages.Package {
 // TestNothingUnderTheClaudeSurfacesCanReachTheWriteEngine is the graph half,
 // and the half a name check cannot express.
 //
-// `internal/deckedit` is the nine surgical operations and nothing else: every
+// `internal/deckedit` is the surgical operations and nothing else: every
 // deck change goes through it. Banning it across the whole
 // transitive import graph means an intermediary package is not a way around
 // the rule — which is exactly how a determined-but-well-meaning commit would

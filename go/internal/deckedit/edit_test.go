@@ -12,7 +12,7 @@ import (
 
 // The gate Phase 4 set for this family: every operation over the fixture
 // decks yields exactly the recorded byte-output. The oracle
-// (testdata/edits.json, a frozen golden) chains the nine operations over
+// (testdata/edits.json, a frozen golden) chains the operations over
 // the fixture decks and records both halves of what an edit operation is --
 // the text when it applies, the sentence when it refuses -- and this
 // reproduces both.
