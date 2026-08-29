@@ -28,6 +28,16 @@ var Archetypes = reference.Themes().Archetypes
 // int, or the deduplicated theme list.
 func deckFieldValue(field string, value any) (any, error) {
 	switch field {
+	case "strategy":
+		// The one prose field the deck's own keys carry. Trimmed and required
+		// non-empty for the same reason a note is: an empty `strategy:` puts a
+		// blank paragraph at the top of the generated primer, and the way to
+		// have no strategy is to not have the key.
+		text := strings.TrimSpace(asString(value))
+		if text == "" {
+			return nil, failf("a strategy needs text; remove the line instead of blanking it")
+		}
+		return text, nil
 	case "bracket":
 		bracket, err := asInt(value)
 		if err != nil {

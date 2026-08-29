@@ -110,3 +110,60 @@ func TestTheMarkIsNotAFieldAnybodyCanSet(t *testing.T) {
 			"rationale in the library is now a claim rather than a record")
 	}
 }
+
+// A deck's `strategy` is the paragraph the shelf, the deck page and the primer
+// all render, and until 2026-08-29 nothing in this app could write it.
+//
+// The editor left it out of `SettableDeckFields` and sent it to `SetNote` in a
+// comment — but `SetNote` writes into the `notes:` mapping and cannot reach a
+// top-level key, so the field was settable only by hand-editing a file that
+// lives on the deployed instance's volume.
+func TestADecksStrategyCanBeWritten(t *testing.T) {
+	t.Parallel()
+	const bare = "slug: gyome\nname: Gyome\nstatus: theoretical\nstage: draft\n" +
+		"cards:\n  - name: Sol Ring\n    why: ramp\n"
+
+	out, err := SetDeckField(bare, "strategy",
+		"Golgari Food aristocrats. Gyome turns every nontoken creature into a "+
+			"meal, and the deck drains the table sacrificing them.")
+	if err != nil {
+		t.Fatalf("writing a strategy was refused: %v", err)
+	}
+	if !strings.Contains(out, "strategy:") {
+		t.Fatalf("the key was not written:\n%s", out)
+	}
+	if !strings.Contains(out, "Golgari Food aristocrats.") {
+		t.Errorf("the text did not land:\n%s", out)
+	}
+	// It goes where the emitter puts it, not at the end of the file: a deck
+	// written by hand and a deck written here have to look alike.
+	if strings.Index(out, "strategy:") > strings.Index(out, "cards:") {
+		t.Errorf("strategy was appended after the cards:\n%s", out)
+	}
+
+	// Rewriting replaces rather than doubling.
+	again, err := SetDeckField(out, "strategy", "A different plan entirely.")
+	if err != nil {
+		t.Fatalf("rewriting was refused: %v", err)
+	}
+	if strings.Count(again, "strategy:") != 1 {
+		t.Errorf("the strategy was written twice:\n%s", again)
+	}
+	if strings.Contains(again, "Golgari Food") {
+		t.Errorf("the old strategy survived under the new one:\n%s", again)
+	}
+}
+
+// Blanking is refused rather than written: an empty `strategy:` puts a blank
+// paragraph at the top of the generated primer, and the way to have no
+// strategy is to not have the key.
+func TestABlankStrategyIsRefused(t *testing.T) {
+	t.Parallel()
+	const deck = "slug: gyome\nname: Gyome\nstatus: theoretical\nstage: draft\n" +
+		"strategy: A plan.\ncards:\n  - name: Sol Ring\n    why: ramp\n"
+	for _, empty := range []string{"", "   ", "\n\t"} {
+		if _, err := SetDeckField(deck, "strategy", empty); err == nil {
+			t.Errorf("a blank strategy (%q) was written", empty)
+		}
+	}
+}
