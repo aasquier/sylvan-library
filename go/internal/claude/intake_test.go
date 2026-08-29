@@ -111,3 +111,37 @@ func TestTheOpeningQuotesTheOwnersRationalesAndNotItsOwn(t *testing.T) {
 			"itself and drifts further from the person")
 	}
 }
+
+// The dial must not answer `off` for a surface that is about to run.
+//
+// This is the bug `dialSurfaces` exists for and the third time it has been
+// found the same way -- by loading the page, not by reading the code. The
+// import screen has no deck by construction, so a default derived from a deck
+// is a default derived from nothing, and `off` stands the whole sheet down on
+// the one page it belongs to.
+func TestTheIntakeSurfaceDoesNotAnswerOffWithNoDeck(t *testing.T) {
+	t.Parallel()
+	got, err := IntakeStanceFor(nil, nil)
+	if err != nil {
+		t.Fatalf("the intake surface has no default: %v", err)
+	}
+	if !got.AllowsCalls() {
+		t.Errorf("the intake's own default is %+v, which makes no call -- so the "+
+			"sheet stands down for everybody on the import screen", got)
+	}
+	// And it does NOT come with a write: ADR 41's second gate is a decision
+	// the user makes on the stance dial, and a surface default that handed it
+	// over would be the gate opening itself.
+	if got.MayWrite() {
+		t.Errorf("the intake's default may write (%+v), so ADR 41's second gate "+
+			"is satisfied by the surface rather than by the user", got)
+	}
+	// A stance the caller asked for still wins, clamped.
+	asked, err := IntakeStanceFor("off", nil)
+	if err != nil {
+		t.Fatalf("an explicit stance was refused: %v", err)
+	}
+	if asked.AllowsCalls() {
+		t.Errorf("an explicit `off` was overridden by the surface default: %+v", asked)
+	}
+}

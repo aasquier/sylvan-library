@@ -249,6 +249,42 @@ func describeOpening(d *deck.Deck) string {
 	}, "\n")
 }
 
+// IntakeDefaultPreset is what "no preference" means on the import screen.
+//
+// `consultant` and deliberately not higher: it speaks when spoken to, which is
+// exactly what a ticked box is, and it writes nothing -- so the four actions
+// that were always allowed are offered and the one ADR 41 gated is not, until
+// the person raises their own stance. The sheet then says where that setting
+// is, which is a better first meeting with the feature than a control that
+// appears without being asked for.
+const IntakeDefaultPreset = "consultant"
+
+// IntakeStanceFor is this surface's default stance, and the clamp over what
+// was asked for.
+//
+// **The import screen has no deck to derive a default from**, which is the
+// same hole `research` and `scan` sit in and it bites harder here: the deck
+// this is about does not exist yet, by construction, so `Resolve(nil, nil)`
+// answers `off` and the whole sheet would stand down for every user on the
+// one page it belongs to. Found by loading the page rather than by reading
+// the code -- the component's own tests mock the dial, so they could not see
+// it, and `dialSurfaces` is the third time this exact absence has produced
+// the same bug.
+func IntakeStanceFor(requested any, limit *Stance) (Stance, error) {
+	if requested == nil {
+		ceil := Ceiling()
+		if limit != nil {
+			ceil = *limit
+		}
+		preset, err := Preset(IntakeDefaultPreset)
+		if err != nil {
+			return Stance{}, err
+		}
+		return Clamp(preset, ceil), nil
+	}
+	return Resolve(requested, nil, limit)
+}
+
 const draftOffReason = "The stance is off, so no call was made. Everything " +
 	"else about this deck still works."
 

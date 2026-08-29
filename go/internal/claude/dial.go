@@ -66,7 +66,14 @@ const DialNever = "One rule holds at every setting: Claude never writes a " +
 // stance and budget warts went. Nothing in the app sends `surface=scan`, which
 // is exactly how it survived -- a doc comment is not a test, and an unused
 // parameter is not a caller.
-var dialSurfaces = map[string]bool{"theme": true, "research": true, "scan": true}
+// **`intake` joined it on 2026-08-28**, and it is the third time. The import
+// screen has no deck by construction -- the deck it is about does not exist
+// until the button is pressed -- so the dial answered `off` and ADR 41's whole
+// sheet stood down for every user. Found the same way `scan` was: by loading
+// the page and asking what the dial ANSWERED.
+var dialSurfaces = map[string]bool{
+	"theme": true, "research": true, "scan": true, "intake": true,
+}
 
 // surfaceStanceFor asks the module that owns `surface` what it makes of
 // `requested`.
@@ -83,6 +90,8 @@ func surfaceStanceFor(surface string, requested any, limit *Stance) (Stance, err
 		return ResearchStanceFor(requested, limit)
 	case "scan":
 		return ScanStanceFor(requested, limit)
+	case "intake":
+		return IntakeStanceFor(requested, limit)
 	default:
 		return ThemeStanceFor(requested, limit)
 	}
