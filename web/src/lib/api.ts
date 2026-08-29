@@ -2867,6 +2867,18 @@ export const api = {
     ref: DeckRef,
     body: { name: string; category: string; why?: string; qty?: number; to?: string },
   ) => post<EditResult>(deckPath(ref, '/cards'), body),
+  // A card onto the swap board, opening a board for a deck that has never kept
+  // one. **Not `addCard` with `to: 'swap_board'`**, and the difference is the
+  // whole reason this exists: that route refuses a deck file with no
+  // `swap_board:` block, because an edit changes what a deck says and never
+  // what shape it has (ADR 12). Starting a board is a shape change, so it is
+  // asked for by name rather than inferred from a `to` somebody may have
+  // mistyped. A deck that already has a board takes the same call, so no
+  // caller needs to know which kind of deck it is holding.
+  addToBoard: (
+    ref: DeckRef,
+    body: { name: string; category: string; why?: string; qty?: number },
+  ) => post<EditResult>(deckPath(ref, '/board'), body),
   // The delete from the 99 is an entombment (ADR 27): the server moves the
   // card to the deck's graveyard with its `why` intact, where `returnCard`
   // and `exileCard` reach it. The route is the old DELETE — what changed is

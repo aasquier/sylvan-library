@@ -18050,3 +18050,57 @@ button:hover .tarot-fan-card {
     min-height: 44px;
   }
 }
+
+/* ================================================================ Lane C —
+ *                                                          the swap board
+ *
+ * The shortlist beside the deck (`components/swapboard.tsx`). Every colour
+ * here is an existing token, so both themes and the `[data-theme]` override
+ * are inherited rather than restated — there is no new palette to keep in
+ * step, which is the failure mode a section-scoped block invites.
+ */
+
+/* The ⇄ mark beside the heading. The vine rather than the token shelf's brass:
+   these are two sections at the foot of the same page and a reader should be
+   able to tell them apart at a glance without reading either word. */
+.swap-glyph {
+  color: var(--vine);
+  font-size: 12px;
+}
+
+/* The empty state — the whole feature for a deck that has never kept a board,
+   so it is a place rather than a notice.
+
+   A panel with a lit left edge: the vine runs down the side the eye starts on
+   and the wash lifts the block off the page just enough to read as somewhere
+   to stand. **Size and edges do the work, never opacity** — dimming a panel to
+   make it recede is how this repo has lost two rounds to "still barely
+   visible". Nothing animates: an empty state that pulses is asking to be
+   pressed, and this one is asking to be read first. */
+.swap-empty {
+  background: color-mix(in srgb, var(--vine) 7%, var(--surface-1));
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--vine);
+}
+
+/* The rationale box. A class rather than the inline `style` the older forms
+   carry, because an inline style is a style a `:hover` and a `:focus-visible`
+   can never reach — commandment 17, and the reason the last hundred dull
+   controls on this site were dull. */
+.swap-field {
+  background: var(--surface-1);
+  border: 1px solid var(--gridline);
+  color: var(--text-primary);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.swap-field::placeholder {
+  color: var(--text-muted);
+}
+.swap-field:hover {
+  border-color: var(--baseline);
+}
+.swap-field:focus {
+  border-color: var(--vine);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--vine) 35%, transparent);
+  outline: none;
+}

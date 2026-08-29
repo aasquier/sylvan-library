@@ -21,6 +21,7 @@ import { CommanderMotion } from '../components/cardmotion'
 import { WheelOfFortune } from '../components/wheel'
 import { OpeningHandDeal } from '../components/openinghand'
 import { TokenShelf } from '../components/tokens'
+import { SwapBoard } from '../components/swapboard'
 import {
   ArmedButton,
   Badge, CardArt, CardHover, CardLoupe, Caveat, ColorRing, ErrorNote, ManaCost,
@@ -1519,73 +1520,23 @@ export default function DeckDetail() {
             </section>
           ))}
 
-          {/* The swap board: the cards being considered, which the deck file
-              has always held and this page has never shown.
+          {/* The swap board: the cards being considered, which the deck
+              file has always held.
 
-              `swap_board` is the model's name for the maybeboard — Commander
-              has no sideboard, so a list of cards you are weighing is exactly
-              what it is. `decklist.Parse` files a pasted `Sideboard`,
-              `Maybeboard` or `Considering` section here, our own moxfield.txt
-              artifact writes the commander and companion into `SIDEBOARD:`,
-              and the edit panel can move a card here — so decks have been
-              arriving with a bench for as long as importing has existed, and
-              the only place to look at it was the YAML (Aaron, 2026-08-24:
-              "do we have the notion of a sidepanel in our decks yet?").
-
-              Between the 99 and the graveyard, because that is where it sits
-              in the deck's own life: not in, not dead, still in the argument.
-              Read-only here on purpose — moving a card between the two lists
-              is a surgical edit and belongs to the edit panel that already
-              does it (ADR 12), not to a second door onto the same operation.
-              Shown to readers, like the graveyard: a bench is deck state. */}
-          {deck.swap_board.length > 0 && (
-            <section className="space-y-2 border-t pt-4"
-                     style={{ borderColor: 'var(--hairline)' }}>
-              <h3 className="flex items-baseline gap-2 text-sm font-semibold">
-                <span aria-hidden>⇄</span> Swap board
-                <span className="tabular text-xs font-normal"
-                      style={{ color: 'var(--text-muted)' }}>
-                  {deck.swap_board.length}
-                </span>
-              </h3>
-              <p className="max-w-2xl text-xs" style={{ color: 'var(--text-muted)' }}>
-                Cards under consideration, outside the {deck.total_cards}. They
-                are not simulated, not validated against the 99, and carry no
-                obligation — a maybeboard by its proper name. Nothing here
-                counts towards a draft’s outstanding rationales.
-              </p>
-              <ul className="space-y-1">
-                {deck.swap_board.map((card) => (
-                  <li key={card.name} className="card-surface rounded-lg p-2">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <CardHover card={card}>
-                        <CardArt src={card.art_crop} alt={card.name}
-                                 ratio="aspect-[626/457]"
-                                 className="w-16 shrink-0 cursor-help" />
-                      </CardHover>
-                      <div className="min-w-0 flex-1 basis-52">
-                        <div className="flex flex-wrap items-baseline gap-2">
-                          <CardHover card={card}>
-                            <span className="cursor-help text-sm font-medium">
-                              {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
-                              {card.name}
-                            </span>
-                          </CardHover>
-                          <ManaCost cost={card.mana_cost} />
-                        </div>
-                        {card.why && (
-                          <p className="mt-0.5 text-xs leading-relaxed"
-                             style={{ color: 'var(--text-secondary)' }}>
-                            <ManaText>{card.why}</ManaText>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+              **Its own component since 2026-08-29**, because it stopped being
+              a list and became a place somebody can start. It used to render
+              under `deck.swap_board.length > 0` — so a deck that had never
+              kept a board had no section at all, and the one feature that
+              needed introducing was invisible to exactly the decks that needed
+              it. It now renders for anyone who can write the deck, folds like
+              its neighbours, and carries the one control that puts a card on
+              it. `components/swapboard.tsx` argues the rest, including why
+              adding to the board is still not a mover between the two
+              lists. */}
+          <SwapBoard deck={deck.swap_board} deckRef={deckRef}
+                     stage={deck.stage} identity={deck.color_identity}
+                     total={deck.total_cards} writable={deck.writable}
+                     onChanged={() => void refresh()} />
 
           {/* The graveyard (ADR 27). Rendered for readers too — an entombed
               card is deck state, not a private undo buffer — but the two ways

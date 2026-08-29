@@ -27,7 +27,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The deck writes: the ten editing routes over
+// The deck writes: the eleven editing routes over
 // `internal/deckedit`'s surgical operations, whose output the
 // recorded goldens pin byte for byte.
 //
