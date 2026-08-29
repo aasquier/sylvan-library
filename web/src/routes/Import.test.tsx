@@ -46,6 +46,7 @@ function result(overrides: Partial<ImportResult> = {}): ImportResult {
     land_count: 36,
     swap_board: [],
     needs_rationale: 85,
+    rationales: 0,
     unknown: [],
     read: [],
     did_you_mean: [],
@@ -207,7 +208,7 @@ describe('Import', () => {
     fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
     fireEvent.click(screen.getByText('Preview'))
 
-    await waitFor(() => expect(screen.getByText(/85 cards will need a/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/85 cards still need a/)).toBeTruthy())
     expect(screen.getByText('draft')).toBeTruthy()
     expect(screen.queryByText(/generate|suggest|write .* for you/i)).toBeNull()
   })
@@ -441,5 +442,38 @@ describe('names that were read', () => {
     await preview(result())
     await waitFor(() => expect(screen.getByText(/99 cards in the 99/)).toBeTruthy())
     expect(screen.queryByText(/read as the card/)).toBeNull()
+  })
+
+  // The quoted rationale column. The page is the only place the format is
+  // written down, and the summary is the only place a person learns their
+  // reasons arrived at all.
+  it('teaches the quoted column without being asked', () => {
+    render(<MemoryRouter><Import /></MemoryRouter>)
+    expect(screen.getByText(/Say why a card is in the deck/)).toBeTruthy()
+    expect(screen.getByText(/Deathtouch body that kills artifacts too/)).toBeTruthy()
+  })
+
+  it('counts the reasons that arrived, not only the ones still owed',
+     async () => {
+    await preview(result({ rationales: 60, needs_rationale: 39 }))
+    await waitFor(() =>
+      expect(screen.getByText(/60 cards arrived with your reason already written/))
+        .toBeTruthy())
+    expect(screen.getByText(/39 cards still need a/)).toBeTruthy()
+  })
+
+  it('says nothing is owed when every card came with its reason', async () => {
+    await preview(result({ rationales: 99, needs_rationale: 0 }))
+    await waitFor(() => expect(screen.getByText('Nothing is owed.')).toBeTruthy())
+    // The promotion is a real control on the deck page, so the page says where
+    // it is rather than leaving a finished deck sitting in draft unexplained.
+    expect(screen.getByText(/promote it to curated from the\s+deck page/)).toBeTruthy()
+  })
+
+  it('keeps the old wording when a paste carried no reasons at all', async () => {
+    await preview(result({ rationales: 0, needs_rationale: 85 }))
+    await waitFor(() =>
+      expect(screen.getByText(/85 cards still need a/)).toBeTruthy())
+    expect(screen.queryByText(/arrived with your reason/)).toBeNull()
   })
 })

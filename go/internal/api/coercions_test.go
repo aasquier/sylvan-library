@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/deckimport"
 	"github.com/aasquier/sylvan-library/go/internal/decklist"
 )
 
@@ -199,8 +200,14 @@ func TestACompanionRendersAsNullRatherThanAnEmptyString(t *testing.T) {
 // page rather than an empty one.
 func TestListsTheFrontendIteratesAreNeverNull(t *testing.T) {
 	t.Parallel()
-	if got := orEmpty(nil); got == nil || len(got) != 0 {
+	if got := orEmpty[string](nil); got == nil || len(got) != 0 {
 		t.Errorf("nothing rendered as %#v", got)
+	}
+	// Generic on purpose: the null that reached the browser was a
+	// `[]deckimport.Correction`, and a helper that only knew about strings is
+	// exactly why that field was the one nobody put through it.
+	if got := orEmpty[deckimport.Correction](nil); got == nil || len(got) != 0 {
+		t.Errorf("no corrections rendered as %#v", got)
 	}
 	if got := orEmpty([]string{}); got == nil || len(got) != 0 {
 		t.Errorf("an empty list rendered as %#v", got)

@@ -418,6 +418,13 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
+		// Which reading of a trailing quoted run the pool has, decided before
+		// anything is spelled or built. It runs first because `Respell` must
+		// never be handed a name with somebody's sentence still glued to it:
+		// scoring that against 35,393 names is asking the wrong question, and
+		// a reported correction from it would be a correction nobody made.
+		read, chosen := deckimport.ReadRationales(parsed, found)
+		wanted = deckimport.NamesIn(read, commander, companion)
 		// Before the deck is built, so a corrected card is simply a card by
 		// the time anything downstream sees it -- the count, the category,
 		// the colour identity and the gate all read the real record.
@@ -425,10 +432,10 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		built, err := deckimport.BuildDeck(parsed, found, deckimport.Options{
+		built, err := deckimport.BuildDeck(read, found, deckimport.Options{
 			Slug: slug, Name: str(body, "name"), Commander: commander,
 			Companion: companion, Bracket: bracket, Status: status,
-			Read: corrections})
+			Read: corrections, Notes: chosen})
 		if err != nil {
 			return err
 		}
@@ -478,18 +485,23 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 	wire.JSON(w, http.StatusOK, map[string]any{
 		"slug": slug, "owner": lib.MyOwner(), "name": d.Name,
 		"stage": d.Stage, "status": d.Status, "created": !dryRun,
-		"commander": d.Commander, "companion": companionOrNil(d.Companion),
+		"commander": orEmpty(d.Commander), "companion": companionOrNil(d.Companion),
 		"total_cards": d.TotalCards(), "land_count": d.LandCount(),
-		"swap_board": swaps, "needs_rationale": report.NeedsRationale(),
-		"unknown": report.Unknown,
+		"swap_board": orEmpty(swaps), "needs_rationale": report.NeedsRationale(),
+		// How many reasons the paste carried in its own quoted column,
+		// beside how many are still owed. Two numbers rather than one
+		// because a person who wrote 60 of them should be told that, and
+		// "40 still owed" on its own reads like nothing arrived.
+		"rationales": report.Rationales,
+		"unknown":    orEmpty(report.Unknown),
 		// The shortlist beside the misses, and how many misses did not get
 		// one. Never applied here: see `didYouMean`.
-		"did_you_mean":         nearby,
+		"did_you_mean":         orEmpty(nearby),
 		"did_you_mean_skipped": over,
 		// What was misspelled and what it was read as. On the wire in its own
 		// right as well as in `notes`, so the page can put it where somebody
 		// will look rather than at the end of a list of remarks.
-		"read":       report.Read,
+		"read":       orEmpty(report.Read),
 		"unreadable": reportedLines(report.Unreadable),
 		"skipped":    reportedLines(report.Skipped),
 		"notes":      orEmpty(report.Notes), "yaml": report.YAML,
@@ -723,9 +735,23 @@ func reportedLines(lines []decklist.Line) []map[string]any {
 	return out
 }
 
-func orEmpty(items []string) []string {
+// orEmpty is a nil slice rendered as `[]` and never as `null`.
+//
+// Generic since 2026-08-28, and the reason is a bug this had already caused:
+// `notes` went through here and `read` did not, so an import where nothing
+// needed respelling sent `read: null` -- `Respell` returns a nil slice when it
+// makes no corrections -- against a wire type declaring `Correction[]`. The
+// page then read `.length` off null and the whole result panel went to the
+// error boundary. Every clean import, which is most of them.
+//
+// Nothing caught it because nothing could: the Go tests assert on the report
+// and not on the JSON, and the page's tests build their own fixture, which of
+// course has an empty array in it. It took pasting a list with no typos in a
+// browser. So the fix is the general one -- every list-shaped field on this
+// response goes through here now, whatever its element type.
+func orEmpty[T any](items []T) []T {
 	if items == nil {
-		return []string{}
+		return []T{}
 	}
 	return items
 }

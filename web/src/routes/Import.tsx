@@ -9,15 +9,24 @@ import {
 } from '../components/ui'
 
 /**
- * Cultivate, Jason Felix, Strixhaven Mystical Archive (2021) — search for two,
- * keep both, one ready now and one for later: an import in miniature, where
- * every name that resolves lands and every one that does not is kept and
- * reported. Part of the Mystical Archive cycle the page mastheads share; see
- * `CardSearch.tsx` for why that cycle, and `PageMasthead` for the
- * hotlink-and-credit rules.
+ * Meticulous Archive, Sam Burley, Murders at Karlov Manor (2024) — a reading
+ * room with the lamps lit, ladders against the shelves and scholars already at
+ * the tables: the place a list becomes part of a collection, which is what this
+ * page does.
+ *
+ * It leaves the Mystical Archive cycle the other mastheads share (see
+ * `CardSearch.tsx` for why that cycle) and the reason is Aaron's, on
+ * 2026-08-28: Magic has painted a great many libraries and this site is named
+ * for one, so the room where decks arrive should be a library rather than a
+ * spell about searching. Sylvan Library itself was not available to it — the
+ * shelf and Learn already wear two different printings of it, and a third
+ * would read as the same page twice.
+ *
+ * `PageMasthead` carries the hotlink-and-credit rules; the credit below is
+ * commandment 19's half of them and is not optional.
  */
-const CULTIVATE_ART =
-  'https://cards.scryfall.io/art_crop/front/b/3/b3896717-1e46-4aa2-88b7-1c4fe76edde1.jpg'
+const METICULOUS_ARCHIVE_ART =
+  'https://cards.scryfall.io/art_crop/front/6/5/652236c2-84ef-45e4-b5fc-ed6170bc3d6c.jpg'
 
 /**
  * Paste a decklist, see exactly what it resolves to, then create it.
@@ -151,18 +160,20 @@ export default function Import() {
   return (
     <div className="space-y-6">
       <PageMasthead
-        art={CULTIVATE_ART}
-        alt="Cultivate, painted by Jason Felix: a gardener cradling a young
-             sprout inside a golden wreath of blossoms."
+        art={METICULOUS_ARCHIVE_ART}
+        alt="Meticulous Archive, painted by Sam Burley: a vast vaulted reading
+             room, lamps burning along its length, ladders leaning against the
+             shelves and scholars bent over their tables."
         title="Import a decklist"
         credit={<>
-          <em>Cultivate</em> by Jason Felix, Strixhaven Mystical Archive —
-          search for two, keep both.
+          <em>Meticulous Archive</em> by Sam Burley, Murders at Karlov Manor —
+          the room a list walks into.
         </>}>
         <p className="max-w-2xl">
           Paste an export from Moxfield, Archidekt, Arena or anywhere else.
           Names are resolved against the local pool — anything that does not
-          resolve is reported, never guessed.{' '}
+          resolve is reported, never guessed. Add a quoted reason to any line
+          and it becomes that card&rsquo;s <code>why</code>.{' '}
           <Link to="/" className="underline" style={{ color: 'var(--series-1)' }}>
             Back to the library
           </Link>
@@ -182,7 +193,9 @@ export default function Import() {
               rows={18}
               spellCheck={false}
               aria-label="Decklist"
-              placeholder={'1 Arahbo, Roar of the World (C17) 27 *CMDR*\n1 Sol Ring\n36 Forest'}
+              placeholder={'1 Arahbo, Roar of the World (C17) 27 *CMDR*\n'
+                + '1 Sol Ring "fast mana, and it never gets cut"\n'
+                + '36 Forest'}
               className="rounded-md p-3 font-mono text-xs leading-relaxed outline-none focus:ring-2"
               style={{
                 background: 'var(--surface-1)',
@@ -194,6 +207,42 @@ export default function Import() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {lines} non-empty line{lines === 1 ? '' : 's'}
           </p>
+
+          {/* The house extension, taught by showing it rather than by
+              describing it. Every export this page reads has a column for the
+              printing and none for the reasoning, which is the one thing a
+              deck file here requires — so the reason goes in quotes at the end
+              of the line, and lands in that card's `why` verbatim.
+
+              Always open rather than behind a disclosure: it is the only place
+              the format is written down, and somebody who does not know it
+              exists will never press a control to find out (commandment 2). */}
+          <div className="space-y-2 rounded-lg px-4 py-3"
+               style={{ background: 'var(--gridline)',
+                        color: 'var(--text-secondary)' }}>
+            <p className="text-xs leading-relaxed">
+              <strong style={{ color: 'var(--text-primary)' }}>
+                Say why a card is in the deck, while you paste it.
+              </strong>{' '}
+              Put the reason in quotes at the end of any line and it becomes
+              that card&rsquo;s <code>why</code> — your words, exactly as you
+              wrote them. Every other column stays as your export wrote it,
+              so a list with no quotes at all still reads perfectly.
+            </p>
+            <pre className="overflow-x-auto rounded-md p-3 font-mono text-[11px] leading-relaxed"
+                 style={{ background: 'var(--surface-1)',
+                          border: '1px solid var(--hairline)',
+                          color: 'var(--text-muted)' }}>
+1 Acidic Slime (ZNC) 59{' '}
+              <span style={{ color: 'var(--series-1)' }}>
+                &quot;Deathtouch body that kills artifacts too&quot;
+              </span>
+            </pre>
+            <p className="text-xs leading-relaxed">
+              Cards you leave unquoted are counted, never invented — nothing
+              here writes a reason on your behalf.
+            </p>
+          </div>
 
           {/* The deck that exists nowhere online. Every other import path
               here is text, so a deck that lives in a box on a table has
@@ -508,16 +557,42 @@ function Preview({ result, showYaml, onToggleYaml, onFix }: {
         </ul>
       )}
 
+      {/* What is owed, and — the half that was missing until the quoted column
+          existed — what arrived. A person who wrote sixty reasons into their
+          paste and is answered with "39 cards will need a why" has been told
+          only the discouraging half of a good outcome (commandment 2). */}
       <div className="rounded-lg px-4 py-3 text-sm"
            style={{ background: 'var(--gridline)', color: 'var(--text-secondary)' }}>
-        <strong style={{ color: 'var(--text-primary)' }}>
-          {result.needs_rationale} card{result.needs_rationale === 1 ? '' : 's'} will
-          need a <code>why</code>.
-        </strong>{' '}
-        An imported deck is a draft: its legality, colour identity and size are
-        checked immediately, and the reasoning is counted rather than invented.
-        Write those rationales, promote it to curated, and the five artifacts
-        unlock.
+        {result.rationales > 0 && (
+          <>
+            <strong style={{ color: 'var(--series-1)' }}>
+              {result.rationales} card{result.rationales === 1 ? '' : 's'} arrived
+              with your reason already written.
+            </strong>{' '}
+          </>
+        )}
+        {result.needs_rationale > 0 ? (
+          <>
+            <strong style={{ color: 'var(--text-primary)' }}>
+              {result.needs_rationale} card{result.needs_rationale === 1 ? '' : 's'}{' '}
+              still need{result.needs_rationale === 1 ? 's' : ''} a <code>why</code>.
+            </strong>{' '}
+            An imported deck is a draft: its legality, colour identity and size
+            are checked immediately, and the reasoning is counted rather than
+            invented. Write the rest, promote it to curated, and the five
+            artifacts unlock.
+          </>
+        ) : (
+          <>
+            <strong style={{ color: 'var(--text-primary)' }}>
+              Nothing is owed.
+            </strong>{' '}
+            It still lands as a draft, so its legality, colour identity and size
+            are reported rather than refused — promote it to curated from the
+            deck page whenever you are happy with it, and the five artifacts
+            unlock.
+          </>
+        )}
       </div>
 
       <button onClick={onToggleYaml} className="btn btn-ghost btn-xs"

@@ -462,3 +462,162 @@ func TestRespellReportsWhatItRead(t *testing.T) {
 		t.Errorf("a name that was read is still reported unknown: %v", report.Unknown)
 	}
 }
+
+// The rationale column, read against a pool.
+//
+// This is the half `decklist` deliberately cannot do. The grammar hands up two
+// readings of a line that ends in a quoted run and refuses to choose; the
+// choice is a lookup, and these are the four shapes it has to get right.
+func TestReadRationalesAsksThePoolWhichReadingItIs(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		line     string
+		known    []string
+		wantName string
+		wantWhy  string
+		wantNote bool
+		why      string
+	}{
+		{
+			name:     "a reason on a card the pool knows",
+			line:     `1 Sol Ring (LTC) 284 "fast mana, every deck"`,
+			known:    []string{"Sol Ring"},
+			wantName: "Sol Ring",
+			wantWhy:  "fast mana, every deck",
+			why:      "the peeled reading resolves, so the quoted run is a reason",
+		},
+		{
+			name:     "an epithet the pool knows as part of the name",
+			line:     `1 Kongming, "Sleeping Dragon"`,
+			known:    []string{`Kongming, "Sleeping Dragon"`},
+			wantName: `Kongming, "Sleeping Dragon"`,
+			wantWhy:  "",
+			wantNote: true,
+			why:      "the whole reading resolves and the peeled one does not",
+		},
+		{
+			name:     "that same card WITH a reason",
+			line:     `1 Kongming, "Sleeping Dragon" "a lord I keep cutting"`,
+			known:    []string{`Kongming, "Sleeping Dragon"`},
+			wantName: `Kongming, "Sleeping Dragon"`,
+			wantWhy:  "a lord I keep cutting",
+			why:      "only the LAST quoted run is the column, so the peel is already right",
+		},
+		{
+			name:     "a misspelling with a reason",
+			line:     `1 Sol Rng "fast mana, every deck"`,
+			known:    []string{"Sol Ring"},
+			wantName: "Sol Rng",
+			wantWhy:  "fast mana, every deck",
+			why: "the pool knows neither reading, so the peeled one is kept and " +
+				"Respell gets a name to score instead of a name plus a sentence",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cards := map[string]*pool.CardRecord{}
+			for _, n := range tc.known {
+				cards[n] = &pool.CardRecord{Name: n}
+			}
+			read, notes := ReadRationales(decklist.Parse(tc.line), cards)
+			if len(read.Cards) != 1 {
+				t.Fatalf("read %d cards, wanted 1 (%s)", len(read.Cards), tc.why)
+			}
+			got := read.Cards[0]
+			if got.Name != tc.wantName {
+				t.Errorf("name: got %q, wanted %q (%s)", got.Name, tc.wantName, tc.why)
+			}
+			if got.Why != tc.wantWhy {
+				t.Errorf("why: got %q, wanted %q (%s)", got.Why, tc.wantWhy, tc.why)
+			}
+			if got.Unpeeled != "" {
+				t.Errorf("Unpeeled survived as %q; a chosen reading leaves no choice "+
+					"behind, or the second NamesIn asks about both again", got.Unpeeled)
+			}
+			if gotNote := len(notes) > 0; gotNote != tc.wantNote {
+				t.Errorf("notes %v, wanted a note: %v -- a reason somebody thought "+
+					"they wrote and did not get has to be said out loud", notes, tc.wantNote)
+			}
+		})
+	}
+}
+
+// The column is the user's own words reaching the deck file, which is the
+// whole point of it: rule 4 forbids a rationale the tool composed, and this
+// composes nothing.
+func TestAPastedReasonBecomesTheCardsWhy(t *testing.T) {
+	t.Parallel()
+	text := "1 Arahbo, Roar of the World (C17) 27 *CMDR*\n" +
+		"1 Sol Ring \"fast mana, and it never gets cut\"\n" +
+		"1 Cultivate\n"
+	cards := map[string]*pool.CardRecord{
+		"Arahbo, Roar of the World": {Name: "Arahbo, Roar of the World"},
+		"Sol Ring":                  {Name: "Sol Ring"},
+		"Cultivate":                 {Name: "Cultivate"},
+	}
+	read, notes := ReadRationales(decklist.Parse(text), cards)
+	report, err := BuildDeck(read, cards, Options{Slug: "arahbo-cats", Notes: notes})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+	byName := map[string]string{}
+	for _, c := range report.Deck.Cards {
+		byName[c.Name] = c.Why
+	}
+	if got := byName["Sol Ring"]; got != "fast mana, and it never gets cut" {
+		t.Errorf("Sol Ring's why is %q; the quoted column is carried verbatim", got)
+	}
+	if got := byName["Cultivate"]; got != "" {
+		t.Errorf("Cultivate's why is %q; a card that arrived without a reason "+
+			"still arrives without one, and nothing here writes it", got)
+	}
+	if report.Rationales != 1 {
+		t.Errorf("counted %d rationales, wanted 1", report.Rationales)
+	}
+	if report.NeedsRationale() != 1 {
+		t.Errorf("%d still owed, wanted 1 (Cultivate)", report.NeedsRationale())
+	}
+	// The file's own header is part of what the person reads, and a deck that
+	// arrived with reasons was not "NOT yet reasoned about".
+	if strings.Contains(report.YAML, "NOT yet reasoned about") {
+		t.Error("the header still calls a deck with a written reason unreasoned about")
+	}
+	if !strings.Contains(report.YAML, "1 of its reasons written") {
+		t.Errorf("the header does not say what arrived:\n%s", report.YAML)
+	}
+	if !strings.Contains(report.YAML, "fast mana, and it never gets cut") {
+		t.Error("the reason did not reach the deck file")
+	}
+}
+
+// A deck that arrived complete is told so, because the next thing its owner
+// wants is the promote control and not a lecture about empty fields.
+func TestAFullyReasonedImportSaysNothingIsOwed(t *testing.T) {
+	t.Parallel()
+	text := "1 Arahbo, Roar of the World (C17) 27 *CMDR* \"the whole deck\"\n" +
+		"1 Sol Ring \"fast mana\"\n"
+	cards := map[string]*pool.CardRecord{
+		"Arahbo, Roar of the World": {Name: "Arahbo, Roar of the World"},
+		"Sol Ring":                  {Name: "Sol Ring"},
+	}
+	read, notes := ReadRationales(decklist.Parse(text), cards)
+	report, err := BuildDeck(read, cards, Options{Slug: "arahbo-cats", Notes: notes})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+	if report.NeedsRationale() != 0 {
+		t.Fatalf("%d still owed, wanted 0", report.NeedsRationale())
+	}
+	if !strings.Contains(report.YAML, "Nothing is owed") {
+		t.Errorf("the header does not say the deck is complete:\n%s", report.YAML)
+	}
+	// Still a draft: `draft` is the deck saying nobody has looked at it whole
+	// yet, and the gate reporting its problems as warnings is the diagnosis a
+	// newcomer wants on the first screen (ADR 13). Promotion is one control
+	// away on the deck page.
+	if report.Deck.Stage != "draft" {
+		t.Errorf("stage is %q; an import lands as a draft however complete it is",
+			report.Deck.Stage)
+	}
+}
