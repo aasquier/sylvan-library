@@ -36,6 +36,13 @@ In order:
    door in a local browser with Aaron's eyes on them, then the full
    deployed walk-through. The Coliseum's gear fan is owed one too — it wants
    a live match with something equipped on the board.
+   **The intake sheet (ADR 41) is owed the sharpest one of these.** Its
+   gates, its writes and its refusals are all tested, and its three prompts
+   have never met a real 99-card list — every test answers them with a
+   script. What a drafted rationale actually *reads like* over somebody's
+   own deck is unmeasured, and it is the only part of that feature a test
+   cannot tell us. Run it against a real import, read all ninety-nine, and
+   expect the prompts to need work.
 2. **The bout's own follow-ups** (#376 landed the combat square-off: the
    arrows are gone and a block opens a fight on the centre stage, the
    attacker out of its own seat's edge and the wall ranked across the
