@@ -6,13 +6,20 @@
  * and the printed primer all render — so a deck without one showed nothing at
  * all, and an imported deck is precisely the deck without one. The silence was
  * worst exactly where somebody had just arrived.
+ *
+ * The second half is the assist, and its tests are about one thing: **a draft
+ * never becomes the deck's description without somebody choosing it twice** —
+ * once to take it into the box, once to save the box. The suite drives the
+ * hard case rather than the easy one, so most of what is below happens over a
+ * description a person already wrote.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ClaudeStatus, DeckDescriptionDraft, StanceView } from '../lib/api'
 
 vi.mock('../lib/api', async () => ({
   ...(await vi.importActual<typeof import('../lib/api')>('../lib/api')),
-  api: { setDeckField: vi.fn() },
+  api: { setDeckField: vi.fn(), claudeStatus: vi.fn(), describeDeck: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
@@ -21,10 +28,54 @@ const { StrategyEditor } = await import('./deckedit')
 const REF = { owner: 'aasquier', slug: 'gyome-food' }
 const GYOME = 'Golgari Food aristocrats. Gyome turns every nontoken creature '
   + 'into a meal, and the deck drains the table sacrificing them.'
+const DRAFTED = 'Cook Food, sacrifice it, drain the table. Slow to start, and '
+  + 'it folds to a board wipe on turn six.'
+
+function view(level: string): StanceView {
+  return {
+    preset: 'consultant',
+    allows_calls: level !== 'off',
+    may_write: false,
+    axes: [{ axis: 'initiative', question: '', level, means: '', levels: [] }],
+  }
+}
+
+/** An instance with a key, at a stance that answers. `level` is the initiative
+ *  axis, which is the one that decides whether a call happens at all. */
+function status(level = 'on-request'): ClaudeStatus {
+  return {
+    installed: true, configured: true, model: 'claude-sonnet-5',
+    stance: view(level), ceiling: view('interjects'), default: view('on-request'),
+    presets: [], never: '', modes: [],
+  }
+}
+
+function drafted(over: Partial<DeckDescriptionDraft> = {}): DeckDescriptionDraft {
+  return {
+    answered_by: 'claude', mode: 'deck-description', slug: 'gyome-food',
+    asked: true, reason: '', stance: view('on-request'),
+    strategy: DRAFTED, themes: ['food', 'aristocrats'],
+    fact: 'Gyome makes Food on every death; fourteen sacrifice outlets.',
+    never: 'This is a draft in your own box. Nothing is saved until you save it.',
+    ...over,
+  }
+}
+
+/** Open the editor over an existing description — the hard case. */
+async function openOver(text: string) {
+  render(<StrategyEditor deck={REF} value={text} writable onDone={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Edit description' }))
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Ask Claude for a draft' })).toBeTruthy())
+}
 
 describe('StrategyEditor', () => {
   afterEach(cleanup)
-  beforeEach(() => vi.mocked(api.setDeckField).mockReset())
+  beforeEach(() => {
+    vi.mocked(api.setDeckField).mockReset()
+    vi.mocked(api.describeDeck).mockReset()
+    vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(status())
+  })
 
   it('offers the pen when the deck says nothing yet', () => {
     render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
@@ -85,5 +136,275 @@ describe('StrategyEditor', () => {
 
     expect(api.setDeckField).not.toHaveBeenCalled()
     expect(screen.getByText(/Golgari Food aristocrats/)).toBeTruthy()
+  })
+})
+
+describe('StrategyEditor: the draft', () => {
+  afterEach(cleanup)
+  beforeEach(() => {
+    vi.mocked(api.setDeckField).mockReset()
+    vi.mocked(api.describeDeck).mockReset()
+    vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(status())
+  })
+
+  // The blank deck is where a newcomer is most likely to want help and least
+  // likely to go looking for it, so the way in sits beside the pen rather than
+  // behind it.
+  it('offers the draft beside the pen on a deck that says nothing yet', async () => {
+    render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ask Claude for a draft' })).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Describe this deck' })).toBeTruthy()
+  })
+
+  // A control that appears and then refuses is worse than one that is honestly
+  // absent (ADR 15) — and a deck somebody else owns is not a deck this can
+  // help with, so nothing is even asked about it.
+  it('asks nothing at all about a deck this person cannot write', () => {
+    render(<StrategyEditor deck={REF} value={GYOME} writable={false} onDone={vi.fn()} />)
+    expect(api.claudeStatus).not.toHaveBeenCalled()
+  })
+
+  // Pressing the way in opens the editor AND asks: the decision was made by
+  // the click that opened it, and a second button for it is a hole to stare
+  // into. Once, on the deck — a re-render must not buy a second call.
+  it('asks once when the editor is opened by the ask', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ask Claude for a draft' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() => expect(screen.getByText(/Cook Food, sacrifice it/)).toBeTruthy())
+    expect(api.describeDeck).toHaveBeenCalledTimes(1)
+  })
+
+  // **The load-bearing one.** The draft renders beside the box and lands in
+  // nothing until somebody presses a button that said what it would do.
+  it('shows a draft without putting a word of it in the box', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() => expect(screen.getByText(/Cook Food, sacrifice it/)).toBeTruthy())
+    const box = screen.getByLabelText('What this deck is trying to do') as HTMLTextAreaElement
+    expect(box.value).toBe(GYOME)
+    // And nothing has been written anywhere: this route proposes, the person
+    // saves, and the save is a separate button.
+    expect(api.setDeckField).not.toHaveBeenCalled()
+  })
+
+  // The label names the cost before it is paid: over a paragraph somebody
+  // wrote, the button says it will replace it.
+  it('says it will replace what you wrote, when there is something to replace', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replace what you wrote' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Use this draft' })).toBeNull()
+  })
+
+  it('says it will simply use the draft, when the box is empty', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ask Claude for a draft' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Use this draft' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Replace what you wrote' })).toBeNull()
+  })
+
+  // A replacement is one click from being undone, and neither version is ever
+  // the one you cannot get back: the draft stays on screen after it is used.
+  it('gives the words back after a replacement', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replace what you wrote' })).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace what you wrote' }))
+    const box = screen.getByLabelText('What this deck is trying to do') as HTMLTextAreaElement
+    expect(box.value).toBe(DRAFTED)
+    // Still nothing saved: the swap happened in this box and nowhere else.
+    expect(api.setDeckField).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Put your own words back' }))
+    expect((screen.getByLabelText('What this deck is trying to do') as HTMLTextAreaElement)
+      .value).toBe(GYOME)
+    // Offered only while there is something to put back.
+    expect(screen.queryByRole('button', { name: 'Put your own words back' })).toBeNull()
+  })
+
+  // Once the draft IS the box, "replace what you wrote" is a sentence about
+  // nothing. Said rather than disabled: a greyed control reads as "this is
+  // broken" where the truth is "this is already done" — and it comes back the
+  // moment somebody types over it.
+  it('stops offering the draft once the box already holds it', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replace what you wrote' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Replace what you wrote' }))
+
+    expect(screen.getByText(/in the box above, and yours to edit/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Replace what you wrote' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Use this draft' })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('What this deck is trying to do'),
+      { target: { value: `${DRAFTED} And it never blocks.` } })
+    expect(screen.getByRole('button', { name: 'Replace what you wrote' })).toBeTruthy()
+  })
+
+  // Taking a draft into the box does not offer an undo of nothing.
+  it('offers no undo when the draft displaced nothing', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ask Claude for a draft' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Use this draft' })).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use this draft' }))
+    expect(screen.queryByRole('button', { name: 'Put your own words back' })).toBeNull()
+  })
+
+  // The draft reaches the deck by the same call a person's own typing does,
+  // and only because they pressed save.
+  it('writes the draft only through save, and only what is in the box', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    vi.mocked(api.setDeckField).mockResolvedValue({ slug: 'gyome-food' } as never)
+    render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ask Claude for a draft' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Use this draft' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Use this draft' }))
+
+    // Edited on the way, which is the point of putting it in a box at all.
+    const edited = `${DRAFTED} And it never blocks.`
+    fireEvent.change(screen.getByLabelText('What this deck is trying to do'),
+      { target: { value: edited } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save description' }))
+
+    await waitFor(() =>
+      expect(api.setDeckField).toHaveBeenCalledWith(REF, 'strategy', edited))
+  })
+
+  // Commandment 2's "shut out" includes shut out by a screen reader. The
+  // answer lands ten to twenty seconds after the button, which a sighted
+  // person watches happen and a reader would otherwise meet as silence, then
+  // silence. An announcement is not a thing a screenshot can show, so nothing
+  // else in this suite would notice a refactor dropping it.
+  it('announces the draft in a region a reader is watching', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toContain('Cook Food, sacrifice it'))
+  })
+
+  // ADR 14 boundary 3: the gate's answer is reproducible and this is not, so
+  // they never share a surface without a label. It names the system, never a
+  // model id (commandment 10).
+  it('says who answered, what it read, and that nothing is saved yet', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() => expect(screen.getByText(/A draft by Claude, not the gate/)).toBeTruthy())
+    expect(screen.getByText(/fourteen sacrifice outlets/)).toBeTruthy()
+    expect(screen.getByText(/Nothing is saved until you save it/)).toBeTruthy()
+    // The themes are shown, and the panel says they are only shown.
+    expect(screen.getByText(/food, aristocrats/)).toBeTruthy()
+    expect(screen.getByText(/this box writes the description/)).toBeTruthy()
+  })
+
+  // `asked: false` is a real answer, not a failure: the dial is down, no call
+  // was made, and it costs nothing. Rendering it as an error would tell
+  // somebody their instance is broken when their preference is merely off.
+  it('renders a stance that made no call as a reason, not an error', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted({
+      asked: false, strategy: '', themes: [],
+      reason: 'The stance is off, so no call was made.',
+    }))
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() => expect(screen.getByText(/no call was made/)).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Replace what you wrote' })).toBeNull()
+  })
+
+  // A dial set to silence is a position somebody chose. Say where the dial is
+  // rather than showing a button that would refuse.
+  it('points at the dial rather than offering a control that would refuse', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(status('off'))
+    render(<StrategyEditor deck={REF} value={GYOME} writable onDone={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }))
+
+    await waitFor(() => expect(screen.getByText(/set to stay silent/)).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Ask Claude for a draft' })).toBeNull()
+    expect(api.describeDeck).not.toHaveBeenCalled()
+  })
+
+  // And the empty state's way in is absent for the same reason.
+  it('does not offer the way in when the dial is down', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(status('off'))
+    render(<StrategyEditor deck={REF} value="" writable onDone={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Describe this deck' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Ask Claude for a draft' })).toBeNull()
+  })
+
+  // **A fallback that reads as a fact is the mistake this repo makes most
+  // often.** A panel that vanished when the status call failed would be
+  // claiming "this instance has no Claude", which nobody checked.
+  it('says the question failed rather than silently having no assist', async () => {
+    vi.mocked(api.claudeStatus).mockRejectedValue(new Error('the network went away'))
+    render(<StrategyEditor deck={REF} value={GYOME} writable onDone={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }))
+
+    await waitFor(() => expect(screen.getByText(/could not be reached just now/)).toBeTruthy())
+    // The box still works, which is what the sentence promises.
+    expect(screen.getByLabelText('What this deck is trying to do')).toBeTruthy()
+  })
+
+  // A refused call is the caller's to see. It must not read as "your deck has
+  // nothing worth saying about it".
+  it('surfaces a refused call instead of an empty panel', async () => {
+    vi.mocked(api.describeDeck).mockRejectedValue(new Error('claude is unavailable'))
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+
+    await waitFor(() => expect(screen.getByText(/claude is unavailable/)).toBeTruthy())
+  })
+
+  // Commandment 17: every control answers the hand that reaches for it, and
+  // the `.btn` family in `index.css` is that commandment in code. jsdom has no
+  // layout, so what this can check is that the family is worn at all — the
+  // hover, focus and press states themselves are Aaron's walk.
+  it('dresses every control in the button family', async () => {
+    vi.mocked(api.describeDeck).mockResolvedValue(drafted())
+    await openOver(GYOME)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Claude for a draft' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replace what you wrote' })).toBeTruthy())
+
+    for (const name of ['Ask again', 'Replace what you wrote']) {
+      expect(screen.getByRole('button', { name }).className,
+        `${name} is a bare button`).toContain('btn')
+    }
+    // The undo only exists on the far side of a replacement.
+    fireEvent.click(screen.getByRole('button', { name: 'Replace what you wrote' }))
+    expect(screen.getByRole('button', { name: 'Put your own words back' }).className)
+      .toContain('btn')
   })
 })

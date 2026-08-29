@@ -3192,6 +3192,33 @@ export const api = {
   forgeStatus: () => get<ForgeStatus>('/api/forge'),
   simForge: (payload: Record<string, unknown>) => post<Job>('/api/sim/forge', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
+  /* ---- Lane B: the bulk edit ------------------------------------------- */
+  /** Rewrite the whole 99 from one pasted list, in two round trips.
+   *
+   *  `dry_run` asks what would happen and writes nothing — the same request,
+   *  the same code, the same plan, which is what `importDeck`'s preview does
+   *  and for the same reason: somebody approves the real result rather than a
+   *  description of it.
+   *
+   *  `basis` is the deck the plan was read from, handed out by the preview and
+   *  handed back on the confirm. The server refuses a plan whose deck has
+   *  moved since — a second tab, or a window left open — so a set of burials
+   *  can never land on a deck they were never compared against. It is opaque
+   *  and never rendered; what a person reads when it does not match is a
+   *  sentence about their deck having changed. */
+  bulkEdit: (ref: DeckRef, body: { text: string; dry_run?: boolean; basis?: string }) =>
+    post<BulkPreview | BulkApplied>(deckPath(ref, '/bulk'), body),
+  // The deck's description, drafted (lane G, 2026-08-29). The import intake
+  // runs this same mode and *writes* what it answers; this route does not,
+  // which is the only difference and the whole point of it: on the deck page
+  // the field may already hold a paragraph its owner wrote. The draft comes
+  // back to the editor's own box, and it reaches the deck file — if it reaches
+  // it at all — through `setDeckField`, the same call the person's typing uses.
+  //
+  // A plain route rather than a job: one call about the whole deck, in the
+  // interview's seconds class rather than the intake's minutes.
+  describeDeck: (ref: DeckRef, body: { stance?: string } = {}) =>
+    post<DeckDescriptionDraft>(deckPath(ref, '/describe'), body),
   /** The crypt: what this player has entombed, newest first.
    *
    * No owner in the path, unlike every other deck call in this client. Your
@@ -3206,6 +3233,44 @@ export const api = {
   returnEntombed: (id: string) =>
     post<{ slug: string; name: string; restored: boolean }>(
       `/api/decks/entombed/${encodeURIComponent(id)}/return`, {}),
+}
+
+/**
+ * A drafted deck description, before anything has written it down.
+ *
+ * **Nothing here is marked as Claude's in the deck file, and that is a
+ * decision.** `why_by: claude` (ADR 41) exists because a rationale is a claim
+ * about somebody's thinking and a drafted one is a claim nobody made yet; the
+ * mark is dropped the first time a person edits the sentence. This paragraph
+ * lands in the owner's own textarea, where they read it and may rewrite half of
+ * it before pressing save — it has passed that moment before it is ever
+ * written. The honesty is paid where it is owed instead: on screen, while the
+ * draft is still a draft, labelled as Claude's and not the gate's.
+ */
+export interface DeckDescriptionDraft {
+  /** ADR 14's third boundary as a field: which system answered. Never a model
+   *  id — commandment 10, and `lib/claudecopy.ts` is that rule in code. */
+  answered_by: string
+  mode: string
+  slug: string
+  /** False when the stance was `off` — no call was made, which is not the same
+   *  as a call that had nothing to say. Render the `reason`, not an error. */
+  asked: boolean
+  reason: string
+  stance: StanceView
+  /** The paragraph. Empty when nothing usable came back, in which case
+   *  `reason` says so. */
+  strategy: string
+  /** The deck's index terms. Always a list — `[]` and never null, so a
+   *  component may map it without a guard that would read as a fact. */
+  themes: string[]
+  /** What the draft rests on: counts, the commander's ability, the cards that
+   *  make the theme. Shown beside the paragraph, because a draft whose facts
+   *  are visible is one somebody can disagree with. */
+  fact: string
+  /** The promise the payload carries about itself, said by the server so a
+   *  second client cannot render this as anything other than a draft. */
+  never: string
 }
 
 /** How many polls in a row may fail before a followed job is given up on.
@@ -3273,4 +3338,106 @@ export function followJob(
     tick()
   })
   return { promise, cancel }
+}
+
+/* ---- Lane B: the bulk edit's wire shapes ------------------------------- */
+
+/** A card the pasted list has and the deck does not. */
+export interface BulkAdd {
+  name: string
+  category: string
+  qty: number
+  why: string
+}
+
+/** A reason the paste replaces, beside the one it replaces.
+ *
+ *  Both halves travel because a confirmation that only counts the rewrites is
+ *  a warning; one that shows the sentence leaving and the sentence arriving is
+ *  a decision. */
+export interface BulkRewrite {
+  name: string
+  was: string
+  why: string
+  /** The sentence being replaced was one Claude drafted (ADR 41). Replacing a
+   *  draft with your own words is the intended path; replacing your own words
+   *  is the one to look at twice. */
+  was_drafted: boolean
+}
+
+export interface BulkRequantify {
+  name: string
+  was: number
+  qty: number
+}
+
+/** A pasted card the edit will not touch, and the reason in plain words. */
+export interface BulkLeft {
+  name: string
+  reason: string
+}
+
+/** A pasted card the edit *cannot* apply — a new card with no reason on a
+ *  curated deck. The whole edit is refused while any of these stand, and the
+ *  reason says exactly what to type. */
+export interface BulkBlocked {
+  name: string
+  reason: string
+}
+
+/** What a pasted list would do to a deck, and what it would not. */
+export interface BulkPlan {
+  /** The deck this plan was read from. Opaque, never rendered, handed back on
+   *  the confirm so a plan cannot land on a deck that moved under it. */
+  basis: string
+  /** The deck is a draft, so a card may arrive owing its reason (ADR 13). */
+  draft: boolean
+  add: BulkAdd[]
+  rewrite: BulkRewrite[]
+  requantify: BulkRequantify[]
+  /** Every card in the 99 the list did not name. They go to the **graveyard**,
+   *  keeping their reason, and come back from the deck page — never deleted. */
+  entomb: string[]
+  unchanged: string[]
+  /** Names that appeared on more than one line; the quantities were added. */
+  merged: string[]
+  left: BulkLeft[]
+  blocked: BulkBlocked[]
+}
+
+/** What the paste was read as, whichever call asked. Shared by the preview and
+ *  the applied answer so the surface renders one thing. */
+export interface BulkReading {
+  /** Names the pool does not know. Never applied — the deck keeps what it has,
+   *  which is also why an unresolved name usually explains one of the
+   *  burials. */
+  unknown: string[]
+  did_you_mean: DidYouMean[]
+  did_you_mean_skipped: number
+  /** Misspellings read as the card they are nearest to, said out loud. */
+  read: Correction[]
+  unreadable: { line: number; text: string }[]
+  skipped: { line: number; text: string }[]
+  /** Lines under a heading that is not the 99 — a commander, a companion, a
+   *  sideboard. Reported rather than applied. */
+  outside: { line: number; text: string }[]
+  notes: string[]
+}
+
+export interface BulkPreview extends BulkReading {
+  slug: string
+  dry_run: true
+  plan: BulkPlan
+  /** Whether the confirm may be offered at all: nothing blocked, and something
+   *  to do. */
+  ready: boolean
+}
+
+export interface BulkApplied extends EditResult, BulkReading {
+  plan: BulkPlan
+  entombed: string[]
+}
+
+export function isBulkPreview(r: BulkPreview | BulkApplied): r is BulkPreview {
+  return 'dry_run' in r && r.dry_run === true
 }

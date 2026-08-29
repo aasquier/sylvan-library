@@ -341,7 +341,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/ocr/{name}", Handler: a.ocrAsset},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}", Handler: a.artMotionStatus},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}/{filename}", Handler: a.artMotionFile},
-		// The deck writes: the nine editing routes,
+		// The deck writes: the ten editing routes,
 		// every one of them going out through `commit` -- so the gate's
 		// verdict and ADR 28's log entry are inherited rather than
 		// remembered. A deck the caller cannot see is a 404 before
@@ -350,6 +350,11 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/cards", Handler: a.addCard},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.removeCard},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/entomb", Handler: a.entombCards},
+		// The bulk edit: the whole 99 from one pasted list, and the only write
+		// here that answers before it acts. `dry_run` returns the plan and
+		// writes nothing; a confirm carries back the deck the plan was read
+		// from and is refused if that deck has moved since.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/bulk", Handler: a.bulkEdit},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}/return", Handler: a.returnCard},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}", Handler: a.exileCard},
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.patchCard},
@@ -400,6 +405,14 @@ func (a *API) Routes() []Route {
 		// deck this caller cannot see and 403 for a read-only source, both
 		// before it reads a single action off the body.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/intake", Handler: a.intakeDeck},
+		// The description, asked from the deck page: the intake's `description`
+		// step as a surface of its own, and the one difference is that this one
+		// WRITES NOTHING. It proposes a paragraph into the editor's box and the
+		// person saves it through `PATCH` above, because on this page the field
+		// may already hold words somebody wrote. It reaches as far as a write
+		// does -- 404 unseen, 403 read-only -- because a draft nobody can save
+		// is a call nobody can use.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/describe", Handler: a.describeDeck},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
 		// the NET lane,

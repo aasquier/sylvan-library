@@ -17,8 +17,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  api, type Card, type CardOffer, type ClaudeStatus, type DeckRef, type EditResult,
-  type InterviewReport, type SlotArgumentReport,
+  api, type Card, type CardOffer, type ClaudeStatus, type DeckDescriptionDraft,
+  type DeckRef, type EditResult, type InterviewReport, type SlotArgumentReport,
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { presetLabel } from '../lib/claudecopy'
@@ -769,6 +769,231 @@ export function NoteEditor({ deck, noteKey, value, onDone, writable = true }: {
 }
 
 /**
+ * `/api/claude` for one deck: what this instance has, and what the dial says.
+ *
+ * **Three answers rather than two**, which is the whole reason this is a hook
+ * and not two lines inlined. `undefined` is "not asked yet", `null` is "the
+ * question itself failed", and a status is a status. The panels below render
+ * nothing for the first and *say so* for the second — because a panel that
+ * vanishes when the call fails is a fallback that reads as a fact, and what it
+ * would be claiming is "this instance has no Claude", which nobody checked.
+ *
+ * Cheap and local: this endpoint reaches no network of its own, it reports
+ * what the environment has and what the dial resolved. It is asked only when
+ * `enabled`, so a deck somebody is merely reading pays nothing for it.
+ */
+function useClaudeStatus(deck: DeckRef, enabled: boolean) {
+  const [status, setStatus] = useState<ClaudeStatus | null | undefined>(undefined)
+  // Read rather than set: the dial lives up on the deck page and this
+  // subscribes to the same store, so moving it and then asking asks with the
+  // stance that was just chosen.
+  const [pin, setPin] = useStance()
+  useEffect(() => {
+    if (!enabled) return
+    let live = true
+    // `owner` too: the route takes its deck as a query parameter rather than a
+    // path segment, so the URL alone does not say whose it is.
+    fetchClaudeStatus({ slug: deck.slug, owner: deck.owner }, pin, () => setPin(null))
+      .then((s) => { if (live) setStatus(s) })
+      .catch(() => { if (live) setStatus(null) })
+    return () => { live = false }
+  }, [deck, enabled, pin, setPin])
+  return { status, pin }
+}
+
+/** Whether a status permits an ask at all: present, keyed, and not switched
+ *  off. The same three-part answer the dossier button and the deck page use —
+ *  a control that appears and then refuses is worse than one that is honestly
+ *  absent (ADR 15). */
+function claudeCanAnswer(status: ClaudeStatus | null | undefined): boolean {
+  return !!status?.installed && !!status.configured
+    && status.stance.axes[0]?.level !== 'off'
+}
+
+/**
+ * Claude's draft of the deck's description — beside the box, never into it.
+ *
+ * The mode is `deck-description`, the same one the import intake runs. There it
+ * writes: an imported deck is seconds old, its description is empty by
+ * construction, and the intake skips the step outright for a deck that already
+ * says something. **Here the field may already hold a paragraph its owner
+ * wrote**, so the route this panel calls writes nothing at all and this panel
+ * is where that difference is kept honest:
+ *
+ * * The draft renders *alongside* the box. Nothing lands in the textarea
+ *   until somebody presses a button, and the button's label says what pressing
+ *   it will do — "Use this draft" over an empty box, "Replace what you wrote"
+ *   over a full one, and no button at all once the box already holds this
+ *   draft. No control here is ambiguous about whose words lose.
+ * * A replacement is one click from being undone, and the draft stays on
+ *   screen after it is used, so neither version is ever the one you cannot get
+ *   back.
+ * * Nothing reaches the deck file until **Save description**, which is the
+ *   same button and the same call a person's own typing goes through.
+ *
+ * This is ADR 8 and ADR 11's principle — no surface writes for you unasked —
+ * applied to a field they do not name. The deck's `strategy` is not a card's
+ * `why`, and this panel does not pretend it is: there is no `why_by`-style mark
+ * on the far side, because ADR 41's mark is dropped the first time a person
+ * edits a drafted sentence and here that edit has already had its chance before
+ * anything is saved. `claude.DescriptionNever` is the server saying the same
+ * thing in the payload, and it renders at the bottom of the panel.
+ */
+function DescriptionAssist({ deck, status, pin, current, autoAsk, onUse }: {
+  deck: DeckRef
+  status: ClaudeStatus | null | undefined
+  pin: string | null
+  /** What is in the box right now, so the control can name what it will cost. */
+  current: string
+  /** Opened by a control that already said "ask", so asking again here would
+   *  be a second click for a decision somebody has made. */
+  autoAsk?: boolean
+  onUse: (draft: string) => void
+}) {
+  const [draft, setDraft] = useState<DeckDescriptionDraft | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const askIt = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      // The dial's pin, or nothing — in which case the server resolves this
+      // deck's own default from its status and clamps it to the deployment's
+      // ceiling. What actually applied comes back in the report.
+      setDraft(await api.describeDeck(deck, { stance: effectivePin(pin, status ?? null) }))
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }, [deck, pin, status])
+
+  // Fired once, on the deck, rather than once per mount: re-rendering must not
+  // buy a second call.
+  const asked = useRef('')
+  useEffect(() => {
+    if (!autoAsk || !claudeCanAnswer(status)) return
+    if (asked.current === deck.slug) return
+    asked.current = deck.slug
+    void askIt()
+  }, [autoAsk, status, deck.slug, askIt])
+
+  if (status === undefined) return null
+  if (status === null) {
+    return (
+      <p className="border-t pt-2 text-xs"
+         style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
+        Claude could not be reached just now. The description is still yours to
+        write, and the box above works either way.
+      </p>
+    )
+  }
+  if (!status.installed || !status.configured) return <ClaudeUnavailable className="text-xs" />
+  if (status.stance.axes[0]?.level === 'off') {
+    // A real position, not a fault: somebody set the dial to stay silent. Say
+    // where the dial is rather than showing a button that would refuse.
+    return (
+      <p className="border-t pt-2 text-xs"
+         style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
+        Claude is set to stay silent for this deck. The dial at the top of the
+        page will let it help you draft this.
+      </p>
+    )
+  }
+
+  const replacing = current.trim().length > 0
+  // Whether the box already holds exactly this draft — true the moment it is
+  // used, false again the first time somebody types.
+  const inBox = !!draft?.strategy && current.trim() === draft.strategy.trim()
+
+  return (
+    <div className="space-y-2 border-t pt-2 text-xs"
+         style={{ borderColor: 'var(--hairline)' }}>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={askIt} disabled={busy} className="btn btn-quiet btn-xs">
+          {busy ? 'Reading your list…' : draft ? 'Ask again' : 'Ask Claude for a draft'}
+        </button>
+        <span style={{ color: 'var(--text-muted)' }}>
+          It drafts. You keep the pen — nothing changes up there unless you say so.
+        </span>
+      </div>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      {/* A live region, because the answer arrives ten to twenty seconds after
+          the button and a sighted person watches it appear. `role="status"` is
+          an implicit polite announcement, which is what `Spinner` and
+          `ErrorNote` carry for the same reason — commandment 2's "shut out"
+          includes shut out by a screen reader. The error is deliberately
+          outside it: `ErrorNote` is its own region and nesting two would have
+          one swallow the other. */}
+      <div role="status" className="space-y-2">
+      {draft && !draft.asked && (
+        <p style={{ color: 'var(--text-muted)' }}>{draft.reason}</p>
+      )}
+
+      {draft?.asked && !draft.strategy && (
+        <p style={{ color: 'var(--text-muted)' }}>
+          {draft.reason || 'Nothing usable came back. Ask again, or write your own.'}
+        </p>
+      )}
+
+      {draft?.asked && draft.strategy && (
+        <div className="draft-panel space-y-2 rounded-lg p-3">
+          {/* ADR 14 boundary 3: the gate's output is reproducible and this is
+              not, so they never share a surface without a label. It names the
+              system, never what computes it (commandment 10). */}
+          <p className="text-[11px] uppercase tracking-wide"
+             style={{ color: 'var(--text-muted)' }}>
+            A draft by Claude, not the gate
+            {draft.stance.preset ? ` · ${presetLabel(draft.stance.preset)}` : null}
+          </p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed"
+             style={{ color: 'var(--text-primary)' }}>
+            <ManaText>{draft.strategy}</ManaText>
+          </p>
+          {draft.fact && (
+            <p style={{ color: 'var(--text-muted)' }}>
+              Read off your list: {draft.fact}
+            </p>
+          )}
+          {draft.themes.length > 0 && (
+            <p style={{ color: 'var(--text-muted)' }}>
+              It also read these as the deck’s themes:{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                {draft.themes.join(', ')}
+              </span>
+              . Shown here only — this box writes the description.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Three states, not two. The label has to name the cost before it
+                is paid — over an empty box this takes a draft, over a full one
+                it takes a paragraph somebody wrote — and once the draft *is*
+                the box, "replace what you wrote" is a sentence about nothing.
+                Said rather than disabled: a greyed control reads as "this is
+                broken" where the truth is "this is already done". */}
+            {inBox ? (
+              <span style={{ color: 'var(--text-secondary)' }}>
+                This draft is in the box above, and yours to edit.
+              </span>
+            ) : (
+              <button onClick={() => onUse(draft.strategy)}
+                      className="btn btn-primary btn-accent-2 btn-xs">
+                {replacing ? 'Replace what you wrote' : 'Use this draft'}
+              </button>
+            )}
+            <span style={{ color: 'var(--text-muted)' }}>{draft.never}</span>
+          </div>
+        </div>
+      )}
+      </div>
+    </div>
+  )
+}
+
+/**
  * The deck's own description — the paragraph the shelf, this page and the
  * generated primer all show.
  *
@@ -782,6 +1007,14 @@ export function NoteEditor({ deck, noteKey, value, onDone, writable = true }: {
  * So a writable deck with no description says so and offers the pen. A deck
  * somebody else owns simply shows nothing, because an empty invitation to
  * edit a deck you cannot edit is furniture.
+ *
+ * **And it offers help writing one**, which is the second half of the same
+ * hole: the mode that says what a deck is trying to do has existed since ADR
+ * 41 and could be reached from exactly one screen — the import intake, which a
+ * deck passes through once and never again. `DescriptionAssist` above is that
+ * mode asked from here, and everything it does it does through this
+ * component's own `text`, so the only thing that ever reaches the deck file is
+ * whatever is in the box when somebody presses save.
  */
 export function StrategyEditor({ deck, value, writable, onDone }: {
   deck: DeckRef
@@ -794,6 +1027,31 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
   const [text, setText] = useState(value)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // What a draft displaced, so a replacement is never the one thing on this
+  // screen you cannot get back. Null means nothing has been displaced.
+  const [displaced, setDisplaced] = useState<string | null>(null)
+  // Set by the empty state's "Ask Claude for a draft", which opens the editor
+  // *and* asks: the decision was made by the click that opened it, and making
+  // somebody press a second button for it is a hole to stare into.
+  const [askOnOpen, setAskOnOpen] = useState(false)
+  // Asked only where the answer is needed: a deck this person can write, and
+  // either open in the editor or missing a description entirely — those are
+  // the two places a control depends on it. A deck being read costs nothing,
+  // and one with a description pays only when somebody picks up the pen.
+  const { status, pin } = useClaudeStatus(deck, writable && (editing || !value))
+
+  function open(from: string, ask: boolean) {
+    setText(from)
+    setDisplaced(null)
+    setAskOnOpen(ask)
+    setEditing(true)
+  }
+
+  /** Take a draft into the box, remembering what it displaced. */
+  function useDraft(drafted: string) {
+    setDisplaced(text.trim() ? text : null)
+    setText(drafted)
+  }
 
   async function save() {
     if (!text.trim()) return
@@ -827,6 +1085,21 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
           A few sentences, for somebody who has never seen the list. It shows
           on your shelf, at the top of this page, and in the printed primer.
         </p>
+        {displaced !== null && (
+          // The undo for a replacement, and it is only ever offered when there
+          // is something to put back. Nothing has been saved at this point —
+          // the swap happened in this box and nowhere else — but "you can get
+          // it back" is worth more said than inferred.
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <button onClick={() => { setText(displaced); setDisplaced(null) }}
+                    className="btn btn-quiet btn-xs">
+              Put your own words back
+            </button>
+            <span style={{ color: 'var(--text-muted)' }}>
+              Your paragraph is safe until you save this one.
+            </span>
+          </div>
+        )}
         {error && <ErrorNote>{error}</ErrorNote>}
         <div className="flex items-center gap-3">
           <PrimaryButton onClick={save} disabled={busy || !text.trim()}>
@@ -834,6 +1107,10 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
           </PrimaryButton>
           <QuietButton onClick={() => setEditing(false)} disabled={busy}>Cancel</QuietButton>
         </div>
+        {writable && (
+          <DescriptionAssist deck={deck} status={status} pin={pin} current={text}
+                             autoAsk={askOnOpen} onUse={useDraft} />
+        )}
       </div>
     )
   }
@@ -846,10 +1123,20 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
         <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           This deck does not say what it is trying to do yet.
         </p>
-        <button onClick={() => { setText(''); setEditing(true) }}
-                className="btn btn-ghost btn-xs mt-2">
-          Describe this deck
-        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button onClick={() => open('', false)} className="btn btn-ghost btn-xs">
+            Describe this deck
+          </button>
+          {/* Offered only where it would work. The blank deck is where a
+              newcomer is most likely to want the help and least likely to go
+              looking for it, so the way in is next to the pen rather than
+              behind it. */}
+          {claudeCanAnswer(status) && (
+            <button onClick={() => open('', true)} className="btn btn-quiet btn-xs">
+              Ask Claude for a draft
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -861,7 +1148,7 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
         <ManaText>{value}</ManaText>
       </p>
       {writable && (
-        <button onClick={() => { setText(value); setEditing(true) }}
+        <button onClick={() => open(value, false)}
                 className="btn btn-ghost btn-xs mt-2">
           Edit description
         </button>
