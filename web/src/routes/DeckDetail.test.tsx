@@ -2229,10 +2229,45 @@ describe('DeckDetail swap board', () => {
       color_identity: ['G'], art_crop: null },
   ]
 
-  it('is absent while the deck has nothing on it', async () => {
+  /** Open the fold. Collapsed is the section's resting state now, so every
+   *  assertion about its contents has to press the heading first. */
+  async function openBoard() {
+    fireEvent.click(await screen.findByRole('button', { name: /Swap board/ }))
+  }
+
+  // **The empty board is the owner's and nobody else's.** It used to be absent
+  // from both, which is what left a deck that had never kept a board with
+  // nowhere to start one (Aaron, 2026-08-29). A reader still gets nothing: an
+  // empty shelf is an invitation to whoever can fill it and furniture to
+  // everybody else.
+  it('offers an empty board to the owner, so there is somewhere to start one',
+     async () => {
+    renderDeck()
+    await screen.findByRole('button', { name: 'Validation' })
+    expect(screen.queryByText(/Swap board/)).not.toBeNull()
+  })
+
+  it('is absent to a reader while the deck has nothing on it', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, writable: false } as unknown as Deck)
     renderDeck()
     await screen.findByRole('button', { name: 'Validation' })
     expect(screen.queryByText(/Swap board/)).toBeNull()
+  })
+
+  // **Collapsed by default**, like the token shelf below it (Aaron,
+  // 2026-08-29: "right now the Sideboard doesn't collapse like the other
+  // areas. Its default should be collapsed"). The heading is there; what is
+  // under it is not, until somebody asks.
+  it('is folded until it is opened', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, swap_board: BENCH } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(/Swap board/)
+    expect(screen.queryByText('Skullclamp')).toBeNull()
+
+    await openBoard()
+    expect(screen.getAllByText('Skullclamp').length).toBeGreaterThan(0)
   })
 
   it('renders the cards being considered, and says they are outside the 99',
@@ -2241,6 +2276,7 @@ describe('DeckDetail swap board', () => {
       { ...DECK, swap_board: BENCH } as unknown as Deck)
     renderDeck()
     await screen.findByText(/Swap board/)
+    await openBoard()
     // `getAllBy`, because a card renders its name in the row and again in
     // the hover card that rides it.
     expect(screen.getAllByText('Skullclamp').length).toBeGreaterThan(0)
@@ -2256,7 +2292,47 @@ describe('DeckDetail swap board', () => {
       { ...DECK, writable: false, swap_board: BENCH } as unknown as Deck)
     renderDeck()
     await screen.findByText(/Swap board/)
+    await openBoard()
     expect(screen.getAllByText('Skullclamp').length).toBeGreaterThan(0)
+  })
+
+  // The empty state is the whole feature for a deck that has none, so it says
+  // what a swap board *is* before it offers to start one (commandment 2). A
+  // reader who has never kept a maybeboard has to learn something here or the
+  // button is a dare.
+  it('explains what a board is before it offers to start one', async () => {
+    renderDeck()
+    await screen.findByText(/Swap board/)
+    await openBoard()
+    expect(screen.getByText(/shortlist it never cut anything for/)).toBeTruthy()
+    // And the reassurance, which is the sentence that gets the button pressed:
+    // putting a card here does nothing to the deck.
+    expect(screen.getByText(/changes nothing about the deck/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Start a swap board/ })).toBeTruthy()
+  })
+
+  // A deck that already has one is offered the same control saying the other
+  // thing, because "start" is wrong once there is something to add to.
+  it('offers to weigh another card once the board has one', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, swap_board: BENCH } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(/Swap board/)
+    await openBoard()
+    expect(screen.getByRole('button', { name: /Weigh another card/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Start a swap board/ })).toBeNull()
+  })
+
+  // The reader gets the list and no way to change it. The board grew its first
+  // control on 2026-08-29 and this is the line that keeps it the owner's.
+  it('gives a reader no way to add to it', async () => {
+    vi.mocked(api.deck).mockResolvedValue(
+      { ...DECK, writable: false, swap_board: BENCH } as unknown as Deck)
+    renderDeck()
+    await screen.findByText(/Swap board/)
+    await openBoard()
+    expect(screen.queryByRole('button', { name: /Weigh another card/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Start a swap board/ })).toBeNull()
   })
 })
 
