@@ -1748,6 +1748,36 @@ describe('DeckDetail sharing', () => {
     expect(screen.getByText('Simulate this deck').getAttribute('href'))
       .toBe('/simulate?owner=aasquier&deck=goreclaw-stompy')
   })
+
+  it('seats the deck in the coliseum\'s first chair and leaves the second',
+     async () => {
+    // The Coliseum reads `?a=` and `?b=` as whole addresses — an owner and a
+    // slug in one parameter, not two positional strings — and this fills only
+    // the first, because the opponent is not a deck page's to choose. Driven
+    // against the running room rather than assumed: `?a=` alone wins the
+    // Champion's chair and the room seats its own default opposite, so the
+    // link lands on a fight that is ready rather than on a shut gate.
+    renderUnfolded()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    expect(screen.getByText('Send it to the Coliseum').getAttribute('href'))
+      .toBe('/coliseum?a=aasquier/goreclaw-stompy')
+  })
+
+  it('gives both rooms a voice that answers a hand', async () => {
+    // Commandment 17, and the reason this pair exists: the simulate link was
+    // an inline `background` a `:hover` could never reach. jsdom has no
+    // stylesheet, so what a test can check is that the control asks for one —
+    // a `.btn` face rather than a colour written on the element.
+    renderUnfolded()
+    await screen.findByText('Goreclaw — Mono-Green Stompy')
+    for (const label of ['Simulate this deck', 'Send it to the Coliseum']) {
+      const link = screen.getByText(label)
+      expect([...link.classList], `${label} wears no button face`)
+        .toContain('btn')
+      expect(link.getAttribute('style'), `${label} colours itself inline`)
+        .toBeNull()
+    }
+  })
 })
 
 /**

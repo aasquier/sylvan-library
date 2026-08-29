@@ -357,7 +357,12 @@ export function OpeningHandDeal({ deckRef }: { deckRef: DeckRef }) {
         </div>
       )}
 
-      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+      {/* `toy-credit` pins the licence line to the bottom edge of the frame:
+          this panel stands beside the Wheel's now, the two are never the same
+          height, and credits that end level are what makes them read as a
+          pair rather than as two things that happened to land next to each
+          other. */}
+      <p className="toy-credit text-[11px]" style={{ color: 'var(--text-muted)' }}>
         <em>Ancestral Recall</em> by Ryan Pancoast, Vintage Masters — one
         blue mana for three cards, and the reason anybody says
         &ldquo;card advantage&rdquo; at all.

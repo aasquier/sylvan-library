@@ -37,6 +37,7 @@ import {
 } from '../components/deckedit'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
+import { CrossedSwordsGlyph, GoldfishGlyph } from '../components/glyphs'
 import { DeckArtifactsPanel } from '../components/artifacts'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
@@ -413,11 +414,48 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               button ride higher than every sibling. Top-aligned, the buttons
               share a line and the caption hangs below on its own. */}
           <div className="mt-5 flex flex-wrap items-start gap-3">
+            {/* **The two rooms a deck can be played in, as a pair.** Both were
+                one flat rectangle and one absence: the simulate link wore an
+                inline `style`, which is a colour a `:hover` can never reach
+                (commandment 17), and there was no way at all from a deck to
+                the Coliseum — the room that plays it against somebody.
+
+                They are deliberately *not* twins. The rooms are made of
+                different things and each control wears the one it opens: the
+                Simulator is a candlelit study table in green felt with a
+                goldfish idling in a bowl on a brass stand, and the Coliseum is
+                blood, sand and brass. A newcomer should be able to tell a
+                solitaire practice run from a real fight before reading either
+                label (commandment 2), and the plate under the words is what
+                does that — the fish and the swords say it twice.
+
+                The Coliseum takes both seats as query parameters and this
+                fills only the first. `?a=owner/slug` wins the Champion's
+                chair; the room seats the shelf's own first deck opposite,
+                because it refuses to open on a form that is already invalid
+                (its comment argues that). So the link hands somebody a fight
+                that is *ready* rather than one that is *set* — which is why
+                the word is "send it" rather than "fight it": the opponent is
+                one dropdown away and is not this page's to choose. */}
             <Link to={`/simulate?owner=${encodeURIComponent(deckRef.owner)}`
                      + `&deck=${encodeURIComponent(deckRef.slug)}`}
-                  className="rounded-lg px-4 py-2 text-sm font-medium"
-                  style={{ background: 'var(--series-1)', color: '#fff' }}>
+                  className="btn btn-goldfish">
+              <GoldfishGlyph />
               Simulate this deck
+            </Link>
+            {/* The slash stays a slash and the two halves are encoded around
+                it, which is the room's own documented shape — encoding the
+                whole address would put a `%2F` in a link people paste at each
+                other for the sake of a separator a query value is allowed to
+                contain. */}
+            <Link to={`/coliseum?a=${encodeURIComponent(deckRef.owner)}`
+                     + `/${encodeURIComponent(deckRef.slug)}`}
+                  className="btn btn-arena">
+              {/* The gate's own size, not the fish's: at fifteen pixels the
+                  crossguard that makes this a pair of swords rather than a
+                  multiplication sign is the first thing to go. */}
+              <CrossedSwordsGlyph />
+              Send it to the Coliseum
             </Link>
             {/* Every control below is hidden rather than disabled when the
                 deck is not this viewer's to change. Disabled would be honest
@@ -1626,13 +1664,23 @@ export default function DeckDetail() {
               they came from, both dessert rather than dinner — and both for
               readers too, since neither writes anything.
 
-              Ancestral Recall goes FIRST, and the order is the argument: a
-              spin of the Wheel is an amusement for somebody who already has
-              a deck, and dealing an opening hand is the thing a person who
-              has never played reaches for (commandment 2). The one that
-              teaches comes before the one that entertains. */}
-          <OpeningHandDeal deckRef={deckRef} />
-          <WheelOfFortune deckRef={deckRef} />
+              **Side by side rather than stacked** (Aaron, 2026-08-29), which
+              costs the order argument nothing: Ancestral Recall is still
+              FIRST, and reading order runs left to right before it runs top
+              to bottom. The argument itself is unchanged — a spin of the
+              Wheel is an amusement for somebody who already has a deck, and
+              dealing an opening hand is the thing a person who has never
+              played reaches for (commandment 2). The one that teaches comes
+              before the one that entertains.
+
+              `.deck-toys` is the pair, and it has no breakpoint in it: the two
+              wrap onto separate rows when there is not room for both, at
+              whatever width that turns out to be. `sm:` has guessed Aaron's
+              phone wrong here before. */}
+          <div className="deck-toys">
+            <OpeningHandDeal deckRef={deckRef} />
+            <WheelOfFortune deckRef={deckRef} />
+          </div>
 
           {/* The very bottom, where the sideboard will sit beside it (Aaron,
               2026-08-27). Collapsed by default and asking for nothing until
