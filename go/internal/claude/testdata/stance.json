@@ -6621,7 +6621,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -6755,7 +6756,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -6889,7 +6891,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7023,7 +7026,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7157,7 +7161,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7291,7 +7296,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7425,7 +7431,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7559,7 +7566,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7693,7 +7701,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7827,7 +7836,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -7961,7 +7971,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8095,7 +8106,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8229,7 +8241,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8363,7 +8376,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8514,7 +8528,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8648,7 +8663,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   },
@@ -8782,7 +8798,8 @@
      },
      {"name":"scan","purpose":"transcribe the text printed on a photographed card","tools":[],"server_tools":[],"writes":[]},
      {"name":"rationale-draft","purpose":"Drafts the `why` for cards that have none, marked as drafted, for a person to keep or rewrite.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
-     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
+     {"name":"intake-filing","purpose":"Files an imported deck's cards under the macro categories the primer and the counts are built from.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]},
+     {"name":"deck-description","purpose":"Says what an imported deck is trying to do, in a paragraph its owner can correct.","tools":["get_cards","get_deck","deck_stats"],"server_tools":[],"writes":[]}
     ]
    }
   }

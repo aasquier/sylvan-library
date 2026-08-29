@@ -389,6 +389,10 @@ func (a *API) Routes() []Route {
 		// whole sweep and sequential inside it, because N jobs would occupy
 		// the two-wide NET lane and starve every sibling surface.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/argue/deck", Handler: a.argueSweep},
+		// The intake sheet (ADR 41). A write route, so it answers 404 for a
+		// deck this caller cannot see and 403 for a read-only source, both
+		// before it reads a single action off the body.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/intake", Handler: a.intakeDeck},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
 		// the NET lane,

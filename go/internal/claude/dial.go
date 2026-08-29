@@ -178,7 +178,7 @@ type Dial struct {
 // exist" was one short for three months -- the sixth completeness claim in
 // this project to rot. Ruled with Aaron and fixed in one change.
 //
-// **Nine since 2026-08-28**, and this time the guard did its job: ADR 41's two
+// **Ten since 2026-08-28**, and this time the guard did its job: ADR 41's two
 // intake modes failed `TestTheDialListsEveryMode` the moment they were added
 // to the data file, which is three months earlier than last time. The number
 // in this sentence is still a claim to re-check; the test is the fact.
@@ -202,6 +202,7 @@ var dialModeOrder = []string{
 	// reach from anywhere before the two they cannot.
 	ModeRationaleDraft,
 	ModeIntakeFiling,
+	ModeDeckDescription,
 }
 
 // DialModes is the built modes as the dial publishes them.

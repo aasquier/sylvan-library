@@ -166,6 +166,7 @@ const (
 	// else. What ADR 41 changed is that a caller OUTSIDE this tree may write
 	// what `rationale-draft` answered, which is why the write door it uses is
 	// on `boundary_test.go`'s banned surface rather than in a mode.
-	ModeRationaleDraft = "rationale-draft"
-	ModeIntakeFiling   = "intake-filing"
+	ModeRationaleDraft  = "rationale-draft"
+	ModeIntakeFiling    = "intake-filing"
+	ModeDeckDescription = "deck-description"
 )
