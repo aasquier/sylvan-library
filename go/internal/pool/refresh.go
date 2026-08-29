@@ -15,12 +15,18 @@
 // the load share **one transaction**, closing the window where an
 // interrupted refresh left the pool with no printings at all.
 //
-// One knowing divergence: older pools store `legalities` and `card_faces`
-// as ASCII-escaped JSON text; this writes raw
-// UTF-8. Nothing reads those columns except `json_extract_string` and a
-// JSON parse, so the difference is invisible to every query — the refresh
-// corpus therefore compares those two columns *parsed* and everything else
-// exactly.
+// The JSON columns — `legalities`, `card_faces`, `all_parts` — go in as
+// decoded documents, never as marshalled text. [jsonText] carries the
+// argument and the outage: a Go string handed to a JSON column is stored as
+// a JSON *string*, `json_extract_string` reads NULL out of it, and that
+// expression is the WHERE clause on every card query in the app. The refresh
+// corpus compares those columns *parsed* and everything else exactly, which
+// is right for key order and was never license for the encoding to drift.
+//
+// A comment here used to say the only divergence was Go's marshalling
+// "rather than json.dumps's ASCII escapes", and that it was invisible to
+// every query. Both halves were wrong, and the second one shipped an empty
+// library to the live site for a week.
 package pool
 
 import (

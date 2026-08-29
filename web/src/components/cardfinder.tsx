@@ -109,8 +109,24 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
   // the library, produced by not being able to ask it. A session that had
   // expired, a server restarting through a deploy and a genuinely unknown card
   // were one sentence, and the first two are the ones somebody can act on.
+  //
+  // **`bare` is the same lesson caught a second time, on the success path.**
+  // A degraded library answers 200 with `cards: []` *and a `message` saying
+  // so* — and the finder read only `cards`, so a server that had told us
+  // exactly what was wrong still rendered as "no card in the library is
+  // spelled anything like that". The failure was never a thrown error, so
+  // the `catch` above could not have caught it: an empty list is only a fact
+  // about a card when nothing came with it.
   const [answer, setAnswer] = useState<
-    { asked: string; cards: CardOffer[]; trouble?: 'signed-out' | 'unreachable' } | null
+    {
+      asked: string
+      cards: CardOffer[]
+      trouble?: 'signed-out' | 'unreachable' | 'bare'
+      /** The library's own words for why it could not answer. Rendered as
+       *  sent: the server owns this sentence, and inventing a second one
+       *  here is how two surfaces start disagreeing about one failure. */
+      said?: string
+    } | null
   >(null)
   const [active, setActive] = useState(0)
   const [open, setOpen] = useState(false)
@@ -123,6 +139,7 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
   const asked = query.length >= MIN_QUERY
   const offers = asked && answer?.asked === query ? answer.cards : null
   const trouble = asked && answer?.asked === query ? answer.trouble : undefined
+  const said = asked && answer?.asked === query ? answer.said : undefined
   const asking = asked && offers === null
 
   // **Debounced, and ordered.** The timer stops a request per keystroke; the
@@ -137,7 +154,12 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
       api.suggestCards(query, OFFERS)
         .then((r) => {
           if (token.current !== mine) return
-          setAnswer({ asked: query, cards: r.cards })
+          // A `message` means the library could not look anything up. It
+          // arrives on a 200 beside an empty list, which is the one shape
+          // that reads as a confident "no such card" if it is not read.
+          setAnswer(r.message
+            ? { asked: query, cards: [], trouble: 'bare', said: r.message }
+            : { asked: query, cards: r.cards })
           setActive(0)
         })
         .catch((e: unknown) => {
@@ -293,7 +315,7 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
       <span className="sr-only" role="status">
         {showing && offers !== null
           ? (trouble !== undefined
-              ? 'The library did not answer. This says nothing about the card you typed.'
+              ? (said ?? 'The library did not answer. This says nothing about the card you typed.')
               : rows.length === 0
                 ? 'No cards match what you typed.'
                 : `${rows.length} card${rows.length === 1 ? '' : 's'} to choose from.`)
@@ -365,6 +387,10 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
                 The library did not answer just then. This says nothing about
                 the card you typed — try it again in a moment.
               </p>
+            )}
+            {/* The library's own sentence, printed as it was sent. */}
+            {showing && !asking && trouble === 'bare' && said && (
+              <p className="finder-note">{said}</p>
             )}
             {showing && asking && (
               <p className="finder-note">Looking through the library…</p>
