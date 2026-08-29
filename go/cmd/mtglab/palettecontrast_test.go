@@ -65,7 +65,10 @@ import (
 //
 // # What it checks
 //
-// Three things, and the second is the one that will earn its keep.
+// Four things, and the second is the one that will earn its keep. They are
+// numbered here and the numbers are on the blocks below; the code runs 3 first
+// because a divergence between the two dark columns would otherwise be
+// reported four times over as four contrast failures.
 //
 //  1. **Every ink clears 4.5:1 in its own theme**, against the worse of
 //     `--page` and `--surface-1` -- because text sits on cards as often as on
@@ -89,6 +92,13 @@ import (
 //     one way for a reader who picked dark and another way for a reader whose
 //     machine picked it for them. Nobody could report that, because no single
 //     reader ever saw both.
+//
+//  4. **Nothing draws text in a colour that was not chosen to be read.** The
+//     other direction of 2: a token classified `wash` that the bundle uses as
+//     a `color`. This is the check that keeps the exemptions honest, because
+//     the argument for leaving a chart slot below 3:1 is precisely that no
+//     sentence is made of it -- and that is a claim about the app, which
+//     drifts, rather than about the palette, which does not.
 //
 // # What it does not check, said plainly
 //
@@ -224,8 +234,8 @@ func TestThePaletteIsLegibleInTheThemeItIsReadIn(t *testing.T) {
 		}
 	}
 
-	// (2), the other direction: a token classified below ink, found being used
-	// as one. See the caveat in the doc comment -- this is a floor, not a
+	// (4) The other direction of 2: a token classified below ink, found being
+	// used as one. See the caveat in the doc comment -- this is a floor, not a
 	// census, and it is here to catch the new mistake rather than to certify
 	// the old ones.
 	inked := textTokens(t, css, bundleScripts(t))
