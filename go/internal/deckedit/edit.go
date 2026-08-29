@@ -104,15 +104,30 @@ var SettableFields = []string{"category", "qty", "why", "art"}
 // last claimed about it.
 const DraftedBy = "claude"
 
-// SettableDeckFields is what SetDeckField will write: the deck's own scalars.
-// `strategy` and `notes` are prose and belong to SetNote; `commander` and
-// `companion` change what the whole deck is legal to contain and are a
-// rebuild, not a field edit. `themes` is the one non-scalar -- a list, but a
-// list of vocabulary keys, so it edits like an enum with a plural rather than
-// like the card blocks. `archetype` is deliberately absent: since ADR 37 it is
-// a reading of the themes, and the way to change a reading is to change what
-// it reads.
-var SettableDeckFields = []string{"stage", "status", "bracket", "commander_art", "pilot", "themes"}
+// SettableDeckFields is what SetDeckField will write: the deck's own scalars,
+// plus the one paragraph that describes the deck.
+//
+// `notes` is prose and belongs to SetNote; `commander` and `companion` change
+// what the whole deck is legal to contain and are a rebuild, not a field edit.
+// `themes` is the one non-scalar -- a list, but a list of vocabulary keys, so
+// it edits like an enum with a plural rather than like the card blocks.
+// `archetype` is deliberately absent: since ADR 37 it is a reading of the
+// themes, and the way to change a reading is to change what it reads.
+//
+// **`strategy` joined on 2026-08-29, and its absence was a hole rather than a
+// decision.** The comment here used to send it to `SetNote` alongside `notes`
+// -- but SetNote writes into the `notes:` mapping and cannot reach a top-level
+// key, so nothing in this package, this API or this app could write a deck's
+// strategy at all. It renders in three places (the library shelf, the deck
+// page, the primer) and was settable only by hand-editing a file that lives
+// on the instance's volume. Aaron found it by asking for the obvious thing:
+// an intake that writes the deck's description.
+//
+// It renders through the same folding writer a card's `why` uses, so a
+// paragraph wraps the way every other paragraph in a deck file does.
+var SettableDeckFields = []string{
+	"stage", "status", "bracket", "commander_art", "pilot", "themes", "strategy",
+}
 
 // PilotMax is the most anybody's name needs. A pilot is a person at a table,
 // not a bio.

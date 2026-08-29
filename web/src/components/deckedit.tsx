@@ -768,6 +768,108 @@ export function NoteEditor({ deck, noteKey, value, onDone, writable = true }: {
   )
 }
 
+/**
+ * The deck's own description — the paragraph the shelf, this page and the
+ * generated primer all show.
+ *
+ * **The empty state is the point of this component, not an afterthought.**
+ * Until 2026-08-29 nothing in the app could write `strategy` at all, and a
+ * deck without one rendered *nothing* here — so the field with the widest
+ * reach in the whole library was the one field with no way in. An imported
+ * deck is exactly the deck that has no description, which made the silence
+ * worst precisely where somebody had just arrived.
+ *
+ * So a writable deck with no description says so and offers the pen. A deck
+ * somebody else owns simply shows nothing, because an empty invitation to
+ * edit a deck you cannot edit is furniture.
+ */
+export function StrategyEditor({ deck, value, writable, onDone }: {
+  deck: DeckRef
+  /** The deck's current description, or "" when it has none. */
+  value: string
+  writable: boolean
+  onDone: (result: EditResult) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(value)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function save() {
+    if (!text.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      onDone(await api.setDeckField(deck, 'strategy', text.trim()))
+      setEditing(false)
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="max-w-3xl space-y-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}>
+            What this deck is trying to do
+          </span>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
+                    aria-label="What this deck is trying to do"
+                    placeholder="Golgari Food aristocrats. Gyome turns every nontoken creature into a meal…"
+                    className="w-full rounded-md px-2 py-1.5 text-sm leading-relaxed outline-none focus:ring-2"
+                    style={inputStyle} />
+        </label>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          A few sentences, for somebody who has never seen the list. It shows
+          on your shelf, at the top of this page, and in the printed primer.
+        </p>
+        {error && <ErrorNote>{error}</ErrorNote>}
+        <div className="flex items-center gap-3">
+          <PrimaryButton onClick={save} disabled={busy || !text.trim()}>
+            {busy ? 'Saving…' : 'Save description'}
+          </PrimaryButton>
+          <QuietButton onClick={() => setEditing(false)} disabled={busy}>Cancel</QuietButton>
+        </div>
+      </div>
+    )
+  }
+
+  if (!value) {
+    // Nothing to read, and nothing anybody else can do about it.
+    if (!writable) return null
+    return (
+      <div className="max-w-3xl">
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          This deck does not say what it is trying to do yet.
+        </p>
+        <button onClick={() => { setText(''); setEditing(true) }}
+                className="btn btn-ghost btn-xs mt-2">
+          Describe this deck
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-3xl">
+      <p className="whitespace-pre-wrap text-sm leading-relaxed"
+         style={{ color: 'var(--text-secondary)' }}>
+        <ManaText>{value}</ManaText>
+      </p>
+      {writable && (
+        <button onClick={() => { setText(value); setEditing(true) }}
+                className="btn btn-ghost btn-xs mt-2">
+          Edit description
+        </button>
+      )}
+    </div>
+  )
+}
+
 /** Start a note the deck does not have yet. */
 export function AddNoteForm({ deck, existing, onDone }: {
   deck: DeckRef

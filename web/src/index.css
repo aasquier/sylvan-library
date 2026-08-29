@@ -4986,20 +4986,185 @@ button:hover .tarot-fan-card {
   background: transparent;
   border: 1px solid var(--hairline);
   transition: color 120ms ease, border-color 120ms ease,
-    background-color 120ms ease;
+    background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .chip-toggle:hover {
   color: var(--text-primary);
   border-color: var(--text-muted);
+  /* The hand gets a ground as well as ink. Colour alone is the reply that
+   * reads as "did something happen?" on a busy panel. */
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 .chip-toggle:focus-visible {
   outline: 2px solid var(--vine);
   outline-offset: 2px;
 }
+/* **Press answers too** (commandment 17: hover, focus AND press). There was
+ * no `:active` on this family at all, so a chip took a click in complete
+ * silence — on a toggle, where the only other feedback is a state change the
+ * eye has to go looking for. */
+.chip-toggle:active {
+  transform: translateY(1px);
+}
+/* **A chosen chip carries the house's green, and carries it on any ground.**
+ *
+ * This used to paint `var(--gridline)`, which is the exact background of the
+ * panels these chips sit in — measured on /import in dark: the panel was
+ * rgb(44,44,42) and a chosen chip was rgb(44,44,42). The "on" state was the
+ * same colour as the thing behind it, so choosing an option could not light
+ * anything up; all that changed was a hairline and the ink. Aaron reported it
+ * as exactly that, and he was right.
+ *
+ * A wash rather than a fill, and light ADDED rather than removed: the vine at
+ * a sixth, its own edge, and an inner line of it so the chip reads lit from
+ * within rather than merely tinted. It survives a grey panel, a page ground
+ * and both themes, because it is mixed from the accent rather than borrowed
+ * from a surface. */
 .chip-toggle.is-on {
   color: var(--text-primary);
-  background: var(--gridline);
-  border-color: var(--baseline);
+  background: color-mix(in srgb, var(--vine) 16%, transparent);
+  border-color: var(--vine);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vine) 22%, transparent);
+}
+.chip-toggle.is-on:hover {
+  background: color-mix(in srgb, var(--vine) 24%, transparent);
+}
+/* The floor is the finger, not the pointer. These sit at 30px, which is fine
+ * under a mouse and under the 44px target a thumb needs. */
+@media (pointer: coarse) {
+  .chip-toggle {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-toggle {
+    transition: color 120ms ease, border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .chip-toggle:active {
+    transform: none;
+  }
+}
+
+/* **A place is not a state.** `.chip-toggle` is dressed for a pressed state —
+ * `aria-pressed`, `is-on`, a lit ground — and it was being worn by four
+ * different kinds of thing, only one of which was a toggle: a `<Link>` to
+ * another colour's page, an in-page jump, an action button, and the real
+ * tabs. Aaron's ruling, 2026-08-29: "I am not a fan of a toggle being
+ * presented as a link. That is awkward."
+ *
+ * So the family splits. `.chip-toggle` keeps the pressed look and belongs to
+ * things that hold a state. `.chip-place` is for things that TAKE YOU
+ * SOMEWHERE, and it never has an `is-on` because there is no state to be in.
+ *
+ * The difference is in the direction the hand feels. A toggle settles *down*
+ * under a press, because you are pushing it where it stands. A place slides
+ * *forward*, because you are leaving — and its chevron leads the way out.
+ * That is one distinction a finger can tell apart in the dark, which is worth
+ * more than two colours a reader has to learn. */
+.chip-place {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  transition: color 120ms ease, border-color 120ms ease,
+    background-color 120ms ease, transform 120ms ease;
+}
+.chip-place::after {
+  content: '›';
+  margin-left: 0.35em;
+  opacity: 0.55;
+  transition: transform 120ms ease, opacity 120ms ease;
+  display: inline-block;
+}
+.chip-place:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+.chip-place:hover::after {
+  transform: translateX(2px);
+  opacity: 1;
+}
+.chip-place:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.chip-place:active {
+  transform: translateX(1px);
+}
+@media (pointer: coarse) {
+  .chip-place {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-place,
+  .chip-place::after {
+    transition: color 120ms ease, border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .chip-place:active {
+    transform: none;
+  }
+  .chip-place:hover::after {
+    transform: none;
+  }
+}
+
+/* What a chosen chip is going to do, said underneath it.
+ *
+ * These were a wall of 12px grey with a bolded lead-in, which is the shape
+ * every disclaimer on the internet has: three registers of the same
+ * information at the same weight, so the eye finds no way in. Three things
+ * fix it and none is decoration. A vine rule ties each entry back to the chip
+ * that opened it, so the connection between "I pressed that" and "this
+ * appeared" is drawn rather than inferred. The name sits in the ink and the
+ * explanation in the secondary, which is one real step of hierarchy instead
+ * of a bold run. And what the action WRITES gets its own line and its own
+ * small-caps label, because "this changes your deck file" is a different kind
+ * of sentence from "here is what it does" and should not be a clause hiding
+ * at the end of one. */
+.intake-told {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.intake-told > li {
+  border-left: 2px solid color-mix(in srgb, var(--vine) 55%, transparent);
+  padding-left: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.intake-told-name {
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.intake-told-what {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0;
+}
+.intake-told-writes {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 0;
+}
+/* Small caps because the deck file is the truth and this line is about the
+ * file. It borrows the masthead's face rather than inventing one. */
+.intake-told-writes b {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--vine);
+  margin-right: 0.35rem;
 }
 
 /* Which Claude answers one account (Admin → Accounts). A `select` rather than

@@ -286,13 +286,12 @@ func TestTheIntakeWritesWhatItWasAnsweredAndMarksIt(t *testing.T) {
 	if !strings.Contains(written, "why: A reason somebody actually wrote.") {
 		t.Errorf("a rationale that was already there was overwritten:\n%s", written)
 	}
-	// The description lands as the deck's game plan note -- the field the
-	// deck file keeps an author's prose in, and the one the primer renders.
-	// It is NOT marked: `why_by` exists because a rationale is a claim about
-	// somebody's thinking, and a paragraph about the whole deck is a
-	// different object.
-	if !strings.Contains(written, "gameplan:") {
-		t.Errorf("the description did not land as a note:\n%s", written)
+	// **The deck's own `strategy`**, which is the paragraph the library shelf,
+	// the deck page and the primer all render. It is NOT marked: `why_by`
+	// exists because a rationale is a claim about somebody's thinking, and a
+	// paragraph about the whole deck is a different object.
+	if !strings.Contains(written, "strategy:") {
+		t.Errorf("the description did not land as the deck's strategy:\n%s", written)
 	}
 	if !strings.Contains(written, "Ramp into big green creatures") {
 		t.Errorf("the description did not reach the file:\n%s", written)

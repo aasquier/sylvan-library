@@ -39,10 +39,11 @@ describe('IntakeChoices', () => {
   // on it is on until somebody turns it on.
   it('starts with everything off', async () => {
     show(true)
-    await waitFor(() => expect(screen.getByText('Sort the cards')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
     for (const label of ['Sort the cards', 'Draft the reasons', 'Describe the deck',
       'Read up on your commander', 'Argue with every card']) {
-      expect(screen.getByText(label).closest('button')!.getAttribute('aria-pressed'))
+      expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed'))
         .toBe('false')
     }
   })
@@ -52,8 +53,9 @@ describe('IntakeChoices', () => {
   // the thing that actually helps.
   it('does not offer to draft reasons when the stance may not write', async () => {
     show(false)
-    await waitFor(() => expect(screen.getByText('Sort the cards')).toBeTruthy())
-    expect(screen.queryByText('Draft the reasons')).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Draft the reasons' })).toBeNull()
     expect(screen.getByText(/may not change anything/)).toBeTruthy()
     // And it says where the setting is, because a control somebody was told
     // about and cannot find is worse than one that was never mentioned.
@@ -62,7 +64,7 @@ describe('IntakeChoices', () => {
 
   it('offers it, and no explanation, when the stance may write', async () => {
     show(true)
-    await waitFor(() => expect(screen.getByText('Draft the reasons')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Draft the reasons' })).toBeTruthy())
     expect(screen.queryByText(/may not change anything/)).toBeNull()
   })
 
@@ -71,14 +73,15 @@ describe('IntakeChoices', () => {
   // inline style no `:hover` can reach.
   it('gives every toggle the chip family and a pressed state', async () => {
     const onChange = show(true, { categories: true })
-    await waitFor(() => expect(screen.getByText('Sort the cards')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
 
-    const sort = screen.getByText('Sort the cards').closest('button')!
+    const sort = screen.getByRole('button', { name: 'Sort the cards' })
     expect(sort.className).toContain('chip-toggle')
     expect(sort.className).toContain('is-on')
     expect(sort.getAttribute('aria-pressed')).toBe('true')
 
-    const argue = screen.getByText('Argue with every card').closest('button')!
+    const argue = screen.getByRole('button', { name: 'Argue with every card' })
     expect(argue.className).toContain('chip-toggle')
     expect(argue.className).not.toContain('is-on')
 
@@ -106,7 +109,7 @@ describe('IntakeChoices', () => {
     show(true, {}, { configured: false })
     await waitFor(() =>
       expect(screen.getByText(/exactly as you pasted it/)).toBeTruthy())
-    expect(screen.queryByText('Sort the cards')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sort the cards' })).toBeNull()
   })
 
   // **The gate is closed before it is opened, not after.** While the dial has
@@ -123,7 +126,7 @@ describe('IntakeChoices', () => {
     vi.mocked(api.claudeStatus).mockResolvedValue(status(true))
     render(<IntakeChoices value={{}} onChange={vi.fn()} slug="arahbo-cats" />)
 
-    expect(screen.queryByText('Draft the reasons')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Draft the reasons' })).toBeNull()
     // Nothing else is claimed while the answer is outstanding either: the
     // stand-down sentence would be a statement about a setting nobody has
     // read yet.
@@ -132,7 +135,7 @@ describe('IntakeChoices', () => {
 
     // ...and then it opens, which is what makes the assertion above a
     // statement about ordering rather than about a broken component.
-    await waitFor(() => expect(screen.getByText('Draft the reasons')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Draft the reasons' })).toBeTruthy())
   })
 })
 
@@ -162,12 +165,13 @@ describe('when the dial cannot be read', () => {
 
     // The four that were never gated are still offered: the server decides
     // what it will do, and hiding them would be guessing the other way.
-    await waitFor(() => expect(screen.getByText('Sort the cards')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
     expect(screen.queryByText(/Claude is turned off/)).toBeNull()
     expect(screen.queryByText(/exactly as you pasted it/)).toBeNull()
     // Drafting stays shut, because closed is the safe direction for a control
     // gated on a permission — but without asserting a setting nobody read.
-    expect(screen.queryByText('Draft the reasons')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Draft the reasons' })).toBeNull()
     expect(screen.queryByText(/may not change anything/)).toBeNull()
   })
 
@@ -192,6 +196,6 @@ describe('when the dial cannot be read', () => {
     render(<IntakeChoices value={{}} onChange={vi.fn()} />)
     await waitFor(() =>
       expect(screen.getByText(/exactly as you pasted it/)).toBeTruthy())
-    expect(screen.queryByText('Sort the cards')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sort the cards' })).toBeNull()
   })
 })

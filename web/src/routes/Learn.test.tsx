@@ -262,3 +262,75 @@ describe('the reading room', () => {
     expect(painting).not.toBeNull()
   })
 })
+
+// ---- the shelves filter -----------------------------------------------------
+
+// **These were jump links wearing a toggle's clothes.** Aaron, 2026-08-29:
+// "I am not a fan of a toggle being presented as a link. That is awkward" —
+// and, asked what they should be instead: "They should be real toggles."
+//
+// The old comment argued that a reader who came for the clans should not have
+// to scroll past the guilds. That is true, and it is a better argument for
+// narrowing the page than for scrolling it.
+describe('the shelf filter', () => {
+  it('starts with every shelf on, so the page opens as it always has', async () => {
+    renderLearn()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Mono-colour/ })).toBeTruthy())
+
+    for (const label of [/Mono-colour/, /Guild/]) {
+      const chip = screen.getByRole('button', { name: label })
+      expect(chip.getAttribute('aria-pressed')).toBe('true')
+      expect(chip.className).toContain('is-on')
+    }
+    // And both shelves are on the page.
+    expect(screen.getByText('Golgari')).toBeTruthy()
+    expect(screen.getByText('Mono-White')).toBeTruthy()
+  })
+
+  it('hides a shelf when its chip is turned off, and brings it back', async () => {
+    renderLearn()
+    await waitFor(() => expect(screen.getByText('Golgari')).toBeTruthy())
+
+    const guilds = screen.getByRole('button', { name: /Guild/ })
+    fireEvent.click(guilds)
+    await waitFor(() => expect(screen.queryByText('Golgari')).toBeNull())
+    expect(guilds.getAttribute('aria-pressed')).toBe('false')
+    // The shelf that was left on is untouched: this narrows, it does not
+    // select one.
+    expect(screen.getByText('Mono-White')).toBeTruthy()
+
+    fireEvent.click(guilds)
+    await waitFor(() => expect(screen.getByText('Golgari')).toBeTruthy())
+  })
+
+  // Turning everything off is a thing a thumb does by accident, and a blank
+  // page with no explanation reads as broken rather than as chosen.
+  it('says so when every shelf is hidden, and offers the way back', async () => {
+    renderLearn()
+    await waitFor(() => expect(screen.getByText('Golgari')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: /Mono-colour/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Guild/ }))
+
+    await waitFor(() =>
+      expect(screen.getByText(/Every shelf is hidden/)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Show them all again' }))
+    await waitFor(() => expect(screen.getByText('Golgari')).toBeTruthy())
+    expect(screen.getByText('Mono-White')).toBeTruthy()
+  })
+
+  // The vocabulary's see-also chips go somewhere; they hold no state and must
+  // not claim one.
+  it('gives the see-also trail a place, not a pressed state', async () => {
+    renderLearn('/learn?tab=words')
+    await waitFor(() => expect(screen.getByText(/See also/)).toBeTruthy())
+
+    const trail = screen.getAllByRole('button').filter((b) =>
+      b.className.includes('chip-place'))
+    expect(trail.length).toBeGreaterThan(0)
+    for (const chip of trail) {
+      expect(chip.getAttribute('aria-pressed')).toBeNull()
+      expect(chip.className).not.toContain('chip-toggle')
+    }
+  })
+})

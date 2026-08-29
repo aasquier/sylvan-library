@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -40,7 +39,7 @@ const IntakeKind = "claude.intake"
 //   - `categories` writes a `category`. Allowed since ADR 13 and simply never
 //     built; a category has always been a field a person sets and this sets it
 //     for them, which is a smaller claim than a rationale by some distance.
-//   - `description` writes the deck's `notes.gameplan` and its `themes`.
+//   - `description` writes the deck's `strategy` and its `themes`.
 //   - `dossier` writes nothing. It fills the deck's cached dossier.
 //   - `argue` writes nothing. It is the existing slot sweep, run at intake.
 //
@@ -367,17 +366,11 @@ func (run *intakeRun) draft(ctx context.Context) wire.OrderedMap {
 	return intakeStep(n, len(wanted), "")
 }
 
-// describe writes the deck's game plan and its themes.
+// describe writes the deck's strategy and its themes.
 func (run *intakeRun) describe(ctx context.Context) wire.OrderedMap {
-	// Left alone if the deck already says what it is doing, by either route:
-	// its own `strategy`, or the note this writes.
+	// A deck that already says what it is doing keeps what it says.
 	if strategy, ok := run.deck.Strategy.(string); ok && strings.TrimSpace(strategy) != "" {
 		return intakeStep(0, 0, "The deck already had a description, which was left alone.")
-	}
-	for _, note := range run.deck.Notes {
-		if note.Key == "gameplan" && strings.TrimSpace(fmt.Sprint(note.Value)) != "" {
-			return intakeStep(0, 0, "The deck already had a game plan, which was left alone.")
-		}
 	}
 	var got claude.Description
 	err := run.api.withPool(ctx, func(c *pool.Conn) error {
@@ -402,17 +395,17 @@ func (run *intakeRun) describe(ctx context.Context) wire.OrderedMap {
 	if err != nil {
 		return intakeFailed(err, run.req.Endpoint)
 	}
-	// **`notes.gameplan` and not the top-level `strategy`, and that is not a
-	// near miss.** `strategy` has a place in the file's key order and no
-	// editor operation that writes it -- `SettableDeckFields` leaves it out
-	// deliberately, on the grounds that prose belongs to `SetNote`. So the
-	// description goes where the deck file already keeps an author's prose,
-	// under the key the generated primer already renders as the game plan.
+	// **The deck's own `strategy`, which is what "the description" means.** It
+	// is the paragraph the library shelf, the deck page and the primer all
+	// render, and until 2026-08-29 nothing in this app could write it: the
+	// editor left it out of `SettableDeckFields` on the grounds that prose
+	// belongs to `SetNote`, and `SetNote` can only reach the `notes:` mapping.
 	//
-	// Found by an end-to-end test reading the file back rather than by
-	// reading the editor: the write was refused, the step reported a failure
-	// note, and every other assertion in the test still passed.
-	updated, err := deckedit.SetNote(text, "gameplan", got.Strategy)
+	// This wrote `notes.gameplan` for one day because of that hole. A game
+	// plan is a real note and a good one, but it is not the deck's
+	// description, and writing it instead left the field somebody actually
+	// reads still empty -- which is exactly how Aaron found the hole.
+	updated, err := deckedit.SetDeckField(text, "strategy", got.Strategy)
 	if err != nil {
 		return intakeFailed(err, run.req.Endpoint)
 	}
@@ -425,7 +418,7 @@ func (run *intakeRun) describe(ctx context.Context) wire.OrderedMap {
 		return intakeFailed(err, run.req.Endpoint)
 	}
 	run.api.recorder().Record(ctx, run.slug, run.owner, run.actor,
-		decklog.Edit{Kind: decklog.EditNote, Note: "gameplan"})
+		decklog.Edit{Kind: decklog.EditSetDeck, Field: "strategy"})
 	run.reload(ctx)
 	return intakeStep(1, 1, "")
 }

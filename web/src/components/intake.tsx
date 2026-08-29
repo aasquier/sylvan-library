@@ -57,9 +57,10 @@ const ACTIONS: {
   {
     key: 'description',
     title: 'Describe the deck',
-    blurb: 'A short paragraph on what the deck is trying to do and what it is '
-      + 'bad at, plus the handful of words that label it.',
-    writes: 'the deck’s game plan note and its themes',
+    blurb: 'The paragraph that shows on your shelf and at the top of the '
+      + 'deck: what it is trying to do, how it wins, and one honest line on '
+      + 'what it is bad at.',
+    writes: 'the deck’s description and its themes',
   },
   {
     key: 'dossier',
@@ -172,20 +173,16 @@ export function IntakeChoices({ value, onChange, slug, owner }: {
           chosen ones are described: five paragraphs nobody asked for is how a
           simple choice starts reading like a form. */}
       {shown.some((a) => value[a.key]) && (
-        <ul className="space-y-2 text-xs leading-relaxed"
-            style={{ color: 'var(--text-secondary)' }}>
+        <ul className="intake-told">
           {shown.filter((a) => value[a.key]).map((action) => (
             <li key={action.key}>
-              <strong style={{ color: 'var(--text-primary)' }}>{action.title}.</strong>{' '}
-              {action.blurb}
+              <span className="intake-told-name">{action.title}</span>
+              <p className="intake-told-what">{action.blurb}</p>
               {action.writes && (
-                <>
-                  {' '}
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    Changes {action.writes}; you can edit or undo any of it on
-                    the deck page.
-                  </span>
-                </>
+                <p className="intake-told-writes">
+                  <b>Writes</b>
+                  {action.writes} — yours to edit or undo on the deck page.
+                </p>
               )}
             </li>
           ))}

@@ -33,6 +33,7 @@ import {
 import { DataTable } from '../components/datatable'
 import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
+  StrategyEditor,
 } from '../components/deckedit'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
@@ -1106,12 +1107,13 @@ export default function DeckDetail() {
         </div>
       )}
 
-      {deck.strategy && (
-        <p className="max-w-3xl text-sm leading-relaxed"
-           style={{ color: 'var(--text-secondary)' }}>
-          <ManaText>{deck.strategy}</ManaText>
-        </p>
-      )}
+      {/* The deck's description, and the only way to write one. It renders
+          even when there is nothing to read — a writable deck with no
+          description says so and offers the pen, because until 2026-08-29
+          nothing in the app could set this field and an imported deck is
+          exactly the deck that has none. */}
+      <StrategyEditor deck={deckRef} value={deck.strategy ?? ''}
+                      writable={deck.writable} onDone={() => void refresh()} />
 
       {/* **The tabs wrap, and that is the whole of the phone fix.** Six of
           them want 432px of row and a 375px phone has 327 to give, so without

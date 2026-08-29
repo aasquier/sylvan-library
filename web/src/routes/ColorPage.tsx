@@ -697,8 +697,10 @@ function CombinationRoom({ combo, taxonomy }: {
           <Chapter>Others like it</Chapter>
           <div className="flex flex-wrap gap-1.5">
             {siblings.map((c) => (
+              // A place, not a state: this takes you to another colour's
+              // page, and it wore a toggle's clothes until Aaron said so.
               <Link key={c.key} to={colorPath(c)}
-                    className="chip-toggle flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm">
+                    className="chip-place flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm">
                 <ColorRing colors={c.colors} size={14} />
                 {c.name}
               </Link>
