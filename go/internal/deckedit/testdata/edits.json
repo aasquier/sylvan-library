@@ -531,7 +531,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -1214,7 +1214,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -1897,7 +1897,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -2580,7 +2580,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -3296,7 +3296,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -3979,7 +3979,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -4662,7 +4662,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -5345,7 +5345,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -6028,7 +6028,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -6782,7 +6782,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -7465,7 +7465,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -8219,7 +8219,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",
@@ -8902,7 +8902,7 @@
       "value": "Somebody Else"
      },
      "ok": false,
-     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy"
+     "error": "'commander' is not a settable deck field; choose one of stage, status, bracket, commander_art, pilot, themes, strategy, name"
     },
     {
      "op": "set_deck_field",

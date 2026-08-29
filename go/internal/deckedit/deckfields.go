@@ -48,6 +48,38 @@ func deckFieldValue(field string, value any) (any, error) {
 		}
 		return bracket, nil
 
+	case "name":
+		// What the deck is called, and the one settable field that is read
+		// before anything else about the deck: the shelf card, the page's
+		// heading, the printed primer's title.
+		//
+		// Blank is refused, and that is the whole difference between this
+		// field and `pilot`. Emptying a pilot means "nobody claims this one",
+		// which is a real thing to say; emptying a name says nothing, because
+		// `Deck.from_text` falls back to the slug and the shelf would go on
+		// showing a name nobody chose as though somebody had. That is this
+		// repository's most-repeated bug -- a fallback rendered as a fact --
+		// so the refusal happens here rather than the fallback happening
+		// later.
+		//
+		// Whitespace is collapsed rather than refused. A name arrives pasted
+		// as often as typed, and a doubled space or a trailing tab is a
+		// slip rather than a decision -- where a name of the wrong *length*
+		// is a decision, and gets an answer instead of a correction.
+		name := strings.Join(strings.Fields(asString(value)), " ")
+		if name == "" {
+			return nil, failf("a deck needs a name -- it is what the shelf and " +
+				"the top of the deck page call it. Rename it to something rather " +
+				"than to nothing.")
+		}
+		if runes := []rune(name); len(runes) > DeckNameMax {
+			return nil, failf("a deck name runs at most %d characters; %s… is %d. "+
+				"What the deck is *doing* belongs in its description, which has "+
+				"room for it.", DeckNameMax,
+				quotedValue(string(runes[:min(24, len(runes))])), len(runes))
+		}
+		return name, nil
+
 	case "pilot":
 		// A person's name: free text, case kept, and emptying it is a real
 		// operation -- it means "nobody claims this one". The cap is about the
