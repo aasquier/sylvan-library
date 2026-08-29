@@ -59,7 +59,7 @@ const ACTIONS: {
     title: 'Describe the deck',
     blurb: 'A short paragraph on what the deck is trying to do and what it is '
       + 'bad at, plus the handful of words that label it.',
-    writes: 'the deck’s strategy and themes',
+    writes: 'the deck’s game plan note and its themes',
   },
   {
     key: 'dossier',

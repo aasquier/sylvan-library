@@ -48,7 +48,7 @@ the deck is created. Aaron's list, in his words, with what each one actually is:
 | 2 | Dividing cards into their macro categories | files each card under one of the thirteen | allowed; nothing does it |
 | 3 | Claude arguing macro categories or best-in-slots | the existing slot-argument sweep, run at intake | allowed, [ADR 25](0025-argue-a-slot-argues-one-direction.md) |
 | 4 | Dossier built on intake for commander | the existing commander dossier | allowed, [ADR 19](0019-the-dossier-cites-three-sources.md) |
-| 5 | Deck description | themes and strategy from the deck's own contents | allowed |
+| 5 | Deck description | the deck's game plan note and its themes, from its own contents | allowed |
 
 Four of the five are inside today's rules and are only unbuilt. **The first one
 is the whole decision**, and the table above is the reason this ADR exists

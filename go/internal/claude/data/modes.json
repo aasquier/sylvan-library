@@ -503,7 +503,7 @@
     "properties": {
      "strategy": {
       "type": "string",
-      "description": "Three or four plain sentences saying what this deck is trying to do and how it wins, including one clause on what it is bad at. Written for somebody who has never seen the list. No power rating, no competitive/casual judgement, no praise. This exact string is written into the deck file as its strategy."
+      "description": "Three or four plain sentences saying what this deck is trying to do and how it wins, including one clause on what it is bad at. Written for somebody who has never seen the list. No power rating, no competitive/casual judgement, no praise. This exact string is written into the deck file as the deck's game plan."
      },
      "themes": {
       "type": "array",

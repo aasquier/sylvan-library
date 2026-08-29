@@ -278,3 +278,53 @@ func newScratchUser(t *testing.T, path, username string) int64 {
 	}
 	return id
 }
+
+// The intake's entry (ADR 41): one row for a whole pass, naming the cards and
+// never the text.
+//
+// The never-the-text half is the one that matters and it is structural rather
+// than careful -- `Edit` has no field a rationale could travel in, so this
+// tests that the sentence stays a sentence about which cards, at every size.
+func TestTheIntakeEntrySaysWhichCardsAndNeverWhatWasWritten(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		edit Edit
+		want string
+		why  string
+	}{
+		{
+			name: "one card", why: "the field is named in the words a sentence wants",
+			edit: Edit{Kind: EditIntake, Field: "why", Cards: []string{"Sol Ring"}},
+			want: "drafted the rationale on Sol Ring",
+		},
+		{
+			name: "the filing pass", why: "the same row shape, keyed by which field",
+			edit: Edit{Kind: EditIntake, Field: "category", Cards: []string{"Sol Ring", "Cultivate"}},
+			want: "drafted the category on Sol Ring, Cultivate",
+		},
+		{
+			name: "more than a handful", why: "the whole 99 must not become the log",
+			edit: Edit{Kind: EditIntake, Field: "why", Cards: []string{
+				"A", "B", "C", "D", "E", "F", "G", "H"}},
+			want: "drafted the rationale on 8 cards: A, B, C, D, E, F, and 2 more",
+		},
+		{
+			name: "a pass that wrote nothing", why: "silence is the one thing a history cannot have",
+			edit: Edit{Kind: EditIntake, Field: "why"},
+			want: "ran the intake and wrote nothing",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			action, summary := Describe(tc.edit)
+			if action != "intake" {
+				t.Errorf("the row is filed under %q, so it is not queryable as an "+
+					"intake", action)
+			}
+			if summary != tc.want {
+				t.Errorf("summary:\n got  %q\n want %q\n(%s)", summary, tc.want, tc.why)
+			}
+		})
+	}
+}
