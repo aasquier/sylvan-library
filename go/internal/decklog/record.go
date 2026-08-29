@@ -157,9 +157,35 @@ const (
 	// oldest rule (ADR 28) and matters more here than anywhere else: the text
 	// is a rationale, and a log that carried rationale text would be the
 	// undo-by-transcript this log exists not to be.
-	EditIntake  EditKind = "intake"
+	EditIntake EditKind = "intake"
+	// The bulk edit: one pasted list rewrote the 99.
+	//
+	// **Its own kind rather than ninety-nine ordinary ones**, for the reason
+	// `EditIntake` above already argues: the pass is the thing that happened,
+	// and a history of ninety-nine rows saying "changed the rationale for X"
+	// buries what somebody comes to this panel to read. And not the fallback
+	// `("edit", "edited the deck")` either -- that is for a shape nobody has
+	// described, and this one is described.
+	//
+	// **Not `EditIntake`**, which would be the tempting reuse: that kind says
+	// a model drafted these sentences (ADR 41), and every sentence a bulk edit
+	// writes was typed by a person into the box. Two operations that write the
+	// same field for opposite reasons are two entries in a history.
+	//
+	// It carries counts and the entombed cards' names, and never a word of
+	// what any rationale says -- this file's oldest rule (ADR 28).
+	EditBulk    EditKind = "bulk"
 	EditSetDeck EditKind = "set-deck"
 )
+
+// BulkTally is what one bulk edit did, in counts.
+//
+// Counts rather than names for three of the four, because the added and
+// rewritten cards are visible in the deck the moment somebody looks at it. The
+// **entombed** ones are not: they are in the graveyard, and a person reading
+// the history is usually reading it to find out where a card went. So those
+// are named, in `Edit.Cards`, exactly as the bulk sweep names them.
+type BulkTally struct{ Added, Rewrote, Requantified, Entombed int }
 
 // Edit is one operation's own description -- the keywords `_commit(**extra)`
 // has always assembled and thrown away with the response.
@@ -174,6 +200,10 @@ type Edit struct {
 	Field    string   // which field a set operation touched
 	Value    any      // and what it was set to; never a rationale
 	Note     string   // which note changed
+	// Bulk is the pasted-list rewrite's tallies. A pointer because zero of
+	// everything is a real answer for every other kind, and only this one has
+	// counts at all.
+	Bulk *BulkTally
 }
 
 // fieldWords are the field names `SetCardField` and `SetDeckField` accept, in
@@ -261,6 +291,9 @@ func Describe(e Edit) (action, summary string) {
 		return "intake", fmt.Sprintf("drafted the %s on %s",
 			word, strings.Join(e.Cards, ", "))
 
+	case EditBulk:
+		return "bulk", bulkSummary(e)
+
 	case EditSetCard:
 		word := fieldWord(e.Field)
 		if word == "" {
@@ -287,6 +320,55 @@ func Describe(e Edit) (action, summary string) {
 	}
 
 	return "edit", "edited the deck"
+}
+
+// bulkSummary is one pasted-list rewrite in a sentence.
+//
+// Only the clauses that happened, in the order somebody cares about them:
+// what arrived, what was reworded, what was renumbered, and what was buried.
+// The burials are named because that is the half a person comes back for, up
+// to the same handful `EditEntomb` names -- and a bulk edit that buried
+// nothing says nothing about burials rather than saying "0 entombed".
+func bulkSummary(e Edit) string {
+	tally := e.Bulk
+	if tally == nil {
+		tally = &BulkTally{}
+	}
+	// Written out rather than run through `plural`, because that helper
+	// appends an `s` and two of the three words here do not take one that way
+	// -- "quantitys" would be in the panel forever.
+	clauses := []string{}
+	for _, part := range []struct {
+		n            int
+		one, several string
+	}{
+		{tally.Added, "1 card added", "%d cards added"},
+		{tally.Rewrote, "1 reason rewritten", "%d reasons rewritten"},
+		{tally.Requantified, "1 quantity changed", "%d quantities changed"},
+	} {
+		switch {
+		case part.n == 1:
+			clauses = append(clauses, part.one)
+		case part.n > 1:
+			clauses = append(clauses, fmt.Sprintf(part.several, part.n))
+		}
+	}
+	if buried := len(e.Cards); buried > 0 {
+		named := e.Cards
+		tail := ""
+		if buried > 6 {
+			named, tail = e.Cards[:6], fmt.Sprintf(", and %d more", buried-6)
+		}
+		clauses = append(clauses, fmt.Sprintf("%s entombed (%s%s)",
+			plural(buried, "card"), strings.Join(named, ", "), tail))
+	}
+	if len(clauses) == 0 {
+		// The route refuses a plan that does nothing, so this is unreachable
+		// through the app. It is here because silence is the one failure a
+		// history cannot have, and an entry that says nothing is silence.
+		return "rewrote the 99 from a pasted list"
+	}
+	return "rewrote the 99 from a pasted list: " + strings.Join(clauses, ", ")
 }
 
 func fieldWord(field string) string {

@@ -36,6 +36,7 @@ import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
   StrategyEditor,
 } from '../components/deckedit'
+import { DeckNameHeading } from '../components/deckname'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
 import { CrossedSwordsGlyph, GoldfishGlyph } from '../components/glyphs'
@@ -43,6 +44,7 @@ import { DeckArtifactsPanel } from '../components/artifacts'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
+import { BulkEditPanel } from '../components/bulkedit'
 import { StanceReadout } from '../components/stance'
 import { DeckLabels } from '../components/labels'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
@@ -338,7 +340,10 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
+            {/* The heading, and the pen beside it on a deck you own. A rename
+                changes what the deck is called and never where it lives. */}
+            <DeckNameHeading name={deck.name} writable={deck.writable}
+                             deckRef={deckRef} onRenamed={onRefresh} />
             {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
             {deck.status === 'theoretical' && <Badge>theory</Badge>}
             {deck.stage === 'draft' && <Badge tone="warning">draft</Badge>}
@@ -1301,6 +1306,17 @@ export default function DeckDetail() {
                     </span>
               )}
             </div>
+          )}
+
+          {/* Lane B's mount point. The whole 99 from one pasted list, which is
+              the one edit big enough that a person has to be shown it before
+              they agree to it — so the panel previews against the server and
+              the confirmation is that plan rather than a sentence about it.
+              Below the per-card row rather than in it: it opens into a box the
+              width of the page, and a control that unfolds into a screen does
+              not belong on a line of chips. */}
+          {deck.writable && (
+            <BulkEditPanel deck={deckRef} onDone={() => void refresh()} />
           )}
 
           {/* The action bar (punch list item 9): the four per-row buttons,

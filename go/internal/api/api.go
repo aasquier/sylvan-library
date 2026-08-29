@@ -341,7 +341,7 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/ocr/{name}", Handler: a.ocrAsset},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}", Handler: a.artMotionStatus},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}/{filename}", Handler: a.artMotionFile},
-		// The deck writes: the ten editing routes,
+		// The deck writes: the eleven editing routes,
 		// every one of them going out through `commit` -- so the gate's
 		// verdict and ADR 28's log entry are inherited rather than
 		// remembered. A deck the caller cannot see is a 404 before
@@ -356,6 +356,11 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/board", Handler: a.startBoard},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.removeCard},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/entomb", Handler: a.entombCards},
+		// The bulk edit: the whole 99 from one pasted list, and the only write
+		// here that answers before it acts. `dry_run` returns the plan and
+		// writes nothing; a confirm carries back the deck the plan was read
+		// from and is refused if that deck has moved since.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/bulk", Handler: a.bulkEdit},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}/return", Handler: a.returnCard},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}", Handler: a.exileCard},
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.patchCard},

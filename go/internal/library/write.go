@@ -19,7 +19,7 @@ import (
 // The write side of a Source.
 //
 // Five verbs, grouped in three families on purpose. `WriteText` belongs to
-// the nine editing routes; `Create`, `Delete` and `SetShared` to the
+// the eleven editing routes; `Create`, `Delete` and `SetShared` to the
 // lifecycle, because an update and a create have opposite safety
 // requirements -- an update to a deck that has vanished is a bug, a create
 // over a deck that exists destroys somebody's work -- and a method that exists

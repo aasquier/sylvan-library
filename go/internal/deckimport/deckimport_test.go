@@ -18,7 +18,7 @@ import (
 // the recorded draft `deck.yaml` for it (testdata/imports.json, a frozen
 // golden).
 //
-// The pool is the load-bearing half. `canonicalName` corrects casing and keeps
+// The pool is the load-bearing half. `CanonicalName` corrects casing and keeps
 // a double-faced card written by its front face, `buildEntries` files a card
 // as `land` on `IsLand` and never on a heading, and an unknown name is kept
 // verbatim rather than dropped -- none of which can be checked without real
@@ -377,9 +377,9 @@ func TestRespellReadsOnlyWhatIsClear(t *testing.T) {
 				t.Fatalf("read %q as %v, want %s", tc.written, got, tc.want)
 			}
 			// The half that makes everything downstream work: the record is
-			// installed under the name that was WRITTEN, so `canonicalName`
+			// installed under the name that was WRITTEN, so `CanonicalName`
 			// finds it and hands back the real card's name.
-			name, rec := canonicalName(tc.written, cards)
+			name, rec := CanonicalName(tc.written, cards)
 			if rec == nil || name != tc.want {
 				t.Errorf("the lookup resolves %q to %q/%v, want %s",
 					tc.written, name, rec, tc.want)

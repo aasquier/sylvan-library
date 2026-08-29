@@ -328,3 +328,83 @@ func TestTheIntakeEntrySaysWhichCardsAndNeverWhatWasWritten(t *testing.T) {
 		})
 	}
 }
+
+// The bulk edit's one entry (Lane B). It says what a pass did in counts, names
+// the cards it buried, and -- the rule this file is oldest about -- never
+// carries a word of what any rationale says.
+func TestTheBulkEntryCountsThePassAndNamesOnlyTheBurials(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		edit Edit
+		want string
+		why  string
+	}{
+		{
+			name: "the ordinary pass",
+			why:  "every clause that happened, in the order somebody cares about",
+			edit: Edit{Kind: EditBulk, Cards: []string{"Sol Ring", "Cultivate"},
+				Bulk: &BulkTally{Added: 4, Rewrote: 6, Requantified: 2, Entombed: 2}},
+			want: "rewrote the 99 from a pasted list: 4 cards added, 6 reasons " +
+				"rewritten, 2 quantities changed, 2 cards entombed (Sol Ring, Cultivate)",
+		},
+		{
+			name: "one of each",
+			why:  "the singular is written out; `plural` would say 'quantitys'",
+			edit: Edit{Kind: EditBulk, Cards: []string{"Sol Ring"},
+				Bulk: &BulkTally{Added: 1, Rewrote: 1, Requantified: 1, Entombed: 1}},
+			want: "rewrote the 99 from a pasted list: 1 card added, 1 reason " +
+				"rewritten, 1 quantity changed, 1 card entombed (Sol Ring)",
+		},
+		{
+			name: "reasons only",
+			why:  "a clause for something that did not happen is noise, not a fact",
+			edit: Edit{Kind: EditBulk, Bulk: &BulkTally{Rewrote: 12}},
+			want: "rewrote the 99 from a pasted list: 12 reasons rewritten",
+		},
+		{
+			name: "more burials than a panel wants",
+			why:  "the whole 99 must not become the log; the same handful EditEntomb names",
+			edit: Edit{Kind: EditBulk,
+				Cards: []string{"A", "B", "C", "D", "E", "F", "G", "H"},
+				Bulk:  &BulkTally{Entombed: 8}},
+			want: "rewrote the 99 from a pasted list: 8 cards entombed " +
+				"(A, B, C, D, E, F, and 2 more)",
+		},
+		{
+			name: "no tally at all",
+			why:  "silence is the one failure a history cannot have",
+			edit: Edit{Kind: EditBulk},
+			want: "rewrote the 99 from a pasted list",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			action, summary := Describe(tc.edit)
+			if action != "bulk" {
+				t.Errorf("the row is filed under %q, so it is not queryable as a "+
+					"bulk edit", action)
+			}
+			if summary != tc.want {
+				t.Errorf("summary:\n got  %q\n want %q\n(%s)", summary, tc.want, tc.why)
+			}
+		})
+	}
+}
+
+// A bulk edit is not an intake, and the two must never be filed as one: an
+// intake says a model drafted these sentences (ADR 41), and a bulk edit says a
+// person typed them into a box.
+func TestABulkEditIsNotFiledAsAnIntake(t *testing.T) {
+	t.Parallel()
+	bulk, _ := Describe(Edit{Kind: EditBulk, Bulk: &BulkTally{Rewrote: 3}})
+	intake, _ := Describe(Edit{Kind: EditIntake, Field: "why", Cards: []string{"A"}})
+	if bulk == intake {
+		t.Fatalf("both operations file under %q, so the history cannot tell a "+
+			"person's words from a drafted sentence", bulk)
+	}
+	_, summary := Describe(Edit{Kind: EditBulk, Bulk: &BulkTally{Rewrote: 3}})
+	if strings.Contains(summary, "drafted") {
+		t.Errorf("the bulk entry claims something was drafted: %q", summary)
+	}
+}
