@@ -65,8 +65,10 @@ func OracleRow(c map[string]any) []any {
 		asDouble(c["cmc"]), asStr(c["type_line"]), asStr(c["oracle_text"]),
 		asList(c["colors"]), asList(c["color_identity"]),
 		asList(c["keywords"]), asList(c["produced_mana"]),
-		jsonText(c["legalities"], "{}"), asStr(c["layout"]),
-		jsonText(c["card_faces"], "[]"), truthy(c["reserved"]),
+		// The absent values are decoded documents too, never the text `"{}"`
+		// and `"[]"` — see [jsonText] for what a string does to a JSON column.
+		jsonText(c["legalities"], map[string]any{}), asStr(c["layout"]),
+		jsonText(c["card_faces"], []any{}), truthy(c["reserved"]),
 		asInt32(c["edhrec_rank"]), asDate(c["released_at"]),
 		asStr(c["set"]), asStr(c["scryfall_uri"]),
 		asStr(img["normal"]), asStr(img["art_crop"]),
@@ -166,18 +168,52 @@ func asList(v any) []string {
 	return out
 }
 
-// jsonText stores the sub-document as text, `empty` when absent — Go's
-// marshalling rather than json.dumps's ASCII escapes; see the package
-// comment in refresh.go for why that difference is invisible.
-func jsonText(v any, empty string) any {
+// jsonText hands the sub-document to the Appender as the decoded value it
+// already is, `empty` when absent.
+//
+// **It must not be marshalled to a string first, and that is not a style
+// preference — it is the bug that emptied the library.** A JSON column takes
+// a *value*; give the Appender a Go `string` and DuckDB stores a JSON string
+// whose content happens to be JSON, so `legalities` lands as
+// `"{\"commander\":\"legal\"}"` rather than `{"commander":"legal"}`. Every
+// read through `json_extract_string` then returns NULL, which is the WHERE
+// clause on **every** card query in the app: the card finder, the card
+// search, the Wheel, the colour rooms. All of them answered "no such card"
+// against a pool holding all 35,393 of them, because `count(*)` has no
+// predicate and so the pool reported itself perfectly healthy.
+//
+// Three things hid it for a week and each is worth a sentence:
+//
+//   - The prepared-statement loader this replaced **parsed** the text on the
+//     way in (`?::JSON` does), so the encoding was right for as long as the
+//     slow path existed and became wrong the moment the Appender arrived.
+//   - `pooltest` still binds `?::JSON`, so the whole suite writes its
+//     fixtures down the *working* path and cannot see this. A pool loaded
+//     through [LoadOracle] is the only fixture that can, which is what
+//     `cards.TestAPoolWrittenByTheRealLoaderAnswersTheCardQueries` is for.
+//   - The comment that used to stand here said the difference was Go's
+//     marshalling "rather than json.dumps's ASCII escapes", and invisible.
+//     It was written looking straight at `"{\"commander\":...}"` — the
+//     double-encoding itself — and read the backslashes as escaping.
+//
+// The decoded value is safe to hand over exactly as `IterCards` produced it:
+// `UseNumber` leaves numbers as [json.Number], and the Appender writes those
+// as numbers, so a face's `"cmc":3.0` stays `3.0` and does not become
+// `"3.0"`. Verified against a heterogeneous `card_faces` — nested objects,
+// nulls, arrays, and a key one face carries and the other does not.
+//
+// The marshal survives as a *validity check* only: its bytes are thrown
+// away. Values off `encoding/json` are always representable, so this is the
+// defensive branch it always was, and a document that somehow is not
+// representable becomes `empty` rather than failing the whole refresh.
+func jsonText(v any, empty any) any {
 	if v == nil {
 		return empty
 	}
-	raw, err := json.Marshal(v)
-	if err != nil {
+	if _, err := json.Marshal(v); err != nil {
 		return empty
 	}
-	return string(raw)
+	return v
 }
 
 // jsonOrNull is [jsonText]'s sibling for a document most cards do not have:
@@ -189,15 +225,15 @@ func jsonText(v any, empty string) any {
 // frozen refresh corpus comparing equal without being regenerated: none of
 // those recorded cards carries `all_parts`, and NULL is what they always
 // said.
+// The same rule as [jsonText] about not stringifying it on the way in.
 func jsonOrNull(v any) any {
 	if v == nil {
 		return nil
 	}
-	raw, err := json.Marshal(v)
-	if err != nil {
+	if _, err := json.Marshal(v); err != nil {
 		return nil
 	}
-	return string(raw)
+	return v
 }
 
 func truthy(v any) bool {

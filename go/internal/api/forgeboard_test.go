@@ -432,7 +432,29 @@ func TestASeatWithNoDeckClaimsNoShape(t *testing.T) {
 	}
 }
 
-// **A card with two names on one picture answers to both of them.**
+// onePicture and twoPictures build a record's faces the two ways Scryfall
+// encodes them: a card whose names share one painting carries faces with no
+// `image_uris`, and a card painted per face carries one on each. Names only,
+// because that is the whole of what tells the two apart here.
+func onePicture(names ...string) []pool.CardFace {
+	faces := make([]pool.CardFace, 0, len(names))
+	for _, name := range names {
+		faces = append(faces, pool.CardFace{Name: name})
+	}
+	return faces
+}
+
+func twoPictures(names ...string) []pool.CardFace {
+	faces := onePicture(names...)
+	for i := range faces {
+		art := "https://cards.scryfall.io/normal/" + faces[i].Name + ".jpg"
+		faces[i].ImageNormal = &art
+	}
+	return faces
+}
+
+// **A card answers to every name it has, and is painted by the face that was
+// named.**
 //
 // Forge renames a card when its other half is cast — a Bonecrusher Giant in
 // hand is *Stomp* on the way to the stack — and the board learns a card's name
@@ -440,50 +462,96 @@ func TestASeatWithNoDeckClaimsNoShape(t *testing.T) {
 // middle of the arena drew a black card with a title on it in the one moment
 // that surface exists for (Aaron, 2026-08-28).
 //
-// The names travel with the card now. **Only for the layouts that print both
-// of them on the picture being held up**, which is the whole of the ruling and
-// the only part that could go wrong quietly: a transforming card's back face
-// has a picture of its own that this record does not carry, so answering to
-// *its* name with *this* image would be the room showing a card that is not
-// the card that was cast — a worse fault than the plate it replaces, because it
-// looks right.
-func TestOnlyACardWithBothHalvesOnOnePictureAnswersToBoth(t *testing.T) {
+// **This was once gated on a list of layouts, and a modal double-faced card
+// drew that same black plate for another year** (Aaron, 2026-08-29: *"MDF cards
+// are not rendering intelligently... blanked out black card with just the text
+// when it is played as a creature... and same deal when played as a land"*).
+// The list named the layouts printing both names on one picture, because at the
+// time the record carried one picture and "does this card answer to two names"
+// and "is the other name on the picture we are holding up" had one answer
+// between them. They are two questions, and the record answers both now: the
+// names come from its own `A // B`, and whether each has a painting of its own
+// comes from whether Scryfall put an `image_uris` on each face.
+//
+// So the fault the old gate existed to prevent is still prevented, by the half
+// that was actually load-bearing: nothing answers to a back face's name *with a
+// front face's picture*. It answers with the back face's picture instead.
+func TestACardAnswersToEveryNameAndIsPaintedByFace(t *testing.T) {
 	t.Parallel()
 	for _, layout := range []struct {
-		name  string
-		card  string
-		kind  string
-		faces []string
+		name   string
+		card   string
+		kind   string
+		faces  []pool.CardFace
+		names  []string
+		images []string
 	}{
+		// The one-picture family. Both names, and no per-face painting,
+		// because `image` is already the picture both are printed on.
 		{"an Adventure", "Bonecrusher Giant // Stomp", "adventure",
-			[]string{"Bonecrusher Giant", "Stomp"}},
-		{"a split card", "Fire // Ice", "split", []string{"Fire", "Ice"}},
-		{"a flip card", "Erayo, Soratami Ascendant // Erayo's Essence",
-			"flip", []string{"Erayo, Soratami Ascendant", "Erayo's Essence"}},
+			onePicture("Bonecrusher Giant", "Stomp"),
+			[]string{"Bonecrusher Giant", "Stomp"}, nil},
+		{"a split card", "Fire // Ice", "split", onePicture("Fire", "Ice"),
+			[]string{"Fire", "Ice"}, nil},
+		{"a flip card", "Erayo, Soratami Ascendant // Erayo's Essence", "flip",
+			onePicture("Erayo, Soratami Ascendant", "Erayo's Essence"),
+			[]string{"Erayo, Soratami Ascendant", "Erayo's Essence"}, nil},
 		{"an aftermath card", "Dusk // Dawn", "aftermath",
-			[]string{"Dusk", "Dawn"}},
-		// The back of a transforming card is a second picture, and this record
-		// carries the front. Nothing may answer to the back's name with it.
+			onePicture("Dusk", "Dawn"), []string{"Dusk", "Dawn"}, nil},
+		// `prepare` is the newest of that family and nobody had heard of it
+		// when the list was written, so it drew the black plate too. Asking the
+		// record rather than a list is what fixes it without anybody knowing
+		// the word.
+		{"a prepare card", "Blazing Firesinger // Seething Song", "prepare",
+			onePicture("Blazing Firesinger", "Seething Song"),
+			[]string{"Blazing Firesinger", "Seething Song"}, nil},
+		// The two-picture family: both names *and* both paintings.
 		{"a transforming card", "Delver of Secrets // Insectile Aberration",
-			"transform", nil},
-		{"a modal double-faced card", "Agadeem's Awakening // Agadeem, the " +
-			"Undercrypt", "modal_dfc", nil},
-		{"a meld card", "Bruna, the Fading Light // Brisela, Voice of Nightmares",
-			"meld", nil},
+			"transform",
+			twoPictures("Delver of Secrets", "Insectile Aberration"),
+			[]string{"Delver of Secrets", "Insectile Aberration"},
+			[]string{
+				"https://cards.scryfall.io/normal/Delver of Secrets.jpg",
+				"https://cards.scryfall.io/normal/Insectile Aberration.jpg",
+			}},
+		{"a modal double-faced card",
+			"Agadeem's Awakening // Agadeem, the Undercrypt", "modal_dfc",
+			twoPictures("Agadeem's Awakening", "Agadeem, the Undercrypt"),
+			[]string{"Agadeem's Awakening", "Agadeem, the Undercrypt"},
+			[]string{
+				"https://cards.scryfall.io/normal/Agadeem's Awakening.jpg",
+				"https://cards.scryfall.io/normal/Agadeem, the Undercrypt.jpg",
+			}},
+		// A meld card is two records and a third, each with one name and no
+		// faces at all — so this never had to decide anything about meld, and
+		// still does not.
+		{"a meld card", "Bruna, the Fading Light", "meld", nil, nil, nil},
 		// And the ordinary card, which is nearly every card: one name, and no
 		// list of one to make somebody wonder what it is for.
-		{"an ordinary card", "Sol Ring", "normal", nil},
+		{"an ordinary card", "Sol Ring", "normal", nil, nil, nil},
 	} {
 		t.Run(layout.name, func(t *testing.T) {
 			t.Parallel()
-			got := facesOf(&pool.CardRecord{Name: layout.card, Layout: layout.kind})
-			if len(got) != len(layout.faces) {
+			rec := &pool.CardRecord{
+				Name: layout.card, Layout: layout.kind, Faces: layout.faces}
+			got := facesOf(rec)
+			if len(got) != len(layout.names) {
 				t.Fatalf("%s (%s) answers to %v, want %v",
-					layout.card, layout.kind, got, layout.faces)
+					layout.card, layout.kind, got, layout.names)
 			}
-			for i, want := range layout.faces {
+			for i, want := range layout.names {
 				if got[i] != want {
 					t.Fatalf("face %d is %q, want %q", i, got[i], want)
+				}
+			}
+			art := facePicturesOf(rec, got)
+			if len(art) != len(layout.images) {
+				t.Fatalf("%s (%s) is painted %v, want %v",
+					layout.card, layout.kind, art, layout.images)
+			}
+			for i, want := range layout.images {
+				if art[i] != want {
+					t.Fatalf("face %d is painted %q, want %q", i, art[i], want)
 				}
 			}
 		})
@@ -495,8 +563,44 @@ func TestOnlyACardWithBothHalvesOnOnePictureAnswersToBoth(t *testing.T) {
 // half and point a magnifier at a card with nothing to point at.
 func TestAHalfLayoutWithOneNameSendsNothing(t *testing.T) {
 	t.Parallel()
-	if got := facesOf(&pool.CardRecord{Name: "Stomp", Layout: "adventure"}); got != nil {
+	got := facesOf(&pool.CardRecord{
+		Name: "Stomp", Layout: "adventure", Faces: onePicture("Stomp")})
+	if got != nil {
 		t.Fatalf("one name became %v", got)
+	}
+}
+
+// **A record that cannot describe its own faces describes none of them.**
+//
+// Two ways the pool can fail to line up, and the same answer to both, because
+// the caller's only use for either list is to index into it beside the other:
+// a short list is not a partial answer, it is a confident answer about the
+// wrong half. That is the fault that kept modal double-faced cards off this
+// wire for a year — showing the front of a card whose back was played looks
+// right, which is what makes it worse than showing nothing.
+func TestAFaceListThatDoesNotLineUpIsNotSent(t *testing.T) {
+	t.Parallel()
+	// A pool too old to carry `card_faces` at all. The name still splits in
+	// two and nothing else corroborates it, so the room is told nothing and
+	// draws the plate — which is what it drew before any of this existed.
+	if got := facesOf(&pool.CardRecord{
+		Name:   "Agadeem's Awakening // Agadeem, the Undercrypt",
+		Layout: "modal_dfc"}); got != nil {
+		t.Fatalf("a record with no faces answered to %v", got)
+	}
+	// And a card painted on one face and not the other, which no real printing
+	// is: all or nothing, so the room falls back to the card's own picture
+	// rather than holding a front up for a back.
+	faces := twoPictures("Delver of Secrets", "Insectile Aberration")
+	faces[1].ImageNormal = nil
+	rec := &pool.CardRecord{Name: "Delver of Secrets // Insectile Aberration",
+		Layout: "transform", Faces: faces}
+	names := facesOf(rec)
+	if len(names) != 2 {
+		t.Fatalf("the names are %v, want both of them", names)
+	}
+	if art := facePicturesOf(rec, names); art != nil {
+		t.Fatalf("half a painting became %v", art)
 	}
 }
 

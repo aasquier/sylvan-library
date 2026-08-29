@@ -370,6 +370,13 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/import", Handler: a.importDeck},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}", Handler: a.deleteDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/shared", Handler: a.setDeckShared},
+		// The crypt, which is the delete's other half (ADR 27's shape, at the
+		// deck level at last): what this caller has entombed, and the way one
+		// comes back. **No owner segment on either**, like the two collection
+		// routes above -- your crypt is yours, so there is no path anybody can
+		// write that names somebody else's.
+		{Method: http.MethodGet, Pattern: "/api/decks/entombed", Handler: a.listEntombed},
+		{Method: http.MethodPost, Pattern: "/api/decks/entombed/{id}/return", Handler: a.restoreDeck},
 		// The artifacts rebuild, and with it every route under `/api/decks` is
 		// the door's: the five deliverables, derived from the deck rather than
 		// edited into it. A **plain route**
@@ -398,6 +405,14 @@ func (a *API) Routes() []Route {
 		// deck this caller cannot see and 403 for a read-only source, both
 		// before it reads a single action off the body.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/intake", Handler: a.intakeDeck},
+		// The description, asked from the deck page: the intake's `description`
+		// step as a surface of its own, and the one difference is that this one
+		// WRITES NOTHING. It proposes a paragraph into the editor's box and the
+		// person saves it through `PATCH` above, because on this page the field
+		// may already hold words somebody wrote. It reaches as far as a write
+		// does -- 404 unseen, 403 read-only -- because a draft nobody can save
+		// is a call nobody can use.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/describe", Handler: a.describeDeck},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
 		// the NET lane,
@@ -517,5 +532,19 @@ func (a *API) poolForAProbe(ctx context.Context, fn func(*pool.Conn) error) erro
 	return a.pool.UseWithoutHolding(ctx, fn)
 }
 
-// noPoolMessage is the sentence every degraded answer carries.
-const noPoolMessage = "no card pool yet -- run `mtglab data refresh`"
+// noPoolMessage is the sentence every degraded answer carries, and it is
+// **read by a player**, not by whoever runs the server -- it travels on the
+// wire as `message` and the card finder prints it under the search box.
+//
+// So it says what happened in plain words and names nothing that computes
+// (commandment 10). It used to read "no card pool yet -- run `mtglab data
+// refresh`", which told somebody adding their first card to go and run a
+// command they have never heard of, on a machine they do not have. The
+// operator's version of this sentence belongs in the log, where it is.
+//
+// It also has to be distinguishable from "no such card" (commandment 2):
+// this is the library failing to answer, and a beginner who reads it as a
+// verdict on their spelling has been told the one wrong thing.
+const noPoolMessage = "The library's shelves are bare just now, so no card " +
+	"can be looked up. This says nothing about the card you asked for — " +
+	"try again in a little while."

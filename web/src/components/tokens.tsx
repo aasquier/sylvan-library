@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, errorMessage } from '../lib/api'
 import type { DeckRef, DeckTokens, TokenPlate } from '../lib/api'
+import { shoppingList, shoppingText } from '../lib/tokenshop'
 import { FieldHint } from './hint'
 import { CardHover, Spinner } from './ui'
 
@@ -30,6 +31,12 @@ import { CardHover, Spinner } from './ui'
  * the middle one into the last would tell somebody their deck makes no tokens
  * when it may make a dozen, which is the one failure this section must not
  * have.
+ *
+ * **And one thing to do about it**: [TokenShopping] turns the shelf into a
+ * list somebody can take to a shop (Aaron, 2026-08-29). It is the only action
+ * in this section — everything else here is a picture — which is why it sits
+ * directly under the paragraph that says to have a few to hand rather than
+ * below a grid that can run to two dozen plates.
  */
 export function TokenShelf({ deckRef }: { deckRef: DeckRef }) {
   const [open, setOpen] = useState(false)
@@ -159,6 +166,22 @@ export function TokenShelf({ deckRef }: { deckRef: DeckRef }) {
             </p>
           )}
 
+          {/* **Above the plates, not below them.** The paragraph directly
+              overhead says "worth having a few to hand before you sit down",
+              and this is the answer to that sentence — so it stands next to
+              it rather than twenty-four plates further down a phone. It is
+              also the only thing in this section that is an *action*, and an
+              action a reader has to scroll to find is an action nobody
+              finds.
+
+              **Absent, never disabled, when there is nothing to buy.** The
+              same `tokens.length > 0` that draws the shelf: a deck that makes
+              nothing has already been told so in its own sentence above, and
+              a greyed-out Copy button beside that sentence would be a
+              second, worse way of saying it. The three declining states
+              never reach here at all. */}
+          {tokens.length > 0 && <TokenShopping tokens={tokens} />}
+
           {tokens.length > 0 && (
             <ul className="token-grid">
               {tokens.map((token, i) => (
@@ -175,6 +198,123 @@ export function TokenShelf({ deckRef }: { deckRef: DeckRef }) {
         </div>
       )}
     </section>
+  )
+}
+
+/** Plain English for a count, because "1 tokens" is how a page tells somebody
+ *  it was written by nobody. */
+function many(n: number, one: string, more: string): string {
+  return `${String(n)} ${n === 1 ? one : more}`
+}
+
+/**
+ * The shopping list, and the one press that puts it on the clipboard.
+ *
+ * Aaron, 2026-08-29: *"I want there to be an 'Export' button in the token
+ * area that can give you a TCGPlayer friendly list to help shop for tokens
+ * when needed."*
+ *
+ * **One press does the thing and shows its work.** The list is copied *and*
+ * revealed by the same press, which is the shape this needs for two separate
+ * reasons. A copy that succeeds silently is a copy that gets pressed four
+ * times — the button says "Copied" and the sentence under it says how much
+ * went across, so the press is answered twice over. And a clipboard that
+ * *refuses* — an old browser, a page without permission — leaves the text
+ * sitting on screen with a sentence saying to select it, rather than leaving
+ * a reader pressing a button that has quietly done nothing. A `catch` that
+ * turned into "nothing happened" would be this repo's most-made mistake
+ * wearing a shopping list.
+ *
+ * **No file, and no automation past the paste.** A download is worse than a
+ * clipboard here — a phone has nowhere to put a `.txt` — and rule 9's "price
+ * and cart, never checkout" is the ceiling: this hands somebody a list and
+ * points at the box it goes in. Nothing here buys anything.
+ */
+function TokenShopping({ tokens }: { tokens: TokenPlate[] }) {
+  const [shown, setShown] = useState(false)
+  const [took, setTook] = useState(false)
+  const [refused, setRefused] = useState(false)
+  const lines = useMemo(() => shoppingList(tokens), [tokens])
+  const text = useMemo(() => shoppingText(lines), [lines])
+  const cards = lines.reduce((sum, line) => sum + line.qty, 0)
+
+  // The label goes back to what it says at rest, so the *next* press is
+  // answered too. Cleared on unmount, because a fold that closes mid-beat
+  // would otherwise set state on a component that has gone.
+  useEffect(() => {
+    if (!took) return
+    const beat = window.setTimeout(() => { setTook(false) }, 1800)
+    return () => { window.clearTimeout(beat) }
+  }, [took])
+
+  async function take() {
+    setShown(true)
+    try {
+      await navigator.clipboard.writeText(text)
+      setRefused(false)
+      setTook(true)
+    } catch {
+      // Not an error box: nothing is broken and nothing was lost. The list is
+      // right there, and the sentence below says to take it by hand.
+      setTook(false)
+      setRefused(true)
+    }
+  }
+
+  return (
+    <div className="token-shop">
+      <button type="button" className="btn btn-brass btn-sm"
+              onClick={() => { void take() }}>
+        <span aria-hidden className="token-shop-glyph">❖</span>
+        {took ? 'Copied' : 'Copy shopping list'}
+      </button>
+
+      {/* Before the press, the button has to say what it is for — "shopping
+          list" alone does not tell somebody who has never bought a single
+          card what they would do with one (commandment 2). */}
+      {!shown && (
+        <p className="token-shop-note">
+          A list to paste into a shop's bulk-add box, for the tokens this deck
+          needs.
+        </p>
+      )}
+
+      {shown && (
+        <>
+          {/* `role="status"` so the press is answered to a screen reader as
+              well as to an eye — the same press, the same sentence. */}
+          <p role="status"
+             className={refused ? 'token-shop-said is-refused' : 'token-shop-said'}>
+            {refused
+              ? 'The clipboard would not take it — the list is below, ready to '
+                + 'select.'
+              : `Copied — ${many(lines.length, 'token', 'tokens')} to look for, `
+                + `${many(cards, 'card', 'cards')} in all.`}
+          </p>
+
+          {/* The exact text that went across, so nobody pastes a surprise. */}
+          <pre className="token-shop-list">{text}</pre>
+
+          <p className="token-shop-note">
+            The number is one for every card in your deck that makes it, up to
+            four — a starting pile rather than a count. The same token can be
+            made a dozen times in a game and still never need more than a few
+            on the table at once, and a coin stands in perfectly well until the
+            real ones arrive.
+          </p>
+
+          <p className="token-shop-note">
+            Each line is the name the card is sold under — a Beast token is
+            listed as <em>Beast Token</em> — so the whole list can go into a
+            bulk-add box at once. Have a look at what it found before you buy
+            anything. One such box is at{' '}
+            <a href="https://www.tcgplayer.com/massentry"
+               target="_blank" rel="noreferrer noopener"
+               className="token-shop-link">tcgplayer.com/massentry</a>.
+          </p>
+        </>
+      )}
+    </div>
   )
 }
 

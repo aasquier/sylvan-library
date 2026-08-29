@@ -205,7 +205,19 @@ func compareRow(t *testing.T, label string, columns []string, got []any,
 	for i, name := range columns {
 		g, w := got[i], want[name]
 		if parsed[name] {
-			var doc any
+			// **The builder hands these over as documents, not as text.** It
+			// used to marshal them to a string, and this branch read only
+			// that shape -- so when the string went away, `doc` stayed nil
+			// and every JSON column compared as null. The recorded value is
+			// untouched either way: `testdata/refresh.json` is a frozen
+			// golden and this is the *comparison* learning the correct
+			// representation, not the golden learning a new one.
+			//
+			// The string case stays because it is still legal input to this
+			// helper and costs one branch. Both sides carry `json.Number`
+			// (both were decoded with `UseNumber`), which marshals as a bare
+			// number, so `jsonEqual` sees the same text for the same value.
+			doc := g
 			if s, ok := g.(string); ok {
 				if err := json.Unmarshal([]byte(s), &doc); err != nil {
 					t.Errorf("%s.%s: unparseable %q", label, name, s)

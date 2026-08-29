@@ -17258,6 +17258,477 @@ button:hover .tarot-fan-card {
   color: var(--text-secondary);
 }
 
+/* ---- the token shopping bench (lane E) ----------------------------------
+   The one *action* in the token shelf: a list of what this deck makes, in
+   the shape a card shop's bulk-add box reads, and one press to take it.
+
+   Its own voice, `.btn-brass`, for `.btn-felt`'s reason one section over —
+   the token shelf already has a palette of its own (brass on parchment, set
+   up beside `.token-glyph`), and a `.btn-quiet` dropped into it would be the
+   page's furniture standing in somebody else's room. Commandment 17 is the
+   rest of it: the border warms to brass and the face lifts on hover, a glint
+   crosses it the way `.btn-primary`'s does but in this room's metal, the
+   press settles it back down, and focus takes the vine ring every other
+   button in the app takes so a keyboard finds this one the same way.
+
+   `--token-*` are defined up beside `.token-glyph` and carry both themes
+   already, so nothing here needs a second `prefers-color-scheme` block: the
+   parchment darkens and the ink lightens on their own. */
+.btn-brass {
+  background: color-mix(in srgb, var(--token-brass) 8%, transparent);
+  border-color: var(--token-edge);
+  color: var(--text-primary);
+}
+.btn-brass:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--token-brass);
+  background: color-mix(in srgb, var(--token-brass) 16%, transparent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--token-brass) 30%, transparent);
+}
+.btn-brass:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--token-brass) 24%, transparent);
+}
+/* The glint, in brass rather than in white: a lantern crossing metal, not a
+   highlight crossing plastic. Only ever on hover, and `.btn`'s own
+   `overflow: hidden` is what keeps it inside the corner radius. */
+.btn-brass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    color-mix(in srgb, var(--token-brass) 55%, transparent) 47%,
+    color-mix(in srgb, var(--token-brass) 18%, transparent) 56%,
+    transparent 68%
+  );
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+.btn-brass:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+/* The mark from the section's own heading, at the size a button wears it.
+   `.btn` already lays its children out in a row with a gap, so this needs no
+   box of its own. */
+.token-shop-glyph {
+  color: var(--token-brass);
+  font-size: 11px;
+}
+
+.token-shop {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+/* Everything this bench says that is not the list itself. Held to the same
+   measure as the section's own paragraph above it, so the two read as one
+   column rather than as a page and an insert.
+
+   **`--text-secondary` and not the `--text-muted` the paragraph above uses,
+   and that is measured rather than preferred.** Muted renders `#898781` on
+   the light theme's page and comes out at **3.41:1** — under AA for text this
+   size, and this is not an aside: it is the paragraph that tells a newcomer
+   how many tokens to buy and why, which is the one thing in this bench they
+   have to be able to read (commandment 2). Secondary measures 7.53:1 on the
+   same ground. The step between this and the aside above it is a hierarchy
+   rather than an accident. */
+.token-shop-note {
+  max-width: 42rem;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.token-shop-note em {
+  color: var(--text-primary);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* The answer to the press — the whole point of the control, so it is the most
+   legible thing on the bench: `--text-primary`, 18.67:1 in light and better
+   in dark.
+
+   **Not the section's brass, and not `--status-warning`, and both of those
+   were measured before they were dropped.** Brass is `#a8792e` on a light
+   page and comes out at 3.66:1; `--status-warning` is `#fab219` and comes out
+   at **1.74:1**, which is a sentence nobody can read at all. A confirmation
+   that cannot be read is the same as no confirmation, which is the whole
+   fault this control exists to not have.
+
+   `is-refused` is a softer ink rather than an alarm colour, because a
+   clipboard that says no has broken nothing: the list is on screen and the
+   sentence redirects to it. What tells the two apart is the words. */
+.token-shop-said {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.token-shop-said.is-refused {
+  color: var(--text-secondary);
+}
+
+/* The exact text that went across, on the shelf's own parchment: a
+   quartermaster's chit rather than a console. Monospace because it is text
+   somebody is about to paste verbatim and the numerals should line up;
+   selectable, because that is the whole of the fallback when the clipboard
+   says no. `--token-ink` on `--token-parchment` measures better than 9:1 in
+   both themes (the argument is up beside `.token-face-blank`, which is the
+   only other place the pair is used). */
+.token-shop-list {
+  align-self: stretch;
+  max-width: 42rem;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--token-rule);
+  background:
+    repeating-linear-gradient(
+      -35deg,
+      transparent 0 9px,
+      color-mix(in srgb, var(--token-brass) 5%, transparent) 9px 10px),
+    var(--token-parchment);
+  color: var(--token-ink);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* The brass goes under the words rather than into them. Brass ink measures
+   3.66:1 on the light theme's page, which is not a link somebody can read;
+   the rule beneath it is decoration and carries the section's metal without
+   carrying the sentence. */
+.token-shop-link {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-decoration-color: var(--token-brass);
+  text-underline-offset: 2px;
+  border-radius: 3px;
+  transition: color 140ms ease, text-decoration-color 140ms ease;
+}
+.token-shop-link:hover {
+  color: var(--text-primary);
+  text-decoration-color: var(--text-primary);
+}
+.token-shop-link:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
+/* **This block has to be here, and it has to name `.btn-brass` itself.** The
+   button family's own reduced-motion guard is up at line ~5274 and it
+   enumerates every voice by name — `.btn-primary`, `.btn-quiet`, `.btn-arena`,
+   `.btn-danger-solid` — rather than leaning on the bare `.btn:hover` rule
+   beside it, and the reason is specificity: `.btn-brass:hover:not(:disabled)`
+   and `.btn:hover:not(:disabled)` weigh exactly the same, so source order
+   decides, and a voice defined *after* the guard wins it. Every new `.btn-*`
+   at the foot of this file inherits that problem and has to answer it here.
+
+   The glint is parked off-screen rather than deleted, which is the shape the
+   two glints above take: `display: none` would work and would also be a
+   second way of saying the same thing. The border and the face's colour stay
+   — a control still has to answer the hand that reaches for it. */
+@media (prefers-reduced-motion: reduce) {
+  .btn-brass:hover:not(:disabled) {
+    transform: none;
+  }
+  .btn-brass:hover:not(:disabled)::after {
+    transform: translateX(-130%);
+  }
+  /* The link still changes colour on hover — it has to answer the hand — but
+     it arrives there rather than fading in. */
+  .token-shop-link {
+    transition: none;
+  }
+}
+
+/* ========================================================= the deck's page
+ *                                          (punch list 2026-08-29, lane D)
+ *
+ * Two things Aaron asked for on a deck page, and they turn out to be the same
+ * complaint twice: *"Wheel of Fortune and Ancestral Recall helpers should be
+ * side-by-side, not stacked on top of each other"*, and *"the 'Simulate this'
+ * button is mega basic, we should also have another button with a direct link
+ * to the coliseum that is also stylized."* One is a column of wasted page and
+ * the other is a rectangle that never answers a hand.
+ */
+
+/* ------------------------------------------------- the two toys, as a pair
+ *
+ * `components/openinghand.tsx` and `components/wheel.tsx`, mounted together in
+ * `.deck-toys` at the foot of the card list.
+ *
+ * **There is no breakpoint in here, and that is the design rather than an
+ * omission.** A `sm:` prefix asks how wide the *window* is, which is a guess
+ * about somebody's device, and this project has guessed Aaron's phone wrong
+ * with exactly that lever before. Flex wrapping with a real basis asks the one
+ * honest question — is there room for both of these — and answers it at
+ * whatever width that turns out to be, in a window, in a split screen, or on a
+ * phone nobody has bought yet.
+ *
+ * **A real basis, not `flex-1`.** `min-w-0` + `flex: 1 1 0%` is the idiom this
+ * app reaches for and it is the wrong one here: a zero basis never wraps, it
+ * only shrinks, so two panels that will not fit get *crushed* side by side
+ * instead of one moving down a row. The basis is measured off the Wheel rather
+ * than chosen — see `.wheel-body` below for what was measured and what it
+ * came to.
+ *
+ * **A folded toy keeps the size of the card it folded into.** Both toys fold
+ * away to a 136px Magic card, and a card stretched to the height of an open
+ * panel beside it is not a card any more. `align-self: start` and no growing,
+ * so all three mixed states — both folded, both open, one of each — are
+ * deliberate.
+ *
+ * **An open toy runs to its twin's full height, and its credit line goes to
+ * the bottom.** The two are never the same height: an undealt hand is a
+ * paragraph and the Wheel is a painting. Two frames of different heights read
+ * as an accident; two frames that start and end level, each with the painter's
+ * name pinned along its bottom edge, read as a pair — and that line is a
+ * licence rather than decoration (commandment 19), so the foot of the frame is
+ * where it belonged anyway.
+ */
+.deck-toys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+.deck-toys > * {
+  flex: 1 1 26rem;
+  min-width: 0;
+}
+/* Open, a toy is a column so the credit can be pushed to the foot of it. */
+.deck-toys > section {
+  display: flex;
+  flex-direction: column;
+}
+.toy-credit {
+  margin-top: auto;
+}
+/* Folded, it is a card and stays card-sized. */
+.deck-toys > .hand-folded,
+.deck-toys > .wheel-folded {
+  flex: 0 0 auto;
+  align-self: start;
+}
+
+/* ---- the Wheel's own two columns
+ *
+ * The scene, and the readout beside it. This was `sm:flex-row`, which asked
+ * the viewport how wide the panel was — a question the viewport could answer
+ * while the panel was always the whole page, and cannot answer now that it is
+ * half of one on a desk and all of one on a phone. Same rule as above: a basis
+ * and a wrap, so the readout drops under the painting exactly when it stops
+ * fitting beside it, which on a half-page panel is always.
+ *
+ * **18rem is a measurement, not a round number.** The painted disc is 0.556 of
+ * the scene's width, and the scene was driven down in steps and looked at:
+ * at 288px (a 160px disc) the planks, all four fates, the lantern and the owl
+ * on the branch are every one of them still there; at 224px the fates are
+ * small but reading; by 176px the disc is 98px, the fates are ten-pixel marks
+ * and the clearing around them has gone to smudge — a coin with a picture
+ * behind it. So the floor is the comfortable end of that range rather than the
+ * breaking point, and it is why the pair above wraps at 26rem: 18rem of scene
+ * plus the panel's own 2.5rem of padding is 20.5rem, and the hand table
+ * beside it wants the rest.
+ *
+ * **`flex-start`, because the scene is a painting and not a column.** The
+ * default `stretch` gives the scene box the height of whichever side is
+ * taller, and the scene's decorations are positioned in percentages of that
+ * box — so a tall readout beside it slid the lantern's glow and the beetle
+ * out from under the painting and onto the page as a smear. That was reachable
+ * before this change too (`sm:flex-row` stretched exactly the same way); it is
+ * fixed here rather than left because halving the panel's width makes it
+ * likelier.
+ *
+ * A container query would be the other answer and is the wrong one here:
+ * `container-type` implies containment, and a contained ancestor becomes the
+ * containing block for `position: fixed` descendants — which is what
+ * `CardHover`'s preview is, and the spun card has one.
+ */
+.wheel-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.wheel-body > .wheel-scene {
+  flex: 1 1 18rem;
+  /* The painting's own ceiling, unchanged from the `max-w-sm` it replaces:
+     past this the crop is being enlarged rather than shown. */
+  max-width: 24rem;
+}
+.wheel-body > .wheel-side {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+/* ------------------------------------------- the two rooms a deck plays in
+ *
+ * `routes/DeckDetail.tsx`'s button row. One of these was a `<Link>` wearing an
+ * inline `style` — `background: var(--series-1)` and white ink, which is the
+ * chart palette on a control, and an inline colour is a colour no `:hover` can
+ * ever reach. It is commandment 17's own worked example, twice over, and it
+ * had no partner: there was no way at all from a deck to the room that plays
+ * it against somebody.
+ *
+ * **They are a pair and they are not twins.** Each wears the room it opens,
+ * which is `.btn-arena`'s argument and `.btn-sigil`'s after it. The Coliseum's
+ * materials are blood, sand and brass and it already has its plate, so the
+ * Coliseum link simply *is* `.btn-arena` — the same face as the gate it leads
+ * to, swords and all. The Simulator is the other kind of game entirely: a
+ * candlelit study table dressed in green felt, with a goldfish idling in a
+ * glass bowl on a brass stand for an opponent (its own nameplate says so). So
+ * the felt is the plate, the stand's brass is the rule, and the candle is the
+ * ink.
+ *
+ * A newcomer has to be able to tell a solitaire practice run from a real fight
+ * before reading either label (commandment 2). Green felt against blood red,
+ * and a fish against a pair of swords, is that difference said twice without a
+ * word of explanation.
+ *
+ * **The greens are declared once rather than per theme**, for the reason
+ * `.btn-arena` and `.btn-deal` both give: a card table lit from above is the
+ * same object in daylight as it is at night. The brass and the candle are
+ * `--anvil-brass` and `--anvil-glint` rather than two new near-misses — the
+ * whole point of naming a material once is that a second surface cannot invent
+ * a slightly different one. Measured against the lit end of the gradient,
+ * `--anvil-glint` on `--felt-lit` is 5.0:1, which is AA at this size and
+ * better everywhere further down.
+ */
+:root {
+  --felt-lit: #2f6b4a;
+  --felt: #1f4b34;
+  --felt-deep: #12301f;
+}
+
+.btn-goldfish {
+  background-image: linear-gradient(
+    180deg,
+    var(--felt-lit) 0%,
+    var(--felt) 58%,
+    var(--felt-deep) 100%);
+  border-color: color-mix(in srgb, var(--anvil-brass) 52%, #0b2415);
+  color: var(--anvil-glint);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 168, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+/* The glint, as the gate next door cuts it — one candle passing over felt, a
+ * shade softer than steel takes it. */
+.btn-goldfish::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 226, 168, 0.28) 47%,
+    rgba(255, 226, 168, 0.09) 56%,
+    transparent 68%);
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+.btn-goldfish:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--anvil-brass) 82%, #0b2415);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 168, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 4px 14px rgba(31, 75, 52, 0.55);
+}
+.btn-goldfish:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+.btn-goldfish:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 226, 168, 0.08);
+}
+
+/* The tail swishes. `fill-box` puts the pivot on the tail's own right edge,
+ * which is buried inside the body — so the fin sweeps around a joint the way a
+ * fish's does, rather than the whole triangle swinging off somewhere. The
+ * press flicks it back the other way, which is the beat a fish turns on. */
+.glyph-fin {
+  transform-box: fill-box;
+  transform-origin: right center;
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-goldfish:hover:not(:disabled) .glyph-fin {
+  transform: rotate(-15deg);
+}
+.btn-goldfish:active:not(:disabled) .glyph-fin {
+  transform: rotate(12deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The table keeps its felt, its brass and its fish; only the swimming goes.
+     `.btn` up in the family already stills the lift and the transitions —
+     these two are what this plate adds. */
+  .btn-goldfish:hover:not(:disabled)::after {
+    transform: translateX(-130%);
+  }
+  .glyph-fin {
+    transition: none;
+  }
+  .btn-goldfish:hover:not(:disabled) .glyph-fin,
+  .btn-goldfish:active:not(:disabled) .glyph-fin {
+    transform: none;
+  }
+}
+
+/* ============================================ lane G: a draft, still a draft
+ *
+ * Claude's proposed deck description, in the column beside the box it is
+ * offered to. The whole job of this rule is to make the paragraph read as
+ * something *presented* rather than something that has happened: it sits on
+ * its own ground, it is fenced on the reading edge in the vine, and it arrives
+ * rather than appearing — because a block of text that pops into a form looks
+ * like the form filled itself in, which is the one thing this surface must
+ * never look like.
+ *
+ * The fence is a border and the ground is a mix, so both follow the theme's
+ * own tokens in either mode rather than being painted twice. No `filter`
+ * anywhere near it: nothing here is over a card, but the reflex is the point
+ * (commandment 19). */
+.draft-panel {
+  background: color-mix(in srgb, var(--vine) 7%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--vine) 30%, transparent);
+  border-inline-start: 3px solid color-mix(in srgb, var(--vine) 62%, transparent);
+  animation: draft-arrives 260ms cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+@keyframes draft-arrives {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Movement is a courtesy, never the message: the panel is fully legible with
+ * the animation removed, so reduced motion simply gets it already arrived. */
+@media (prefers-reduced-motion: reduce) {
+  .draft-panel {
+    animation: none;
+  }
+}
+
 /* ======================================================= Lane B: the bulk
  *                                                    edit's paste and plan
  *
