@@ -246,7 +246,9 @@ go/internal/deck*         model, yaml emitter, edit engine, lifecycle, log
 go/internal/gate          validate + companion + partners
 go/internal/sim           tier1 goldfish, karsten + curve (tier 1.5),
                           mulligan grid, compile, ADR 18 cache, tier3 Forge
-go/internal/claude        the pipe, stance, personas, all seven modes
+go/internal/claude        the pipe, stance, personas, every mode — the set is
+                          `data/modes.json` and `ModeNames()`, never a number
+                          written down here
 go/internal/tarot         the 78-card deck and the seeded spread
 go/internal/mt19937,      the determinism kernels: seeded generator, exact
   floats, textutil,       float arithmetic + rendering, recorded string
@@ -293,9 +295,16 @@ did not produce, and stashes the snapshot the next build diffs against:
 **build before editing**.
 
 **4. Every card carries a `why`.** Validation fails without one, and **no
-surface ever writes one on the user's behalf** — every write path refuses an
-empty rationale (ADR 8, ADR 11). Drafts get one counted warning instead of 99
-errors; promotion to curated is refused while any card is blank (ADR 13).
+surface writes one unasked** — every write path refuses an empty rationale
+(ADR 8, ADR 11). **One exception, and it is doubly gated** (ADR 41): on an
+import the user may ask Claude to draft the blank ones, which needs both the
+toggle and a stance whose write axis is above `none`. Every drafted sentence
+is written `why_by: claude` and loses the mark the instant a person edits it,
+and a draft never writes over a rationale that is already there. Drafts get
+one counted warning instead of 99 errors; promotion to curated is refused
+while any card is blank (ADR 13) but **not** because a rationale was drafted
+— Aaron ruled on 2026-08-28 that a filled `why` is a filled `why`, which is
+why the mark is the only thing left carrying that difference.
 
 **5. Never commit** card pool data, collection/wishlist/purchase data, or
 credentials — CI enforces by filename and content scan. `app.db` holds
@@ -338,11 +347,15 @@ promise; `fly secrets` deployed).
 - **Deterministic code decides; Claude advises** (ADR 14): legality,
   identity, mana, simulation and price are deterministic Go, tested without
   a network.
-  Claude owns opinions and research, through seven read-only modes with
-  structural guards: the interview returns only questions; the slot argument
-  has no field for a defence (ADR 25); research cannot see a deck (ADR 26);
-  the dossier and research cite checked sources or refuse (ADR 19). **No
-  path passes a model response into a deck's `why`.** Say which system
+  Claude owns opinions and research, through read-only modes with structural
+  guards: the interview returns only questions; the slot argument has no
+  field for a defence (ADR 25); research cannot see a deck (ADR 26); the
+  dossier and research cite checked sources or refuse (ADR 19). **No mode
+  writes anything** — `may_write` is empty on every one, `NewMode` refuses
+  otherwise, and `boundary_test.go` bans the whole `internal/claude` tree
+  from the write engine transitively. A model response reaches a deck's
+  `why` by exactly one path, which lives *outside* that tree and runs only
+  because somebody ticked a box on an import (ADR 41). Say which system
   answered: the gate is reproducible, an opinion is not.
 - **Claude surfaces**: a mode (prompt, tools, write scope) plus the user's
   stance dial (ADR 15, ADR 20/21 for the theme table and personas). The
