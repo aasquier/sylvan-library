@@ -85,8 +85,12 @@ func TestTheWheelWithNoPoolIsTheDegradedShape(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("%d: %s", status, raw)
 	}
+	// The shape is the assertion -- key order included, since it is the wire.
+	// The sentence itself is read off the constant rather than copied here:
+	// it is a sentence a *player* reads, so it changes when the copy changes,
+	// and a literal in a test only ever rots into a second opinion about it.
 	want := `{"pool_available":false,"card":null,"symbol":null,` +
-		`"message":"no card pool yet -- run ` + "`mtglab data refresh`" + `"}`
+		`"message":` + string(mustJSON(t, noPoolMessage)) + `}`
 	if string(raw) != want {
 		t.Fatalf("got %s\nwant %s", raw, want)
 	}

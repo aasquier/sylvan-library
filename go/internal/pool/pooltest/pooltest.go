@@ -72,6 +72,17 @@ func Writer(path string) (*sql.DB, error) {
 
 // insert binds each row by column, casting where the driver's VARCHAR would
 // otherwise meet a typed column: lists, JSON, dates.
+//
+// **`?::JSON` is not how the refresh writes, and that gap has cost a live
+// outage.** The cast *parses* the text into a document; the Appender that
+// `pool.LoadOracle` uses takes a value and would store this same string as a
+// JSON string, which `json_extract_string` reads NULL out of. So every
+// fixture built here is correct by a route production does not take, and no
+// test standing on this one can see an encoding fault in the loader. The
+// fixture that can is `cards.TestAPoolWrittenByTheRealLoaderAnswersTheCardQueries`,
+// which loads a bulk file through [pool.LoadOracle] itself; send a question
+// about *how the pool is written* there, and keep this for questions about
+// what the pool contains.
 func insert(tb testing.TB, db *sql.DB, table string, cols []string, rows [][]any) {
 	tb.Helper()
 	holders := make([]string, len(cols))

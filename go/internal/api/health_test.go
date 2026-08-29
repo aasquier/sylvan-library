@@ -20,7 +20,7 @@ func TestHealthWithNoPoolIsTheDegradedShapeExactly(t *testing.T) {
 		t.Fatalf("%d: %s", status, raw)
 	}
 	want := `{"pool":false,"oracle_cards":0,"printings":0,` +
-		`"message":"no card pool yet -- run ` + "`mtglab data refresh`" + `"}`
+		`"message":` + string(mustJSON(t, noPoolMessage)) + `}`
 	if string(raw) != want {
 		t.Fatalf("got %s\nwant %s", raw, want)
 	}

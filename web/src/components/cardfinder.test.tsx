@@ -284,6 +284,29 @@ describe('when the library cannot be reached', () => {
     expect(screen.queryByText(/did not answer just then/)).toBeNull()
   })
 
+  // **The same lesson, caught a second time on the path nobody was watching.**
+  // A library that cannot look anything up answers **200** with an empty list
+  // *and a sentence saying so*, and the finder read only `cards` — so a server
+  // that had said exactly what was wrong still rendered as "no card in the
+  // library is spelled anything like that". No error is ever thrown, so every
+  // one of the tests above passes straight through it: this failure arrives
+  // down the success path wearing the shape of an answer.
+  it('does not read a library that could not answer as a card that does not exist', async () => {
+    suggestCards.mockResolvedValue({
+      cards: [],
+      message: "The library's shelves are bare just now, so no card can be " +
+        'looked up. This says nothing about the card you asked for — try ' +
+        'again in a little while.',
+    })
+    render(<CardFinder value={null} onChange={() => {}} identity={[]} />)
+    await type('Sol Ring')
+
+    expect(screen.queryByText(/spelled anything like that/)).toBeNull()
+    // The library's own words, and in both places — the note and the live
+    // region — for the same reason as the failures above.
+    expect(screen.getAllByText(/shelves are bare/)).toHaveLength(2)
+  })
+
   // A failure followed by a good answer must clear, or one blip poisons the
   // box until it is closed.
   it('recovers on the next answer', async () => {
