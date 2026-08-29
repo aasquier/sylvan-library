@@ -360,3 +360,37 @@ export function StrongboxGlyph({ size = 15 }: { size?: number }) {
     </svg>
   )
 }
+
+/**
+ * A quill, nib down: the sign for naming a thing.
+ *
+ * Magic has written on its own cards for thirty years — a scribe's hand is
+ * the game's own furniture, not an office supply, which is why this is a
+ * feather and not a pencil (commandment 5).
+ *
+ * Two shapes were drawn. A full plume read as a blob at 14px: barbs a
+ * quarter-pixel wide vanish into the anti-aliasing and what survives is an
+ * outline of nothing. So the vane is one solid leaf with a single shaft
+ * line through it, and the nib is a separate wedge below — the smallest
+ * drawing that still says *feather* rather than *arrow*. Never rendered
+ * alone: this file's rule is that a mark rides beside a word, because an
+ * icon-only control asks a newcomer to already know the app.
+ */
+export function QuillGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      {/* The vane: a leaf swept from the top right down to the left, cut flat
+          along the shaft so the shaft can be drawn over it rather than beside
+          it. */}
+      <path d="M17.2 2.4 C12.4 2.9 8.2 5.4 6.1 9.2 C5.2 10.8 4.9 12.4 5.4 13.7
+               L15.1 5.1 L6.6 14.9 C8.1 15.2 9.7 14.7 11.2 13.6
+               C14.8 11 16.9 6.9 17.2 2.4 Z"
+            fill="currentColor" />
+      {/* The nib, pointing at the line it is about to write on. Detached from
+          the vane by a hair, which is the gap a real quill has where the barbs
+          are stripped back. */}
+      <path d="M4.6 15.1 L2.2 17.9 L5.6 16.6 Z" fill="currentColor" />
+    </svg>
+  )
+}

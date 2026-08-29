@@ -17990,3 +17990,63 @@ button:hover .tarot-fan-card {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------- lane K:
+   renaming a deck (`components/deckname.tsx`)
+
+   The box is the heading it replaces, not a form field dropped beside it:
+   same face, same weight, one size down so the row does not jump when it
+   opens. Editing a title in place should feel like writing on the page,
+   which is the whole reason it is not a modal.
+
+   It answers the hand the way the `.btn` family does — a hairline that warms
+   to the vine on hover, and a focus ring rather than the browser's default
+   outline, which on a transparent field is invisible against the hero art.
+   `field-sizing` is deliberately absent: this box is a fixed width and a long
+   name scrolls inside it, because a heading that grows as you type reflows
+   the badges beside it on every keystroke. */
+.deck-rename-box {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.75rem;
+  letter-spacing: -0.01em;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.deck-rename-box:hover {
+  border-color: color-mix(in srgb, var(--vine) 55%, var(--hairline));
+}
+.deck-rename-box:focus {
+  outline: none;
+  border-color: var(--vine);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vine) 22%, transparent);
+}
+/* Past the cap the box says so itself, so the count under it is a second
+   voice rather than the only one. */
+.deck-rename-box[aria-invalid='true'],
+.deck-rename-box[aria-invalid='true']:focus {
+  border-color: var(--status-critical);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-critical) 20%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-rename-box {
+    transition: none;
+  }
+}
+
+/* A thumb's floor, on this lane's own controls only.
+   `.chip-toggle` and `.chip-place` got a 44px minimum under a coarse pointer
+   when the chips were fixed; the `.btn` family never did, so `.btn-xs` is a
+   28px target on a phone everywhere it is used. Fixing that for every button
+   in the app is a sweep and not this branch — but a control that is the only
+   way to rename your deck has to be reachable by the thumb that is holding
+   the phone. */
+@media (pointer: coarse) {
+  .deck-rename-pen,
+  .deck-rename .btn {
+    min-height: 44px;
+  }
+}
