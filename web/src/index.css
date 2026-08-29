@@ -4,21 +4,71 @@
    column is the same hues re-stepped for the dark surface, validated as a set
    against it. Slots 1-4 pass every hard gate in both modes on the adjacent
    pairlist; light-mode aqua and yellow sit below 3:1, so every chart using
-   them ships direct labels and a table view. */
+   them ships direct labels and a table view.
+
+   # A token that is written as words is measured against the page it is read on
+
+   "Re-stepped for the surface" was the intent and it was **not** what half of
+   this block did. Seven tokens were tuned once against a near-black page and
+   then handed unchanged to a near-white one -- `--text-muted`, `--status-good`,
+   `--status-warning`, `--status-serious` were literally the *same hex* in both
+   themes, and `--series-1`/`--series-2` had a light column that had been
+   stepped for a chart's 3:1 and never for a sentence's 4.5:1. Measured against
+   the light `--page` on 2026-08-29:
+
+     --text-muted     #898781  3.41:1  and it is the ink of ~325 places
+     --status-warning #fab219  1.74:1  a sentence nobody can read at all
+     --series-2       #eb6834  3.04:1
+     --status-good    #0ca30c  3.18:1
+     --status-serious #ec835a  2.50:1  (10px uppercase, in the argue panel)
+     --series-1       #2a78d6  4.19:1  (and #fff on it, as a pill, 4.42:1)
+
+   Dark mode hid it: every one of those clears AA against `#0d0d0d`, so the
+   theme that was checked was the theme that was fine. The stylesheet even knew
+   -- `.token-shop-note` and `.tarot-table-felt` and `.seance-note` each work
+   *around* `--text-muted` locally, one of them quoting this exact 3.41 -- and
+   the token itself was never moved. Three local patches is a design telling
+   you where it hurts.
+
+   So the light column gets its own values. Chosen by walking lightness down
+   the token's own hue and saturation until it clears **4.6:1 against both
+   `--page` and `--surface-1`** -- the least that clears the bar, plus a tenth
+   of slack, because a value sitting exactly on 4.50 is one paper-colour tweak
+   away from failing and this repo has been bitten by exactness with no slack
+   before. Nothing is darkened past what it needs: `--text-muted` lands at
+   4.62 with `--text-secondary` still 7.53 above it, so the three-step
+   hierarchy (primary 18.67 / secondary 7.53 / muted 4.62) is wider than it
+   was, not flatter.
+
+   **The chart palette was the one real fork, and it was settled by measuring
+   rather than by taste.** Slots 1 and 2 are chart colours first and the worry
+   was that darkening them to win a text ratio would wreck a set chosen to be
+   distinguishable. It does the opposite: across the five light slots the
+   minimum pairwise dE76 goes 39.6 -> 45.5, and under a deuteranope simulation
+   -- where the set was weakest, orange against gold at 15.3 -- it goes to
+   25.1. Every pair improves or is unchanged. Slots 3, 4 and 5 are untouched
+   and keep the sub-3:1 mitigation the paragraph above describes, because
+   nothing in the app ever writes words in them.
+
+   `--seq-450` deliberately does *not* follow `--series-1` down. It used to
+   share its hex by coincidence; it is a step in the sequential ramp, it is
+   only ever a bar fill, and moving it would bend a ramp to serve a sentence.
+
+   `go/cmd/mtglab/palettecontrast_test.go` is this comment as a gate. */
 :root {
   color-scheme: light;
 
   --surface-1: #fcfcfb;
   --page: #f9f9f7;
   --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
+  --text-secondary: #52514e;         /* 7.53:1 on --page, 7.73 on --surface-1 */
+  --text-muted: #73716c;             /* 4.62 / 4.75 -- was #898781 at 3.41 */
   --gridline: #e1e0d9;
   --baseline: #c3c2b7;
   --hairline: rgba(11, 11, 11, 0.1);
 
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
+  --series-1: #2771cb;               /* 4.62 / 4.75 -- was #2a78d6 at 4.19 */
+  --series-2: #c74614;               /* 4.62 / 4.74 -- was #eb6834 at 3.04 */
   --series-3: #1baf7a;
   --series-4: #eda100;
   --series-5: #e87ba4;
@@ -38,10 +88,25 @@
   --heat-ink: #2a78d6;
   --heat-on: #fcfcfb;
 
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  /* The severity ramp, in the light theme's own inks. Every one of these is
+     read as words somewhere -- a stat tile's figure, a charge's strength, the
+     line that says a card could not be found -- so all four are held to 4.5
+     rather than to a mark's 3.0, and the three that carry a fill as well
+     (`.tape-span[data-kind='clock']`, `.tape-note-mark`, `.bout-mark`) get a
+     more visible mark out of the same move: the clock pip went from 1.74:1
+     against the page to 4.62, which is the difference between a gold dot on
+     paper and a dot.
+
+     `--status-serious` also loses a seventh of its saturation on the way down.
+     Two reasons, and both are the ramp's own logic: a serious charge should
+     read *quieter* than a decisive one, and a fully saturated rust at this
+     lightness lands 2.0 dE from the chart's new `--series-2` -- close enough
+     to be the same colour. At 0.85 saturation it sits 10.8 from the chart's
+     orange and 19.1 from critical's red, which is a ramp again. */
+  --status-good: #0a840a;            /* 4.61 / 4.74 -- was #0ca30c at 3.18 */
+  --status-warning: #986803;         /* 4.62 / 4.74 -- was #fab219 at 1.74 */
+  --status-serious: #bd4f25;         /* 4.62 / 4.75 -- was #ec835a at 2.50 */
+  --status-critical: #d03b3b;        /* 4.56 / 4.68 -- already cleared; left */
 
   /* MTG's own identity colors. Not a categorical palette -- these are the
      game's fixed semantics, so they follow the entity by definition. */
@@ -58,6 +123,23 @@
   --vine: #4a7c59;
 }
 
+/* The dark column, and it is written twice on purpose: a browser whose owner
+   has never touched the toggle gets it from the media query, and one whose
+   owner has gets it from `[data-theme='dark']`. **The two must say the same
+   thing, and for two tokens they did not.** `--heat-ink` and `--heat-on` were
+   corrected only in the toggle's copy, so the castability grid was drawn one
+   way for a reader who had picked dark and another way for a reader whose
+   machine had picked it for them -- a difference nobody could have reported,
+   because no single reader ever saw both. They are in both copies now, and
+   `palettecontrast_test.go` holds the two blocks equal so the next omission
+   is a red test rather than a second silent fork.
+
+   Two values moved as well, and both were failing where the light theme's
+   were: `--status-critical` was `#d03b3b` in both themes -- 4.56:1 on paper,
+   but only **4.05:1** on the dark page and **3.62:1** on a card, which is the
+   ink of twenty error messages -- and `--series-2` measured 4.48 on a card,
+   two hundredths short. Everything else in this column was already right and
+   is untouched. */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme='light'])) {
     color-scheme: dark;
@@ -71,7 +153,7 @@
     --hairline: rgba(255, 255, 255, 0.1);
 
     --series-1: #3987e5;
-    --series-2: #d95926;
+    --series-2: #da5c2b;
     --series-3: #199e70;
     --series-4: #c98500;
     --series-5: #d55181;
@@ -80,6 +162,14 @@
     --seq-400: #3987e5;
     --seq-450: #5598e7;
     --seq-600: #86b6ef;
+
+    --heat-ink: #5598e7;
+    --heat-on: #0d0d0d;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d85b5b;
 
     --vine: #6fae7f;
   }
@@ -97,7 +187,7 @@
   --hairline: rgba(255, 255, 255, 0.1);
 
   --series-1: #3987e5;
-  --series-2: #d95926;
+  --series-2: #da5c2b;
   --series-3: #199e70;
   --series-4: #c98500;
   --series-5: #d55181;
@@ -109,6 +199,11 @@
 
   --heat-ink: #5598e7;
   --heat-on: #0d0d0d;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d85b5b;
 
   --vine: #6fae7f;
 }
@@ -11996,9 +12091,11 @@ button:hover .tarot-fan-card {
 .record-figure.is-young { color: var(--text-secondary); font-weight: 500; }
 
 /* `--text-secondary` for `.record-figure.is-shy`'s reason: this qualifies the
-   headline number rather than captioning it, and at this size the muted token
-   measures 3.41:1 on the light page. A warning nobody can read is a number
-   presented without its warning. */
+   headline number rather than captioning it. It was written when muted
+   measured 3.41:1 on the light page and could not be read at all; muted is
+   4.62 now (the token was re-inked, see the head of this file), so the choice
+   is a weight rather than a rescue -- a warning that is merely quiet is still
+   a number presented without its warning. */
 .record-provisional {
   font-size: 0.62rem;
   font-weight: 500;
@@ -12012,9 +12109,10 @@ button:hover .tarot-fan-card {
 /* `--text-secondary` rather than the `--text-muted` its neighbours wear, and
    the difference is deliberate: this sentence is not a caption, it is what
    stands *in place of* the number — the whole answer for a deck too new to
-   have one. Muted measures 3.41:1 on the light page, which is under the floor
-   for type this size, and quietening the one line that explains an absence is
-   how an absence gets read as a bug. */
+   have one. Muted was 3.41:1 on the light page when this was written, under
+   the floor for type this size; it clears it now at 4.62, and the line keeps
+   secondary anyway, because quietening the one sentence that explains an
+   absence is how an absence gets read as a bug. */
 .record-figure.is-shy {
   min-width: 0;
   font-size: 0.72rem;
@@ -17332,13 +17430,20 @@ button:hover .tarot-fan-card {
    column rather than as a page and an insert.
 
    **`--text-secondary` and not the `--text-muted` the paragraph above uses,
-   and that is measured rather than preferred.** Muted renders `#898781` on
-   the light theme's page and comes out at **3.41:1** — under AA for text this
+   and that is measured rather than preferred.** Muted rendered `#898781` on
+   the light theme's page and came out at **3.41:1** — under AA for text this
    size, and this is not an aside: it is the paragraph that tells a newcomer
    how many tokens to buy and why, which is the one thing in this bench they
    have to be able to read (commandment 2). Secondary measures 7.53:1 on the
    same ground. The step between this and the aside above it is a hierarchy
-   rather than an accident. */
+   rather than an accident.
+
+   **That 3.41 is the number that eventually moved the token itself.** This
+   block was one of three places that worked around the light theme's muted
+   ink locally; the head of this file now re-inks it to 4.62 for every one of
+   the ~325 places that could not each grow a patch. Secondary stays here —
+   the hierarchy was the other half of the argument and it did not depend on
+   the failure. */
 .token-shop-note {
   max-width: 42rem;
   font-size: 12px;
@@ -17357,10 +17462,13 @@ button:hover .tarot-fan-card {
 
    **Not the section's brass, and not `--status-warning`, and both of those
    were measured before they were dropped.** Brass is `#a8792e` on a light
-   page and comes out at 3.66:1; `--status-warning` is `#fab219` and comes out
+   page and comes out at 3.66:1; `--status-warning` was `#fab219` and came out
    at **1.74:1**, which is a sentence nobody can read at all. A confirmation
    that cannot be read is the same as no confirmation, which is the whole
-   fault this control exists to not have.
+   fault this control exists to not have. (Warning is `#986803` and 4.62:1 in
+   the light theme now — that 1.74 is one of the measurements that moved it —
+   but it stays dropped here on the other ground: nothing has gone wrong, and
+   a confirmation drawn in the colour of trouble says otherwise.)
 
    `is-refused` is a softer ink rather than an alarm colour, because a
    clipboard that says no has broken nothing: the list is on screen and the
@@ -17941,4 +18049,58 @@ button:hover .tarot-fan-card {
   .deck-rename .btn {
     min-height: 44px;
   }
+}
+
+/* ================================================================ Lane C —
+ *                                                          the swap board
+ *
+ * The shortlist beside the deck (`components/swapboard.tsx`). Every colour
+ * here is an existing token, so both themes and the `[data-theme]` override
+ * are inherited rather than restated — there is no new palette to keep in
+ * step, which is the failure mode a section-scoped block invites.
+ */
+
+/* The ⇄ mark beside the heading. The vine rather than the token shelf's brass:
+   these are two sections at the foot of the same page and a reader should be
+   able to tell them apart at a glance without reading either word. */
+.swap-glyph {
+  color: var(--vine);
+  font-size: 12px;
+}
+
+/* The empty state — the whole feature for a deck that has never kept a board,
+   so it is a place rather than a notice.
+
+   A panel with a lit left edge: the vine runs down the side the eye starts on
+   and the wash lifts the block off the page just enough to read as somewhere
+   to stand. **Size and edges do the work, never opacity** — dimming a panel to
+   make it recede is how this repo has lost two rounds to "still barely
+   visible". Nothing animates: an empty state that pulses is asking to be
+   pressed, and this one is asking to be read first. */
+.swap-empty {
+  background: color-mix(in srgb, var(--vine) 7%, var(--surface-1));
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--vine);
+}
+
+/* The rationale box. A class rather than the inline `style` the older forms
+   carry, because an inline style is a style a `:hover` and a `:focus-visible`
+   can never reach — commandment 17, and the reason the last hundred dull
+   controls on this site were dull. */
+.swap-field {
+  background: var(--surface-1);
+  border: 1px solid var(--gridline);
+  color: var(--text-primary);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.swap-field::placeholder {
+  color: var(--text-muted);
+}
+.swap-field:hover {
+  border-color: var(--baseline);
+}
+.swap-field:focus {
+  border-color: var(--vine);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--vine) 35%, transparent);
+  outline: none;
 }
