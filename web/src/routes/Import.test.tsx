@@ -320,15 +320,23 @@ describe('Import', () => {
     await waitFor(() => expect(screen.getByText('line 7: (LTC) 284')).toBeTruthy())
   })
 
-  it('can show the deck.yaml it would write', async () => {
+  // The label no longer names the file format (commandment 10 -- a player is
+  // never told what this is written in), so the disclosure is found by its
+  // ROLE and its state rather than by its prose. That is the better handle
+  // anyway: `aria-expanded` is the thing a screen reader is told, so asserting
+  // on it is asserting on what a person actually receives.
+  it('can show the file it would write, and says when it is open', async () => {
     renderImport()
     paste('1 Sol Ring')
     fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
     fireEvent.click(screen.getByText('Preview'))
-    await waitFor(() => expect(screen.getByText(/Show the deck.yaml/)).toBeTruthy())
+    const shown = () => screen.getByRole('button', { name: /the file this writes/ })
+    await waitFor(() => expect(shown()).toBeTruthy())
+    expect(shown().getAttribute('aria-expanded')).toBe('false')
 
-    fireEvent.click(screen.getByText(/Show the deck.yaml/))
+    fireEvent.click(shown())
     expect(screen.getByText(/stage: draft/)).toBeTruthy()
+    expect(shown().getAttribute('aria-expanded')).toBe('true')
   })
 
   it('surfaces a refusal instead of failing silently', async () => {

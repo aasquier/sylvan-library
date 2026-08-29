@@ -136,6 +136,28 @@ load-bearing.
     commandment 9 at its sharpest — the art is lent to us, and compliance is
     not a preference.
 
+20. **A link goes somewhere; a toggle answers here.** Thou shalt not dress a
+    control as a hyperlink when it changes this page rather than leaving it.
+    An underline and a blue promise a destination, and a newcomer who clicks
+    one expecting to *go* somewhere and instead watches a panel unfold has
+    been told a small lie by the interface. Anything that opens, closes,
+    shows, hides or switches is a **button**, it says which state it is in
+    (`aria-expanded` for a disclosure, `aria-pressed` for a setting), and it
+    replies to hover, focus and press like everything else (commandment 17).
+    The failure has a mechanism and it is worth naming, because it is how all
+    four of the first ones happened: `.btn-ghost` is underlined by design and
+    its hover changes only `color`, so a caller who sets `color` **inline**
+    silently outranks the stylesheet and the control answers the hand with
+    nothing at all — a blue "Tell me more" and, worse, a blue "Save". Use
+    `.btn-ghost-accent` in `web/src/index.css`, never an inline ink; the hover
+    now also lays down a wash and thickens the underline precisely so that a
+    forgotten `style={{ color }}` can no longer silence it. A real `<a>` for a
+    real destination is not this commandment's business, and the dotted
+    underline on a glossary term is an affordance rather than a link
+    (`web/src/components/term.tsx` argues it) — the test is never "is it
+    underlined", it is **"does this take me somewhere, or does it change what
+    is in front of me?"**
+
 ## Setup
 
 ```bash

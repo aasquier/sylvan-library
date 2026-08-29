@@ -90,8 +90,8 @@ export function TheShelves() {
 
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
         <button type="button" onClick={() => setOpen((o) => !o)}
-                className="btn btn-ghost btn-xs font-medium"
-                style={{ color: 'var(--series-1)' }}>
+                aria-expanded={open}
+                className="btn btn-ghost btn-ghost-accent btn-xs font-medium">
           {open ? 'Enough' : 'Tell me more'}
         </button>
         <button type="button"
