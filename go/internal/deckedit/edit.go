@@ -94,6 +94,16 @@ const Graveyard = "graveyard"
 // picture this deck shows for the slot, blank for the pool's default.
 var SettableFields = []string{"category", "qty", "why", "art"}
 
+// DraftedBy is the only value `why_by` ever holds (ADR 41). A rationale with
+// no mark was written by a person, which is every rationale in the library
+// that predates the intake.
+//
+// Not in SettableFields, and that is the point: `why_by` is not a field
+// anybody types. It is written by DraftRationale and dropped by SetCardField,
+// so its value tracks who last touched the sentence rather than what somebody
+// last claimed about it.
+const DraftedBy = "claude"
+
 // SettableDeckFields is what SetDeckField will write: the deck's own scalars.
 // `strategy` and `notes` are prose and belong to SetNote; `commander` and
 // `companion` change what the whole deck is legal to contain and are a

@@ -38,7 +38,7 @@ function status(presets: { name: string; available: boolean }[]): ClaudeStatus {
       name: p.name, blurb: `${p.name} blurb`, stance: view(p.name),
       available: p.available,
     })),
-    never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
+    never: 'One rule holds at every setting: Claude never writes a card’s rationale on its own. On an import you can ask it to draft the ones you have not written, and every sentence it drafts is marked as Claude’s until you rewrite it.',
     modes: [],
   }
 }

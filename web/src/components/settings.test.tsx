@@ -47,7 +47,7 @@ function status(over: Partial<ClaudeStatus> = {}): ClaudeStatus {
       { name: 'second-opinion', blurb: 'A second pair of eyes.', stance: view('second-opinion'), available: true },
       { name: 'collaborator', blurb: 'Batches edits.', stance: view('collaborator'), available: false },
     ],
-    never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
+    never: 'One rule holds at every setting: Claude never writes a card’s rationale on its own. On an import you can ask it to draft the ones you have not written, and every sentence it drafts is marked as Claude’s until you rewrite it.',
     modes: [],
     ...over,
   }

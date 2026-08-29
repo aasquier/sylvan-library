@@ -67,6 +67,13 @@ var writeSurface = map[string][]string{
 	writeEngine: {
 		"ReplaceCard", "AddCard", "RemoveCard", "EntombCard", "ReturnCard",
 		"ExileCard", "SetCardField", "SetDeckField", "SetShared", "SetNote",
+		// ADR 41 added `DraftRationale`, the one operation that exists to put
+		// a model's sentence in a deck file. It is banned here HARDER than the
+		// rest, not softer: ADR 41 puts the narrowing in the caller precisely
+		// so that this tree stays unable to reach a write, and a new write
+		// door left off this list would be the exact hole the ADR promises it
+		// is not opening.
+		"DraftRationale",
 	},
 	"github.com/aasquier/sylvan-library/go/internal/library": {
 		"WriteText", "Create", "Delete", "SetShared", "WriteArtifacts",

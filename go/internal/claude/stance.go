@@ -197,9 +197,12 @@ var PresetBlurbs = map[string]string{
 	"consultant": "Speaks when spoken to, about what the gate already flagged.",
 	"second-opinion": "Volunteers observations and looks at neighbouring " +
 		"cards. Still writes nothing.",
+	// The rationale clause changed with ADR 41 and the change is the whole
+	// point of the write axis existing: this preset sits at `proposes`, and
+	// until the intake there was no surface anywhere that read that level.
 	"collaborator": "Questions the deck's axis and batches edits for one " +
-		"approval. Never writes a rationale -- that rule has no " +
-		"stance above it.",
+		"approval. Drafts a rationale only where you asked for one on an " +
+		"import, and marks every one it wrote.",
 }
 
 // Preset resolves a preset by name, refusing an unknown one rather than
