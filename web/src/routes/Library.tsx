@@ -482,14 +482,19 @@ function TheCrypt({ entombed, error, busy, failed, onReturn }: {
                 <div className="min-w-0 flex-1 basis-52">
                   <div className="text-sm font-medium">{entry.name}</div>
                   <div className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {/* Every clause is a fact the server sent. `when` is null
-                        when nothing recorded the burial, and the row simply
-                        does not claim one — a made-up "just now" here would be
-                        a lie in the one place somebody checks that their deck
-                        survived. */}
+                    {/* **Every clause here is conditional, and that is the
+                        point.** Each one is a fact the server sent, and each
+                        one is omitted rather than guessed when the server had
+                        no answer — `when` is null for a burial nothing
+                        recorded, and a count of zero means the deck file could
+                        not be read. "0 cards" beside a deck somebody knows had
+                        99 is the worst sentence available on the one screen
+                        they came to for reassurance, and a made-up "just now"
+                        is the second worst. */}
                     {entry.commander.length > 0 && <>{entry.commander.join(' & ')} · </>}
-                    {entry.total_cards} card{entry.total_cards === 1 ? '' : 's'}
-                    {when && <> · entombed {when}</>}
+                    {entry.total_cards > 0
+                      && <>{entry.total_cards} card{entry.total_cards === 1 ? '' : 's'} · </>}
+                    entombed{when ? ` ${when}` : ', and still here'}
                   </div>
                 </div>
                 <button

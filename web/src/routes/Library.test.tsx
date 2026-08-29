@@ -903,8 +903,26 @@ describe('Library crypt', () => {
     await openCrypt()
 
     expect(await screen.findByText(/99 cards/)).toBeTruthy()
-    // No date, no "just now", no "Invalid Date" — the row simply does not say.
+    // No date, no "just now", no "Invalid Date" — the row says the deck is
+    // entombed and still there, and claims nothing about when.
     expect(screen.queryByText(/entombed \d/i)).toBeNull()
+    expect(screen.getByText(/entombed, and still here/i)).toBeTruthy()
+  })
+
+  // A count of zero is what the server sends when it could not read the deck
+  // file, and "0 cards" beside a deck somebody knows had 99 is the worst
+  // sentence available on the screen they came to for reassurance. The row
+  // leaves the count out instead.
+  it('does not claim a deck it could not measure is empty', async () => {
+    vi.mocked(api.entombed).mockResolvedValue(
+      { entombed: [buried({ total_cards: 0, commander: [] })] })
+    await openCrypt()
+
+    expect(await screen.findByText(/entombed 5 minutes ago/)).toBeTruthy()
+    // Read off the row, not off the page: the masthead says "35,000 cards in
+    // the local pool", and a loose `/0 cards/` matches *that* — which is how
+    // this assertion passed against the wrong element on the first run.
+    expect(screen.getByRole('listitem').textContent).not.toMatch(/cards/)
   })
 
   it('does not report a crypt it could not read as an empty one', async () => {
