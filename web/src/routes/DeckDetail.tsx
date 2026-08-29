@@ -42,6 +42,7 @@ import { DeckArtifactsPanel } from '../components/artifacts'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { SwapComposer } from '../components/swap'
+import { BulkEditPanel } from '../components/bulkedit'
 import { StanceReadout } from '../components/stance'
 import { DeckLabels } from '../components/labels'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
@@ -1300,6 +1301,17 @@ export default function DeckDetail() {
                     </span>
               )}
             </div>
+          )}
+
+          {/* Lane B's mount point. The whole 99 from one pasted list, which is
+              the one edit big enough that a person has to be shown it before
+              they agree to it — so the panel previews against the server and
+              the confirmation is that plan rather than a sentence about it.
+              Below the per-card row rather than in it: it opens into a box the
+              width of the page, and a control that unfolds into a screen does
+              not belong on a line of chips. */}
+          {deck.writable && (
+            <BulkEditPanel deck={deckRef} onDone={() => void refresh()} />
           )}
 
           {/* The action bar (punch list item 9): the four per-row buttons,

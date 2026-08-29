@@ -16,6 +16,8 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckedit"
+	"github.com/aasquier/sylvan-library/go/internal/deckimport"
+	"github.com/aasquier/sylvan-library/go/internal/decklist"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
@@ -25,16 +27,17 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The deck writes: the nine editing routes over
+// The deck writes: the ten editing routes over
 // `internal/deckedit`'s surgical operations, whose output the
 // recorded goldens pin byte for byte.
 //
 // **Every write goes out through `commit`**, which
 // carries its two jobs: no caller can change a deck without being told what
 // the change did to the gate, and no caller can change a deck without the
-// change being recorded (ADR 28). That it is one function rather than nine is
-// the whole design -- the tenth edit operation is the one somebody adds in a
-// year, and it inherits both.
+// change being recorded (ADR 28). That it is one function rather than ten is
+// the whole design -- and it has now been proved rather than argued: the tenth
+// route, the bulk edit, arrived on 2026-08-29 and inherited both without
+// touching either.
 //
 // Three refusals, and which is which is a decision rather than a default.
 // A deck the caller may not *see* is absent from their source, so every verb
@@ -182,7 +185,7 @@ func (a *API) answer(w http.ResponseWriter, r *http.Request, src library.Source,
 // diff is what said so: `POST /api/decks` with a body of `{` and no
 // content type is `dict_type`, because a body whose content type does not
 // say JSON is never parsed -- the raw bytes stand
-// as a string, and a string is not a dictionary. Nine write routes
+// as a string, and a string is not a dictionary. Every write route
 // shared this function and none of their goldens sent anything but a valid
 // object, so the branch had never been asked a question.
 //
@@ -493,6 +496,209 @@ func (a *API) entombCards(w http.ResponseWriter, r *http.Request) {
 		extra: map[string]any{"entombed": resolved},
 		edit:  decklog.Edit{Kind: decklog.EditEntomb, Cards: resolved},
 	}, err)
+}
+
+// bulkEdit is `POST .../bulk` -- the whole 99 from one pasted list, in two
+// round trips.
+//
+// **The one editing route that answers before it acts.** `dry_run` runs the
+// identical code path and writes nothing, which is the shape `importDeck`
+// argued and this borrows: the plan on screen is the real plan, computed by
+// the code that will apply it, rather than a description of what that code
+// intends to do. All the two calls do differently is one write and one check.
+//
+// **The check is what makes "you were asked" true.** A confirm carries back
+// the `basis` the preview handed out, and the deck must still be that deck: a
+// second tab, a window left open over lunch, or a double-click that beat the
+// first response home would otherwise apply a plan whose burials were worked
+// out against a comparison nobody made. A confirm with no `basis` at all is
+// refused too, so "somebody saw the plan" is a fact about the protocol rather
+// than a promise about the browser.
+//
+// **The gate reports; it does not block.** An invalid deck is edited like any
+// other and the answer carries `errors` and `warnings` from the same `commit`
+// every write here goes through -- a player fixing a broken deck is exactly
+// who this is for. Two things are refused outright: an empty box, and a
+// curated deck asked to take a card with no reason (rule 4, predicted in the
+// plan rather than discovered mid-fold).
+func (a *API) bulkEdit(w http.ResponseWriter, r *http.Request) {
+	src, _, ok := a.writeTarget(w, r)
+	if !ok {
+		return
+	}
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	dryRun := truthy(body["dry_run"])
+
+	parsed := decklist.Parse(str(body, "text"))
+	// Only the deck's own section. A `Commander:` or `SIDEBOARD:` heading names
+	// cards that live outside the 99 -- our own moxfield.txt artifact puts the
+	// commander under `SIDEBOARD:` -- and this edit is about the 99. Those
+	// lines are reported rather than read, because a line somebody pasted and
+	// nothing happened to is the silence this repo keeps writing by accident.
+	if len(parsed.Section("deck")) == 0 {
+		a.refuseWrite(w, "bulk", rejectf("there are no cards in that box, so "+
+			"nothing was changed. Paste the 99 first: an empty list would send "+
+			"every card in this deck to the graveyard, which is not something "+
+			"to do by accident."))
+		return
+	}
+
+	text, err := src.ReadText(r.Context(), r.PathValue("slug"))
+	if a.refuseWrite(w, "bulk", err) {
+		return
+	}
+
+	var plan *deckedit.BulkPlan
+	var corrections []deckimport.Correction
+	var unknown []string
+	var nearby []suggestion
+	var over int
+	var quoted []string
+	err = a.usePool(r.Context(), func(c *pool.Conn) error {
+		// The import's own resolution sequence, in its order and for its
+		// reasons: which reading of a trailing quoted run the pool has, then
+		// the misspellings, then the cards. Reused rather than rewritten --
+		// `deckimport` measured those thresholds (0.95, with a 0.04 lead) and
+		// a second matcher here would read a name differently from the page
+		// that created the deck.
+		found, err := c.GetCards(r.Context(), deckimport.NamesIn(parsed, nil, ""))
+		if err != nil {
+			return err
+		}
+		read, chosen := deckimport.ReadRationales(parsed, found)
+		quoted = chosen
+		corrections, err = deckimport.Respell(r.Context(), poolReader{c},
+			deckimport.NamesIn(read, nil, ""), found)
+		if err != nil {
+			return err
+		}
+
+		wanted := []deckedit.BulkCard{}
+		for _, line := range read.Section("deck") {
+			name, rec := deckimport.CanonicalName(line.Name, found)
+			if rec == nil {
+				// Rule 1: a card nobody looked up is a card whose legality is a
+				// guess, so it never reaches the plan. It is reported by name
+				// with a shortlist, and the deck keeps whatever it has.
+				if !slices.Contains(unknown, name) {
+					unknown = append(unknown, name)
+				}
+				continue
+			}
+			// The only inference, and only because `IsLand` is a card pool
+			// fact -- `deckimport.buildEntries` argues it and this is the same
+			// rule for the same reason. Read only for a card being added; one
+			// already in the 99 keeps whatever it is filed under.
+			category := "utility"
+			if rec.IsLand() {
+				category = "land"
+			}
+			wanted = append(wanted, deckedit.BulkCard{Name: name, Qty: line.Qty,
+				Category: category, Why: line.Why})
+		}
+		plan, err = deckedit.PlanBulk(text, wanted)
+		if err != nil {
+			return err
+		}
+		// Last, and inside the same lease: the shortlist is the only part of
+		// this allowed to fail quietly, exactly as it is on the import page.
+		nearby, over = didYouMean(r.Context(), c, unknown)
+		return nil
+	})
+	if errors.Is(err, pool.ErrNoPool) {
+		// Without the pool every name is unknown, so the plan would bury the
+		// whole deck and add nothing back. Refuse rather than half-do it.
+		a.refuseWrite(w, "bulk", rejectf(
+			"a bulk edit needs the card pool -- run `mtglab data refresh`"))
+		return
+	}
+	if a.refuseWrite(w, "bulk", err) {
+		return
+	}
+
+	// **What was read is reported beside what would happen**, and this is
+	// where the preview earns its keep: a name the pool could not resolve is
+	// also a name the paste did not match, so somewhere in `plan.Entomb` is
+	// the card that line was meant to be. Saying both, together, is the whole
+	// difference between a burial somebody chose and one that surprised them.
+	reading := map[string]any{
+		"unknown":              orEmpty(unknown),
+		"did_you_mean":         orEmpty(nearby),
+		"did_you_mean_skipped": over,
+		"read":                 orEmpty(corrections),
+		"unreadable":           reportedLines(parsed.Unreadable),
+		"skipped":              reportedLines(parsed.Skipped),
+		// Lines under a heading that is not the 99 -- a commander, a companion,
+		// a sideboard. Read as lines and reported as lines, never applied.
+		"outside": reportedLines(outsideThe99(parsed)),
+		"notes":   orEmpty(quoted),
+	}
+
+	if dryRun {
+		out := map[string]any{
+			"slug": r.PathValue("slug"), "dry_run": true, "plan": plan,
+			// Whether the confirm may be pressed at all: a blocked plan cannot
+			// be applied and a plan that changes nothing must not be, so the
+			// surface never offers a control that would only refuse.
+			"ready": len(plan.Blocked) == 0 && plan.Touches(),
+		}
+		for k, v := range reading {
+			out[k] = v
+		}
+		wire.JSON(w, http.StatusOK, out)
+		return
+	}
+
+	// A confirm names the deck it was agreed against. Absent is refused rather
+	// than waved through: this route is reachable without a browser, and the
+	// preview is the only thing that makes the write a consented one.
+	basis := strings.TrimSpace(str(body, "basis"))
+	switch {
+	case basis == "":
+		a.refuseWrite(w, "bulk", rejectf("take a look at what this would change "+
+			"before it happens; nothing was written."))
+		return
+	case basis != plan.Basis:
+		a.refuseWrite(w, "bulk", rejectf("this deck changed while the plan was "+
+			"on screen, so nothing was written. Take another look and the plan "+
+			"will be worked out again against the deck as it is now."))
+		return
+	}
+
+	updated, err := deckedit.ApplyBulk(text, plan)
+	extra := map[string]any{"plan": plan, "entombed": orEmpty(plan.Entomb)}
+	for k, v := range reading {
+		extra[k] = v
+	}
+	a.answer(w, r, src, updated, commitOutcome{
+		extra: extra,
+		// One entry for the whole pass (ADR 28), naming the cards it buried
+		// and counting everything else. Never a word of what a rationale says.
+		edit: decklog.Edit{Kind: decklog.EditBulk, Cards: plan.Entomb,
+			Bulk: &decklog.BulkTally{
+				Added: len(plan.Add), Rewrote: len(plan.Rewrite),
+				Requantified: len(plan.Requantify), Entombed: len(plan.Entomb)}},
+	}, err)
+}
+
+// outsideThe99 is every pasted line filed under a heading that is not the deck
+// itself, in the order it was pasted.
+//
+// Reported and never read. A paste carrying a `Commander` or `SIDEBOARD`
+// section is usually a whole-deck export -- ours puts the commander in the
+// sideboard -- so those lines are somebody's cards and deserve to be told they
+// were not applied, rather than to vanish.
+func outsideThe99(parsed decklist.List) []decklist.Line {
+	out := []decklist.Line{}
+	for _, c := range parsed.Cards {
+		if c.Section != "deck" {
+			out = append(out, decklist.Line{LineNo: c.LineNo, Text: c.Name})
+		}
+	}
+	return out
 }
 
 // returnCard is `POST .../graveyard/{name}/return` -- the undo half of ADR 27.
