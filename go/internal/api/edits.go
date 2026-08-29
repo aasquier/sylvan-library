@@ -26,7 +26,7 @@ import (
 )
 
 // The deck writes: the nine editing routes over
-// `internal/deckedit`'s nine surgical operations, whose output the
+// `internal/deckedit`'s surgical operations, whose output the
 // recorded goldens pin byte for byte.
 //
 // **Every write goes out through `commit`**, which
