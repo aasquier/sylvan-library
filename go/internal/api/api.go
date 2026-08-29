@@ -393,6 +393,14 @@ func (a *API) Routes() []Route {
 		// deck this caller cannot see and 403 for a read-only source, both
 		// before it reads a single action off the body.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/intake", Handler: a.intakeDeck},
+		// The description, asked from the deck page: the intake's `description`
+		// step as a surface of its own, and the one difference is that this one
+		// WRITES NOTHING. It proposes a paragraph into the editor's box and the
+		// person saves it through `PATCH` above, because on this page the field
+		// may already hold words somebody wrote. It reaches as far as a write
+		// does -- 404 unseen, 403 read-only -- because a draft nobody can save
+		// is a call nobody can use.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/describe", Handler: a.describeDeck},
 		// The commander dossier (ADR 19), both halves: the free GET that reads
 		// the store and never calls, and the POST that writes one as a JOB on
 		// the NET lane,

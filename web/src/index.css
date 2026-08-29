@@ -17257,3 +17257,43 @@ button:hover .tarot-fan-card {
   line-height: 1.45;
   color: var(--text-secondary);
 }
+
+/* ============================================ lane G: a draft, still a draft
+ *
+ * Claude's proposed deck description, in the column beside the box it is
+ * offered to. The whole job of this rule is to make the paragraph read as
+ * something *presented* rather than something that has happened: it sits on
+ * its own ground, it is fenced on the reading edge in the vine, and it arrives
+ * rather than appearing — because a block of text that pops into a form looks
+ * like the form filled itself in, which is the one thing this surface must
+ * never look like.
+ *
+ * The fence is a border and the ground is a mix, so both follow the theme's
+ * own tokens in either mode rather than being painted twice. No `filter`
+ * anywhere near it: nothing here is over a card, but the reflex is the point
+ * (commandment 19). */
+.draft-panel {
+  background: color-mix(in srgb, var(--vine) 7%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--vine) 30%, transparent);
+  border-inline-start: 3px solid color-mix(in srgb, var(--vine) 62%, transparent);
+  animation: draft-arrives 260ms cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+@keyframes draft-arrives {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Movement is a courtesy, never the message: the panel is fully legible with
+ * the animation removed, so reduced motion simply gets it already arrived. */
+@media (prefers-reduced-motion: reduce) {
+  .draft-panel {
+    animation: none;
+  }
+}
