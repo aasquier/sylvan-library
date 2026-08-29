@@ -408,8 +408,14 @@ export default function Import() {
               All of these are optional and off unless you turn them on, and
               your deck arrives exactly as you pasted it either way.
             </p>
-            <IntakeChoices value={sheet} onChange={setSheet}
-                           slug={effectiveSlug} />
+            {/* **No slug, deliberately.** This screen is about a deck that
+                does not exist yet, and `effectiveSlug` is what the deck WILL
+                be called — asking the dial about it 404s, which this
+                component then rendered as "Claude is turned off for this
+                deck". The `intake` surface exists precisely so the dial can
+                answer without a deck; passing a name that is not one yet
+                undoes that. */}
+            <IntakeChoices value={sheet} onChange={setSheet} />
           </div>
         </section>
       </div>
