@@ -883,17 +883,27 @@ export function markedHere(struck: { card: string; id?: number } | null,
  * moment the room exists to show a spell (Aaron, 2026-08-28).
  *
  * `faces` is the answer and it comes from the pool: the server sends every name
- * the card answers to, so a beat naming any of them finds it. Zero is the face
- * the card is filed under and one is the other one — which is the half a room
- * might want to point at, or the face it should hold up instead.
+ * the card answers to, so a beat naming any of them finds it. Zero is the front
+ * — the name before the `//` — and one is the other one, which is the half a
+ * room might want to point at, or the face it should hold up instead.
+ *
+ * **The list is asked first and the dictionary's own name is the fallback**,
+ * which is the opposite of the order this used to run in and matters now that
+ * the index picks a *picture*. The dictionary files a card under whatever face
+ * Forge happened to name first, and that is not always the front: a card first
+ * seen already on its back is filed under the back's name, and asking "is this
+ * the name we know it by" answers *zero* for it — the front — and would hold up
+ * the wrong painting of a card the room had every fact about. The list is
+ * ordered as the card is printed, so an index into it means the same thing
+ * whichever name the dictionary happens to carry.
  *
  * A card with no `faces` answers 0 or -1 and nothing else, which is nearly
- * every card.
+ * every card, and is what the fallback is for.
  */
 export function halfNamed(card: ForgeBoardCard, inBeat: string): number {
-  if (sameCard(card.name, inBeat)) return 0
   const at = (card.faces ?? []).indexOf(inBeat)
-  return at
+  if (at >= 0) return at
+  return sameCard(card.name, inBeat) ? 0 : -1
 }
 
 /**

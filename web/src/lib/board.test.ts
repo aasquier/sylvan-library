@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
 import type { ForgeBoard, ForgeBoardCard } from './api'
 import type { BoardCard, BoardSide, BoardStack } from './board'
 import { alignLanes, clashOf, faceInPlay, fightingStats, fightOf, foldBoard,
-  markedHere, pictureOf, stackRow } from './board'
+  halfNamed, markedHere, pictureOf, stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -1318,6 +1318,29 @@ describe('a card with two faces, and which one the room holds up', () => {
     // And a beat about some other card entirely gets the card, not an index
     // into a list it is not in.
     expect(pictureOf(mdfc, -1)).toBe('front.jpg')
+  })
+
+  it('names a half by the printed order, not by what it is filed as', () => {
+    // The ordinary way round: the dictionary knows the front, and the beat
+    // names either half.
+    expect(halfNamed(mdfc, "Agadeem's Awakening")).toBe(0)
+    expect(halfNamed(mdfc, 'Agadeem, the Undercrypt')).toBe(1)
+    // **And a card filed under its back.** Forge names a card by the face it
+    // is on, and the dictionary keeps whichever it saw first — so a card first
+    // seen already turned over is filed under the back's name. Asking "is this
+    // the name we know it by" answers *zero* for that card, which is the front,
+    // and would hold up the wrong painting of a card the room knows everything
+    // about.
+    const filedByBack: ForgeBoardCard = {
+      ...mdfc, name: 'Agadeem, the Undercrypt' }
+    expect(halfNamed(filedByBack, 'Agadeem, the Undercrypt')).toBe(1)
+    expect(pictureOf(filedByBack,
+      halfNamed(filedByBack, 'Agadeem, the Undercrypt'))).toBe('back.jpg')
+    // A card with one name still answers 0 to its own name and -1 to anything
+    // else, which is nearly every card in a match.
+    const plain: ForgeBoardCard = { id: 1, name: 'Sol Ring', image: 'ring.jpg' }
+    expect(halfNamed(plain, 'Sol Ring')).toBe(0)
+    expect(halfNamed(plain, 'Stomp')).toBe(-1)
   })
 
   it('reads the face a permanent is standing on off its type line', () => {
