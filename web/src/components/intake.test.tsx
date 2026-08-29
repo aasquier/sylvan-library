@@ -135,3 +135,63 @@ describe('IntakeChoices', () => {
     await waitFor(() => expect(screen.getByText('Draft the reasons')).toBeTruthy())
   })
 })
+
+// **The bug Aaron hit on 2026-08-29**, reported as "I wasn't prompted with any
+// intake options".
+//
+// The import page passed `slug={effectiveSlug}` — the name the deck WILL have
+// — and `/api/claude?slug=…` resolves the deck and 404s when there is not one.
+// The catch set `status` to null, `configured` fell back to `false`, and the
+// sheet rendered "Claude is turned off for this deck": a statement about
+// somebody's settings, made by something that could not read their settings.
+// The same shape as the card finder reporting a failure as an absence, found
+// the same day.
+//
+// Two tests, because the fix has two halves and either alone leaves a hole.
+describe('when the dial cannot be read', () => {
+  afterEach(cleanup)
+  beforeEach(() => vi.mocked(api.claudeStatus).mockReset())
+
+  it('does not claim Claude is turned off', async () => {
+    // Resolves null rather than rejecting: `status === null` is the state the
+    // component actually branches on, and it is what a failed read leaves
+    // behind. Driving it this way reaches the same branch without a rejection
+    // for the runner to count as an escape.
+    vi.mocked(api.claudeStatus).mockResolvedValue(null as never)
+    render(<IntakeChoices value={{}} onChange={vi.fn()} />)
+
+    // The four that were never gated are still offered: the server decides
+    // what it will do, and hiding them would be guessing the other way.
+    await waitFor(() => expect(screen.getByText('Sort the cards')).toBeTruthy())
+    expect(screen.queryByText(/Claude is turned off/)).toBeNull()
+    expect(screen.queryByText(/exactly as you pasted it/)).toBeNull()
+    // Drafting stays shut, because closed is the safe direction for a control
+    // gated on a permission — but without asserting a setting nobody read.
+    expect(screen.queryByText('Draft the reasons')).toBeNull()
+    expect(screen.queryByText(/may not change anything/)).toBeNull()
+  })
+
+  // **The cause, pinned.** `/api/claude?slug=…` resolves the deck and 404s
+  // when there is not one, and on the import screen there never is one yet:
+  // the deck is created by the button. The `intake` surface exists exactly so
+  // the dial can answer without a deck, and passing a would-be slug undoes it.
+  it('asks as the intake surface and never about a deck that does not exist',
+     async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(status(true))
+    render(<IntakeChoices value={{}} onChange={vi.fn()} />)
+    await waitFor(() => expect(api.claudeStatus).toHaveBeenCalled())
+
+    const sent = vi.mocked(api.claudeStatus).mock.calls[0]![0]!
+    expect(sent.surface).toBe('intake')
+    expect(sent.slug).toBeUndefined()
+  })
+
+  it('still stands down when the dial actually says Claude is off', async () => {
+    vi.mocked(api.claudeStatus).mockResolvedValue(
+      status(false, { configured: false }))
+    render(<IntakeChoices value={{}} onChange={vi.fn()} />)
+    await waitFor(() =>
+      expect(screen.getByText(/exactly as you pasted it/)).toBeTruthy())
+    expect(screen.queryByText('Sort the cards')).toBeNull()
+  })
+})

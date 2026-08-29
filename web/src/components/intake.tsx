@@ -118,14 +118,20 @@ export function IntakeChoices({ value, onChange, slug, owner }: {
     return () => { live = false }
   }, [slug, owner, pin, setPin])
 
+  // **A dial that could not be read is not a dial that said no.** These three
+  // used to fall back to `false`, so any failure -- a 404, a dropped request,
+  // a 500 -- rendered as "Claude is turned off for this deck", which is a
+  // statement about somebody's settings made by something that could not read
+  // their settings. `unread` keeps the two apart.
+  const unread = asked && status === null
   const configured = status?.configured ?? false
   const mayWrite = status?.stance.may_write ?? false
   const allowsCalls = status?.stance.allows_calls ?? false
 
   // Nothing here can run without a credential and a stance that speaks, so
   // the whole sheet stands down rather than offering five controls that would
-  // each fail the same way.
-  if (asked && (!configured || !allowsCalls)) {
+  // each fail the same way. Only when the dial actually SAID so.
+  if (asked && !unread && (!configured || !allowsCalls)) {
     return (
       <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         Your deck will land exactly as you pasted it. Claude is turned off for
@@ -135,6 +141,10 @@ export function IntakeChoices({ value, onChange, slug, owner }: {
     )
   }
 
+  // Drafting stays shut when the answer is unknown -- closed is the safe
+  // direction for a control gated on a permission -- but the four that were
+  // never gated are still offered, because the server decides what it will do
+  // and a sheet that hid them would be guessing in the other direction.
   const shown = ACTIONS.filter((a) => a.key !== 'rationales' || mayWrite)
 
   return (
@@ -186,7 +196,7 @@ export function IntakeChoices({ value, onChange, slug, owner }: {
           explains why a control the user may have been told about is not on
           their screen, and hiding that behind a hover is hiding it from every
           phone and every keyboard. */}
-      {asked && !mayWrite && (
+      {asked && !mayWrite && !unread && (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Claude will not draft the reasons for your cards here, because your
           settings say it may not change anything. That is the write setting on
