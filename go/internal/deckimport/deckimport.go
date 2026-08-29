@@ -291,8 +291,8 @@ func ReadRationales(parsed decklist.List,
 		if c.Unpeeled == "" {
 			continue
 		}
-		_, peeled := canonicalName(c.Name, cards)
-		_, whole := canonicalName(c.Unpeeled, cards)
+		_, peeled := CanonicalName(c.Name, cards)
+		_, whole := CanonicalName(c.Unpeeled, cards)
 		if peeled != nil || whole == nil {
 			continue
 		}
@@ -307,7 +307,7 @@ func ReadRationales(parsed decklist.List,
 // Respell reads the names the pool could not resolve.
 //
 // `cards` is the lookup `BuildDeck` will use, and this ADDS to it: a reading
-// is installed under the name that was WRITTEN, so `canonicalName` finds the
+// is installed under the name that was WRITTEN, so `CanonicalName` finds the
 // record and hands back the card's real name, and every count, category and
 // colour downstream is the real card's. Nothing else in the pipeline needs to
 // know a correction happened -- which is exactly the point, because a
@@ -337,7 +337,7 @@ func Respell(ctx context.Context, reader Reader, names []string,
 			continue
 		}
 		seen[written] = true
-		if _, rec := canonicalName(written, cards); rec != nil {
+		if _, rec := CanonicalName(written, cards); rec != nil {
 			continue
 		}
 		found, err := reader.Nearest(ctx, written, 2)
@@ -452,13 +452,13 @@ func commanderReading(wanted []string, cards map[string]*pool.CardRecord) ([]str
 		return wanted, ""
 	}
 	whole := wanted[0]
-	if _, rec := canonicalName(whole, cards); rec != nil {
+	if _, rec := CanonicalName(whole, cards); rec != nil {
 		return wanted, ""
 	}
 	for _, parts := range pairParts(whole) {
 		resolved := make([]string, 0, len(parts))
 		for _, part := range parts {
-			name, rec := canonicalName(part, cards)
+			name, rec := CanonicalName(part, cards)
 			if rec == nil {
 				break
 			}
@@ -491,7 +491,7 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	unknown := []string{}
 
 	resolve := func(written string) (string, *pool.CardRecord) {
-		canonical, rec := canonicalName(written, cards)
+		canonical, rec := CanonicalName(written, cards)
 		if rec == nil && !slices.Contains(unknown, canonical) {
 			unknown = append(unknown, canonical)
 		}
@@ -554,7 +554,7 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	demoted := []string{}
 	demotedLines := []decklist.Card{}
 	for _, line := range nominated {
-		canonical, _ := canonicalName(line.Name, cards)
+		canonical, _ := CanonicalName(line.Name, cards)
 		if outside[strings.ToLower(canonical)] {
 			continue
 		}
@@ -673,7 +673,7 @@ func commandZoneReasons(parsed decklist.List, cards map[string]*pool.CardRecord,
 		if strings.TrimSpace(line.Why) == "" {
 			continue
 		}
-		canonical, _ := canonicalName(line.Name, cards)
+		canonical, _ := CanonicalName(line.Name, cards)
 		if !outside[strings.ToLower(canonical)] {
 			continue
 		}
@@ -744,14 +744,21 @@ func buildEntries(lines []decklist.Card,
 	return entries, removed
 }
 
-// canonicalName is the name as the pool spells it, and the record behind it.
+// CanonicalName is the name as the pool spells it, and the record behind it.
 //
 // Casing is corrected, but a double-faced card written by its front face stays
 // written that way. `GetCards` resolves both, the curated decks all use face
 // names ("Branchloft Pathway"), and expanding one to "Branchloft Pathway //
 // Boulderloft Pathway" on import would make the library inconsistent for no
 // gain.
-func canonicalName(written string, cards map[string]*pool.CardRecord) (string, *pool.CardRecord) {
+//
+// **Exported on 2026-08-29 for the deck page's bulk edit**, which resolves a
+// pasted list against a deck that already exists rather than into a new one.
+// It has to spell a name the way this does or it would find no match for a
+// card the deck holds under its front face -- and would then bury that card
+// and add the same card back under a different spelling. One resolver, so the
+// two paths cannot disagree about what a name is.
+func CanonicalName(written string, cards map[string]*pool.CardRecord) (string, *pool.CardRecord) {
 	rec, ok := cards[written]
 	if !ok || rec == nil {
 		return written, nil
