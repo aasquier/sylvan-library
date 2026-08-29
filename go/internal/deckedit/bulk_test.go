@@ -539,3 +539,25 @@ func TestAFoldedReasonPastedBackUnchangedIsNotARewrite(t *testing.T) {
 		t.Error("the plan found work in a list that says what the deck says")
 	}
 }
+
+// A card handed over with nothing filed takes the model's own default rather
+// than reaching AddCard, which refuses a blank category outright -- a refusal
+// mid-fold about something the person can neither see nor fix. `deckimport`
+// makes the same choice for the same reason, and the plan says which filing it
+// used so nothing is hidden.
+func TestACardWithNoFilingTakesTheModelsDefault(t *testing.T) {
+	t.Parallel()
+	draft := strings.Replace(bulkFixture, "stage: curated", "stage: draft", 1)
+	p := plan(t, draft,
+		BulkCard{Name: "Sol Ring", Qty: 1},
+		BulkCard{Name: "Cultivate", Qty: 1},
+		BulkCard{Name: "Craterhoof Behemoth", Qty: 1},
+		BulkCard{Name: "Forest", Qty: 36},
+		BulkCard{Name: "Terastodon", Qty: 1})
+	if len(p.Add) != 1 || p.Add[0].Category != "utility" {
+		t.Fatalf("the unfiled card was planned as %+v", p.Add)
+	}
+	if _, err := ApplyBulk(draft, p); err != nil {
+		t.Fatalf("the edit was refused: %v", err)
+	}
+}

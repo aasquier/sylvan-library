@@ -291,8 +291,18 @@ func PlanBulk(text string, wanted []BulkCard) (*BulkPlan, error) {
 					BulkBlocked{Name: card.Name, Reason: blockedNoWhy})
 				continue
 			}
+			// The model's own default for a card nobody has filed, which is
+			// `deckimport`'s too. Not an inference about the card: `AddCard`
+			// refuses a blank category outright, so leaving it blank would be
+			// a refusal mid-fold about something the person cannot see or fix,
+			// where this is a filing they can change on the deck page. The
+			// plan says which one it used.
+			category := strings.TrimSpace(card.Category)
+			if category == "" {
+				category = "utility"
+			}
 			plan.Add = append(plan.Add, BulkAdd{Name: card.Name,
-				Category: card.Category, Qty: card.Qty,
+				Category: category, Qty: card.Qty,
 				Why: strings.TrimSpace(card.Why)})
 			continue
 		}
