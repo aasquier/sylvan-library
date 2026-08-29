@@ -341,13 +341,19 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/ocr/{name}", Handler: a.ocrAsset},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}", Handler: a.artMotionStatus},
 		{Method: http.MethodGet, Pattern: "/api/art/motion/{oracle_id}/{effect}/{filename}", Handler: a.artMotionFile},
-		// The deck writes: the nine editing routes,
+		// The deck writes: the ten editing routes,
 		// every one of them going out through `commit` -- so the gate's
 		// verdict and ADR 28's log entry are inherited rather than
 		// remembered. A deck the caller cannot see is a 404 before
 		// writability is asked; one they can see but not edit is a 403.
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/swap", Handler: a.swapCard},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/cards", Handler: a.addCard},
+		// The board: a card onto the swap board, opening one for a deck that
+		// has never kept a board. Separate from `/cards` because starting a
+		// board changes the file's *shape*, which is the one thing ADR 12
+		// says an edit may not do off its own bat -- so it is asked for by
+		// name rather than inferred from a `to` somebody may have mistyped.
+		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/board", Handler: a.startBoard},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.removeCard},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/entomb", Handler: a.entombCards},
 		{Method: http.MethodPost, Pattern: "/api/decks/{owner}/{slug}/graveyard/{name}/return", Handler: a.returnCard},
