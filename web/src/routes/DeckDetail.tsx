@@ -245,8 +245,7 @@ function PilotLine({ deck, deckRef, onRefresh }: {
                           border: '1px solid var(--hairline)',
                           color: 'var(--text-primary)' }} />
           <button type="button" onClick={() => void save()}
-                  className="btn btn-ghost btn-xs font-medium"
-                  style={{ color: 'var(--series-1)' }}>
+                  className="btn btn-ghost btn-ghost-accent btn-xs font-medium">
             Save
           </button>
           <button type="button" onClick={() => setEditing(false)}
@@ -1263,8 +1262,7 @@ export default function DeckDetail() {
               {deck.stage !== 'draft' && (
                 <>
                   {' '}The <button type="button" onClick={() => setTab('artifacts')}
-                          className="btn btn-ghost btn-xs"
-                          style={{ color: 'var(--series-1)' }}>
+                          className="btn btn-ghost btn-ghost-accent btn-xs">
                     Artifacts
                   </button> tab has the decklist, if you want to build your own.
                 </>

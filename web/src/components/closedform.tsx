@@ -251,6 +251,7 @@ export function ClosedForm({ shelf }: { shelf: ShelfResult }) {
         <Heatmap shelf={shelf} rows={rows} />
         {inHorizon.length > 12 && (
           <button type="button" className="btn btn-quiet btn-sm"
+                  aria-expanded={showAll}
                   onClick={() => setShowAll((v) => !v)}>
             {showAll ? 'Show the worst twelve'
               : `Show all ${shelf.cards.length} cards`}

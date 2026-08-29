@@ -4475,6 +4475,39 @@ button:hover .tarot-fan-card {
 }
 .btn-ghost:hover:not(:disabled) {
   color: var(--text-primary);
+  /* **Three replies, because the first one is the only one an inline `color`
+   * can silence.** `.btn-ghost` is the one control in this family dressed as
+   * a link -- it is underlined by design, above -- and for a long time its
+   * whole hover was the line above this comment. Four controls set their ink
+   * inline (a blue "Tell me more", a blue "Save"), an inline style outranks a
+   * stylesheet, and every one of them answered the hand with *nothing*: the
+   * key sealed inside the locked door.
+   *
+   * A wash and a thicker underline cannot be overridden by an ink choice, so
+   * the reply survives whatever colour a caller reaches for. Use
+   * `.btn-ghost-accent` below rather than an inline `color`; this exists so
+   * that the day somebody forgets, the control still answers. */
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.btn-ghost:active:not(:disabled) {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+/* The accent ink `.btn-ghost` callers kept writing inline. A class rather
+ * than a `style={{ color }}` for exactly one reason: a `:hover` can reach it.
+ * Named for the role, not the hue, so the token can move under it. */
+.btn-ghost-accent { color: var(--series-1); }
+.btn-ghost-accent:hover:not(:disabled) { color: var(--series-1); }
+
+/* A disclosure that is open says so in its own face, not only in its label.
+ * `aria-expanded` is the fact; this is the fact made visible, so the state is
+ * legible to somebody who is not reading the verb. */
+.btn-ghost[aria-expanded='true'] {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 /* At the fortune-teller's table the quiet voice dresses for the room:

@@ -695,9 +695,9 @@ function Preview({ result, showYaml, onToggleYaml, onFix }: {
         )}
       </div>
 
-      <button onClick={onToggleYaml} className="btn btn-ghost btn-xs"
-              style={{ color: 'var(--series-1)' }}>
-        {showYaml ? 'Hide' : 'Show'} the deck.yaml this writes
+      <button onClick={onToggleYaml} aria-expanded={showYaml}
+              className="btn btn-ghost btn-ghost-accent btn-xs">
+        {showYaml ? 'Hide' : 'Show'} the file this writes
       </button>
       {showYaml && (
         <pre className="max-h-96 overflow-auto rounded-md p-3 font-mono text-[11px] leading-relaxed"
