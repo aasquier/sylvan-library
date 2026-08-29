@@ -443,3 +443,17 @@ func TestWithoutAPoolTheAnswersDegradeToTheRecordedShapes(t *testing.T) {
 		t.Fatal(status)
 	}
 }
+
+// mustJSON is a sentence as it appears on the wire, quoting and escaping
+// included, so a test that pins a whole response body can hold the *shape*
+// exactly while reading the *words* off the constant that owns them. A
+// player-facing sentence copied into a test literal is two sources of truth
+// for one string, and the copy is the one that goes stale silently.
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}

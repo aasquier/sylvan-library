@@ -519,5 +519,19 @@ func (a *API) poolForAProbe(ctx context.Context, fn func(*pool.Conn) error) erro
 	return a.pool.UseWithoutHolding(ctx, fn)
 }
 
-// noPoolMessage is the sentence every degraded answer carries.
-const noPoolMessage = "no card pool yet -- run `mtglab data refresh`"
+// noPoolMessage is the sentence every degraded answer carries, and it is
+// **read by a player**, not by whoever runs the server -- it travels on the
+// wire as `message` and the card finder prints it under the search box.
+//
+// So it says what happened in plain words and names nothing that computes
+// (commandment 10). It used to read "no card pool yet -- run `mtglab data
+// refresh`", which told somebody adding their first card to go and run a
+// command they have never heard of, on a machine they do not have. The
+// operator's version of this sentence belongs in the log, where it is.
+//
+// It also has to be distinguishable from "no such card" (commandment 2):
+// this is the library failing to answer, and a beginner who reads it as a
+// verdict on their spelling has been told the one wrong thing.
+const noPoolMessage = "The library's shelves are bare just now, so no card " +
+	"can be looked up. This says nothing about the card you asked for — " +
+	"try again in a little while."

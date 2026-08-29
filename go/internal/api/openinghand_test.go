@@ -117,7 +117,7 @@ func TestTheDealWithNoPoolIsTheDegradedShape(t *testing.T) {
 		t.Fatalf("%d: %s", status, raw)
 	}
 	want := `{"pool_available":false,"cards":[],` +
-		`"message":"no card pool yet -- run ` + "`mtglab data refresh`" + `"}`
+		`"message":` + string(mustJSON(t, noPoolMessage)) + `}`
 	if string(raw) != want {
 		t.Fatalf("got %s\nwant %s", raw, want)
 	}
