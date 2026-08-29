@@ -17257,3 +17257,157 @@ button:hover .tarot-fan-card {
   line-height: 1.45;
   color: var(--text-secondary);
 }
+
+/* ======================================================= Lane B: the bulk
+ *                                                    edit's paste and plan
+ *
+ * The deck page's "rewrite the 99 from a list": a box you paste a whole deck
+ * into, and — the half that matters — the plan you are shown before any of it
+ * happens. Almost all of it rides the `.btn` family and the app's tokens; what
+ * is here is the four things that had nowhere else to live.
+ *
+ * **The plan arrives rather than appearing.** A block of destructive-looking
+ * consequences that pops into existence under a button reads as an error; one
+ * that rises into place reads as an answer (commandment 6). A quarter of a
+ * second of travel, and `fill: both` is deliberately NOT used — a filled
+ * animation leaves `transform` applied as the identity matrix, which makes the
+ * element a containing block for anything `position: fixed` beneath it.
+ *
+ * **A burial chip is a card's name in the graveyard's colour**, and the
+ * graveyard is `--status-serious` rather than `--status-critical` on purpose:
+ * nothing here is destroyed, and painting it in the colour the app uses for
+ * "this cannot be undone" would say something untrue to the person reading
+ * fastest (commandment 2).
+ */
+
+.bulk-box {
+  background: var(--page);
+  color: var(--text-primary);
+  border: 1px solid var(--hairline);
+  resize: vertical;
+  min-height: 9rem;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.bulk-box:hover {
+  border-color: color-mix(in srgb, var(--vine) 55%, var(--hairline));
+}
+.bulk-box:focus {
+  border-color: var(--vine);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vine) 22%, transparent);
+}
+
+.bulk-plan {
+  background: var(--page);
+  border: 1px solid var(--hairline);
+  animation: bulk-plan-rise 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes bulk-plan-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* One count, in the colour of the thing it counts. Tiles rather than a
+   sentence because four numbers read at a glance and four clauses do not. */
+.bulk-tally {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border-radius: 0.45rem;
+  padding: 0.3rem 0.6rem;
+  background: color-mix(in srgb, var(--tally) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tally) 32%, transparent);
+}
+.bulk-tally-n {
+  font-size: 1rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--tally);
+}
+.bulk-tally-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Each part of the plan under a rule in its own colour, so the destructive
+   half is legible as the destructive half without reading a word. */
+.bulk-section {
+  border-left: 2px solid color-mix(in srgb, var(--rule) 60%, transparent);
+  padding-left: 0.75rem;
+}
+.bulk-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rule);
+  margin-bottom: 0.35rem;
+}
+
+/* What is being replaced, or a line that could not be read: the muted ink and
+   an italic, so the sentence leaving is visibly the sentence leaving. */
+.bulk-was {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.bulk-tomb-chip,
+.bulk-quiet-chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 11px;
+  border: 1px solid var(--hairline);
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.bulk-tomb-chip {
+  background: color-mix(in srgb, var(--status-serious) 12%, transparent);
+  border-color: color-mix(in srgb, var(--status-serious) 38%, transparent);
+  color: var(--text-primary);
+}
+.bulk-tomb-chip:hover {
+  background: color-mix(in srgb, var(--status-serious) 20%, transparent);
+  border-color: var(--status-serious);
+}
+.bulk-quiet-chip {
+  background: var(--gridline);
+  color: var(--text-secondary);
+}
+.bulk-quiet-chip:hover {
+  border-color: var(--vine);
+  color: var(--text-primary);
+}
+
+/* The unchanged eighty: present, foldable, and a real control — a `<summary>`
+   is a button in every way that matters, so it answers hover, focus and press
+   like one (commandment 17). */
+.bulk-details {
+  border-top: 1px solid var(--hairline);
+  padding-top: 0.6rem;
+}
+.bulk-summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  margin-left: -0.35rem;
+  list-style-position: inside;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+.bulk-summary:hover {
+  color: var(--text-primary);
+  background: var(--gridline);
+}
+.bulk-summary:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.bulk-summary:active {
+  background: color-mix(in srgb, var(--vine) 16%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bulk-plan {
+    animation: none;
+  }
+}

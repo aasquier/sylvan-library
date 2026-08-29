@@ -30,7 +30,7 @@ import (
 // the source's own sharing
 // verb.
 //
-// Kept apart from the nine editing routes on purpose, and the reason is
+// Kept apart from the ten editing routes on purpose, and the reason is
 // visible in the shapes below: **none of these goes through `commit`.**
 // Creation and deletion are deliberately
 // outside ADR 28's activity log, which is a decision rather than an oversight
