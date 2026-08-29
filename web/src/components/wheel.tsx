@@ -369,8 +369,13 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="wheel-scene relative w-full max-w-sm shrink-0 overflow-hidden rounded-lg">
+      {/* Scene and readout, and the row wraps on its own — see `.wheel-body`
+          in index.css. It was `sm:flex-row`, which asks the *viewport* how
+          wide this panel is; since 2026-08-29 the panel is half a deck page
+          on a desk and a whole one on a phone, so the viewport stopped being
+          able to answer. */}
+      <div className="wheel-body">
+        <div className="wheel-scene relative overflow-hidden rounded-lg">
           <img src={WHEEL_ART}
                alt="Wheel of Fortune, painted by Daniel Gelon for Limited
                     Edition Alpha: a red-cloaked figure spins a plank wheel
@@ -589,7 +594,7 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
           )}
         </div>
 
-        <div className="min-w-0 flex-1 space-y-2">
+        <div className="wheel-side space-y-2">
           <button type="button" onClick={() => void turn()} disabled={spinning}
                   className={`wheel-spin-btn${spinning ? ' is-turning' : ''}`}>
             <span className="wheel-spin-btn-glyph" aria-hidden="true" />
@@ -658,7 +663,12 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
         </div>
       </div>
 
-      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+      {/* `toy-credit` pins the licence line to the bottom edge of the frame
+          rather than letting it float up under the last thing that rendered.
+          Beside its twin that matters: the two panels are never the same
+          height, and two credits that end level are the difference between a
+          pair and an accident. */}
+      <p className="toy-credit text-[11px]" style={{ color: 'var(--text-muted)' }}>
         <em>Wheel of Fortune</em> by Daniel Gelon, Limited Edition Alpha —
         the wheel that turns is the painting&rsquo;s own, cut loose by a mask
         and put back exactly where it was.
