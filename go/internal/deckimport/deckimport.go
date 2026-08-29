@@ -32,11 +32,30 @@
 // high enough that no measured typo has ever come near failing it and no
 // measured non-word has ever come near passing it.
 //
-// **Nothing is invented.** Every card arrives with an empty `why` and the deck
-// is written as `stage: draft`, so the gate reports those as warnings and
-// counts them (ADR 13). A rationale written by the tool is precisely the empty
-// justification rule 4 exists to prevent, and doing it 99 times at once is
-// worse than doing it once (ADR 11).
+// **Nothing is invented, and the rationale column is not an exception.** A
+// pasted line may carry its own reason -- `1 Acidic Slime (ZNC) 59 "deathtouch
+// body that also eats artifacts"` -- and that reason is written into the
+// deck's `why` verbatim. This is not the tool filling a field in: it is a
+// person writing their own rationale in the only place the exports left free,
+// which is the same act as typing it into the deck editor and is what rule 4
+// asks for rather than something it forbids. What would break the rule is
+// composing one, and nothing here composes anything. A card that arrived
+// without a quoted reason still arrives with an empty `why`.
+//
+// The deck is written as `stage: draft` either way, including when every line
+// carried a reason. Draft is not only a statement about empty fields -- it is
+// the deck saying nobody has looked at it in one piece yet -- and the gate
+// reports a draft's problems as warnings instead of errors (ADR 13), which is
+// the diagnosis a newcomer wants on the first screen rather than a refusal.
+// Promotion is one control away on the deck page, and the import says so when
+// there is nothing left owed.
+//
+// **The reading of the column takes a card pool, so it happens here.** Twelve
+// card names contain a quote and five end in one, so `decklist` hands up both
+// readings of a line like `1 Kongming, "Sleeping Dragon"` and `ReadRationales`
+// asks which one the pool has. Measured against this pool, not one of the five
+// peels to a name the pool also knows, so the question has a single answer
+// every time it is asked.
 //
 // **One thing is inferred, and only because it is a card pool fact.** A card
 // is filed under `land` when `CardRecord.IsLand` says so -- which is right
@@ -55,13 +74,18 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/decklist"
+	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
-// Header is the comment block every imported file opens with. `{today}` is
-// filled at build time.
-const Header = `# Imported %s from a pasted decklist, and NOT yet reasoned about.
+// The comment block every imported file opens with, in its two forms. The
+// deck file is the truth, so the truth is what the header states: a list
+// pasted with its reasons already written did not arrive unreasoned about,
+// and telling its owner that nothing here will fill a `why` in for them would
+// be answering a question they did not ask.
+const (
+	headerBare = `# Imported %s from a pasted decklist, and NOT yet reasoned about.
 #
 # ` + "`stage: draft`" + ` means the gate reports every missing ` + "`why`" + ` as a warning
 # instead of an error, so the deck's *facts* -- legality, colour identity,
@@ -73,6 +97,33 @@ const Header = `# Imported %s from a pasted decklist, and NOT yet reasoned about
 # will fill one in for you -- a rationale written by the tool is exactly the
 # empty justification the rule exists to prevent.
 `
+
+	headerReasoned = `# Imported %s from a pasted decklist, with %d of its reasons written
+# by the person who pasted it. Those are their words, carried across verbatim
+# from the quoted column; nothing here composed one.
+#
+# ` + "`stage: draft`" + ` means the gate reports what is still owed as a warning
+# instead of an error, so the deck's *facts* -- legality, colour identity,
+# singleton, size -- are checked from day one.
+#
+# %s
+`
+)
+
+// header is the block for a deck that carried `carried` reasons of its own and
+// still owes `owed`.
+func header(date string, carried, owed int) string {
+	if carried == 0 {
+		return fmt.Sprintf(headerBare, date)
+	}
+	tail := fmt.Sprintf("%d card(s) are still waiting for a reason. The gate\n"+
+		"# refuses promotion to `curated` until every one of them has one.", owed)
+	if owed == 0 {
+		tail = "Nothing is owed: every card has a reason, so this deck can be\n" +
+			"# promoted to `curated` whenever you are happy with it."
+	}
+	return fmt.Sprintf(headerReasoned, date, carried, tail)
+}
 
 // Refused is `ImportRefused`: the list could not be turned into a deck, and
 // nothing was written.
@@ -109,6 +160,11 @@ type Report struct {
 	Skipped []decklist.Line
 	// Things that were changed rather than rejected, each worth saying aloud.
 	Notes []string
+	// Rationales is how many cards arrived with a reason of their own, from
+	// the quoted column. Counted rather than derived from the deck so the
+	// number is about what was PASTED: a card whose reason was written twice
+	// on two merged lines is one card with a reason, not two.
+	Rationales int
 }
 
 // NeedsRationale is how many cards are still waiting for one.
@@ -128,6 +184,11 @@ func NamesIn(parsed decklist.List, commander []string, companion string) []strin
 	}
 	for _, c := range parsed.Cards {
 		add(c.Name)
+		// The other reading of a trailing quoted run, so `ReadRationales` can
+		// choose by lookup rather than by guessing -- the same trick, and for
+		// the same reason, as the comma below. After it has chosen there is
+		// one reading per line and this adds nothing.
+		add(c.Unpeeled)
 	}
 	for _, c := range commander {
 		add(c)
@@ -194,6 +255,53 @@ type Reader interface {
 	Nearest(ctx context.Context, written string, limit int) ([]Candidate, error)
 	// Cards is `pool.Conn.GetCards`: whole records, by name.
 	Cards(ctx context.Context, names []string) (map[string]*pool.CardRecord, error)
+}
+
+// ReadRationales decides, for every line that ended with a quoted run, whether
+// that run was the card's reason or part of the card's name.
+//
+// `decklist` cannot tell: `1 Sol Ring "fast mana"` and `1 Kongming, "Sleeping
+// Dragon"` are the same shape, and only a card pool separates them. So the
+// grammar hands up both readings and this one asks -- `cards` being the same
+// finished lookup `BuildDeck` will use, fetched over both readings by
+// `NamesIn`.
+//
+// The peeled reading wins unless the pool knows the whole one and does not
+// know the peeled one. Measured over this pool that condition is exact rather
+// than merely likely: five card names end in a quoted run, and not one of them
+// peels to a name the pool also has, so no line is ever decided by precedence
+// alone. When the pool knows neither, the peeled reading is kept so `Respell`
+// scores the card's name instead of the card's name with somebody's sentence
+// glued to it.
+//
+// Returns the list with one reading per line -- `Unpeeled` cleared, so a
+// second `NamesIn` asks about exactly what was chosen -- and a note for each
+// line where the quoted run turned out to be a name, because a reason the
+// person thought they wrote and did not get is precisely the kind of silence
+// this package refuses.
+func ReadRationales(parsed decklist.List,
+	cards map[string]*pool.CardRecord) (decklist.List, []string) {
+
+	notes := []string{}
+	out := parsed
+	out.Cards = make([]decklist.Card, len(parsed.Cards))
+	for i, c := range parsed.Cards {
+		out.Cards[i] = c
+		out.Cards[i].Unpeeled = ""
+		if c.Unpeeled == "" {
+			continue
+		}
+		_, peeled := canonicalName(c.Name, cards)
+		_, whole := canonicalName(c.Unpeeled, cards)
+		if peeled != nil || whole == nil {
+			continue
+		}
+		out.Cards[i].Name, out.Cards[i].Why = c.Unpeeled, ""
+		notes = append(notes, fmt.Sprintf(
+			"line %d: the quoted words are part of the card's name, so %s was "+
+				"read as one card and not as a card with a reason", c.LineNo, whole.Name))
+	}
+	return out, notes
 }
 
 // Respell reads the names the pool could not resolve.
@@ -284,6 +392,10 @@ type Options struct {
 	// rather than done here because reading a name needs the pool and this
 	// function is handed a finished lookup.
 	Read []Correction
+	// Notes is what the steps before this one decided, for the same reason:
+	// `ReadRationales` needs the pool and runs earlier, and what it chose has
+	// to reach the person who pasted the list.
+	Notes []string
 }
 
 // pairSeparators is how one field might be holding two commanders, best
@@ -375,7 +487,7 @@ func commanderReading(wanted []string, cards map[string]*pool.CardRecord) ([]str
 func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	opts Options) (*Report, error) {
 
-	notes := []string{}
+	notes := slices.Clone(opts.Notes)
 	unknown := []string{}
 
 	resolve := func(written string) (string, *pool.CardRecord) {
@@ -458,6 +570,15 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 				"and went into the 99: %s", len(demotedLines), strings.Join(demoted, ", ")))
 	}
 
+	// A reason written on the commander's own line has nowhere to go in the
+	// 99, because the command zone is a list of names and not of entries. It
+	// is still the person's writing, so it is kept where the deck file keeps
+	// an author's prose -- `notes` -- rather than dropped, and the report says
+	// where it went. Nothing is composed on the way: the sentence is theirs,
+	// and the only thing added is which card it was about, and only when there
+	// is more than one card it could have been about.
+	zoneWhy, zoneCount := commandZoneReasons(parsed, cards, outside)
+
 	entries, moved := buildEntries(append(parsed.Section("deck"), demotedLines...),
 		resolve, outside, &notes)
 	swaps, alsoMoved := buildEntries(parsed.Section("swap_board"), resolve, outside, &notes)
@@ -487,6 +608,13 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	// correction changed what the deck contains) instead of parsing prose out
 	// of `Notes`. A note as well was two copies of one fact on one screen.
 
+	rationales := zoneCount
+	for _, c := range append(slices.Clone(entries), swaps...) {
+		if strings.TrimSpace(c.Why) != "" {
+			rationales++
+		}
+	}
+
 	name := strings.TrimSpace(opts.Name)
 	if name == "" {
 		name = opts.Slug
@@ -496,6 +624,12 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 		value := companion
 		companionPtr = &value
 	}
+	if zoneWhy != "" {
+		notes = append(notes, "a reason was written on a line that turned out to "+
+			"be in the command zone, which holds names and not reasons; it was "+
+			"kept verbatim as the deck's `command_zone` note")
+	}
+
 	built := &deck.Deck{
 		Slug:      opts.Slug,
 		Name:      name,
@@ -508,14 +642,54 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 		Cards:     entries,
 		SwapBoard: swaps,
 	}
+	if zoneWhy != "" {
+		built.Notes = deckyaml.Map{{Key: "command_zone", Value: zoneWhy}}
+	}
 	body, err := built.Dump()
 	if err != nil {
 		return nil, err
 	}
-	text := fmt.Sprintf(Header, time.Now().Format("2006-01-02")) + "\n" + body
+	text := header(time.Now().Format("2006-01-02"), rationales,
+		len(built.Unjustified())) + "\n" + body
 
 	return &Report{Deck: built, YAML: text, Unknown: unknown, Read: opts.Read,
-		Unreadable: parsed.Unreadable, Skipped: parsed.Skipped, Notes: notes}, nil
+		Unreadable: parsed.Unreadable, Skipped: parsed.Skipped, Notes: notes,
+		Rationales: rationales}, nil
+}
+
+// commandZoneReasons gathers the quoted reasons from lines whose card ended up
+// in the command zone, in the order they were pasted.
+//
+// One card's reason is kept exactly as it was written. Two cards' -- a partner
+// pair, or a commander and a companion -- are labelled with the card each was
+// about, because two unattributed sentences in one note is a worse record of
+// what somebody said than two attributed ones.
+func commandZoneReasons(parsed decklist.List, cards map[string]*pool.CardRecord,
+	outside map[string]bool) (string, int) {
+
+	type reason struct{ name, why string }
+	found := []reason{}
+	for _, line := range parsed.Cards {
+		if strings.TrimSpace(line.Why) == "" {
+			continue
+		}
+		canonical, _ := canonicalName(line.Name, cards)
+		if !outside[strings.ToLower(canonical)] {
+			continue
+		}
+		found = append(found, reason{name: canonical, why: line.Why})
+	}
+	switch len(found) {
+	case 0:
+		return "", 0
+	case 1:
+		return found[0].why, 1
+	}
+	lines := make([]string, 0, len(found))
+	for _, f := range found {
+		lines = append(lines, fmt.Sprintf("%s: %s", f.name, f.why))
+	}
+	return strings.Join(lines, "\n"), len(found)
 }
 
 // buildEntries resolves parsed lines into card entries, merging repeated
@@ -541,6 +715,13 @@ func buildEntries(lines []decklist.Card,
 		}
 		if existing, ok := byKey[key]; ok {
 			existing.Qty += line.Qty
+			// The merged line's reason is kept only when the first line had
+			// none. Two lines of one card with two different reasons is a
+			// person disagreeing with themselves, and choosing between them
+			// here would be composing a rationale by picking one.
+			if existing.Why == "" {
+				existing.Why = line.Why
+			}
 			*notes = append(*notes, fmt.Sprintf(
 				"%s appeared on more than one line; merged to qty %d",
 				canonical, existing.Qty))
@@ -551,7 +732,8 @@ func buildEntries(lines []decklist.Card,
 		if rec != nil && rec.IsLand() {
 			category = "land"
 		}
-		byKey[key] = &deck.CardEntry{Name: canonical, Category: category, Qty: line.Qty}
+		byKey[key] = &deck.CardEntry{Name: canonical, Category: category,
+			Qty: line.Qty, Why: line.Why}
 		order = append(order, key)
 	}
 

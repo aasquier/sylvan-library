@@ -31,10 +31,25 @@
 //     recorded grammar reads three Forests. `digitValue` is the six lines
 //     that keep it so.
 //
-// The one ambiguity that cannot be resolved here: a bare `3 Steps Ahead` is
-// either three copies of "Steps Ahead" or one copy of the blue instant.
-// Without a pool both readings are equally good, so the leading-number reading
-// wins -- and the resulting unknown name gets reported rather than guessed at.
+// **The rationale column.** A line may end with a quoted run, and that run is
+// the card's `why`: `1 Acidic Slime (ZNC) 59 "deathtouch body that also eats
+// artifacts"`. It is the house extension to the exports above -- Moxfield and
+// the rest have nowhere to put the one thing a deck file requires -- and it is
+// peeled here as one more trailing annotation, `Card.Why`.
+//
+// Twelve real card names contain a quote character and five of them END with a
+// quoted run, so peeling is genuinely ambiguous: `1 Kongming, "Sleeping
+// Dragon"` is one card, and `1 Sol Ring "ramp"` is a card and a rationale.
+// Both readings are carried -- `Card.Name`/`Card.Why` peeled, `Card.Unpeeled`
+// whole -- because deciding between them takes a card pool and this package
+// does not have one. `deckimport` asks the pool and takes the reading it knows.
+//
+// The two ambiguities that cannot be resolved here, then, and they are the
+// same shape: a bare `3 Steps Ahead` is either three copies of "Steps Ahead"
+// or one copy of the blue instant, and a trailing quote is either an epithet
+// or a reason. Without a pool both readings are equally good -- so the
+// leading-number reading wins outright, and the quoted one is handed up as a
+// pair for something that can measure to choose from.
 package decklist
 
 import (
@@ -126,6 +141,21 @@ var (
 	// World`. Safe to strip unconditionally because no card name begins with a
 	// bracket.
 	leadingSetRe = regexp.MustCompile(`^\[[A-Za-z0-9]{2,6}\]` + sp + `*`)
+
+	// The rationale column: a quoted run anchored to the end of the line.
+	//
+	// `[^"\x{201c}\x{201d}]*` rather than `.*` is the whole safety of it --
+	// the opener found is the NEAREST one, so `Henzie "Toolbox" Torre "the
+	// whole plan"` peels the plan and keeps the toolbox. A greedy body would
+	// open at the toolbox and hand back a card called `Henzie`.
+	//
+	// Curly quotes are in the class because a rationale written in a document
+	// and pasted here arrives with them, and somebody who typed a sensible
+	// sentence into Word should not be told their line is unreadable. The
+	// closer may differ from the opener for the same reason: a half-edited
+	// paste really does carry one of each.
+	quoteRe = regexp.MustCompile(
+		sp + `*["\x{201c}]([^"\x{201c}\x{201d}]*)["\x{201d}]` + sp + `*$`)
 )
 
 // MaxLine is the longest line this will look at, in code points.
@@ -143,6 +173,19 @@ type Card struct {
 	Qty     int
 	Section string
 	LineNo  int
+	// Why is the quoted rationale column, "" when the line carried none. The
+	// text is verbatim between the quotes: no trimming beyond the ends, no
+	// case folding, nothing added.
+	Why string
+	// Unpeeled is the other reading of a line that ended with a quoted run --
+	// the name with that run still attached, as `Kongming, "Sleeping Dragon"`
+	// needs. Empty when there was no quote to peel, or when peeling left
+	// nothing behind, in which case Name already holds the whole thing.
+	//
+	// Set only where a choice exists, so a caller with a card pool can make
+	// it and a caller without one can ignore the field and still be right
+	// about every line that is not one of the five.
+	Unpeeled string
 }
 
 // Line is a line that was not turned into a card, with its number.
@@ -232,21 +275,26 @@ func Parse(text string) List {
 			continue
 		}
 
-		body, markers := stripAnnotations(line)
-		if body == "" {
+		body, markers, why, rawWhole := stripAnnotations(line)
+		qty, name := stripLeading(body)
+		whole := ""
+		if rawWhole != "" {
+			// The two readings share everything left of the quote, so the
+			// quantity is read off the whole one -- the peeled one can be
+			// nothing but that quantity, and `1` on its own is not a count.
+			qty, whole = stripLeading(rawWhole)
+			if startsQuoted(whole) {
+				// Nothing stood left of the quoted run, so it was never a
+				// rationale: it is the whole card, as `"Ach! Hans, Run!"` is.
+				// No choice is left for the pool to make, so none is offered.
+				name, why, whole = whole, "", ""
+			}
+		}
+		if name == "" {
 			out.Unreadable = append(out.Unreadable, Line{LineNo: lineNo, Text: trim(line)})
 			continue
 		}
-
-		qty := 1
-		if n, rest, ok := leadingQty(body); ok {
-			qty, body = n, trim(rest)
-		}
-		body = trim(leadingSetRe.ReplaceAllString(body, ""))
-		if body == "" {
-			out.Unreadable = append(out.Unreadable, Line{LineNo: lineNo, Text: trim(line)})
-			continue
-		}
+		body = name
 
 		if section == "ignored" {
 			out.Skipped = append(out.Skipped, Line{LineNo: lineNo, Text: body})
@@ -259,18 +307,60 @@ func Parse(text string) List {
 		if markers["cmdr"] {
 			where = "commander"
 		}
-		out.Cards = append(out.Cards,
-			Card{Name: body, Qty: qty, Section: where, LineNo: lineNo})
+		out.Cards = append(out.Cards, Card{Name: body, Qty: qty, Section: where,
+			LineNo: lineNo, Why: why, Unpeeled: whole})
 	}
 	return out
 }
 
-// stripAnnotations peels printing and category annotations off the end of a
-// line, returning what is left and any `*...*` markers found, lowercased.
-// Applied in a loop because they combine: `(2X2) 297 *F* *CMDR*`.
-func stripAnnotations(text string) (string, map[string]bool) {
+// startsQuoted reports whether a name begins with a quote character, which is
+// how the peeled reading is known to be empty without the quantity having to
+// be subtracted from it twice. `1 "Ach! Hans, Run!"` leaves `"Ach! Hans,
+// Run!"`, and a card standing left of its own rationale never would.
+func startsQuoted(name string) bool {
+	return strings.HasPrefix(name, `"`) || strings.HasPrefix(name, "\u201c")
+}
+
+// stripLeading peels a quantity and a leading set code off the front of what
+// an annotation peel left, returning the quantity (1 when the line named none)
+// and what is left.
+func stripLeading(body string) (int, string) {
+	qty := 1
+	if n, rest, ok := leadingQty(body); ok {
+		qty, body = n, trim(rest)
+	}
+	return qty, trim(leadingSetRe.ReplaceAllString(body, ""))
+}
+
+// stripAnnotations peels printing, rationale and category annotations off the
+// end of a line, returning what is left, any `*...*` markers found lowercased,
+// the rationale, and the other reading of the line when there is one. Applied
+// in a loop because they combine: `(2X2) 297 *F* *CMDR*`.
+//
+// The rationale is peeled at most once however many quoted runs a line
+// carries. `1 Kongming, "Sleeping Dragon" "the whole plan"` has two, and a
+// second peel would take the epithet off a card name -- so the column is one
+// column, and everything left of it is somebody's card.
+//
+// **Adjacency is what makes the reading ambiguous, and it is measured rather
+// than assumed.** The alternative is offered only when nothing else peeled off
+// between the name and the quoted run, because that is the only arrangement a
+// card name could have had: `Kongming, "Sleeping Dragon"` is a name and
+// `Henzie "Toolbox" Torre (NCC) 27 "why"` cannot be, since no card is printed
+// with its own collector number in the middle of it. So the alternative is a
+// real substring of what was pasted, never a string assembled here.
+func stripAnnotations(text string) (string, map[string]bool, string, string) {
 	markers := map[string]bool{}
+	why, leftOfQuote, quoted, peeled := "", "", "", false
 	for {
+		if !peeled {
+			if m := quoteRe.FindStringSubmatchIndex(text); m != nil {
+				why, peeled = text[m[2]:m[3]], true
+				leftOfQuote, quoted = text[:m[0]], text[m[0]:]
+				text = leftOfQuote
+				continue
+			}
+		}
 		if m := markerRe.FindStringSubmatchIndex(text); m != nil {
 			markers[strings.ToLower(trim(text[m[2]:m[3]]))] = true
 			text = text[:m[0]]
@@ -294,7 +384,11 @@ func stripAnnotations(text string) (string, map[string]bool) {
 			text = text[:m[0]]
 			continue
 		}
-		return trim(text), markers
+		whole := ""
+		if peeled && text == leftOfQuote {
+			whole = trim(text + quoted)
+		}
+		return trim(text), markers, why, whole
 	}
 }
 

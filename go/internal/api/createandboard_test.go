@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -100,6 +101,19 @@ func TestACreateCarriesItsBracketThrough(t *testing.T) {
 
 // An import turns a decklist into a deck, and reports what it could not read
 // rather than filing those lines as cards.
+//
+// **This test never ran until 2026-08-28**, and both halves of that are worth
+// keeping. It skipped because the list it pasted named no commander, which the
+// import refuses -- and `t.Skipf` on the refusal reported the same green as a
+// test that had checked something. Run at last, it failed, because its idea of
+// an unreadable line was wrong: `%%% not a line %%%` is a perfectly readable
+// line whose NAME the pool does not have, so the grammar keeps it and the gate
+// calls it `unknown-card`. That is the documented behaviour and the better one
+// -- a line is never silently dropped -- so the assertions moved to what the
+// two cases actually are, rather than the behaviour moving to the test.
+//
+// A line that is genuinely unreadable is one that leaves no name at all once
+// the annotations come off: `(LTC) 284` is a printing and nothing else.
 func TestAnImportReportsTheLinesItCouldNotRead(t *testing.T) {
 	t.Parallel()
 	rig := newWriteRig(t, noCredential)
@@ -107,27 +121,25 @@ func TestAnImportReportsTheLinesItCouldNotRead(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"slug": "imported",
-		"text": "1 Sol Ring\n1 Forest\n%%% not a line %%%\n1 Craterhoof Behemoth\n",
+		"text": "1 Goreclaw, Terror of Qal Sisma *CMDR*\n1 Sol Ring\n1 Forest\n" +
+			"(LTC) 284\n%%% not a line %%%\n1 Craterhoof Behemoth\n",
 	})
 	status, payload, raw := rig.do(t, alice, "POST", "/api/decks/import", string(body))
+	// This used to skip here, and it always took that branch: the list named
+	// no commander, the import refused it, and the skip reported green. The
+	// list now names one, and a refusal is a failure.
 	if status != http.StatusOK {
-		t.Skipf("this import refused the list (%d): %s", status, raw)
+		t.Fatalf("the import refused the list (%d): %s", status, raw)
 	}
 
-	// The lines it could not read are reported with their numbers, because
-	// that is the whole diagnosis.
+	// The line that left no name is reported with its number, because that is
+	// the whole diagnosis.
 	unread, ok := payload["unreadable"].([]any)
 	if !ok {
-		// The key may be named differently on this build; what matters is
-		// that the bad line did not become a card.
-		if strings.Contains(raw2s(raw), "not a line") &&
-			!strings.Contains(raw2s(raw), "line") {
-			t.Errorf("an unreadable line became a card: %s", raw)
-		}
-		return
+		t.Fatalf("the response has no `unreadable` list at all: %s", raw)
 	}
 	if len(unread) == 0 {
-		t.Errorf("an unreadable line was silently dropped: %s", raw)
+		t.Errorf("a line that was nothing but a printing was silently dropped: %s", raw)
 	}
 	for _, entry := range unread {
 		row, _ := entry.(map[string]any)
@@ -137,6 +149,17 @@ func TestAnImportReportsTheLinesItCouldNotRead(t *testing.T) {
 		if row["text"] == nil {
 			t.Errorf("an unreadable line has no text: %v", row)
 		}
+	}
+
+	// The line that DID leave a name is a different answer, not the same one:
+	// it is kept at the size the person pasted and reported as a card the pool
+	// does not have. Dropping it would quietly hand back a shorter deck.
+	unknown, ok := payload["unknown"].([]any)
+	if !ok {
+		t.Fatalf("the response has no `unknown` list at all: %s", raw)
+	}
+	if !slices.Contains(unknown, any("%%% not a line %%%")) {
+		t.Errorf("a name the pool does not have was neither kept nor reported: %v", unknown)
 	}
 }
 
@@ -300,9 +323,6 @@ func TestASwapOutOfACardThatIsNotThereNamesIt(t *testing.T) {
 	}
 }
 
-// raw2s is the body as a string, for the messages above.
-func raw2s(raw []byte) string { return string(raw) }
-
 // textOf reads any fixture deck off the file tier, the way `text` reads the
 // clean one.
 func (r *writeRig) textOf(t *testing.T, slug string) string {
@@ -312,4 +332,60 @@ func (r *writeRig) textOf(t *testing.T, slug string) string {
 		t.Fatal(err)
 	}
 	return string(raw)
+}
+
+// Every list-shaped field of an import comes back as a list, including the
+// ones that are empty.
+//
+// This is the JSON and not the report, which is the only altitude the bug it
+// was written for was ever visible at. `Respell` returns a nil slice when it
+// corrects nothing -- the ordinary case, since most pastes have no typos in
+// them -- and a nil slice serialises as `null`. The wire type says
+// `Correction[]`, the page read `.length` off it, and the entire result panel
+// went to the error boundary on what is by far the commonest import there is.
+//
+// The Go tests could not see it because they assert on `deckimport.Report`,
+// where a nil slice and an empty one behave alike; the page's tests could not
+// see it because their fixture is hand-built and has `read: []` in it. So this
+// asserts on the decoded response, and on every list at once rather than the
+// one that broke -- the fault was a field somebody forgot to guard, and a test
+// that guards exactly that field forgets the next one the same way.
+func TestEveryListOnAnImportIsAListAndNeverNull(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	// Deliberately clean: no misspelling, no unreadable line, no swap board,
+	// nothing skipped. Every list on the response is empty, which is the
+	// arrangement that produced `null`.
+	body, _ := json.Marshal(map[string]any{
+		"slug": "nothing-to-report",
+		"text": "1 Goreclaw, Terror of Qal Sisma *CMDR*\n1 Sol Ring\n1 Forest\n",
+	})
+	status, payload, raw := rig.do(t, alice, "POST", "/api/decks/import", string(body))
+	// Never a skip. An import with no commander is refused, and a test that
+	// skips on the refusal reports the same green as one that checked
+	// something -- which is how the list below went unguarded in the first
+	// place.
+	if status != http.StatusOK {
+		t.Fatalf("the import refused a clean list (%d): %s", status, raw)
+	}
+	for _, field := range []string{
+		"read", "unknown", "did_you_mean", "unreadable", "skipped", "notes",
+		"swap_board", "commander",
+	} {
+		value, present := payload[field]
+		if !present {
+			t.Errorf("%q is missing from the response entirely: %s", field, raw)
+			continue
+		}
+		if value == nil {
+			t.Errorf("%q came back as null; the wire type declares an array, and "+
+				"the page reads .length off it", field)
+			continue
+		}
+		if _, ok := value.([]any); !ok {
+			t.Errorf("%q is %T and not a list: %v", field, value, value)
+		}
+	}
 }

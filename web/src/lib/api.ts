@@ -1226,6 +1226,11 @@ export interface ImportResult {
   land_count: number
   swap_board: string[]
   needs_rationale: number
+  /** How many cards arrived with a reason already written, from the quoted
+   *  column. Beside `needs_rationale` rather than instead of it: somebody who
+   *  wrote sixty of them should be told so, and a count of what is still owed
+   *  on its own reads as though nothing arrived. */
+  rationales: number
   /** Misspellings the pool read as the card they are nearest to. The deck
    *  holds the real card; this is the saying-so. */
   read: Correction[]

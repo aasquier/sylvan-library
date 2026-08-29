@@ -105,3 +105,119 @@ func checkLines(t *testing.T, what string, got []Line, want []wantLine) {
 		}
 	}
 }
+
+// The rationale column, and the five card names that make it ambiguous.
+//
+// The interesting half of this table is not the happy path -- it is
+// `Kongming, "Sleeping Dragon"`, where the same shape of line means two
+// different things and this package deliberately refuses to choose. Every
+// case that ends with a quote therefore records BOTH readings, and the pair
+// is the contract `deckimport` resolves against the pool.
+func TestParseReadsTheRationaleColumn(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		line     string
+		wantName string
+		wantWhy  string
+		wantWhol string
+		why      string
+	}{
+		{
+			name: "the format Aaron asked for", why: "quantity, name, printing, reason",
+			line:     `1 Access Tunnel (MKC) 247 "Taps for colorless but also lets small creatures through"`,
+			wantName: "Access Tunnel",
+			wantWhy:  "Taps for colorless but also lets small creatures through",
+			wantWhol: "",
+		},
+		{
+			name: "no printing", why: "the column does not depend on a set code being present",
+			line:     `1 Beast Within "Single target removal for stubborn blockers"`,
+			wantName: "Beast Within",
+			wantWhy:  "Single target removal for stubborn blockers",
+			wantWhol: `Beast Within "Single target removal for stubborn blockers"`,
+		},
+		{
+			name: "the reason comes before the printing", why: "annotations peel right to left in a loop, so their order is free",
+			line:     `1 Sol Ring "fast mana, every deck" (LTC) 284`,
+			wantName: "Sol Ring",
+			wantWhy:  "fast mana, every deck",
+			wantWhol: `Sol Ring "fast mana, every deck"`,
+		},
+		{
+			name: "a marker rides along", why: "*CMDR* still has to reach the section logic",
+			line:     `1 Arahbo, Roar of the World (C17) 27 *CMDR* "the whole deck"`,
+			wantName: "Arahbo, Roar of the World",
+			wantWhy:  "the whole deck",
+			wantWhol: "",
+		},
+		{
+			name: "a quoted epithet mid-name", why: "the NEAREST opener wins, or this card becomes `Henzie`",
+			line:     `1 Henzie "Toolbox" Torre (NCC) 27 "the reason he is here"`,
+			wantName: `Henzie "Toolbox" Torre`,
+			wantWhy:  "the reason he is here",
+			wantWhol: "",
+		},
+		{
+			name: "a name that ends in a quoted epithet", why: "Kongming is one card; both readings are handed up for the pool",
+			line:     `1 Kongming, "Sleeping Dragon"`,
+			wantName: "Kongming,",
+			wantWhy:  "Sleeping Dragon",
+			wantWhol: `Kongming, "Sleeping Dragon"`,
+		},
+		{
+			name: "that same name WITH a reason", why: "two quoted runs, and only the last one is the column",
+			line:     `1 Kongming, "Sleeping Dragon" "a five-mana lord I keep cutting"`,
+			wantName: `Kongming, "Sleeping Dragon"`,
+			wantWhy:  "a five-mana lord I keep cutting",
+			wantWhol: `Kongming, "Sleeping Dragon" "a five-mana lord I keep cutting"`,
+		},
+		{
+			name: "a name that is nothing but a quoted run", why: "peeling leaves no card, so there is no choice to offer",
+			line:     `1 "Ach! Hans, Run!" (UNG) 3`,
+			wantName: `"Ach! Hans, Run!"`,
+			wantWhy:  "",
+			wantWhol: "",
+		},
+		{
+			name: "curly quotes from a document", why: "a reason written in Word and pasted here is still a reason",
+			line:     "1 Cultivate (M21) 177 “ramp and fixing in one card”",
+			wantName: "Cultivate",
+			wantWhy:  "ramp and fixing in one card",
+			wantWhol: "",
+		},
+		{
+			name: "an empty quoted run", why: "a rationale nobody wrote is not a rationale; the card still lands",
+			line:     `1 Sol Ring ""`,
+			wantName: "Sol Ring",
+			wantWhy:  "",
+			wantWhol: `Sol Ring ""`,
+		},
+		{
+			name: "no quote at all", why: "every existing dialect keeps parsing exactly as it did",
+			line:     `1 Sol Ring (LTC) 284`,
+			wantName: "Sol Ring",
+			wantWhy:  "",
+			wantWhol: "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := Parse(tc.line)
+			if len(got.Cards) != 1 {
+				t.Fatalf("%s: read %d cards, wanted 1 (%s)\n%+v",
+					tc.line, len(got.Cards), tc.why, got)
+			}
+			c := got.Cards[0]
+			if c.Name != tc.wantName {
+				t.Errorf("name: got %q, wanted %q (%s)", c.Name, tc.wantName, tc.why)
+			}
+			if c.Why != tc.wantWhy {
+				t.Errorf("why: got %q, wanted %q (%s)", c.Why, tc.wantWhy, tc.why)
+			}
+			if c.Unpeeled != tc.wantWhol {
+				t.Errorf("unpeeled: got %q, wanted %q (%s)", c.Unpeeled, tc.wantWhol, tc.why)
+			}
+		})
+	}
+}
