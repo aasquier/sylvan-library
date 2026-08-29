@@ -828,8 +828,7 @@ export interface ForgeBoardCard {
   art?: string
   /** Carried for tokens, whose printing is chosen rather than looked up. */
   artist?: string
-  /** The card's other name, for the cards that have one **and print both of
-   *  them on the one picture** — an Adventure, a split card, a flip card.
+  /** Every name this card answers to, for the cards with more than one.
    *  Absent for everything else, which is nearly every card.
    *
    *  Forge renames a card when its other half is cast, and this board learns a
@@ -840,9 +839,20 @@ export interface ForgeBoardCard {
    *  are two different kinds of spell — Locthwain Scorn is a Sorcery printed on
    *  an Enchantment — and the plate has to name the half that was cast. */
   face_types?: string[]
+  /** Each face's own **painting**, index-aligned with `faces`, and absent for
+   *  the cards whose faces share one — an Adventure, a split card, a flip
+   *  card, where `image` is the picture both names are printed on.
+   *
+   *  Present is the room's permission to change the picture: a modal
+   *  double-faced card played as its land back is a painting of a land, and
+   *  the front's sorcery is the wrong card to hold up for it. See `pictureOf`
+   *  and `faceInPlay` in `lib/board.ts`. */
+  face_images?: string[]
   /** Scryfall's own word for how the card is printed — `adventure`, `split`,
    *  `flip` — and only ever sent alongside `faces`. The one thing that reads
-   *  it is the room deciding *where on the picture* the half being cast is. */
+   *  it is the room deciding *where on the picture* the half being cast is,
+   *  which is a question a card with `face_images` does not have: its halves
+   *  are not on one picture. */
   layout?: string
   /** Whether the card makes mana, from Scryfall's `produced_mana`. A card
    *  fact, sent because a board keeps mana rocks back with the lands and

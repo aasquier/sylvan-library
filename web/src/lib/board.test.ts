@@ -11,10 +11,10 @@
 
 import { describe, expect, it } from 'vitest'
 
-import type { ForgeBoard } from './api'
+import type { ForgeBoard, ForgeBoardCard } from './api'
 import type { BoardCard, BoardSide, BoardStack } from './board'
-import { alignLanes, clashOf, fightingStats, fightOf, foldBoard,
-  markedHere, stackRow } from './board'
+import { alignLanes, clashOf, faceInPlay, fightingStats, fightOf, foldBoard,
+  markedHere, pictureOf, stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -1277,5 +1277,106 @@ describe('asking about a fight from either end of it', () => {
   it('says nothing about a creature that is not in a fight at all', () => {
     const idle = side(2, [beast(9, 'Bystander')])
     expect(fightOf(9, far, idle)).toBeNull()
+  })
+})
+
+describe('a card with two faces, and which one the room holds up', () => {
+  /** Agadeem's Awakening: a sorcery on the front, a land on the back, and a
+   *  painting for each — the card Aaron caught the arena drawing as a black
+   *  plate (2026-08-29). Both names and both paintings come from the pool. */
+  const mdfc: ForgeBoardCard = {
+    id: 30,
+    name: "Agadeem's Awakening",
+    types: 'Sorcery',
+    seat: 1,
+    image: 'front.jpg',
+    faces: ["Agadeem's Awakening", 'Agadeem, the Undercrypt'],
+    face_types: ['Sorcery', 'Land'],
+    face_images: ['front.jpg', 'back.jpg'],
+    layout: 'modal_dfc',
+  }
+  /** Bonecrusher Giant: two names on one piece of cardboard, so no
+   *  `face_images` — the card's own picture is right for both of them. */
+  const adventure: ForgeBoardCard = {
+    id: 31,
+    name: 'Bonecrusher Giant',
+    types: 'Creature - Giant',
+    seat: 1,
+    image: 'giant.jpg',
+    faces: ['Bonecrusher Giant', 'Stomp'],
+    face_types: ['Creature — Giant', 'Instant — Adventure'],
+    layout: 'adventure',
+  }
+
+  it('paints a half with that half own picture, or with the card own', () => {
+    expect(pictureOf(mdfc, 0)).toBe('front.jpg')
+    expect(pictureOf(mdfc, 1)).toBe('back.jpg')
+    // An Adventure has one painting and both names are printed on it, so the
+    // card's own picture is the right answer for either half.
+    expect(pictureOf(adventure, 0)).toBe('giant.jpg')
+    expect(pictureOf(adventure, 1)).toBe('giant.jpg')
+    // And a beat about some other card entirely gets the card, not an index
+    // into a list it is not in.
+    expect(pictureOf(mdfc, -1)).toBe('front.jpg')
+  })
+
+  it('reads the face a permanent is standing on off its type line', () => {
+    // The land back: the live type line singles it out outright.
+    expect(faceInPlay(mdfc, 'Land')).toBe(1)
+    expect(faceInPlay(mdfc, 'Sorcery')).toBe(0)
+    // **Forge and Scryfall spell a dash differently**, on every card with
+    // subtypes: `Creature - Human Insect` and `Creature — Human Insect` are
+    // the same sentence and have to compare equal.
+    const delver: ForgeBoardCard = {
+      ...mdfc,
+      face_types: ['Creature — Human Wizard', 'Creature — Human Insect'],
+    }
+    expect(faceInPlay(delver, 'Creature - Human Insect')).toBe(1)
+    // The second rung: a type line that agrees about the card types and not
+    // about the subtypes still tells a Land from a Sorcery.
+    expect(faceInPlay(mdfc, 'Land - Cave')).toBe(1)
+  })
+
+  it('turns nothing over on a guess', () => {
+    // Two faces this cannot tell apart. A werewolf's halves are both
+    // `Creature — Werewolf`, and the honest answer is that nothing on this
+    // pipe says which side is up.
+    const werewolf: ForgeBoardCard = {
+      ...mdfc,
+      face_types: ['Creature — Human Werewolf', 'Creature — Human Werewolf'],
+    }
+    expect(faceInPlay(werewolf, 'Creature - Human Werewolf')).toBe(-1)
+    // A type line that is neither face — an animated land, say.
+    expect(faceInPlay(mdfc, 'Creature - Elemental')).toBe(-1)
+    // And a card whose halves share one painting is never turned over at all:
+    // there is no second picture to turn to.
+    expect(faceInPlay(adventure, 'Instant — Adventure')).toBe(-1)
+  })
+
+  it('turns a permanent over on the beat the game announced it', () => {
+    const b: ForgeBoard = {
+      seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],
+      cards: [mdfc],
+      steps: [
+        { turn: 1, seat: 1, changes: [{ id: 30, zone: 'hand', seat: 1 }] },
+        {
+          turn: 1,
+          seat: 1,
+          changes: [{ id: 30, zone: 'land', seat: 1, types: 'Land' }],
+        },
+      ],
+    }
+    // In hand it is the card, under the name it was drawn by and its own
+    // picture. **The dictionary's `types` is the card's LAST type line in the
+    // game**, so anything reading that instead of the change would have turned
+    // this card over before it was ever played.
+    const held = foldBoard(b, 1).sides[0]?.hand[0]
+    expect(held?.name).toBe("Agadeem's Awakening")
+    expect(held?.image).toBe('front.jpg')
+    // Played as a land, it is the land — named and painted as the face on the
+    // table, in the row a land stands in.
+    const played = foldBoard(b, 2).sides[0]?.land[0]
+    expect(played?.name).toBe('Agadeem, the Undercrypt')
+    expect(played?.image).toBe('back.jpg')
   })
 })

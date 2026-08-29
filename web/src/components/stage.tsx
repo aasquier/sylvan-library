@@ -27,7 +27,7 @@ import viaArt from '../assets/coliseum/via.webp'
 import type { ForgeBoard } from '../lib/api'
 import type { Clash } from '../lib/board'
 import type { Speed, StagedBeat } from '../lib/reel'
-import { halfNamed } from '../lib/board'
+import { halfNamed, pictureOf } from '../lib/board'
 import { halfGlassFor } from '../lib/halves'
 import { ARCANA, boutAt, type BoutFighter, faceFor, mannerOf, plateNote,
   type Outcome, plateWord, sceneFor, type Staged, stagedBout, stagedMana,
@@ -830,13 +830,26 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
       word: plateWord(manner, kind, beat.who),
       note: plateNote(manner, beat.target),
       count: times,
-      image: face?.image ?? null,
+      // **The painting of the half that was cast, which is not always the
+      // card's own.** A Bonecrusher Giant and its Stomp share one piece of
+      // cardboard, so the card's image is right for both names; Agadeem's
+      // Awakening and Agadeem, the Undercrypt are two paintings, and the arena
+      // holding up the sorcery for the land somebody just played would be
+      // showing a card that was not played (Aaron, 2026-08-29). `pictureOf`
+      // knows which kind it has, and answers `''` — a plate, legible and
+      // honest — rather than the front for a back it has no picture of.
+      image: face ? pictureOf(face, half) || null : null,
       // **Which half of the card this is, when the card has two on one
       // picture.** `halfNamed` is 0 for the face the card is filed under and 1
       // for the other, and `lib/halves.ts` turns that pair into the glass —
       // null for a card with one half, an Adventure cast as its creature, or a
       // layout nobody has measured. See `Staged.half`.
-      half: halfGlassFor(face?.layout, half),
+      //
+      // **A card with a painting per face wears none of it**, and that is the
+      // rule rather than an accident of which layouts have been measured: a
+      // magnifier points at part of one picture, and this card's two names are
+      // not on one picture at all. The whole of the right face is up instead.
+      half: face?.face_images ? null : halfGlassFor(face?.layout, half),
       // **Which scene opens behind the card.** The manner alone decided this
       // until #375, which is why a creature nobody cast got a battlefield and
       // an identical creature somebody paid seven mana for got a glow. See
