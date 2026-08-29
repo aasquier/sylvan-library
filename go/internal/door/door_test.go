@@ -132,6 +132,10 @@ var placeholders = map[string]string{
 	"{key}": "mulligan", "{job_id}": "deadbeef", "{username}": "alice",
 	"{oracle_id}": "0aae2e33-0000-4000-8000-000000000000",
 	"{effect}":    "depth-drift", "{filename}": "loop.webm", "{code}": "W",
+	// The crypt's opaque handle. Sixteen hex characters is what one looks
+	// like, and it names nothing here on purpose: these sweeps ask what the
+	// door does before a handler ever sees the request.
+	"{id}": "0123456789abcdef",
 }
 
 func concrete(t *testing.T, pattern string) string {
