@@ -17257,3 +17257,195 @@ button:hover .tarot-fan-card {
   line-height: 1.45;
   color: var(--text-secondary);
 }
+
+/* ---- the token shopping bench (lane E) ----------------------------------
+   The one *action* in the token shelf: a list of what this deck makes, in
+   the shape a card shop's bulk-add box reads, and one press to take it.
+
+   Its own voice, `.btn-brass`, for `.btn-felt`'s reason one section over —
+   the token shelf already has a palette of its own (brass on parchment, set
+   up beside `.token-glyph`), and a `.btn-quiet` dropped into it would be the
+   page's furniture standing in somebody else's room. Commandment 17 is the
+   rest of it: the border warms to brass and the face lifts on hover, a glint
+   crosses it the way `.btn-primary`'s does but in this room's metal, the
+   press settles it back down, and focus takes the vine ring every other
+   button in the app takes so a keyboard finds this one the same way.
+
+   `--token-*` are defined up beside `.token-glyph` and carry both themes
+   already, so nothing here needs a second `prefers-color-scheme` block: the
+   parchment darkens and the ink lightens on their own. */
+.btn-brass {
+  background: color-mix(in srgb, var(--token-brass) 8%, transparent);
+  border-color: var(--token-edge);
+  color: var(--text-primary);
+}
+.btn-brass:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--token-brass);
+  background: color-mix(in srgb, var(--token-brass) 16%, transparent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--token-brass) 30%, transparent);
+}
+.btn-brass:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--token-brass) 24%, transparent);
+}
+/* The glint, in brass rather than in white: a lantern crossing metal, not a
+   highlight crossing plastic. Only ever on hover, and `.btn`'s own
+   `overflow: hidden` is what keeps it inside the corner radius. */
+.btn-brass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    color-mix(in srgb, var(--token-brass) 55%, transparent) 47%,
+    color-mix(in srgb, var(--token-brass) 18%, transparent) 56%,
+    transparent 68%
+  );
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+.btn-brass:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+/* The mark from the section's own heading, at the size a button wears it.
+   `.btn` already lays its children out in a row with a gap, so this needs no
+   box of its own. */
+.token-shop-glyph {
+  color: var(--token-brass);
+  font-size: 11px;
+}
+
+.token-shop {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+/* Everything this bench says that is not the list itself. Held to the same
+   measure as the section's own paragraph above it, so the two read as one
+   column rather than as a page and an insert.
+
+   **`--text-secondary` and not the `--text-muted` the paragraph above uses,
+   and that is measured rather than preferred.** Muted renders `#898781` on
+   the light theme's page and comes out at **3.41:1** — under AA for text this
+   size, and this is not an aside: it is the paragraph that tells a newcomer
+   how many tokens to buy and why, which is the one thing in this bench they
+   have to be able to read (commandment 2). Secondary measures 7.53:1 on the
+   same ground. The step between this and the aside above it is a hierarchy
+   rather than an accident. */
+.token-shop-note {
+  max-width: 42rem;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.token-shop-note em {
+  color: var(--text-primary);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* The answer to the press — the whole point of the control, so it is the most
+   legible thing on the bench: `--text-primary`, 18.67:1 in light and better
+   in dark.
+
+   **Not the section's brass, and not `--status-warning`, and both of those
+   were measured before they were dropped.** Brass is `#a8792e` on a light
+   page and comes out at 3.66:1; `--status-warning` is `#fab219` and comes out
+   at **1.74:1**, which is a sentence nobody can read at all. A confirmation
+   that cannot be read is the same as no confirmation, which is the whole
+   fault this control exists to not have.
+
+   `is-refused` is a softer ink rather than an alarm colour, because a
+   clipboard that says no has broken nothing: the list is on screen and the
+   sentence redirects to it. What tells the two apart is the words. */
+.token-shop-said {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.token-shop-said.is-refused {
+  color: var(--text-secondary);
+}
+
+/* The exact text that went across, on the shelf's own parchment: a
+   quartermaster's chit rather than a console. Monospace because it is text
+   somebody is about to paste verbatim and the numerals should line up;
+   selectable, because that is the whole of the fallback when the clipboard
+   says no. `--token-ink` on `--token-parchment` measures better than 9:1 in
+   both themes (the argument is up beside `.token-face-blank`, which is the
+   only other place the pair is used). */
+.token-shop-list {
+  align-self: stretch;
+  max-width: 42rem;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--token-rule);
+  background:
+    repeating-linear-gradient(
+      -35deg,
+      transparent 0 9px,
+      color-mix(in srgb, var(--token-brass) 5%, transparent) 9px 10px),
+    var(--token-parchment);
+  color: var(--token-ink);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* The brass goes under the words rather than into them. Brass ink measures
+   3.66:1 on the light theme's page, which is not a link somebody can read;
+   the rule beneath it is decoration and carries the section's metal without
+   carrying the sentence. */
+.token-shop-link {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-decoration-color: var(--token-brass);
+  text-underline-offset: 2px;
+  border-radius: 3px;
+  transition: color 140ms ease, text-decoration-color 140ms ease;
+}
+.token-shop-link:hover {
+  color: var(--text-primary);
+  text-decoration-color: var(--text-primary);
+}
+.token-shop-link:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
+/* **This block has to be here, and it has to name `.btn-brass` itself.** The
+   button family's own reduced-motion guard is up at line ~5274 and it
+   enumerates every voice by name — `.btn-primary`, `.btn-quiet`, `.btn-arena`,
+   `.btn-danger-solid` — rather than leaning on the bare `.btn:hover` rule
+   beside it, and the reason is specificity: `.btn-brass:hover:not(:disabled)`
+   and `.btn:hover:not(:disabled)` weigh exactly the same, so source order
+   decides, and a voice defined *after* the guard wins it. Every new `.btn-*`
+   at the foot of this file inherits that problem and has to answer it here.
+
+   The glint is parked off-screen rather than deleted, which is the shape the
+   two glints above take: `display: none` would work and would also be a
+   second way of saying the same thing. The border and the face's colour stay
+   — a control still has to answer the hand that reaches for it. */
+@media (prefers-reduced-motion: reduce) {
+  .btn-brass:hover:not(:disabled) {
+    transform: none;
+  }
+  .btn-brass:hover:not(:disabled)::after {
+    transform: translateX(-130%);
+  }
+  /* The link still changes colour on hover — it has to answer the hand — but
+     it arrives there rather than fading in. */
+  .token-shop-link {
+    transition: none;
+  }
+}
