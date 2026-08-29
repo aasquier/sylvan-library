@@ -365,6 +365,13 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/import", Handler: a.importDeck},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}", Handler: a.deleteDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/shared", Handler: a.setDeckShared},
+		// The crypt, which is the delete's other half (ADR 27's shape, at the
+		// deck level at last): what this caller has entombed, and the way one
+		// comes back. **No owner segment on either**, like the two collection
+		// routes above -- your crypt is yours, so there is no path anybody can
+		// write that names somebody else's.
+		{Method: http.MethodGet, Pattern: "/api/decks/entombed", Handler: a.listEntombed},
+		{Method: http.MethodPost, Pattern: "/api/decks/entombed/{id}/return", Handler: a.restoreDeck},
 		// The artifacts rebuild, and with it every route under `/api/decks` is
 		// the door's: the five deliverables, derived from the deck rather than
 		// edited into it. A **plain route**
