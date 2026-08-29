@@ -42,6 +42,47 @@ type CardRecord struct {
 	GameChanger    bool
 	FlavorText     *string
 	Artist         *string
+	// Faces is Scryfall's `card_faces`, in printed order, and empty for the
+	// cards that have one face -- which is nearly every card.
+	//
+	// **The point of it is that a face may carry its own picture.** Scryfall
+	// put `image_uris` on the *card* for the layouts that print two names on
+	// one piece of cardboard -- an Adventure, a split card, a flip card -- and
+	// on the *faces* for the ones where each face is a painting of its own: a
+	// transforming card, a modal double-faced card. So the presence of
+	// [CardFace.ImageNormal] is not a detail of the encoding, it is Scryfall
+	// saying which kind of card this is, and it is the only place that
+	// distinction is written down as a fact rather than as a list of layout
+	// names somebody has to keep.
+	//
+	// Measured over this pool on 2026-08-29: six layouts carry an `A // B`
+	// name -- transform (401), adventure (170), split (137), modal_dfc (100),
+	// prepare (55), flip (26) -- and exactly two of them, transform and
+	// modal_dfc, put an `image_uris` on each face. `meld` carries no faces at
+	// all and no `//` in its name, because each meld part is its own record.
+	Faces []CardFace
+}
+
+// CardFace is one face of a card that has more than one.
+//
+// **Every field is the face's own answer to a question the card also answers**,
+// which is the whole reason it exists: `Agadeem's Awakening // Agadeem, the
+// Undercrypt` is a Sorcery *and* a Land, painted twice, and a room holding up
+// one picture has to be able to say which. [CardRecord.ImageNormal] is the
+// front for such a card (`images` in rows.go falls back to the first face), so
+// it is the right answer for the card and the wrong one for the back half.
+//
+// Pointer fields are absent values rather than empty ones, for
+// [CardRecord]'s reason: a face with no picture of its own is a face printed
+// on the card's, and that is not the same fact as a face whose picture we
+// failed to record.
+type CardFace struct {
+	Name     string
+	TypeLine string
+	// ImageNormal and ImageArtCrop are this face's own picture, and are nil
+	// for a face printed on the card's one picture.
+	ImageNormal  *string
+	ImageArtCrop *string
 }
 
 // HasColor is `color in rec.color_identity`.
@@ -129,7 +170,7 @@ var readColumns = []string{
 	"produced_mana", "reserved", "legalities", "edhrec_rank",
 	"image_normal", "image_art_crop", "layout", "keywords",
 	"power", "toughness", "loyalty", "defense", "game_changer",
-	"flavor_text", "artist",
+	"flavor_text", "artist", "card_faces",
 }
 
 // selectClause is `_select`: the SELECT, with any column this pool lacks
@@ -189,6 +230,7 @@ func toRecord(v []any) *CardRecord {
 		GameChanger:   asBool(v[18]),
 		FlavorText:    asStringPtr(v[19]),
 		Artist:        asStringPtr(v[20]),
+		Faces:         cardFaces(v[21]),
 	}
 	if rec.Layout == "" {
 		rec.Layout = "normal"
@@ -217,6 +259,53 @@ func legalities(v any) map[string]any {
 		}
 	}
 	return map[string]any{}
+}
+
+// cardFaces reads the `card_faces` column however the driver hands it over,
+// on `legalities`' terms one column across: the decoded list for a JSON-typed
+// column, or text for a pool that stored it as VARCHAR.
+//
+// **A face with no name is dropped, and dropping one drops them all.** The one
+// thing every caller does with this list is index into it alongside the names
+// the card's own `A // B` splits into, so a list that is *short* is worse than
+// no list: it is an index that silently answers for the wrong half. Nothing
+// but a malformed record can produce one, which is exactly when a confident
+// wrong answer is least wanted.
+func cardFaces(v any) []CardFace {
+	var raw []any
+	switch t := v.(type) {
+	case []any:
+		raw = t
+	case string:
+		if json.Unmarshal([]byte(t), &raw) != nil {
+			return nil
+		}
+	case []byte:
+		if json.Unmarshal(t, &raw) != nil {
+			return nil
+		}
+	default:
+		return nil
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	faces := make([]CardFace, 0, len(raw))
+	for _, item := range raw {
+		face, _ := item.(map[string]any)
+		name := asString(face["name"])
+		if name == "" {
+			return nil
+		}
+		img, _ := face["image_uris"].(map[string]any)
+		faces = append(faces, CardFace{
+			Name:         name,
+			TypeLine:     asString(face["type_line"]),
+			ImageNormal:  asStringPtr(img["normal"]),
+			ImageArtCrop: asStringPtr(img["art_crop"]),
+		})
+	}
+	return faces
 }
 
 func asString(v any) string {

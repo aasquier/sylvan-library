@@ -78,6 +78,63 @@ func keys(m map[string]*pool.CardRecord) []string {
 	return out
 }
 
+// **A card's faces come back with their own paintings, and a card with one
+// face comes back with none.**
+//
+// The whole point of reading `card_faces` is the distinction Scryfall encodes
+// in it: `image_uris` sits on the *card* when both names are printed on one
+// piece of cardboard and on the *faces* when each is a painting of its own. So
+// this asserts the encoding rather than the parse — a transforming card's back
+// has a URL of its own, and it is not the card's.
+//
+// Read through the driver on purpose. `card_faces` is a JSON column and the
+// driver decodes it before this package sees it, so a unit test over a string
+// would be testing a shape nothing produces (see `coercions_test.go`, which
+// records what the driver's widths cost this pool once already).
+func TestACardsFacesCarryTheirOwnPaintings(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	use(t, pooltest.Open(t), func(c *pool.Conn) {
+		got, err := c.GetCards(ctx,
+			[]string{"Ajani, Nacatl Pariah", "Sol Ring"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if faces := got["Sol Ring"].Faces; len(faces) != 0 {
+			t.Fatalf("a one-faced card carries %v", faces)
+		}
+		faces := got["Ajani, Nacatl Pariah"].Faces
+		if len(faces) != 2 {
+			t.Fatalf("Ajani has %d faces", len(faces))
+		}
+		if faces[0].Name != "Ajani, Nacatl Pariah" ||
+			faces[1].Name != "Ajani, Nacatl Avenger" {
+			t.Fatalf("the faces are named %q and %q",
+				faces[0].Name, faces[1].Name)
+		}
+		// Each half is a different kind of thing, which is the fact a board
+		// reads to say what a permanent turned into.
+		if faces[0].TypeLine != "Legendary Creature — Cat Warrior" ||
+			faces[1].TypeLine != "Legendary Planeswalker — Ajani" {
+			t.Fatalf("the faces are %q and %q",
+				faces[0].TypeLine, faces[1].TypeLine)
+		}
+		if faces[0].ImageNormal == nil || faces[1].ImageNormal == nil {
+			t.Fatal("a transforming card came back with a face unpainted")
+		}
+		if *faces[0].ImageNormal == *faces[1].ImageNormal {
+			t.Fatal("both faces answered with one painting")
+		}
+		// And the card's own picture is the front's, which is why a back face
+		// needs its own: `images` in rows.go falls back to the first face, so
+		// `ImageNormal` is right for the card and wrong for the other half.
+		if got["Ajani, Nacatl Pariah"].ImageNormal == nil ||
+			*got["Ajani, Nacatl Pariah"].ImageNormal != *faces[0].ImageNormal {
+			t.Fatal("the card's own picture is not its front face's")
+		}
+	})
+}
+
 func TestGetCardsIsMemoisedPerOpen(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

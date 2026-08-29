@@ -496,8 +496,8 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
     }
     for (const change of step.changes ?? []) {
       let card = state.get(change.id)
+      const known = named.get(change.id)
       if (!card) {
-        const known = named.get(change.id)
         card = {
           id: change.id,
           name: known?.name ?? '',
@@ -563,7 +563,27 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
       if (change.tapped != null) card.tapped = change.tapped
       if (change.power != null) card.power = change.power
       if (change.toughness != null) card.toughness = change.toughness
-      if (change.types) card.types = change.types
+      if (change.types) {
+        card.types = change.types
+        // **A card with a painting per face turns over here, and nowhere
+        // else.** The dictionary files a card under the name it was first seen
+        // by and never revises it, so a modal double-faced card played as its
+        // land is still filed as the sorcery on its front — and drawing that
+        // sorcery in the land row is the board showing a card that is not the
+        // card on the table (Aaron, 2026-08-29). A type line changing is the
+        // one thing on this pipe that says a permanent turned over, and it
+        // arrives on the step the game announced it. `faceInPlay` answers -1
+        // for everything it cannot tell apart, and -1 leaves the card exactly
+        // as it was.
+        const face = known ? faceInPlay(known, change.types) : -1
+        if (face >= 0 && known) {
+          card.image = pictureOf(known, face)
+          // The name goes with the picture or the tile labels a land with a
+          // sorcery's name. Only ever for the cards this turned over, so every
+          // other card in the match is named exactly as it was.
+          card.name = known.faces?.[face] ?? card.name
+        }
+      }
       if (change.combat != null) card.combat = change.combat
       if (change.attacking != null) card.attacking = change.attacking
       if (change.blocking != null) card.blocking = change.blocking
@@ -862,19 +882,115 @@ export function markedHere(struck: { card: string; id?: number } | null,
  * so the middle of the arena drew a black card with a title on it — in the one
  * moment the room exists to show a spell (Aaron, 2026-08-28).
  *
- * `faces` is the answer and it comes from the pool: for the layouts that print
- * both names on **one picture**, the server sends both names with the card, so
- * a beat naming either of them finds it. Zero is the face the card is filed
- * under and one is the other one — which is the half a room might want to point
- * at.
+ * `faces` is the answer and it comes from the pool: the server sends every name
+ * the card answers to, so a beat naming any of them finds it. Zero is the front
+ * — the name before the `//` — and one is the other one, which is the half a
+ * room might want to point at, or the face it should hold up instead.
+ *
+ * **The list is asked first and the dictionary's own name is the fallback**,
+ * which is the opposite of the order this used to run in and matters now that
+ * the index picks a *picture*. The dictionary files a card under whatever face
+ * Forge happened to name first, and that is not always the front: a card first
+ * seen already on its back is filed under the back's name, and asking "is this
+ * the name we know it by" answers *zero* for it — the front — and would hold up
+ * the wrong painting of a card the room had every fact about. The list is
+ * ordered as the card is printed, so an index into it means the same thing
+ * whichever name the dictionary happens to carry.
  *
  * A card with no `faces` answers 0 or -1 and nothing else, which is nearly
- * every card.
+ * every card, and is what the fallback is for.
  */
 export function halfNamed(card: ForgeBoardCard, inBeat: string): number {
-  if (sameCard(card.name, inBeat)) return 0
   const at = (card.faces ?? []).indexOf(inBeat)
-  return at
+  if (at >= 0) return at
+  return sameCard(card.name, inBeat) ? 0 : -1
+}
+
+/**
+ * The painting for one of a card's names.
+ *
+ * **Two questions, and they were one question for as long as a card had one
+ * picture.** A Bonecrusher Giant and its Stomp are printed on the same piece of
+ * cardboard, so answering to *Stomp* with the card's own image is showing the
+ * card that was cast. A modal double-faced card is not like that: Agadeem's
+ * Awakening and Agadeem, the Undercrypt are two paintings, and holding up the
+ * sorcery for the land is the quiet version of the same fault the black plate
+ * was the loud version of (Aaron, 2026-08-29: *"MDF cards are not rendering
+ * intelligently"*).
+ *
+ * `face_images` is the server saying this card has a painting per face, and its
+ * absence is the server saying it has one. **Never a guess either way**: it is
+ * sent whole or not at all, so an index into it is either the face's own
+ * painting or there is no such list and `image` is the truth for every name.
+ *
+ * The empty string is a real answer and the room already knows what to do with
+ * it — a card with no painting is set in type on a plate, which is legible and
+ * is not a claim about which half is being looked at.
+ */
+export function pictureOf(card: ForgeBoardCard, half: number): string {
+  return (half >= 0 ? card.face_images?.[half] : undefined) ?? card.image ?? ''
+}
+
+/**
+ * Which face a permanent is standing on the battlefield as, or `-1` for a card
+ * this cannot answer for.
+ *
+ * **The type line is the only thing on this pipe that says a permanent turned
+ * over.** Forge names a card by its current face, but this board's dictionary
+ * learns a name once and never revises it — so the card that was drawn as
+ * *Agadeem's Awakening* is still filed under that name when it is a land on the
+ * battlefield. What the board *does* keep current is the type line, which
+ * arrives as a change on the step the game announced it, and a modal
+ * double-faced card going from Sorcery to Land is a sentence about which face
+ * is now face up.
+ *
+ * **Only ever asked with a type line that just changed**, which matters: the
+ * dictionary's own `types` is the card's *last* type line in the game rather
+ * than its first, so a Delver of Secrets that flips on turn six is filed all
+ * game as an Insectile Aberration. Reading that at step zero would turn the
+ * card over before the game did. A change is a fact about the step it is on.
+ *
+ * The ladder is two rungs and a floor. The whole type line first, compared
+ * loosely enough to survive two spellings of a dash — Forge writes
+ * `Creature - Human Insect` and Scryfall writes `Creature — Human Insect`, and
+ * they are the same sentence. Then the card types alone, which is what tells a
+ * Sorcery from a Land when the subtypes disagree about something. And a floor
+ * of `-1` when neither rung singles out exactly one face: two faces that are
+ * both `Creature — Werewolf` genuinely cannot be told apart by this, and the
+ * honest answer to that is to leave the card showing whatever it was showing
+ * rather than to turn it over on a coin toss.
+ */
+export function faceInPlay(card: ForgeBoardCard, types: string): number {
+  const kinds = card.face_types
+  if (!card.face_images || !kinds
+      || kinds.length !== card.face_images.length) {
+    return -1
+  }
+  const live = plainType(types)
+  for (const read of [(s: string) => s, cardTypes]) {
+    let found = -1
+    for (let i = 0; i < kinds.length; i++) {
+      if (read(plainType(kinds[i] ?? '')) !== read(live)) continue
+      if (found >= 0) return -1
+      found = i
+    }
+    if (found >= 0) return found
+  }
+  return -1
+}
+
+/** A type line with the spelling arguments taken out of it: one case, one kind
+ *  of dash, one kind of gap. The dash is the one that matters — Forge and
+ *  Scryfall disagree about it on every card that has subtypes. */
+function plainType(line: string): string {
+  return line.toLowerCase().replace(/[\u2010-\u2015]/g, '-')
+    .replace(/\s+/g, ' ').trim()
+}
+
+/** The card types alone — everything before the dash — which is the half of a
+ *  type line that says what kind of thing a permanent is. */
+function cardTypes(line: string): string {
+  return (line.split('-')[0] ?? line).trim()
 }
 
 /** A run of identical cards, drawn as one stack with a count on it. */
