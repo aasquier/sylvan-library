@@ -5046,6 +5046,71 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* **A place is not a state.** `.chip-toggle` is dressed for a pressed state —
+ * `aria-pressed`, `is-on`, a lit ground — and it was being worn by four
+ * different kinds of thing, only one of which was a toggle: a `<Link>` to
+ * another colour's page, an in-page jump, an action button, and the real
+ * tabs. Aaron's ruling, 2026-08-29: "I am not a fan of a toggle being
+ * presented as a link. That is awkward."
+ *
+ * So the family splits. `.chip-toggle` keeps the pressed look and belongs to
+ * things that hold a state. `.chip-place` is for things that TAKE YOU
+ * SOMEWHERE, and it never has an `is-on` because there is no state to be in.
+ *
+ * The difference is in the direction the hand feels. A toggle settles *down*
+ * under a press, because you are pushing it where it stands. A place slides
+ * *forward*, because you are leaving — and its chevron leads the way out.
+ * That is one distinction a finger can tell apart in the dark, which is worth
+ * more than two colours a reader has to learn. */
+.chip-place {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  transition: color 120ms ease, border-color 120ms ease,
+    background-color 120ms ease, transform 120ms ease;
+}
+.chip-place::after {
+  content: '›';
+  margin-left: 0.35em;
+  opacity: 0.55;
+  transition: transform 120ms ease, opacity 120ms ease;
+  display: inline-block;
+}
+.chip-place:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+.chip-place:hover::after {
+  transform: translateX(2px);
+  opacity: 1;
+}
+.chip-place:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.chip-place:active {
+  transform: translateX(1px);
+}
+@media (pointer: coarse) {
+  .chip-place {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-place,
+  .chip-place::after {
+    transition: color 120ms ease, border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .chip-place:active {
+    transform: none;
+  }
+  .chip-place:hover::after {
+    transform: none;
+  }
+}
+
 /* What a chosen chip is going to do, said underneath it.
  *
  * These were a wall of 12px grey with a bolded lead-in, which is the shape

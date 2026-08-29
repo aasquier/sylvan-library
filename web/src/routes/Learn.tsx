@@ -127,6 +127,21 @@ function ColorsTab({ taxonomy }: { taxonomy: ColorTaxonomy }) {
     }))
     .filter((s) => s.members.length > 0)
 
+  // Every shelf on by default, keyed by tier: the page opens as it always
+  // has, and the filter only ever narrows from there.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
+  const showing = {
+    has: (key: string) => !hidden.has(key),
+  }
+  const shown = shelves.filter(({ tier }) => !hidden.has(tier.key))
+  const toggleShelf = (key: string) => setHidden((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
+  const showEverything = () => setHidden(new Set())
+
   if (!taxonomy.combinations.length) {
     // The fallback is itself an index, so its absence is not a state this
     // screen can render around: `/api/colors` is checked-in prose served with
@@ -148,22 +163,47 @@ function ColorsTab({ taxonomy }: { taxonomy: ColorTaxonomy }) {
                         onPick={(c) => navigate(colorPath(c))} />
       </section>
 
-      {/* Jump links rather than a filter: seven shelves on one page, and the
-          reader who came for the clans should not have to scroll past the
-          guilds to find them. They are places, so they wear the chip. */}
-      <nav className="flex flex-wrap gap-1.5" aria-label="Jump to a shelf">
-        {shelves.map(({ tier }) => (
-          <a key={tier.key} href={`#tier-${tier.key}`}
-             className="chip-toggle flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium">
-            <TierGlyph tier={tier.key} />
-            {tier.label}
-          </a>
-        ))}
+      {/* **A filter, since 2026-08-29.** These were jump links wearing a
+          toggle's clothes — the comment here used to argue that a reader who
+          came for the clans should not scroll past the guilds, which is true
+          and is a better argument for narrowing the page than for scrolling
+          it. Aaron's ruling: a toggle presented as a link is awkward, and
+          these should be real toggles.
+
+          Every shelf starts on, so the page opens exactly as it always has
+          and nobody has to discover a control to read it (commandment 2). */}
+      <nav className="flex flex-wrap gap-1.5" aria-label="Which shelves to show">
+        {shelves.map(({ tier }) => {
+          const on = showing.has(tier.key)
+          return (
+            <button key={tier.key} type="button" aria-pressed={on}
+                    onClick={() => toggleShelf(tier.key)}
+                    className={`chip-toggle flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-3 text-sm font-medium${
+                      on ? ' is-on' : ''}`}>
+              <TierGlyph tier={tier.key} />
+              {tier.label}
+            </button>
+          )
+        })}
       </nav>
 
-      {shelves.map(({ tier, members }) => (
+      {shown.map(({ tier, members }) => (
         <TierShelf key={tier.key} tier={tier} members={members} />
       ))}
+
+      {/* Turning every shelf off is a thing somebody can do by accident on a
+          phone, and an empty page with no explanation reads as broken. */}
+      {shown.length === 0 && (
+        <div className="space-y-2">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Every shelf is hidden, so there is nothing to read.
+          </p>
+          <button type="button" onClick={showEverything}
+                  className="btn btn-ghost btn-xs">
+            Show them all again
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -198,7 +238,7 @@ function TermEntry({ term, byKey, onJump }: {
             See also
             {term.see_also.map((key) => (
               <button key={key} onClick={() => onJump(key)}
-                      className="chip-toggle rounded px-1.5 py-0.5">
+                      className="chip-place rounded px-1.5 py-0.5">
                 {byKey.get(key)?.term ?? key}
               </button>
             ))}
