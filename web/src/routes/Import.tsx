@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  api, deckUrl, errorMessage, type Correction, type ImportResult,
+  api, deckUrl, errorMessage, followJob, type Correction, type ImportResult,
+  type IntakeSheet, type Job,
 } from '../lib/api'
+import { IntakeChoices } from '../components/intake'
+import { runIntake } from '../lib/intake'
 import CameraDoor from '../components/camera'
 import {
   Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
@@ -40,6 +43,37 @@ const METICULOUS_ARCHIVE_ART =
  * ends on a count of the work still owed rather than on a success message.
  */
 
+/**
+ * What the intake is doing, while the import waits on it.
+ *
+ * The percentage is the job's own -- five steps, one tick each -- and the
+ * label says which action rather than "working", because the actions take
+ * wildly different times and somebody watching a bar that has sat at 40% for
+ * two minutes deserves to know it is the one that reads the whole web.
+ */
+function IntakeProgress({ job }: { job: Job }) {
+  const pct = Math.max(0, Math.min(100, Math.round(job.percent)))
+  return (
+    <div className="space-y-2 rounded-lg px-4 py-3"
+         style={{ background: 'var(--gridline)' }}>
+      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+        Settling the deck in… {job.done} of {job.total} done.
+      </p>
+      <div className="h-1.5 w-full overflow-hidden rounded-full"
+           style={{ background: 'var(--surface-1)' }}
+           role="progressbar" aria-valuenow={pct} aria-valuemin={0}
+           aria-valuemax={100} aria-label="Intake progress">
+        <div className="h-full rounded-full transition-[width] duration-300"
+             style={{ width: `${pct}%`, background: 'var(--series-1)' }} />
+      </div>
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        Your deck is already saved. This is the extra work you asked for, and
+        the deck page opens as soon as it is finished.
+      </p>
+    </div>
+  )
+}
+
 /** `Arahbo — Cats` -> `arahbo-cats`, matching the slug the API will accept. */
 function slugify(name: string): string {
   return name
@@ -63,6 +97,11 @@ export default function Import() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'preview' | 'create' | null>(null)
   const [showYaml, setShowYaml] = useState(false)
+  // The intake sheet (ADR 41), empty by default and per import: a sheet that
+  // remembered its last state would be a standing permission rather than an
+  // answer about this deck.
+  const [sheet, setSheet] = useState<IntakeSheet>({})
+  const [intake, setIntake] = useState<Job | null>(null)
 
   // Typing a name fills the slug, until the slug is edited by hand.
   const [slugTouched, setSlugTouched] = useState(false)
@@ -142,10 +181,23 @@ export default function Import() {
     try {
       const result = await api.importDeck(body(dryRun, override))
       setPreview(result)
-      // `result.owner` rather than an assumption about whose library it
-      // landed in: the server chooses the tier, and the deck's address
-      // needs the owner segment (ADR 22).
-      if (result.created) navigate(deckUrl(result))
+      if (result.created) {
+        // The intake runs HERE rather than on the deck page, and the deck
+        // page is not opened until it is done. Navigating first would drop
+        // somebody onto a deck that is about to rewrite itself underneath
+        // them — ninety-nine rationales appearing one reload at a time, with
+        // nothing on screen saying why.
+        const started = await runIntake(
+          { owner: result.owner, slug: result.slug }, sheet)
+        if (started) {
+          setIntake(started)
+          await followJob(started.id, setIntake, 400, started).promise
+        }
+        // `result.owner` rather than an assumption about whose library it
+        // landed in: the server chooses the tier, and the deck's address
+        // needs the owner segment (ADR 22).
+        navigate(deckUrl(result))
+      }
     } catch (e) {
       setError(errorMessage(e))
       if (!dryRun) setPreview(null)
@@ -341,8 +393,34 @@ export default function Import() {
             Preview runs the same resolution and the same gate, and writes
             nothing.
           </p>
+
+          {/* The intake sheet (ADR 41). Under the buttons rather than above
+              them: the deck lands whatever is ticked here, and a row of
+              optional extras between somebody and the button they came for
+              would read as a form standing in the way. */}
+          <div className="space-y-3 rounded-lg px-4 py-3"
+               style={{ background: 'var(--gridline)',
+                        color: 'var(--text-secondary)' }}>
+            <p className="text-xs leading-relaxed">
+              <strong style={{ color: 'var(--text-primary)' }}>
+                Want a hand with it as it lands?
+              </strong>{' '}
+              All of these are optional and off unless you turn them on, and
+              your deck arrives exactly as you pasted it either way.
+            </p>
+            <IntakeChoices value={sheet} onChange={setSheet}
+                           slug={effectiveSlug} />
+          </div>
         </section>
       </div>
+
+      {/* What the intake is doing, while the page waits for it. A job with a
+          label and a percentage rather than a bare spinner: five actions over
+          ninety-nine cards is minutes, and a spinner that long reads as a
+          page that has died. */}
+      {intake && intake.status !== 'done' && (
+        <IntakeProgress job={intake} />
+      )}
 
       {error && <ErrorNote>{error}</ErrorNote>}
       {busy === 'preview' && !preview && <Spinner label="Resolving names…" />}

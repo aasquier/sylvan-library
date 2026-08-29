@@ -273,7 +273,7 @@ describe('the Claude menu in the header', () => {
       { name: 'off', blurb: 'No calls.', available: true,
         stance: { preset: 'off', allows_calls: false, may_write: false, axes: [] } },
     ],
-    never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
+    never: 'One rule holds at every setting: Claude never writes a card’s rationale on its own. On an import you can ask it to draft the ones you have not written, and every sentence it drafts is marked as Claude’s until you rewrite it.',
     modes: [],
   }
 

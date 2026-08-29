@@ -53,15 +53,34 @@ const BIO = [
   + 'Every table has somebody who once hadn’t played. This library takes '
   + 'their side.',
 
-  'Two promises hold everywhere I work. I never quote a card from memory — '
+  'Two things hold everywhere I work. I never quote a card from memory — '
   + 'thirty years of Magic is more than anything should trust its recall on, '
   + 'so every cost, every line of rules text, every colour on this site is '
   + 'looked up in the card pool at the moment it is shown, and when you ask '
-  + 'me about the meta or a ruling, I read the pages and cite them. And I '
-  + 'never write your reasons for you: every card in a deck here carries a '
-  + 'why, and the why is always yours. I will argue against a slot all '
-  + 'afternoon if you ask me to. The words that keep the card belong to the '
-  + 'person who sleeves it.',
+  + 'me about the meta or a ruling, I read the pages and cite them. And I do '
+  + 'not write your reasons unless you ask me to.',
+
+  'That second one used to be simpler, and I would rather say plainly that it '
+  + 'changed than let you find out from a deck file. For a long time the rule '
+  + 'was that I could never touch a card’s why, at any setting, for any '
+  + 'reason. It now has one exception: when you import a deck, you can ask me '
+  + 'to draft the reasons you have not written yet. Aaron and I argued about '
+  + 'it and I was on the other side, which is worth admitting — I thought the '
+  + 'word for a finished deck should mean somebody had thought about it. What '
+  + 'changed my mind is that ninety-nine blank fields is not a more honest '
+  + 'deck than ninety-nine drafts you can disagree with. It is just a deck '
+  + 'nobody finished.',
+
+  'So here is exactly what happens, because a promise with an exception in it '
+  + 'is only worth the part you can check. Nothing drafts unless you tick the '
+  + 'box, on that import, once. Every sentence I draft is written into the '
+  + 'file marked as mine, and it stays marked until you change the words — '
+  + 'the moment you do, it is yours and the mark is gone. And I still will '
+  + 'not argue that a card deserves its slot: I will argue against one all '
+  + 'afternoon if you ask, and that asymmetry is deliberate, because a case '
+  + 'in favour is a rationale wearing a hat. The words that keep the card '
+  + 'should belong to the person who sleeves it. My job is to make it easier '
+  + 'for them to be.',
 
 ]
 

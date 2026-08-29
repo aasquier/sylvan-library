@@ -277,7 +277,7 @@ const STANCE = {
 const CLAUDE_STATUS = {
   installed: true, configured: true, model: 'claude-sonnet-5',
   stance: STANCE, ceiling: STANCE, default: STANCE, presets: [],
-  never: 'One rule holds at every setting: Claude never writes a card’s rationale. The why is always yours.',
+  never: 'One rule holds at every setting: Claude never writes a card’s rationale on its own. On an import you can ask it to draft the ones you have not written, and every sentence it drafts is marked as Claude’s until you rewrite it.',
   modes: [{ name: 'rationale-interview', purpose: 'Asks about a slot.',
             tools: ['get_cards'], writes: [] }],
 }

@@ -117,6 +117,9 @@ func TestTheDialListsEveryMode(t *testing.T) {
 	want := []string{
 		ModeRationaleInterview, ModeSlotArgument, ModeCommanderDossier,
 		ModeResearch, ModeThemeConversation, ModeThemeProposal, ModeScan,
+		// ADR 41's two, last, because the dial's order is a decision about
+		// what somebody reads first and these two run from one screen only.
+		ModeRationaleDraft, ModeIntakeFiling, ModeDeckDescription,
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Errorf("the dial lists\n  %v\nthe recorded order is\n  %v", names, want)

@@ -148,6 +148,16 @@ const (
 	EditSwap    EditKind = "swap"
 	EditNote    EditKind = "note"
 	EditSetCard EditKind = "set-card"
+	// The intake's write (ADR 41). One entry for a whole pass rather than one
+	// per card: the pass is the thing that happened, and ninety-nine rows
+	// saying "drafted a rationale" would bury the history somebody actually
+	// comes here to read.
+	//
+	// It records WHICH cards and never WHAT was written, which is this file's
+	// oldest rule (ADR 28) and matters more here than anywhere else: the text
+	// is a rationale, and a log that carried rationale text would be the
+	// undo-by-transcript this log exists not to be.
+	EditIntake  EditKind = "intake"
 	EditSetDeck EditKind = "set-deck"
 )
 
@@ -232,6 +242,24 @@ func Describe(e Edit) (action, summary string) {
 
 	case EditNote:
 		return "note", "changed the " + e.Note + " note"
+
+	case EditIntake:
+		// `Field` carries which pass this was -- `why` or `category` -- in the
+		// same slot `EditSetCard` uses, so the row stays queryable by field.
+		word := fieldWord(e.Field)
+		if word == "" {
+			word = "entry"
+		}
+		if len(e.Cards) == 0 {
+			return "intake", "ran the intake and wrote nothing"
+		}
+		if len(e.Cards) > 6 {
+			return "intake", fmt.Sprintf("drafted the %s on %s: %s, and %d more",
+				word, plural(len(e.Cards), "card"), strings.Join(e.Cards[:6], ", "),
+				len(e.Cards)-6)
+		}
+		return "intake", fmt.Sprintf("drafted the %s on %s",
+			word, strings.Join(e.Cards, ", "))
 
 	case EditSetCard:
 		word := fieldWord(e.Field)

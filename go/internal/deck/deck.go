@@ -45,6 +45,16 @@ type CardEntry struct {
 	// Which printing's art this deck shows for the card, or "" for the
 	// pool's default.
 	Art string
+	// WhyBy is who wrote the rationale, and it is only ever `claude` or empty
+	// (ADR 41). Empty means a person did, which is true of every rationale
+	// written before the intake existed and of every one typed since.
+	//
+	// It is provenance rather than a warning label, and it is load-bearing:
+	// Aaron ruled that a drafted rationale satisfies promotion to `curated`,
+	// so this mark is the ONLY thing left carrying the difference between a
+	// sentence somebody formed and a sentence somebody accepted. It comes off
+	// the moment the text changes -- editing a draft is adopting it.
+	WhyBy string
 }
 
 // Deck is the parsed file.
@@ -198,6 +208,9 @@ func cardFrom(obj any) (CardEntry, error) {
 	}
 	if v, present := m["why"]; present {
 		entry.Why = stringOr(v, "")
+	}
+	if v, present := m["why_by"]; present {
+		entry.WhyBy = stringOr(v, "")
 	}
 	if v, present := m["qty"]; present && v != nil {
 		switch q := v.(type) {
@@ -393,6 +406,12 @@ func cardPayload(c CardEntry, draft bool) map[string]any {
 		out["why"] = c.Why
 	} else if draft {
 		out["why"] = ""
+	}
+	// Only when there is one, so a deck nobody has run the intake over says
+	// nothing about authorship rather than saying "not claude" ninety-nine
+	// times.
+	if c.WhyBy != "" {
+		out["why_by"] = c.WhyBy
 	}
 	if c.Qty != 1 {
 		out["qty"] = c.Qty

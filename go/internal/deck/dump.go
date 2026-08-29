@@ -135,6 +135,13 @@ func cardObject(c CardEntry, draft bool) yamlemit.Map {
 	if c.Why != "" {
 		obj = append(obj, yamlemit.Pair{Key: "why", Value: c.Why})
 	}
+	// Immediately after the sentence it is about, because provenance that
+	// sits six keys away from its text is provenance nobody reads. Absent
+	// unless something drafted the rationale, so no existing deck file moves
+	// a byte.
+	if c.WhyBy != "" {
+		obj = append(obj, yamlemit.Pair{Key: "why_by", Value: c.WhyBy})
+	}
 	if c.Qty != 1 {
 		obj = append(obj, yamlemit.Pair{Key: "qty", Value: c.Qty})
 	}

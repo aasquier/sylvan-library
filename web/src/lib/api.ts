@@ -1279,6 +1279,42 @@ export interface SwapResult extends EditResult {
   why: string
 }
 
+/** The intake sheet: what an imported deck is being asked to have done to it
+ *  (ADR 41). Every field is off unless it is sent true. */
+export interface IntakeSheet {
+  /** Draft the `why` on cards that have none. The one action gated on the
+   *  stance's write axis, and the one that marks what it wrote. */
+  rationales?: boolean
+  /** File cards still sitting on the importer's `utility` default. */
+  categories?: boolean
+  /** Write the deck's strategy and themes. */
+  description?: boolean
+  /** Fill the cached commander dossier. Writes nothing to the deck. */
+  dossier?: boolean
+  /** Run the slot sweep over the 99. Writes nothing to the deck. */
+  argue?: boolean
+  stance?: string
+}
+
+/** One action's outcome: what it changed, out of what it looked at, and a
+ *  sentence when the number alone would read as a failure. */
+export interface IntakeStep {
+  changed: number
+  considered: number
+  note?: string
+}
+
+export interface IntakeResult {
+  slug: string
+  /** False when the stance made no call at all, with `reason` saying so. */
+  asked: boolean
+  reason?: string
+  steps: Partial<Record<
+    'rationales' | 'categories' | 'description' | 'dossier' | 'argue',
+    IntakeStep
+  >>
+}
+
 export interface Job {
   id: string
   kind: string
@@ -2936,6 +2972,17 @@ export const api = {
   // joins the run rather than paying twice.
   argueDeck: (ref: DeckRef, body: { cards: string[]; stance?: string }) =>
     post<Job>(deckPath(ref, '/argue/deck'), body),
+  // The intake sheet (ADR 41). Returns a **job**, because five actions over a
+  // 99-card deck is minutes, and one job rather than five because the actions
+  // run in an order and a person who ticked four boxes wants one thing to
+  // watch. Follow it with `followJob` and read `job.result` as an
+  // `IntakeResult`.
+  //
+  // `rationales` is the only action the server can refuse outright: drafting a
+  // `why` needs a stance whose write axis is above `none`, so the control for
+  // it is not offered below that and a 422 here means the page was stale.
+  intake: (ref: DeckRef, body: IntakeSheet) =>
+    post<Job>(deckPath(ref, '/intake'), body),
   // The commander dossier, in two halves that are deliberately different verbs.
   // The GET is free and reads a stored row, so the deck page can ask on every
   // load; the POST spends money and reaches the network. One function with a

@@ -456,7 +456,23 @@ func SetCardField(text, name, field string, value any) (string, error) {
 	if field == "art" && written == "" {
 		c = drop()
 	}
-	rebuilt, err := rewriteEntry(lines, e, map[string]change{field: c}, []string{field})
+	changes := map[string]change{field: c}
+	order := []string{field}
+	// **Writing a rationale un-marks it** (ADR 41). `why_by: claude` says a
+	// model drafted this sentence; the moment a person writes over it the
+	// sentence is theirs, and a mark left behind would be a lie in the one
+	// file that is supposed to be the truth. Blanking counts too: what is
+	// gone was not drafted by anybody.
+	//
+	// Here rather than in the intake because this is the single door every
+	// `why` goes through -- the deck page, the CLI, an edit from a swap --
+	// and a rule enforced at one of those and not the others is a rule that
+	// holds until the second caller.
+	if field == "why" {
+		changes["why_by"] = drop()
+		order = append(order, "why_by")
+	}
+	rebuilt, err := rewriteEntry(lines, e, changes, order)
 	if err != nil {
 		return "", err
 	}
@@ -471,6 +487,68 @@ func SetCardField(text, name, field string, value any) (string, error) {
 	} else {
 		item[field] = written
 	}
+	if field == "why" {
+		delete(item, "why_by")
+	}
+	return verified(updated, expected)
+}
+
+// DraftRationale writes a rationale a model drafted, and marks it as one.
+//
+// The tenth operation, and the only one that exists because of [ADR 41]. It is
+// deliberately NOT `SetCardField(field="why")` with an extra argument, for
+// three reasons that all point the same way:
+//
+//   - **It is greppable.** Every write of a drafted sentence in this repo is a
+//     call to this function, so "what can put a model's words in a deck" has a
+//     one-line answer that a reader can check rather than a set of call sites
+//     that have to be traced.
+//   - **`boundary_test.go` names the write surface**, and this is on it. The
+//     Claude tree cannot call this any more than it can call SetCardField --
+//     which is the point of ADR 41 landing in the caller rather than the mode.
+//   - **It refuses what SetCardField allows.** A drafted rationale never
+//     overwrites a rationale that is already there, and never writes an empty
+//     one. Both are below.
+//
+// Refusing to overwrite is the load-bearing half. A person's sentence and a
+// draft are indistinguishable once written, so the only moment this can be got
+// right is before the write -- and an intake that ran twice, or ran over the
+// quoted column PR #391 introduced, would otherwise replace somebody's own
+// words with a model's and mark the result as drafted, which loses the words
+// and tells the truth about the wrong sentence.
+func DraftRationale(text, name, why string) (string, error) {
+	why = strings.TrimSpace(why)
+	if why == "" {
+		return "", failf("refusing to write an empty rationale for %s", quotedValue(name))
+	}
+
+	doc, lines, err := open(text)
+	if err != nil {
+		return "", err
+	}
+	listKey, position, e, err := locateCard(doc, lines, name, CardLists)
+	if err != nil {
+		return "", err
+	}
+
+	existing := cardAt(listOf(doc, listKey), position)
+	if held, ok := existing["why"].(string); ok && strings.TrimSpace(held) != "" {
+		return "", failf("%s already has a rationale; a draft never writes over one",
+			quotedValue(name))
+	}
+
+	changes := map[string]change{"why": set(why), "why_by": set(DraftedBy)}
+	order := []string{"why", "why_by"}
+	rebuilt, err := rewriteEntry(lines, e, changes, order)
+	if err != nil {
+		return "", err
+	}
+	updated := joinAround(lines, e.start, e.end, rebuilt)
+
+	expected := copyDoc(doc)
+	item := cardAt(listOf(expected, listKey), position)
+	item["why"] = why
+	item["why_by"] = DraftedBy
 	return verified(updated, expected)
 }
 

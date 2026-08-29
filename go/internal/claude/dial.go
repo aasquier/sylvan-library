@@ -35,8 +35,23 @@ package claude
 // the mismatch on the first run, which is what a byte comparison is for --
 // every field-by-field assertion in the world reads these two as "the never
 // sentence" and passes.
+//
+// **Reworded again on 2026-08-28, because [ADR 41] made it false.** The
+// sentence used to end "The why is always yours", and the intake can now draft
+// a rationale on an imported deck. That is a promise this project published on
+// the control itself, so it changed the day the behaviour did rather than the
+// day somebody noticed -- the corpus in `testdata/stance.json` is what turned
+// "somebody noticed" into a failing test.
+//
+// What survives is the part that is still true and is the part that mattered:
+// nothing drafts unasked, and a drafted sentence is never passed off as the
+// owner's. Both halves are mechanised rather than promised -- the toggle is
+// off by default and gated on the write axis, and `why_by: claude` is written
+// beside the sentence and dropped the moment a person edits it.
 const DialNever = "One rule holds at every setting: Claude never writes a " +
-	"card's rationale. The why is always yours."
+	"card's rationale on its own. On an import you can ask it to draft the " +
+	"ones you have not written, and every sentence it drafts is marked as " +
+	"Claude's until you rewrite it."
 
 // dialSurfaces is the surfaces that own their own
 // answer to "no preference", because they run with no deck to derive one from.
@@ -51,7 +66,14 @@ const DialNever = "One rule holds at every setting: Claude never writes a " +
 // stance and budget warts went. Nothing in the app sends `surface=scan`, which
 // is exactly how it survived -- a doc comment is not a test, and an unused
 // parameter is not a caller.
-var dialSurfaces = map[string]bool{"theme": true, "research": true, "scan": true}
+// **`intake` joined it on 2026-08-28**, and it is the third time. The import
+// screen has no deck by construction -- the deck it is about does not exist
+// until the button is pressed -- so the dial answered `off` and ADR 41's whole
+// sheet stood down for every user. Found the same way `scan` was: by loading
+// the page and asking what the dial ANSWERED.
+var dialSurfaces = map[string]bool{
+	"theme": true, "research": true, "scan": true, "intake": true,
+}
 
 // surfaceStanceFor asks the module that owns `surface` what it makes of
 // `requested`.
@@ -68,6 +90,8 @@ func surfaceStanceFor(surface string, requested any, limit *Stance) (Stance, err
 		return ResearchStanceFor(requested, limit)
 	case "scan":
 		return ScanStanceFor(requested, limit)
+	case "intake":
+		return IntakeStanceFor(requested, limit)
 	default:
 		return ThemeStanceFor(requested, limit)
 	}
@@ -163,6 +187,11 @@ type Dial struct {
 // exist" was one short for three months -- the sixth completeness claim in
 // this project to rot. Ruled with Aaron and fixed in one change.
 //
+// **Ten since 2026-08-28**, and this time the guard did its job: ADR 41's two
+// intake modes failed `TestTheDialListsEveryMode` the moment they were added
+// to the data file, which is three months earlier than last time. The number
+// in this sentence is still a claim to re-check; the test is the fact.
+//
 // Still an explicit list rather than a derivation: the order is a decision
 // somebody makes, never an artifact of a registry's
 // iteration. `TestTheDialListsEveryMode` is what stops it
@@ -176,6 +205,13 @@ var dialModeOrder = []string{
 	ModeThemeConversation,
 	ModeThemeProposal,
 	ModeScan,
+	// The intake's two (ADR 41). They sit last because the dial's order is a
+	// decision about what somebody reads first, and these two only ever run
+	// from one screen -- a person tuning their stance meets the six they can
+	// reach from anywhere before the two they cannot.
+	ModeRationaleDraft,
+	ModeIntakeFiling,
+	ModeDeckDescription,
 }
 
 // DialModes is the built modes as the dial publishes them.

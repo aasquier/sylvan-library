@@ -43,6 +43,7 @@ func TestEveryDefinedModeLoads(t *testing.T) {
 	for _, name := range []string{
 		ModeRationaleInterview, ModeSlotArgument, ModeCommanderDossier,
 		ModeResearch, ModeThemeConversation, ModeThemeProposal, ModeScan,
+		ModeRationaleDraft, ModeIntakeFiling, ModeDeckDescription,
 	} {
 		if _, err := GetMode(name); err != nil {
 			t.Errorf("the constant %q names no mode: %v", name, err)

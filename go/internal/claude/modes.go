@@ -161,4 +161,12 @@ const (
 	ModeThemeConversation  = "theme-conversation"
 	ModeThemeProposal      = "theme-proposal"
 	ModeScan               = "scan"
+	// The two the intake added (ADR 41). Both are read-only like every other
+	// mode -- `may_write` stays empty and `NewMode` still refuses anything
+	// else. What ADR 41 changed is that a caller OUTSIDE this tree may write
+	// what `rationale-draft` answered, which is why the write door it uses is
+	// on `boundary_test.go`'s banned surface rather than in a mode.
+	ModeRationaleDraft  = "rationale-draft"
+	ModeIntakeFiling    = "intake-filing"
+	ModeDeckDescription = "deck-description"
 )

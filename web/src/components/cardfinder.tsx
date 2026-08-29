@@ -30,7 +30,11 @@
  *
  * ## What it does not do
  *
- * **It never writes a rationale, and it never will** (rule 4, ADR 8, ADR 11).
+ * **It never writes a rationale** (rule 4, ADR 8, ADR 11). ADR 41 opened one
+ * door elsewhere -- an import may ask for drafts, marked as drafts -- and this
+ * is not it: a card being added by hand is somebody at a keyboard with the
+ * field in front of them, and drafting into it would be answering a question
+ * they are in the middle of answering.
  * It fills exactly one field on the user's behalf and only when the card pool
  * says so outright: a land is filed under `land`, which is the importer's own
  * rule and a card pool fact rather than an opinion. Every other category is an
