@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/cards"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -25,10 +27,11 @@ import (
 )
 
 // The moments a deck begins and ends: `POST /api/decks`, `POST
-// /api/decks/import`, `DELETE /api/decks/{owner}/{slug}` and `PUT
-// .../shared` -- the four lifecycle routes: create, import and delete, and
-// the source's own sharing
-// verb.
+// /api/decks/import`, `DELETE /api/decks/{owner}/{slug}`, `PUT
+// .../shared`, and the crypt's two -- `GET /api/decks/entombed` and `POST
+// /api/decks/entombed/{id}/return` -- the six lifecycle routes: create,
+// import and delete, the source's own sharing verb, and the way back out of
+// a deletion.
 //
 // Kept apart from the nine editing routes on purpose, and the reason is
 // visible in the shapes below: **none of these goes through `commit`.**
@@ -36,14 +39,17 @@ import (
 // outside ADR 28's activity log, which is a decision rather than an oversight
 // -- adding them means a second call site, and the log's whole design is that
 // there is one. Sharing is outside it for the same reason and one more: it
-// changes who may *read* a deck, not what the deck is.
+// changes who may *read* a deck, not what the deck is. A restore is outside
+// it because it is the undo of something the log never recorded.
 //
-// Two of the four write into the caller's **own** library and never into an
+// Four of the six write into the caller's **own** library and never into an
 // owner named in the path (no ownership question exists for
-// them), so they resolve `Mine` rather than `SourceFor`. The other two
-// take the owner segment like every other per-deck route, and inherit ADR 22's
-// answers with it: a deck the caller cannot see is absent from their source
-// and every verb against it is a 404 before writability is consulted.
+// them), so they resolve the caller rather than a path segment -- `Mine` for
+// create and import, `myCrypts` for the crypt's two, which is `Mine` widened
+// to every library the caller may write and argued where it stands. The other
+// two take the owner segment like every other per-deck route, and inherit
+// ADR 22's answers with it: a deck the caller cannot see is absent from their
+// source and every verb against it is a 404 before writability is consulted.
 
 // slugPattern is the slug grammar. A slug becomes a directory name under
 // `decks/`, so it is checked rather than trusted: the API takes it from a
@@ -516,8 +522,14 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 // The last operation in the lifecycle, and the only one that can lose work.
 // Three safeguards, chosen so that each catches something the others do not:
 // a typed `confirm` that is neither a boolean nor a flag, a read-only source
-// that refuses, and a deck that **moves** rather than vanishing -- which is
-// why the answer carries where it went.
+// that refuses, and a deck that **moves** rather than vanishing.
+//
+// The answer used to carry *where* it moved to, and that was the whole way
+// back: a filesystem path, rendered to the player, under a sentence telling
+// them to open a shell. It carries a crypt id now -- an opaque handle the
+// route below turns back into a deck -- and `recoverable` beside it, because
+// "deleted" and "recoverable" have to be separately true and separately
+// visible, which was the good half of the old answer's argument.
 //
 // `confirm` is a query parameter because a DELETE with no body is the
 // conventional shape. It takes the slug or the word `bury`, case-insensitively:
@@ -552,16 +564,38 @@ func (a *API) deleteDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	movedTo, err := writer.Delete(r.Context(), slug)
-	if a.refuseWrite(w, "delete", err) {
+	if _, err := writer.Delete(r.Context(), slug); a.refuseWrite(w, "delete", err) {
 		return
+	}
+	// The id the crypt itself hands out, found by asking it rather than by
+	// deriving one from what `Delete` returned: which handle names this
+	// burial is the tier's business, and one round trip through the crypt is
+	// what keeps that knowledge from being copied up here.
+	//
+	// An empty id is not an error. It means the crypt could not be read back
+	// in this instant, and the surface has to say "it is in the crypt" without
+	// offering the one-click way out -- which is true, and is not the same
+	// claim as "there is no way back".
+	id := ""
+	if crypt, err := library.CryptFor(src); err == nil {
+		if entombed, err := crypt.Entombed(r.Context()); err == nil {
+			for _, e := range entombed {
+				if e.Slug == slug {
+					id = e.ID
+					break
+				}
+			}
+		} else {
+			a.log.Warn("the crypt could not be read after a delete", "slug", slug, "error", err)
+		}
 	}
 	wire.JSON(w, http.StatusOK, map[string]any{
 		"slug": slug, "name": d.Name, "deleted": true,
-		// Where it went, so the answer to "can I get it back" is in the
-		// response rather than in someone's memory of how this was built.
-		"moved_to": movedTo, "total_cards": d.TotalCards(),
-		"stage": d.Stage, "status": d.Status,
+		// Two fields rather than one: whether it can be raised again, and the
+		// handle that raises it.
+		"recoverable": id != "", "crypt_id": id,
+		"total_cards": d.TotalCards(),
+		"stage":       d.Stage, "status": d.Status,
 	})
 }
 
@@ -569,10 +603,174 @@ func (a *API) deleteDeck(w http.ResponseWriter, r *http.Request) {
 //
 // "Bury" is Magic's own retired templating for destroying a permanent so that
 // it cannot regenerate, and it is the right verb here for the reason the
-// obvious alternatives are the wrong ones: the deck goes to `decks/.trash/`
-// and can be brought back, so "exile" -- which in Magic means gone for good --
-// would misdescribe what this does.
+// obvious alternatives are the wrong ones: the deck goes to the crypt and can
+// be raised again, so "exile" -- which in Magic means gone for good -- would
+// misdescribe what this does.
 const deleteWord = "bury"
+
+// ---- the crypt -------------------------------------------------------------
+
+// The two routes that make a deletion survivable, and the reason they exist:
+// the deck level had ADR 27's *entomb* and none of its *graveyard*. What a
+// player was given instead was the path the deck had been moved to and the
+// suggestion that they go and get it -- a leak of what runs underneath this
+// site (commandment 10) offered as a feature, and, to anyone who has never
+// opened a terminal, not an offer at all.
+//
+// **Neither takes an owner segment.** Your crypt is yours -- resolved from
+// who is asking, like create and import -- so there is no path a caller can
+// write that names somebody else's, which settles ADR 5 for this family by
+// construction rather than by a check: an entombed deck is still somebody's,
+// and the only 404 available here is about your own.
+
+// listEntombed is `GET /api/decks/entombed`: the caller's crypt, newest
+// first.
+//
+// `entombed_at` is null rather than absent when nothing recorded the burial
+// -- an entry somebody put on the volume by hand. A missing timestamp
+// rendered as a date would be this repo's most-repeated bug (a fallback that
+// reads as a fact) in the one place a player looks to check that their deck
+// is still there.
+func (a *API) listEntombed(w http.ResponseWriter, r *http.Request) {
+	crypts, ok := a.myCrypts(w, r)
+	if !ok {
+		return
+	}
+	entombed := []library.Entombed{}
+	for _, c := range crypts {
+		found, err := c.crypt.Entombed(r.Context())
+		if a.refuseWrite(w, "crypt", err) {
+			// One crypt that will not answer fails the whole list. Returning
+			// the half that did would be a list of "everything you buried"
+			// with something missing from it, which is the worst answer
+			// available on this screen.
+			return
+		}
+		entombed = append(entombed, found...)
+	}
+	// Newest first across all of them. Each crypt sorts its own; merging two
+	// sorted lists by concatenation does not, and the entry somebody just lost
+	// has to be the one on top.
+	sort.SliceStable(entombed, func(i, j int) bool { return entombed[i].At.After(entombed[j].At) })
+	out := []map[string]any{}
+	for _, e := range entombed {
+		row := map[string]any{
+			"id": e.ID, "slug": e.Slug, "name": e.Name,
+			"total_cards": e.Cards, "commander": orEmpty(e.Commander),
+			"entombed_at": nil,
+		}
+		if !e.At.IsZero() {
+			row["entombed_at"] = e.At.UTC().Format(time.RFC3339)
+		}
+		out = append(out, row)
+	}
+	wire.JSON(w, http.StatusOK, map[string]any{"entombed": out})
+}
+
+// restoreDeck is `POST /api/decks/entombed/{id}/return` -- the deck-level
+// twin of the graveyard's `return`, and named the same verb on purpose:
+// ADR 27 taught the word for a card, and a player who has entombed one has
+// already been taught how this ends.
+//
+// A restore never renames (`FileSource.Restore` argues why), so the one
+// refusal that is about the library rather than about the caller is a slug a
+// living deck already holds. That answers 422 with the question only the
+// player can settle, and never with a rename nobody asked for.
+func (a *API) restoreDeck(w http.ResponseWriter, r *http.Request) {
+	crypts, ok := a.myCrypts(w, r)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	for _, c := range crypts {
+		slug, err := c.crypt.Restore(r.Context(), id)
+		// Not this crypt's: ask the next one. An id nobody holds falls out of
+		// the loop, which is the only 404 this route has.
+		if library.IsNotFound(err) {
+			continue
+		}
+		var exists library.ErrExists
+		if errors.As(err, &exists) {
+			a.refuseWrite(w, "restore", rejectf(
+				"a deck called %s is already on your shelf, and a deck always comes "+
+					"back under its own name. Entomb or rename that one first, and this "+
+					"deck can have its name back.", wire.Quote(exists.Slug)))
+			return
+		}
+		if a.refuseWrite(w, "restore", err) {
+			return
+		}
+		d, err := c.src.Get(r.Context(), slug)
+		if a.refuseWrite(w, "restore", err) {
+			return
+		}
+		wire.JSON(w, http.StatusOK, map[string]any{
+			"slug": slug, "name": d.Name, "restored": true,
+			"total_cards": d.TotalCards(), "stage": d.Stage, "status": d.Status,
+		})
+		return
+	}
+	// Its own sentence rather than `refuse`'s: that one names the thing that
+	// was not found, and what was not found here is a handle no player has
+	// ever seen or typed.
+	wire.Detail(w, http.StatusNotFound,
+		"that deck is not in your crypt -- it may already be back on your shelf")
+}
+
+// ownedCrypt is one crypt the caller may open, with the source behind it: a
+// restore has to read the deck it just raised, and asking the library twice
+// for the same half would leave two answers that could disagree.
+type ownedCrypt struct {
+	crypt library.Crypt
+	src   library.Source
+}
+
+// myCrypts is every crypt this caller may open -- the crypts of the libraries
+// they can *write* -- answering the refusal itself.
+//
+// Almost always exactly one, and "almost always" is the word that makes a
+// button which cannot work. `Mine` alone would be wrong for one real
+// arrangement: an admin on an instance with no maintainer configured writes
+// the file tier through the owner segment (ADR 17) while `Mine` answers with
+// their own rows, so a deck they buried through one would have been raised
+// through the other, and the notice on screen would have offered a handle
+// this route could not find.
+//
+// Derived from `Visible` rather than listed, for the same reason the door's
+// sweeps derive from the route table: a tier added later is included without
+// anybody remembering to. **Writability is the whole test** -- a deck you may
+// read is not a deck you may bury, and somebody else's shared shelf has no
+// crypt to show you (`CryptFor` refuses one, and `SharedOnly` has none at
+// all).
+func (a *API) myCrypts(w http.ResponseWriter, r *http.Request) ([]ownedCrypt, bool) {
+	lib, err := a.library(r.Context())
+	if a.refuse(w, "crypt", err) {
+		return nil, false
+	}
+	visible, err := lib.Visible(r.Context())
+	if a.refuse(w, "crypt", err) {
+		return nil, false
+	}
+	out := []ownedCrypt{}
+	for _, owned := range visible {
+		if !owned.Source.Writable() {
+			continue
+		}
+		crypt, err := library.CryptFor(owned.Source)
+		if err != nil {
+			continue
+		}
+		out = append(out, ownedCrypt{crypt: crypt, src: owned.Source})
+	}
+	if len(out) == 0 {
+		// No library of your own is not an empty crypt, and it is not a
+		// server fault either: it is the answer a caller with nothing to write
+		// gets, in the same words every other write refusal uses.
+		a.refuseWrite(w, "crypt", library.ErrReadOnly{})
+		return nil, false
+	}
+	return out, true
+}
 
 // ---- sharing ---------------------------------------------------------------
 

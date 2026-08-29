@@ -214,7 +214,11 @@ func TestImportPassesTheImportersOwnRefusalThrough(t *testing.T) {
 
 // ---- delete ----------------------------------------------------------------
 
-func TestDeleteMovesTheDeckAndSaysWhere(t *testing.T) {
+// The answer says the deck is recoverable and hands over the handle that
+// recovers it. It used to say *where the deck went* -- a filesystem path,
+// rendered to the player under an instruction to open a shell -- and the
+// sweep in `crypt_test.go` is what holds that gone for good.
+func TestDeleteMovesTheDeckAndSaysItCanComeBack(t *testing.T) {
 	t.Parallel()
 	rig := newWriteRig(t, noCredential)
 	defer rig.close()
@@ -224,12 +228,32 @@ func TestDeleteMovesTheDeckAndSaysWhere(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("%d %s", status, raw)
 	}
-	movedTo, _ := body["moved_to"].(string)
-	if movedTo == "" {
-		t.Fatal("a delete that cannot say where the deck went has destroyed it")
+	if recoverable, _ := body["recoverable"].(bool); !recoverable {
+		t.Error("a delete that cannot say the deck is recoverable has destroyed it")
 	}
-	if _, err := os.Stat(filepath.Join(movedTo, "deck.yaml")); err != nil {
-		t.Errorf("the deck is not where the answer said: %v", err)
+	id, _ := body["crypt_id"].(string)
+	if id == "" {
+		t.Fatal("no handle came back, so nothing can raise the deck")
+	}
+	// The deck really did move rather than vanish: the crypt says so, and
+	// this is the only place that reads the directory to prove it, because
+	// nothing above the library layer is told the folder's name any more.
+	buried, err := os.ReadDir(filepath.Join(rig.decks, ".trash"))
+	if err != nil {
+		t.Fatalf("the crypt could not be read: %v", err)
+	}
+	moved := false
+	for _, e := range buried {
+		if !strings.HasPrefix(e.Name(), "mono-green-clean-") {
+			continue
+		}
+		moved = true
+		if _, err := os.Stat(filepath.Join(rig.decks, ".trash", e.Name(), "deck.yaml")); err != nil {
+			t.Errorf("the deck was destroyed rather than moved: %v", err)
+		}
+	}
+	if !moved {
+		t.Fatalf("nothing in the crypt is the deck that was just deleted: %v", buried)
 	}
 	if _, found := rig.read(t, "mono-green-clean"); found {
 		t.Error("the deck is still in the library")

@@ -2055,12 +2055,36 @@ export interface DeleteResult {
   slug: string
   name: string
   deleted: boolean
-  /** Where the deck went. Not a boolean, because "deleted" and "recoverable"
-   *  have to be separately true and separately visible. */
-  moved_to: string
+  /** Whether the deck can be raised again — separately true and separately
+   *  visible from `deleted`, which is the good half of the argument the old
+   *  `moved_to` field made. That field carried a filesystem path, and the
+   *  library page printed it. */
+  recoverable: boolean
+  /** The handle `returnEntombed` takes. Opaque: it names an entry in this
+   *  player's crypt and nothing else, and **nothing renders it**. Empty when
+   *  the crypt could not be read back in that instant, which is why
+   *  `recoverable` is its own field rather than `crypt_id !== ''` computed at
+   *  every call site. */
+  crypt_id: string
   total_cards: number
   stage: string
   status: string
+}
+
+/** One deck in the crypt: entombed, not erased.
+ *
+ * `entombed_at` is null rather than absent when nothing recorded the burial.
+ * A missing time rendered as a date would be a lie told in the one place a
+ * player looks to check their deck is still there, so the surface says it
+ * does not know instead.
+ */
+export interface EntombedDeck {
+  id: string
+  slug: string
+  name: string
+  total_cards: number
+  commander: string[]
+  entombed_at: string | null
 }
 
 export interface CreateResult {
@@ -2920,10 +2944,11 @@ export const api = {
    *  once and held. */
   themes: () => get<ThemeVocabulary>('/api/themes'),
   lore: () => get<LoreShelves>('/api/lore'),
-  // The only call here that can lose work. `confirm` must be a word somebody
-  // typed — `bury`, or the slug itself — which a mis-aimed click cannot
-  // satisfy. The deck moves to `.trash/` rather than being unlinked, and the
-  // response says where.
+  // The only call here that can lose work — and even this one does not, which
+  // is the point of the two calls at the foot of this object. `confirm` must
+  // be a word somebody typed — `bury`, or the slug itself — which a mis-aimed
+  // click cannot satisfy. The deck goes to the crypt rather than being
+  // unlinked, and the answer carries the handle that raises it again.
   deleteDeck: (ref: DeckRef, confirm: string) =>
     send<DeleteResult>('DELETE',
       deckPath(ref, `?confirm=${encodeURIComponent(confirm)}`)),
@@ -3157,6 +3182,20 @@ export const api = {
   forgeStatus: () => get<ForgeStatus>('/api/forge'),
   simForge: (payload: Record<string, unknown>) => post<Job>('/api/sim/forge', payload),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
+  /** The crypt: what this player has entombed, newest first.
+   *
+   * No owner in the path, unlike every other deck call in this client. Your
+   * crypt is yours — the server resolves it from who is asking — so there is
+   * no URL anybody can type that names somebody else's. */
+  entombed: () => get<{ entombed: EntombedDeck[] }>('/api/decks/entombed'),
+  /** Raise one deck out of the crypt, under its own name.
+   *
+   * 422 when a living deck already holds that name: a deck always comes back
+   * as itself, so the server asks rather than renaming. The detail is the
+   * sentence to show. */
+  returnEntombed: (id: string) =>
+    post<{ slug: string; name: string; restored: boolean }>(
+      `/api/decks/entombed/${encodeURIComponent(id)}/return`, {}),
 }
 
 /** How many polls in a row may fail before a followed job is given up on.
