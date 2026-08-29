@@ -125,13 +125,43 @@ const DraftedBy = "claude"
 //
 // It renders through the same folding writer a card's `why` uses, so a
 // paragraph wraps the way every other paragraph in a deck file does.
+//
+// **`name` joined on 2026-08-29, and its absence was the same hole.** An
+// imported deck wore whatever name the import form was given, forever: nothing
+// in this package, this API or this app could write it, and the name is the
+// first thing anybody reads on the shelf and at the top of the deck page.
+// Aaron found it the same way -- by asking for the obvious thing.
+//
+// **It is the display name and never the address.** A deck is addressed by
+// its owner and its slug (ADR 22) -- a folder on the file tier, a column on
+// the other -- and that slug is in every link anybody has already shared,
+// every artifact on disk, and every row of the deck's own history, none of
+// which this operation can reach. `FileSource.Restore` refuses to
+// rename a deck for exactly that reason -- "a deck whose every artifact, link
+// and log entry named something else" -- and a rename that dragged the slug
+// along would be the same wrong. So this writes `name:` and leaves `slug:`
+// alone, and the surface that offers the pen says so.
 var SettableDeckFields = []string{
 	"stage", "status", "bracket", "commander_art", "pilot", "themes", "strategy",
+	"name",
 }
 
 // PilotMax is the most anybody's name needs. A pilot is a person at a table,
 // not a bio.
 const PilotMax = 40
+
+// DeckNameMax is the most a deck's name needs, and it is measured rather than
+// picked: the longest name a single-faced legendary creature prints under is
+// 41 characters ("Myojin of Night's Reach and Grim Betrayal"), and the longest
+// a double-faced one prints under is 58 ("Reidane, God of the Worthy //
+// Valkmira, Protector's Shield"). A deck is usually its commander and a theme,
+// so the cap has to clear the longer of those plus " -- Equipment Voltron" and
+// still stop somebody pasting a paragraph into a heading.
+//
+// Like PilotMax it is about the shelf and the page, not about people: this is
+// a title on a card and an `h1`, and past eighty characters it stops being
+// either.
+const DeckNameMax = 80
 
 // deckKeyOrder is the order `Deck.dump` writes top-level keys in. Used to
 // place a key the file does not have yet -- `stage` is absent from every deck

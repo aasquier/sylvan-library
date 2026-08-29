@@ -35,6 +35,7 @@ import {
   AddCardForm, AddNoteForm, NoteEditor, RationaleEditor, SlotArgumentPanel,
   StrategyEditor,
 } from '../components/deckedit'
+import { DeckNameHeading } from '../components/deckname'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
 import { CrossedSwordsGlyph, GoldfishGlyph } from '../components/glyphs'
@@ -337,7 +338,10 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{deck.name}</h1>
+            {/* The heading, and the pen beside it on a deck you own. A rename
+                changes what the deck is called and never where it lives. */}
+            <DeckNameHeading name={deck.name} writable={deck.writable}
+                             deckRef={deckRef} onRenamed={onRefresh} />
             {deck.bracket && <Badge>Bracket {deck.bracket}</Badge>}
             {deck.status === 'theoretical' && <Badge>theory</Badge>}
             {deck.stage === 'draft' && <Badge tone="warning">draft</Badge>}
