@@ -1,7 +1,11 @@
 package deckread
 
 import (
+	"bytes"
+	"encoding/json"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/deck"
 )
 
 // The pure helpers every deck payload is assembled from.
@@ -225,4 +229,52 @@ func sameStrings(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+// **The mark travels to the page, and only when there is one.**
+//
+// `why_by` is written into `deck.yaml` by `dump.go` and was then dropped on
+// the way out: `CardRow` never copied it and `CardJSON` had no field for it,
+// so the file knew which sentences Claude drafted and the deck page could not.
+// Since a drafted `why` satisfies `curated` (Aaron, 2026-08-28), this mark is
+// the only thing carrying that difference.
+//
+// Both directions are asserted. A mark that never appears and a mark that
+// appears on everything are the same bug to a reader, and `omitempty` means
+// the second one is a wire question rather than a rendering one.
+func TestARationaleSaysWhoDraftedIt(t *testing.T) {
+	t.Parallel()
+
+	drafted := CardRow(deck.CardEntry{
+		Name: "Sol Ring", Category: "ramp", Why: "Two mana on turn one.",
+		WhyBy: "claude", Qty: 1,
+	}, nil, false)
+	if drafted.WhyBy != "claude" {
+		t.Errorf("a drafted rationale reached the page as %q, want %q",
+			drafted.WhyBy, "claude")
+	}
+
+	written := CardRow(deck.CardEntry{
+		Name: "Cultivate", Category: "ramp", Why: "Fixes and ramps.", Qty: 1,
+	}, nil, false)
+	if written.WhyBy != "" {
+		t.Errorf("a rationale nobody marked carries %q", written.WhyBy)
+	}
+
+	// And the wire keeps the difference: a mark is a thing that is *there*,
+	// so the unmarked row must not carry an empty one for a reader to weigh.
+	body, err := json.Marshal(written)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if bytes.Contains(body, []byte("why_by")) {
+		t.Errorf("an unmarked rationale still serialised why_by: %s", body)
+	}
+	marked, err := json.Marshal(drafted)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !bytes.Contains(marked, []byte(`"why_by":"claude"`)) {
+		t.Errorf("a drafted rationale did not serialise its mark: %s", marked)
+	}
 }

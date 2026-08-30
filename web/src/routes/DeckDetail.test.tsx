@@ -2391,3 +2391,34 @@ describe('a deck somebody else owns', () => {
     expect(screen.getByText('Bulk entomb…')).toBeTruthy()
   })
 })
+
+/* Whose sentence this is (ADR 41).
+ *
+ * A drafted `why` satisfies `curated` — Aaron ruled that on 2026-08-28 — so
+ * `why_by` is the only thing separating a rationale Claude wrote from one the
+ * owner wrote. It was written faithfully into `deck.yaml` and then dropped on
+ * the way to the browser: `deckread.CardJSON` had no such field, so the page
+ * anybody actually reads their deck on could not tell them.
+ *
+ * Both directions, because a mark that never shows and a mark that shows on
+ * everything are the same bug to a reader.
+ */
+describe('a rationale says who drafted it', () => {
+  it('marks the ones Claude wrote', async () => {
+    vi.mocked(api.deck).mockResolvedValue({
+      ...DECK,
+      cards: [{ ...DECK.cards[0], why_by: 'claude' }],
+    } as unknown as Deck)
+    renderUnfolded()
+    expect(await screen.findByText('Ramp and threat in one card.')).toBeTruthy()
+    expect(screen.getByText('Claude drafted this')).toBeTruthy()
+  })
+
+  it('says nothing about a rationale a person wrote', async () => {
+    renderUnfolded()
+    expect(await screen.findByText('Ramp and threat in one card.')).toBeTruthy()
+    // The unmarked case is the overwhelmingly common one, and it must read as
+    // an absence rather than as a claim about authorship.
+    expect(screen.queryByText('Claude drafted this')).toBeNull()
+  })
+})

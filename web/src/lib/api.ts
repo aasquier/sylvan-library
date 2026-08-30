@@ -117,6 +117,11 @@ export interface Card {
   name: string
   category: string
   why: string
+  /** `"claude"` on a rationale the intake drafted, absent on one a person
+   *  wrote (ADR 41). Since a drafted `why` satisfies `curated`, this mark is
+   *  the only thing separating Claude's sentence from the owner's — so the
+   *  page has to be able to say which is which. */
+  why_by?: string
   qty: number
   known: boolean
   /** Which printing's art this deck picked for the slot, or "" for the
