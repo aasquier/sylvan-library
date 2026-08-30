@@ -1470,6 +1470,28 @@ export default function DeckDetail() {
                         <p className="mt-0.5 text-xs leading-relaxed"
                            style={{ color: 'var(--text-secondary)' }}>
                           <ManaText>{card.why}</ManaText>
+                          {/* **Whose sentence this is** (ADR 41). A drafted
+                              `why` satisfies `curated` — Aaron ruled that on
+                              2026-08-28 — so this mark is the only thing left
+                              separating Claude's words from the owner's, and
+                              until it was served the deck file said so
+                              faithfully while the page anybody actually reads
+                              could not. It goes the instant a person rewrites
+                              the sentence, because `SetCardField` drops
+                              `why_by`.
+
+                              Said in words rather than hung on a glyph with a
+                              `title`: a tooltip is hover-only, which is no
+                              phone and no keyboard, and this is a claim about
+                              authorship rather than a decoration. Same shape
+                              the bulk-edit preview already uses for the same
+                              fact. */}
+                          {card.why_by === 'claude' && (
+                            <span className="ml-1.5 whitespace-nowrap text-[10px] uppercase tracking-wide"
+                                  style={{ color: 'var(--text-muted)' }}>
+                              Claude drafted this
+                            </span>
+                          )}
                         </p>
                       ) : (
                         /* Where the draft's outstanding work actually is. The

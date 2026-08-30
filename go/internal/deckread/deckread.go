@@ -231,9 +231,22 @@ type CardJSON struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
 	Why      string `json:"why"`
-	Qty      int    `json:"qty"`
-	Art      string `json:"art"`
-	Known    bool   `json:"known"`
+	// WhyBy is `claude` on a rationale the intake drafted, and empty on one a
+	// person wrote (ADR 41). The tag is decoration: `MarshalJSON` below writes
+	// this row key by key, and that is where the key is actually emitted —
+	// and omitted, because a mark is a thing that is *there*.
+	//
+	// **It is served because it is the only thing carrying the difference.**
+	// Aaron ruled on 2026-08-28 that a drafted `why` satisfies `curated`, so
+	// the mark is all that separates eighty-four sentences Claude wrote from
+	// eighty-four the owner wrote — and until this field existed it was
+	// written faithfully into `deck.yaml` by `dump.go` and then dropped on the
+	// way to the only screen anybody reads their deck on. The file was honest
+	// and the page could not be.
+	WhyBy string `json:"why_by,omitempty"`
+	Qty   int    `json:"qty"`
+	Art   string `json:"art"`
+	Known bool   `json:"known"`
 	// The pool's facts, present only when known.
 	ManaCost      *string  `json:"mana_cost,omitempty"`
 	CMC           *float64 `json:"cmc,omitempty"`
@@ -261,8 +274,17 @@ type CardJSON struct {
 // the two hero fields only when asked. `omitempty` alone would drop a known
 // card's null `power`, which the payload writes.
 func (c CardJSON) MarshalJSON() ([]byte, error) {
-	out := []wire.KV{{Key: "name", Value: c.Name}, {Key: "category", Value: c.Category}, {Key: "why", Value: c.Why}, {Key: "qty", Value: c.Qty},
-		{Key: "art", Value: c.Art}, {Key: "known", Value: c.Known}}
+	out := []wire.KV{{Key: "name", Value: c.Name}, {Key: "category", Value: c.Category}, {Key: "why", Value: c.Why}}
+	// Beside the sentence it is about, and only when there is a mark to make.
+	// A mark is a thing that is *there*: writing `"why_by": ""` on every one
+	// of ninety-nine rows would hand the page an empty string to weigh on each
+	// of them, which is the shape a reader mistakes for "nobody drafted this"
+	// being a claim rather than an absence.
+	if c.WhyBy != "" {
+		out = append(out, wire.KV{Key: "why_by", Value: c.WhyBy})
+	}
+	out = append(out, wire.KV{Key: "qty", Value: c.Qty},
+		wire.KV{Key: "art", Value: c.Art}, wire.KV{Key: "known", Value: c.Known})
 	if c.Known {
 		out = append(out, wire.KV{Key: "mana_cost", Value: c.ManaCost}, wire.KV{Key: "cmc", Value: Deref(c.CMC)}, wire.KV{Key: "type_line", Value: c.TypeLine},
 			wire.KV{Key: "oracle_text", Value: c.OracleText}, wire.KV{Key: "color_identity", Value: c.ColorIdentity}, wire.KV{Key: "image", Value: c.Image},
@@ -285,7 +307,8 @@ func Deref(f *float64) any {
 }
 
 func CardRow(entry deck.CardEntry, rec *pool.CardRecord, full bool) CardJSON {
-	row := CardJSON{Name: entry.Name, Category: entry.Category, Why: entry.Why, Qty: entry.Qty,
+	row := CardJSON{Name: entry.Name, Category: entry.Category, Why: entry.Why,
+		WhyBy: entry.WhyBy, Qty: entry.Qty,
 		Art: entry.Art, Known: rec != nil, full: full}
 	if rec != nil {
 		cmc := rec.CMC
