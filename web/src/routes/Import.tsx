@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  api, deckUrl, errorMessage, followJob, type Correction, type ImportResult,
-  type IntakeSheet, type Job,
+  api, deckUrl, errorMessage, followJob, type CommanderCheck, type Correction,
+  type ImportResult, type IntakeSheet, type Job,
 } from '../lib/api'
 import { IntakeChoices } from '../components/intake'
 import {
@@ -11,6 +11,7 @@ import {
 import CameraDoor from '../components/camera'
 import {
   Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
+  type FieldAnswer,
 } from '../components/ui'
 
 /**
@@ -143,6 +144,87 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+/**
+ * What the library makes of the commander box, under the commander box.
+ *
+ * **The sentence is the answer and the ring is only the headline.** A green
+ * border says "yes" faster than words can, and says nothing at all about
+ * *why* a name was refused — so every state that is not `ready` carries a
+ * whole sentence written server-side, where the rules actually live, and this
+ * renders it rather than composing one (ADR 14: the gate decides, and the page
+ * repeats what it decided).
+ *
+ * `aria-live="polite"` because the answer arrives after the typing stops: a
+ * ring nobody can see is not an answer, and the same is true of a sentence
+ * that never reaches a screen reader (this has been half a room four times
+ * now, so it is written down here).
+ */
+function CommanderAnswer({
+  state, check, onPick,
+}: {
+  state: FieldAnswer
+  check: CommanderCheck | null
+  onPick: (name: string) => void
+}) {
+  const ink = state === 'ready' ? 'var(--status-good)'
+    : state === 'trouble' ? 'var(--status-serious)'
+      : state === 'unknown' ? 'var(--status-warning)'
+        : 'var(--text-muted)'
+  const offers = check?.did_you_mean ?? []
+  return (
+    <div id="commander-answer" aria-live="polite" className="space-y-2">
+      {state === 'asking' && (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Looking through the library&hellip;
+        </p>
+      )}
+      {state !== 'asking' && state !== 'blank' && check && (
+        <p className="text-xs leading-relaxed" style={{ color: ink }}>
+          {check.sentence}
+        </p>
+      )}
+      {check?.commanders.map((seat) => (
+        <p key={seat.name} className="flex flex-wrap items-center gap-x-2 text-xs"
+           style={{ color: 'var(--text-muted)' }}>
+          <span>{seat.type_line}</span>
+          {seat.mana_cost && <ManaText>{seat.mana_cost}</ManaText>}
+          {seat.pairing && <span>{seat.pairing}</span>}
+        </p>
+      ))}
+      {offers.map((offer) => (
+        <div key={offer.written} className="flex flex-wrap items-center gap-2">
+          {offer.candidates.map((seat) => {
+            // A card that cannot lead is offered and MARKED, never hidden:
+            // hiding it is indistinguishable from the card not existing, and
+            // somebody who typed a card they own would be told it is not real.
+            //
+            // The mark is written on the chip and NOT in a `title`. A tooltip
+            // is hover-only, which is no phone and no keyboard — half the room
+            // told nothing, four separate times on this site before it was
+            // written down.
+            const leads = seat.may_command && seat.legal_commander
+            return (
+              <button
+                key={seat.name}
+                type="button"
+                onClick={() => onPick(seat.name)}
+                className={`chip-offer rounded-full px-3 py-1 text-xs${
+                  leads ? '' : ' is-aside'}`}>
+                {seat.name}
+                {/* The mark's colour lives in the stylesheet, NOT inline. An
+                    inline `color` outranks every `:hover` that could ever
+                    reach it, which is how a hundred controls on this site
+                    went quiet under the hand (commandment 20). */}
+                {!leads && <span className="chip-offer-mark">&middot; cannot lead</span>}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Import() {
   const navigate = useNavigate()
   const [text, setText] = useState('')
@@ -191,6 +273,51 @@ export default function Import() {
   // Typing a name fills the slug, until the slug is edited by hand.
   const [slugTouched, setSlugTouched] = useState(false)
   const effectiveSlug = slugTouched ? slug : slugify(name)
+
+  // What the library makes of the commander box.
+  //
+  // **The answer carries the question it answers, and that is the whole
+  // design.** A bare `check` plus a separate `asking` flag has to be kept in
+  // step by hand, and the state it gets wrong is the dangerous one: a green
+  // ring still lit under a name two letters further along. Storing the query
+  // beside its answer makes "is this answer about what is in the box right
+  // now" a comparison rather than a promise, so a stale answer cannot be
+  // rendered even in principle.
+  const [answered, setAnswered] =
+    useState<{ asked: string; check: CommanderCheck } | null>(null)
+  const typedCommander = commander.trim()
+  const commanderCheck =
+    answered && answered.asked === typedCommander ? answered.check : null
+  const commanderState: FieldAnswer = !typedCommander
+    ? 'blank'
+    : commanderCheck ? commanderCheck.state : 'asking'
+
+  useEffect(() => {
+    const typed = commander.trim()
+    if (!typed) return
+    // **Debounced, and the timer is the cancel.** A lookup per keystroke would
+    // ask the library thirty times over for one commander's name — so the
+    // pending question is dropped whenever another letter lands, and `live`
+    // drops an answer this field has already moved past.
+    let live = true
+    const timer = setTimeout(() => {
+      api.checkCommander(typed)
+        .then((check) => { if (live) setAnswered({ asked: typed, check }) })
+        // Answered as blank rather than left spinning, and never as an error.
+        // This box is a courtesy on an optional field: if the library cannot
+        // be reached the import itself will say so where errors belong, and a
+        // complaint under a half-typed name would be the interface shouting
+        // about its own plumbing (commandment 10, commandment 2).
+        .catch(() => {
+          if (live) {
+            setAnswered({ asked: typed, check: {
+              state: 'blank', sentence: '', commanders: [], did_you_mean: [],
+            } })
+          }
+        })
+    }, 320)
+    return () => { live = false; clearTimeout(timer) }
+  }, [commander])
 
   function body(dryRun: boolean, override?: string) {
     return {
@@ -412,8 +539,19 @@ export default function Import() {
 1 Acidic Slime (ZNC) 59{' '}
               <span style={{ color: 'var(--series-1)' }}>
                 &quot;Deathtouch body that kills artifacts too&quot;
+              </span>{' '}
+              <span style={{ color: 'var(--vine)' }}>
+                [interaction]
               </span>
             </pre>
+            <p className="text-xs leading-relaxed">
+              The word in <span style={{ color: 'var(--vine)' }}>[square
+              brackets]</span> is optional too, and it files the card:{' '}
+              <code>ramp</code>, <code>interaction</code>, <code>threat</code>,{' '}
+              <code>card-advantage</code> and the rest of the shelves this
+              library sorts by. A word it does not know is mentioned once and
+              costs the card nothing — it lands filed as usual, reason intact.
+            </p>
             <p className="text-xs leading-relaxed">
               Cards you leave unquoted are counted, never invented — nothing
               here writes a reason on your behalf.
@@ -490,8 +628,17 @@ export default function Import() {
           <TextField label="Slug" value={effectiveSlug}
                      onChange={(v) => { setSlugTouched(true); setSlug(v) }}
                      placeholder="arahbo-cats" />
+          {/* The one field on this page that can be checked while it is being
+              typed, so it is. A commander is the fact everything else about a
+              deck hangs off — its colours, its gate, its whole first
+              screen — and the difference between a green ring now and an
+              `unknown-card` after a preview is the difference between a typo
+              and a mystery (commandment 2). */}
           <TextField label="Commander" value={commander} onChange={setCommander}
+                     answer={commanderState} describedBy="commander-answer"
                      placeholder="blank uses the list's own; a pair is A + B" />
+          <CommanderAnswer state={commanderState} check={commanderCheck}
+                           onPick={setCommander} />
           <TextField label="Companion" value={companion} onChange={setCompanion}
                      placeholder="optional; sits outside the 100" />
           <div className="flex flex-wrap gap-3">

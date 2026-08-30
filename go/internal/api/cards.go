@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -12,7 +13,9 @@ import (
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/cards"
+	"github.com/aasquier/sylvan-library/go/internal/deckimport"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
+	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
@@ -164,6 +167,264 @@ func (a *API) suggest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.JSON(w, http.StatusOK, map[string]any{"cards": out})
+}
+
+// ---- the commander field ---------------------------------------------------
+
+// commanderSeat is one card considered for the command zone.
+//
+// No picture and no painter, deliberately. This answers a text field while
+// somebody is still typing in it, and a card image owes a credit in the same
+// room it renders in (commandment 19, ADR 32) -- a strip under an input is not
+// that room. The cost, the type line and the identity are what confirm a
+// commander anyway: they are the three things you check before sleeving one.
+type commanderSeat struct {
+	Name          string   `json:"name"`
+	ManaCost      *string  `json:"mana_cost"`
+	TypeLine      string   `json:"type_line"`
+	ColorIdentity []string `json:"color_identity"`
+	// MayCommand is the rules question -- legendary creature, or a card that
+	// says it can be your commander, or a Background when a pair is being
+	// read. LegalCommander is the format question, and they fail apart: a
+	// banned legend answers true and false.
+	MayCommand     bool `json:"may_command"`
+	LegalCommander bool `json:"legal_commander"`
+	// Pairing is how this card partners, in words, or "" for a card that
+	// does not. It is what makes "write both names" actionable rather than
+	// mysterious when somebody types half of a pair.
+	Pairing string  `json:"pairing"`
+	Score   float64 `json:"score"`
+}
+
+// commanderOffer is one written name and the cards it might have been.
+type commanderOffer struct {
+	Written    string          `json:"written"`
+	Candidates []commanderSeat `json:"candidates"`
+}
+
+// commanderAnswer is what the import page's commander box is told.
+//
+// `state` is the field's own condition and the only thing the border reads:
+// `blank`, `ready`, `trouble`, `unknown`. `sentence` is always a whole
+// sentence a newcomer can act on, never a code and never a scold.
+type commanderAnswer struct {
+	State      string           `json:"state"`
+	Sentence   string           `json:"sentence"`
+	Commanders []commanderSeat  `json:"commanders"`
+	DidYouMean []commanderOffer `json:"did_you_mean"`
+	Message    string           `json:"message,omitempty"`
+}
+
+// commanderOffers is how many near names one unknown entry is offered.
+const commanderOffers = 5
+
+// seatOf describes one card. `name` is how the card should be SPELLED back --
+// the front face for a double-faced card somebody wrote by its front face,
+// exactly as `deckimport.CanonicalName` spells it and for the same reason: the
+// library writes face names, and answering "Etali, Primal Conqueror" with
+// "Etali, Primal Conqueror // Etali, Primal Sickness" would be this box
+// disagreeing with the import it sits above.
+func seatOf(name string, rec *pool.CardRecord, paired bool, score float64) commanderSeat {
+	seat := commanderSeat{Name: name, ManaCost: rec.ManaCost,
+		TypeLine: rec.TypeLine, ColorIdentity: rec.ColorIdentity,
+		MayCommand: gate.CanBeCommander(rec, paired),
+		// A Background can never lead alone, but it is a legal commander in a
+		// pair -- so the seat says what it is either way, and the sentence
+		// beside it is what explains the difference.
+		LegalCommander: rec.LegalCommander, Score: score}
+	if p := gate.PairingOf(rec); p != nil {
+		seat.Pairing = p.Describe()
+	}
+	return seat
+}
+
+// commanderCheck is `GET /api/cards/commander` -- what the import page's
+// commander box is answered with while somebody types in it.
+//
+// Private, like every other card route: nothing is added to the door's
+// allowlist, so it is refused without a session before routing, which is the
+// same posture as the import it serves.
+//
+// **Its own route rather than a flag on `/api/cards/suggest`, and the reason
+// is that they answer different questions.** Suggest answers "which cards are
+// named like this", and its `legal_commander` is the *format's* answer --
+// whether the card is legal in Commander at all, which is true of Sol Ring.
+// Whether a card may sit in the command zone is `gate.CanBeCommander`, a
+// different fact entirely, and neither one implies the other. Nor can a
+// typeahead read `Tymna the Weaver + Thrasios, Triton Hero`: one field can be
+// holding two commanders, deciding that takes a card pool (`CommanderReading`,
+// the same one the import itself uses), and whether the two may sit together
+// is a third fact again (`gate.CheckPair`). So this route answers about the
+// FIELD, and the suggest route still answers about a name.
+//
+// Every fact in the answer is deterministic (ADR 14): the pool knows the
+// cards, the gate knows the rules, and nothing here is an opinion.
+//
+// **A near name is offered, never hidden**, and commanders are listed first
+// rather than alone -- the same argument `suggest` records above. Somebody who
+// typed a card that cannot lead is told which card they typed and why it
+// cannot, which is the diagnosis; a filtered list would have said "no such
+// card" about a card they own.
+func (a *API) commanderCheck(w http.ResponseWriter, r *http.Request) {
+	text := strings.TrimSpace(last(r.URL.Query(), "q"))
+	out := commanderAnswer{State: "blank", Commanders: []commanderSeat{},
+		DidYouMean: []commanderOffer{}}
+	if text == "" {
+		wire.JSON(w, http.StatusOK, out)
+		return
+	}
+
+	ctx := r.Context()
+	err := a.usePool(ctx, func(c *pool.Conn) error {
+		// Both readings fetched at once, exactly as the import fetches them,
+		// so the choice below is made by lookup rather than by guessing.
+		names := []string{text}
+		for _, parts := range deckimport.PairParts(text) {
+			names = append(names, parts...)
+		}
+		records, err := c.GetCards(ctx, names)
+		if err != nil {
+			return err
+		}
+		wanted, _ := deckimport.CommanderReading([]string{text}, records)
+		paired := len(wanted) > 1
+
+		missing, seated := []string{}, []*pool.CardRecord{}
+		for _, written := range wanted {
+			canonical, rec := deckimport.CanonicalName(written, records)
+			if rec == nil {
+				missing = append(missing, canonical)
+				continue
+			}
+			seated = append(seated, rec)
+			out.Commanders = append(out.Commanders, seatOf(canonical, rec, paired, 1))
+		}
+		if len(missing) > 0 {
+			out.State, out.Sentence = "unknown", unknownSentence(missing)
+			offers, err := commanderNearby(ctx, c, missing, paired)
+			if err != nil {
+				return err
+			}
+			out.DidYouMean = offers
+			return nil
+		}
+		out.State, out.Sentence = commanderVerdict(out.Commanders, seated)
+		return nil
+	})
+	if errors.Is(err, pool.ErrNoPool) {
+		// The field cannot be answered at all, so it says nothing rather than
+		// answering `unknown` -- a red box over a correctly-typed commander is
+		// worse than no box.
+		wire.JSON(w, http.StatusOK, commanderAnswer{State: "blank",
+			Commanders: []commanderSeat{}, DidYouMean: []commanderOffer{},
+			Message: noPoolMessage})
+		return
+	}
+	if err != nil {
+		a.fail(w, "commander check", err)
+		return
+	}
+	wire.JSON(w, http.StatusOK, out)
+}
+
+// commanderVerdict reads the resolved seats into a state and a sentence.
+// `seats` and `seated` are the same cards in the same order, wire-side and
+// pool-side.
+func commanderVerdict(seats []commanderSeat, seated []*pool.CardRecord) (string, string) {
+	if len(seats) == 0 {
+		// Only blanks were written, which the trim in the handler should
+		// already have caught. Answered rather than left to fall through to
+		// `ready`, which would light the box green over nothing.
+		return "blank", ""
+	}
+	if len(seats) > 2 {
+		return "trouble", fmt.Sprintf("A deck is led by one commander, or by two "+
+			"that pair with each other. This reads as %d names — write one, or "+
+			"two with a + between them.", len(seats))
+	}
+	for i, seat := range seats {
+		if !seat.MayCommand {
+			// A Background typed alone is the one near-miss that earns its own
+			// sentence: the card IS a command-zone card, it simply cannot go
+			// there alone, and "that is not a commander" would be a flat lie
+			// about it -- the exact shape of thing commandment 2 forbids.
+			if gate.IsBackground(seated[i]) {
+				return "trouble", fmt.Sprintf("%s is a Background. It rides along "+
+					"with a commander that chooses one, so write both names with "+
+					"a + between them.", seat.Name)
+			}
+			return "trouble", fmt.Sprintf("%s is a real card, but it cannot sit "+
+				"in the command zone. A commander is a legendary creature — or "+
+				"a card whose text says it can be your commander.", seat.Name)
+		}
+		if !seat.LegalCommander {
+			return "trouble", fmt.Sprintf("%s could sit in the command zone, but "+
+				"it is not legal in Commander, so it cannot lead a deck.", seat.Name)
+		}
+	}
+	if len(seats) == 2 {
+		if why := gate.CheckPair(seated[0], seated[1]); why != "" {
+			return "trouble", fmt.Sprintf("%s and %s cannot lead together: %s.",
+				seats[0].Name, seats[1].Name, why)
+		}
+		return "ready", fmt.Sprintf("%s and %s can lead this deck together.",
+			seats[0].Name, seats[1].Name)
+	}
+	return "ready", fmt.Sprintf("%s can lead this deck.", seats[0].Name)
+}
+
+// unknownSentence says which typed names are not cards, without scolding
+// anybody for a typo (commandment 2).
+func unknownSentence(missing []string) string {
+	if len(missing) == 1 {
+		return fmt.Sprintf("No card here is called %s. Check the spelling, pick "+
+			"one below, or leave this blank and the list's own commander line "+
+			"will be used.", wire.Quote(missing[0]))
+	}
+	return fmt.Sprintf("%d of those names are not cards here: %s. Pick from "+
+		"below, or leave this blank and the list's own commander line will be "+
+		"used.", len(missing), strings.Join(missing, ", "))
+}
+
+// commanderNearby is the shortlist for each name the pool did not know, with
+// the cards that may actually command listed first.
+func commanderNearby(ctx context.Context, c *pool.Conn, missing []string,
+	paired bool) ([]commanderOffer, error) {
+
+	offers := []commanderOffer{}
+	for _, written := range missing {
+		found, err := cards.Suggest(ctx, c, written, commanderOffers)
+		if err != nil {
+			return nil, err
+		}
+		names := make([]string, 0, len(found))
+		for _, s := range found {
+			names = append(names, s.Name)
+		}
+		records, err := c.GetCards(ctx, names)
+		if err != nil {
+			return nil, err
+		}
+		leads, rest := []commanderSeat{}, []commanderSeat{}
+		for _, s := range found {
+			rec := records[s.Name]
+			if rec == nil {
+				// The pool moved between the two queries. Dropped rather than
+				// half-rendered: a row with no card behind it is a row
+				// somebody would click.
+				continue
+			}
+			seat := seatOf(rec.Name, rec, paired, math.Round(s.Score*10000)/10000)
+			if seat.MayCommand && seat.LegalCommander {
+				leads = append(leads, seat)
+				continue
+			}
+			rest = append(rest, seat)
+		}
+		offers = append(offers, commanderOffer{Written: written,
+			Candidates: append(leads, rest...)})
+	}
+	return offers, nil
 }
 
 // identifiedCard is `service._identified_card`: the compact card a camera

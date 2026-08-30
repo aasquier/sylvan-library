@@ -10,7 +10,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ClaudeStatus, ImportResult, Job, StanceView } from '../lib/api'
+import type {
+  ClaudeStatus, CommanderCheck, CommanderSeat, ImportResult, Job, StanceView,
+} from '../lib/api'
 import Import from './Import'
 
 const navigate = vi.fn()
@@ -30,7 +32,14 @@ vi.mock('../lib/api', async () => ({
   // this page meets it: one decides what the sheet shows, the other carries
   // the submit. They are mocked side by side because the question worth asking
   // is whether the same value reaches both.
-  api: { importDeck: vi.fn(), claudeStatus: vi.fn(), intake: vi.fn() },
+  // `checkCommander` is what the commander box asks while somebody types in
+  // it. Mocked here as well as reset below because an unmocked method is
+  // `undefined`, and every test that renders this page would throw out of a
+  // debounce timer with nothing to say which test it belonged to.
+  api: {
+    importDeck: vi.fn(), claudeStatus: vi.fn(), intake: vi.fn(),
+    checkCommander: vi.fn(),
+  },
   // Stubbed: this file asks what the page *sends*, and the real poller would
   // put a timer between the click and the assertion for nothing.
   followJob: vi.fn(),
@@ -134,6 +143,34 @@ function decidedWith(): string | undefined {
   return vi.mocked(api.claudeStatus).mock.calls.at(-1)?.[0]?.stance
 }
 
+function commanderCheck(overrides: Partial<CommanderCheck> = {}): CommanderCheck {
+  return {
+    state: 'blank', sentence: '', commanders: [], did_you_mean: [], ...overrides,
+  }
+}
+
+function seat(overrides: Partial<CommanderSeat> = {}): CommanderSeat {
+  return {
+    name: 'Arahbo, Roar of the World', mana_cost: '{3}{G}{W}',
+    type_line: 'Legendary Creature — Cat Avatar', color_identity: ['G', 'W'],
+    may_command: true, legal_commander: true, pairing: '', score: 1, ...overrides,
+  }
+}
+
+/**
+ * Type a commander and wait for the box to have actually asked about it.
+ *
+ * Real timers, not fake ones: this file has thirty-eight tests that predate
+ * the debounce and none of them expects a frozen clock, and installing one
+ * globally to save 320ms would be a change to every test in the room.
+ */
+async function typeCommander(text: string) {
+  fireEvent.change(screen.getByLabelText('Commander'), { target: { value: text } })
+  await waitFor(
+    () => expect(api.checkCommander).toHaveBeenCalledWith(text.trim()),
+    { timeout: 3000 })
+}
+
 beforeEach(() => {
   navigate.mockReset()
   vi.mocked(api.importDeck).mockReset().mockResolvedValue(result())
@@ -142,6 +179,9 @@ beforeEach(() => {
   // for every test that is not about it.
   vi.mocked(api.claudeStatus).mockReset().mockResolvedValue(dial(false))
   vi.mocked(api.intake).mockReset().mockResolvedValue(job())
+  // The commander box asks nothing of the tests that are not about it: a
+  // blank answer leaves the field looking exactly as it always did.
+  vi.mocked(api.checkCommander).mockReset().mockResolvedValue(commanderCheck())
   vi.mocked(followJob).mockReset().mockReturnValue({
     promise: Promise.resolve(job()), cancel: () => {},
   })
@@ -270,6 +310,141 @@ describe('Import', () => {
     fireEvent.click(screen.getByText('Preview'))
     await waitFor(() => expect(api.importDeck).toHaveBeenCalled())
     expect(vi.mocked(api.importDeck).mock.calls[0]?.[0].commander).toEqual([])
+  })
+
+  // ------------------------------------------- the commander box, as you type
+
+  it('asks nothing at all while the commander box is empty', async () => {
+    renderImport()
+    fireEvent.change(screen.getByLabelText('Commander'), { target: { value: '  ' } })
+    await new Promise((r) => setTimeout(r, 500))
+    // Whitespace is not a name, and a lookup for one would light the box up
+    // over nothing.
+    expect(api.checkCommander).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Commander').className).toContain('is-blank')
+  })
+
+  it('sends the box whole, so the pool decides one commander from two', async () => {
+    renderImport()
+    await typeCommander('Arahbo, Roar of the World')
+    // The same rule the import body follows: a comma is part of a legendary
+    // creature's name far more often than it separates two of them, and
+    // splitting here would ask about two cards that do not exist.
+    expect(api.checkCommander).toHaveBeenCalledWith('Arahbo, Roar of the World')
+  })
+
+  it('lights the field green, in the markup and in words, for a real commander', async () => {
+    vi.mocked(api.checkCommander).mockResolvedValue(commanderCheck({
+      state: 'ready',
+      sentence: 'Arahbo, Roar of the World can lead this deck.',
+      commanders: [seat()],
+    }))
+    renderImport()
+    await typeCommander('Arahbo, Roar of the World')
+    await waitFor(() =>
+      expect(screen.getByLabelText('Commander').className).toContain('is-ready'))
+    // The ring is the headline and the sentence is the answer: a green border
+    // alone says nothing a screen reader can hear.
+    expect(screen.getByText('Arahbo, Roar of the World can lead this deck.'))
+      .toBeTruthy()
+    expect(screen.getByText('Legendary Creature — Cat Avatar')).toBeTruthy()
+  })
+
+  it('never leaves a stale answer lit under a name that has moved on', async () => {
+    vi.mocked(api.checkCommander).mockResolvedValue(commanderCheck({
+      state: 'ready', sentence: 'Arahbo, Roar of the World can lead this deck.',
+      commanders: [seat()],
+    }))
+    renderImport()
+    await typeCommander('Arahbo, Roar of the World')
+    await waitFor(() =>
+      expect(screen.getByLabelText('Commander').className).toContain('is-ready'))
+    // One more letter and the green must go out at once, before any answer
+    // about the new text has arrived. A ring that lags is a ring that lies.
+    fireEvent.change(screen.getByLabelText('Commander'),
+      { target: { value: 'Arahbo, Roar of the Worldd' } })
+    expect(screen.getByLabelText('Commander').className).toContain('is-asking')
+    expect(screen.queryByText('Arahbo, Roar of the World can lead this deck.'))
+      .toBeNull()
+  })
+
+  it('says why a real card cannot lead, rather than calling it unknown', async () => {
+    vi.mocked(api.checkCommander).mockResolvedValue(commanderCheck({
+      state: 'trouble',
+      sentence: 'Sol Ring is a real card, but it cannot sit in the command zone.',
+      commanders: [seat({
+        name: 'Sol Ring', type_line: 'Artifact', may_command: false,
+      })],
+    }))
+    renderImport()
+    await typeCommander('Sol Ring')
+    await waitFor(() =>
+      expect(screen.getByLabelText('Commander').className).toContain('is-trouble'))
+    expect(screen.getByText(
+      'Sol Ring is a real card, but it cannot sit in the command zone.')).toBeTruthy()
+  })
+
+  it('offers near names as buttons, and accepting one fills the field', async () => {
+    vi.mocked(api.checkCommander).mockResolvedValue(commanderCheck({
+      state: 'unknown',
+      sentence: "No card here is called 'Arahbo, Roar of the Wrld'.",
+      did_you_mean: [{
+        written: 'Arahbo, Roar of the Wrld',
+        candidates: [seat({ score: 0.98 })],
+      }],
+    }))
+    renderImport()
+    await typeCommander('Arahbo, Roar of the Wrld')
+    await waitFor(() =>
+      expect(screen.getByLabelText('Commander').className).toContain('is-unknown'))
+    const offer = screen.getByText('Arahbo, Roar of the World').closest('button')!
+    // A suggestion changes what is in front of you rather than taking you
+    // anywhere, so it is a button wearing a chip — never a link (commandment
+    // 20) — and it answers the hand through `.chip-offer` (commandment 17).
+    expect(offer.tagName).toBe('BUTTON')
+    expect(offer.className).toContain('chip-offer')
+    expect(offer.getAttribute('aria-pressed')).toBeNull()
+    fireEvent.click(offer)
+    expect((screen.getByLabelText('Commander') as HTMLInputElement).value)
+      .toBe('Arahbo, Roar of the World')
+  })
+
+  it('offers a card that cannot lead, marked rather than hidden', async () => {
+    vi.mocked(api.checkCommander).mockResolvedValue(commanderCheck({
+      state: 'unknown',
+      sentence: "No card here is called 'Sol Rng'.",
+      did_you_mean: [{
+        written: 'Sol Rng',
+        candidates: [seat({
+          name: 'Sol Ring', type_line: 'Artifact', may_command: false,
+        })],
+      }],
+    }))
+    renderImport()
+    await typeCommander('Sol Rng')
+    await waitFor(() => expect(screen.getByText('Sol Ring')).toBeTruthy())
+    const offer = screen.getByText('Sol Ring').closest('button')!
+    // Hiding it is indistinguishable from the card not existing, so it is
+    // marked — and the mark is on the chip, not in a `title` no phone and no
+    // keyboard would ever reach.
+    expect(offer.className).toContain('is-aside')
+    expect(offer.textContent).toContain('cannot lead')
+    expect(offer.getAttribute('title')).toBeNull()
+  })
+
+  it('says nothing at all when the lookup fails', async () => {
+    // Built per call, never handed to `mockRejectedValue` once: a single
+    // rejected promise made at mock-setup time is an unhandled rejection the
+    // moment nothing awaits it, and it fails a test that never ran.
+    vi.mocked(api.checkCommander).mockImplementation(
+      () => Promise.reject(new ApiError('the library is unreachable', 500)))
+    renderImport()
+    await typeCommander('Arahbo, Roar of the World')
+    // The box is a courtesy on an optional field. It settles rather than
+    // spinning, and it never turns the plumbing into a complaint on screen.
+    await waitFor(() =>
+      expect(screen.getByLabelText('Commander').className).toContain('is-blank'))
+    expect(screen.queryByText(/unreachable/)).toBeNull()
   })
 
   // -------------------------------------------------------------- the report

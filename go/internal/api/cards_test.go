@@ -418,9 +418,161 @@ func TestLoreResolvesNamesAndCountsTheDropped(t *testing.T) {
 	}
 }
 
+// The import page's commander box, answered while somebody types in it.
+//
+// The four states are the contract, because the border reads `state` and
+// nothing else: a green box over a card that cannot lead is the bug this route
+// exists to prevent.
+func TestTheCommanderBoxAnswersTheFieldRatherThanTheName(t *testing.T) {
+	t.Parallel()
+	a := New(Config{Pool: pooltest.Open(t)})
+	for _, tc := range []struct {
+		name, typed, state string
+		says               []string
+		why                string
+	}{
+		{
+			name: "nothing typed", typed: "", state: "blank",
+			why: "a blank box is the documented way to use the list's own commander",
+		},
+		{
+			name: "a legendary creature", typed: "Gyome, Master Chef", state: "ready",
+			says: []string{"Gyome, Master Chef", "can lead this deck"},
+			why:  "the comma is part of the name, and one lookup settles it",
+		},
+		{
+			name: "the same name in the wrong case", typed: "gyome, master chef", state: "ready",
+			says: []string{"Gyome, Master Chef"},
+			why:  "the pool resolves casing, so a person typing in lower case is not wrong",
+		},
+		{
+			name: "a card that is not a commander", typed: "Sol Ring", state: "trouble",
+			says: []string{"Sol Ring", "cannot sit in the command zone", "legendary creature"},
+			why: "`legal_commander` is true of Sol Ring, so the format's answer " +
+				"would have lit this box green -- the rules question is a different one",
+		},
+		{
+			name: "a legend that is banned", typed: "Emrakul, the Aeons Torn", state: "trouble",
+			says: []string{"Emrakul, the Aeons Torn", "not legal in Commander"},
+			why:  "it may sit in the command zone and still may not lead a deck",
+		},
+		{
+			name: "two legends that do not pair", typed: "Gyome, Master Chef + Goreclaw, Terror of Qal Sisma",
+			state: "trouble",
+			says:  []string{"cannot lead together", "pairing ability"},
+			why:   "a pair is a third fact again, and the gate's own sentence says which",
+		},
+		{
+			name: "a misspelling", typed: "Gyome, Master Cheff", state: "unknown",
+			says: []string{"No card here is called", "Gyome, Master Cheff"},
+			why:  "a wrong name gets help, and the shortlist is the help",
+		},
+		{
+			name: "a double-faced card by its front face", typed: "Etali, Primal Conqueror",
+			state: "ready", says: []string{"Etali, Primal Conqueror can lead this deck"},
+			why: "the library writes face names, so answering with the combined " +
+				"name would be this box disagreeing with the import below it",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			status, body, raw := call(t, a, "GET",
+				"/api/cards/commander?q="+url.QueryEscape(tc.typed), "")
+			if status != 200 {
+				t.Fatalf("%d %s", status, raw)
+			}
+			if body["state"] != tc.state {
+				t.Fatalf("state is %v, wanted %q (%s): %s",
+					body["state"], tc.state, tc.why, raw)
+			}
+			sentence, _ := body["sentence"].(string)
+			for _, want := range tc.says {
+				if !strings.Contains(sentence, want) {
+					t.Errorf("the sentence does not say %q (%s): %q", want, tc.why, sentence)
+				}
+			}
+			// Every state answers with both lists present, so the browser never
+			// reads a null where it expects to iterate.
+			for _, key := range []string{"commanders", "did_you_mean"} {
+				if _, ok := body[key].([]any); !ok {
+					t.Errorf("%q is not a list: %s", key, raw)
+				}
+			}
+		})
+	}
+}
+
+// The shortlist offers cards that cannot lead, marked, rather than hiding
+// them -- the same argument the typeahead records, and for the same reason: a
+// card hidden from the list is indistinguishable from a card that does not
+// exist. Commanders come first so the marking costs nobody a scroll.
+func TestTheCommanderBoxOffersNearNamesWithTheOnesThatCanLeadFirst(t *testing.T) {
+	t.Parallel()
+	a := New(Config{Pool: pooltest.Open(t)})
+	_, body, raw := call(t, a, "GET", "/api/cards/commander?q=Sol+Rng", "")
+	offers := body["did_you_mean"].([]any)
+	if len(offers) != 1 {
+		t.Fatalf("%d offers for one unknown name: %s", len(offers), raw)
+	}
+	offer := offers[0].(map[string]any)
+	if offer["written"] != "Sol Rng" {
+		t.Fatalf("the offer does not say what was written: %s", raw)
+	}
+	rows := offer["candidates"].([]any)
+	if len(rows) == 0 {
+		t.Fatalf("a misspelling offered nothing: %s", raw)
+	}
+	row := rows[0].(map[string]any)
+	for _, key := range []string{"name", "mana_cost", "type_line", "color_identity",
+		"may_command", "legal_commander", "pairing", "score"} {
+		if _, ok := row[key]; !ok {
+			t.Errorf("a candidate lacks %q: %s", key, raw)
+		}
+	}
+	// Sol Ring is offered, and marked as unable to lead rather than dropped.
+	if row["name"] != "Sol Ring" {
+		t.Fatalf("Sol Rng did not offer Sol Ring: %s", raw)
+	}
+	if row["may_command"] != false || row["legal_commander"] != true {
+		t.Fatalf("Sol Ring is legal in Commander and cannot lead a deck; the row "+
+			"says otherwise: %v", row)
+	}
+	// A picture is deliberately absent: this strip sits under a text field, and
+	// a card image owes its painter a credit in the room it renders in.
+	for _, key := range []string{"image", "art_crop", "artist"} {
+		if _, ok := row[key]; ok {
+			t.Errorf("the field's answer carries %q, which owes a credit it has "+
+				"nowhere to print: %s", key, raw)
+		}
+	}
+	// The ones that can lead sort ahead of the ones that cannot.
+	_, near, nearRaw := call(t, a, "GET", "/api/cards/commander?q=Gyome+Master+Che", "")
+	for _, o := range near["did_you_mean"].([]any) {
+		seen := false
+		for _, c := range o.(map[string]any)["candidates"].([]any) {
+			row := c.(map[string]any)
+			leads := row["may_command"] == true && row["legal_commander"] == true
+			if !leads {
+				seen = true
+				continue
+			}
+			if seen {
+				t.Fatalf("%v can lead and is listed below one that cannot: %s",
+					row["name"], nearRaw)
+			}
+		}
+	}
+}
+
 func TestWithoutAPoolTheAnswersDegradeToTheRecordedShapes(t *testing.T) {
 	t.Parallel()
 	a := New(Config{})
+	// The commander box says nothing at all rather than `unknown`: a red box
+	// over a correctly-typed commander is worse than no box.
+	if _, body, raw := call(t, a, "GET", "/api/cards/commander?q=Gyome", ""); body["message"] == nil ||
+		body["state"] != "blank" || len(body["commanders"].([]any)) != 0 {
+		t.Fatalf("commander: %s", raw)
+	}
 	if _, body, _ := call(t, a, "GET", "/api/cards/search?q=sol", ""); body["total"] != float64(0) || body["message"] == nil {
 		t.Fatalf("search: %v", body)
 	}

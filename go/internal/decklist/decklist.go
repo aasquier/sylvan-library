@@ -50,6 +50,27 @@
 // or a reason. Without a pool both readings are equally good -- so the
 // leading-number reading wins outright, and the quoted one is handed up as a
 // pair for something that can measure to choose from.
+//
+// **The category column.** A line may end with a bracketed word, after the
+// rationale: `1 Llanowar Elves "one-mana ramp" [ramp]`. It is peeled into
+// `Card.Category` and it is deliberately the LAST column, so the two house
+// extensions never compete for the same characters.
+//
+// Brackets rather than a second quoted run, and the reason is measured rather
+// than preferred: **no card name in the pool contains `[` or `]`** -- 0 of
+// 35,393 oracle names and 0 printing names, checked 2026-08-30 -- while twelve
+// contain a quote and five END with one, which is the whole reason the quoted
+// column needs two readings carried up. A bracket can be peeled outright.
+//
+// The token is carried up **verbatim**, and that is this package's first rule
+// again rather than an oversight: a category means something to the app and
+// nothing to a grammar, so `deckimport` folds it against the real vocabulary
+// and reports what it could not place. Peeling `[Ramp{top}]` down to `Ramp` is
+// the one liberty taken, because the brace suffix is Archidekt's cursor
+// position rather than part of the word -- and Archidekt is why this column is
+// bracketed at all: it has been writing the deck's own category in exactly
+// this position, in exactly these brackets, since long before we read it.
+// `[Commander]` keeps its old meaning and is not a category.
 package decklist
 
 import (
@@ -186,6 +207,12 @@ type Card struct {
 	// it and a caller without one can ignore the field and still be right
 	// about every line that is not one of the five.
 	Unpeeled string
+	// Category is the bracketed column, "" when the line carried none. The
+	// word is verbatim but for a trimmed `{...}` suffix -- unfolded, unmapped
+	// and unjudged, because what counts as a category is the app's fact and
+	// not the grammar's. `[Commander]` never lands here: it is the section
+	// marker it has always been.
+	Category string
 }
 
 // Line is a line that was not turned into a card, with its number.
@@ -275,7 +302,7 @@ func Parse(text string) List {
 			continue
 		}
 
-		body, markers, why, rawWhole := stripAnnotations(line)
+		body, markers, why, rawWhole, category := stripAnnotations(line)
 		qty, name := stripLeading(body)
 		whole := ""
 		if rawWhole != "" {
@@ -308,7 +335,7 @@ func Parse(text string) List {
 			where = "commander"
 		}
 		out.Cards = append(out.Cards, Card{Name: body, Qty: qty, Section: where,
-			LineNo: lineNo, Why: why, Unpeeled: whole})
+			LineNo: lineNo, Why: why, Unpeeled: whole, Category: category})
 	}
 	return out
 }
@@ -334,13 +361,16 @@ func stripLeading(body string) (int, string) {
 
 // stripAnnotations peels printing, rationale and category annotations off the
 // end of a line, returning what is left, any `*...*` markers found lowercased,
-// the rationale, and the other reading of the line when there is one. Applied
-// in a loop because they combine: `(2X2) 297 *F* *CMDR*`.
+// the rationale, the other reading of the line when there is one, and the
+// category token. Applied in a loop because they combine: `(2X2) 297 *F*
+// *CMDR*`.
 //
 // The rationale is peeled at most once however many quoted runs a line
 // carries. `1 Kongming, "Sleeping Dragon" "the whole plan"` has two, and a
 // second peel would take the epithet off a card name -- so the column is one
-// column, and everything left of it is somebody's card.
+// column, and everything left of it is somebody's card. The category is one
+// column for the same reason and by the same mechanism: the first bracket
+// peeled is the rightmost, and it keeps the slot.
 //
 // **Adjacency is what makes the reading ambiguous, and it is measured rather
 // than assumed.** The alternative is offered only when nothing else peeled off
@@ -349,9 +379,15 @@ func stripLeading(body string) (int, string) {
 // `Henzie "Toolbox" Torre (NCC) 27 "why"` cannot be, since no card is printed
 // with its own collector number in the middle of it. So the alternative is a
 // real substring of what was pasted, never a string assembled here.
-func stripAnnotations(text string) (string, map[string]bool, string, string) {
+//
+// The category peels to the RIGHT of the rationale, which is what keeps that
+// adjacency test honest: `1 Kongming, "Sleeping Dragon" [threat]` peels the
+// bracket first, and the quote it then finds is still flush against the name,
+// so both readings are carried exactly as they are without the bracket.
+func stripAnnotations(text string) (string, map[string]bool, string, string, string) {
 	markers := map[string]bool{}
 	why, leftOfQuote, quoted, peeled := "", "", "", false
+	category := ""
 	for {
 		if !peeled {
 			if m := quoteRe.FindStringSubmatchIndex(text); m != nil {
@@ -368,14 +404,22 @@ func stripAnnotations(text string) (string, map[string]bool, string, string) {
 		}
 		if m := bracketRe.FindStringSubmatchIndex(text); m != nil {
 			// Archidekt writes the deck's own category here, e.g. `[Ramp]` or
-			// `[Commander{top}]`. Only the commander label is kept, and only
-			// because it is a fact the exporter stated rather than something
-			// inferred from the card -- ADR 13 leaves every other category to
-			// a human, on the grounds that a guessed category ends up asserted
-			// in a generated primer.
-			label := strings.ToLower(trim(strings.SplitN(text[m[2]:m[3]], "{", 2)[0]))
-			if label == "commander" || label == "commanders" {
+			// `[Commander{top}]`, and the brace is a cursor position rather
+			// than part of the word.
+			//
+			// The commander label is a section marker and never a category --
+			// ADR 13's reasoning stands, that a category is a person's claim
+			// and not an exporter's guess, and it is exactly why the word is
+			// carried up unfolded for `deckimport` to place against the real
+			// vocabulary rather than accepted here. What ADR 13 argued against
+			// was INFERRING one; a word somebody typed in the column that
+			// exists for it is the opposite of an inference.
+			word := trim(strings.SplitN(text[m[2]:m[3]], "{", 2)[0])
+			switch label := strings.ToLower(word); {
+			case label == "commander" || label == "commanders":
 				markers["cmdr"] = true
+			case category == "":
+				category = word
 			}
 			text = text[:m[0]]
 			continue
@@ -388,7 +432,7 @@ func stripAnnotations(text string) (string, map[string]bool, string, string) {
 		if peeled && text == leftOfQuote {
 			whole = trim(text + quoted)
 		}
-		return trim(text), markers, why, whole
+		return trim(text), markers, why, whole, category
 	}
 }
 

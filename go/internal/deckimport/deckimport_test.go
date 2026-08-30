@@ -12,6 +12,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/decklist"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/pool/pooltest"
+	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
 // The importer's oracle: a paste, resolved against the 21-card pool, beside
@@ -239,7 +240,7 @@ func TestACommaIsUsuallyPartOfTheName(t *testing.T) {
 			for _, n := range tc.known {
 				cards[n] = &pool.CardRecord{Name: n}
 			}
-			got, note := commanderReading([]string{tc.written}, cards)
+			got, note := CommanderReading([]string{tc.written}, cards)
 			if len(got) != len(tc.want) {
 				t.Fatalf("read %q as %v, want %v", tc.written, got, tc.want)
 			}
@@ -588,6 +589,121 @@ func TestAPastedReasonBecomesTheCardsWhy(t *testing.T) {
 	}
 	if !strings.Contains(report.YAML, "fast mana, and it never gets cut") {
 		t.Error("the reason did not reach the deck file")
+	}
+}
+
+// The category column reaches the card entry, and the word the person wrote
+// outranks the one that would have been inferred.
+func TestAPastedCategoryFilesTheCard(t *testing.T) {
+	t.Parallel()
+	text := "1 Arahbo, Roar of the World (C17) 27 *CMDR*\n" +
+		"1 Sol Ring \"fast mana\" [ramp]\n" +
+		"1 Rhystic Study [CARD-ADVANTAGE]\n" +
+		"1 Cultivate\n" +
+		"1 Forest [ramp]\n"
+	cards := map[string]*pool.CardRecord{
+		"Arahbo, Roar of the World": {Name: "Arahbo, Roar of the World"},
+		"Sol Ring":                  {Name: "Sol Ring"},
+		"Rhystic Study":             {Name: "Rhystic Study"},
+		"Cultivate":                 {Name: "Cultivate"},
+		"Forest":                    {Name: "Forest", TypeLine: "Basic Land — Forest"},
+	}
+	read, notes := ReadRationales(decklist.Parse(text), cards)
+	report, err := BuildDeck(read, cards, Options{Slug: "arahbo-cats", Notes: notes})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+	filed := map[string]string{}
+	why := map[string]string{}
+	for _, c := range report.Deck.Cards {
+		filed[c.Name], why[c.Name] = c.Category, c.Why
+	}
+	for _, tc := range []struct{ card, want, because string }{
+		{"Sol Ring", "ramp", "the word in brackets is what the person filed it under"},
+		{"Rhystic Study", "card-advantage", "the match is case-folded, and the stored value is the model's own casing"},
+		{"Cultivate", "utility", "a line with no category still takes the default"},
+		{"Forest", "ramp", "a stated category outranks the land inference, which exists to fill a blank"},
+	} {
+		if got := filed[tc.card]; got != tc.want {
+			t.Errorf("%s filed as %q, wanted %q -- %s", tc.card, got, tc.want, tc.because)
+		}
+	}
+	if got := why["Sol Ring"]; got != "fast mana" {
+		t.Errorf("Sol Ring's why is %q; the category column must not disturb the reason", got)
+	}
+	for _, note := range report.Notes {
+		if strings.Contains(note, "not ones this library files by") {
+			t.Errorf("every word here is a real category, but the import complained: %q", note)
+		}
+	}
+}
+
+// A word this library does not file by is said once, not ninety-nine times,
+// and it costs the card neither its place nor its reason.
+//
+// The count is the whole point. Archidekt writes its own free-text category in
+// exactly this column, so a straight export can arrive with a hundred words in
+// it -- and a hundred complaints would bury the unknown cards and the missing
+// reasons under a list of things that are not even wrong.
+func TestAnUnplaceableCategoryIsSaidOnceAndCostsNothing(t *testing.T) {
+	t.Parallel()
+	text := "1 Arahbo, Roar of the World (C17) 27 *CMDR*\n" +
+		"1 Sol Ring \"fast mana\" [Big Beaters]\n" +
+		"1 Rhystic Study \"the tax\" [Big Beaters]\n" +
+		"1 Cultivate [Mana Rocks]\n"
+	cards := map[string]*pool.CardRecord{
+		"Arahbo, Roar of the World": {Name: "Arahbo, Roar of the World"},
+		"Sol Ring":                  {Name: "Sol Ring"},
+		"Rhystic Study":             {Name: "Rhystic Study"},
+		"Cultivate":                 {Name: "Cultivate"},
+	}
+	read, notes := ReadRationales(decklist.Parse(text), cards)
+	report, err := BuildDeck(read, cards, Options{Slug: "arahbo-cats", Notes: notes})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+	if len(report.Deck.Cards) != 3 {
+		t.Fatalf("%d cards landed, wanted 3: an unreadable category must not cost "+
+			"anybody a card", len(report.Deck.Cards))
+	}
+	for _, c := range report.Deck.Cards {
+		if c.Category != "utility" {
+			t.Errorf("%s filed as %q; a word that could not be placed leaves the "+
+				"card filed the way it would have been anyway", c.Name, c.Category)
+		}
+	}
+	if report.Rationales != 2 {
+		t.Errorf("counted %d rationales, wanted 2: the reason survives a category "+
+			"nobody could place", report.Rationales)
+	}
+	said := []string{}
+	for _, note := range report.Notes {
+		if strings.Contains(note, "not ones this library files by") {
+			said = append(said, note)
+		}
+	}
+	if len(said) != 1 {
+		t.Fatalf("%d notes about category words, wanted exactly 1:\n%s",
+			len(said), strings.Join(said, "\n"))
+	}
+	// Two distinct words over three lines: the count is of words, not of lines,
+	// so a category written on ninety-nine cards is still one word.
+	if !strings.Contains(said[0], "2 category word(s)") {
+		t.Errorf("the note counts something other than the distinct words: %q", said[0])
+	}
+	for _, word := range []string{"Big Beaters", "Mana Rocks"} {
+		if !strings.Contains(said[0], word) {
+			t.Errorf("the note does not name %q, so nobody can act on it: %q", word, said[0])
+		}
+	}
+	// Naming the real ones is what makes the sentence actionable rather than a
+	// complaint, and reading them off the model is what keeps this honest when
+	// the vocabulary changes.
+	for _, real := range reference.Deck().Categories {
+		if !strings.Contains(said[0], real) {
+			t.Errorf("the note does not offer %q as a category anybody could use: %q",
+				real, said[0])
+		}
 	}
 }
 

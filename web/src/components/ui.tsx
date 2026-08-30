@@ -315,17 +315,36 @@ export function NumberField({
   )
 }
 
+/** How a field that checks itself as you type is doing. `.field-answer` in
+ *  index.css carries each one, and `blank` deliberately looks like an
+ *  unchecked field rather than like a failure. */
+export type FieldAnswer = 'blank' | 'asking' | 'ready' | 'unknown' | 'trouble'
+
 export function TextField({
-  label, value, onChange, placeholder,
+  label, value, onChange, placeholder, answer, describedBy,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
+  /** Present only on a field something is checking; absent leaves the field
+   *  exactly as it has always been. */
+  answer?: FieldAnswer
+  describedBy?: string
 }) {
   // basis-64 gives the field a real preferred width so the wrapping filter row
   // breaks onto a new line instead of crushing it; flex-1 with the default
   // basis-0 collapsed it to ~14px next to the fixed-width selects.
+  //
+  // **A checked field is styled by class and NOT inline, and the two cannot be
+  // mixed.** The inline `border` below outranks any rule a stylesheet can
+  // write, so leaving it in place while adding a class would have produced a
+  // field that answers in the DOM and nowhere a person can see — commandment
+  // 20's exact mechanism, which is why `answer` swaps the whole treatment over
+  // to `.field-answer` rather than adding to it. `focus:ring-2` goes with it:
+  // the class owns focus too, and two box-shadows for one state is one of them
+  // silently winning.
+  const checked = answer !== undefined
   return (
     <label className="flex min-w-48 flex-1 basis-64 flex-col gap-1">
       <span className="text-[11px] font-medium uppercase tracking-wide"
@@ -336,8 +355,11 @@ export function TextField({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2"
-        style={{
+        aria-describedby={describedBy}
+        className={checked
+          ? `field-answer h-9 rounded-md px-2 text-sm is-${answer}`
+          : 'h-9 rounded-md px-2 text-sm outline-none focus:ring-2'}
+        style={checked ? undefined : {
           background: 'var(--surface-1)',
           color: 'var(--text-primary)',
           border: '1px solid var(--hairline)',
