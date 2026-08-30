@@ -3,9 +3,9 @@
  * gives at the top of its own file: oxlint's fast-refresh rule is right, these
  * are not components, and each of them is needed by more than one file.
  * `theaterRows` and `theaterBeats` are called by the Coliseum (which owns the
- * job) and `shortName` and `beatLine` by the stage (which owns the row and the
- * beat); putting any of them in `components/theater.tsx` costs that file its
- * fast refresh to save an import.
+ * job) and `shortName`, `legendName` and `beatLine` by the stage (which owns
+ * the row and the beat); putting any of them in `components/theater.tsx` costs
+ * that file its fast refresh to save an import.
  *
  * The two `theater*` readers are narrowings of `Job.partial`, which is
  * `unknown` because the shape belongs to the job's kind. Somebody has to do
@@ -34,13 +34,67 @@ export function theaterRows(partial: unknown): ForgeGameRow[] {
 
 /** What to call a deck in a line that has to stay one line.
  *
- * A deck is named for its commander and then for what it does — "Arahbo, Roar
- * of the World — Cats" — and a feed row wants the first part of that: the
- * general's name, which is how anybody actually refers to the deck out loud.
- * So take everything before the dash, then everything before the title's
- * comma. A name with neither is already short and comes back untouched.
+ * A deck is *usually* named for its commander and then for what it does —
+ * "Arahbo, Roar of the World — Cats" — and a feed row wants the first part of
+ * that: the general's name, which is how anybody actually refers to the deck
+ * out loud. The dash is a real separator in that title and everything after it
+ * goes.
+ *
+ * **The comma is not, and that was this function's bug.** It used to cut at
+ * the first comma unconditionally, on the assumption that a deck's name is
+ * always "Commander, Epithet — Theme". That is *card-name* grammar — a legend
+ * really does carry a comma between name and title, which is what
+ * [legendName] below is for — applied to prose somebody wrote freely. Aaron's
+ * Atla Palani deck is called **"Life, Uh, Finds a Way"**, and every surface in
+ * the Coliseum called it *"Life"*: the dropdown he picks it with, the tape,
+ * the feed. The commas in that title are commas in a sentence, and a separator
+ * that occurs inside the data is not a separator — the house learned this once
+ * already, when the importer split a commander field on its commas.
+ *
+ * So the cut is decided by lookup rather than by punctuation: the comma is a
+ * separator **only when the text before it is the deck's own general**, which
+ * is the case the shortening was written for and the only case it is right
+ * for. Anything else is a title that happens to contain a comma and comes back
+ * whole. Matched case-insensitively and against the general's own pre-comma
+ * head, so "Atla Palani, Nest Tender — Dinos" shortens under a commander
+ * recorded as "Atla Palani, Nest Tender".
+ *
+ * `commander` takes the deck row's whole `commander` list because that is the
+ * shape every caller holds, and a partner pair is two chances to be named for
+ * your general rather than one. **Absent or unmatched, the whole pre-dash
+ * title is the answer** — the safe direction: a name that is longer than it
+ * needed to be is untidy, and a name cut down to somebody else's word is
+ * wrong.
  */
-export function shortName(name: string): string {
+export function shortName(
+  name: string, commander?: string | readonly string[] | null,
+): string {
+  const beforeDash = (name.split('—')[0] ?? name).trim() || name
+  const comma = beforeDash.indexOf(',')
+  if (comma < 0) return beforeDash
+  const head = beforeDash.slice(0, comma).trim()
+  if (!head) return beforeDash
+  const generals = typeof commander === 'string' ? [commander] : commander ?? []
+  const namedForIt = generals.some((general) =>
+    (general.split(',')[0] ?? general).trim().toLowerCase()
+      === head.toLowerCase())
+  return namedForIt ? head : beforeDash
+}
+
+/** What to call a *card* whose name carries a title.
+ *
+ * The unconditional comma cut [shortName] used to be, kept for the job it was
+ * always correct at: Magic prints a legend as "Brimaz, King of Oreskos", the
+ * comma is the printed separator between the name and the title, and a board
+ * that lists two of them reads *"Brimaz, King of Oreskos, Arahbo, Roar of the
+ * World"* — four names to a reader and two to the game.
+ *
+ * The distinction against [shortName] is the whole point of there being two
+ * functions: **a card's name is a form and a deck's name is prose.** One may
+ * be split on its punctuation because Wizards put the punctuation there; the
+ * other may not, because a person did.
+ */
+export function legendName(name: string): string {
   const beforeDash = name.split('—')[0] ?? name
   return (beforeDash.split(',')[0] ?? beforeDash).trim() || name
 }

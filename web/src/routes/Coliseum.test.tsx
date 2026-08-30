@@ -40,16 +40,27 @@ vi.mock('../lib/api', async () => {
 
 const { api } = await import('../lib/api')
 
+// **The `commander` is fixture furniture that earns its place.** The shelf
+// really does send it, and it is what decides whether a deck's title shortens
+// at all — a fixture without it makes every one of these decks look like a
+// deck named for nothing, and the pickers below would pass while shortening
+// nobody.
 const DECKS = [
   { slug: 'gyome', owner: 'aaron', name: 'Gyome, Master Chef — Food',
-    pilot: '', writable: true },
+    commander: ['Gyome, Master Chef'], pilot: '', writable: true },
   { slug: 'arahbo', owner: 'aaron', name: 'Arahbo, Roar of the World — Cats',
-    pilot: '', writable: true },
+    commander: ['Arahbo, Roar of the World'], pilot: '', writable: true },
+  // A deck named for a line rather than for its general — Aaron's, and the
+  // one the room got wrong. Its commas belong to a sentence, so the whole
+  // title is its short name and the picker has to say all of it.
+  { slug: 'atla', owner: 'aaron', name: 'Life, Uh, Finds a Way',
+    commander: ['Atla Palani, Nest Tender'], pilot: '', writable: true },
   // Somebody else's deck, with a pilot on it. Both of those used to be
   // concatenated into the option's own label; this is the fixture that catches
   // them coming back.
   { slug: 'tivit', owner: 'mark', name: 'Tivit, Seller of Secrets — Artifacts',
-    pilot: "Mark's wife", writable: false },
+    commander: ['Tivit, Seller of Secrets'], pilot: "Mark's wife",
+    writable: false },
 ] as unknown as DeckTile[]
 
 function champion(name: string, role: string): ColiseumChampion {
@@ -744,6 +755,11 @@ describe('the tale of the tape', () => {
 
     expect(labels).toContain('Gyome — Food')
     expect(labels).toContain('Arahbo — Cats')
+    // **The bug Aaron found, in the control he found it in.** The epithet is
+    // cut by looking the general up, never by cutting at a comma: this deck's
+    // commas are a sentence's, its general is not "Life", and the option used
+    // to offer it as exactly that.
+    expect(labels).toContain('Life, Uh, Finds a Way')
     // The owner is not dropped — it is spent only where the ambiguity really
     // lives, on a deck that is not yours, and with a mark that cannot be read
     // as part of the deck's own name.
