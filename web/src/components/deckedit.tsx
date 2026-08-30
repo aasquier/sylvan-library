@@ -625,9 +625,17 @@ export function AddCardForm({ deck, stage, identity, onDone }: {
     setBusy(true)
     setError(null)
     try {
-      const result = await api.addCard(deck, {
-        name: card.name, category, why: why.trim(), qty, to,
-      })
+      // **Two routes, because starting a swap board is a shape change.**
+      // `POST .../cards` refuses a deck file with no `swap_board:` block --
+      // an edit changes what a deck says, never what shape it has (ADR 12) --
+      // so a deck that has never kept a board answered this form with a 422
+      // and the panel had no way to ask for one. `addToBoard` is the route
+      // that may open it, and it takes a deck that already has one just the
+      // same, so this does not have to know which kind it is holding.
+      const body = { name: card.name, category, why: why.trim(), qty }
+      const result = to === 'swap_board'
+        ? await api.addToBoard(deck, body)
+        : await api.addCard(deck, { ...body, to })
       onDone(result)
       setCard(null)
       setWhy('')
