@@ -34,7 +34,7 @@ import {
   type ScanResult,
 } from '../lib/api'
 import { CARD_ASPECT } from '../lib/cardframe'
-import { decklistLines } from '../lib/decklist'
+import { decklistLines, owingNote } from '../lib/decklist'
 import { read, rest, warm, type Sighting } from '../lib/reader'
 import { Badge, ErrorNote, Spinner } from './ui'
 
@@ -64,6 +64,7 @@ interface Shot {
    *  A wrong match next to the words it came from can be caught. */
   transcribed?: { title?: string; corner?: string }
 }
+
 
 export default function CameraDoor({ onCards }: {
   /** Hands finished lines to whoever opened the door. The Import page drops
@@ -303,8 +304,7 @@ export default function CameraDoor({ onCards }: {
           </button>
           {owing > 0 && (
             <span className="text-xs" style={{ color: 'var(--status-warning)' }}>
-              {owing} photograph{owing === 1 ? '' : 's'} still need a name — they
-              will be left behind.
+              {owingNote(owing)}
             </span>
           )}
         </div>

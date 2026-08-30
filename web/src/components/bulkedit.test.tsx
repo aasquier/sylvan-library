@@ -209,3 +209,20 @@ it('reports the lines it did not read', async () => {
   expect(screen.getByText('(LTC) 284')).toBeTruthy()
   expect(screen.getByText(/works on the 99/)).toBeTruthy()
 })
+
+/* One card, and three words that have to agree with it.
+ *
+ * The noun and the trailing clause were already conditional; the verb was
+ * not, so a plan leaving exactly one card alone said "1 card stay exactly as
+ * it is". Both counts are asserted, because a pluralisation fixed in one
+ * direction and broken in the other is the usual way these are "fixed". */
+it('agrees with the count when exactly one card is left alone', async () => {
+  await look(preview({ plan: plan({ unchanged: ['Sol Ring'] }) }))
+  expect(screen.getByText(/1 card stays exactly as it is/)).toBeTruthy()
+  expect(screen.queryByText(/1 card stay exactly/)).toBeNull()
+})
+
+it('and still reads correctly when several are', async () => {
+  await look(preview({ plan: plan({ unchanged: ['Sol Ring', 'Cultivate'] }) }))
+  expect(screen.getByText(/2 cards stay exactly as they are/)).toBeTruthy()
+})
