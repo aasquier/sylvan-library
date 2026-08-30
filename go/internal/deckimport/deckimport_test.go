@@ -621,3 +621,85 @@ func TestAFullyReasonedImportSaysNothingIsOwed(t *testing.T) {
 			report.Deck.Stage)
 	}
 }
+
+// ADR 49: a paste may declare that its quoted reasons were drafted, and then
+// every card whose reason actually arrived is marked -- never a card whose
+// reason is still owed, because a mark on an empty `why` would claim
+// authorship of a sentence nobody wrote. The swap board's reasons came from
+// the same hand and take the same mark, and the commander's -- which lands as
+// a note, where no mark can travel -- is named out loud in the report instead.
+func TestTheDeclaredHandMarksOnlyWhatItWrote(t *testing.T) {
+	t.Parallel()
+	text := "1 Arahbo, Roar of the World (C17) 27 *CMDR* \"the whole deck\"\n" +
+		"1 Sol Ring \"fast mana, and it never gets cut\"\n" +
+		"1 Cultivate\n" +
+		"Sideboard:\n" +
+		"1 Beast Within \"single target removal, waiting its turn\"\n"
+	cards := map[string]*pool.CardRecord{
+		"Arahbo, Roar of the World": {Name: "Arahbo, Roar of the World"},
+		"Sol Ring":                  {Name: "Sol Ring"},
+		"Cultivate":                 {Name: "Cultivate"},
+		"Beast Within":              {Name: "Beast Within"},
+	}
+
+	read, notes := ReadRationales(decklist.Parse(text), cards)
+	report, err := BuildDeck(read, cards, Options{
+		Slug: "arahbo-cats", Notes: notes, WhyBy: "claude"})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+
+	marks := map[string]string{}
+	for _, c := range append(slices.Clone(report.Deck.Cards), report.Deck.SwapBoard...) {
+		marks[c.Name] = c.WhyBy
+	}
+	if got := marks["Sol Ring"]; got != "claude" {
+		t.Errorf("Sol Ring's mark is %q; a carried reason takes the declared hand", got)
+	}
+	if got := marks["Beast Within"]; got != "claude" {
+		t.Errorf("Beast Within's mark is %q; the swap board's reasons were "+
+			"drafted by the same hand", got)
+	}
+	if got := marks["Cultivate"]; got != "" {
+		t.Errorf("Cultivate's mark is %q; a reason still owed takes no mark", got)
+	}
+	// The indented form counts only the marks on cards -- the drafted header
+	// names `why_by: claude` in its own prose, and that mention is not a mark.
+	if got := strings.Count(report.YAML, "\n    why_by: claude"); got != 2 {
+		t.Errorf("the file carries %d marks, wanted 2:\n%s", got, report.YAML)
+	}
+	// The file's own first paragraph must not claim an authorship its marks
+	// deny: a declared paste gets the drafted header, not the person one.
+	if strings.Contains(report.YAML, "by the person who pasted it") {
+		t.Errorf("the header claims the person wrote reasons the marks call "+
+			"drafted:\n%s", report.YAML)
+	}
+	if !strings.Contains(report.YAML, "reasons drafted by") {
+		t.Errorf("the header does not say the reasons were drafted:\n%s", report.YAML)
+	}
+	zoneNamed := false
+	for _, n := range report.Notes {
+		if strings.Contains(n, "where no mark can follow it") {
+			zoneNamed = true
+		}
+	}
+	if !zoneNamed {
+		t.Errorf("the commander's drafted sentence went to `notes` unnamed; "+
+			"the report must say it aloud: %v", report.Notes)
+	}
+
+	// The same paste with nothing declared: nobody is marked, because an
+	// unmarked reason means a person wrote it and that claim must never be
+	// manufactured by a default.
+	read, notes = ReadRationales(decklist.Parse(text), cards)
+	unmarked, err := BuildDeck(read, cards, Options{Slug: "arahbo-cats", Notes: notes})
+	if err != nil {
+		t.Fatalf("building the undeclared paste: %v", err)
+	}
+	if strings.Contains(unmarked.YAML, "why_by") {
+		t.Errorf("a paste that declared nothing grew a mark:\n%s", unmarked.YAML)
+	}
+	if !strings.Contains(unmarked.YAML, "by the person who pasted it") {
+		t.Errorf("an undeclared paste keeps the person's own header:\n%s", unmarked.YAML)
+	}
+}

@@ -97,6 +97,11 @@ export default function Import() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'preview' | 'create' | null>(null)
   const [showYaml, setShowYaml] = useState(false)
+  // ADR 49: whether the quoted reasons in this paste were drafted by Claude,
+  // so the file can name the hand. Off by default and never remembered — an
+  // unmarked reason means a person wrote it, and that claim must never be
+  // manufactured by a sticky setting.
+  const [claudeDrafted, setClaudeDrafted] = useState(false)
   // The intake sheet (ADR 41), empty by default and per import: a sheet that
   // remembered its last state would be a standing permission rather than an
   // answer about this deck.
@@ -148,6 +153,10 @@ export default function Import() {
       bracket: bracket ? Number(bracket) : null,
       status,
       dry_run: dryRun,
+      // Sent only when declared: an absent field and an empty one mean the
+      // same thing to the server, but a body that says `why_by: ""` on every
+      // ordinary import would read as a question this page keeps asking.
+      ...(claudeDrafted ? { why_by: 'claude' } : {}),
     }
   }
 
@@ -305,6 +314,28 @@ export default function Import() {
               Cards you leave unquoted are counted, never invented — nothing
               here writes a reason on your behalf.
             </p>
+
+            {/* ADR 49's door. A reason with no mark means a person wrote it,
+                and a paste Claude helped draft would wear that claim forever
+                — `why_by` is not a field anybody types, so the declaration
+                has to ride the import itself. Off by default, per import,
+                and the mark it lays down fades the moment a sentence is
+                rewritten by hand (ADR 41). */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1">
+              <button
+                type="button"
+                aria-pressed={claudeDrafted}
+                onClick={() => setClaudeDrafted((v) => !v)}
+                className={`chip-toggle rounded-full px-3 py-1.5 text-xs font-medium${
+                  claudeDrafted ? ' is-on' : ''}`}>
+                Claude drafted these reasons
+              </button>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {claudeDrafted
+                  ? 'Each quoted reason lands signed as drafted, and the signature fades when you rewrite one in your own words.'
+                  : 'If Claude drafted the quoted reasons with you, say so here and the file will name the hand that wrote them.'}
+              </span>
+            </div>
           </div>
 
           {/* The deck that exists nowhere online. Every other import path
@@ -675,7 +706,9 @@ function Preview({ result, showYaml, onToggleYaml, onFix }: {
           <>
             <strong style={{ color: 'var(--series-1)' }}>
               {result.rationales} card{result.rationales === 1 ? '' : 's'} arrived
-              with your reason already written.
+              with {result.why_by
+                ? 'a reason already written — Claude’s drafting, and the file says so.'
+                : 'your reason already written.'}
             </strong>{' '}
           </>
         )}

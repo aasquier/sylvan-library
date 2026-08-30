@@ -108,11 +108,29 @@ const (
 #
 # %s
 `
+
+	// The paste declared its reasons were drafted (ADR 49), so the header
+	// says so too -- a file whose prose claimed "those are their words"
+	// above ninety-nine `why_by: claude` marks would be contradicting
+	// itself in its own first paragraph.
+	headerDrafted = `# Imported %s from a pasted decklist, with %d of its reasons drafted by
+# Claude and carried across verbatim from the quoted column. Those on cards
+# are marked ` + "`why_by: claude`" + ` below, and a mark fades the moment a person
+# rewrites its sentence (ADR 41, ADR 49).
+#
+# ` + "`stage: draft`" + ` means the gate reports what is still owed as a warning
+# instead of an error, so the deck's *facts* -- legality, colour identity,
+# singleton, size -- are checked from day one.
+#
+# %s
+`
 )
 
 // header is the block for a deck that carried `carried` reasons of its own and
-// still owes `owed`.
-func header(date string, carried, owed int) string {
+// still owes `owed`. `whyBy` is who the paste declared drafted them -- empty
+// means the person's own words, and the prose differs because the file must
+// not claim an authorship its marks deny.
+func header(date string, carried, owed int, whyBy string) string {
 	if carried == 0 {
 		return fmt.Sprintf(headerBare, date)
 	}
@@ -121,6 +139,9 @@ func header(date string, carried, owed int) string {
 	if owed == 0 {
 		tail = "Nothing is owed: every card has a reason, so this deck can be\n" +
 			"# promoted to `curated` whenever you are happy with it."
+	}
+	if whyBy != "" {
+		return fmt.Sprintf(headerDrafted, date, carried, tail)
 	}
 	return fmt.Sprintf(headerReasoned, date, carried, tail)
 }
@@ -396,6 +417,13 @@ type Options struct {
 	// `ReadRationales` needs the pool and runs earlier, and what it chose has
 	// to reach the person who pasted the list.
 	Notes []string
+	// WhyBy names the hand that drafted the quoted reasons riding the paste,
+	// and every card whose reason came from the text is marked with it
+	// (ADR 49). Empty means the person wrote them, which needs no mark. The
+	// only non-empty value the route ever passes is `deckedit.DraftedBy`;
+	// held as a plain string here because this package sits below deckedit
+	// and the route owns the refusal.
+	WhyBy string
 }
 
 // pairSeparators is how one field might be holding two commanders, best
@@ -583,6 +611,24 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 		resolve, outside, &notes)
 	swaps, alsoMoved := buildEntries(parsed.Section("swap_board"), resolve, outside, &notes)
 
+	// The mark, where the paste declared one (ADR 49). Only a card whose
+	// reason actually arrived takes it -- an empty `why` is a debt, not a
+	// sentence, and a mark on nothing would claim authorship of a thing that
+	// was never written. The swap board's reasons were drafted by the same
+	// hand as the 99's, so they carry the same mark.
+	if opts.WhyBy != "" {
+		for i := range entries {
+			if strings.TrimSpace(entries[i].Why) != "" {
+				entries[i].WhyBy = opts.WhyBy
+			}
+		}
+		for i := range swaps {
+			if strings.TrimSpace(swaps[i].Why) != "" {
+				swaps[i].WhyBy = opts.WhyBy
+			}
+		}
+	}
+
 	// Lists that mark the commander inline really do have 100 lines, and a
 	// commander given with `--commander` is usually still sitting in the
 	// sideboard section -- that is where our own moxfield.txt artifact puts it.
@@ -625,9 +671,16 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 		companionPtr = &value
 	}
 	if zoneWhy != "" {
-		notes = append(notes, "a reason was written on a line that turned out to "+
-			"be in the command zone, which holds names and not reasons; it was "+
-			"kept verbatim as the deck's `command_zone` note")
+		zoneNote := "a reason was written on a line that turned out to " +
+			"be in the command zone, which holds names and not reasons; it was " +
+			"kept verbatim as the deck's `command_zone` note"
+		if opts.WhyBy != "" {
+			// Notes carry no `why_by`, so the mark cannot travel with the
+			// sentence -- the report says it out loud instead.
+			zoneNote += ", where no mark can follow it: that sentence was " +
+				"drafted, not hand-written"
+		}
+		notes = append(notes, zoneNote)
 	}
 
 	built := &deck.Deck{
@@ -650,7 +703,7 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 		return nil, err
 	}
 	text := header(time.Now().Format("2006-01-02"), rationales,
-		len(built.Unjustified())) + "\n" + body
+		len(built.Unjustified()), opts.WhyBy) + "\n" + body
 
 	return &Report{Deck: built, YAML: text, Unknown: unknown, Read: opts.Read,
 		Unreadable: parsed.Unreadable, Skipped: parsed.Skipped, Notes: notes,

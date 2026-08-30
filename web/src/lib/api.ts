@@ -1241,6 +1241,11 @@ export interface ImportResult {
    *  wrote sixty of them should be told so, and a count of what is still owed
    *  on its own reads as though nothing arrived. */
   rationales: number
+  /** Who the paste declared drafted its quoted reasons (ADR 49): `"claude"`,
+   *  or empty when nobody did. Echoed so a dry-run preview can say the
+   *  reasons will land signed, from the answer rather than from what the
+   *  page remembers asking. */
+  why_by: string
   /** Misspellings the pool read as the card they are nearest to. The deck
    *  holds the real card; this is the saying-so. */
   read: Correction[]
@@ -2934,6 +2939,11 @@ export const api = {
     bracket?: number | null
     status?: string
     dry_run?: boolean
+    /** Who drafted the quoted reasons in the paste (ADR 49). `"claude"` is
+     *  the only value the server accepts, and every card whose reason came
+     *  from the text is marked `why_by: claude` in the file. Omitted means a
+     *  person wrote them, which needs no mark. */
+    why_by?: string
   }) => post<ImportResult>('/api/decks/import', body),
   // What a camera thought it saw, read against the pool. **No image is sent**
   // — a sighting is a set code, a collector number and a title, and the

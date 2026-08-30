@@ -54,6 +54,7 @@ function result(overrides: Partial<ImportResult> = {}): ImportResult {
     swap_board: [],
     needs_rationale: 85,
     rationales: 0,
+    why_by: '',
     unknown: [],
     read: [],
     did_you_mean: [],
@@ -275,6 +276,35 @@ describe('Import', () => {
     await waitFor(() => expect(screen.getByText(/85 cards still need a/)).toBeTruthy())
     expect(screen.getByText('draft')).toBeTruthy()
     expect(screen.queryByText(/generate|suggest|write .* for you/i)).toBeNull()
+  })
+
+  // ADR 49: the paste may declare its quoted reasons were Claude's drafting,
+  // and the declaration rides the import itself — off by default, because an
+  // unmarked reason means a person wrote it.
+  it('sends why_by only when the drafting is declared, and says the reasons land signed', async () => {
+    renderImport()
+    paste('1 Sol Ring "fast mana"')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    fireEvent.click(screen.getByText('Preview'))
+
+    await waitFor(() => expect(api.importDeck).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.importDeck).mock.calls[0]?.[0]).not.toHaveProperty('why_by')
+
+    const declare = screen.getByText('Claude drafted these reasons').closest('button')!
+    expect(declare.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(declare)
+    expect(declare.getAttribute('aria-pressed')).toBe('true')
+
+    vi.mocked(api.importDeck).mockResolvedValue(result({
+      rationales: 1, why_by: 'claude',
+    }))
+    fireEvent.click(screen.getByText('Preview'))
+    await waitFor(() => expect(api.importDeck).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.importDeck).mock.calls[1]?.[0]).toMatchObject({
+      why_by: 'claude',
+    })
+    await waitFor(() =>
+      expect(screen.getByText(/Claude’s drafting, and the file says so/)).toBeTruthy())
   })
 
   it('shows the gate errors the list already has', async () => {

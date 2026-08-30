@@ -54,6 +54,7 @@ they differ.
 | [38](0038-the-served-backend-is-rewritten-in-go.md) | The served backend is rewritten in Go, and the bench stays Python | Accepted |
 | [39](0039-configuration-is-a-value-and-tests-run-in-parallel.md) | Configuration is a value, resolved once and passed, and tests run in parallel | Accepted — supersedes the "read at call time" reasoning in [`internal/config`](../../go/internal/config/config.go) |
 | [40](0040-the-second-injection-reaches-the-command-tree.md) | The second injection reaches the command tree | Accepted |
+| [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md) | The intake is asked for, and the hand that wrote it is named | Accepted |
 | [42](0042-a-scribe-rides-forges-event-bus.md) | A scribe rides Forge's event bus, and the board is a listener rather than a parser | Accepted |
 | [43](0043-a-generated-banner-is-a-shelf-entry-and-never-a-commit.md) | A generated banner is a shelf entry, and never a commit | Accepted — widens the effect vocabulary of [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) |
 | [44](0044-the-board-holds-state-and-never-holds-a-guess.md) | The board holds the state the events do not, and never holds a guess | Accepted |
@@ -61,11 +62,13 @@ they differ.
 | [46](0046-the-coliseum-runs-at-night.md) | The Coliseum runs at night | Proposed — the record is built, the night is designed |
 | [47](0047-one-architecture-and-a-required-check-gates-something-real.md) | One architecture, and a required check gates something real | Accepted — supersedes the *two-architecture check* clause of [23](0023-a-green-main-deploys-itself.md) |
 | [48](0048-light-lands-on-a-card-and-never-through-it.md) | Light lands on a card, and never through it | Accepted — widens [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) to every surface, and corrects its misquotation of Scryfall's imagery guidelines |
+| [49](0049-an-import-may-name-the-hand-behind-its-rationales.md) | An import may name the hand behind its rationales | Accepted — extends [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md)'s mark to reasons that arrive with the paste |
 
-**A note on the numbering.** There is no 41, and this table does not know why
-— the number was never used. The hole stays: renumbering would move a number
-somebody may already have cited, which is the one thing an immutable record
-must not do.
+**A note on the numbering.** For a while this table said there was no 41 and
+never had been. There is — [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md)
+landed on 2026-08-28 without its index row, and the note explaining the hole
+outlived the hole. It stays as a lesson in its own subject: a fact recorded in
+prose is a claim to re-check, in this table like everywhere else.
 
 **A note on vocabulary.** 2 and 7 call the local card database the **corpus**.
 That is what it was called when they were written; everywhere else in the

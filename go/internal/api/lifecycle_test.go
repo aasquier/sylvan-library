@@ -3,6 +3,7 @@ package api
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -139,8 +140,8 @@ func TestImportWritesADraftWithEveryRationaleOwed(t *testing.T) {
 	}
 	for _, key := range []string{"slug", "owner", "name", "stage", "status",
 		"created", "commander", "companion", "total_cards", "land_count",
-		"swap_board", "needs_rationale", "unknown", "unreadable", "skipped",
-		"notes", "yaml", "ok", "errors", "warnings"} {
+		"swap_board", "needs_rationale", "why_by", "unknown", "unreadable",
+		"skipped", "notes", "yaml", "ok", "errors", "warnings"} {
 		if _, present := body[key]; !present {
 			t.Errorf("the answer has no %q: %s", key, raw)
 		}
@@ -178,6 +179,51 @@ func TestADryRunWritesNothing(t *testing.T) {
 	}
 	if _, found := rig.read(t, "previewed"); found {
 		t.Error("a dry run wrote a deck")
+	}
+}
+
+// ADR 49: the paste may declare that its quoted reasons were drafted, and the
+// route holds the door -- one hand ever drafts, so one value is ever legal.
+func TestImportSignsTheReasonsThePasteDeclared(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	reasoned := "1 Sol Ring \"fast mana, and it never gets cut\"\n30 Forest\n"
+	status, body, raw := rig.do(t, alice, "POST", "/api/decks/import",
+		`{"slug":"signed","commander":["Goreclaw, Terror of Qal Sisma"],`+
+			`"why_by":"claude","text":`+strconv.Quote(reasoned)+`}`)
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if body["why_by"] != "claude" {
+		t.Errorf("the answer does not echo the hand: %v", body["why_by"])
+	}
+	text, found := rig.read(t, "signed")
+	if !found {
+		t.Fatal("the import was reported created and no file was written")
+	}
+	// The indented form counts only the marks on cards; the drafted header
+	// names the mark in its own prose, and that mention is not one.
+	if strings.Count(text, "\n    why_by: claude") != 1 {
+		t.Errorf("only Sol Ring carried a reason, so only Sol Ring is marked:\n%s", text)
+	}
+	if !strings.Contains(text, "reasons drafted by") {
+		t.Errorf("the file's header does not say the reasons were drafted:\n%s", text)
+	}
+
+	// Any other name is a claim the deck file has no way to record.
+	status, body, raw = rig.do(t, alice, "POST", "/api/decks/import",
+		`{"slug":"missigned","commander":["Goreclaw, Terror of Qal Sisma"],`+
+			`"why_by":"aaron","text":`+strconv.Quote(reasoned)+`}`)
+	if status != 422 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if detail, _ := body["detail"].(string); !strings.HasPrefix(detail, "why_by can only be") {
+		t.Errorf("detail is %q", detail)
+	}
+	if _, found := rig.read(t, "missigned"); found {
+		t.Error("a refused declaration wrote a deck anyway")
 	}
 }
 

@@ -99,9 +99,10 @@ var SettableFields = []string{"category", "qty", "why", "art"}
 // that predates the intake.
 //
 // Not in SettableFields, and that is the point: `why_by` is not a field
-// anybody types. It is written by DraftRationale and dropped by SetCardField,
-// so its value tracks who last touched the sentence rather than what somebody
-// last claimed about it.
+// anybody types. It is written by DraftRationale -- and by an import whose
+// paste declares its quoted reasons were drafted (ADR 49) -- and dropped by
+// SetCardField, so its value tracks who last touched the sentence rather
+// than what somebody last claimed about it.
 const DraftedBy = "claude"
 
 // SettableDeckFields is what SetDeckField will write: the deck's own scalars,
