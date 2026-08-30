@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { type ClaudeStatus, type IntakeSheet } from '../lib/api'
+import { type ClaudeStatus, type IntakeSheet, type IntakeStepKey } from '../lib/api'
+import { INTAKE_TITLES } from '../lib/intake'
 import { fetchClaudeStatus, useStance } from '../lib/stance'
 
 /**
@@ -51,26 +52,28 @@ import { fetchClaudeStatus, useStance } from '../lib/stance'
  * deck (commandment 2). "Commander dossier" is a name; "who your commander is
  * and where they come from" is what they get. Every label here is the second
  * kind, and the shortest true version of it.
+ *
+ * The titles themselves live in `lib/intake` rather than here, and are the
+ * same strings the account of the finished run puts on its sentences — a
+ * person who ticked "Sort the cards" is told what came of "Sort the cards".
  */
 
-/** One row of the sheet. `writes` is what it changes in the deck file, in
- *  words, or null when it changes nothing there. */
+/** One row of the sheet. The title is `INTAKE_TITLES[key]`; `writes` is what
+ *  it changes in the deck file, in words, or null when it changes nothing
+ *  there. */
 const ACTIONS: {
-  key: keyof IntakeSheet
-  title: string
+  key: IntakeStepKey
   blurb: string
   writes: string | null
 }[] = [
   {
     key: 'categories',
-    title: 'Sort the cards',
     blurb: 'Files every card under what it is doing — ramp, removal, a win '
       + 'condition — instead of leaving them all under Utility.',
     writes: 'the category on each card',
   },
   {
     key: 'rationales',
-    title: 'Draft the reasons',
     blurb: 'Writes a first pass at why each card is in the deck. They are '
       + 'marked as Claude’s in the file until you rewrite them, and cards you '
       + 'already wrote a reason for are left alone.',
@@ -78,7 +81,6 @@ const ACTIONS: {
   },
   {
     key: 'description',
-    title: 'Describe the deck',
     blurb: 'The paragraph that shows on your shelf and at the top of the '
       + 'deck: what it is trying to do, how it wins, and one honest line on '
       + 'what it is bad at.',
@@ -86,14 +88,12 @@ const ACTIONS: {
   },
   {
     key: 'dossier',
-    title: 'Read up on your commander',
     blurb: 'Who they are in Magic’s story, what kind of deck they usually '
       + 'lead, and who else you might have built instead.',
     writes: null,
   },
   {
     key: 'argue',
-    title: 'Argue with every card',
     blurb: 'Makes the case against each card holding its slot. Only against — '
       + 'the case for a card is a reason, and reasons are yours to write.',
     writes: null,
@@ -228,7 +228,7 @@ export function IntakeChoices({ value, onChange, onStance, slug, owner, running 
                 onChange((prev) => ({ ...prev, [action.key]: prev[action.key] !== true }))}
               className={`chip-toggle rounded-full px-3 py-1.5 text-xs font-medium${
                 on ? ' is-on' : ''}`}>
-              {action.title}
+              {INTAKE_TITLES[action.key]}
             </button>
           )
         })}
@@ -242,7 +242,7 @@ export function IntakeChoices({ value, onChange, onStance, slug, owner, running 
         <ul className="intake-told">
           {shown.filter((a) => value[a.key]).map((action) => (
             <li key={action.key}>
-              <span className="intake-told-name">{action.title}</span>
+              <span className="intake-told-name">{INTAKE_TITLES[action.key]}</span>
               <p className="intake-told-what">{action.blurb}</p>
               {action.writes && (
                 <p className="intake-told-writes">

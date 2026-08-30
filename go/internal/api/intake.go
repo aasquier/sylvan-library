@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -310,13 +311,12 @@ func (run *intakeRun) file(ctx context.Context) wire.OrderedMap {
 	}
 
 	var filings []claude.Filing
+	var outcome claude.IntakeOutcome
 	err := run.api.withPool(ctx, func(c *pool.Conn) error {
 		req := run.req
 		req.Deps = tools.Deps{Source: run.src, Pool: c}
-		var outcome claude.IntakeOutcome
 		var err error
 		filings, outcome, err = claude.FileCards(ctx, run.deck, wanted, req)
-		_ = outcome
 		return err
 	})
 	if err != nil {
@@ -335,7 +335,55 @@ func (run *intakeRun) file(ctx context.Context) wire.OrderedMap {
 	if err != nil {
 		return intakeFailed(err, run.req.Endpoint)
 	}
-	return intakeStep(n, len(wanted), "")
+	return intakeStep(n, len(wanted), leftUnfiled(outcome.Unanswered))
+}
+
+// leftForYou names the cards the drafting had no answer for.
+//
+// **Leaving a card out is the design, and saying nothing about it was not.**
+// `internal/claude/intake.go` says so at the top: a card the model cannot
+// ground is left out, and its owner writes that one, which is exactly where
+// they were before the intake ran. That is right. What was missing is the
+// sentence -- the run reported "eighty-four of eighty-five" and named the
+// eighty-fifth to nobody, so the only way to find your own card was to diff
+// your deck against your paste.
+//
+// Named while the list is short and counted once it is long, because the
+// point is to be able to go and look: three names are a place to start and
+// forty are a wall of text, and the deck page already lists every card still
+// owed a reason.
+func leftForYou(names []string) string {
+	switch n := len(names); {
+	case n == 0:
+		return ""
+	case n == 1:
+		return "No reason was drafted for " + names[0] + " — that one is yours to write."
+	case n <= 3:
+		return "No reason was drafted for " + strings.Join(names, ", ") +
+			" — those are yours to write."
+	default:
+		return fmt.Sprintf("No reason was drafted for %d cards, including %s — "+
+			"they are the ones still marked as needing one.",
+			n, strings.Join(names[:3], ", "))
+	}
+}
+
+// leftUnfiled is `leftForYou`'s sibling for the filing pass, and the same
+// omission: `FileCards` is allowed to leave a card it cannot place, and
+// nothing said which. A card left here keeps the category it arrived with
+// rather than gaining a blank, so the sentence says that instead of asking
+// for work.
+func leftUnfiled(names []string) string {
+	switch n := len(names); {
+	case n == 0:
+		return ""
+	case n <= 3:
+		return "Left under Utility, having no clearer home: " +
+			strings.Join(names, ", ") + "."
+	default:
+		return fmt.Sprintf("%d cards were left under Utility, having no clearer "+
+			"home, including %s.", n, strings.Join(names[:3], ", "))
+	}
 }
 
 // draft is the rationales pass, and the one ADR 41 exists for.
@@ -360,11 +408,12 @@ func (run *intakeRun) draft(ctx context.Context) wire.OrderedMap {
 	}
 
 	var drafts []claude.Draft
+	var outcome claude.IntakeOutcome
 	err := run.api.withPool(ctx, func(c *pool.Conn) error {
 		req := run.req
 		req.Deps = tools.Deps{Source: run.src, Pool: c}
 		var err error
-		drafts, _, err = claude.DraftRationales(ctx, run.deck, wanted, req)
+		drafts, outcome, err = claude.DraftRationales(ctx, run.deck, wanted, req)
 		return err
 	})
 	if err != nil {
@@ -383,7 +432,7 @@ func (run *intakeRun) draft(ctx context.Context) wire.OrderedMap {
 	if err != nil {
 		return intakeFailed(err, run.req.Endpoint)
 	}
-	return intakeStep(n, len(wanted), "")
+	return intakeStep(n, len(wanted), leftForYou(outcome.Unanswered))
 }
 
 // describe writes the deck's strategy and its themes.

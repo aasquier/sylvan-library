@@ -92,11 +92,12 @@ function dial(mayWrite: boolean): ClaudeStatus {
   }
 }
 
-function job(): Job {
+function job(overrides: Partial<Job> = {}): Job {
   return {
     id: 'j1', kind: 'claude.intake', status: 'done', done: 1, total: 1,
     percent: 100, label: 'intake: cats', result: null, partial: null,
     error: null, created_at: '2026-08-29T00:00:00Z',
+    ...overrides,
   }
 }
 
@@ -742,5 +743,102 @@ describe('when the extra work does not finish', () => {
     await importWithLostJob(500)
     expect(await screen.findByText(/Your deck is saved and safe/)).toBeTruthy()
     expect(screen.queryByText(/library was most likely restarting/)).toBeNull()
+  })
+})
+
+/* The extra work finished, and it had something to say about it.
+ *
+ * **This page is the only one that can say it.** The run's account of itself
+ * lives in the job and the job dies with the process, and every step has been
+ * writing a sentence for the moments its two numbers would read as a failure —
+ * "eighty-four of eighty-five" is a fine result and a frightening line. The
+ * page navigated to the deck the instant the job resolved, so all of them were
+ * written and dropped. The one that matters is the one naming a card Claude
+ * had nothing to say about: leaving it out is the design, and finding your own
+ * card meant reading ninety-nine reasons looking for the gap.
+ *
+ * The tests below drive the real `intakeAftermath` and the real render — only
+ * the job's `result` is scripted, which is the wire and nothing else.
+ */
+describe('when the extra work leaves something behind', () => {
+  /** A finished run whose steps say what they left. */
+  function intakeSaying(steps: Record<string, unknown>) {
+    vi.mocked(followJob).mockReturnValue({
+      promise: Promise.resolve(job({
+        result: { slug: 'arahbo-cats', asked: true, steps },
+      })),
+      cancel: () => {},
+    })
+  }
+
+  async function importAndFinish() {
+    vi.mocked(api.importDeck).mockResolvedValue(result({ created: true }))
+    renderImport()
+    paste('1 Sol Ring')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Sort the cards' }))
+    fireEvent.click(screen.getByText('Import as draft'))
+  }
+
+  it('names the card it drafted no reason for', async () => {
+    intakeSaying({
+      rationales: {
+        changed: 84, considered: 85,
+        note: 'No reason was drafted for Virtue of Persistence — that one is '
+          + 'yours to write.',
+      },
+    })
+    await importAndFinish()
+    expect(await screen.findByText(/Virtue of Persistence/)).toBeTruthy()
+    // Under the same words the chip was ticked with, so what happened and what
+    // was asked for are named the same thing.
+    expect(screen.getAllByText('Draft the reasons').length).toBeGreaterThan(0)
+  })
+
+  // The whole point of holding: leaving takes the only account of what
+  // happened with it, and the account cannot be reached again from anywhere.
+  it('does not navigate away from what it has to say', async () => {
+    intakeSaying({
+      categories: {
+        changed: 98, considered: 99,
+        note: 'Left under Utility, having no clearer home: Sol Ring.',
+      },
+    })
+    await importAndFinish()
+    await screen.findByText(/Left under Utility/)
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('offers the door to the deck it did write to', async () => {
+    intakeSaying({
+      rationales: { changed: 84, considered: 85, note: 'one was left for you' },
+    })
+    await importAndFinish()
+    const door = await screen.findByRole('link', { name: 'Open your deck' })
+    // Owner-qualified, off the response, exactly as the happy path is (ADR 22).
+    expect(door.getAttribute('href')).toBe('/decks/aasquier/arahbo-cats')
+  })
+
+  // **The ordinary run must not be made to press a button.** Nothing to report
+  // is the common case by a distance, and a page that stopped on every import
+  // would have turned a fix for a silence into a toll on everybody.
+  it('goes straight to the deck when there is nothing to report', async () => {
+    intakeSaying({ rationales: { changed: 85, considered: 85 } })
+    await importAndFinish()
+    await waitFor(() => expect(navigate)
+      .toHaveBeenCalledWith('/decks/aasquier/arahbo-cats'))
+    expect(screen.queryByRole('link', { name: 'Open your deck' })).toBeNull()
+  })
+
+  // A result the page does not recognise is not a crash. The deck is written
+  // by the time any of this runs, and a page that fell over on the way to
+  // saying so would be the worse failure by a distance.
+  it('goes to the deck when the run reported a shape it cannot read', async () => {
+    vi.mocked(followJob).mockReturnValue({
+      promise: Promise.resolve(job({ result: 'finished' })), cancel: () => {},
+    })
+    await importAndFinish()
+    await waitFor(() => expect(navigate)
+      .toHaveBeenCalledWith('/decks/aasquier/arahbo-cats'))
   })
 })

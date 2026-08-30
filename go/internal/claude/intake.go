@@ -83,11 +83,23 @@ type IntakeRequest struct {
 // ask -- reported rather than silently dropped, because a mode answering about
 // cards nobody asked about is a fact about the prompt and somebody should be
 // able to see it climb.
+//
+// `Unanswered` is the other half of that reconciliation, and it was missing.
+// `Skipped` counts rows that came back and were *rejected*; a card the model
+// simply never mentioned came back as nothing at all and was counted nowhere.
+// Asked for eighty-five and given eighty-four, the intake wrote eighty-four
+// and said so in a number -- and which card had been left was recoverable
+// only by diffing your own deck against your own paste.
+//
+// Names rather than a count, because the count was already there and was not
+// the useful half. It is the deck's own spelling, so it matches what the page
+// will show.
 type IntakeOutcome struct {
-	Stance  Stance
-	Asked   bool
-	Reason  string
-	Skipped int
+	Stance     Stance
+	Asked      bool
+	Reason     string
+	Skipped    int
+	Unanswered []string
 }
 
 // DraftRationales asks for a `why` on each named card.
@@ -141,7 +153,39 @@ func DraftRationales(ctx context.Context, d *deck.Deck, cards []string,
 			out = append(out, row)
 		}
 	}
-	return out, IntakeOutcome{Stance: effective, Asked: true, Skipped: skipped}, nil
+	return out, IntakeOutcome{Stance: effective, Asked: true, Skipped: skipped,
+		Unanswered: unanswered(cards, wanted, drafted(out))}, nil
+}
+
+// drafted is the set of cards an answer actually arrived for, casefolded.
+func drafted(out []Draft) map[string]bool {
+	got := make(map[string]bool, len(out))
+	for _, dr := range out {
+		got[Casefold(dr.Card)] = true
+	}
+	return got
+}
+
+// unanswered is what was asked about and never came back.
+//
+// **The half of the reconciliation that was missing.** `Skipped` counts rows
+// that arrived and were rejected; a card the model simply never mentioned
+// arrived as nothing and was counted nowhere -- so an intake asked for
+// eighty-five and given eighty-four wrote eighty-four, reported the two
+// numbers, and named the missing card to nobody.
+//
+// Walked in the order the cards were asked in rather than over a map, because
+// this list is put in front of a person and an order nobody chose reads as a
+// fault of its own.
+func unanswered(cards []string, wanted map[string]string, got map[string]bool) []string {
+	out := []string{}
+	for _, name := range cards {
+		folded := Casefold(name)
+		if proper, held := wanted[folded]; held && !got[folded] {
+			out = append(out, proper)
+		}
+	}
+	return out
 }
 
 // FileCards asks which macro category each named card belongs under.
@@ -191,7 +235,12 @@ func FileCards(ctx context.Context, d *deck.Deck, cards []string,
 			out = append(out, row)
 		}
 	}
-	return out, IntakeOutcome{Stance: effective, Asked: true, Skipped: skipped}, nil
+	got := make(map[string]bool, len(out))
+	for _, f := range out {
+		got[Casefold(f.Card)] = true
+	}
+	return out, IntakeOutcome{Stance: effective, Asked: true, Skipped: skipped,
+		Unanswered: unanswered(cards, wanted, got)}, nil
 }
 
 // Description is what a deck is trying to do, before anything has written it
