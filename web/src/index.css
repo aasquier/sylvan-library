@@ -5157,6 +5157,37 @@ button:hover .tarot-fan-card {
 .chip-toggle.is-on:hover {
   background: color-mix(in srgb, var(--vine) 24%, transparent);
 }
+/* **A locked chip has to look locked, or it is worse than one that lied.**
+ *
+ * The intake sheet stays on screen while its work runs — what you asked for
+ * is the most useful thing to be reading during the two or three minutes it
+ * takes — but the request has already gone, so a chip pressed now changes
+ * nothing on the server. Disabling it is the honest half; this is the other
+ * half, because a control that silently stops answering the hand is exactly
+ * the "did something happen?" failure `:hover` and `:active` were added to
+ * this family to close.
+ *
+ * The chosen ones keep their green so the sheet still reads as the list of
+ * what was asked for; what goes is the *invitation* — the pointer, the lift
+ * under a press, and the hover reply. `:disabled` wins over `:hover` and
+ * `:active` here by coming after them. */
+.chip-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+.chip-toggle:disabled:hover {
+  color: var(--text-muted);
+  border-color: var(--hairline);
+  background: transparent;
+}
+.chip-toggle.is-on:disabled:hover {
+  color: var(--text-primary);
+  border-color: var(--vine);
+  background: color-mix(in srgb, var(--vine) 16%, transparent);
+}
+.chip-toggle:disabled:active {
+  transform: none;
+}
 /* The floor is the finger, not the pointer. These sit at 30px, which is fine
  * under a mouse and under the 44px target a thumb needs. */
 @media (pointer: coarse) {

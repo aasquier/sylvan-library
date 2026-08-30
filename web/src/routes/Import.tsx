@@ -461,8 +461,14 @@ export default function Import() {
                 the sheet holds it in a ref rather than in the dependency list
                 that drives the dial, but a stable callback is the right thing
                 to hand it regardless. */}
+            {/* Locked from the moment the button is pressed — not from the
+                moment the job appears. The two are a whole round trip apart on
+                a 99-card paste, and that gap is precisely when somebody who
+                pressed Import and saw nothing happen reaches for a chip. */}
             <IntakeChoices value={sheet} onChange={setSheet}
-                           onStance={setSheetStance} />
+                           onStance={setSheetStance}
+                           running={busy === 'create'
+                                    || (intake !== null && intake.status !== 'done')} />
           </div>
         </section>
       </div>
