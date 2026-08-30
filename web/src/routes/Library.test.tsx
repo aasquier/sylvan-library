@@ -20,7 +20,7 @@ vi.mock('../lib/api', async () => ({
   deckUrl: (await vi.importActual<typeof import('../lib/api')>('../lib/api')).deckUrl,
   api: { decks: vi.fn(), health: vi.fn(), deleteDeck: vi.fn(),
          colors: vi.fn(), lore: vi.fn(),
-         entombed: vi.fn(), returnEntombed: vi.fn() },
+         entombed: vi.fn(), returnEntombed: vi.fn(), emptyCrypt: vi.fn() },
 }))
 
 const { api } = await import('../lib/api')
@@ -101,6 +101,7 @@ beforeEach(() => {
   vi.mocked(api.entombed).mockReset().mockResolvedValue({ entombed: [] })
   vi.mocked(api.returnEntombed).mockReset().mockResolvedValue(
     { slug: 'goreclaw', name: 'Goreclaw', restored: true })
+  vi.mocked(api.emptyCrypt).mockReset().mockResolvedValue({ emptied: true, destroyed: 1 })
   // The shelf-fact strip is decorative and must never block the shelf, so
   // the default here is the shelves failing to load. The one test about the
   // strip supplies its own.
@@ -957,5 +958,202 @@ describe('Library crypt', () => {
     const page = document.body.textContent ?? ''
     expect(page).not.toMatch(/\.trash|decks\/|shell|terminal|filesystem|directory|folder/i)
     expect(page).not.toContain(HANDLE)
+  })
+
+  /**
+   * Emptying the crypt: the only control in this app that destroys a deck.
+   *
+   * The gate is a typed word rather than an arm-then-fire, and these tests are
+   * written against the reason. `ArmedButton` asks for two clicks a measured
+   * distance apart, and PR #409 is the standing evidence that a gesture gate
+   * can be satisfied without a decision — one double-click delivered both
+   * halves and buried a card out of a real deck. There is no gesture that
+   * types a word, so the assertions below are all about the word: that nothing
+   * fires without it, that the near-miss most likely to be reached for is
+   * refused, and that what the player agreed to was on screen while they
+   * agreed to it.
+   */
+  describe('emptying it', () => {
+    const twoBuried = () => [
+      buried(),
+      buried({ id: 'ff00ff00ff00ff00', slug: 'trostani', name: 'Trostani', total_cards: 100 }),
+    ]
+
+    /** Opens the crypt with two decks in it and opens the confirmation. */
+    async function openConfirmation() {
+      vi.mocked(api.entombed).mockResolvedValue({ entombed: twoBuried() })
+      await openCrypt()
+      fireEvent.click(await screen.findByRole('button', { name: /empty the crypt/i }))
+      return screen.getByRole('dialog')
+    }
+
+    it('offers no way to empty a crypt with nothing in it', async () => {
+      vi.mocked(api.entombed).mockResolvedValue({ entombed: [buried()] })
+      await openCrypt()
+
+      // Present with something in it...
+      expect(await screen.findByRole('button', { name: /empty the crypt/i })).toBeTruthy()
+      vi.mocked(api.entombed).mockResolvedValue({ entombed: [] })
+      fireEvent.click(screen.getByRole('button', { name: /^return$/i }))
+
+      // ...and gone once there is not, rather than sitting there as a control
+      // whose only outcome is that nothing happens.
+      expect(await screen.findByText(/nothing rests here/i)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /empty the crypt/i })).toBeNull()
+    })
+
+    // **What a newcomer must be able to see before this can fire.** Not the
+    // count alone: the decks by name, because "empty the crypt" is an
+    // abstraction and "Trostani" is a deck somebody built.
+    it('names every deck it is about to destroy, and says nothing comes back', async () => {
+      const dialog = await openConfirmation()
+
+      expect(within(dialog).getByText('Goreclaw')).toBeTruthy()
+      expect(within(dialog).getByText('Trostani')).toBeTruthy()
+      expect(dialog.textContent).toMatch(/permanently/i)
+      expect(dialog.textContent).toMatch(/nothing here can be brought back/i)
+      // The Magic word is explained rather than assumed (commandment 2).
+      expect(dialog.textContent).toMatch(/gone for good/i)
+      // And nothing has happened yet.
+      expect(api.emptyCrypt).not.toHaveBeenCalled()
+    })
+
+    it('will not fire until the word is typed, and refuses the word next door',
+      async () => {
+        const dialog = await openConfirmation()
+        const fire = within(dialog).getByRole('button', { name: /exile all 2 decks/i })
+        const input = within(dialog).getByRole('textbox')
+
+        expect((fire as HTMLButtonElement).disabled).toBe(true)
+
+        // `bury` is the near miss that matters: it is the word the delete
+        // dialog taught them, and it is the wrong one here because burying is
+        // the reversible operation and this is not.
+        fireEvent.change(input, { target: { value: 'bury' } })
+        expect((fire as HTMLButtonElement).disabled).toBe(true)
+        expect(dialog.textContent).toMatch(/that is not the word/i)
+
+        fireEvent.click(fire)
+        expect(api.emptyCrypt).not.toHaveBeenCalled()
+      })
+
+    // Case and surrounding space are forgiven, exactly as the delete's are —
+    // the near side must never refuse something the player plainly typed, and
+    // what is sent is the value this dialog validated.
+    it('accepts the word whatever the capitals, and sends what it checked', async () => {
+      const dialog = await openConfirmation()
+      fireEvent.change(within(dialog).getByRole('textbox'),
+        { target: { value: '  EXILE  ' } })
+
+      const fire = within(dialog).getByRole('button', { name: /exile all 2 decks/i })
+      expect((fire as HTMLButtonElement).disabled).toBe(false)
+      fireEvent.click(fire)
+
+      await waitFor(() => expect(api.emptyCrypt).toHaveBeenCalledWith('exile'))
+    })
+
+    it('says how many went, and re-reads the crypt rather than emptying it here',
+      async () => {
+        const dialog = await openConfirmation()
+        vi.mocked(api.emptyCrypt).mockResolvedValue({ emptied: true, destroyed: 2 })
+        vi.mocked(api.entombed).mockResolvedValue({ entombed: [] })
+
+        fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'exile' } })
+        fireEvent.click(within(dialog).getByRole('button', { name: /exile all 2 decks/i }))
+
+        expect(await screen.findByText(/2 decks were exiled/i)).toBeTruthy()
+        // The server is the authority on what is left.
+        await waitFor(() => expect(api.entombed).toHaveBeenCalledTimes(2))
+        expect(screen.queryByRole('dialog')).toBeNull()
+        // And the empty state does not claim every deck is still on the shelf,
+        // which was true a moment ago and is not now.
+        expect(screen.getByText(/the crypt has been emptied/i)).toBeTruthy()
+      })
+
+    // **The claim that had to be withdrawn.** The notice after a deletion says
+    // a named deck "rests in your crypt — entombed, not erased" and offers a
+    // button to raise it. Both stop being true the instant the crypt is
+    // emptied, and leaving it up would be this page telling somebody their
+    // deck is recoverable seconds after they destroyed it.
+    it('withdraws the "it rests in your crypt" notice once the crypt is emptied',
+      async () => {
+        vi.mocked(api.entombed).mockResolvedValue({ entombed: [buried()] })
+        renderLibrary()
+        await waitFor(() => expect(shownNames()).toHaveLength(3))
+
+        // Bury a deck the ordinary way, so the reassuring notice is on screen.
+        // Named exactly: the tile's own `aria-label` is `Entomb <deck>`, and
+        // matching it loosely would also catch the dialog's own button.
+        fireEvent.click(screen.getByRole('button', { name: 'Entomb Goreclaw' }))
+        const burial = screen.getByRole('dialog')
+        fireEvent.change(within(burial).getByRole('textbox'), { target: { value: 'bury' } })
+        fireEvent.click(within(burial).getByRole('button', { name: /entomb this deck/i }))
+        expect(await screen.findByText(/rests in your crypt/i)).toBeTruthy()
+
+        fireEvent.click(await screen.findByRole('tab', { name: /crypt/i }))
+        fireEvent.click(await screen.findByRole('button', { name: /empty the crypt/i }))
+        const dialog = screen.getByRole('dialog')
+        vi.mocked(api.entombed).mockResolvedValue({ entombed: [] })
+        fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'exile' } })
+        fireEvent.click(within(dialog).getByRole('button', { name: /exile this deck/i }))
+
+        expect(await screen.findByText(/one deck was exiled/i)).toBeTruthy()
+        expect(screen.queryByText(/rests in your crypt/i)).toBeNull()
+        expect(screen.queryByRole('button', { name: /return it/i })).toBeNull()
+      })
+
+    // The same rule in the other direction. "Your crypt is empty" is a claim
+    // about *now*, and the moment somebody buries a deck it is false — so the
+    // notice has to go when the next burial arrives, not sit there until it is
+    // dismissed.
+    it('withdraws the "your crypt is empty" notice when a deck is buried after it',
+      async () => {
+        const dialog = await openConfirmation()
+        vi.mocked(api.emptyCrypt).mockResolvedValue({ emptied: true, destroyed: 2 })
+        vi.mocked(api.entombed).mockResolvedValue({ entombed: [] })
+        fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'exile' } })
+        fireEvent.click(within(dialog).getByRole('button', { name: /exile all 2 decks/i }))
+        expect(await screen.findByText(/2 decks were exiled/i)).toBeTruthy()
+
+        // Back to the shelf, and bury something.
+        fireEvent.click(screen.getByRole('tab', { name: /my decks/i }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Entomb Goreclaw' }))
+        const burial = screen.getByRole('dialog')
+        fireEvent.change(within(burial).getByRole('textbox'), { target: { value: 'bury' } })
+        fireEvent.click(within(burial).getByRole('button', { name: /entomb this deck/i }))
+
+        expect(await screen.findByText(/rests in your crypt/i)).toBeTruthy()
+        expect(screen.queryByText(/your crypt is empty/i)).toBeNull()
+      })
+
+    // A refusal leaves the dialog open with the decks still named in it, and
+    // claims nothing about what was destroyed. The rejection is built per call
+    // rather than once, or the promise is created before anything can await it.
+    it('shows a failure without claiming anything was destroyed', async () => {
+      const dialog = await openConfirmation()
+      vi.mocked(api.emptyCrypt).mockImplementation(
+        () => Promise.reject(new Error('the library is asleep')))
+
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'exile' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: /exile all 2 decks/i }))
+
+      expect(await screen.findByText(/the library is asleep/i)).toBeTruthy()
+      expect(screen.getByRole('dialog')).toBeTruthy()
+      expect(screen.queryByText(/were exiled/i)).toBeNull()
+    })
+
+    // Commandment 17: the control that opens this is a real `.btn`, not a bare
+    // button — and it wears the outlined danger voice, with the solid one kept
+    // for the press that actually destroys something.
+    it('dresses the two controls as opening and committing, not as one button',
+      async () => {
+        const dialog = await openConfirmation()
+        // The opener is behind the dialog; find it by class rather than by
+        // re-querying a name the dialog also matches.
+        const opener = document.querySelector('.btn.btn-danger:not(.btn-danger-solid)')
+        expect(opener?.textContent).toMatch(/empty the crypt/i)
+        expect(within(dialog).getByRole('button', { name: /exile all 2 decks/i })
+          .className).toMatch(/btn-danger-solid/)
+      })
   })
 })

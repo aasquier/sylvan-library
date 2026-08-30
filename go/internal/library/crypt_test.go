@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/library"
 )
 
@@ -300,11 +301,146 @@ func TestOnlyAnOwnerHasACrypt(t *testing.T) {
 	if _, err := readOnly.Restore(context.Background(), "whatever"); !library.IsReadOnly(err) {
 		t.Errorf("a read-only tier raised a deck: %v", err)
 	}
+	// And the destructive one, which is the one that would matter: a tier
+	// that refuses to *show* you a crypt but empties it is worse than either.
+	if _, err := readOnly.Empty(context.Background()); !library.IsReadOnly(err) {
+		t.Errorf("a read-only tier emptied its crypt: %v", err)
+	}
 	// The keyhole view has no crypt at all -- not one that refuses, none.
 	// Stronger than a refusal: there is no method to call.
 	view := library.NewSharedOnly(library.NewFileSource(root, false))
 	if _, err := library.CryptFor(view); !library.IsReadOnly(err) {
 		t.Errorf("the shared-only view handed out a crypt: %v", err)
+	}
+}
+
+// ---- emptying it -----------------------------------------------------------
+
+// The drain, and the two facts that make it safe to offer: it destroys
+// everything that was in the crypt, and it destroys nothing that was not.
+//
+// The second half is the one worth a test rather than a reading. `.trash` sits
+// *inside* the library root, one `os.RemoveAll` away from the decks
+// themselves, and "empty the crypt" and "empty the library" differ by a single
+// path segment.
+func TestEmptyingTheCryptDestroysTheBuriedAndSparesTheLiving(t *testing.T) {
+	t.Parallel()
+	src, root := writableTier(t, "gyome")
+	ctx := context.Background()
+	crypt := cryptOf(t, src)
+
+	// Two buried, one left standing.
+	if err := src.Create(ctx, "trostani", strings.Replace(oneDeck, "Test Deck", "Trostani", 1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := src.Create(ctx, "arahbo", strings.Replace(oneDeck, "Test Deck", "Arahbo", 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Delete(ctx, "trostani"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Delete(ctx, "arahbo"); err != nil {
+		t.Fatal(err)
+	}
+
+	gone, err := crypt.Empty(ctx)
+	if err != nil {
+		t.Fatalf("empty: %v", err)
+	}
+	if gone != 2 {
+		t.Errorf("emptying two burials reported %d", gone)
+	}
+	after, err := crypt.Entombed(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 0 {
+		t.Errorf("the emptied crypt still lists %+v", after)
+	}
+	// Off the disk, not merely out of the listing: this is the one operation
+	// whose whole promise is that the bytes are gone.
+	entries, err := os.ReadDir(filepath.Join(root, ".trash"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the crypt directory still holds %d entries", len(entries))
+	}
+	// And the deck nobody buried is exactly where it was.
+	if _, err := src.Get(ctx, "gyome"); err != nil {
+		t.Errorf("emptying the crypt took a living deck with it: %v", err)
+	}
+}
+
+// An empty crypt empties successfully. The alternative -- an error -- would
+// make the control an error message for the state it exists to produce, and
+// the surface would have to special-case the commonest case there is.
+func TestEmptyingAnEmptyCryptIsNotAFailure(t *testing.T) {
+	t.Parallel()
+	src, _ := writableTier(t, "gyome")
+
+	// Twice: once with no `.trash` directory at all -- the normal state of a
+	// library nobody has deleted from -- and once after it exists but is bare.
+	gone, err := cryptOf(t, src).Empty(context.Background())
+	if err != nil {
+		t.Fatalf("a library with no crypt yet: %v", err)
+	}
+	if gone != 0 {
+		t.Errorf("an untouched library reported %d decks destroyed", gone)
+	}
+	ctx := context.Background()
+	if _, err := src.Delete(ctx, "gyome"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cryptOf(t, src).Empty(ctx); err != nil {
+		t.Fatal(err)
+	}
+	gone, err = cryptOf(t, src).Empty(ctx)
+	if err != nil {
+		t.Fatalf("a crypt already emptied: %v", err)
+	}
+	if gone != 0 {
+		t.Errorf("emptying an empty crypt reported %d decks destroyed", gone)
+	}
+}
+
+// What is destroyed is what `Entombed` listed, which is what the player was
+// shown and agreed to -- so an entry this tier can neither name nor parse goes
+// with the rest rather than surviving a sweep it was counted in.
+//
+// The same reading in reverse is the reason `Empty` walks `crypt()` instead of
+// removing the directory: a file beside the entries is not an entry, is not in
+// the count, and is not in the list anybody agreed to.
+func TestEmptyingTheCryptTakesTheEntriesAndLeavesWhatIsNotOne(t *testing.T) {
+	t.Parallel()
+	src, root := writableTier(t)
+	ctx := context.Background()
+
+	trash := filepath.Join(root, ".trash")
+	if err := os.MkdirAll(filepath.Join(trash, "handplaced"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(trash, "handplaced", "deck.yaml"),
+		[]byte("name: Hand Placed\nstatus: draft\ncards: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Not a directory, so `Entombed` never listed it and nobody agreed to it.
+	if err := os.WriteFile(filepath.Join(trash, "notes.txt"), []byte("mine"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	gone, err := cryptOf(t, src).Empty(ctx)
+	if err != nil {
+		t.Fatalf("empty: %v", err)
+	}
+	if gone != 1 {
+		t.Errorf("one unparseable entry was counted as %d", gone)
+	}
+	if _, err := os.Stat(filepath.Join(trash, "handplaced")); !os.IsNotExist(err) {
+		t.Error("an entry the crypt listed survived being emptied")
+	}
+	if _, err := os.Stat(filepath.Join(trash, "notes.txt")); err != nil {
+		t.Errorf("emptying the crypt destroyed something it never listed: %v", err)
 	}
 }
 
@@ -428,5 +564,139 @@ func TestACryptOnlyEverHoldsItsOwnersDecks(t *testing.T) {
 	}
 	if !deleted.Valid {
 		t.Error("the deck was raised out of somebody else's crypt")
+	}
+}
+
+// Emptying is a `DELETE` here rather than a mark being cleared, so the row is
+// what has to be gone -- and the `WHERE` has to be narrow in both directions
+// at once: this owner, and only the rows that were buried.
+//
+// **The living deck is the assertion that matters.** One dropped clause turns
+// "empty my crypt" into "delete my library", and both statements are one line
+// long and look equally reasonable.
+func TestTheSQLCryptEmptiesTheBuriedRowsAndNoOthers(t *testing.T) {
+	t.Parallel()
+	src, db := ownedSQLTier(t)
+	ctx := context.Background()
+	crypt := cryptOf(t, src)
+
+	for _, slug := range []string{"gyome", "trostani", "arahbo"} {
+		if err := src.Create(ctx, slug, sqlDeck); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := src.Delete(ctx, "trostani"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Delete(ctx, "arahbo"); err != nil {
+		t.Fatal(err)
+	}
+
+	gone, err := crypt.Empty(ctx)
+	if err != nil {
+		t.Fatalf("empty: %v", err)
+	}
+	if gone != 2 {
+		t.Errorf("two buried rows were counted as %d", gone)
+	}
+	// Gone from the table, not merely unmarked: a cleared `deleted_at` would
+	// have *restored* both decks, which is the opposite operation and would
+	// leave this test green on the count alone.
+	var buried int
+	if err := db.QueryRow(
+		"SELECT COUNT(*) FROM user_decks WHERE deleted_at IS NOT NULL").Scan(&buried); err != nil {
+		t.Fatal(err)
+	}
+	if buried != 0 {
+		t.Errorf("%d buried rows survived the emptying", buried)
+	}
+	if _, err := src.Get(ctx, "trostani"); !library.IsNotFound(err) {
+		t.Error("a destroyed deck came back onto the shelf")
+	}
+	if _, err := src.Get(ctx, "gyome"); err != nil {
+		t.Errorf("emptying the crypt deleted a living deck: %v", err)
+	}
+}
+
+// One account's drain never reaches another's crypt. The route cannot name
+// somebody else's -- there is no owner segment -- so this is the tier holding
+// up the half that the route's shape is resting on.
+func TestEmptyingOneCryptLeavesAnothersAlone(t *testing.T) {
+	t.Parallel()
+	mine, db := ownedSQLTier(t)
+	ctx := context.Background()
+	if err := mine.Create(ctx, "gyome", sqlDeck); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mine.Delete(ctx, "gyome"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A second account, with its own buried deck under the same slug -- the
+	// same name on purpose, since a `WHERE` that forgot the owner would match
+	// on it. A real row rather than an invented id: `user_decks.owner_id` is a
+	// foreign key, so a made-up owner cannot own anything to be spared.
+	bob, err := auth.Create(ctx, db, "bob", "bob@example.com", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs := library.NewSQLSource(db, db, bob.ID, true, false)
+	if err := theirs.Create(ctx, "gyome", sqlDeck); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := theirs.Delete(ctx, "gyome"); err != nil {
+		t.Fatal(err)
+	}
+
+	gone, err := cryptOf(t, mine).Empty(ctx)
+	if err != nil {
+		t.Fatalf("empty: %v", err)
+	}
+	if gone != 1 {
+		t.Errorf("emptying one crypt destroyed %d decks", gone)
+	}
+	still, err := cryptOf(t, theirs).Entombed(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(still) != 1 {
+		t.Fatalf("the other account's crypt holds %d decks after somebody else emptied theirs", len(still))
+	}
+	// And it is still raisable, which is the fact the other account cares
+	// about: a row that survived as a tombstone nobody can open is not a deck.
+	if _, err := cryptOf(t, theirs).Restore(ctx, still[0].ID); err != nil {
+		t.Errorf("the surviving deck could not be raised: %v", err)
+	}
+}
+
+// The shared-only keyhole and a read-only row view have no drain, for the
+// reason they have no crypt: a view that cannot be asked is stronger than one
+// that refuses, and this is the method where the difference would be paid for.
+func TestASharedOnlyViewCannotEmptyACrypt(t *testing.T) {
+	t.Parallel()
+	src, db := ownedSQLTier(t)
+	ctx := context.Background()
+	if err := src.Create(ctx, "gyome", sqlDeck); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Delete(ctx, "gyome"); err != nil {
+		t.Fatal(err)
+	}
+
+	// `sharedOnly` set: somebody else's shelf, seen through the keyhole.
+	keyhole := library.NewSQLSource(db, db, 1, true, true)
+	if _, err := keyhole.Empty(ctx); !library.IsReadOnly(err) {
+		t.Errorf("a shared-only view emptied a crypt: %v", err)
+	}
+	if _, err := library.CryptFor(library.NewSharedOnly(src)); !library.IsReadOnly(err) {
+		t.Errorf("the shared-only wrapper handed out a crypt: %v", err)
+	}
+	// Untouched.
+	still, err := cryptOf(t, src).Entombed(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(still) != 1 {
+		t.Errorf("the refused emptying left %d decks in the crypt", len(still))
 	}
 }

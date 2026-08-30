@@ -228,6 +228,142 @@ func TestAHandleTheCryptDoesNotHoldIsAPlainAbsence(t *testing.T) {
 	}
 }
 
+// ---- the drain -------------------------------------------------------------
+
+// The crypt swept clean: everything in it goes, and nothing outside it does.
+//
+// The second clause is checked against another account's crypt as well as
+// against the caller's own shelf, because there are two ways to write this
+// wrong and they fail in different directions -- one takes your living decks,
+// the other takes somebody else's buried ones.
+func TestEmptyingTheCryptDestroysEveryEntryAndOnlyTheCallersOwn(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	// Two in bob's crypt: the fixture's, and one he buries now.
+	if status, _, raw := rig.do(t, bob, "DELETE",
+		"/api/decks/bob/bobs-private?confirm=bury", ""); status != 200 {
+		t.Fatalf("delete: %d %s", status, raw)
+	}
+	if before := rig.crypt(t, bob); len(before) != 2 {
+		t.Fatalf("bob's crypt holds %+v", before)
+	}
+
+	status, body, raw := rig.do(t, bob, "DELETE", "/api/decks/entombed?confirm=exile", "")
+	if status != 200 {
+		t.Fatalf("empty: %d %s", status, raw)
+	}
+	if body["emptied"] != true {
+		t.Errorf("the answer does not say it emptied: %v", body)
+	}
+	if n, _ := body["destroyed"].(float64); int(n) != 2 {
+		t.Errorf("two entries were reported as %v destroyed", body["destroyed"])
+	}
+	if after := rig.crypt(t, bob); len(after) != 0 {
+		t.Errorf("the emptied crypt still lists %+v", after)
+	}
+	// His living decks are where he left them.
+	if status, _, raw := rig.do(t, bob, "GET", "/api/decks/bob/bobs-public", ""); status != 200 {
+		t.Errorf("emptying the crypt took a living deck: %d %s", status, raw)
+	}
+	// And alice's crypt is untouched -- there is no owner segment on this
+	// route, so this is the structure holding rather than a check passing.
+	if hers := rig.crypt(t, alice); len(hers) != 1 {
+		t.Errorf("emptying bob's crypt changed alice's to %+v", hers)
+	}
+}
+
+// The typed word, and every near miss refused.
+//
+// `bury` is in the table on purpose: it is the word next door, the one a
+// player has been taught by the delete dialog, and the one most likely to be
+// reached for here. It is the wrong word, because burying is the reversible
+// operation and this is not.
+func TestEmptyingTheCryptTakesTheWordAndNothingElse(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	for _, confirm := range []string{"", "yes", "true", "bury", "gone", "exil"} {
+		status, body, raw := rig.do(t, bob, "DELETE",
+			"/api/decks/entombed?confirm="+confirm, "")
+		if status != 422 {
+			t.Fatalf("confirm=%q answered %d %s", confirm, status, raw)
+		}
+		if detail := str(body, "detail"); !strings.Contains(detail, "exile") {
+			t.Errorf("the refusal for %q does not say the word: %q", confirm, detail)
+		}
+		// Nothing went. A refusal that half-empties the crypt is the worst
+		// outcome this route has.
+		if still := rig.crypt(t, bob); len(still) != 1 {
+			t.Fatalf("a refused emptying left %+v", still)
+		}
+	}
+
+	// Case and surrounding space are forgiven, exactly as the delete's are:
+	// the near side must not refuse something the player plainly typed.
+	if status, _, raw := rig.do(t, bob, "DELETE",
+		"/api/decks/entombed?confirm=%20EXILE%20", ""); status != 200 {
+		t.Fatalf("a confirmation with capitals and space answered %d %s", status, raw)
+	}
+	if still := rig.crypt(t, bob); len(still) != 0 {
+		t.Errorf("the crypt still holds %+v", still)
+	}
+}
+
+// Emptying an already-empty crypt succeeds and destroys nothing. The control
+// exists to produce this state, so it must not be an error to be in it.
+func TestEmptyingAnEmptyCryptSucceedsWithNothingDestroyed(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	if status, _, raw := rig.do(t, bob, "DELETE",
+		"/api/decks/entombed?confirm=exile", ""); status != 200 {
+		t.Fatalf("the first emptying: %d %s", status, raw)
+	}
+	status, body, raw := rig.do(t, bob, "DELETE", "/api/decks/entombed?confirm=exile", "")
+	if status != 200 {
+		t.Fatalf("emptying an empty crypt answered %d %s", status, raw)
+	}
+	if n, _ := body["destroyed"].(float64); int(n) != 0 {
+		t.Errorf("an empty crypt reported %v destroyed", body["destroyed"])
+	}
+}
+
+// **The promise the word makes.** After an emptying, the handle that used to
+// raise a deck raises nothing -- and it comes back as the family's ordinary
+// absence rather than as a fault, because a deck that was exiled is exactly as
+// gone as one that was never there.
+func TestAHandleFromAnEmptiedCryptRaisesNothing(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	_, deleted, _ := rig.do(t, bob, "DELETE", "/api/decks/bob/bobs-private?confirm=bury", "")
+	id := str(deleted, "crypt_id")
+	if id == "" {
+		t.Fatal("the deletion handed back no handle to test with")
+	}
+	if status, _, raw := rig.do(t, bob, "DELETE",
+		"/api/decks/entombed?confirm=exile", ""); status != 200 {
+		t.Fatalf("empty: %d %s", status, raw)
+	}
+
+	status, body, raw := rig.do(t, bob, "POST", "/api/decks/entombed/"+id+"/return", "")
+	if status != 404 {
+		t.Fatalf("a handle from an emptied crypt answered %d %s", status, raw)
+	}
+	if detail := str(body, "detail"); !strings.Contains(detail, "crypt") {
+		t.Errorf("the absence reads %q", detail)
+	}
+	// And the deck did not quietly come back onto the shelf.
+	if status, _, _ := rig.do(t, bob, "GET", "/api/decks/bob/bobs-private", ""); status != 404 {
+		t.Errorf("an exiled deck answers %d", status)
+	}
+}
+
 // **The regression.** Nothing this family says to a player names what is
 // underneath the site: not a path, not the trash directory, not a table, not a
 // shell. Commandment 10 -- a filesystem path is as much a leak as a model id.
@@ -256,6 +392,12 @@ func TestNothingAboutADeletionNamesWhatIsUnderneath(t *testing.T) {
 	record(t, bob, "POST", "/api/decks/entombed/deadbeefdeadbeef/return", "")
 	record(t, bob, "DELETE", "/api/decks/bob/bobs-public?confirm=nope", "")
 	record(t, bob, "POST", "/api/decks/entombed/"+id+"/return", "")
+	// The drain, both ways. Last, because it leaves the crypt empty -- and in
+	// the sweep rather than in a test of its own for the reason the sweep
+	// exists: this family's leak was in a success body nobody re-read, and a
+	// route added later is exactly where the next one would be.
+	record(t, bob, "DELETE", "/api/decks/entombed?confirm=nope", "")
+	record(t, bob, "DELETE", "/api/decks/entombed?confirm=exile", "")
 
 	// The decks directory itself, and every word that would give it away. The
 	// last three are the sentence that shipped: *"The deck moves to

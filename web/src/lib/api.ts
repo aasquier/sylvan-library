@@ -2989,11 +2989,12 @@ export const api = {
    *  once and held. */
   themes: () => get<ThemeVocabulary>('/api/themes'),
   lore: () => get<LoreShelves>('/api/lore'),
-  // The only call here that can lose work — and even this one does not, which
-  // is the point of the two calls at the foot of this object. `confirm` must
-  // be a word somebody typed — `bury`, or the slug itself — which a mis-aimed
-  // click cannot satisfy. The deck goes to the crypt rather than being
-  // unlinked, and the answer carries the handle that raises it again.
+  // The call that looks like the dangerous one and is not, which is the point
+  // of the three at the foot of this object: the deck goes to the crypt rather
+  // than being unlinked, and the answer carries the handle that raises it
+  // again. `confirm` must be a word somebody typed — `bury`, or the slug
+  // itself — which a mis-aimed click cannot satisfy. (`emptyCrypt` is the one
+  // that genuinely loses work, and it asks for a different word on purpose.)
   deleteDeck: (ref: DeckRef, confirm: string) =>
     send<DeleteResult>('DELETE',
       deckPath(ref, `?confirm=${encodeURIComponent(confirm)}`)),
@@ -3275,6 +3276,17 @@ export const api = {
   returnEntombed: (id: string) =>
     post<{ slug: string; name: string; restored: boolean }>(
       `/api/decks/entombed/${encodeURIComponent(id)}/return`, {}),
+  /** Empty the crypt: every entombed deck destroyed, and none of them coming
+   *  back. **The only call in this client that truly loses work.**
+   *
+   *  `confirm` must be the word `exile`, which is the game's own word for
+   *  removal with no way back — and deliberately not `bury`, the word next
+   *  door, which names the reversible thing this is not. No owner in the
+   *  path, like the two calls above it: the crypt this empties is the
+   *  caller's, and there is no URL that names anybody else's. */
+  emptyCrypt: (confirm: string) =>
+    send<{ emptied: boolean; destroyed: number }>('DELETE',
+      `/api/decks/entombed?confirm=${encodeURIComponent(confirm)}`),
 }
 
 /**

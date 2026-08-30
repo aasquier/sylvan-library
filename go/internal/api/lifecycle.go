@@ -29,10 +29,10 @@ import (
 
 // The moments a deck begins and ends: `POST /api/decks`, `POST
 // /api/decks/import`, `DELETE /api/decks/{owner}/{slug}`, `PUT
-// .../shared`, and the crypt's two -- `GET /api/decks/entombed` and `POST
-// /api/decks/entombed/{id}/return` -- the six lifecycle routes: create,
-// import and delete, the source's own sharing verb, and the way back out of
-// a deletion.
+// .../shared`, and the crypt's three -- `GET /api/decks/entombed`, `POST
+// /api/decks/entombed/{id}/return` and `DELETE /api/decks/entombed` -- the
+// seven lifecycle routes: create, import and delete, the source's own sharing
+// verb, the way back out of a deletion, and the way to make one final.
 //
 // Kept apart from the eleven editing routes on purpose, and the reason is
 // visible in the shapes below: **none of these goes through `commit`.**
@@ -41,12 +41,14 @@ import (
 // -- adding them means a second call site, and the log's whole design is that
 // there is one. Sharing is outside it for the same reason and one more: it
 // changes who may *read* a deck, not what the deck is. A restore is outside
-// it because it is the undo of something the log never recorded.
+// it because it is the undo of something the log never recorded, and emptying
+// the crypt is outside it because a deck's own history cannot outlive the
+// deck.
 //
-// Four of the six write into the caller's **own** library and never into an
+// Five of the seven write into the caller's **own** library and never into an
 // owner named in the path (no ownership question exists for
 // them), so they resolve the caller rather than a path segment -- `Mine` for
-// create and import, `myCrypts` for the crypt's two, which is `Mine` widened
+// create and import, `myCrypts` for the crypt's three, which is `Mine` widened
 // to every library the caller may write and argued where it stands. The other
 // two take the owner segment like every other per-deck route, and inherit
 // ADR 22's answers with it: a deck the caller cannot see is absent from their
@@ -624,16 +626,21 @@ const deleteWord = "bury"
 
 // ---- the crypt -------------------------------------------------------------
 
-// The two routes that make a deletion survivable, and the reason they exist:
-// the deck level had ADR 27's *entomb* and none of its *graveyard*. What a
+// The routes that make a deletion survivable, and the reason they exist: the
+// deck level had ADR 27's *entomb* and none of its *graveyard*. What a
 // player was given instead was the path the deck had been moved to and the
 // suggestion that they go and get it -- a leak of what runs underneath this
 // site (commandment 10) offered as a feature, and, to anyone who has never
 // opened a terminal, not an offer at all.
 //
-// **Neither takes an owner segment.** Your crypt is yours -- resolved from
-// who is asking, like create and import -- so there is no path a caller can
-// write that names somebody else's, which settles ADR 5 for this family by
+// The third route is the one that makes a deletion *final*, and it belongs
+// with the other two rather than beside `deleteDeck`: it is about the crypt
+// as a room, not about any deck in it. A place decks only ever accumulate in
+// eventually stops being a safety net and starts being a drawer nobody opens.
+//
+// **None of them takes an owner segment.** Your crypt is yours -- resolved
+// from who is asking, like create and import -- so there is no path a caller
+// can write that names somebody else's, which settles ADR 5 for this family by
 // construction rather than by a check: an entombed deck is still somebody's,
 // and the only 404 available here is about your own.
 
@@ -730,6 +737,77 @@ func (a *API) restoreDeck(w http.ResponseWriter, r *http.Request) {
 	wire.Detail(w, http.StatusNotFound,
 		"that deck is not in your crypt -- it may already be back on your shelf")
 }
+
+// emptyCrypt is `DELETE /api/decks/entombed`: the crypt swept clean, and the
+// only route in this app that destroys a deck.
+//
+// It exists because a crypt is the one room here that only ever fills up.
+// Every other list a player keeps has a way to get smaller; this one grew by
+// one every time somebody changed their mind, forever, and the way to shorten
+// it was to raise a deck you did not want in order to bury it again -- which
+// does not shorten it either. A holding area with no drain is a holding area
+// people stop opening.
+//
+// **`exile` is the confirmation word, and it is the exact opposite of the one
+// next door on purpose.** `deleteDeck` takes `bury` and argues, where it
+// stands, that "exile" would be wrong there because in Magic exile means gone
+// for good and an entombed deck comes back. Here nothing comes back, so the
+// word this project already refused to misuse is the correct one at last. A
+// player who has read either dialog has been taught the difference by the
+// game's own vocabulary rather than by a warning label.
+//
+// The confirmation is a typed word rather than a flag for the reason
+// `deleteDeck` gives: a boolean is answered identically by somebody who read
+// the screen and somebody who clicked through it. Unlike the delete it does
+// **not** also accept a slug -- there is no one deck being named here, which
+// is the entire hazard.
+func (a *API) emptyCrypt(w http.ResponseWriter, r *http.Request) {
+	crypts, ok := a.myCrypts(w, r)
+	if !ok {
+		return
+	}
+	typed := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("confirm")))
+	if typed != emptyWord {
+		a.refuseWrite(w, "empty-crypt", rejectf(
+			"to empty your crypt, confirm by typing %s. Got %s. Everything in "+
+				"the crypt is destroyed and no deck comes back from this, which is "+
+				"why it is not a yes/no.",
+			wire.Quote(emptyWord), wire.Quote(r.URL.Query().Get("confirm"))))
+		return
+	}
+
+	// Emptied one crypt at a time, and a failure part-way is reported rather
+	// than swallowed -- with the count that did go, because by then those
+	// decks are already gone and an error implying otherwise would be the
+	// worst sentence available here. The surface re-reads the crypt on both
+	// paths, so what is left is what the player sees.
+	destroyed := 0
+	for _, c := range crypts {
+		gone, err := c.crypt.Empty(r.Context())
+		destroyed += gone
+		if err != nil {
+			a.log.Warn("the crypt could not be emptied",
+				"actor", a.actor(r.Context()), "destroyed", destroyed, "error", err)
+			a.refuseWrite(w, "empty-crypt", err)
+			return
+		}
+	}
+	// Recorded on the server and nowhere else. ADR 28's log is a deck's own
+	// history and these decks no longer have one -- but an operation with no
+	// undo should leave a trace somewhere a maintainer can find it, and the
+	// player is told the count on screen rather than in a log.
+	a.log.Info("the crypt was emptied", "actor", a.actor(r.Context()), "destroyed", destroyed)
+	wire.JSON(w, http.StatusOK, map[string]any{"emptied": true, "destroyed": destroyed})
+}
+
+// emptyWord is the crypt's own confirmation, and the counterpart to
+// `deleteWord`.
+//
+// Magic's "exile" is removal from the game with no way back, which is exactly
+// what this does and exactly what burying a deck does not. The two words are
+// the game's own distinction between the reversible and the final, and using
+// them for the two operations means the vocabulary is doing the teaching.
+const emptyWord = "exile"
 
 // ownedCrypt is one crypt the caller may open, with the source behind it: a
 // restore has to read the deck it just raised, and asking the library twice

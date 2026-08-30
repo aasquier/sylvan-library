@@ -77,6 +77,22 @@ type Crypt interface {
 	// living deck already holds the slug, ErrReadOnly when the crypt is not
 	// the caller's.
 	Restore(ctx context.Context, id string) (string, error)
+	// Empty destroys every entry in the crypt and says how many went, which
+	// is the one operation here with no way back. ErrReadOnly when the crypt
+	// is not the caller's.
+	//
+	// **It destroys what `Entombed` would have listed, entry by entry, and
+	// never the crypt itself.** A crypt is a place rather than a container
+	// somebody swaps out: removing the whole directory would also take
+	// anything a future version of this code puts beside the entries, and it
+	// would report a count nobody measured. Emptying it one entry at a time
+	// costs a syscall each and means the number returned is the number of
+	// decks that are actually gone.
+	//
+	// An empty crypt is emptied successfully, and returns zero. Refusing
+	// there would make the button an error message for the state it is
+	// supposed to produce.
+	Empty(ctx context.Context) (int, error)
 }
 
 // CryptFor is how a handler asks a Source for its crypt.
@@ -249,6 +265,41 @@ func (f *FileSource) Restore(_ context.Context, id string) (string, error) {
 	return entry.Slug, nil
 }
 
+// Empty removes every crypt directory. The only thing in this package that
+// destroys a deck.
+//
+// **It goes through `crypt()` rather than through `os.RemoveAll(.trash)`**,
+// and the difference is the whole safety of it: `crypt()` is what `Entombed`
+// answers with, so what is destroyed is exactly the list the player was shown
+// and agreed to. A blanket removal would also delete whatever else is under
+// `.trash` -- a file this tier did not write, a directory a later version
+// keeps -- and could not say how many decks that was.
+//
+// A failure stops at the first entry and reports it, leaving the rest of the
+// crypt where it is. The alternative is carrying on and returning a count that
+// is a lower bound on what went and tells nobody which ones: a half-emptied
+// crypt the player can look at is recoverable attention, and a number they
+// cannot trust is not.
+func (f *FileSource) Empty(_ context.Context) (int, error) {
+	found, err := f.crypt()
+	if err != nil {
+		return 0, err
+	}
+	gone := 0
+	for _, e := range found {
+		// The same guard `Restore` applies before this name becomes a path
+		// again, and for a sharper reason here: this call deletes a tree.
+		if !safeSegment(e.dir) {
+			return gone, fmt.Errorf("empty the crypt: %q is not a name this crypt can hold", e.dir)
+		}
+		if err := os.RemoveAll(filepath.Join(f.Root, trashDir, e.dir)); err != nil {
+			return gone, fmt.Errorf("empty the crypt: %w", err)
+		}
+		gone++
+	}
+	return gone, nil
+}
+
 // safeSegment is `path`'s guard, said once: a slug is one path component or it
 // is not a slug.
 func safeSegment(s string) bool {
@@ -354,6 +405,39 @@ func (s *SQLSource) Restore(ctx context.Context, id string) (string, error) {
 		return "", fmt.Errorf("restore deck %q: %w", entry.entry.Slug, err)
 	}
 	return entry.entry.Slug, nil
+}
+
+// Empty deletes this owner's entombed rows outright, which is where the two
+// tiers stop resembling each other: the file tier's crypt is a place and this
+// one is a mark, so emptying it is the row going rather than the mark being
+// cleared. `Restore` clears the mark; nothing clears this.
+//
+// One statement rather than a read and a loop. The `WHERE` is the crypt's own
+// definition -- this owner, marked deleted -- so a row that arrives between
+// the list the player looked at and this call is covered by the sentence they
+// agreed to ("everything in your crypt"), and `RowsAffected` counts what
+// actually went instead of what was expected to.
+//
+// `owner_id` is in the clause for the same reason `Restore` repeats it: the
+// one statement here that can destroy a deck must not be able to reach outside
+// the library that issued it.
+func (s *SQLSource) Empty(ctx context.Context) (int, error) {
+	if !s.writable || s.write == nil || s.sharedOnly {
+		return 0, ErrReadOnly{}
+	}
+	result, err := s.write.ExecContext(ctx,
+		"DELETE FROM user_decks WHERE owner_id = ? AND deleted_at IS NOT NULL", s.ownerID)
+	if err != nil {
+		return 0, fmt.Errorf("empty the crypt: %w", err)
+	}
+	gone, err := result.RowsAffected()
+	if err != nil {
+		// The decks are gone either way -- the DELETE succeeded. Only the
+		// count is unavailable, and saying so beats reporting a zero that
+		// would read as "there was nothing there".
+		return 0, fmt.Errorf("empty the crypt: the crypt was emptied but not counted: %w", err)
+	}
+	return int(gone), nil
 }
 
 // The tiers that have a crypt, checked at compile time. `SharedOnly` is

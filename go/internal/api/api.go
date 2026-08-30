@@ -383,6 +383,12 @@ func (a *API) Routes() []Route {
 		// write that names somebody else's.
 		{Method: http.MethodGet, Pattern: "/api/decks/entombed", Handler: a.listEntombed},
 		{Method: http.MethodPost, Pattern: "/api/decks/entombed/{id}/return", Handler: a.restoreDeck},
+		// And the crypt's drain, which is the only route here that destroys a
+		// deck. Same path as the list and no owner segment for the same
+		// reason: the crypt this empties is the caller's, resolved from who is
+		// asking, so there is nothing to address but your own. Confirmed by a
+		// typed `exile` rather than by a flag -- `emptyCrypt` argues the word.
+		{Method: http.MethodDelete, Pattern: "/api/decks/entombed", Handler: a.emptyCrypt},
 		// The artifacts rebuild, and with it every route under `/api/decks` is
 		// the door's: the five deliverables, derived from the deck rather than
 		// edited into it. A **plain route**
