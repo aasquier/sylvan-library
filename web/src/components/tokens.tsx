@@ -9,13 +9,20 @@ import { CardHover, Spinner } from './ui'
  * What a deck makes: the tokens its 99 and its commanders put onto the
  * battlefield.
  *
- * **Collapsed by default, and at the very foot of the page** (Aaron,
+ * **Collapsed by default, and the last of the deck's own paperwork** (Aaron,
  * 2026-08-27: "another section that is collapsed by default ... on the very
  * bottom with sideboard when we get that far"). It is a *section* rather than
- * one of the two toys above it, so it takes the page's section idiom — the
+ * one of the two toys, so it takes the page's section idiom — the
  * `.disclosure-toggle` header the 99's own categories fold with — and not the
  * card-shaped fold the Wheel and the deal use. Those two are dessert; this is
  * part of the deck's own paperwork, and it will have the sideboard beside it.
+ *
+ * **It sits above the toys, not below them** (Aaron, 2026-08-30). It was
+ * written for the very bottom and read wrong there: the Wheel and the deal
+ * are amusements, and putting the thing a player actually needs at the table
+ * *underneath* them made the page trail off into dessert with the paperwork
+ * lost past it. `.deck-toys` is now the page's last row, always — see the
+ * ordering note in `routes/DeckDetail.tsx`.
  *
  * **Nothing is asked for until it is opened.** Folded, this component has made
  * no request and is loading no pictures — the Wheel's and the deal's rule, for

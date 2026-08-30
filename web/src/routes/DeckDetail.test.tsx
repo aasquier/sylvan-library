@@ -704,6 +704,41 @@ describe('DeckDetail wheel of fortune', () => {
 })
 
 /**
+ * Where things sit on the list tab, which is a ruling and not a detail.
+ *
+ * Aaron, 2026-08-30: the tokens shelf moves above the two toys, and the toys
+ * stay at the very bottom. The rule generalises past this one move — the Wheel
+ * and the deal are the dessert trolley, so anything *about the deck* comes
+ * before them — and the generalisation is the half worth pinning, because the
+ * way this breaks is nobody re-reading a comment while appending a section to
+ * the end of a 2,000-line render.
+ *
+ * So the assertion is the invariant rather than the pair: `.deck-toys` is the
+ * **last** child of the list pane. A test that only checked "tokens before
+ * toys" would stay green through exactly the mistake this guards.
+ */
+describe('DeckDetail list order', () => {
+  it('keeps the toys at the very bottom, with the tokens shelf above them',
+     async () => {
+       renderUnfolded()
+       await screen.findByText(DECK.name)
+
+       const tokens = screen.getByRole('button', { name: /Tokens/ })
+       const toys = document.querySelector('.deck-toys')
+       expect(toys).toBeTruthy()
+       // Both toys are in there, folded — this is the row, not a stray class.
+       expect(within(toys as HTMLElement)
+         .getByTitle('Unfold the Wheel of Fortune')).toBeTruthy()
+
+       // The shelf comes first...
+       expect(tokens.compareDocumentPosition(toys as Node)
+              & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+       // ...and nothing at all comes after the toys.
+       expect((toys as Element).parentElement?.lastElementChild).toBe(toys)
+     })
+})
+
+/**
  * The stats tab's punch-list additions (2026-08-15 item 6): opening-hand
  * hypergeometrics, the type breakdown, and the Game Changers count — which
  * had been in the payload since the printed-stats branch with no screen.
