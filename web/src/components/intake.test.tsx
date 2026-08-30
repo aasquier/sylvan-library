@@ -29,10 +29,12 @@ function status(mayWrite: boolean, over: Partial<ClaudeStatus> = {}): ClaudeStat
   }
 }
 
-function show(mayWrite: boolean, value: IntakeSheet = {}, over: Partial<ClaudeStatus> = {}) {
+function show(mayWrite: boolean, value: IntakeSheet = {}, over: Partial<ClaudeStatus> = {},
+              running = false) {
   vi.mocked(api.claudeStatus).mockResolvedValue(status(mayWrite, over))
   const onChange = vi.fn<(u: (p: IntakeSheet) => IntakeSheet) => void>()
-  render(<IntakeChoices value={value} onChange={onChange} slug="arahbo-cats" />)
+  render(<IntakeChoices value={value} onChange={onChange} slug="arahbo-cats"
+                        running={running} />)
   return onChange
 }
 
@@ -264,5 +266,53 @@ describe('the stance the sheet decided with', () => {
     render(<IntakeChoices value={{}} onChange={vi.fn()} />)
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Draft the reasons' })).toBeTruthy())
+  })
+})
+
+/* The sheet is locked once its work is running.
+ *
+ * An intake over ninety-nine cards is two or three minutes, and the sheet
+ * stays on screen for all of it — what was asked for is the most useful thing
+ * to be reading while it happens. But the request left when the button was
+ * pressed, so a chip toggled now changes nothing on the server: press "Draft
+ * the reasons" off mid-run and it would go grey exactly as though it had been
+ * called off, while eighty-four rationales arrived anyway.
+ *
+ * Driven rather than asserted about, because "it is disabled" and "pressing it
+ * does nothing" are different claims and only the second one matters.
+ */
+describe('while the work is running', () => {
+  afterEach(cleanup)
+  beforeEach(() => vi.mocked(api.claudeStatus).mockReset())
+
+  it('locks every chip, and a press changes nothing', async () => {
+    const onChange = show(true, { rationales: true }, {}, true)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Draft the reasons' })).toBeTruthy())
+
+    for (const label of ['Sort the cards', 'Draft the reasons', 'Describe the deck',
+      'Read up on your commander', 'Argue with every card']) {
+      const chip = screen.getByRole('button', { name: label })
+      expect(chip.hasAttribute('disabled'), `${label} is locked`).toBe(true)
+      fireEvent.click(chip)
+    }
+    expect(onChange, 'no press reached the sheet').not.toHaveBeenCalled()
+  })
+
+  it('still says which ones were asked for', async () => {
+    show(true, { rationales: true }, {}, true)
+    const chip = await screen.findByRole('button', { name: 'Draft the reasons' })
+    // Locked, but still legibly the thing that was chosen — the sheet is a
+    // record of the request while the request is being carried out.
+    expect(chip.getAttribute('aria-pressed')).toBe('true')
+    expect(chip.className).toContain('is-on')
+  })
+
+  it('leaves the chips live before anything has been submitted', async () => {
+    const onChange = show(true)
+    const chip = await screen.findByRole('button', { name: 'Sort the cards' })
+    expect(chip.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(chip)
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 })

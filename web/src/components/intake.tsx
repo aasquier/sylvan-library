@@ -100,7 +100,7 @@ const ACTIONS: {
   },
 ]
 
-export function IntakeChoices({ value, onChange, onStance, slug, owner }: {
+export function IntakeChoices({ value, onChange, onStance, slug, owner, running }: {
   value: IntakeSheet
   /** A functional update, and deliberately not a plain value: two chips
    *  toggled inside one frame would otherwise both read the same stale
@@ -115,6 +115,21 @@ export function IntakeChoices({ value, onChange, onStance, slug, owner }: {
    *  before a slug is chosen, which is fine: the dial answers without one. */
   slug?: string
   owner?: string
+  /**
+   * The sheet has been submitted and the work is running.
+   *
+   * **A chip toggled now changes nothing, and said nothing about it.** The
+   * request left when the button was pressed; the run is on the server and
+   * reads none of this. So a chip that still answers the hand is telling a
+   * small lie for the whole two or three minutes an intake takes — press
+   * "Draft the reasons" off while it is drafting and it goes grey, exactly as
+   * though it had been called off, and eighty-four rationales arrive anyway.
+   *
+   * Locked rather than hidden: what was asked for is the most useful thing on
+   * the screen while it is being done, and a sheet that vanished at the moment
+   * it started would take that away.
+   */
+  running?: boolean
 }) {
   const [pin, setPin] = useStance()
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
@@ -201,6 +216,14 @@ export function IntakeChoices({ value, onChange, onStance, slug, owner }: {
               key={action.key}
               type="button"
               aria-pressed={on}
+              disabled={running}
+              // Said rather than merely shown: a disabled control explains
+              // itself to a pointer that hovers it and to a reader that lands
+              // on it, and "why can I not press this" is the whole question a
+              // locked sheet raises.
+              title={running
+                ? 'Asked for already — this is running now and cannot be changed'
+                : undefined}
               onClick={() =>
                 onChange((prev) => ({ ...prev, [action.key]: prev[action.key] !== true }))}
               className={`chip-toggle rounded-full px-3 py-1.5 text-xs font-medium${
