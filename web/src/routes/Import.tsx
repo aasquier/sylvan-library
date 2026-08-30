@@ -5,7 +5,7 @@ import {
   type IntakeSheet, type Job,
 } from '../lib/api'
 import { IntakeChoices } from '../components/intake'
-import { runIntake } from '../lib/intake'
+import { intakeTrouble, runIntake } from '../lib/intake'
 import CameraDoor from '../components/camera'
 import {
   Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
@@ -96,6 +96,11 @@ export default function Import() {
   const [preview, setPreview] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'preview' | 'create' | null>(null)
+  // The extra work did not finish, and where the (saved) deck is. Two pieces
+  // of state rather than one, because the sentence and the door are answers
+  // to different questions: what happened, and what now.
+  const [trouble, setTrouble] = useState<string | null>(null)
+  const [troubleDeck, setTroubleDeck] = useState<string | null>(null)
   const [showYaml, setShowYaml] = useState(false)
   // ADR 49: whether the quoted reasons in this paste were drafted by Claude,
   // so the file can name the hand. Off by default and never remembered — an
@@ -198,6 +203,8 @@ export default function Import() {
   async function runWith(override: string | undefined, dryRun: boolean) {
     setBusy(dryRun ? 'preview' : 'create')
     setError(null)
+    setTrouble(null)
+    setTroubleDeck(null)
     try {
       const result = await api.importDeck(body(dryRun, override))
       setPreview(result)
@@ -211,7 +218,26 @@ export default function Import() {
           { owner: result.owner, slug: result.slug }, sheet, sheetStance)
         if (started) {
           setIntake(started)
-          await followJob(started.id, setIntake, 400, started).promise
+          try {
+            await followJob(started.id, setIntake, 400, started).promise
+          } catch (e) {
+            // **The extra work failing must not strand somebody on this
+            // page.** The deck is created and saved by now — that happened
+            // above, in a different request — so a failure here is about the
+            // things that were going to be *added* to it. Before this catch
+            // existed the rejection fell to the outer handler, which put the
+            // server's own `no such job` on screen and skipped the navigate
+            // below, leaving a saved deck with no door offered to it.
+            //
+            // Told rather than swallowed, and told here rather than on the
+            // deck page: this is the only screen that knows what was asked
+            // for. The deck stays one press away, and the reason the wait
+            // existed at all is now spent — nothing is going to rewrite the
+            // deck underneath them any more.
+            setTrouble(intakeTrouble(e))
+            setTroubleDeck(deckUrl(result))
+            return
+          }
         }
         // `result.owner` rather than an assumption about whose library it
         // landed in: the server chooses the tier, and the deck's address
@@ -477,8 +503,31 @@ export default function Import() {
           label and a percentage rather than a bare spinner: five actions over
           ninety-nine cards is minutes, and a spinner that long reads as a
           page that has died. */}
-      {intake && intake.status !== 'done' && (
+      {intake && intake.status !== 'done' && !trouble && (
         <IntakeProgress job={intake} />
+      )}
+
+      {/* The extra work did not finish. Not an `ErrorNote`: nothing here is
+          broken from the reader's side — their deck exists, it is intact, and
+          the only thing missing is what was going to be added to it. A red
+          bar over "your deck is saved and safe" would be the page arguing
+          with itself. The door is a real destination, so it is a real link
+          (commandment 20), and it is the loudest thing in the box because it
+          is the thing to do next. */}
+      {trouble && (
+        <div className="space-y-3 rounded-lg px-4 py-3"
+             role="status"
+             style={{ background: 'var(--gridline)' }}>
+          <p className="text-sm leading-relaxed"
+             style={{ color: 'var(--text-primary)' }}>
+            {trouble}
+          </p>
+          {troubleDeck && (
+            <Link to={troubleDeck} className="btn btn-primary btn-accent-1 btn-sm">
+              Open your deck
+            </Link>
+          )}
+        </div>
       )}
 
       {error && <ErrorNote>{error}</ErrorNote>}
