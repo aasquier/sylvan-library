@@ -171,7 +171,7 @@ const DeckNameMax = 80
 var deckKeyOrder = []string{
 	"slug", "name", "status", "stage", "commander", "shared", "pilot",
 	"commander_art", "companion", "bracket", "archetype", "themes",
-	"strategy", "notes", "cards", "swap_board", "graveyard",
+	"strategy", "notes", "cards", "swap_board", "graveyard", "combos",
 }
 
 // entry is one card's place in the file, in both encodings at once.

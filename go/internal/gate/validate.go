@@ -201,6 +201,8 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 			len(pending), len(d.Cards), strings.Join(shown, ", "), more), "")
 	}
 
+	checkCombos(d, rep)
+
 	for _, card := range d.Cards {
 		if !reference.IsCategory(card.Category) {
 			rep.add("warn", "unknown-category", fmt.Sprintf("category %s is not one of %s",
@@ -231,6 +233,18 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 		if cards[name] == nil {
 			rep.add("error", "unknown-card", "not found in the local pool -- check spelling, or refresh "+
 				"the Scryfall data if this is a new card", name)
+		}
+	}
+
+	// The same question one block over, answered a softer way. A name in the
+	// 99 that nobody can look up makes the deck's legality a guess, which is an
+	// error; a name in the combos block that nobody can look up costs the entry
+	// its picture and nothing else. The deck is still a deck.
+	for _, name := range d.ComboNames() {
+		if cards[name] == nil {
+			rep.add("warn", "combo-unknown-card", "named in the combos but not found in the local "+
+				"pool, so it has no card to show -- check the spelling against the card's printed "+
+				"name, or refresh the Scryfall data if this is a new card", name)
 		}
 	}
 
@@ -294,6 +308,69 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 		checkCompanion(d, companion, cards, identity, rep)
 	}
 	return rep
+}
+
+// checkCombos reads the combos block against the deck it describes.
+//
+// **Warnings, every one of them, and that is the decision rather than the
+// default.** A combos block is a reading of the deck, not part of it: a deck
+// whose catalogue has drifted is a deck with a stale note, and refusing to
+// generate its artifacts over one would be the gate holding a primer hostage to
+// a paragraph. It is also commandment 2 -- somebody who catalogues their first
+// machine and gets four red errors for it has been told they did it wrong, when
+// what happened is that they cut a card afterwards.
+//
+// Nothing here asks whether the Magic is right. Whether two cards actually go
+// infinite together is not a question a deterministic check can answer (ADR
+// 14), and pretending otherwise would be the gate having an opinion. What it
+// checks is whether the entry still matches the deck sitting next to it.
+func checkCombos(d *deck.Deck, rep *Report) {
+	in99 := map[string]bool{}
+	for _, card := range d.Cards {
+		in99[strings.ToLower(strings.TrimSpace(card.Name))] = true
+	}
+	for _, name := range d.Commander {
+		in99[strings.ToLower(strings.TrimSpace(name))] = true
+	}
+	has := func(name string) bool {
+		return in99[strings.ToLower(strings.TrimSpace(name))]
+	}
+
+	for _, combo := range d.Combos {
+		where := combo.Heading()
+		for _, piece := range combo.Cards {
+			if has(piece) {
+				continue
+			}
+			// The commonest way a catalogue goes stale: the machine was real,
+			// and then a piece of it was cut. Named as the piece rather than as
+			// the entry, so the row points at the card to put back.
+			rep.add("warn", "combo-piece-missing", fmt.Sprintf("is listed as a piece of "+
+				"%s but is not in the 99 -- either it was cut and the combo no longer "+
+				"assembles, or it belongs in the entry's `needs` as the card this deck "+
+				"is still looking for", wire.Quote(where)), piece)
+		}
+		if !combo.NearMiss() {
+			continue
+		}
+		if has(combo.Needs) {
+			rep.add("warn", "combo-needs-in-99", fmt.Sprintf("is marked as the card %s is "+
+				"waiting for, but it is already in the deck -- this machine is complete, "+
+				"so move it up into the entry's `cards` and drop the trade",
+				wire.Quote(where)), combo.Needs)
+		}
+		if strings.TrimSpace(combo.Cut) == "" {
+			// Aaron's rule, checked rather than trusted: a suggestion the deck
+			// cannot act on is not a suggestion.
+			rep.add("warn", "combo-no-cut", fmt.Sprintf("%s is one card short and does not "+
+				"say what would come out for it; a card to bring in is only a suggestion "+
+				"once there is a slot for it", wire.Quote(where)), combo.Needs)
+		} else if !has(combo.Cut) {
+			rep.add("warn", "combo-cut-missing", fmt.Sprintf("is offered as the cut that "+
+				"makes room for %s, but it is not in the 99 -- the slot it would free is "+
+				"already free", wire.Quote(combo.Needs)), combo.Cut)
+		}
+	}
 }
 
 // checkCompanion is `validate._check_companion`: the companion itself and

@@ -60,6 +60,11 @@ func PoolFor(ctx context.Context, c *pool.Conn, d *deck.Deck) (map[string]*pool.
 	if d.Companion != nil {
 		names = append(names, *d.Companion)
 	}
+	// The combos block names cards too, and half of them are deliberately not
+	// in the deck -- the card a near-miss is waiting for is the whole point of
+	// the entry. Looked up here, in the one query, so the gate can say whether
+	// a name resolves and the page can show the picture without a second fetch.
+	names = append(names, d.ComboNames()...)
 	return c.GetCards(ctx, names)
 }
 
@@ -510,6 +515,9 @@ func DeckPayload(ctx context.Context, c *pool.Conn, d *deck.Deck, writable bool,
 		{Key: "total_cards", Value: d.TotalCards()}, {Key: "land_count", Value: d.LandCount()},
 		{Key: "color_identity", Value: identity}, {Key: "commander_card", Value: commanderCard},
 		{Key: "cards", Value: rows(d.Cards)}, {Key: "swap_board", Value: rows(d.SwapBoard)}, {Key: "graveyard", Value: rows(d.Graveyard)},
+		// After the three lists of cards, because a combo is a reading of them
+		// rather than a fourth list -- the same place it sits in the file.
+		{Key: "combos", Value: ComboRows(d, cards)},
 		{Key: "pool_available", Value: c != nil},
 	}
 	return body, nil

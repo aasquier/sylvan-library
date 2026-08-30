@@ -368,6 +368,11 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}/cards/{name}", Handler: a.patchCard},
 		{Method: http.MethodPatch, Pattern: "/api/decks/{owner}/{slug}", Handler: a.patchDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/notes/{key}", Handler: a.setNote},
+		// The combos block, written whole. A PUT rather than a POST because
+		// the body *is* the block afterwards: there is no per-entry address to
+		// patch, since a combo's name is the cards it is made of and those are
+		// the very thing an edit changes.
+		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/combos", Handler: a.setCombos},
 		// The deck lifecycle: the moments a deck
 		// begins and ends. None of these goes through `commit` -- creation
 		// and deletion are deliberately

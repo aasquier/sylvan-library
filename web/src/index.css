@@ -18453,3 +18453,160 @@ button:hover .tarot-fan-card {
     min-height: 44px;
   }
 }
+
+/* ==================================================================== the
+ *                                                                  combos
+ *
+ * The machines a deck can assemble (`components/combos.tsx`), between the 99
+ * and the swap board. Same discipline as the block above: every colour is an
+ * existing token, so both themes and the `[data-theme]` override are inherited
+ * rather than restated — a section-scoped block that mints its own palette is
+ * a palette that goes out of step in exactly one theme.
+ *
+ * **Nothing here is a `filter`, and nothing here is on a card.** The one
+ * temptation this section carries is dimming the painting of a piece the deck
+ * no longer has, which is commandment 19's exact failure — reaching through a
+ * card and changing Wizards' painting. A missing piece is said in words
+ * instead, in the heading, where it can be read out loud.
+ */
+
+/* The ∞ mark beside the heading. `--series-1` rather than the vine: the swap
+   board two sections down wears the vine, and a reader should be able to tell
+   the two shelves apart at a glance without reading either word. */
+.combo-glyph {
+  color: var(--series-1);
+  font-size: 13px;
+}
+
+/* One machine. A panel with a lit left edge, like the swap board's empty
+   state — size and edges do the work, never opacity. */
+.combo-entry {
+  border-left: 2px solid color-mix(in srgb, var(--series-1) 55%, transparent);
+}
+/* A near-miss reads differently on sight, because it is the one entry here
+   somebody can act on today. The vine, because acting means the swap board. */
+.combo-entry.is-near {
+  border-left-color: var(--vine);
+  background: color-mix(in srgb, var(--vine) 4%, var(--surface-1));
+}
+
+/* The "+" between two pieces: punctuation, not a word. */
+.combo-plus {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* A piece's name. The dotted underline is the same affordance a glossary term
+   wears — there is more of this to see, on hover, on focus and on a tap — and
+   it is a `CardHover`'s child rather than a link, so it promises no
+   destination (commandment 20). */
+.combo-piece {
+  border-bottom: 1px dotted color-mix(in srgb, var(--text-muted) 70%, transparent);
+  cursor: help;
+}
+.combo-piece.is-absent {
+  color: var(--text-muted);
+}
+.combo-piece-note {
+  font-size: 0.85em;
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* "Makes", "Costs" — the quiet label in front of a line, so the eye can find
+   the same fact in every entry without a table. */
+.combo-label {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* The instructions. A real ordered list, numbered by the browser, so the steps
+   renumber themselves when somebody edits one out. */
+.combo-steps {
+  color: var(--text-secondary);
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.combo-steps::marker,
+.combo-steps li::marker {
+  color: var(--text-muted);
+}
+
+/* The trade a near-miss offers, and the form's own near-miss fields. */
+.combo-trade {
+  background: color-mix(in srgb, var(--vine) 8%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--vine) 30%, transparent);
+}
+.combo-away {
+  color: var(--vine);
+  font-weight: 600;
+}
+
+/* The empty state — the whole feature for a deck that has never catalogued
+   anything, so it is a place rather than a notice. */
+.combo-empty {
+  background: color-mix(in srgb, var(--series-1) 6%, var(--surface-1));
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--series-1);
+}
+
+/* A chosen piece in the form: a chip that is also the way to take it off
+   again, so it answers the hand rather than sitting there as a label. */
+.combo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  background: transparent;
+  transition: color 120ms ease, border-color 120ms ease,
+    background-color 120ms ease, transform 120ms ease;
+}
+.combo-chip:hover {
+  border-color: var(--status-critical);
+  background: color-mix(in srgb, var(--status-critical) 10%, transparent);
+}
+.combo-chip:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+.combo-chip:active {
+  transform: translateY(1px);
+}
+.combo-chip-x {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.combo-chip:hover .combo-chip-x {
+  color: var(--status-critical);
+}
+
+/* The form's boxes. A class rather than an inline `style`, because an inline
+   style is a style a `:hover` and a `:focus-visible` can never reach —
+   commandment 17, and the reason a hundred dull controls on this site were
+   dull. Written out rather than sharing `.swap-field` on purpose: two shelves
+   whose fields happen to look alike are not one control, and aliasing them
+   means the next change to either has to be argued for both. */
+.combo-field {
+  background: var(--surface-1);
+  border: 1px solid var(--gridline);
+  color: var(--text-primary);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.combo-field::placeholder {
+  color: var(--text-muted);
+}
+.combo-field:hover {
+  border-color: var(--baseline);
+}
+.combo-field:focus {
+  border-color: var(--series-1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--series-1) 35%, transparent);
+  outline: none;
+}

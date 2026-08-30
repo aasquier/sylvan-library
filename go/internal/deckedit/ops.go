@@ -607,18 +607,7 @@ func SetDeckField(text, field string, value any) (string, error) {
 		// The key is absent -- `stage` is, in every deck written before ADR
 		// 13. Place it where `Deck.dump` would rather than at the end of the
 		// file.
-		at := 0
-		for _, key := range deckKeyOrder {
-			if key == field {
-				break
-			}
-			s, e, ok := topLevelSpan(lines, key)
-			if !ok {
-				continue
-			}
-			content, _ := splitTail(lines[s:e], 0)
-			at = max(at, s+len(content))
-		}
+		at := placeAfter(lines, field)
 		rendered, err := render(field, written, 0)
 		if err != nil {
 			return "", err
@@ -710,18 +699,7 @@ func SetShared(text string, shared bool) (string, error) {
 		// Placed where `Deck.dump` would put it -- after the commander,
 		// before the pilot -- rather than at the end of the file, which is
 		// the rule SetDeckField follows for an absent `stage:`.
-		at := 0
-		for _, key := range deckKeyOrder {
-			if key == "shared" {
-				break
-			}
-			s, e, ok := topLevelSpan(lines, key)
-			if !ok {
-				continue
-			}
-			content, _ := splitTail(lines[s:e], 0)
-			at = max(at, s+len(content))
-		}
+		at := placeAfter(lines, "shared")
 		return verified(joinAround(lines, at, at, rendered), expected)
 	}
 	_, tail := splitTail(lines[start:end], 0)

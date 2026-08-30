@@ -864,6 +864,146 @@ func (a *API) setNote(w http.ResponseWriter, r *http.Request) {
 	}, err)
 }
 
+// setCombos is `PUT .../combos` -- the deck's catalogue of machines, written
+// whole.
+//
+// **The whole block, and no per-entry route.** Every other write here addresses
+// one thing by name, and a combo has no name to be addressed by: it is called
+// after the cards it is made of, which is exactly what an edit to it changes.
+// So the client composes the block and sends it, and `deckedit.SetCombos`
+// refuses the text unless it parses back to a deck that differs in `combos:`
+// and nowhere else. `internal/deckedit/combos.go` argues the trade at length.
+//
+// **The names are canonicalised against the pool, and never refused by it.**
+// A player typing `axebane guardian` gets `Axebane Guardian` written, because
+// the deck file's names are the pool's names and a hover keys on the exact one.
+// A name the pool has never heard of is written as typed and the gate warns
+// about it -- refusing would be this route deciding that a card the local pool
+// has not been refreshed for does not exist, which is a claim about a database
+// wearing the costume of a claim about Magic. With no pool at all every name
+// goes through untouched, which is the same degraded answer every other
+// pool-backed check here gives.
+func (a *API) setCombos(w http.ResponseWriter, r *http.Request) {
+	src, _, ok := a.writeTarget(w, r)
+	if !ok {
+		return
+	}
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	raw, isList := body["combos"].([]any)
+	if !isList {
+		if _, present := body["combos"]; !present {
+			wire.Detail(w, http.StatusUnprocessableEntity, "combos is required")
+			return
+		}
+		wire.Detail(w, http.StatusUnprocessableEntity, "combos must be a list")
+		return
+	}
+	wanted := make([]deck.Combo, 0, len(raw))
+	for i, item := range raw {
+		entry, isMap := item.(map[string]any)
+		if !isMap {
+			a.refuseWrite(w, "combos", rejectf("combo %d is not a mapping of cards, "+
+				"produces, how and setup", i+1))
+			return
+		}
+		combo := deck.Combo{
+			Produces: str(entry, "produces"), How: str(entry, "how"),
+			Setup: str(entry, "setup"), Needs: str(entry, "needs"),
+			Cut: str(entry, "cut"),
+			// `by` is deliberately not read. The mark says Claude drafted this
+			// entry (ADR 41), and a caller who could send it could claim it --
+			// so it is carried forward from the deck file by the editor, or not
+			// at all.
+		}
+		combo.Cards = append(combo.Cards, asNames(entry["cards"])...)
+		wanted = append(wanted, combo)
+	}
+
+	if err := a.canonicalise(r.Context(), wanted); a.refuseWrite(w, "combos", err) {
+		return
+	}
+
+	text, err := src.ReadText(r.Context(), r.PathValue("slug"))
+	if a.refuseWrite(w, "combos", err) {
+		return
+	}
+	updated, err := deckedit.SetCombos(text, wanted)
+	a.answer(w, r, src, updated, commitOutcome{
+		extra: map[string]any{"combos": len(wanted)},
+		edit:  decklog.Edit{Kind: decklog.EditCombos, Value: len(wanted)},
+	}, err)
+}
+
+// canonicalise rewrites every name a combos block holds into the pool's own
+// spelling, in one query, leaving anything the pool does not know exactly as it
+// was typed.
+//
+// Case only, and never a near match: `GetCards` is an exact lookup, so this
+// cannot quietly turn one card into a different one. The fuzzy matcher the
+// import uses (`deckimport.Respell`) is deliberately not reached for here -- it
+// belongs where somebody is watching a list being read back to them, not on a
+// save that would silently substitute a card into a combo they wrote.
+func (a *API) canonicalise(ctx context.Context, combos []deck.Combo) error {
+	names := []string{}
+	for _, combo := range combos {
+		names = append(names, combo.Cards...)
+		names = append(names, combo.Needs, combo.Cut)
+	}
+	var found map[string]*pool.CardRecord
+	err := a.usePool(ctx, func(c *pool.Conn) error {
+		var err error
+		found, err = c.GetCards(ctx, names)
+		return err
+	})
+	if errors.Is(err, pool.ErrNoPool) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	canonical := func(name string) string {
+		if rec := found[strings.TrimSpace(name)]; rec != nil {
+			return rec.Name
+		}
+		return name
+	}
+	for i := range combos {
+		for j, name := range combos[i].Cards {
+			combos[i].Cards[j] = canonical(name)
+		}
+		combos[i].Needs = canonical(combos[i].Needs)
+		combos[i].Cut = canonical(combos[i].Cut)
+	}
+	return nil
+}
+
+// asNames reads the one list shape a combo's `cards` arrives in, dropping the
+// blanks a form leaves behind when somebody clears a row rather than removing
+// it. A bare string is read as a list of one, because a combo of one card is a
+// real thing to catalogue and a client sending the shorthand meant it.
+func asNames(v any) []string {
+	switch list := v.(type) {
+	case string:
+		return []string{list}
+	case []any:
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			if item == nil {
+				continue
+			}
+			if name := strings.TrimSpace(wire.Plain(item)); name != "" {
+				out = append(out, name)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 // ---- the shared checks -----------------------------------------------------
 
 // findCard is `service._find_card`: the 99 and the swap board, case-folded.

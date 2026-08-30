@@ -109,6 +109,11 @@ func TestTheGateMatchesTheGoldenCaseForCase(t *testing.T) {
 		if d.Companion != nil {
 			names = append(names, *d.Companion)
 		}
+		// The combos block's names too, exactly as `deckread.PoolFor` looks
+		// them up. None of the frozen decks catalogues a machine, so this adds
+		// nothing today and would be the first thing to go stale if one ever
+		// did -- which is the reason it is written rather than assumed.
+		names = append(names, d.ComboNames()...)
 		if err := p.Use(ctx, func(c *pool.Conn) error {
 			cards, err := c.GetCards(ctx, names)
 			if err != nil {

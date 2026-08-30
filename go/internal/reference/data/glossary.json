@@ -237,7 +237,20 @@
       "long": "Combat damage, commander damage, a combo, or milling everyone out. Naming it matters more in Commander than elsewhere: 40 life across three opponents is a lot of damage, and a deck that generates value beautifully and has no way to convert it is a deck that loses slowly. Every card in a deck here should be able to say which one it serves.",
       "section": "building",
       "see_also": [
+        "combo",
         "bracket"
+      ]
+    },
+    {
+      "key": "combo",
+      "term": "Combo",
+      "short": "Two or three cards that, put together, do something none of them can do alone.",
+      "long": "The pieces feed each other: one untaps the other, or copies it, or pays for it, and the loop can be repeated. That is all anybody means by “infinite mana” — you are not really doing it forever, you are saying out loud that the loop works, doing it enough times to win, and getting on with the game. Plenty of combos are quieter than that and just make two cards much better side by side. Writing a deck's combos down is worth doing long before you assemble one: it tells you which cards to protect, which never to cut, and where the deck is a single card short of a machine it could already be running.",
+      "section": "building",
+      "see_also": [
+        "wincon",
+        "tutor",
+        "why"
       ]
     },
     {

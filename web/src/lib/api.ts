@@ -253,6 +253,65 @@ export interface CardOffer {
   via: 'exact' | 'holds' | 'words' | 'near'
 }
 
+/**
+ * One card a combo names, resolved by the server so the page can draw it.
+ *
+ * Deliberately not a `Card`: a `Card` is a card *in a deck* and carries the
+ * three fields that only exist once it is one. Half the cards a combos block
+ * names are not in the deck at all — the card a near-miss is waiting for is the
+ * whole point of the entry — so the shape says only what is true of a name in a
+ * catalogue.
+ */
+export interface ComboCardRef {
+  name: string
+  /** The whole card, hot-linked (ADR 6), for the hover. Null when the pool
+   *  does not know the name — which the page draws rather than hides, because a
+   *  misspelling that rendered nothing would be a piece missing in silence. */
+  image: string | null
+  /** The painting alone, for a thumbnail. A full card at sixty pixels is a
+   *  grey rectangle. */
+  art_crop: string | null
+  /** Whether this deck actually has the card: in the 99, or in the command
+   *  zone. Served rather than worked out here, because a client intersecting
+   *  the names against `cards` gets the commander wrong — and half the combos
+   *  in Commander run through it. */
+  in_deck: boolean
+}
+
+/**
+ * One machine the deck can assemble.
+ *
+ * There is no `name`: an entry is called after the cards it is made of, joined
+ * with " + ", which is how anybody who plays the deck refers to it and the one
+ * heading that cannot go stale when a piece is swapped.
+ */
+export interface Combo {
+  cards: ComboCardRef[]
+  produces: string
+  how: string
+  setup: string
+  /** The card this deck is missing, or null on a machine that assembles. Its
+   *  presence is what makes an entry a near-miss. */
+  needs: ComboCardRef | null
+  /** What would come out for it. Always beside `needs` — a card to bring in is
+   *  only a suggestion once there is a slot for it. */
+  cut: ComboCardRef | null
+  /** `claude` on an entry Claude drafted, absent on one a person wrote — the
+   *  same mark, and the same rule, as `why_by` on a card (ADR 41). Absent
+   *  rather than empty: a mark is a thing that is *there*. */
+  by?: string
+}
+
+/** A combo as it is sent back: names, not resolved references. */
+export interface ComboDraft {
+  cards: string[]
+  produces: string
+  how: string
+  setup: string
+  needs: string
+  cut: string
+}
+
 export interface DeckDetail extends DeckSummary {
   notes: Record<string, string>
   commander_card: Card | null
@@ -261,6 +320,9 @@ export interface DeckDetail extends DeckSummary {
   /** Entombed cards (ADR 27): out of the 99 but not gone, each keeping the
    *  category and `why` it left with. Newest first. */
   graveyard: Card[]
+  /** The machines this deck catalogues, in the order its file lists them —
+   *  the author's order, so nothing here sorts. */
+  combos: Combo[]
   pool_available: boolean
   /** The Scryfall printing id whose art this deck shows, or '' for the
    *  default. A deck property rather than a viewer preference: it lives in
@@ -2991,6 +3053,18 @@ export const api = {
   setNote: (ref: DeckRef, key: string, value: string) =>
     send<EditResult>('PUT', deckPath(ref, `/notes/${encodeURIComponent(key)}`),
       { value }),
+  // The combos block, written whole — a PUT because the body *is* the block
+  // afterwards. There is no per-entry route and there is not going to be one: a
+  // combo has no name to be addressed by, because it is called after the cards
+  // it is made of, and those are the very thing an edit to it changes. Adding,
+  // editing and removing all compose the list here and send it.
+  //
+  // `by` is deliberately absent from `ComboDraft`. The mark says Claude drafted
+  // an entry (ADR 41), and a caller who could send it could claim it — so the
+  // server carries it forward from the deck file onto entries nobody changed,
+  // and ignores anything the wire says about it.
+  setCombos: (ref: DeckRef, combos: ComboDraft[]) =>
+    send<EditResult>('PUT', deckPath(ref, '/combos'), { combos }),
   // The deck's own scalars. `stage: curated` is promotion, and the server
   // refuses it while any card is blank rather than writing a deck the gate
   // would immediately reject. `commander_art` goes through here too, and is

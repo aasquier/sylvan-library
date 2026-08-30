@@ -48,6 +48,7 @@ var writeRoutes = []struct{ method, suffix, payload string }{
 	{"PATCH", "/cards/Forest", `{"field":"category","value":"ramp"}`},
 	{"PATCH", "", `{"field":"stage","value":"draft"}`},
 	{"PUT", "/notes/plan", `{"value":"a note"}`},
+	{"PUT", "/combos", `{"combos":[{"cards":["Sol Ring"],"produces":"two mana"}]}`},
 	{"DELETE", "", `{"confirm":"gyome"}`},
 	{"PUT", "/shared", `{"shared":true}`},
 	// The night games' flag. It is here for the 404 sweeps rather than for its
