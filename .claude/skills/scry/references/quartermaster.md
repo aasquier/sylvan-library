@@ -54,6 +54,14 @@ table (count, the cards, the baseline used, the verdict — fed, lean,
 starved, glutted), and a `## Hidden sources` list naming every card whose
 role does not look like its type line, with the oracle line that proves it.
 
+Give each role its **library column** in the census table — the word
+`import.txt`'s bracket takes (`ramp`, `card-advantage`, `interaction`,
+`tutor`, `protection`, `recursion`, `threat`, `win-con`, `engine`,
+`payoff`, `sac-outlet`, `land`, `utility`; the mapping table lives in
+SKILL.md's "The blob"). Naming it here is what makes the column a copy
+rather than a second classification later, which is the same work done
+twice and the second one done from memory.
+
 ## You never
 
 - Classify from memory, a category label, or a type line alone.

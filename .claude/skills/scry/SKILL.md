@@ -162,7 +162,8 @@ real instruments, headless:
 ```bash
 mkdir -p "$SCRY/decks/<slug>"
 # write deck.yaml: name, commander, stage: draft, status: theoretical,
-# cards as {name, why, qty} entries — the same list import.txt carries
+# cards as {name, category, why, qty} entries — the same list import.txt
+# carries, categories included, so the gate reads the deck Aaron will import
 export MTGLAB_DECKS_DIR="$SCRY/decks"
 ./mtglab decks validate <slug>            # the gate: banned, identity, size
 ./mtglab sim mana <slug> --seed 7 --games 20000
@@ -210,25 +211,54 @@ prompt, the roadmap artifact.
 ## The blob — import.txt's exact shape
 
 The site's parser (`go/internal/decklist`) is the audience. One card per
-line, no category sections for the 99 — **the import logic handles
-categories; never pre-sort them** (Aaron's ruling, 2026-08-29).
+line, and **never pre-sort the 99 into category sections** (Aaron's ruling,
+2026-08-29) — the file is one flat list. The category rides on the line
+itself, in the last column, which is the ruling honoured rather than
+reversed: no headings, no grouping, no ordering by role.
 
 ```
 1 Arahbo, Roar of the World (C17) 27 *CMDR* "the whole deck, and the reason the 99 purrs"
-1 Access Tunnel (MKC) 247 "Taps for colorless but also lets small creatures through"
-1 Sol Ring "fast mana, and it never gets cut"
+1 Access Tunnel (MKC) 247 "Taps for colorless but also lets small creatures through" [utility]
+1 Sol Ring "fast mana, and it never gets cut" [ramp]
+1 Swords to Plowshares "one white mana answers almost anything" [interaction]
 
 Maybeboard:
-1 Beast Within "flexible answer waiting its turn on the swap board"
+1 Beast Within "flexible answer waiting its turn on the swap board" [interaction]
 ```
 
 - Quantity, name, optional `(SET) collector`, the commander marked `*CMDR*`,
-  and the `why` in **straight double quotes, last on the line**.
+  the `why` in **straight double quotes**, and the category in **square
+  brackets, last on the line**.
 - **A why may not contain any quotation mark, straight or curly** — the
-  parser's quoted run ends at the first one. Apostrophes are fine.
+  parser's quoted run ends at the first one. Apostrophes are fine. Square
+  brackets inside a why are safe: the quoted run is peeled whole.
 - Lines stay under 512 runes; a card whose *name* ends in a quoted epithet
   (Kongming) must always be followed by a rationale, or the parser has two
   readings.
+- **The category column is the Quartermaster's census, spent.** Every card
+  already got a primary role read off its oracle text; write that role into
+  the brackets rather than counting it twice. The library files by exactly
+  these words and no others:
+
+  | Census role | Column |
+  |---|---|
+  | ramp | `ramp` |
+  | card advantage | `card-advantage` |
+  | targeted removal, sweepers | `interaction` |
+  | tutors | `tutor` |
+  | protection | `protection` |
+  | recursion | `recursion` |
+  | threats / finishers | `threat`, or `win-con` for a card the deck wins *with* |
+  | synergy pieces | `engine`, or `payoff` for the card the synergy pays off into |
+  | (a sacrifice outlet) | `sac-outlet` |
+  | lands | `land` |
+  | flex | `utility` |
+
+  A word outside that list is not an error — the import names it once and
+  files the card as usual — but it is a wasted column, so use the table.
+  Omit the bracket entirely rather than guessing: a card left uncategorised
+  lands as `utility` for a human to file, which is the honest outcome, and
+  **the site infers `land` from the pool anyway**, so lands may be left bare.
 - **Word budget:** a role-player's why runs ~8–20 words; a card pivotal to
   the strategy earns 25–45. Every why in the descriptive voice
   (non-negotiable 3), and none of them identical boilerplate — a reader

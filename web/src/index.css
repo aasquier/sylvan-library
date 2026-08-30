@@ -18316,3 +18316,140 @@ button:hover .tarot-fan-card {
     opacity: 0.48;
   }
 }
+
+/* ------------------------------------------------- a field that answers back
+ *
+ * The import page's commander box, and the shape any field that checks itself
+ * while you type should wear.
+ *
+ * **Every colour lives here rather than inline on the input, and that is the
+ * point rather than tidiness.** An inline `border` outranks every rule below
+ * it, so a caller who styled the input by hand would switch the answer off
+ * without anything failing — commandment 20's mechanism exactly, one control
+ * over, and the reason `.swap-field` above exists in the same shape.
+ *
+ * The states are the field's own condition, never a verdict on the person:
+ * `is-ready` is the green a correct commander earns, `is-unknown` is a name
+ * the library does not have (amber — a question, not a fault), and
+ * `is-trouble` is a real card that cannot lead (orange). Nothing here goes
+ * red. A commander box is optional, and no optional field has ever earned the
+ * colour of a broken one (commandment 2). */
+.field-answer {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--hairline);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.field-answer::placeholder {
+  color: var(--text-muted);
+}
+.field-answer:hover {
+  border-color: color-mix(in srgb, var(--vine) 55%, var(--hairline));
+}
+.field-answer:focus {
+  border-color: var(--vine);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vine) 22%, transparent);
+  outline: none;
+}
+.field-answer.is-asking {
+  border-color: color-mix(in srgb, var(--vine) 40%, var(--hairline));
+}
+.field-answer.is-ready,
+.field-answer.is-ready:hover {
+  border-color: var(--status-good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-good) 20%, transparent);
+}
+/* The commander lands rather than blinks on: a quick bloom of the same green
+   and back, so an answer that arrives while you are still looking at the
+   keyboard is still there to be caught out of the corner of an eye
+   (commandment 6). */
+.field-answer.is-ready {
+  animation: commander-seated 620ms ease-out;
+}
+.field-answer.is-ready:focus {
+  border-color: var(--status-good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-good) 34%, transparent);
+}
+.field-answer.is-unknown,
+.field-answer.is-unknown:hover {
+  border-color: var(--status-warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-warning) 18%, transparent);
+}
+.field-answer.is-trouble,
+.field-answer.is-trouble:hover {
+  border-color: var(--status-serious);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-serious) 18%, transparent);
+}
+@keyframes commander-seated {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-good) 55%, transparent);
+  }
+  55% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--status-good) 26%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-good) 20%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-answer.is-ready {
+    animation: none;
+  }
+}
+
+/* The names offered under a field that could not read one — "did you mean".
+ *
+ * A chip rather than a link, because pressing one changes what is in front of
+ * you rather than taking you anywhere (commandment 20); and it answers hover,
+ * focus AND press, because every control does (commandment 17). It carries no
+ * `aria-pressed`: a suggestion has no state to be in, and a control that wears
+ * a state it can only ever answer `false` to is lying to a screen reader. */
+.chip-offer {
+  background: var(--page);
+  border: 1px solid var(--hairline);
+  color: var(--text-primary);
+  transition: background 120ms ease, border-color 120ms ease,
+    color 120ms ease, transform 120ms ease;
+}
+.chip-offer:hover {
+  background: color-mix(in srgb, var(--vine) 14%, transparent);
+  border-color: var(--vine);
+}
+.chip-offer:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+  border-color: var(--vine);
+}
+.chip-offer:active {
+  transform: translateY(1px);
+  background: color-mix(in srgb, var(--vine) 22%, transparent);
+}
+/* A name that cannot lead is still offered — hiding it is indistinguishable
+   from the card not existing — so it is marked rather than dropped, and the
+   mark is a quieter chip that still answers the hand. */
+.chip-offer.is-aside {
+  color: var(--text-muted);
+  border-style: dashed;
+}
+.chip-offer.is-aside:hover {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+/* The "cannot lead" mark, coloured here rather than inline on the span, so
+   the hover above can reach it — an inline `color` outranks every rule a
+   stylesheet can write, and a mark that stays grey while its chip lights up
+   is the control answering the hand only halfway. */
+.chip-offer-mark {
+  margin-left: 0.25rem;
+  color: var(--text-muted);
+}
+.chip-offer:hover .chip-offer-mark,
+.chip-offer:focus-visible .chip-offer-mark {
+  color: inherit;
+}
+@media (pointer: coarse) {
+  .chip-offer {
+    min-height: 44px;
+  }
+}

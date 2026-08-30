@@ -188,6 +188,46 @@ export interface Card {
  * pretended otherwise would be one optional field away from a surface writing
  * a rationale, which is the one thing no surface may do (rule 4, ADR 8).
  */
+/** One card considered for the command zone.
+ *
+ *  No `image` and no `artist`, on purpose: this answers a text field while
+ *  somebody is still typing in it, and a card image owes its painter a credit
+ *  in the same room it renders in (commandment 19, ADR 32). The cost, the type
+ *  line and the identity are what confirm a commander anyway. */
+export interface CommanderSeat {
+  name: string
+  mana_cost: string | null
+  type_line: string
+  color_identity: string[]
+  /** The rules question: may this card sit in the command zone at all. */
+  may_command: boolean
+  /** The format question, and it fails apart from the one above — a banned
+   *  legend answers `may_command: true` and `legal_commander: false`, and Sol
+   *  Ring answers the other way round. */
+  legal_commander: boolean
+  /** How this card partners, in words, or '' for a card that does not. */
+  pairing: string
+  score: number
+}
+
+/** One written name and the cards it might have been. */
+export interface CommanderOffer {
+  written: string
+  candidates: CommanderSeat[]
+}
+
+/** What the commander box is told about itself.
+ *
+ *  `state` is the field's own condition and the only thing its border reads;
+ *  `sentence` is always a whole sentence a newcomer can act on. */
+export interface CommanderCheck {
+  state: 'blank' | 'ready' | 'trouble' | 'unknown'
+  sentence: string
+  commanders: CommanderSeat[]
+  did_you_mean: CommanderOffer[]
+  message?: string
+}
+
 export interface CardOffer {
   name: string
   mana_cost: string | null
@@ -2901,6 +2941,13 @@ export const api = {
   suggestCards: (q: string, limit = 8) =>
     get<{ cards: CardOffer[]; message?: string }>(
       `/api/cards/suggest?q=${encodeURIComponent(q)}&limit=${limit}`),
+  /** Ask what the commander box is holding.
+   *
+   *  Sent whole and never split here, for the same reason the import body is:
+   *  a comma is part of a legendary creature's name far more often than it
+   *  separates two of them, and telling the two apart takes a card pool. */
+  checkCommander: (q: string) =>
+    get<CommanderCheck>(`/api/cards/commander?q=${encodeURIComponent(q)}`),
   swapCard: (ref: DeckRef, body: { out: string; into: string; why: string }) =>
     post<SwapResult>(deckPath(ref, '/swap'), body),
   addCard: (

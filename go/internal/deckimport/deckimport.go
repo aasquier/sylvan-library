@@ -61,6 +61,15 @@
 // is filed under `land` when `CardRecord.IsLand` says so -- which is right
 // about the double-faced cards a type line is wrong about -- and everything
 // else takes the model's `utility` default for a human to file.
+//
+// **A category the paste stated is not that inference and does not compete
+// with it.** `1 Llanowar Elves "one-mana ramp" [ramp]` files the card under
+// `ramp` because a person said so, which is the same act as choosing it from
+// the dropdown on the deck page. The word is matched against the model's own
+// vocabulary, case-folded and no further: nothing here maps a word onto a
+// category it resembles, because that would be exactly the guess ADR 13
+// refused. A word this cannot place leaves the card filed as it would have
+// been anyway, keeps its reason, and is named once for the whole paste.
 package deckimport
 
 import (
@@ -77,7 +86,14 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/deckyaml"
 	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
+
+// unplaceableShown bounds the category words named in the one note about
+// them. Enough that a hand-written paste sees every word it got wrong, few
+// enough that an Archidekt export's whole vocabulary cannot turn one sentence
+// into a wall.
+const unplaceableShown = 6
 
 // The comment block every imported file opens with, in its two forms. The
 // deck file is the truth, so the truth is what the header states: a list
@@ -213,10 +229,10 @@ func NamesIn(parsed decklist.List, commander []string, companion string) []strin
 	}
 	for _, c := range commander {
 		add(c)
-		// Both readings of a comma, so `commanderReading` can decide between
+		// Both readings of a comma, so `CommanderReading` can decide between
 		// them by lookup rather than by guessing. Fetching a few extra names
 		// costs one entry in a list that is already ~100 long.
-		for _, parts := range pairParts(c) {
+		for _, parts := range PairParts(c) {
 			for _, part := range parts {
 				add(part)
 			}
@@ -432,12 +448,12 @@ type Options struct {
 // is also punctuation inside most legendary names.
 var pairSeparators = []string{" + ", "+", ","}
 
-// pairParts is every way this string might be two or more names, in the order
-// worth trying. Its own function so `NamesIn` and `commanderReading` cannot
+// PairParts is every way this string might be two or more names, in the order
+// worth trying. Its own function so `NamesIn` and `CommanderReading` cannot
 // disagree about what the parts of a name are -- one fetches them, the other
 // chooses between them, and a fetch that missed a reading would make that
 // reading permanently unavailable.
-func pairParts(name string) [][]string {
+func PairParts(name string) [][]string {
 	out := [][]string{}
 	for _, sep := range pairSeparators {
 		if !strings.Contains(name, sep) {
@@ -456,7 +472,7 @@ func pairParts(name string) [][]string {
 	return out
 }
 
-// commanderReading decides between "one card whose name contains a comma" and
+// CommanderReading decides between "one card whose name contains a comma" and
 // "two partners written with a comma between them".
 //
 // **A comma is part of a legendary creature's name far more often than it
@@ -475,7 +491,7 @@ func pairParts(name string) [][]string {
 // part is, does the pair reading win. When neither reading resolves, nothing
 // is invented -- the original string stays exactly as written and is reported
 // as unknown, with the shortlist beside it.
-func commanderReading(wanted []string, cards map[string]*pool.CardRecord) ([]string, string) {
+func CommanderReading(wanted []string, cards map[string]*pool.CardRecord) ([]string, string) {
 	if len(wanted) != 1 {
 		return wanted, ""
 	}
@@ -483,7 +499,7 @@ func commanderReading(wanted []string, cards map[string]*pool.CardRecord) ([]str
 	if _, rec := CanonicalName(whole, cards); rec != nil {
 		return wanted, ""
 	}
-	for _, parts := range pairParts(whole) {
+	for _, parts := range PairParts(whole) {
 		resolved := make([]string, 0, len(parts))
 		for _, part := range parts {
 			name, rec := CanonicalName(part, cards)
@@ -543,7 +559,7 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	}
 	// Before the count is checked, because the whole point is that one name
 	// with a comma in it is one commander and not two.
-	wanted, pairing := commanderReading(wanted, cards)
+	wanted, pairing := CommanderReading(wanted, cards)
 	if pairing != "" {
 		notes = append(notes, pairing)
 	}
@@ -607,9 +623,39 @@ func BuildDeck(parsed decklist.List, cards map[string]*pool.CardRecord,
 	// is more than one card it could have been about.
 	zoneWhy, zoneCount := commandZoneReasons(parsed, cards, outside)
 
+	unplaceable := []string{}
 	entries, moved := buildEntries(append(parsed.Section("deck"), demotedLines...),
-		resolve, outside, &notes)
-	swaps, alsoMoved := buildEntries(parsed.Section("swap_board"), resolve, outside, &notes)
+		resolve, outside, &notes, &unplaceable)
+	swaps, alsoMoved := buildEntries(parsed.Section("swap_board"), resolve, outside,
+		&notes, &unplaceable)
+
+	// One note for the whole paste, however many lines carried a word this
+	// could not place.
+	//
+	// **Counted rather than repeated, and the reason is a paste we already
+	// read.** Archidekt has always written its own free-text category in this
+	// column -- "Big Beaters", "Card Draw", "Removal" -- so a straight
+	// Archidekt export can arrive with ninety-nine words in it and perhaps two
+	// that happen to be ours. Ninety-nine identical complaints would bury the
+	// unknown cards and the missing reasons under a list of things that are
+	// not wrong, which is exactly the shape rule 4 already refused for drafted
+	// rationales. The distinct words are named so the sentence is actionable,
+	// bounded so it stays a sentence, and the cards themselves land filed the
+	// way they always were, reasons intact.
+	if len(unplaceable) > 0 {
+		shown := unplaceable
+		if len(shown) > unplaceableShown {
+			shown = shown[:unplaceableShown]
+		}
+		note := fmt.Sprintf("%d category word(s) in [brackets] are not ones this "+
+			"library files by, so those cards were filed as usual: %s",
+			len(unplaceable), strings.Join(shown, ", "))
+		if len(unplaceable) > len(shown) {
+			note += fmt.Sprintf(" (and %d more)", len(unplaceable)-len(shown))
+		}
+		notes = append(notes, note+". The ones it knows are "+
+			strings.Join(reference.Deck().Categories, ", ")+".")
+	}
 
 	// The mark, where the paste declared one (ADR 49). Only a card whose
 	// reason actually arrived takes it -- an empty `why` is a debt, not a
@@ -747,9 +793,13 @@ func commandZoneReasons(parsed decklist.List, cards map[string]*pool.CardRecord,
 
 // buildEntries resolves parsed lines into card entries, merging repeated
 // names.
+//
+// `unplaceable` collects the category words this could not match, so the
+// caller can say so once for the whole paste rather than once per line.
 func buildEntries(lines []decklist.Card,
 	resolve func(string) (string, *pool.CardRecord),
-	outside map[string]bool, notes *[]string) ([]deck.CardEntry, []string) {
+	outside map[string]bool, notes *[]string,
+	unplaceable *[]string) ([]deck.CardEntry, []string) {
 
 	order := []string{}
 	byKey := map[string]*deck.CardEntry{}
@@ -784,6 +834,22 @@ func buildEntries(lines []decklist.Card,
 		category := "utility"
 		if rec != nil && rec.IsLand() {
 			category = "land"
+		}
+		// A category the person wrote outranks both of those, and the word
+		// "outranks" is doing real work: the inference exists to fill a blank,
+		// and this line is not blank. So a land somebody filed under `ramp`
+		// stays filed under `ramp` and the gate says its piece about the
+		// mismatch -- which is the diagnosis they wanted, exactly as an
+		// invalid deck is simulated rather than refused. Quietly overruling
+		// the column would make the column a suggestion box.
+		if word := strings.TrimSpace(line.Category); word != "" {
+			if folded := strings.ToLower(word); reference.IsCategory(folded) {
+				category = folded
+			} else if !slices.ContainsFunc(*unplaceable, func(s string) bool {
+				return strings.EqualFold(s, word)
+			}) {
+				*unplaceable = append(*unplaceable, word)
+			}
 		}
 		byKey[key] = &deck.CardEntry{Name: canonical, Category: category,
 			Qty: line.Qty, Why: line.Why}

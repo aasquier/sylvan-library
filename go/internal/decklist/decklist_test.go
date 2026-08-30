@@ -221,3 +221,137 @@ func TestParseReadsTheRationaleColumn(t *testing.T) {
 		})
 	}
 }
+
+// The category column, and the two columns it has to sit beside without
+// disturbing either.
+//
+// The cases worth having are the ones where the bracket meets the quote. A
+// rationale that CONTAINS brackets must keep them, because the quoted run is
+// peeled before anything looks inside it; a card name that ends in a quoted
+// epithet must still hand up both readings with the bracket gone from both,
+// because the bracket peels first and the adjacency test that decides those
+// readings is therefore asked the same question it was always asked.
+func TestParseReadsTheCategoryColumn(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		line     string
+		wantName string
+		wantWhy  string
+		wantCat  string
+		wantWhol string
+		wantCmdr bool
+		why      string
+	}{
+		{
+			name: "the format Aaron asked for", why: "quantity, name, reason, category",
+			line:     `1 Llanowar Elves "one-mana ramp" [ramp]`,
+			wantName: "Llanowar Elves", wantWhy: "one-mana ramp", wantCat: "ramp",
+			wantWhol: `Llanowar Elves "one-mana ramp"`,
+		},
+		{
+			name: "with a printing too", why: "the new column peels beside the old ones, not instead of them",
+			line:     `1 Acidic Slime (ZNC) 59 "deathtouch that eats artifacts" [interaction]`,
+			wantName: "Acidic Slime", wantWhy: "deathtouch that eats artifacts",
+			wantCat: "interaction",
+		},
+		{
+			name: "a category and no reason", why: "the columns are independent; either may stand alone",
+			line:     `1 Sol Ring (LTC) 284 [ramp]`,
+			wantName: "Sol Ring", wantWhy: "", wantCat: "ramp",
+		},
+		{
+			name: "no category at all", why: "every existing dialect keeps parsing exactly as it did",
+			line:     `1 Sol Ring "fast mana, and it never gets cut"`,
+			wantName: "Sol Ring", wantWhy: "fast mana, and it never gets cut", wantCat: "",
+			wantWhol: `Sol Ring "fast mana, and it never gets cut"`,
+		},
+		{
+			name: "a word this library does not file by", why: "the grammar reads the token; placing it is deckimport's job",
+			line:     `1 Sol Ring "fast mana" [Big Beaters]`,
+			wantName: "Sol Ring", wantWhy: "fast mana", wantCat: "Big Beaters",
+			wantWhol: `Sol Ring "fast mana"`,
+		},
+		{
+			name: "the word is carried verbatim", why: "so an unplaceable word can be quoted back as it was typed",
+			line:     `1 Sol Ring [RaMp]`,
+			wantName: "Sol Ring", wantCat: "RaMp",
+		},
+		{
+			name: "Archidekt's brace suffix", why: "`{top}` is a cursor position, never part of the word",
+			line:     `1 Sol Ring [Ramp{top}]`,
+			wantName: "Sol Ring", wantCat: "Ramp",
+		},
+		{
+			name: "a reason with brackets inside it", why: "the quoted run is peeled whole; nothing looks inside it",
+			line:     `1 Sol Ring "ramp [and it never gets cut]" [ramp]`,
+			wantName: "Sol Ring", wantWhy: "ramp [and it never gets cut]", wantCat: "ramp",
+			wantWhol: `Sol Ring "ramp [and it never gets cut]"`,
+		},
+		{
+			name: "a reason that is only brackets, no category", why: "a bracket inside quotes is not the category column",
+			line:     `1 Sol Ring "[ramp]"`,
+			wantName: "Sol Ring", wantWhy: "[ramp]", wantCat: "",
+			wantWhol: `Sol Ring "[ramp]"`,
+		},
+		{
+			name: "a quoted name plus a category", why: "Kongming keeps both readings, and neither carries the bracket",
+			line:     `1 Kongming, "Sleeping Dragon" [threat]`,
+			wantName: "Kongming,", wantWhy: "Sleeping Dragon", wantCat: "threat",
+			wantWhol: `Kongming, "Sleeping Dragon"`,
+		},
+		{
+			name: "a quoted name, a reason AND a category", why: "three columns, and the name survives all of them",
+			line:     `1 Kongming, "Sleeping Dragon" "a lord I keep cutting" [threat]`,
+			wantName: `Kongming, "Sleeping Dragon"`, wantWhy: "a lord I keep cutting",
+			wantCat:  "threat",
+			wantWhol: `Kongming, "Sleeping Dragon" "a lord I keep cutting"`,
+		},
+		{
+			name: "the commander label is not a category", why: "`[Commander]` is the section marker it has always been",
+			line:     `1 Arahbo, Roar of the World [Commander{top}]`,
+			wantName: "Arahbo, Roar of the World", wantCat: "", wantCmdr: true,
+		},
+		{
+			name: "the commander label beside a real category", why: "one bracket routes the line, the other files the card",
+			line:     `1 Arahbo, Roar of the World [threat] [Commander]`,
+			wantName: "Arahbo, Roar of the World", wantCat: "threat", wantCmdr: true,
+		},
+		{
+			name: "two categories", why: "the rightmost keeps the slot, as the rationale column does",
+			line:     `1 Sol Ring [ramp] [payoff]`,
+			wantName: "Sol Ring", wantCat: "payoff",
+		},
+		{
+			name: "a marker rides along", why: "*F* still peels, and the bracket is not it",
+			line:     `1 Sol Ring (2X2) 297 *F* [ramp]`,
+			wantName: "Sol Ring", wantCat: "ramp",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := Parse(tc.line)
+			if len(got.Cards) != 1 {
+				t.Fatalf("%s: read %d cards, wanted 1 (%s)\n%+v",
+					tc.line, len(got.Cards), tc.why, got)
+			}
+			c := got.Cards[0]
+			if c.Name != tc.wantName {
+				t.Errorf("name: got %q, wanted %q (%s)", c.Name, tc.wantName, tc.why)
+			}
+			if c.Why != tc.wantWhy {
+				t.Errorf("why: got %q, wanted %q (%s)", c.Why, tc.wantWhy, tc.why)
+			}
+			if c.Category != tc.wantCat {
+				t.Errorf("category: got %q, wanted %q (%s)", c.Category, tc.wantCat, tc.why)
+			}
+			if c.Unpeeled != tc.wantWhol {
+				t.Errorf("unpeeled: got %q, wanted %q (%s)", c.Unpeeled, tc.wantWhol, tc.why)
+			}
+			if where := c.Section == "commander"; where != tc.wantCmdr {
+				t.Errorf("section: got %q, wanted commander=%v (%s)",
+					c.Section, tc.wantCmdr, tc.why)
+			}
+		})
+	}
+}
