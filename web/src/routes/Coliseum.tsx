@@ -68,8 +68,8 @@ import { useSearchParams } from 'react-router-dom'
 import {
   api, errorMessage, followJob,
   type Coliseum, type ColiseumArena, type ColiseumFact,
-  type ColiseumStandings, type DeckTile, type ForgeBeats, type ForgeResult,
-  type Job, type ValidationReport,
+  type ColiseumStandings, type DeckTile, type ForgeBeats, type ForgeDeckRow,
+  type ForgeResult, type Job, type ValidationReport,
 } from '../lib/api'
 import { ColiseumRecord } from '../components/coliseumrecord'
 import { CardHover, Caveat, ErrorNote, NumberField, Select }
@@ -134,15 +134,23 @@ const drawShuffle = () => Math.floor(Math.random() * SHUFFLE_CEILING) + 1
  * flavour, and `shortName` exists in `lib/theater.ts` for this exact reason.
  * The theme stays, because it is the half that tells two decks apart.
  *
+ * **The general is passed, and it is what decides whether anything is cut at
+ * all.** This control is where Aaron found the bug: his Atla Palani deck is
+ * called "Life, Uh, Finds a Way" and the dropdown offered it as *"Life"*,
+ * because the epithet was being found by punctuation rather than by lookup.
+ * A deck named for its commander still reads "Arahbo — Cats"; a deck named
+ * for a joke keeps the joke.
+ *
  * The pilot is dropped outright: it is a person's name, it was never how
  * anybody chose a deck, and it was most of the overflow. The owner is handled
  * by the caller, and only where it earns its space.
  */
-function leanName(name: string): string {
+function leanName(name: string, commander?: readonly string[]): string {
+  const short = shortName(name, commander)
   const cut = name.indexOf('—')
-  if (cut < 0) return shortName(name)
+  if (cut < 0) return short
   const theme = name.slice(cut + 1).trim()
-  return theme ? `${shortName(name)} — ${theme}` : shortName(name)
+  return theme ? `${short} — ${theme}` : short
 }
 
 /** One deck, as the gate offers it.
@@ -155,7 +163,9 @@ function leanName(name: string): string {
 function seatOption(d: DeckTile) {
   return {
     value: `${d.owner}/${d.slug}`,
-    label: d.writable ? leanName(d.name) : `${leanName(d.name)} · ${d.owner}`,
+    label: d.writable
+      ? leanName(d.name, d.commander)
+      : `${leanName(d.name, d.commander)} · ${d.owner}`,
   }
 }
 
@@ -610,9 +620,18 @@ function spell(seconds: number): string {
  * it. Nothing counts up, for the same reason: a numeral arriving through
  * animation frames is a numeral that reads zero in a tab nobody is watching.
  */
-function TaleOfTheTape({ result, homeSlug }: {
+function TaleOfTheTape({ result, homeSlug, commanderOf }: {
   result: ForgeResult
   homeSlug: string
+  /** The general a slug is named for, out of the room's shelf.
+   *
+   *  Passed in rather than read off the result, because a `ForgeDeckRow`
+   *  carries a slug and a name and no commander at all — and `shortName` needs
+   *  the general to know whether a deck's title is its commander's or its own
+   *  (a deck called "Life, Uh, Finds a Way" is not a deck called "Life").
+   *  Undefined for a deck the shelf has not handed us, which is the safe way
+   *  round: the whole title, rather than somebody's first word. */
+  commanderOf: (slug: string) => readonly string[] | undefined
 }) {
   // Seated the way the room seated them, so the total on the left belongs to
   // the deck that has been on the left since the gate opened. Falling back to
@@ -639,11 +658,12 @@ function TaleOfTheTape({ result, homeSlug }: {
   const counted = winsHome + winsAway + result.draws + result.timed_out
   const played = Math.max(result.played, counted, 1)
   const share = (n: number) => `${Math.max(0, (n / played) * 100)}%`
+  const said = (d: ForgeDeckRow) => shortName(d.name, commanderOf(d.slug))
   const band = away
-    ? `${winsHome} of ${result.played} bouts to ${shortName(home.name)}`
-      + `, ${winsAway} to ${shortName(away.name)}`
+    ? `${winsHome} of ${result.played} bouts to ${said(home)}`
+      + `, ${winsAway} to ${said(away)}`
       + `, ${result.draws} drawn and ${result.timed_out} stopped by the clock`
-    : `${winsHome} of ${result.played} bouts to ${shortName(home.name)}`
+    : `${winsHome} of ${result.played} bouts to ${said(home)}`
 
   return (
     <div className="tape">
@@ -652,7 +672,7 @@ function TaleOfTheTape({ result, homeSlug }: {
       <div className="tape-score">
         <div className="tape-seat">
           <span className="tape-seat-name" title={home.name}>
-            {leanName(home.name)}
+            {leanName(home.name, commanderOf(home.slug))}
           </span>
           <span className="tape-seat-wins tabular">{winsHome}</span>
           <span className="tape-seat-of">
@@ -664,7 +684,7 @@ function TaleOfTheTape({ result, homeSlug }: {
         </div>
         <div className="tape-seat is-away">
           <span className="tape-seat-name" title={away?.name}>
-            {away ? leanName(away.name) : 'No challenger'}
+            {away ? leanName(away.name, commanderOf(away.slug)) : 'No challenger'}
           </span>
           <span className="tape-seat-wins tabular">{winsAway}</span>
           <span className="tape-seat-of">
@@ -732,7 +752,7 @@ function TaleOfTheTape({ result, homeSlug }: {
               <span className="bout-no tabular">{r.game}</span>
               <span className="bout-took">
                 <span className="bout-mark" aria-hidden="true" />
-                {took ? shortName(took.name)
+                {took ? said(took)
                   : kind === 'clock' ? 'Stopped by the clock'
                     : 'Nobody — the bout ended level'}
               </span>
@@ -1113,8 +1133,10 @@ export default function ColiseumRoom() {
   const stage = useCallback((game: number): Arriving | null => {
     const heard = played.find((g) => g.game === game)
     if (!heard) return null
-    const name = (slug: string) =>
-      shortName(decks.find((d) => d.slug === slug)?.name ?? slug)
+    const name = (slug: string) => {
+      const of = decks.find((d) => d.slug === slug)
+      return shortName(of?.name ?? slug, of?.commander)
+    }
     // Forge counts every player-turn; a person counts their own. See
     // `playerTurns` for the measurement that made this necessary.
     const turns = playerTurns(heard.beats)
@@ -1190,11 +1212,23 @@ export default function ColiseumRoom() {
     [reel.shown, reel.queue])
 
   /** What the field calls a seat. The board carries slugs and Forge's own deck
-   *  titles; only the room has the shelf that turns either into a name. */
-  const seatName = useCallback((slug: string | null, fallback: string) =>
-    shortName(slug
-      ? (decks.find((d) => d.slug === slug)?.name ?? slug)
-      : fallback), [decks])
+   *  titles; only the room has the shelf that turns either into a name — and
+   *  the shelf is also where the general comes from, which is what decides
+   *  whether the title shortens at all. A `fallback` is Forge's own title for
+   *  a deck the shelf does not have, so it is shortened against no commander
+   *  and comes back whole, which is the right way to be wrong. */
+  const seatName = useCallback((slug: string | null, fallback: string) => {
+    const of = slug ? decks.find((d) => d.slug === slug) : undefined
+    return shortName(of?.name ?? (slug || fallback), of?.commander)
+  }, [decks])
+
+  /** Which general a slug is sleeved behind, for the surfaces that shorten a
+   *  deck's name and only have the match's own rows to go on. A `ForgeDeckRow`
+   *  carries a slug and a title; the shelf is the only thing in the room that
+   *  knows whether that title is the commander's name or a sentence somebody
+   *  liked, and `shortName` cannot tell them apart without it. */
+  const commanderOf = useCallback((slug: string) =>
+    decks.find((d) => d.slug === slug)?.commander, [decks])
 
   // The play-by-play is offered from the moment a match starts and stays
   // offered after it ends, because the last game finishing is the moment
@@ -1437,7 +1471,8 @@ export default function ColiseumRoom() {
           {/* Keyed on the job so a second match crowns again rather than
               reusing the element the last one was dismissed from. */}
           <MatchVerdict key={`verdict-${job?.id ?? 'x'}`} result={forge} />
-          <TaleOfTheTape result={forge} homeSlug={slugOf(a)} />
+          <TaleOfTheTape result={forge} homeSlug={slugOf(a)}
+                         commanderOf={commanderOf} />
 
           {/* **The shuffle is written down, and it is not written here.**
               This line used to be a badge reading "shuffle 7" — a bare

@@ -165,9 +165,13 @@ export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
   // Short names in the feed: a row is one line and a deck's full name is
   // most of it. The panels above still carry the whole name, so nothing is
   // lost — the feed is just not where a subtitle belongs.
+  //
+  // The commander rides along because the cut is decided by lookup rather
+  // than by punctuation: only a deck named for its general loses its
+  // epithet, and a deck called "Life, Uh, Finds a Way" keeps every word.
   const name = (slug: string | null) =>
-    slug === aSlug ? shortName(a?.name ?? aSlug)
-      : slug === bSlug ? shortName(b?.name ?? bSlug)
+    slug === aSlug ? shortName(a?.name ?? aSlug, a?.commander)
+      : slug === bSlug ? shortName(b?.name ?? bSlug, b?.commander)
         : null
 
   return (

@@ -61,7 +61,7 @@ import { type BoardCard, type Clash, halfNamed, pictureOf } from './board'
 import { type HalfGlass } from './halves'
 import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
-import { shortName } from './theater'
+import { legendName } from './theater'
 
 /**
  * What is happening to the card on the stage.
@@ -1127,8 +1127,12 @@ const WALL_NAMED = 3
  *
  * - **Short names.** A comma-joined list of legends is unreadable, because
  *   half of them contain a comma: *"Brimaz, King of Oreskos, Arahbo, Roar of
- *   the World"* is four names to a reader and two to the game. `shortName` is
- *   the room's own cut and every other surface here already uses it.
+ *   the World"* is four names to a reader and two to the game. `legendName` is
+ *   the room's own cut, and it is deliberately **not** `shortName` beside it:
+ *   these are card names, where the comma is Wizards' own separator between a
+ *   legend and its title, and cutting on it is always right. `shortName` is
+ *   for a *deck's* name, which is prose somebody wrote and whose commas are
+ *   only a separator when the title turns out to be the general's.
  * - **A count rather than a plural.** Only tokens ever repeat, and pluralising
  *   a card's name is a guess about English that this project does not make
  *   about card text anywhere else — *Zombie Army* does not take an `s`. The
@@ -1158,7 +1162,7 @@ function walled(blockers: BoutFighter[]): string {
     byName.set(b.name, (byName.get(b.name) ?? 0) + b.count)
   }
   const said = [...byName].map(([name, n]) =>
-    n > 1 ? `${shortName(name)} ×${n}` : shortName(name))
+    n > 1 ? `${legendName(name)} ×${n}` : legendName(name))
   if (said.length > WALL_NAMED) {
     const rest = [...byName.values()].slice(WALL_NAMED)
       .reduce((n, c) => n + c, 0)

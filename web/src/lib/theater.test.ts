@@ -9,7 +9,12 @@
  *   tolerates on purpose), and as the real payload. All three are "no rows
  *   yet" and none of them may throw.
  * - **`shortName` is how a deck is referred to out loud** — the general's
- *   name, which is what fits in a feed row.
+ *   name, which is what fits in a feed row. The cases below are mostly about
+ *   when it must *not* shorten: it decides by looking the general up rather
+ *   than by cutting at a comma, because a deck's name is prose and "Life, Uh,
+ *   Finds a Way" is not a deck called "Life".
+ * - **`legendName` is the same cut for a card**, where the comma really is a
+ *   separator because Wizards printed it there.
  * - **`beatLine` turns one beat into English**, and the two things worth
  *   holding are that a kind it has never heard of is still rendered, and that
  *   `who` is the player the sentence is *about* rather than the seat the wire
@@ -18,7 +23,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ForgeBeat, ForgeGameRow } from './api'
-import { beatLine, shortName, theaterRows } from './theater'
+import { beatLine, legendName, shortName, theaterRows } from './theater'
 
 function row(over: Partial<ForgeGameRow> = {}): ForgeGameRow {
   return {
@@ -47,13 +52,78 @@ describe('theaterRows', () => {
 })
 
 describe('shortName', () => {
+  // The dash is a real separator and everything past it goes, always. The
+  // comma is the one under test.
+  it.each<[string, string[] | undefined, string]>([
+    // Named for its general: the epithet is the general's title, so it goes.
+    ['Arahbo, Roar of the World — Cats', ['Arahbo, Roar of the World'],
+      'Arahbo'],
+    ['Atla Palani, Nest Tender — Dinos', ['Atla Palani, Nest Tender'],
+      'Atla Palani'],
+    ['Goreclaw, Terror of Qal Sisma — Stompy', ['Goreclaw, Terror of Qal Sisma'],
+      'Goreclaw'],
+    // **The bug.** Aaron's Atla Palani deck is a line from a film and its
+    // commas are a sentence's, not a legend's. Cut by punctuation it read
+    // "Life" in every Coliseum control; the general's name is nowhere near
+    // the front of it, so nothing is cut.
+    ['Life, Uh, Finds a Way', ['Atla Palani, Nest Tender'],
+      'Life, Uh, Finds a Way'],
+    // The same title with a theme on the end: the dash still separates.
+    ['Life, Uh, Finds a Way — Dinos', ['Atla Palani, Nest Tender'],
+      'Life, Uh, Finds a Way'],
+    // Case-insensitive, because a deck's title is typed by a person and a
+    // commander's name is copied off a card.
+    ['arahbo, roar of the world — Cats', ['Arahbo, Roar of the World'],
+      'arahbo'],
+    // A partner pair is two chances to be named for your general.
+    ['Ravos, Soultender — Aristocrats',
+      ['Tymna the Weaver', 'Ravos, Soultender'], 'Ravos'],
+    // Nothing to match against: the safe direction is the whole title. This
+    // is the shelf not having loaded yet, and a stranger's deck the room only
+    // knows Forge's own name for.
+    ['Arahbo, Roar of the World — Cats', undefined,
+      'Arahbo, Roar of the World'],
+    ['Life, Uh, Finds a Way', undefined, 'Life, Uh, Finds a Way'],
+    // No comma at all: already short, and the commander is beside the point.
+    ['Trostani tokens', undefined, 'Trostani tokens'],
+    ['Gyome — Food (Mitch)', ['Gyome, Master Chef'], 'Gyome'],
+    // Empty in, empty out — the guard the first cut of this function had and
+    // this one keeps.
+    ['', ['Atla Palani, Nest Tender'], ''],
+    ['— Cats', ['Atla Palani, Nest Tender'], '— Cats'],
+  ])('shortens %s under %s to %s', (full, commander, short) => {
+    expect(shortName(full, commander)).toBe(short)
+  })
+
+  // The commander may arrive as one name rather than a list, which is what a
+  // caller holding a single general has.
+  it('takes a bare commander name as well as a list', () => {
+    expect(shortName('Atla Palani, Nest Tender — Dinos', 'Atla Palani'))
+      .toBe('Atla Palani')
+    expect(shortName('Life, Uh, Finds a Way', 'Atla Palani, Nest Tender'))
+      .toBe('Life, Uh, Finds a Way')
+  })
+
+  // A deck whose title *starts* with a word that is not its general keeps
+  // every word of it, even when the general is named later on.
+  it('does not cut on a comma the general is not in front of', () => {
+    expect(shortName('Ready, Atla Palani, Fire', ['Atla Palani, Nest Tender']))
+      .toBe('Ready, Atla Palani, Fire')
+  })
+})
+
+describe('legendName', () => {
+  // The unconditional cut, which is right for a card because Wizards printed
+  // the comma. `lib/stage.ts`'s wall is the caller; a board naming two legends
+  // reads as four names without it.
   it.each([
-    ['Arahbo, Roar of the World — Cats', 'Arahbo'],
-    ['Goreclaw, Terror of Qal Sisma — Mono-Green Stompy', 'Goreclaw'],
-    ['Gyome, Master Chef — Food (Mitch)', 'Gyome'],
-    ['Trostani tokens', 'Trostani tokens'],
-  ])('shortens %s to %s', (full, short) => {
-    expect(shortName(full)).toBe(short)
+    ['Brimaz, King of Oreskos', 'Brimaz'],
+    ['Arahbo, Roar of the World', 'Arahbo'],
+    ['Sacred Cat', 'Sacred Cat'],
+    ['Cat Token', 'Cat Token'],
+    ['', ''],
+  ])('calls %s %s', (full, short) => {
+    expect(legendName(full)).toBe(short)
   })
 })
 
