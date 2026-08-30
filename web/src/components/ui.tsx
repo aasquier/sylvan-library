@@ -1037,7 +1037,32 @@ export function CardLoupe({ src, alt, className = '', zoom = 2.6, imgStyle }: {
  * caller now: the reading room's "Start over", which is destructive in the
  * way this pattern was built for *and* spends money — it discards the
  * transcript and the next turn is a paid one.
+ *
+ * **A double-click is one gesture, not two decisions, and it used to arm and
+ * fire this button in a single stroke.** Driven on the deployed site
+ * 2026-08-30: one `double_click` on "Entomb 1 selected" put a card in the
+ * graveyard, and the same component is the arm on `Exile`, where the loss is
+ * permanent and the deck page's own comment calls exiling "two deliberate
+ * steps by construction". It was not: the first click armed, the second
+ * confirmed, and nothing between them asked how long that took. So the arm
+ * now has a floor as well as a ceiling — a confirm that lands within
+ * `DWELL` of the arming click is the back half of a double-click and is
+ * dropped, leaving the button armed so the *next* real click still works.
+ * The ceiling (`ARM_TIMEOUT`) is unchanged and argued above.
  */
+
+/** How long the arm must be looked at before it will fire, in ms.
+ *
+ * Above the platform double-click thresholds (macOS tops out at 500ms, and
+ * the fast half of that range is where an accidental stroke lands) and far
+ * below the time it takes to read a label that says "Gone forever?" — the
+ * deliberate second click this guard is designed *not* to catch arrives well
+ * after half a second, because the label changed and a person read it. */
+const DWELL = 500
+
+/** How long an untouched arm stays cocked, in ms. */
+const ARM_TIMEOUT = 4000
+
 export function ArmedButton({ children, armedLabel, title, onConfirm }: {
   children: ReactNode
   /** What the armed state says — name the consequence, not "are you sure". */
@@ -1046,9 +1071,12 @@ export function ArmedButton({ children, armedLabel, title, onConfirm }: {
   onConfirm: () => void
 }) {
   const [armed, setArmed] = useState(false)
+  // When the arming click landed. A ref rather than state: nothing renders
+  // from it, and a re-render between the two clicks must not reset the clock.
+  const armedAt = useRef(0)
   useEffect(() => {
     if (!armed) return
-    const timer = setTimeout(() => setArmed(false), 4000)
+    const timer = setTimeout(() => setArmed(false), ARM_TIMEOUT)
     return () => clearTimeout(timer)
   }, [armed])
   return (
@@ -1060,9 +1088,12 @@ export function ArmedButton({ children, armedLabel, title, onConfirm }: {
                  + `text-[11px] font-medium${armed ? ' armed' : ''}`}
       onClick={() => {
         if (armed) {
+          // Too soon to be a decision: stay armed and wait for a real one.
+          if (Date.now() - armedAt.current < DWELL) return
           setArmed(false)
           onConfirm()
         } else {
+          armedAt.current = Date.now()
           setArmed(true)
         }
       }}

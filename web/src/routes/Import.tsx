@@ -562,11 +562,19 @@ function UnknownNames({ result, onFix }: {
               {s.written}
             </span>
             <span aria-hidden style={{ color: 'var(--text-muted)' }}>→</span>
+            {/* `.card-action`, not `.chip-toggle`. These look like the chips
+                next door and behave nothing like them: picking one *rewrites
+                the list above* and the button is gone on the next render, so
+                there is no "on" for it to be in. Wearing the toggle's class
+                asked it for an `aria-pressed` it could only ever answer
+                falsely — a control that says it is off, forever, is worse
+                than one that says nothing. Commandment 20 is about matching
+                the dress to the deed in both directions. */}
             {s.candidates.map((c) => (
               <button key={c.name} type="button"
                       onClick={() => onFix([{ written: s.written, chosen: c.name }])}
                       title={`Rewrite “${s.written}” as “${c.name}” in the list above`}
-                      className="chip-toggle text-xs">
+                      className="card-action rounded-md px-2 py-0.5 text-xs">
                 {c.name}
               </button>
             ))}

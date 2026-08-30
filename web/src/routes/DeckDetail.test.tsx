@@ -243,6 +243,30 @@ function unfoldWheel() {
   fireEvent.click(screen.getByTitle('Unfold the Wheel of Fortune'))
 }
 
+/**
+ * Drives an `ArmedButton` the way a person does: arm it, read the label it
+ * changed to, then decide.
+ *
+ * Two `fireEvent.click` calls in a row land in the same millisecond, which is
+ * a **double-click** — one gesture — and `ArmedButton` now refuses to treat
+ * it as two decisions. That guard exists because the old behaviour was live:
+ * one double-click on "Entomb 1 selected" moved a card to the graveyard of a
+ * real deck on 2026-08-30. See `components/armedbutton.test.tsx`.
+ *
+ * So the clock moves between the two presses. It is mocked rather than waited
+ * out because half a second per armed control is half a second this suite
+ * would pay forever to prove nothing — the dwell itself is tested where it
+ * lives, and what these tests are about is what happens *after* a confirm.
+ */
+function armThenConfirm(button: HTMLElement) {
+  const at = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(at)
+  fireEvent.click(button)
+  clock.mockReturnValue(at + 1_000)
+  fireEvent.click(button)
+  clock.mockRestore()
+}
+
 function renderDeck() {
   return render(
     <MemoryRouter initialEntries={['/decks/aasquier/goreclaw-stompy']}>
@@ -255,7 +279,7 @@ function renderDeck() {
 
 /** Open the tab the shortlist lives on. */
 function openValidation() {
-  fireEvent.click(screen.getByRole('button', { name: 'Validation' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Validation' }))
 }
 
 /** A stance rendered the way `mtglab.claude.stance.describe` renders one. */
@@ -438,7 +462,7 @@ afterEach(cleanup)
 describe('DeckDetail validation tab', () => {
   it('does not fetch a shortlist until the tab is opened', async () => {
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     expect(api.suggestions).not.toHaveBeenCalled()
 
     openValidation()
@@ -447,11 +471,11 @@ describe('DeckDetail validation tab', () => {
 
   it('fetches the shortlist once, not on every tab switch', async () => {
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
     await waitFor(() => expect(api.suggestions).toHaveBeenCalledTimes(1))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
     openValidation()
     await waitFor(() => expect(screen.getByText('Cultivator Colossus')).toBeTruthy())
     expect(api.suggestions).toHaveBeenCalledTimes(1)
@@ -459,7 +483,7 @@ describe('DeckDetail validation tab', () => {
 
   it('renders candidates under the error they belong to, with their reasons', async () => {
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
 
     const candidate = await screen.findByText('Cultivator Colossus')
@@ -472,7 +496,7 @@ describe('DeckDetail validation tab', () => {
     // The whole design rests on this being a measurement the user overrules.
     // If the disclaimer ever quietly disappears, that is a change worth failing.
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
     await screen.findByText('Cultivator Colossus')
     expect(screen.getByText(/not a recommendation/)).toBeTruthy()
@@ -483,7 +507,7 @@ describe('DeckDetail validation tab', () => {
       slug: 'goreclaw-stompy', pool_available: false, targets: [],
     })
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
 
     await screen.findByText(/not legal in Commander/)
@@ -495,7 +519,7 @@ describe('DeckDetail validation tab', () => {
     // the empty justification the rule exists to prevent, so the button stays
     // disabled rather than the app inventing one.
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
     fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
 
@@ -512,7 +536,7 @@ describe('DeckDetail validation tab', () => {
 
   it('sends the swap the user composed, and refetches what it invalidated', async () => {
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
     fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
     fireEvent.change(screen.getByRole('textbox'),
@@ -533,7 +557,7 @@ describe('DeckDetail validation tab', () => {
     vi.mocked(api.swapCard).mockRejectedValue(
       new Error("'Rhystic Study' identity {U} is outside the commander's {G}"))
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
     fireEvent.click(await screen.findByRole('button', { name: 'Use this card' }))
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'nope' } })
@@ -547,7 +571,7 @@ describe('DeckDetail validation tab', () => {
     // Accepting a suggestion means reading its rules text, and the shortlist
     // shows only art and a score. Same affordance as the decklist rows.
     renderUnfolded()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     openValidation()
     const art = await screen.findByAltText('Cultivator Colossus')
 
@@ -688,7 +712,7 @@ describe('DeckDetail stats tab', () => {
   async function openStats() {
     renderUnfolded()
     await screen.findByText(DECK.name)
-    fireEvent.click(screen.getByRole('button', { name: 'Stats' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Stats' }))
   }
 
   it('shows the opening-hand odds with their which-system caveat', async () => {
@@ -1016,9 +1040,16 @@ describe('DeckDetail graveyard', () => {
     renderUnfolded()
     await screen.findByText(/graveyard/i)
     const button = screen.getByRole('button', { name: 'Exile' })
+    // Armed and confirmed a second apart, because the two presses have to be
+    // two decisions — see `armThenConfirm`. Written out rather than using the
+    // helper so the arm can be caught in the act of having done nothing.
+    const at = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(at)
     fireEvent.click(button)
     expect(api.exileCard).not.toHaveBeenCalled()
+    clock.mockReturnValue(at + 1_000)
     fireEvent.click(button)
+    clock.mockRestore()
     await waitFor(() => expect(api.exileCard)
       .toHaveBeenCalledWith(REF, 'Nissa, Who Shakes the World'))
   })
@@ -1037,9 +1068,13 @@ describe('DeckDetail graveyard', () => {
     fireEvent.click(screen.getByRole('checkbox',
       { name: /choose primeval titan/i }))
     const sweep = screen.getByRole('button', { name: /entomb 1 selected/i })
+    const at = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(at)
     fireEvent.click(sweep)
     expect(api.entombCards).not.toHaveBeenCalled()
+    clock.mockReturnValue(at + 1_000)
     fireEvent.click(sweep)
+    clock.mockRestore()
     await waitFor(() => expect(api.entombCards)
       .toHaveBeenCalledWith(REF, ['Primeval Titan']))
     // Wait out the send-off and the re-read, so the deferred refresh cannot
@@ -1662,7 +1697,7 @@ describe('DeckDetail for a reader', () => {
     // renders for a reader. Only the Edit control goes.
     renderUnfolded()
     await screen.findByText('Goreclaw — Mono-Green Stompy')
-    fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
     expect(screen.queryByText('Edit')).toBeNull()
   })
 
@@ -2021,7 +2056,7 @@ describe('DeckDetail deck review', () => {
  */
 describe('deck history', () => {
   function openHistory() {
-    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'History' }))
   }
 
   it('is not fetched until the tab is opened', async () => {
@@ -2083,10 +2118,9 @@ describe('deck history', () => {
     await waitFor(() => expect(api.deckLog).toHaveBeenCalledTimes(1))
 
     // Any edit will do; `refresh` is what every one of them calls.
-    fireEvent.click(screen.getByRole('button', { name: 'The 99' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'The 99' }))
     fireEvent.click(screen.getByRole('button', { name: 'Entomb' }))
-    fireEvent.click(screen.getByRole('button', { name: /Primeval Titan/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Primeval Titan/ }))
+    armThenConfirm(screen.getByRole('button', { name: /Primeval Titan/ }))
     await waitFor(() => expect(api.entombCard).toHaveBeenCalled())
     await waitFor(() => expect(api.deckLog).toHaveBeenCalledTimes(2))
   })
@@ -2176,7 +2210,7 @@ describe('the tabs on a phone', () => {
    */
   it('wraps rather than running off the side', async () => {
     renderDeck()
-    const history = await screen.findByRole('button', { name: 'History' })
+    const history = await screen.findByRole('tab', { name: 'History' })
     const strip = history.parentElement
 
     expect(strip?.className).toContain('flex-wrap')
@@ -2190,7 +2224,7 @@ describe('the tabs on a phone', () => {
     // a gesture nobody is told about.
     for (const name of ['The 99', 'Stats', 'Validation', 'Notes', 'Artifacts',
       'History']) {
-      expect(screen.getByRole('button', { name }).parentElement).toBe(strip)
+      expect(screen.getByRole('tab', { name }).parentElement).toBe(strip)
     }
   })
 
@@ -2243,7 +2277,7 @@ describe('DeckDetail swap board', () => {
   it('offers an empty board to the owner, so there is somewhere to start one',
      async () => {
     renderDeck()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     expect(screen.queryByText(/Swap board/)).not.toBeNull()
   })
 
@@ -2251,7 +2285,7 @@ describe('DeckDetail swap board', () => {
     vi.mocked(api.deck).mockResolvedValue(
       { ...DECK, writable: false } as unknown as Deck)
     renderDeck()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     expect(screen.queryByText(/Swap board/)).toBeNull()
   })
 
@@ -2341,7 +2375,7 @@ describe('a deck somebody else owns', () => {
     vi.mocked(api.deck).mockResolvedValue(
       { ...DECK, writable: false } as unknown as Deck)
     renderDeck()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     // Named, so it is a fact about a person rather than a permission error.
     expect(screen.getByText(/This is aasquier’s deck, and you are reading it/))
       .toBeTruthy()
@@ -2352,7 +2386,7 @@ describe('a deck somebody else owns', () => {
 
   it('says nothing of the kind on your own deck', async () => {
     renderDeck()
-    await screen.findByRole('button', { name: 'Validation' })
+    await screen.findByRole('tab', { name: 'Validation' })
     expect(screen.queryByText(/you are reading it/)).toBeNull()
     expect(screen.getByText('Bulk entomb…')).toBeTruthy()
   })

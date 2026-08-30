@@ -1170,10 +1170,21 @@ export default function DeckDetail() {
           seen (commandment 2). Two rows show all six. Rather than a
           breakpoint, too: `sm:` has guessed Aaron's phone wrong before, and a
           strip that wraps is right at every width without anybody having to
-          have guessed one. `Coliseum` and `Admin` already wear this. */}
-      <div className="flex flex-wrap gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
+          have guessed one. `Coliseum` and `Admin` already wear this.
+
+          **And now the tablist semantics they wear too.** The class, the
+          `is-active` ink and the wrapping were shared; the half that says
+          *which tab you are on* was not, so this strip drew a highlight a
+          screen reader could not read and named no current tab at all
+          (commandment 20 — a control says which state it is in, and
+          commandment 2, because the newcomer most likely to need the answer
+          is the one least able to guess it). `Coliseum` is the shape being
+          copied here, down to the label on the list. */}
+      <div role="tablist" aria-label="This deck"
+           className="flex flex-wrap gap-1 border-b" style={{ borderColor: 'var(--hairline)' }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
+                  onClick={() => setTab(t.id)}
                   className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm font-medium${
                     tab === t.id ? ' is-active' : ''}`}>
             {t.label}

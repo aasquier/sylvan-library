@@ -177,6 +177,7 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
           {WINDOWS.map((w) => (
             <button key={w.key} type="button"
                     onClick={() => setSpan(w.key)}
+                    aria-pressed={span === w.key}
                     className={`chip-toggle rounded-md px-2.5 py-1 text-xs font-medium${
                       span === w.key ? ' is-on' : ''}`}>
               {w.label}
@@ -216,6 +217,7 @@ function ClaudePanel({ claude }: { claude: AdminClaude }) {
         {AXES.map((a) => (
           <button key={a.key} type="button"
                   onClick={() => setAxis(a.key)}
+                  aria-pressed={axis === a.key}
                   className={`chip-toggle rounded-md px-2.5 py-1 text-xs font-medium${
                     axis === a.key ? ' is-on' : ''}`}>
             {a.label}
