@@ -124,6 +124,12 @@ func (a *API) refuseWrite(w http.ResponseWriter, where string, err error) bool {
 	switch {
 	case library.IsReadOnly(err):
 		wire.Detail(w, http.StatusForbidden, err.Error())
+	// A refusal about the deck rather than about the caller, so it lands with
+	// `editRejected` on 422 rather than with ErrReadOnly on 403: the caller may
+	// own this deck outright and simply be asking for the one thing its tier
+	// cannot keep. See `library.ErrNoNightGames`.
+	case library.IsNoNightGames(err):
+		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.As(err, &rejected):
 		wire.Detail(w, http.StatusUnprocessableEntity, rejected.Error())
 	case deckedit.IsFailed(err):

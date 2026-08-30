@@ -40,6 +40,9 @@ function deck(overrides: Partial<DeckTile> & { slug: string }): DeckTile {
     themes: [],
     archetype: null,
     shared: true,
+    // Out of the night games by default, which is what every deck is until
+    // somebody visits the settings room and says otherwise.
+    coliseum_at_night: false,
     showcase: true,
     status: 'built',
     stage: 'curated',

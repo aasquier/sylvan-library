@@ -26,6 +26,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { ClaudeStatus } from '../lib/api'
 import { CLEARING_HINT, ClearingNote } from './clearing'
 import { presetLabel } from '../lib/claudecopy'
@@ -167,6 +168,26 @@ export function SettingsMenu({ theme, onToggleTheme }: {
                     on={clearing.on} onChange={clearing.toggle} />
           )}
           {!clearing.offered && !clearing.homescreen && <ClearingNote />}
+          {/* The door to the decks' own settings.
+              **A real destination, so a real link** (commandment 20): every
+              other row in this panel changes something here and is a button
+              for that reason; this one leaves. It closes the panel on the way
+              out, because a popup left standing over the page you just asked
+              for is a popup you have to dismiss before you can read it. */}
+          <div className="mt-2 border-t pt-2" style={{ borderColor: 'var(--hairline)' }}>
+            <Link to="/settings" onClick={() => setOpen(false)}
+                  className="menu-row flex w-full items-center gap-3 rounded-md px-1.5 py-1.5 text-left">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-medium"
+                      style={{ color: 'var(--text-primary)' }}>Your decks</span>
+                <span className="block text-[11px]"
+                      style={{ color: 'var(--text-muted)' }}>
+                  Who can read each one, and the arena after dark.
+                </span>
+              </span>
+              <span aria-hidden style={{ color: 'var(--text-muted)' }}>›</span>
+            </Link>
+          </div>
           {claude && status && (
             <div className="mt-2 border-t pt-2"
                  style={{ borderColor: 'var(--hairline)' }}>

@@ -376,6 +376,21 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodPost, Pattern: "/api/decks/import", Handler: a.importDeck},
 		{Method: http.MethodDelete, Pattern: "/api/decks/{owner}/{slug}", Handler: a.deleteDeck},
 		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/shared", Handler: a.setDeckShared},
+		// The night games' standing consent, one deck at a time. Its own route
+		// beside `shared` rather than a `field` on the PATCH, for the reason
+		// `shared` has one: the tiers do not agree about where this fact lives
+		// -- and here they do not agree about whether it can live at all, so
+		// the source is again what knows.
+		{Method: http.MethodPut, Pattern: "/api/decks/{owner}/{slug}/coliseum-at-night",
+			Handler: a.setDeckColiseumAtNight},
+		// The two master switches: every deck the caller owns, in one press.
+		// **No owner segment on either**, like the crypt below and the two
+		// collection routes above -- your shelf is yours, so there is no path
+		// anybody can write that names somebody else's. Each loops the
+		// single-deck verb rather than issuing a bulk write of its own.
+		{Method: http.MethodPut, Pattern: "/api/decks/shared", Handler: a.setEveryDeckShared},
+		{Method: http.MethodPut, Pattern: "/api/decks/coliseum-at-night",
+			Handler: a.setEveryDeckColiseumAtNight},
 		// The crypt, which is the delete's other half (ADR 27's shape, at the
 		// deck level at last): what this caller has entombed, and the way one
 		// comes back. **No owner segment on either**, like the two collection

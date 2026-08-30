@@ -50,6 +50,11 @@ var writeRoutes = []struct{ method, suffix, payload string }{
 	{"PUT", "/notes/plan", `{"value":"a note"}`},
 	{"DELETE", "", `{"confirm":"gyome"}`},
 	{"PUT", "/shared", `{"shared":true}`},
+	// The night games' flag. It is here for the 404 sweeps rather than for its
+	// own sake: whether a deck can *hold* this flag is the tier's business and
+	// is answered elsewhere, but "there is no such deck" and "that deck is not
+	// yours" must answer identically on this route and on the ten above it.
+	{"PUT", "/coliseum-at-night", `{"coliseum_at_night":true}`},
 }
 
 // **A deck that is not there is a 404 on every route, never a 500.** The

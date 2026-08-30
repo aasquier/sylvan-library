@@ -18,8 +18,9 @@ import (
 
 // The write side of a Source.
 //
-// Five verbs, grouped in three families on purpose. `WriteText` belongs to
-// the eleven editing routes; `Create`, `Delete` and `SetShared` to the
+// Six verbs, grouped in three families on purpose. `WriteText` belongs to
+// the eleven editing routes; `Create`, `Delete`, `SetShared` and
+// `SetColiseumAtNight` to the
 // lifecycle, because an update and a create have opposite safety
 // requirements -- an update to a deck that has vanished is a bug, a create
 // over a deck that exists destroys somebody's work -- and a method that exists
@@ -69,6 +70,31 @@ type ErrExists struct{ Slug string }
 
 func (e ErrExists) Error() string { return "a deck called '" + e.Slug + "' already exists" }
 
+// ErrNoNightGames is the refusal from a tier that has nowhere to keep the
+// night-games flag, and it is deliberately **not** ErrReadOnly: the caller may
+// well own this deck and be able to change everything else about it, so
+// answering "not yours to change" would be false. The route layer turns it
+// into a 422 -- a refusal about the deck rather than about the caller.
+//
+// It exists because the flag is stored in one place only (rung 13's column),
+// which was Aaron's ruling and is argued at `Deck.ColiseumAtNight`: the file
+// tier has no row, so this is the honest answer rather than a second store
+// invented to avoid giving it. The sentence names no machinery, per
+// commandment 10 -- a player reads it, and what a player needs to know is
+// that the gate is not open to these decks, not why.
+type ErrNoNightGames struct{ Slug string }
+
+func (e ErrNoNightGames) Error() string {
+	return "the showcase decks keep to daylight for now — the night gate opens to players' own decks first"
+}
+
+// IsNoNightGames lets the route layer pick a status without knowing which
+// tier answered, like IsReadOnly and IsNotFound below.
+func IsNoNightGames(err error) bool {
+	var e ErrNoNightGames
+	return errors.As(err, &e)
+}
+
 // Writer is the write half of a Source. Sources implement it; the interface is
 // separate so a handler that only reads cannot accidentally hold one.
 type Writer interface {
@@ -86,6 +112,15 @@ type Writer interface {
 	// tiers keep this fact in different places -- `deck.yaml` here, a column
 	// there -- and a caller should not have to know which.
 	SetShared(ctx context.Context, slug string, shared bool) error
+	// SetColiseumAtNight enters the deck for the night games, or withdraws it.
+	//
+	// Beside SetShared and shaped like it, with one deliberate difference: the
+	// two tiers do **not** keep this fact in two places, because it is kept in
+	// one and the other tier refuses (ErrNoNightGames). The verb still belongs
+	// on the interface rather than only on SQLSource -- a caller holding a
+	// Writer should get a refusal it can render, not a type assertion it has
+	// to remember to write.
+	SetColiseumAtNight(ctx context.Context, slug string, night bool) error
 	// WriteArtifacts stores a build's output and says what was stored.
 	//
 	// Rendered text rather than a deck, because generating and storing are
@@ -334,6 +369,33 @@ func (f *FileSource) SetShared(ctx context.Context, slug string, shared bool) er
 	return writeAtomically(path, updated)
 }
 
+// SetColiseumAtNight refuses, and the refusal is the design rather than a gap
+// waiting to be filled in.
+//
+// This tier's truth is `deck.yaml`, and the night-games flag is deliberately
+// not in it (see `Deck.ColiseumAtNight`). Writing one here would mean adding a
+// key to hand-written files for a feature that does not exist yet, and would
+// put it into every export of a deck that is not even the owner's to enter.
+// So the honest answer is that these decks cannot be entered, and the UI is
+// expected to say so before anybody presses anything -- this is the backstop,
+// not the message.
+//
+// **Writability is checked first**, so the answer does not depend on whether
+// the deck is there: the tier's standing order, and the same ordering
+// `WriteArtifacts` keeps and for the same reason.
+func (f *FileSource) SetColiseumAtNight(ctx context.Context, slug string, _ bool) error {
+	if !f.writable {
+		return ErrReadOnly{Slug: slug}
+	}
+	// The deck still has to exist. A refusal about a deck that is not there
+	// would be a 422 where every other verb answers 404, and "this deck cannot
+	// be entered" is a strange thing to hear about a deck nobody has.
+	if _, err := f.path(slug); err != nil {
+		return err
+	}
+	return ErrNoNightGames{Slug: slug}
+}
+
 // ---- the SQL tier ----------------------------------------------------------
 
 // WriteText stores the deck's YAML and re-derives the column that summarises
@@ -466,6 +528,33 @@ func (s *SQLSource) SetShared(ctx context.Context, slug string, shared bool) err
 	return nil
 }
 
+// SetColiseumAtNight enters this deck for the night games, or withdraws it.
+// The owner's call alone, like SetShared above.
+//
+// **`updated_at` moves.** It is the owner changing something about their own
+// deck, and the column means "when did this row last change" rather than "when
+// did the 99 last change" -- `SetShared` has always moved it for the same
+// reason, and the two must not disagree about what that timestamp is for.
+func (s *SQLSource) SetColiseumAtNight(ctx context.Context, slug string, night bool) error {
+	if !s.writable || s.write == nil {
+		return ErrReadOnly{Slug: slug}
+	}
+	r, err := s.row(ctx, slug)
+	if err != nil {
+		return err
+	}
+	flag := 0
+	if night {
+		flag = 1
+	}
+	if _, err := s.write.ExecContext(ctx,
+		"UPDATE user_decks SET coliseum_at_night = ?, updated_at = ? WHERE id = ?",
+		flag, nowISO(), r.id); err != nil {
+		return fmt.Errorf("enter deck %q for the night games: %w", slug, err)
+	}
+	return nil
+}
+
 // WriteArtifacts replaces this deck's rows in `user_deck_artifacts`.
 //
 // Deleted then inserted, in one transaction, so a rebuild leaves exactly what
@@ -561,6 +650,19 @@ func (v *SharedOnly) Delete(ctx context.Context, slug string) (string, error) {
 }
 
 func (v *SharedOnly) SetShared(ctx context.Context, slug string, _ bool) error {
+	if err := v.visible(ctx, slug); err != nil {
+		return err
+	}
+	return ErrReadOnly{Slug: slug}
+}
+
+// SetColiseumAtNight refuses as ErrReadOnly rather than ErrNoNightGames, and
+// the order matters: whose deck this is comes first. Entering somebody else's
+// deck for the night games is not a thing this caller may do regardless of
+// which tier is underneath, so answering "these decks cannot be entered" would
+// describe the wrong obstacle -- and on a deck they cannot see at all,
+// `visible` has already made it a 404.
+func (v *SharedOnly) SetColiseumAtNight(ctx context.Context, slug string, _ bool) error {
 	if err := v.visible(ctx, slug); err != nil {
 		return err
 	}

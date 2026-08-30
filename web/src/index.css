@@ -5188,6 +5188,33 @@ button:hover .tarot-fan-card {
 .chip-toggle:disabled:active {
   transform: none;
 }
+/* **A half-lit switch, for a shelf that is half one thing and half the other.**
+ *
+ * `.is-on` is the answer to a yes/no chip and there is a third answer a master
+ * switch has to give: *some*. The settings room's two master controls govern
+ * every deck at once, and "some of them" is the ordinary state of a library
+ * before anybody has visited that page — so a control that could only draw on
+ * or off would have to misdraw the common case.
+ *
+ * Literally half-filled rather than dimmed, and that is the whole design: a
+ * weaker wash reads as "on, but tired" and this has to read as "partly". The
+ * gradient stops hard at the midpoint so the eye sees two halves rather than a
+ * fade, and the edge stays the vine's at full strength because the chip *is*
+ * lit — it is its contents that are divided. `aria-pressed="mixed"` carries
+ * the same fact to a reader who sees none of this. */
+.chip-toggle.is-part {
+  color: var(--text-primary);
+  border-color: var(--vine);
+  background: linear-gradient(105deg,
+    color-mix(in srgb, var(--vine) 20%, transparent) 0 50%,
+    transparent 50% 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vine) 18%, transparent);
+}
+.chip-toggle.is-part:hover:not(:disabled) {
+  background: linear-gradient(105deg,
+    color-mix(in srgb, var(--vine) 28%, transparent) 0 50%,
+    color-mix(in srgb, var(--text-primary) 6%, transparent) 50% 100%);
+}
 /* The floor is the finger, not the pointer. These sit at 30px, which is fine
  * under a mouse and under the 44px target a thumb needs. */
 @media (pointer: coarse) {
@@ -18244,4 +18271,48 @@ button:hover .tarot-fan-card {
   border-color: var(--vine);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--vine) 35%, transparent);
   outline: none;
+}
+
+/* ---------------------------------------------------- the settings room ---
+ *
+ * **A torch that has not been lit yet.**
+ *
+ * The Coliseum at Night panel promises something that does not happen tonight,
+ * and the panel has to carry that without a paragraph of apology: a warm ember
+ * gathers along its lower edge, breathes once every nine seconds, and never
+ * reaches flame. Slow and dim on purpose — a bright flicker would read as the
+ * feature running, which is the one thing this room must not imply.
+ *
+ * Drawn on a pseudo-element rather than on the panel, so the animation cannot
+ * touch anything the panel contains, and `pointer-events: none` so a glow can
+ * never take a press meant for the switch sitting on top of it. */
+.settings-night {
+  position: relative;
+  overflow: hidden;
+}
+.settings-night::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 56%;
+  pointer-events: none;
+  background: radial-gradient(120% 100% at 50% 130%,
+    color-mix(in srgb, #f0a24a 26%, transparent) 0%,
+    color-mix(in srgb, #b4541a 12%, transparent) 42%,
+    transparent 72%);
+  opacity: 0.5;
+  animation: settings-ember 9s ease-in-out infinite;
+}
+@keyframes settings-ember {
+  0%, 100% { opacity: 0.34; transform: translateY(2px) scaleY(0.96); }
+  50%      { opacity: 0.62; transform: translateY(0) scaleY(1.04); }
+}
+/* The system asked for stillness, so the ember holds its middle value rather
+ * than disappearing: the panel keeps the warmth that tells it apart from the
+ * sharing panel beside it, and only the breathing stops. */
+@media (prefers-reduced-motion: reduce) {
+  .settings-night::after {
+    animation: none;
+    opacity: 0.48;
+  }
 }

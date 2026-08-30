@@ -455,6 +455,322 @@ func TestAnotherAccountsPrivateDeckIsA404ToEveryLifecycleVerb(t *testing.T) {
 	}
 }
 
+// ---- the night games -------------------------------------------------------
+
+// nightOf reads one of bob's decks' night flag back through the read route, so
+// the assertions below check what a browser would be told rather than what the
+// write route said about itself.
+//
+// Bob's, and read as bob, like `sharedOf` below: his are the only decks in the
+// fixture that can hold this flag at all -- alice is the maintainer, so hers
+// are the file tier's.
+func nightOf(t *testing.T, rig *writeRig, slug string) bool {
+	t.Helper()
+	status, body, raw := rig.do(t, bob, "GET", "/api/decks/bob/"+slug, "")
+	if status != 200 {
+		t.Fatalf("reading bob/%s back: %d %s", slug, status, raw)
+	}
+	night, ok := body["coliseum_at_night"].(bool)
+	if !ok {
+		t.Fatalf("the deck does not say whether it is entered for the night games: %s", raw)
+	}
+	return night
+}
+
+// The owner enters their own deck and the answer is the deck, saying so.
+//
+// Bob rather than alice, and that is the whole reason this rig has two
+// accounts: alice is the maintainer, so her decks are the file tier's, which
+// has nowhere to keep this flag (the test below drives that). Bob's are the
+// only decks in the fixture that can actually hold it.
+func TestEnteringADeckForTheNightGamesAnswersWithTheDeck(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	if nightOf(t, rig, "bobs-private") {
+		t.Fatal("a deck is entered for the night games before anybody asked")
+	}
+	status, body, raw := rig.do(t, bob, "PUT",
+		"/api/decks/bob/bobs-private/coliseum-at-night", `{"coliseum_at_night":true}`)
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if body["coliseum_at_night"] != true || body["slug"] == nil {
+		t.Errorf("the answer should be the whole deck, entered: %s", raw)
+	}
+	if !nightOf(t, rig, "bobs-private") {
+		t.Error("the deck did not stay entered")
+	}
+
+	// And withdrawing puts it back.
+	if status, _, raw = rig.do(t, bob, "PUT",
+		"/api/decks/bob/bobs-private/coliseum-at-night", `{"coliseum_at_night":false}`); status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if nightOf(t, rig, "bobs-private") {
+		t.Error("the deck did not come back out of the night games")
+	}
+}
+
+// **The two flags are not the same switch.** They sit in adjacent columns of
+// the same shape, they are written by two routes built from one shape, and the
+// settings page shows them side by side -- so an UPDATE naming the wrong
+// column would look completely correct until somebody's private deck went on
+// display because they entered it for the night games.
+func TestTheNightFlagAndSharingDoNotTouchEachOther(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	status, _, raw := rig.do(t, bob, "PUT",
+		"/api/decks/bob/bobs-private/coliseum-at-night", `{"coliseum_at_night":true}`)
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	_, body, raw := rig.do(t, bob, "GET", "/api/decks/bob/bobs-private", "")
+	if body["shared"] != false {
+		t.Errorf("entering a private deck for the night games put it on display: %s", raw)
+	}
+
+	// And the other way round: sharing must not enter anything.
+	if status, _, raw = rig.do(t, bob, "PUT",
+		"/api/decks/bob/bobs-public/shared", `{"shared":false}`); status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if nightOf(t, rig, "bobs-public") {
+		t.Error("taking a deck off display entered it for the night games")
+	}
+}
+
+func TestEnteringTheNightGamesNeedsTheFlag(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	status, body, raw := rig.do(t, bob, "PUT",
+		"/api/decks/bob/bobs-private/coliseum-at-night", `{}`)
+	if status != 422 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if body["detail"] != "coliseum_at_night is required" {
+		t.Errorf("detail is %v", body["detail"])
+	}
+}
+
+// ADR 5 again, on the new route: bob's private deck is absent from alice's
+// source, so this is a 404 and not a 403 -- a 403 would confirm it exists.
+// The deck she *can* see and does not own is the other answer.
+func TestTheNightRouteKeepsADR5(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	if status, _, raw := rig.do(t, alice, "PUT",
+		"/api/decks/bob/bobs-private/coliseum-at-night",
+		`{"coliseum_at_night":true}`); status != 404 {
+		t.Errorf("bob's private deck answered alice %d, not 404: %s", status, raw)
+	}
+	if status, _, raw := rig.do(t, alice, "PUT",
+		"/api/decks/bob/bobs-public/coliseum-at-night",
+		`{"coliseum_at_night":true}`); status != 403 {
+		t.Errorf("bob's shared deck answered alice %d, not 403: %s", status, raw)
+	}
+	// Neither refusal wrote anything.
+	if nightOf(t, rig, "bobs-private") || nightOf(t, rig, "bobs-public") {
+		t.Error("a refused request entered a deck anyway")
+	}
+}
+
+// The file tier refuses, and refuses as a fact about the deck rather than
+// about the caller: alice owns these decks outright and may change everything
+// else about them, so a 403 saying "not yours to change" would be false.
+//
+// **This is the shape of the gap Aaron should know about**, not a bug: the
+// flag lives in one place, the file tier has no row in it, and the maintainer's
+// own decks are the file tier's. The settings page is expected to say so
+// before anybody presses anything; this proves the server does not lie if they
+// do.
+func TestTheFileTierCannotEnterTheNightGamesAndSaysWhy(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	before := rig.text(t)
+	status, body, raw := rig.do(t, alice, "PUT",
+		"/api/decks/alice/mono-green-clean/coliseum-at-night", `{"coliseum_at_night":true}`)
+	if status != 422 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	detail, _ := body["detail"].(string)
+	if !strings.Contains(detail, "night gate") {
+		t.Errorf("the refusal should say the gate is shut, in words a player reads: %q", detail)
+	}
+	// Commandment 10: the sentence a player is shown names nothing underneath.
+	for _, leak := range []string{"column", "row", "SQL", "sqlite", "database", "table"} {
+		if strings.Contains(strings.ToLower(detail), strings.ToLower(leak)) {
+			t.Errorf("the refusal names %q to a player: %q", leak, detail)
+		}
+	}
+	if rig.text(t) != before {
+		t.Error("a refused entry rewrote the deck file")
+	}
+}
+
+// ---- the master switches ---------------------------------------------------
+
+// The master control's whole job, driven rather than described: bob's shelf
+// starts **mixed** -- one shared, one not -- and one press makes it uniform.
+//
+// Mixed is the interesting starting state and the reason the master is a
+// three-state control rather than a checkbox: a switch that could only be read
+// as on or off would have to lie about this shelf before anybody touched it.
+func TestTheMasterSwitchTakesAMixedShelfToAllOn(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	// The fixture's shelf: bobs-public shared, bobs-private not. Asserted
+	// rather than assumed -- if the fixture ever stops being mixed, this test
+	// stops testing what it says it tests and nothing else would notice.
+	if !sharedOf(t, rig, "bobs-public") || sharedOf(t, rig, "bobs-private") {
+		t.Fatal("the fixture shelf is no longer mixed, so this test proves nothing")
+	}
+
+	status, body, raw := rig.do(t, bob, "PUT", "/api/decks/shared", `{"shared":true}`)
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if body["shared"] != true {
+		t.Errorf("the receipt should say what was asked for: %s", raw)
+	}
+	// Two, not three: the deleted deck is not on the shelf and must not be
+	// counted, woken or written.
+	if body["changed"] != float64(2) {
+		t.Errorf("changed is %v, want 2 -- the crypt is not part of the shelf: %s",
+			body["changed"], raw)
+	}
+	if !sharedOf(t, rig, "bobs-public") || !sharedOf(t, rig, "bobs-private") {
+		t.Error("the master switch did not reach every deck")
+	}
+
+	// And off takes all of them off, from uniform rather than from mixed.
+	if status, _, raw = rig.do(t, bob, "PUT", "/api/decks/shared", `{"shared":false}`); status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if sharedOf(t, rig, "bobs-public") || sharedOf(t, rig, "bobs-private") {
+		t.Error("the master switch left a deck on display")
+	}
+}
+
+// The same for the night games, which start uniformly off -- so the assertion
+// that matters is that one press reaches every deck rather than the first.
+func TestTheMasterSwitchEntersEveryDeckForTheNightGames(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	status, body, raw := rig.do(t, bob, "PUT",
+		"/api/decks/coliseum-at-night", `{"coliseum_at_night":true}`)
+	if status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if body["coliseum_at_night"] != true || body["changed"] != float64(2) {
+		t.Errorf("the receipt is wrong: %s", raw)
+	}
+	if !nightOf(t, rig, "bobs-public") || !nightOf(t, rig, "bobs-private") {
+		t.Error("the master switch did not enter every deck")
+	}
+	// Sharing is untouched by the sweep, the same way it is untouched by the
+	// single-deck write.
+	if sharedOf(t, rig, "bobs-private") {
+		t.Error("the night sweep put a private deck on display")
+	}
+
+	if status, _, raw = rig.do(t, bob, "PUT",
+		"/api/decks/coliseum-at-night", `{"coliseum_at_night":false}`); status != 200 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if nightOf(t, rig, "bobs-public") || nightOf(t, rig, "bobs-private") {
+		t.Error("the master switch left a deck entered")
+	}
+}
+
+// **The master switch reaches the caller's shelf and stops there.** It takes no
+// owner segment precisely so that no path can name somebody else's library --
+// this drives the guarantee rather than trusting the route's shape, because a
+// handler that resolved `Visible` without filtering on writability would serve
+// the same URL and quietly publish every deck alice can see.
+func TestTheMasterSwitchTouchesNobodyElsesDecks(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+
+	if status, _, raw := rig.do(t, alice, "PUT",
+		"/api/decks/shared", `{"shared":false}`); status != 200 {
+		t.Fatalf("alice's own sweep: %d %s", status, raw)
+	}
+	// Alice's sweep ran over the file tier, which is hers. Bob's shelf is
+	// exactly as it was.
+	if !sharedOf(t, rig, "bobs-public") {
+		t.Error("alice's master switch took bob's deck off display")
+	}
+	if sharedOf(t, rig, "bobs-private") {
+		t.Error("alice's master switch put bob's private deck on display")
+	}
+}
+
+func TestTheMasterSwitchNeedsTheFlag(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	for _, c := range []struct{ target, want string }{
+		{"/api/decks/shared", "shared is required"},
+		{"/api/decks/coliseum-at-night", "coliseum_at_night is required"},
+	} {
+		status, body, raw := rig.do(t, bob, "PUT", c.target, `{}`)
+		if status != 422 {
+			t.Errorf("%s answered %d, not 422: %s", c.target, status, raw)
+			continue
+		}
+		if body["detail"] != c.want {
+			t.Errorf("%s said %v, want %q", c.target, body["detail"], c.want)
+		}
+	}
+}
+
+// The night sweep over a shelf that cannot hold the flag refuses, and refuses
+// **before writing anything** -- the file tier's first deck is where it stops,
+// so there is no half-entered library to explain.
+func TestTheNightSweepRefusesAShelfThatCannotHoldIt(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	before := rig.text(t)
+	status, body, raw := rig.do(t, alice, "PUT",
+		"/api/decks/coliseum-at-night", `{"coliseum_at_night":true}`)
+	if status != 422 {
+		t.Fatalf("%d %s", status, raw)
+	}
+	if detail, _ := body["detail"].(string); !strings.Contains(detail, "night gate") {
+		t.Errorf("the sweep's refusal should be the tier's own sentence: %q", detail)
+	}
+	if rig.text(t) != before {
+		t.Error("a refused sweep rewrote a deck file")
+	}
+}
+
+// sharedOf reads a deck's `shared` back through the read route, as its owner.
+func sharedOf(t *testing.T, rig *writeRig, slug string) bool {
+	t.Helper()
+	status, body, raw := rig.do(t, bob, "GET", "/api/decks/bob/"+slug, "")
+	if status != 200 {
+		t.Fatalf("reading bob/%s back: %d %s", slug, status, raw)
+	}
+	shared, ok := body["shared"].(bool)
+	if !ok {
+		t.Fatalf("the deck does not say whether it is shared: %s", raw)
+	}
+	return shared
+}
+
 // lineDiff is the lines in `after` that were not in `before`.
 func lineDiff(before, after string) []string {
 	had := map[string]int{}

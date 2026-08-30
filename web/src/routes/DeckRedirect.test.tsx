@@ -24,7 +24,8 @@ const { api } = await import('../lib/api')
 function tile(owner: string, slug: string): DeckTile {
   return {
     owner, slug, name: `${owner}/${slug}`, shared: true,
-  pilot: '', showcase: false,
+    coliseum_at_night: false,
+    pilot: '', showcase: false,
     status: 'built', stage: 'curated', writable: false, needs_rationale: 0,
     commander: [], companion: null, bracket: null, themes: [], archetype: null,
     total_cards: 99,

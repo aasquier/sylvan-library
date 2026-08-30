@@ -205,8 +205,8 @@ func TestMigrateLeavesTheFileInWAL(t *testing.T) {
 	}
 }
 
-// The embedded ladder has exactly SchemaVersion rungs: a 13th file lying
-// beside a version of 12 would otherwise sit there unapplied, looking
+// The embedded ladder has exactly SchemaVersion rungs: a 14th file lying
+// beside a version of 13 would otherwise sit there unapplied, looking
 // landed.
 func TestTheEmbeddedLadderIsExactlyTheVersion(t *testing.T) {
 	t.Parallel()
@@ -217,5 +217,123 @@ func TestTheEmbeddedLadderIsExactlyTheVersion(t *testing.T) {
 	if len(entries) != SchemaVersion {
 		t.Fatalf("%d files under migrations/ beside SchemaVersion %d",
 			len(entries), SchemaVersion)
+	}
+}
+
+// Rung 13 lands on a shelf that is already full, which is the only thing about
+// it that could go wrong on the deployed volume.
+//
+// `TestMigrateClimbsFromEveryRung` above proves the *schema* arrives from any
+// starting point, and it proves it against empty files. This asks the question
+// that matters to somebody who already owns decks: the ladder runs at boot
+// (ADR 23), so the first instance to see this rung has rows in `user_decks`
+// before the column exists -- and every one of them must come out the other
+// side entered for nothing. An opt-in that defaulted to opted-in would enter
+// somebody's whole library in a feature they never chose, which is the one
+// failure this flag must not have.
+func TestRungThirteenLeavesExistingDecksOutOfTheNightGames(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "app.db")
+	buildAtRung(t, path, 12)
+
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	now := "2026-08-30T12:00:00+00:00"
+	if _, err := db.Exec(
+		`INSERT INTO users (id, username, created_at) VALUES (1, 'aaron', ?)`, now); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	// One shared and one private, so the new column cannot be confused with
+	// the old one by a rung that copied the wrong default across.
+	if _, err := db.Exec(
+		`INSERT INTO user_decks (owner_id, slug, name, yaml, shared, created_at, updated_at)
+		 VALUES (1, 'gyome', 'Gyome', 'name: Gyome', 1, ?, ?),
+		        (1, 'arahbo', 'Arahbo', 'name: Arahbo', 0, ?, ?)`,
+		now, now, now, now); err != nil {
+		t.Fatalf("seed decks: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close before migrating: %v", err)
+	}
+
+	if err := Migrate(path); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	db, err = sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	rows, err := db.Query(
+		"SELECT slug, shared, coliseum_at_night FROM user_decks ORDER BY slug")
+	if err != nil {
+		t.Fatalf("the column the rung adds is not there: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+	seen := map[string]int{}
+	for rows.Next() {
+		var slug string
+		var shared, night int
+		if err := rows.Scan(&slug, &shared, &night); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		if night != 0 {
+			t.Errorf("%s came up the ladder already entered for the night games", slug)
+		}
+		seen[slug] = shared
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows: %v", err)
+	}
+	// The decks that were there are still there, wearing what they wore. A
+	// rung that dropped and rebuilt the table would pass every assertion above
+	// and fail this one.
+	if len(seen) != 2 || seen["gyome"] != 1 || seen["arahbo"] != 0 {
+		t.Errorf("the rung disturbed the decks it climbed past: %v", seen)
+	}
+}
+
+// The flag is writable once the rung has run, and writing it does not disturb
+// the flag beside it. Two columns of the same shape on one table is exactly
+// where an UPDATE lands on the wrong one, and nothing above would notice.
+func TestRungThirteenGivesTheNightFlagItsOwnColumn(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "app.db")
+	if err := Migrate(path); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	now := "2026-08-30T12:00:00+00:00"
+	if _, err := db.Exec(
+		`INSERT INTO users (id, username, created_at) VALUES (1, 'aaron', ?)`, now); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO user_decks (id, owner_id, slug, name, yaml, shared, created_at, updated_at)
+		 VALUES (1, 1, 'gyome', 'Gyome', 'name: Gyome', 1, ?, ?)`, now, now); err != nil {
+		t.Fatalf("seed deck: %v", err)
+	}
+	if _, err := db.Exec(
+		"UPDATE user_decks SET coliseum_at_night = 1 WHERE id = 1"); err != nil {
+		t.Fatalf("entering the deck for the night games: %v", err)
+	}
+	var shared, night int
+	if err := db.QueryRow(
+		"SELECT shared, coliseum_at_night FROM user_decks WHERE id = 1").
+		Scan(&shared, &night); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if night != 1 {
+		t.Errorf("the night flag did not stick: %d", night)
+	}
+	if shared != 1 {
+		t.Errorf("entering the night games changed who can see the deck: shared = %d", shared)
 	}
 }

@@ -29,6 +29,7 @@ const Import = lazy(() => import('./routes/Import'))
 const Learn = lazy(() => import('./routes/Learn'))
 const NewDeck = lazy(() => import('./routes/NewDeck'))
 const Research = lazy(() => import('./routes/Research'))
+const Settings = lazy(() => import('./routes/Settings'))
 const Simulator = lazy(() => import('./routes/Simulator'))
 
 // Every entry carries a `hint`, rendered as the link's `title`: the labels
@@ -482,6 +483,13 @@ export default function App() {
           <Route path="/colors/:slug" element={<ColorPage />} />
           <Route path="/colors" element={<Navigate to="/learn?tab=colors" replace />} />
           <Route path="/claude" element={<AboutClaude />} />
+          {/* The per-deck decisions the header's gear could not hold: who may
+              read each deck, and whether it goes to the arena after dark. The
+              gear keeps the preferences that are about the person; this room
+              keeps the ones that are about their decks, because a row per deck
+              is a list and a list does not belong in a popup that closes on a
+              stray click. `routes/Settings.tsx` argues the split. */}
+          <Route path="/settings" element={<Settings />} />
           {/* Declared unconditionally. A non-admin who types the URL gets the
               page's own 403 from the API rather than the catch-all's "nothing
               here", which is the more honest of the two answers. */}

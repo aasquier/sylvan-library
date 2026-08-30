@@ -1,8 +1,8 @@
--- app.db's recorded schema at version 12: what the ladder under
+-- app.db's recorded schema at version 13: what the ladder under
 -- go/internal/auth/migrations/ builds, read back out of sqlite_master.
 -- TestMigrateBuildsTheRecordedSchema holds auth.Migrate to these bytes,
 -- so a new rung updates this record in the same change. Do not hand-edit.
-PRAGMA user_version = 12;
+PRAGMA user_version = 13;
 CREATE TABLE auth_tokens (
         -- The hash of the token, for the same reason `sessions` stores one:
         -- reading this file must not hand over a live credential, and an
@@ -181,7 +181,7 @@ CREATE TABLE user_decks (
         deleted_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
-    );
+    , coliseum_at_night INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE "users" (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -200,6 +200,9 @@ CREATE INDEX sessions_by_user ON sessions(user_id);
 CREATE INDEX sim_cache_by_use ON sim_cache(last_used_at);
 CREATE INDEX user_decks_by_owner
         ON user_decks(owner_id) WHERE deleted_at IS NULL;
+CREATE INDEX user_decks_coliseum_at_night
+        ON user_decks(coliseum_at_night)
+        WHERE coliseum_at_night = 1 AND deleted_at IS NULL;
 CREATE INDEX user_decks_shared
         ON user_decks(shared) WHERE shared = 1 AND deleted_at IS NULL;
 CREATE UNIQUE INDEX user_decks_slug

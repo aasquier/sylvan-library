@@ -65,10 +65,22 @@ In order:
    (reproducible), the simulator (seeded measurement), and Claude's slot
    argument (an opinion, ADR 25). The three problems to solve first are
    recorded in git history with the original design.
-5. **Open deck rulings**: two banned cards still need replacements chosen
+5. **Coliseum at Night**: the arena running matches after dark, unattended,
+   over the decks whose owners entered them. **The consent is already
+   collected** — the settings room (`/settings`) carries the per-deck flag
+   and a master switch for the whole shelf, so the first night can be played
+   with decks somebody chose rather than with whatever the library held. What
+   is left is the whole feature: what a night run *is* (how many games, which
+   pairings, on whose schedule), where the results land, and how a player
+   reads them in the morning. Two facts to design around rather than
+   rediscover: the flag lives only where a player's own decks live, so the
+   showcase cannot be entered and the room says so; and Forge wants 2.3–2.5
+   cores for one match, which is the constraint that decides how many games a
+   night can hold on this machine.
+6. **Open deck rulings**: two banned cards still need replacements chosen
    (Goreclaw's is deliberate — the live invalid example stays). Deck facts
    are volume facts; verify before acting.
-6. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
+7. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
    (secret scanning, push protection), uptime watching, the wrong-painter
    credit (needs a pool schema change and a refresh), cache-write tokens
    (schema v11), the phone's touch targets, region-scoped motion (Syr

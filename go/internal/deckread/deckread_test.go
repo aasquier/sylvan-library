@@ -223,6 +223,7 @@ func TestTheDeckPayloadKeepsTheRecordedKeyOrder(t *testing.T) {
 	}
 	want := []string{
 		"commander_art", "slug", "name", "writable", "owner", "shared",
+		"coliseum_at_night",
 		"pilot", "status", "stage", "needs_rationale", "commander",
 		"companion", "bracket", "archetype", "themes", "strategy", "notes",
 		"total_cards", "land_count", "color_identity", "commander_card",

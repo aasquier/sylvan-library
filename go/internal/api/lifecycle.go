@@ -908,6 +908,161 @@ func (a *API) setDeckShared(w http.ResponseWriter, r *http.Request) {
 	a.getDeck(w, r)
 }
 
+// ---- the night games -------------------------------------------------------
+
+// setDeckColiseumAtNight is
+// `PUT /api/decks/{owner}/{slug}/coliseum-at-night`: the owner entering one
+// deck for the games the arena will run after dark, or withdrawing it.
+//
+// **Nothing schedules anything on the strength of this yet**, and the route
+// exists anyway because consent recorded in advance is the only kind worth
+// having here: the first night has to be played with decks whose owners chose
+// them. The copy on the settings page carries that honestly; this route just
+// records the answer.
+//
+// Shaped on `setDeckShared` above, refusal for refusal, with one addition it
+// does not have: a tier with nowhere to keep this answers ErrNoNightGames,
+// which is a 422 rather than a 403 because it is a fact about the deck and not
+// about the caller (`library.ErrNoNightGames`).
+func (a *API) setDeckColiseumAtNight(w http.ResponseWriter, r *http.Request) {
+	// The body first, then the deck -- `setDeckShared`'s recorded order, kept
+	// so the two flags cannot answer a malformed request differently.
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	raw, given := body[nightField]
+	if !given {
+		wire.Detail(w, http.StatusUnprocessableEntity, nightField+" is required")
+		return
+	}
+	src, _, ok := a.writeTarget(w, r)
+	if !ok {
+		return
+	}
+	slug := r.PathValue("slug")
+	writer, err := library.WriterFor(src, slug)
+	if a.refuseWrite(w, nightField, err) {
+		return
+	}
+	if err := writer.SetColiseumAtNight(r.Context(), slug, truthy(raw)); a.refuseWrite(w, nightField, err) {
+		return
+	}
+	a.getDeck(w, r)
+}
+
+// The two body keys, named once. They are also the two path tails, hyphenated
+// -- `shared` and `coliseum-at-night` -- which is the house's split: paths
+// wear hyphens, wire keys wear underscores.
+const (
+	sharedField = "shared"
+	nightField  = "coliseum_at_night"
+)
+
+// setEveryDeckShared and setEveryDeckColiseumAtNight are the two master
+// controls: `PUT /api/decks/shared` and `PUT /api/decks/coliseum-at-night`.
+//
+// **Neither takes an owner segment**, which is the crypt's argument (see
+// `listEntombed`) rather than a shortcut: the decks these reach are the
+// caller's own, resolved from who is asking, so there is no path anybody can
+// write that turns every deck in somebody else's library on or off. ADR 5 is
+// settled here by construction, and that matters more on a route that writes
+// a whole shelf at once than on one that writes a single deck.
+func (a *API) setEveryDeckShared(w http.ResponseWriter, r *http.Request) {
+	a.setEveryDeckFlag(w, r, sharedField, library.Writer.SetShared)
+}
+
+func (a *API) setEveryDeckColiseumAtNight(w http.ResponseWriter, r *http.Request) {
+	a.setEveryDeckFlag(w, r, nightField, library.Writer.SetColiseumAtNight)
+}
+
+// setEveryDeckFlag writes one flag across every deck the caller may write.
+//
+// **It loops the same per-deck verb the single-deck route calls**, rather than
+// issuing one UPDATE across the shelf. That is deliberate and costs a
+// statement per deck: the verb is where each tier's rule about this flag
+// lives -- the file tier's YAML surgery for `shared`, its refusal for the
+// night games -- so a bulk path that went around it would be a second
+// implementation free to disagree with the first. Libraries here are tens of
+// decks, not thousands.
+//
+// **The first refusal stops the run**, and the honest consequence is written
+// down rather than hidden: a refusal that arrives partway leaves the decks
+// before it written. In the one case that actually refuses -- the file tier
+// having nowhere to keep the night flag -- it arrives on the first deck and
+// nothing is written at all. The client re-reads the shelf afterwards either
+// way, so what it renders is the truth rather than what it hoped for.
+func (a *API) setEveryDeckFlag(w http.ResponseWriter, r *http.Request, field string,
+	set func(library.Writer, context.Context, string, bool) error) {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	raw, given := body[field]
+	if !given {
+		wire.Detail(w, http.StatusUnprocessableEntity, field+" is required")
+		return
+	}
+	value := truthy(raw)
+	owned, ok := a.myWritableLibraries(w, r)
+	if !ok {
+		return
+	}
+	changed := 0
+	for _, o := range owned {
+		writer, err := library.WriterFor(o.Source, "")
+		if a.refuseWrite(w, field, err) {
+			return
+		}
+		// Slugs rather than All: this writes a flag and reads no deck, so
+		// parsing ninety-nine cards apiece to find out what to name is work
+		// nobody asked for.
+		slugs, err := o.Source.Slugs(r.Context())
+		if a.refuse(w, field, err) {
+			return
+		}
+		for _, slug := range slugs {
+			if err := set(writer, r.Context(), slug, value); a.refuseWrite(w, field, err) {
+				return
+			}
+			changed++
+		}
+	}
+	// What was asked for and how many decks wear it now. The client re-reads
+	// the shelf regardless -- this is the receipt, not the new state.
+	wire.JSON(w, http.StatusOK, map[string]any{field: value, "changed": changed})
+}
+
+// myWritableLibraries is every library this caller may write, which is exactly
+// their own: `Visible` filtered by `Writable`, the same derivation `myCrypts`
+// uses and for the same reason -- a tier added later is included without
+// anybody remembering to.
+//
+// A caller with nothing to write gets the ordinary read-only refusal rather
+// than a 200 over an empty list, so "the master switch did nothing" is never
+// reported as success.
+func (a *API) myWritableLibraries(w http.ResponseWriter, r *http.Request) ([]library.Owned, bool) {
+	lib, err := a.library(r.Context())
+	if a.refuse(w, "decks", err) {
+		return nil, false
+	}
+	visible, err := lib.Visible(r.Context())
+	if a.refuse(w, "decks", err) {
+		return nil, false
+	}
+	out := []library.Owned{}
+	for _, owned := range visible {
+		if owned.Source.Writable() {
+			out = append(out, owned)
+		}
+	}
+	if len(out) == 0 {
+		a.refuseWrite(w, "decks", library.ErrReadOnly{})
+		return nil, false
+	}
+	return out, true
+}
+
 // ---- the shared helpers ----------------------------------------------------
 
 // bodyBracket reads the optional bracket: absent, null or empty is none;
