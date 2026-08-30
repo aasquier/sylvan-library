@@ -99,6 +99,11 @@ type RefreshOptions struct {
 type RefreshCounts struct {
 	Oracle    int64
 	Printings int64
+	// Swept is the older dated bulk files this run took off the download
+	// shelf once its own work was safely in the pool, and the bytes they were
+	// holding. Zero on every failure, on purpose: [SweepBulk] argues why the
+	// previous copy is worth keeping until then.
+	Swept SweepCounts
 }
 
 // RefreshWatcher is how a caller follows along. Every field may be nil, and a
@@ -159,6 +164,12 @@ const (
 // deliberately: a refresh that downloaded first would leave a window in which
 // the operator's mental model -- "while this runs, the library is shut" --
 // stops being true for the first several minutes of it.
+//
+// The last thing it does, and only on the way out of a run that shelved
+// everything it set out to, is sweep the older dated copies off the download
+// shelf ([SweepBulk] argues the timing and what it will not touch). Every
+// failure above returns before that, so a refresh that broke leaves the
+// previous copy exactly where a rollback would want it.
 func Refresh(ctx context.Context, opt RefreshOptions, watch RefreshWatcher) (RefreshCounts, error) {
 	wait := opt.Wait
 	if wait <= 0 {
@@ -190,6 +201,11 @@ func Refresh(ctx context.Context, opt RefreshOptions, watch RefreshWatcher) (Ref
 	watch.shelved(OracleBulk, counts.Oracle)
 
 	if opt.OracleOnly {
+		// The oracle half is done and the printings were never looked at, so
+		// this run has an opinion about one kind's older copies and none at
+		// all about the other's.
+		counts.Swept = sweepLeavings(opt.ScryfallDir, map[string]string{
+			OracleBulk: oracle})
 		return counts, nil
 	}
 
@@ -205,5 +221,21 @@ func Refresh(ctx context.Context, opt RefreshOptions, watch RefreshWatcher) (Ref
 	}
 	watch.shelved(PrintingsBulk, counts.Printings)
 
+	counts.Swept = sweepLeavings(opt.ScryfallDir, map[string]string{
+		OracleBulk: oracle, PrintingsBulk: printings})
 	return counts, nil
+}
+
+// sweepLeavings tidies the download shelf, and lives at the two points where
+// the work is unambiguously finished and at no other point in this file.
+//
+// **The error is dropped deliberately.** A shelf that will not tidy is not a
+// refresh that failed: the rows are in, every caller's own report is true, and
+// turning a stuck `unlink` into a failed refresh would send an operator
+// looking for a broken pool that is sitting there fully loaded. What a caller
+// gets instead is the count -- zero files swept is the honest answer to both
+// "there was nothing older" and "nothing older would go".
+func sweepLeavings(dir string, kept map[string]string) SweepCounts {
+	swept, _ := SweepBulk(dir, kept)
+	return swept
 }
