@@ -77,7 +77,13 @@ function statefulButtons() {
       const tag = src.slice(m.index, end + 1)
       if (!STATEFUL.test(tag)) continue
       const line = src.slice(0, m.index).split('\n').length
-      found.push({ where: `${path.replace('../', 'src/')}:${line}`, tag })
+      // Anchored, and the anchor is the point: `import.meta.glob` hands back
+      // keys relative to this file (`../routes/Admin.tsx`), so only a leading
+      // `../` is the prefix being rewritten. A bare `.replace('../', …)`
+      // rewrites the first occurrence wherever it falls, which is a different
+      // rule that happens to agree on today's paths — and CodeQL was right to
+      // say so rather than wait for the day they disagree.
+      found.push({ where: `${path.replace(/^\.\.\//, 'src/')}:${line}`, tag })
     }
   }
   return found
