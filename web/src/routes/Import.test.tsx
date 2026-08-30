@@ -34,10 +34,16 @@ vi.mock('../lib/api', async () => ({
   // Stubbed: this file asks what the page *sends*, and the real poller would
   // put a timer between the click and the assertion for nothing.
   followJob: vi.fn(),
-  ApiError: class extends Error {},
+  // Carries `status`, because `intakeTrouble` reads it: a lost job is a 404
+  // and gets its own sentence, and a stub without the field would send every
+  // test down the generic branch.
+  ApiError: class extends Error {
+    status: number
+    constructor(message: string, status = 0) { super(message); this.status = status }
+  },
 }))
 
-const { api, followJob } = await import('../lib/api')
+const { api, followJob, ApiError } = await import('../lib/api')
 
 function result(overrides: Partial<ImportResult> = {}): ImportResult {
   return {
@@ -670,5 +676,71 @@ describe('the stance that decided the sheet', () => {
     const sent = vi.mocked(api.intake).mock.calls[0]![1]
     expect(decidedWith()).toBe('second-opinion')
     expect(sent.stance).toBe('second-opinion')
+  })
+})
+
+/* The extra work can fail, and the deck is still there.
+ *
+ * The intake runs after the deck has been created, in a different request, so
+ * a failure here is about what was going to be *added*. Before this the
+ * rejection fell to the page's outer handler: the server's own `no such job`
+ * went on screen — lowercase machinery, commandment 10 — and the navigate was
+ * skipped, stranding somebody on the import page with a saved deck and no door
+ * offered to it. That is exactly what happened on the first real intake ever
+ * run against a ninety-nine, because merging deploys here (ADR 23) and the job
+ * registry is in memory.
+ */
+describe('when the extra work does not finish', () => {
+  async function importWithLostJob(status = 404) {
+    vi.mocked(api.importDeck).mockResolvedValue(result({ created: true }))
+    // Built per call, and marked handled on the spot. A rejected promise
+    // created at mock-setup time is unhandled until the page happens to await
+    // it, which Node reports as a failure of this file rather than of the code.
+    // `.catch` returns a new promise; the original still rejects for the page.
+    vi.mocked(followJob).mockImplementation(() => {
+      const promise = Promise.reject(new ApiError('no such job', status))
+      promise.catch(() => { /* the page is the real handler */ })
+      return { promise, cancel: () => {} }
+    })
+    renderImport()
+    paste('1 Sol Ring')
+    fireEvent.change(screen.getByLabelText('Deck name'), { target: { value: 'Cats' } })
+    // Any ticked action starts the run, and this one is ungated — the lost
+    // job is the same lost job whatever was asked for, and using the drafting
+    // toggle here would drag ADR 41's write gate into a test about failure.
+    fireEvent.click(await screen.findByRole('button', { name: 'Sort the cards' }))
+    fireEvent.click(screen.getByText('Import as draft'))
+  }
+
+  it('says so in words, and never in the server\'s', async () => {
+    await importWithLostJob()
+    const note = await screen.findByText(/Your deck is saved and safe/)
+    expect(note).toBeTruthy()
+    // The machinery's own account of itself belongs in the log.
+    expect(screen.queryByText(/no such job/)).toBeNull()
+  })
+
+  it('offers the door to the deck it did save', async () => {
+    await importWithLostJob()
+    const door = await screen.findByRole('link', { name: 'Open your deck' })
+    // Owner-qualified, off the response, exactly as the happy path is.
+    expect(door.getAttribute('href')).toBe('/decks/aasquier/arahbo-cats')
+  })
+
+  it('does not navigate away from the explanation', async () => {
+    await importWithLostJob()
+    await screen.findByText(/Your deck is saved and safe/)
+    // Leaving would take the only account of what happened with it. The link
+    // above is the way on, chosen rather than done to them.
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('names the restart when the work was lost, and not otherwise', async () => {
+    await importWithLostJob(404)
+    expect(await screen.findByText(/library was most likely restarting/)).toBeTruthy()
+    cleanup()
+    await importWithLostJob(500)
+    expect(await screen.findByText(/Your deck is saved and safe/)).toBeTruthy()
+    expect(screen.queryByText(/library was most likely restarting/)).toBeNull()
   })
 })
