@@ -16,6 +16,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/cards"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/deckedit"
 	"github.com/aasquier/sylvan-library/go/internal/deckimport"
 	"github.com/aasquier/sylvan-library/go/internal/decklist"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
@@ -383,6 +384,16 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		status = "theoretical"
 	}
 	dryRun := truthy(body["dry_run"])
+	// Who drafted the quoted reasons in the paste (ADR 49). One hand ever
+	// drafts, so one value is ever legal -- anything else is a claim the
+	// deck file has no way to record, refused rather than stored.
+	whyBy := strings.TrimSpace(str(body, "why_by"))
+	if whyBy != "" && whyBy != deckedit.DraftedBy {
+		wire.Detail(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"why_by can only be %q -- it names the hand that drafted the "+
+				"quoted reasons, and only one hand ever drafts", deckedit.DraftedBy))
+		return
+	}
 
 	if !slugPattern.MatchString(slug) {
 		a.refuseWrite(w, "import", rejectf(
@@ -441,7 +452,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		built, err := deckimport.BuildDeck(read, found, deckimport.Options{
 			Slug: slug, Name: str(body, "name"), Commander: commander,
 			Companion: companion, Bracket: bracket, Status: status,
-			Read: corrections, Notes: chosen})
+			Read: corrections, Notes: chosen, WhyBy: whyBy})
 		if err != nil {
 			return err
 		}
@@ -499,7 +510,10 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		// because a person who wrote 60 of them should be told that, and
 		// "40 still owed" on its own reads like nothing arrived.
 		"rationales": report.Rationales,
-		"unknown":    orEmpty(report.Unknown),
+		// Echoed so a dry-run preview can say the reasons will land signed,
+		// from the answer rather than from what the page remembers asking.
+		"why_by":  whyBy,
+		"unknown": orEmpty(report.Unknown),
 		// The shortlist beside the misses, and how many misses did not get
 		// one. Never applied here: see `didYouMean`.
 		"did_you_mean":         orEmpty(nearby),

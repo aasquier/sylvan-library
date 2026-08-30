@@ -7,6 +7,11 @@ description: Use for any Magic&#58; the Gathering deckbuilding, tuning, playtest
 
 Local toolkit for Commander deckbuilding, simulation, and shopping.
 
+**Bringing one of Aaron's existing decks *into* the library is `/scry`'s
+work** — the intake council, `.claude/skills/scry/` — not this skill's.
+This skill tunes what is already in the library; scry convenes the
+advisors over a pasted list that is not.
+
 ## Non-negotiables
 
 **1. Verify before asserting. Never evaluate a card from memory.**
