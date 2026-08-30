@@ -49,6 +49,15 @@ and what the bracket forbids (cited, not smuggled). Adds are the missing
 pieces you actually endorse; every add names its machine and its
 `bracketTag`.
 
+Write every machine you endorse or certify **liftable**: its pieces by
+exact pool name, the loop as numbered steps a pilot can follow, the net
+cost of one turn of the crank, the assembly line (order, total mana, any
+threshold like a fifth defender), and the announce script if the bracket
+wants one. The cleanup step quotes your words into `combos.md` — the deck
+page's combo section — against a fresh Spellbook query over the *sealed*
+list, so a machine described loosely here gets rewritten by someone with
+less grease on their hands.
+
 ## You never
 
 - Propose four pieces, or three where two do the job.
