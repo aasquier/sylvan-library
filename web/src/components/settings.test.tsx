@@ -18,6 +18,7 @@
  */
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeStatus, StanceView } from '../lib/api'
@@ -71,14 +72,38 @@ beforeEach(() => {
   cleanup()
 })
 
+// The panel carries one real destination — the door to the decks' own
+// settings room — so it needs a router around it the way it has one in the
+// app. Everything else in here is a switch that changes something on the
+// spot; this is the only row that leaves.
 async function open() {
-  render(<SettingsMenu theme="light" onToggleTheme={() => {}} />)
+  render(
+    <MemoryRouter>
+      <SettingsMenu theme="light" onToggleTheme={() => {}} />
+    </MemoryRouter>,
+  )
   const trigger = await screen.findByRole('button', { name: 'Settings' })
   fireEvent.click(trigger)
   return trigger
 }
 
 describe('SettingsMenu', () => {
+  // The gear holds the preferences that are about *you*. The per-deck ones —
+  // who may read each deck, and the arena after dark — are a list that grows,
+  // so they live in their own room and this is the way in. A **link**, because
+  // it goes somewhere: every other row here changes something in place and is
+  // a switch for that reason (commandment 20).
+  it('offers a way through to the decks’ own settings', async () => {
+    claudeStatus.mockResolvedValue(status({ configured: false }))
+    await open()
+    const door = screen.getByRole('link', { name: /Your decks/ })
+    expect(door.getAttribute('href')).toBe('/settings')
+    // And it is not dressed as a switch: nothing here should read as though
+    // pressing it toggles something.
+    expect(door.getAttribute('aria-pressed')).toBeNull()
+    expect(door.getAttribute('role')).toBeNull()
+  })
+
   it('renders the gear even without Claude, but no Claude section', async () => {
     claudeStatus.mockResolvedValue(status({ configured: false }))
     await open()

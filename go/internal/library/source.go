@@ -319,33 +319,56 @@ type row struct {
 	slug   string
 	yaml   string
 	shared bool
+	night  bool
+}
+
+// rowColumns is the column list both readers use, named once so a row read
+// one deck at a time and a row read in a batch cannot drift apart -- which is
+// exactly how a new column gets filled in `Get` and left false in `All`.
+const rowColumns = "id, slug, yaml, shared, coliseum_at_night"
+
+// scanRow reads `rowColumns` in order. The two integer flags go through local
+// variables because SQLite has no boolean and the driver will not scan a 0
+// into a bool.
+func scanRow(dest interface{ Scan(...any) error }) (row, error) {
+	var r row
+	var shared, night int64
+	if err := dest.Scan(&r.id, &r.slug, &r.yaml, &shared, &night); err != nil {
+		return row{}, err
+	}
+	r.shared = shared != 0
+	r.night = night != 0
+	return r, nil
 }
 
 func (s *SQLSource) row(ctx context.Context, slug string) (row, error) {
 	where, args := s.where()
-	var r row
-	var shared int64
-	err := s.db.QueryRowContext(ctx, "SELECT id, slug, yaml, shared FROM user_decks WHERE "+where+" AND slug = ?",
-		append(args, slug)...).Scan(&r.id, &r.slug, &r.yaml, &shared)
+	r, err := scanRow(s.db.QueryRowContext(ctx,
+		"SELECT "+rowColumns+" FROM user_decks WHERE "+where+" AND slug = ?",
+		append(args, slug)...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return row{}, ErrNotFound{Slug: slug}
 	}
 	if err != nil {
 		return row{}, err
 	}
-	r.shared = shared != 0
 	return r, nil
 }
 
 // parse is `SqlDeckSource._parse`: the row's slug is the identity, and the
 // `shared` column is the truth for this tier, written over whatever the
 // YAML says.
+//
+// `coliseum_at_night` is set here too and is **not** written over anything:
+// the file has no such key and never will, so the row is not a truth
+// competing with the YAML's -- it is the only place the fact exists.
 func parse(r row) (*deck.Deck, error) {
 	d, err := deck.FromText(r.yaml, r.slug)
 	if err != nil {
 		return nil, err
 	}
 	d.Shared = r.shared
+	d.ColiseumAtNight = r.night
 	return d, nil
 }
 
@@ -359,19 +382,18 @@ func (s *SQLSource) Get(ctx context.Context, slug string) (*deck.Deck, error) {
 
 func (s *SQLSource) All(ctx context.Context) ([]*deck.Deck, error) {
 	where, args := s.where()
-	rows, err := s.db.QueryContext(ctx, "SELECT id, slug, yaml, shared FROM user_decks WHERE "+where+" ORDER BY slug", args...)
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT "+rowColumns+" FROM user_decks WHERE "+where+" ORDER BY slug", args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []*deck.Deck{}
 	for rows.Next() {
-		var r row
-		var shared int64
-		if err := rows.Scan(&r.id, &r.slug, &r.yaml, &shared); err != nil {
+		r, err := scanRow(rows)
+		if err != nil {
 			return nil, err
 		}
-		r.shared = shared != 0
 		d, err := parse(r)
 		if err != nil {
 			return nil, err

@@ -54,6 +54,19 @@ export interface DeckSummary {
    *  is only ever interesting on your own decks, where it is the answer to
    *  "is this one on display". */
   shared: boolean
+  /** Whether the owner has entered this deck for Coliseum at Night.
+   *
+   *  **Nothing runs on it yet**, and that is the whole point of it existing:
+   *  it is consent recorded before there is anything to consent to, so the
+   *  first night is played with decks whose owners chose them. Any copy built
+   *  on this field has to say so — a control that reads as though it starts
+   *  something today would be a lie the settings room tells.
+   *
+   *  False on every deck the showcase serves, which is a real answer there
+   *  rather than a missing one: those decks cannot hold this yet, and
+   *  `settings-room` copy says so where somebody would otherwise reach for the
+   *  switch. */
+  coliseum_at_night: boolean
   /** Who sleeves this deck up (second 2026-08-15 punch list, item 10): a
    *  household tag — "Mark's wife", "the kids" — not an account. The owner
    *  says whose library it lives in; this says which human plays it. Empty
@@ -111,6 +124,15 @@ export interface DeckSummary {
  */
 export interface DeckTile extends DeckSummary {
   showcase: boolean
+}
+
+/** What a master switch answers: what was asked for, and how many decks now
+ *  wear it. Deliberately not the new shelf — the page re-reads that, so this
+ *  cannot go stale between the write and the render. */
+export interface BulkFlagResult {
+  shared?: boolean
+  coliseum_at_night?: boolean
+  changed: number
 }
 
 export interface Card {
@@ -2943,6 +2965,28 @@ export const api = {
   // nothing the gate has an opinion about.
   setShared: (ref: DeckRef, shared: boolean) =>
     send<DeckDetail>('PUT', deckPath(ref, '/shared'), { shared }),
+  // Enter one deck for Coliseum at Night, or withdraw it. Answers with the
+  // whole deck for `setShared`'s reason: it changes no card and the gate has
+  // no opinion about it, so there is no `EditResult` to report.
+  //
+  // A deck the showcase serves cannot hold this and the server says so with a
+  // 422 rather than pretending. The settings room is expected to have said it
+  // first — this refusal is the backstop, not the message.
+  setColiseumAtNight: (ref: DeckRef, night: boolean) =>
+    send<DeckDetail>('PUT', deckPath(ref, '/coliseum-at-night'),
+      { coliseum_at_night: night }),
+  // The two master switches: every deck you own, in one press.
+  //
+  // **Neither takes a `DeckRef`, and that is the point.** The server resolves
+  // whose decks these are from who is asking, so there is no argument a client
+  // could get wrong that would reach somebody else's shelf. `changed` is how
+  // many decks now wear the flag — a receipt, not the new state; the caller
+  // re-reads the shelf.
+  setEveryDeckShared: (shared: boolean) =>
+    send<BulkFlagResult>('PUT', '/api/decks/shared', { shared }),
+  setEveryDeckColiseumAtNight: (night: boolean) =>
+    send<BulkFlagResult>('PUT', '/api/decks/coliseum-at-night',
+      { coliseum_at_night: night }),
   importDeck: (body: {
     slug: string
     text: string

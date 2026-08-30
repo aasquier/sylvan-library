@@ -63,6 +63,7 @@ func sqlTier(t *testing.T) library.Source {
 	ddl := `
 CREATE TABLE user_decks (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id INTEGER NOT NULL,
   slug TEXT NOT NULL, name TEXT NOT NULL, yaml TEXT NOT NULL, shared INTEGER NOT NULL DEFAULT 0,
+  coliseum_at_night INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE user_deck_artifacts (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER NOT NULL,
   name TEXT NOT NULL, body TEXT NOT NULL, built_at TEXT NOT NULL, UNIQUE(deck_id, name));`

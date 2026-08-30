@@ -66,28 +66,33 @@ func PoolFor(ctx context.Context, c *pool.Conn, d *deck.Deck) (map[string]*pool.
 // Tile is one row of `GET /api/decks`, in `service._tiles`' key order, with
 // `showcase` appended by `list_library`.
 type Tile struct {
-	Slug           string   `json:"slug"`
-	Owner          string   `json:"owner"`
-	Name           string   `json:"name"`
-	Writable       bool     `json:"writable"`
-	Shared         bool     `json:"shared"`
-	Pilot          string   `json:"pilot"`
-	Status         string   `json:"status"`
-	Stage          string   `json:"stage"`
-	NeedsRationale int      `json:"needs_rationale"`
-	Commander      []string `json:"commander"`
-	Companion      *string  `json:"companion"`
-	Bracket        *int     `json:"bracket"`
-	Archetype      string   `json:"archetype"`
-	Themes         []string `json:"themes"`
-	TotalCards     int      `json:"total_cards"`
-	LandCount      int      `json:"land_count"`
-	Strategy       any      `json:"strategy"`
-	ArtCrop        *string  `json:"art_crop"`
-	ColorIdentity  []string `json:"color_identity"`
-	Errors         *int     `json:"errors"`
-	Warnings       *int     `json:"warnings"`
-	Showcase       bool     `json:"showcase"`
+	Slug     string `json:"slug"`
+	Owner    string `json:"owner"`
+	Name     string `json:"name"`
+	Writable bool   `json:"writable"`
+	Shared   bool   `json:"shared"`
+	// Whether the owner has entered this deck for the night games. Beside
+	// `shared` because the settings page reads the two together, and false on
+	// every deck the file tier serves -- which is a real answer there rather
+	// than a missing one (`Deck.ColiseumAtNight`).
+	ColiseumAtNight bool     `json:"coliseum_at_night"`
+	Pilot           string   `json:"pilot"`
+	Status          string   `json:"status"`
+	Stage           string   `json:"stage"`
+	NeedsRationale  int      `json:"needs_rationale"`
+	Commander       []string `json:"commander"`
+	Companion       *string  `json:"companion"`
+	Bracket         *int     `json:"bracket"`
+	Archetype       string   `json:"archetype"`
+	Themes          []string `json:"themes"`
+	TotalCards      int      `json:"total_cards"`
+	LandCount       int      `json:"land_count"`
+	Strategy        any      `json:"strategy"`
+	ArtCrop         *string  `json:"art_crop"`
+	ColorIdentity   []string `json:"color_identity"`
+	Errors          *int     `json:"errors"`
+	Warnings        *int     `json:"warnings"`
+	Showcase        bool     `json:"showcase"`
 }
 
 // ChosenArt is one row of `service._chosen_arts`: the printing behind a
@@ -194,7 +199,8 @@ func Tiles(ctx context.Context, c *pool.Conn, decks []*deck.Deck, writable bool,
 	out := []Tile{}
 	for _, d := range decks {
 		row := Tile{Slug: d.Slug, Owner: owner, Name: d.Name, Writable: writable, Shared: d.Shared,
-			Pilot: d.Pilot, Status: d.Status, Stage: d.Stage, NeedsRationale: len(d.Unjustified()),
+			ColiseumAtNight: d.ColiseumAtNight,
+			Pilot:           d.Pilot, Status: d.Status, Stage: d.Stage, NeedsRationale: len(d.Unjustified()),
 			Commander: append([]string{}, d.Commander...), Companion: d.Companion, Bracket: d.Bracket,
 			Archetype: d.Archetype(), Themes: append([]string{}, d.Themes...),
 			TotalCards: d.TotalCards(), LandCount: d.LandCount(), Strategy: d.Strategy,
@@ -496,6 +502,7 @@ func DeckPayload(ctx context.Context, c *pool.Conn, d *deck.Deck, writable bool,
 	body := []wire.KV{
 		{Key: "commander_art", Value: d.CommanderArt}, {Key: "slug", Value: d.Slug}, {Key: "name", Value: d.Name},
 		{Key: "writable", Value: writable}, {Key: "owner", Value: owner}, {Key: "shared", Value: d.Shared},
+		{Key: "coliseum_at_night", Value: d.ColiseumAtNight},
 		{Key: "pilot", Value: d.Pilot}, {Key: "status", Value: d.Status}, {Key: "stage", Value: d.Stage},
 		{Key: "needs_rationale", Value: len(d.Unjustified())}, {Key: "commander", Value: d.Commander},
 		{Key: "companion", Value: d.Companion}, {Key: "bracket", Value: d.Bracket}, {Key: "archetype", Value: d.Archetype()},

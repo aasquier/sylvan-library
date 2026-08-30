@@ -59,11 +59,23 @@ type CardEntry struct {
 
 // Deck is the parsed file.
 type Deck struct {
-	Slug            string
-	Name            string
-	Status          string
-	Stage           string
-	Shared          bool
+	Slug   string
+	Name   string
+	Status string
+	Stage  string
+	Shared bool
+	// ColiseumAtNight is the owner's standing consent to send this deck down
+	// to the arena after dark, once the night games begin.
+	//
+	// **Read from the row and never from the file, which is the one way it
+	// differs from `Shared` above.** Aaron ruled it, and the ruling has a
+	// consequence worth stating where the field is: `FromText` never sets
+	// this, `Dump` and `Payload` never write it, so a deck that round-trips
+	// through YAML loses it -- correctly, because the YAML was never where it
+	// lived. Only `SQLSource` fills it in, from `user_decks.coliseum_at_night`
+	// (rung 13). The file tier has no row to read, so its decks answer `false`
+	// and its write verb refuses; `SetColiseumAtNight` argues that.
+	ColiseumAtNight bool
 	Pilot           string
 	Commander       []string
 	CommanderArt    string
