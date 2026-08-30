@@ -22,6 +22,22 @@ import {
 const DELETE_WORD = 'bury'
 
 /**
+ * The word that confirms emptying the crypt. Mirrors the server's own, and it
+ * is deliberately **not** the word next door.
+ *
+ * `DELETE_WORD` above says why "exile" would be wrong for entombing a deck:
+ * in Magic, exile is removal with no way back, and an entombed deck comes
+ * back. Here nothing does — so the word this file already refused to misuse is
+ * the correct one, and the two dialogs teach the difference with the game's
+ * own vocabulary instead of with a bigger warning label.
+ *
+ * A newcomer does not arrive knowing that, which is why the dialog spells the
+ * word out in plain English beside the input rather than assuming it
+ * (commandment 2). Magic's vocabulary is the flavour; it is never the gate.
+ */
+const EMPTY_WORD = 'exile'
+
+/**
  * When a deck was entombed, in words rather than in a timestamp.
  *
  * **Null is not a date.** The server sends null when nothing recorded the
@@ -164,6 +180,160 @@ function DeleteDialog({ deck, onCancel, onDeleted }: {
           <button onClick={onCancel} disabled={busy}
                   className="btn btn-quiet">
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Confirm emptying the crypt — the one thing in this app that destroys a deck.
+ *
+ * Built on `DeleteDialog` above rather than on `ArmedButton`, and the choice is
+ * the whole safety argument. `ArmedButton` is a *gesture* gate: it asks for two
+ * clicks a measured distance apart, which is right for entombing a card,
+ * because the graveyard is one click from undoing it. Nothing undoes this. A
+ * gate made of clicks is answered identically by somebody who read the screen
+ * and somebody who did not, and PR #409 is the standing evidence — a single
+ * double-click satisfied both halves of an arm-then-fire and buried a card out
+ * of a real deck. A word that has to be *typed* cannot be delivered by a stray
+ * gesture at all, which is why this project's two most destructive controls
+ * (deleting a deck, deleting an account) both ask for one.
+ *
+ * **Three things a newcomer must be able to see before this can fire**, and
+ * each is on screen rather than implied:
+ *
+ *  1. *How many*, and *which ones*. The decks are named, because "empty the
+ *     crypt" is an abstraction and "Trostani, Selesnya's Voice" is a deck
+ *     somebody built. Nobody should have to remember what is in there.
+ *  2. *That nothing comes back.* Said in plain words, and said as the contrast
+ *     with the thing they already did — they entombed these decks, and were
+ *     told that was survivable. It was. This is not, and the sentence has to
+ *     do that work explicitly rather than trusting the red button to.
+ *  3. *What the word means.* `exile` is Magic's own term and it is exact, but a
+ *     confirmation is the wrong place to be quizzed on vocabulary, so the
+ *     English is beside it.
+ *
+ * The `text-transform` rule from `DeleteDialog` applies here too: a field whose
+ * contents must be retyped verbatim can never carry one.
+ */
+function EmptyCryptDialog({ entombed, onCancel, onEmptied }: {
+  entombed: EntombedDeck[]
+  onCancel: () => void
+  onEmptied: (destroyed: number) => void
+}) {
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const answer = typed.trim().toLowerCase()
+  const matches = answer === EMPTY_WORD
+  const count = entombed.length
+
+  async function empty() {
+    if (!matches) return
+    setBusy(true)
+    setError(null)
+    try {
+      // The normalised answer rather than the raw keystrokes, for the reason
+      // `DeleteDialog` sends its own: it is the value this dialog validated,
+      // and sending anything else lets the two sides disagree about what was
+      // confirmed.
+      const result = await api.emptyCrypt(answer)
+      onEmptied(result.destroyed)
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.6)' }}
+         onClick={onCancel}>
+      <div className="card-surface w-full max-w-md rounded-xl p-6"
+           role="dialog" aria-modal="true"
+           aria-label="Empty the crypt"
+           onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold tracking-tight">
+          Empty the crypt?
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          {/* The contrast is the sentence, not the adjective. These decks were
+              entombed, and the dialog that did it promised they could be
+              raised again — truthfully. This is the promise being spent. */}
+          You entombed {count === 1 ? 'this deck' : `these ${count} decks`}, and
+          until now {count === 1 ? 'it' : 'they'} could still be raised.
+          Emptying the crypt destroys {count === 1 ? 'it' : 'all ' + count}{' '}
+          <strong style={{ color: 'var(--text-primary)' }}>permanently</strong>.
+          Every card, every rationale, every artifact goes with{' '}
+          {count === 1 ? 'it' : 'them'}, and nothing here can be brought back
+          afterwards.
+        </p>
+        {/* Named, not counted. A list somebody can read is the difference
+            between agreeing to a number and agreeing to their decks. */}
+        <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-md px-3 py-2 text-sm"
+            style={{ background: 'var(--page)', border: '1px solid var(--hairline)' }}>
+          {entombed.map((entry) => (
+            <li key={entry.id} className="flex items-baseline gap-2">
+              <span aria-hidden style={{ color: 'var(--text-muted)' }}>⚰</span>
+              <span className="min-w-0 flex-1">{entry.name}</span>
+              {entry.total_cards > 0 && (
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {entry.total_cards} card{entry.total_cards === 1 ? '' : 's'}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        <label className="mt-4 block">
+          {/* Deliberately not `uppercase` — see `DeleteDialog`'s docstring for
+              the bug that rule comes from. */}
+          <span className="text-xs tracking-wide"
+                style={{ color: 'var(--text-muted)' }}>
+            Type <code style={{ color: 'var(--text-primary)' }}>{EMPTY_WORD}</code>
+            {' '}to confirm
+          </span>
+          <input
+            autoFocus
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onCancel()
+              if (e.key === 'Enter' && matches) void empty()
+            }}
+            placeholder={EMPTY_WORD}
+            aria-label={`Type ${EMPTY_WORD} to confirm destroying everything in your crypt`}
+            className="mt-1 w-full rounded-md px-3 py-2 font-mono text-sm"
+            style={{ background: 'var(--page)', color: 'var(--text-primary)',
+                     border: '1px solid var(--hairline)' }}
+          />
+          {/* The vocabulary, in English. Nobody should have to know Magic's
+              rules text to understand what they are agreeing to — and a
+              disabled button with no stated reason is what made the old delete
+              dialog read as broken rather than as refusing. */}
+          <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+            {matches
+              ? <>In Magic, exiling something removes it from the game for
+                  good — there is no graveyard to fetch it back from.</>
+              : typed.trim()
+                ? <>That is not the word. Type <code>{EMPTY_WORD}</code> — Magic&rsquo;s
+                    word for gone for good.</>
+                : <><code>{EMPTY_WORD}</code> is Magic&rsquo;s word for gone for
+                    good, which is what this does.</>}
+          </span>
+        </label>
+        {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+        <div className="mt-5 flex items-center gap-3">
+          <button onClick={empty} disabled={!matches || busy}
+                  className="btn btn-danger-solid">
+            {busy
+              ? 'Exiling…'
+              : `Exile ${count === 1 ? 'this deck' : `all ${count} decks`}`}
+          </button>
+          <button onClick={onCancel} disabled={busy}
+                  className="btn btn-quiet">
+            Keep them
           </button>
         </div>
       </div>
@@ -431,7 +601,7 @@ function DeckGrid({ decks, onDelete, heading }: {
  * same verb, same shape of row. A player who has entombed a card has already
  * been taught how this ends.
  */
-function TheCrypt({ entombed, error, busy, failed, onReturn }: {
+function TheCrypt({ entombed, error, busy, failed, onReturn, onEmpty, justEmptied }: {
   /** Null means *not known* — the crypt could not be read — which is why
    *  `error` exists rather than an empty list standing in for it. */
   entombed: EntombedDeck[] | null
@@ -439,6 +609,18 @@ function TheCrypt({ entombed, error, busy, failed, onReturn }: {
   busy: string | null
   failed: string | null
   onReturn: (id: string) => void
+  /** Opens the confirmation. Never the destruction itself — the control that
+   *  opens a dialog and the control that fires it are different buttons on
+   *  purpose, which is the `.btn-danger` / `.btn-danger-solid` split the
+   *  delete already uses. */
+  onEmpty: () => void
+  /** Whether this screen has just emptied the crypt, which changes what an
+   *  empty crypt is allowed to say. The reassuring version of the empty state
+   *  — *every deck you have made is still on the shelf* — is true for somebody
+   *  who never buried anything and **false** for somebody who exiled three
+   *  decks ten seconds ago. Same absence, two different facts; this is which
+   *  one it is. */
+  justEmptied: boolean
 }) {
   if (entombed === null) {
     return (
@@ -455,9 +637,27 @@ function TheCrypt({ entombed, error, busy, failed, onReturn }: {
           tab is a control, and a reader arriving by keyboard or by screen
           reader needs the page's outline to name the room they are in. Same
           reason the browse shelf keeps a heading per owner. */}
-      <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
-        <span aria-hidden>⚰</span> The crypt
-      </h2>
+      {/* The heading and the drain share a row, and the drain is at the far
+          end of it: emptying the crypt should be reachable without being the
+          thing your eye lands on when you come here looking for a deck. Same
+          reasoning as the `Entomb` button on a tile. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
+          <span aria-hidden>⚰</span> The crypt
+        </h2>
+        {/* Absent on an empty crypt, and that is not tidiness: a control whose
+            only possible outcome is "nothing happened" is a control that
+            teaches people their clicks do not matter. */}
+        {entombed.length > 0 && (
+          <button
+            onClick={onEmpty}
+            disabled={busy !== null}
+            title="Destroy every deck in the crypt — permanently, with no way back"
+            className="btn btn-danger btn-sm">
+            Empty the crypt
+          </button>
+        )}
+      </div>
       <p className="max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
         Decks you entombed. Nothing here was erased — return one and it comes
         back whole, every rationale and every artifact with it. A deck always
@@ -467,7 +667,9 @@ function TheCrypt({ entombed, error, busy, failed, onReturn }: {
       {entombed.length === 0 ? (
         <div className="card-surface rounded-lg px-4 py-8 text-center text-sm"
              style={{ color: 'var(--text-secondary)' }}>
-          Nothing rests here. Every deck you have made is still on the shelf.
+          {justEmptied
+            ? 'Nothing rests here. The crypt has been emptied.'
+            : 'Nothing rests here. Every deck you have made is still on the shelf.'}
         </div>
       ) : (
         <ul className="space-y-2">
@@ -541,6 +743,13 @@ export default function Library() {
   const [cryptError, setCryptError] = useState<string | null>(null)
   const [returning, setReturning] = useState<string | null>(null)
   const [returnError, setReturnError] = useState<string | null>(null)
+  /** Whether the confirmation is open. Not "is it emptying" — the dialog owns
+   *  its own busy state, the same way `deleting` does. */
+  const [emptying, setEmptying] = useState(false)
+  /** How many decks the last emptying destroyed, for the notice afterwards.
+   *  Zero is a real answer and reads differently from null, so this is not a
+   *  boolean: `null` is "nothing has been emptied on this screen". */
+  const [emptied, setEmptied] = useState<number | null>(null)
 
   /** Read the crypt. Its own call rather than part of the shelf's payload:
    *  the crypt is a place you visit, and a shelf that waited on it would be
@@ -826,9 +1035,34 @@ export default function Library() {
         </div>
       )}
 
+      {/* After the crypt has been emptied. Its own notice rather than silence,
+          because the screen it leaves behind — an empty crypt — looks exactly
+          like the screen of somebody who never buried anything, and a player
+          who has just destroyed work deserves to be told it happened rather
+          than left to infer it from an absence. */}
+      {emptied !== null && (
+        <div role="status"
+             className="card-surface flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm"
+             style={{ color: 'var(--text-secondary)' }}>
+          <span aria-hidden style={{ color: 'var(--text-muted)' }}>⚰</span>
+          <span>
+            Your crypt is empty. {emptied === 1
+              ? 'One deck was exiled'
+              : `${emptied} decks were exiled`} — gone for good, with no way
+            back. Everything still on your shelf is untouched.
+          </span>
+          <span className="ml-auto">
+            <button onClick={() => setEmptied(null)} className="btn btn-ghost btn-xs">
+              Dismiss
+            </button>
+          </span>
+        </div>
+      )}
+
       {shelf === 'crypt' ? (
         <TheCrypt entombed={crypt} error={cryptError} busy={returning}
-                  failed={returnError} onReturn={(id) => void returnDeck(id)} />
+                  failed={returnError} onReturn={(id) => void returnDeck(id)}
+                  onEmpty={() => setEmptying(true)} justEmptied={emptied !== null} />
       ) : shelf === 'mine' && mine.length === 0 ? (
         <FirstRun />
       ) : shown.length === 0 ? (
@@ -872,8 +1106,38 @@ export default function Library() {
               (d) => d.slug !== deleting.slug || d.owner !== deleting.owner))
             setDeleted({ name: deleting.name, cryptId })
             setDeleting(null)
+            // **And the emptied notice goes**, for the same reason it clears
+            // the deletion notice on its way in: "your crypt is empty" is a
+            // claim about right now, and right now there is a deck in it.
+            setEmptied(null)
             // The crypt just gained an entry, and the tab that shows it is
             // built from this list.
+            void loadCrypt()
+          }}
+        />
+      )}
+
+      {/* Mounted only with a crypt that has something in it. `crypt` is null
+          when it could not be read, and a confirmation that cannot list what
+          it is about to destroy has no business being open — the list is half
+          of what the player is agreeing to. */}
+      {emptying && crypt !== null && crypt.length > 0 && (
+        <EmptyCryptDialog
+          entombed={crypt}
+          onCancel={() => setEmptying(false)}
+          onEmptied={(destroyed) => {
+            setEmptying(false)
+            setEmptied(destroyed)
+            // **The deletion notice has to go.** It says a named deck "rests
+            // in your crypt — entombed, not erased" and offers a button to
+            // raise it. Both of those just stopped being true, and leaving it
+            // on screen would be this page telling somebody their deck is
+            // recoverable seconds after they destroyed it.
+            setDeleted(null)
+            setReturnError(null)
+            // Re-read rather than emptied locally: the server is the authority
+            // on what is left, and an emptying that raced something else must
+            // not leave this page asserting a crypt it did not look at.
             void loadCrypt()
           }}
         />
