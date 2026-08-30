@@ -413,7 +413,9 @@ export default function NewDeck() {
             {DOORS.map((d) => (
               <button
                 key={d.key}
+                type="button"
                 onClick={() => setMode(d.key)}
+                aria-pressed={mode === d.key}
                 className={`chip-toggle rounded-md px-3 py-1.5 text-sm font-medium${
                   mode === d.key ? ' is-on' : ''}`}
               >

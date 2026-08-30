@@ -201,7 +201,13 @@ function ArtifactCard({ artifact, deckRef, open, onToggle }: {
 
   return (
     <section className="card-surface rounded-xl p-4">
-      <button onClick={onToggle}
+      {/* A disclosure wearing `.strip-tab`, not a tab — the class is here for
+          the ink and the shape, and the row opens the artifact underneath
+          rather than moving between places. So `aria-expanded`, never
+          `aria-selected`: the word beside the size already says "read" or
+          "hide" to anyone who can see it, and this is that same sentence said
+          to everyone else (commandment 20). */}
+      <button type="button" onClick={onToggle} aria-expanded={open}
               className="strip-tab flex w-full items-baseline justify-between gap-3
                          rounded-lg px-2 py-1 text-left">
         <span className="font-mono text-sm font-semibold">{artifact.name}</span>
