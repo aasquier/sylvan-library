@@ -100,6 +100,24 @@ func rowsLabel(kind string) string {
 	return "oracle cards"
 }
 
+// sayTheSweep is the last line of a refresh that tidied up after itself.
+//
+// **It only appears when there was something to sweep**, which is the same
+// judgement [sayWaiting] makes about waiting: an ordinary refresh on a shelf
+// that is already tidy reads exactly as it always has, and the line is news
+// rather than furniture. The noun agrees with the count, and the bytes wear
+// the same thousands separators as every other number this command prints.
+func sayTheSweep(out io.Writer, swept pool.SweepCounts) {
+	if swept.Files <= 0 {
+		return
+	}
+	older := fmt.Sprintf("%d older bulk files", swept.Files)
+	if swept.Files == 1 {
+		older = "1 older bulk file"
+	}
+	fmt.Fprintf(out, "swept %s (%s bytes freed)\n", older, commas(swept.Bytes))
+}
+
 func dataRefreshCommand(cfg config.Config) *cobra.Command {
 	var oracleOnly bool
 	cmd := &cobra.Command{
@@ -113,7 +131,7 @@ func dataRefreshCommand(cfg config.Config) *cobra.Command {
 		// same order, with the same words.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
-			_, err := pool.Refresh(cmd.Context(), pool.RefreshOptions{
+			counts, err := pool.Refresh(cmd.Context(), pool.RefreshOptions{
 				DBPath:      cfg.DBPath(),
 				ScryfallDir: cfg.ScryfallDir(),
 				OracleOnly:  oracleOnly,
@@ -127,7 +145,11 @@ func dataRefreshCommand(cfg config.Config) *cobra.Command {
 					fmt.Fprintf(out, "  loaded %s %s\n", commas(n), rowsLabel(kind))
 				},
 			})
-			return err
+			if err != nil {
+				return err
+			}
+			sayTheSweep(out, counts.Swept)
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&oracleOnly, "oracle-only", false,

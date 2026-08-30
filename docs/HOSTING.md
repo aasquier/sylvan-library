@@ -141,6 +141,18 @@ Facts about that command worth knowing at the terminal:
 - **It is transactional.** The delete and the reload of each table share
   one transaction, so a killed refresh leaves the *old* pool intact, not an
   empty one.
+- **It tidies the download shelf.** Once the rows are in, the refresh deletes
+  the older dated copies of the kinds it just loaded and says what it took:
+  `swept 5 older bulk files (243,142,880 bytes freed)`. Nothing did that
+  before, so `/data/scryfall` grew by half a gigabyte a run. It sweeps nothing
+  after a refresh that *failed* (the previous copy is the only local rollback
+  for rows still in the pool), nothing of the printings after `--oracle-only`
+  (that run never read them), and nothing that is not exactly
+  `<kind>-<date><suffix>` — a `.part` in flight, a file you decompressed by
+  hand, and anything else in that directory are left alone. **A run whose
+  download was skipped still sweeps**, which is how a shelf that grew before
+  this existed is reclaimed: run the refresh once, and the pile goes whether
+  or not Scryfall published today.
 - **It is fast now**: ~27 seconds end to end on a dev Mac. On the app
   machine's shared core, budget minutes — and update this sentence with a
   measured number the first time you run one there.

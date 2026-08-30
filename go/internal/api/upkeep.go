@@ -309,8 +309,12 @@ func (a *API) gatherTheLibrary(rep jobs.Progress) (any, error) {
 			"phase", string(pool.PhaseOf(err)), "error", err)
 		return nil, errors.New(libraryTrouble(err))
 	}
+	// The sweep goes to the log and not to the page: the room says what the
+	// library holds, and a count of deleted files on a volume is the
+	// operator's business rather than a player's (commandment 10).
 	a.log.Warn("the library was gathered again",
-		"cards", counts.Oracle, "printings", counts.Printings)
+		"cards", counts.Oracle, "printings", counts.Printings,
+		"swept", counts.Swept.Files, "freed", counts.Swept.Bytes)
 	return wire.OrderedMap{
 		{Key: "cards", Value: counts.Oracle},
 		{Key: "printings", Value: counts.Printings},

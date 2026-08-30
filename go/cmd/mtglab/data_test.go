@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
 // The `data` family: the runbook's three commands over the volume.
@@ -25,9 +27,11 @@ import (
 // that silently wrote nothing would leave a gap nobody notices until somebody
 // asks about a month that has one.
 //
-// `refresh` is the one that is not here: it downloads from Scryfall, and the
-// download itself is tested against a stub in `internal/pool` rather than by
-// reaching the network from a test.
+// `refresh` is mostly not here: it downloads from Scryfall, and the sequence
+// itself is tested against a stub in `internal/pool` rather than by reaching
+// the network from a test. What *is* here is its last line. The sweep's report
+// is a pure function of a count and a writer, and "1 older bulk files" is
+// exactly the kind of thing a stub two packages away would never catch.
 //
 // All parallel since ADR 40: the volume each of these runs against is a
 // [deployment] value rather than MTGLAB_DATA_DIR on the process.
@@ -187,6 +191,40 @@ func TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero(t *testing.T) {
 	// knowing: nothing about the output says the volume was empty.
 	if _, statErr := os.Stat(d.DBPath()); statErr != nil {
 		t.Errorf("the snapshot did not create the pool it reported on: %v", statErr)
+	}
+}
+
+// The refresh's last line: what it swept, and nothing at all when it swept
+// nothing.
+//
+// The silence is the half worth pinning. An ordinary refresh on a shelf that
+// is already tidy has to read exactly as it always has — the line is news, the
+// same judgement [sayWaiting] makes about waiting — and a `0 older bulk files`
+// on every run would be furniture within a week.
+func TestTheRefreshSaysWhatItSweptAndStaysQuietWhenItSweptNothing(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		swept pool.SweepCounts
+		want  string
+	}{
+		{"a tidy shelf", pool.SweepCounts{}, ""},
+		// A count of one agrees with its noun.
+		{"one copy", pool.SweepCounts{Files: 1, Bytes: 512},
+			"swept 1 older bulk file (512 bytes freed)\n"},
+		// And the bytes wear the same separators as every other number this
+		// command prints.
+		{"a full shelf", pool.SweepCounts{Files: 6, Bytes: 317_004_233},
+			"swept 6 older bulk files (317,004,233 bytes freed)\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			sayTheSweep(&out, tc.swept)
+			if got := out.String(); got != tc.want {
+				t.Errorf("the refresh said %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

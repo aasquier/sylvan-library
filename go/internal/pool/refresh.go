@@ -236,8 +236,11 @@ func DownloadBulkFrom(ctx context.Context, indexURL, kind, destDir string) (stri
 	if err != nil {
 		return "", err
 	}
+	// The list is [bulkSuffixes] rather than one written here, because the
+	// sweep matches parked names against the same one; two copies would drift
+	// into a file this code downloads and never tidies away.
 	suffix := ".json"
-	for _, s := range []string{".jsonl.gz", ".jsonl", ".json.gz"} {
+	for _, s := range bulkSuffixes {
 		if strings.HasSuffix(url, s) {
 			suffix = s
 			break
