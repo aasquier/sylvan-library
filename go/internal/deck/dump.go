@@ -106,7 +106,55 @@ func (d *Deck) Dump() (string, error) {
 		payload = append(payload, yamlemit.Pair{
 			Key: "graveyard", Value: cardList(d.Graveyard, false)})
 	}
+	// Last, and written only when occupied, like the two shelves above it.
+	//
+	// **Last on purpose.** A combo is a reading *of* the deck rather than part
+	// of it, so it goes after everything the deck is made of -- and putting it
+	// there means that catalogueing the first machine on a deck that has never
+	// had one appends to the file instead of pushing the 99 down, which is the
+	// difference between a one-block diff and a whole-file one.
+	if len(d.Combos) > 0 {
+		payload = append(payload, yamlemit.Pair{Key: "combos", Value: ComboList(d.Combos)})
+	}
 	return yamlemit.Dump(payload, DumpWidth)
+}
+
+// ComboList is the `combos:` block as the emitter's node model, and it is the
+// one renderer of that block: `Dump` writes a whole file with it and
+// `deckedit.SetCombos` writes the block alone with it, so a combos block
+// written by a deck being imported and one written by somebody pressing Save
+// cannot come out as different bytes.
+func ComboList(combos []Combo) yamlemit.List {
+	out := make(yamlemit.List, 0, len(combos))
+	for _, c := range combos {
+		out = append(out, comboObject(c))
+	}
+	return out
+}
+
+// comboObject renders one entry, in the file's key order.
+//
+// `needs` sits second, directly under the pieces, because the two together are
+// what the entry *is*: a machine, or a machine one card short. Everything after
+// that is what it does. `cut` follows the prose because it is the answer to a
+// question the prose has already raised, and `by` is last for the reason
+// `why_by` is not -- it is about the entry rather than about any one sentence
+// in it.
+func comboObject(c Combo) yamlemit.Map {
+	obj := yamlemit.Map{{Key: "cards", Value: stringList(c.Cards)}}
+	for _, pair := range []yamlemit.Pair{
+		{Key: "needs", Value: c.Needs},
+		{Key: "produces", Value: c.Produces},
+		{Key: "how", Value: c.How},
+		{Key: "setup", Value: c.Setup},
+		{Key: "cut", Value: c.Cut},
+		{Key: "by", Value: c.By},
+	} {
+		if text, _ := pair.Value.(string); text != "" {
+			obj = append(obj, pair)
+		}
+	}
+	return obj
 }
 
 // cardList is `[c.to_obj() for c in cards]`, with the draft rule applied.

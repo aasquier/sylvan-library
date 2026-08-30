@@ -57,6 +57,55 @@ type CardEntry struct {
 	WhyBy string
 }
 
+// Combo is one machine the deck can assemble: the cards it is made of, what
+// it produces, how it is turned, and what it costs to set up.
+//
+// **There is no `name` field, and that is a decision.** A combo's name is the
+// cards it is made of -- `Cards` joined with " + " -- which is how anybody who
+// plays the deck refers to it and the one heading that cannot go stale when a
+// piece is swapped. A separate title would be a second thing to keep true.
+//
+// **Terse by construction.** Four fields say what the machine is, two more
+// mark the one that is a card short, and there is nothing else: table manners,
+// lines to hold up, and when to go for it are the pilot's business and live in
+// the deck's notes. A block that grew a seventh field would be a primer.
+type Combo struct {
+	// The pieces this deck already sleeves, by exact pool name. The heading.
+	Cards []string
+	// What it makes, in the player's own words: "infinite colored mana".
+	Produces string
+	// The instructions, numbered, in the order the hands do them.
+	How string
+	// What it takes to get there -- mana, turns, a creature that has to be
+	// free of summoning sickness.
+	Setup string
+	// Needs is the one card this deck does not have yet. Its presence is what
+	// makes an entry a near-miss rather than a machine, and it is why `Cut`
+	// exists: Aaron's rule is that a suggestion the deck cannot act on is not
+	// a suggestion, so a near-miss always names the trade.
+	Needs string
+	// Cut is the card in the 99 the near-miss would come in for.
+	Cut string
+	// By is who assembled this entry, and it is only ever `claude` or empty --
+	// `CardEntry.WhyBy`'s rule, one block over (ADR 41).
+	//
+	// **Nothing in this phase writes it.** The field exists now so that the
+	// intake's combos action lands into a shape that already carries
+	// provenance rather than one that has to grow it later; a deck file may
+	// still hold the mark, and it survives a round trip. It comes off the
+	// moment a person changes what the entry says -- editing a draft is
+	// adopting it -- and `deckedit.SetCombos` is where that happens, because a
+	// mark the client could send is a mark the client could forge.
+	By string
+}
+
+// Heading is what this combo is called: its pieces, joined. The one name it
+// has, derived rather than stored, so it cannot disagree with the cards.
+func (c Combo) Heading() string { return strings.Join(c.Cards, " + ") }
+
+// NearMiss reports whether this entry is a card short of being a machine.
+func (c Combo) NearMiss() bool { return strings.TrimSpace(c.Needs) != "" }
+
 // Deck is the parsed file.
 type Deck struct {
 	Slug   string
@@ -95,6 +144,10 @@ type Deck struct {
 	Cards     []CardEntry
 	SwapBoard []CardEntry
 	Graveyard []CardEntry
+	// The machines this deck can assemble, in the order the file lists them.
+	// Order is the author's -- the first entry is the one they lead with -- so
+	// nothing here sorts.
+	Combos []Combo
 }
 
 // FromText parses deck YAML that is not necessarily a file. `slug` is the
@@ -198,7 +251,87 @@ func FromText(text string, slug string) (*Deck, error) {
 			*section.into = append(*section.into, entry)
 		}
 	}
+	d.Combos = []Combo{}
+	if list, ok := raw["combos"].([]any); ok {
+		for i, item := range list {
+			combo, err := comboFrom(item)
+			if err != nil {
+				return nil, fmt.Errorf("deck yaml: combos[%d]: %w", i, err)
+			}
+			d.Combos = append(d.Combos, combo)
+		}
+	}
 	return d, nil
+}
+
+// comboFrom reads one entry of the `combos:` block.
+//
+// A mapping only. `cardFrom` next door accepts a bare string as a card filed
+// under utility, because a hand-written deck list is a list of names and that
+// shorthand is worth having; a combo has no such shorthand -- a bare string
+// could be a card, a heading, or a sentence, and guessing which would file
+// somebody's prose as a card name the gate then warns about.
+func comboFrom(obj any) (Combo, error) {
+	m, ok := obj.(map[string]any)
+	if !ok {
+		return Combo{}, fmt.Errorf("a combo is a mapping of cards, produces, how and setup, not %T", obj)
+	}
+	combo := Combo{Cards: []string{}}
+	switch c := m["cards"].(type) {
+	case string:
+		// One card is still a list of pieces. Written by a person rather than
+		// by the app, which is the only way this shape arrives.
+		combo.Cards = []string{c}
+	case []any:
+		for _, item := range c {
+			// A nil entry is a line somebody left blank -- `- ` with nothing
+			// after it, which a hand-edited file grows the moment a piece is
+			// deleted rather than removed. Skipped rather than rendered, because
+			// `fmt.Sprint(nil)` is the string "<nil>" and that would become a
+			// card name in a heading and a warning from the gate.
+			if item == nil {
+				continue
+			}
+			if name := strings.TrimSpace(fmt.Sprint(item)); name != "" {
+				combo.Cards = append(combo.Cards, name)
+			}
+		}
+	}
+	combo.Produces = strings.TrimSpace(stringOr(m["produces"], ""))
+	combo.How = strings.TrimSpace(stringOr(m["how"], ""))
+	combo.Setup = strings.TrimSpace(stringOr(m["setup"], ""))
+	combo.Needs = strings.TrimSpace(stringOr(m["needs"], ""))
+	combo.Cut = strings.TrimSpace(stringOr(m["cut"], ""))
+	combo.By = strings.TrimSpace(stringOr(m["by"], ""))
+	return combo, nil
+}
+
+// ComboNames is every card name a combo block refers to, in reading order and
+// deduplicated: the pieces, the card a near-miss needs, and the card it would
+// cut.
+//
+// One list because there is one question behind all three -- does the pool
+// know this name -- and both the gate and the wire ask it. A name is a name
+// wherever it stands in the entry.
+func (d *Deck) ComboNames() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[strings.ToLower(name)] {
+			return
+		}
+		seen[strings.ToLower(name)] = true
+		out = append(out, name)
+	}
+	for _, combo := range d.Combos {
+		for _, name := range combo.Cards {
+			add(name)
+		}
+		add(combo.Needs)
+		add(combo.Cut)
+	}
+	return out
 }
 
 // cardFrom is `CardEntry.from_obj`.
@@ -507,7 +640,45 @@ func (d *Deck) Payload() map[string]any {
 		}
 		p["graveyard"] = yard
 	}
+	// **Here for the same reason every other block is**, and it is worth
+	// spelling out because the omission would be silent: `swaps.md` diffs a
+	// deck against the last build's snapshot by asking whether these two
+	// payloads are equal, so a block missing from this projection is a block
+	// whose changes report the deck as unchanged. Catalogue three combos, run
+	// a build, and the swap record would say nothing happened.
+	if len(d.Combos) > 0 {
+		machines := make([]map[string]any, 0, len(d.Combos))
+		for _, combo := range d.Combos {
+			machines = append(machines, comboPayload(combo))
+		}
+		p["combos"] = machines
+	}
 	return p
+}
+
+// comboPayload is one combo as `Dump` will write it: only the keys that have
+// something to say, in the order the file puts them.
+func comboPayload(c Combo) map[string]any {
+	out := map[string]any{"cards": append([]string{}, c.Cards...)}
+	if c.Needs != "" {
+		out["needs"] = c.Needs
+	}
+	if c.Produces != "" {
+		out["produces"] = c.Produces
+	}
+	if c.How != "" {
+		out["how"] = c.How
+	}
+	if c.Setup != "" {
+		out["setup"] = c.Setup
+	}
+	if c.Cut != "" {
+		out["cut"] = c.Cut
+	}
+	if c.By != "" {
+		out["by"] = c.By
+	}
+	return out
 }
 
 // SameAs reports whether two decks would dump to the same text -- the

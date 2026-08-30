@@ -58,3 +58,37 @@ swap_board:
   - name: Bojuka Bog
     category: land
     why: Graveyard hate on a land; bring in against reanimator pods.
+
+# The machines this deck can assemble. Optional, terse, and entirely the
+# author's: nothing generates this block and nothing prunes it.
+#
+# There is no `name` -- an entry is called after the cards it is made of, so
+# the heading cannot go stale when a piece changes. `cards` are exact pool
+# names (the deck page hovers each one), `produces` is what the machine makes,
+# `how` is the instructions in the order your hands do them, and `setup` is
+# what it costs to get there.
+#
+# An entry that names `needs` is one card short of assembling, and it always
+# says what would come out for it in `cut` -- a card to bring in is only a
+# suggestion once there is a slot for it. The gate warns about a catalogue
+# that has drifted from the deck beside it (a piece that was cut, a `needs`
+# that has since arrived); it never refuses one.
+#
+# `by: claude` appears only on an entry Claude drafted, and comes off the
+# moment a person edits what it says -- the same mark, and the same rule, as
+# `why_by` on a card.
+combos:
+  - cards: [Axebane Guardian, High Alert]
+    produces: infinite colored mana; infinite untaps of your creatures
+    how: 1) Tap Axebane Guardian for X, where X is your defender count.
+      2) Pay {2}{W}{U} to High Alert to untap it. 3) Each crank costs four
+      and makes X.
+    setup: six mana across two quiet turns, then the fifth defender; the
+      Guardian must be free of summoning sickness.
+  - cards: [Axebane Guardian]
+    needs: Umbral Mantle
+    produces: infinite colored mana
+    how: 1) Equip the Mantle. 2) Pay {3} to untap the Guardian. 3) Repeat
+      while you have five or more defenders.
+    setup: four mana, the Mantle, and a board of walls.
+    cut: Suspicious Bookcase

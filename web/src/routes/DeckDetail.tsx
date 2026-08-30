@@ -21,6 +21,7 @@ import { CommanderMotion } from '../components/cardmotion'
 import { WheelOfFortune } from '../components/wheel'
 import { OpeningHandDeal } from '../components/openinghand'
 import { TokenShelf } from '../components/tokens'
+import { Combos } from '../components/combos'
 import { SwapBoard } from '../components/swapboard'
 import {
   ArmedButton,
@@ -1550,6 +1551,24 @@ export default function DeckDetail() {
               )}
             </section>
           ))}
+
+          {/* The combos: the machines this deck can assemble, and the ones it
+              is a card short of.
+
+              Between the 99 and the swap board, because that is where it sits
+              in the deck's own life — after what the deck *is*, before what it
+              is weighing. It is deck data rather than an artifact: a
+              `combos:` block in `deck.yaml`, editable in place, carried by an
+              import and diffed by `swaps.md`. An entry has no name; it is
+              called after the cards it is made of, which is why the whole
+              block is written in one PUT rather than edited entry by entry.
+              `components/combos.tsx` argues the rest, including why the
+              near-miss's swap-board button asks for a rationale rather than
+              composing one. */}
+          <Combos combos={deck.combos} deckRef={deckRef}
+                  stage={deck.stage} identity={deck.color_identity}
+                  writable={deck.writable}
+                  onChanged={() => void refresh()} />
 
           {/* The swap board: the cards being considered, which the deck
               file has always held.

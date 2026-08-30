@@ -176,6 +176,18 @@ const (
 	// what any rationale says -- this file's oldest rule (ADR 28).
 	EditBulk    EditKind = "bulk"
 	EditSetDeck EditKind = "set-deck"
+	// The combos block, rewritten whole.
+	//
+	// **One entry for the block rather than one per entry**, which is the same
+	// call `EditIntake` and `EditBulk` already make: the block is the unit that
+	// is written, so it is the unit the history reports. A person editing the
+	// setup line of one machine would otherwise produce "changed a combo,
+	// changed a combo, changed a combo" for a block they reordered.
+	//
+	// It carries how many machines the deck now catalogues, in `Value` -- a
+	// count, never the prose, which is this file's oldest rule (ADR 28). What
+	// a combo *says* lives in the deck file, where the deck's own words belong.
+	EditCombos EditKind = "combos"
 )
 
 // BulkTally is what one bulk edit did, in counts.
@@ -293,6 +305,15 @@ func Describe(e Edit) (action, summary string) {
 
 	case EditBulk:
 		return "bulk", bulkSummary(e)
+
+	case EditCombos:
+		n, _ := e.Value.(int)
+		if n == 0 {
+			// The shelf emptied. Said as its own sentence rather than as
+			// "catalogued 0 combos", which is a score and not an event.
+			return "combos", "cleared the combos"
+		}
+		return "combos", fmt.Sprintf("catalogued %s", plural(n, "combo"))
 
 	case EditSetCard:
 		word := fieldWord(e.Field)

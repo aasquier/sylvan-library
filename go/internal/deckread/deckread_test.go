@@ -227,7 +227,7 @@ func TestTheDeckPayloadKeepsTheRecordedKeyOrder(t *testing.T) {
 		"pilot", "status", "stage", "needs_rationale", "commander",
 		"companion", "bracket", "archetype", "themes", "strategy", "notes",
 		"total_cards", "land_count", "color_identity", "commander_card",
-		"cards", "swap_board", "graveyard", "pool_available",
+		"cards", "swap_board", "graveyard", "combos", "pool_available",
 	}
 	if len(body) != len(want) {
 		t.Fatalf("payload has %d keys, want %d", len(body), len(want))

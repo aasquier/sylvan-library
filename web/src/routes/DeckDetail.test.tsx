@@ -95,6 +95,7 @@ const DECK = {
   pool_available: true,
   swap_board: [],
   graveyard: [],
+  combos: [],
   cards: [{
     name: 'Primeval Titan', category: 'ramp', why: 'Ramp and threat in one card.',
     qty: 1, known: true, mana_cost: '{4}{G}{G}', cmc: 6, type_line: 'Creature — Giant',
