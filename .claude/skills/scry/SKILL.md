@@ -194,10 +194,15 @@ the dossier published as an artifact:
    against the specific slot it vacates (mtg-lab rule 5), with rough
    Scryfall prices on the ins. Cuts are low-stakes by decree: Aaron owns
    the cards and can always put them back.
-3. **The dossier** (artifact) — the deck's name and story, a high-level
+3. **`combos.md`** — the combo dossier, for the deck page's combo section:
+   every combo actually sleeved in the final 99, each entry carrying its
+   pieces by exact card name, how it works, and how to set it up. See "The
+   combo dossier" below for the shape and for the fresh final-list query
+   it is built from — never hand the intake query's roster over as final.
+4. **The dossier** (artifact) — the deck's name and story, a high-level
    description, the pilot's quick-start (first three turns, the main line,
    the panic button), the sim numbers with seeds, and the council's tally.
-4. **`minutes.md`** — each advisor's verdict, in voice. The keepsake.
+5. **`minutes.md`** — each advisor's verdict, in voice. The keepsake.
 
 Close the session by the standing rules: memory updates, the next-session
 prompt, the roadmap artifact.
@@ -235,6 +240,52 @@ Maybeboard:
   `why_by: claude` (ADR 49). The mark is the truth-teller; skipping it
   makes the file lie in six months.
 
+## The combo dossier — combos.md's exact shape
+
+The deck page is growing a combo section that takes pasted combos — the
+card names for previews, an explanation of how the combo works, and how it
+can be set up (Aaron, 2026-08-30). The scry feeds it `combos.md`: one entry
+per combo **actually sleeved in the final 99**, plus an optional appendix
+for lines exactly one swap-board card away, each marked as such.
+
+Ground truth for the roster is a **fresh Spellbook `find-my-combos` POST
+over the sealed list** (save it as `spellbook-final.json`), never the
+intake query — combat and Rainbow both change the answer (the first scry's
+combat round seated two untappers the intake query had never seen). The
+Artificer's report supplies the narration; the final query decides which
+machines are really in the deck. Every card fact in an entry is read off
+the pool (non-negotiable 1 binds here too).
+
+Each entry:
+
+```
+## Axebane Guardian + High Alert
+
+Cards: Axebane Guardian, High Alert
+Produces: infinite colored mana; infinite untaps of your creatures
+
+How it works: 1) ... 2) ... 3) ...
+Setup: ...
+Table manners: ...
+```
+
+- The `##` heading joins the pieces with ` + `; the `Cards:` line repeats
+  them comma-separated. Both carry **exact pool names** — previews resolve
+  from them, so no nicknames, no shorthand, and a two-faced card's full
+  `A // B` name.
+- **How it works** is numbered steps in plain language: what you activate,
+  what untaps what, the net cost of one loop and where its profit comes
+  from, and what the loop converts into (the win, the library, the mana).
+- **Setup** says what to deploy in what order, the total mana to assemble
+  and to go, any threshold to reach first (the fifth defender), what to
+  hold back, and what breaks it — a tapped piece, a removal window.
+- **Table manners** closes the entry whenever the bracket asks for it —
+  the Artificer's announce script lives in the entry, not the minutes.
+- Prose blocks run ~25–45 words each, descriptive voice, and contain **no
+  quotation mark of any kind** — the combo parser's quoting rules are not
+  written yet, and the import parser's history says a quoted run ends
+  where you least want it to.
+
 ## What a scry never does
 
 - Never quotes a card's text, cost, or identity it did not just look up.
@@ -248,5 +299,5 @@ Maybeboard:
 - Never ships a combo above the bracket Aaron dialed without flagging it in
   combat, and never "fixes" the library's deliberately-invalid deck if it
   somehow appears in a paste.
-- Never ends without the four deliverables or an explicit note of which are
+- Never ends without the five deliverables or an explicit note of which are
   missing and why.
