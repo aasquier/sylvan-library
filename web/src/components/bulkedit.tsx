@@ -346,8 +346,14 @@ function BulkPlanView({ preview, busy, onApply }: {
       {plan.unchanged.length > 0 && (
         <details className="bulk-details">
           <summary className="bulk-summary">
-            {plan.unchanged.length} card{plan.unchanged.length === 1 ? '' : 's'} stay
-            exactly as {plan.unchanged.length === 1 ? 'it is' : 'they are'}
+            {/* Three words agree with the count, not two. The noun and the
+                trailing clause were already conditional and the verb was not,
+                so a single unchanged card read "1 card stay exactly as it is"
+                — on the one panel whose whole job is to be read carefully
+                before 78 cards are buried. */}
+            {plan.unchanged.length} card{plan.unchanged.length === 1 ? '' : 's'}{' '}
+            {plan.unchanged.length === 1 ? 'stays' : 'stay'} exactly as{' '}
+            {plan.unchanged.length === 1 ? 'it is' : 'they are'}
           </summary>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {plan.unchanged.map((name) => (

@@ -11,7 +11,7 @@
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { decklistLines } from '../lib/decklist'
+import { decklistLines, owingNote } from '../lib/decklist'
 import CameraDoor from './camera'
 
 afterEach(() => {
@@ -107,5 +107,22 @@ describe('asking Claude to read one (ADR 34)', () => {
     // the control does not exist to be pressed by accident.
     render(<CameraDoor onCards={vi.fn()} />)
     expect(screen.queryByText('Ask Claude to read it')).toBeNull()
+  })
+})
+
+describe('the photographs that never got a name', () => {
+  /* One is the ordinary reading here, not the edge case: cards are
+   * photographed one at a time. The line agreed its noun with the count and
+   * left the verb and the pronoun behind — "1 photograph still need a name —
+   * they will be left behind." Both counts are asserted, because a plural
+   * fixed in one direction and broken in the other is the usual repair. */
+  it('agrees its verb and pronoun with a single photograph', () => {
+    expect(owingNote(1))
+      .toBe('1 photograph still needs a name — it will be left behind.')
+  })
+
+  it('and stays plural for more than one', () => {
+    expect(owingNote(3))
+      .toBe('3 photographs still need a name — they will be left behind.')
   })
 })
