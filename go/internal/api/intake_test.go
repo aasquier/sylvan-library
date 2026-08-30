@@ -464,3 +464,63 @@ func TestTheIntakesArgueStepSkipsTheManaBase(t *testing.T) {
 		t.Errorf("made %v arguments of 4: %s", changed, doneRaw)
 	}
 }
+
+// **The card the intake had no answer for is named.**
+//
+// Leaving a card out is the design -- `internal/claude/intake.go` says so at
+// the top: a card the model cannot ground is left out and its owner writes
+// that one, which is exactly where they were before the intake ran. What was
+// missing was the sentence. A run asked for eighty-five and given eighty-four
+// wrote eighty-four, reported the two numbers, and named the eighty-fifth to
+// nobody, so the only way to find your own card was to diff your deck against
+// your paste. Found doing exactly that on a real import, 2026-08-30.
+func TestTheDraftingNamesWhatItLeft(t *testing.T) {
+	t.Parallel()
+
+	if got := leftForYou(nil); got != "" {
+		t.Errorf("a complete run said %q, want silence", got)
+	}
+	// One card is the overwhelmingly common case and reads as a sentence.
+	one := leftForYou([]string{"Virtue of Persistence"})
+	if !strings.Contains(one, "Virtue of Persistence") {
+		t.Errorf("the one card left is not named: %q", one)
+	}
+	if !strings.Contains(one, "that one is yours to write") {
+		t.Errorf("the singular does not agree: %q", one)
+	}
+	few := leftForYou([]string{"A", "B", "C"})
+	if !strings.Contains(few, "A, B, C") || !strings.Contains(few, "those are") {
+		t.Errorf("three cards read wrongly: %q", few)
+	}
+	// Past a handful the names stop being a place to start and become a wall,
+	// and the deck page already lists every card still owed a reason.
+	many := leftForYou([]string{"A", "B", "C", "D", "E"})
+	if !strings.Contains(many, "5 cards") || !strings.Contains(many, "including A, B, C") {
+		t.Errorf("a long list did not fall back to a count: %q", many)
+	}
+	if strings.Contains(many, "D") && strings.Contains(many, "E") {
+		t.Errorf("a long list named everything anyway: %q", many)
+	}
+}
+
+// The filing pass has the same omission and a different consequence: a card
+// left here keeps the category it arrived under rather than gaining a blank,
+// so its sentence says that instead of asking for work.
+func TestTheFilingSaysWhatItLeftUnderUtility(t *testing.T) {
+	t.Parallel()
+
+	if got := leftUnfiled(nil); got != "" {
+		t.Errorf("a complete run said %q, want silence", got)
+	}
+	few := leftUnfiled([]string{"Sol Ring"})
+	if !strings.Contains(few, "Sol Ring") || !strings.Contains(few, "Utility") {
+		t.Errorf("the card left unfiled is not named: %q", few)
+	}
+	if strings.Contains(few, "yours to write") {
+		t.Errorf("a filing asked for a rationale: %q", few)
+	}
+	many := leftUnfiled([]string{"A", "B", "C", "D"})
+	if !strings.Contains(many, "4 cards") || !strings.Contains(many, "including A, B, C") {
+		t.Errorf("a long list did not fall back to a count: %q", many)
+	}
+}

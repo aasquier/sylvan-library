@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -203,6 +204,87 @@ func TestDraftingReturnsOnlyCardsThatWereAskedAbout(t *testing.T) {
 	if outcome.Skipped != 1 {
 		t.Errorf("skipped %d, wanted 1 -- the count is how somebody sees this "+
 			"climbing", outcome.Skipped)
+	}
+	// Both cards were answered, so nothing was left. A reconciliation that
+	// invents a complaint about a complete run is worse than none.
+	if len(outcome.Unanswered) != 0 {
+		t.Errorf("a complete run left %q behind", outcome.Unanswered)
+	}
+}
+
+// **The card that never came back is named, and the volunteered one is not.**
+//
+// `Skipped` counts rows that arrived and were *rejected*; a card the model
+// simply never mentioned arrives as nothing and used to be counted nowhere.
+// So a run asked for two and given one wrote one, reported "skipped: 1" about
+// an entirely different card, and named the missing one to nobody -- which
+// left diffing your own deck against your own paste as the only way to find
+// it. Found doing exactly that on a real import, 2026-08-30.
+func TestTheDraftingReportsTheCardThatNeverCameBack(t *testing.T) {
+	t.Parallel()
+	api := &scriptedAPI{replies: []string{reply{stop: "end_turn", content: textBlock(
+		`{"drafts":[` +
+			// Lowercased on purpose: an answer is an answer whatever case it
+			// arrives in, and matching on anything but the casefold would
+			// report a card that was drafted perfectly well as missing.
+			`{"card":"beast within","why":"Answers anything at all.","fact":"Destroy target permanent."},` +
+			`{"card":"Rhystic Study","why":"Nobody asked about this one.","fact":"invented"}` +
+			`]}`)}.json()}}
+
+	_, outcome, err := DraftRationales(context.Background(), intakeFixture(),
+		[]string{"Cultivate", "Beast Within"},
+		IntakeRequest{Endpoint: api.start(t), Requested: "collaborator"})
+	if err != nil {
+		t.Fatalf("drafting: %v", err)
+	}
+	if len(outcome.Unanswered) != 1 || outcome.Unanswered[0] != "Cultivate" {
+		t.Fatalf("unanswered %q, want [Cultivate]: `Beast Within` was answered "+
+			"in lower case and `Rhystic Study` was never asked about -- the "+
+			"second is a rejection, which is what Skipped is for",
+			outcome.Unanswered)
+	}
+	if outcome.Skipped != 1 {
+		t.Errorf("skipped %d, want 1 -- the volunteered card is the rejected "+
+			"one, and it must not appear in both counts", outcome.Skipped)
+	}
+}
+
+// The list is put in front of a person, so it is walked in the order the cards
+// were asked in. An order nobody chose reads as a fault of its own -- and a
+// map's, which is what this would have been, changes between runs.
+func TestTheUnansweredAreNamedInTheOrderTheyWereAskedIn(t *testing.T) {
+	t.Parallel()
+	api := &scriptedAPI{replies: []string{reply{stop: "end_turn", content: textBlock(
+		`{"drafts":[{"card":"Cultivate","why":"Ramp and fixing.","fact":"a fact"}]}`)}.json()}}
+
+	_, outcome, err := DraftRationales(context.Background(), intakeFixture(),
+		[]string{"Sol Ring", "Cultivate", "Beast Within"},
+		IntakeRequest{Endpoint: api.start(t), Requested: "collaborator"})
+	if err != nil {
+		t.Fatalf("drafting: %v", err)
+	}
+	want := []string{"Sol Ring", "Beast Within"}
+	if !slices.Equal(outcome.Unanswered, want) {
+		t.Errorf("unanswered %q, want %q", outcome.Unanswered, want)
+	}
+}
+
+// The filing pass has the same hole and the same fix: a card `FileCards` never
+// placed keeps the category it arrived under, and nothing said which card that
+// was.
+func TestTheFilingReportsTheCardItNeverPlaced(t *testing.T) {
+	t.Parallel()
+	api := &scriptedAPI{replies: []string{reply{stop: "end_turn", content: textBlock(
+		`{"filings":[{"card":"Cultivate","category":"ramp","fact":"Search for a basic land."}]}`)}.json()}}
+
+	_, outcome, err := FileCards(context.Background(), intakeFixture(),
+		[]string{"Cultivate", "Beast Within"},
+		IntakeRequest{Endpoint: api.start(t), Requested: "collaborator"})
+	if err != nil {
+		t.Fatalf("filing: %v", err)
+	}
+	if len(outcome.Unanswered) != 1 || outcome.Unanswered[0] != "Beast Within" {
+		t.Errorf("unanswered %q, want [Beast Within]", outcome.Unanswered)
 	}
 }
 

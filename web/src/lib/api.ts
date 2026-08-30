@@ -1335,6 +1335,14 @@ export interface IntakeResult {
   >>
 }
 
+/** One of the five actions, spelled the way the result names it.
+ *
+ *  Derived from `IntakeResult` rather than written out a second time, so a
+ *  `Record<IntakeStepKey, …>` anywhere else is a completeness check the
+ *  typechecker performs — the sheet's titles are one such record, and adding a
+ *  sixth action would fail to compile until it had a name on screen. */
+export type IntakeStepKey = keyof IntakeResult['steps']
+
 export interface Job {
   id: string
   kind: string

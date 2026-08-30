@@ -36,13 +36,18 @@ In order:
    door in a local browser with Aaron's eyes on them, then the full
    deployed walk-through. The Coliseum's gear fan is owed one too — it wants
    a live match with something equipped on the board.
-   **The intake sheet (ADR 41) is owed the sharpest one of these.** Its
-   gates, its writes and its refusals are all tested, and its three prompts
-   have never met a real 99-card list — every test answers them with a
-   script. What a drafted rationale actually *reads like* over somebody's
-   own deck is unmeasured, and it is the only part of that feature a test
-   cannot tell us. Run it against a real import, read all ninety-nine, and
-   expect the prompts to need work.
+   **The intake sheet's walk (ADR 41) is spent, and it came back the other
+   way.** The prediction here was that its three prompts, having only ever
+   been answered by a script, would need work against a real 99-card list.
+   They did not: over some eighty-nine drafted rationales they read as
+   deck-aware, cross-referencing the actual list rather than describing each
+   card alone. That is the one thing no test could have told us, and it is
+   now known. What the walk found instead was the *silence* around the
+   result — a run that drafted eighty-four of eighty-five named the
+   eighty-fifth to nobody — which was a bug rather than a roadmap item, and
+   is closed. The residue worth watching: roughly one rationale in ninety
+   trails off into fragments of the card's own rules text, which is the
+   prompt's ceiling and not a parsing fault.
 2. **The bout's own follow-ups** (#376 landed the combat square-off: the
    arrows are gone and a block opens a fight on the centre stage, the
    attacker out of its own seat's edge and the wall ranked across the

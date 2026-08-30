@@ -5,7 +5,9 @@ import {
   type IntakeSheet, type Job,
 } from '../lib/api'
 import { IntakeChoices } from '../components/intake'
-import { intakeTrouble, runIntake } from '../lib/intake'
+import {
+  intakeAftermath, intakeTrouble, runIntake, type IntakeAftermath,
+} from '../lib/intake'
 import CameraDoor from '../components/camera'
 import {
   Badge, ErrorNote, ManaText, PageMasthead, Spinner, TextField,
@@ -68,8 +70,65 @@ function IntakeProgress({ job }: { job: Job }) {
       </div>
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
         Your deck is already saved. This is the extra work you asked for, and
-        the deck page opens as soon as it is finished.
+        the deck page opens as soon as it is finished — unless there is
+        something worth telling you first.
       </p>
+    </div>
+  )
+}
+
+/**
+ * What the finished intake had to say, and the door to the deck it wrote to.
+ *
+ * **The page used to navigate the instant the job resolved**, which meant a
+ * run could tell you nothing about itself. Every step already wrote a sentence
+ * for the moments its two numbers would read as a failure — and the one that
+ * matters most is "eighty-four of eighty-five", where the eighty-fifth is a
+ * real card in somebody's real deck that Claude had nothing to say about and
+ * nothing named it. Finding your own card meant reading ninety-nine reasons
+ * looking for the gap.
+ *
+ * So the page holds, but only when there is something to hold it for: a clean
+ * run has no notes and still goes straight to the deck. The door is a real
+ * destination and therefore a real link (commandment 20), and it is the
+ * loudest thing here because it is the thing to do next.
+ *
+ * Not an `ErrorNote`, for the same reason the trouble box below is not:
+ * nothing has gone wrong. The deck is written, the work is done, and this is
+ * the intake being honest about the edges of it. A red bar over "your deck is
+ * saved" would be the page arguing with itself.
+ *
+ * It borrows `.intake-told` — the list the sheet describes the chosen actions
+ * with, a few inches up this same page. The same vine rule down the left, the
+ * same name over the same kind of sentence: what you asked for, and then what
+ * came of it.
+ */
+function IntakeAccount({ rows, deck }: { rows: IntakeAftermath[]; deck: string }) {
+  return (
+    <div className="space-y-3 rounded-lg px-4 py-3"
+         role="status"
+         style={{ background: 'var(--gridline)' }}>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+        <strong>Your deck is saved and on the shelf.</strong> The extra work is
+        finished, and this is what it left for you. Nothing here is broken, and
+        none of it has to be done today.
+      </p>
+      <ul className="intake-told">
+        {rows.map((row) => (
+          <li key={row.key}>
+            {/* Empty on the one row that is about the whole run rather than
+                any single action, and a heading reading "" would be a stray
+                gap above the only sentence there is. */}
+            {row.title !== '' && (
+              <span className="intake-told-name">{row.title}</span>
+            )}
+            <p className="intake-told-what">{row.note}</p>
+          </li>
+        ))}
+      </ul>
+      <Link to={deck} className="btn btn-primary btn-accent-1 btn-sm">
+        Open your deck
+      </Link>
     </div>
   )
 }
@@ -101,6 +160,11 @@ export default function Import() {
   // to different questions: what happened, and what now.
   const [trouble, setTrouble] = useState<string | null>(null)
   const [troubleDeck, setTroubleDeck] = useState<string | null>(null)
+  // What the finished intake had to say, and where the deck it wrote to is.
+  // Empty is the ordinary answer — a run with nothing to report never stops
+  // the page — so this is also the whole of the decision to hold.
+  const [account, setAccount] = useState<IntakeAftermath[]>([])
+  const [accountDeck, setAccountDeck] = useState<string | null>(null)
   const [showYaml, setShowYaml] = useState(false)
   // ADR 49: whether the quoted reasons in this paste were drafted by Claude,
   // so the file can name the hand. Off by default and never remembered — an
@@ -205,6 +269,8 @@ export default function Import() {
     setError(null)
     setTrouble(null)
     setTroubleDeck(null)
+    setAccount([])
+    setAccountDeck(null)
     try {
       const result = await api.importDeck(body(dryRun, override))
       setPreview(result)
@@ -219,7 +285,19 @@ export default function Import() {
         if (started) {
           setIntake(started)
           try {
-            await followJob(started.id, setIntake, 400, started).promise
+            const finished = await followJob(started.id, setIntake, 400, started).promise
+            // **The one moment the run can be heard.** Its account of itself
+            // dies with this page, and until now the page left immediately —
+            // so a step that had already written "no reason was drafted for
+            // Virtue of Persistence" said it to nobody. Held only when there
+            // is something to hold for: a clean run reports nothing and goes
+            // straight through, exactly as before.
+            const said = intakeAftermath(finished.result)
+            if (said.length > 0) {
+              setAccount(said)
+              setAccountDeck(deckUrl(result))
+              return
+            }
           } catch (e) {
             // **The extra work failing must not strand somebody on this
             // page.** The deck is created and saved by now — that happened
@@ -505,6 +583,15 @@ export default function Import() {
           page that has died. */}
       {intake && intake.status !== 'done' && !trouble && (
         <IntakeProgress job={intake} />
+      )}
+
+      {/* The extra work finished and had something to say about it — which
+          cards it had no reason for, which it could not place, what it was not
+          allowed to do. The deck is written and waiting; this is the last
+          screen that knows what was asked for, so it is the only one that can
+          report on it. */}
+      {account.length > 0 && accountDeck && (
+        <IntakeAccount rows={account} deck={accountDeck} />
       )}
 
       {/* The extra work did not finish. Not an `ErrorNote`: nothing here is

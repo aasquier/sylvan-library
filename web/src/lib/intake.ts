@@ -1,4 +1,7 @@
-import { ApiError, api, type IntakeSheet, type Job } from './api'
+import {
+  ApiError, api, type IntakeResult, type IntakeSheet, type IntakeStepKey,
+  type Job,
+} from './api'
 
 /**
  * Runs the intake sheet against a deck that has just been created (ADR 41).
@@ -66,4 +69,95 @@ export function intakeTrouble(err: unknown): string {
   return 'Your deck is saved and safe. The extra work you asked for did not '
     + 'finish, and nothing was written wrongly — the reasons simply are not '
     + 'there yet.'
+}
+
+/**
+ * What each action is called, wherever a person is shown one.
+ *
+ * **One copy, used twice.** The sheet puts these on its chips before the run
+ * and the account of what happened puts them on its sentences afterwards, and
+ * those have to be the same words: somebody who ticked "Sort the cards" and is
+ * then told something about "categorisation" has been handed a second name for
+ * the thing they chose.
+ *
+ * A total `Record` rather than a list, deliberately, and it is doing two jobs
+ * the typechecker will not let it drop. A sixth action added to the wire
+ * without a name here fails to compile — where a list would simply have
+ * rendered its outcome as nothing at all. And object key order is insertion
+ * order for string keys, so **this literal is also the reading order**: the
+ * outcomes come back down the page in the order the actions were offered,
+ * rather than in whatever order the wire happened to serialise them.
+ *
+ * Each is what the action *does* rather than what it is called, because the
+ * audience for this page is somebody who has just pasted their one deck
+ * (commandment 2): "commander dossier" is a name, and "read up on your
+ * commander" is what they get.
+ */
+export const INTAKE_TITLES: Record<IntakeStepKey, string> = {
+  categories: 'Sort the cards',
+  rationales: 'Draft the reasons',
+  description: 'Describe the deck',
+  dossier: 'Read up on your commander',
+  argue: 'Argue with every card',
+}
+
+/** One thing the finished intake has to say for itself, ready to render:
+ *  the action it is about, in the sheet's own words, and the sentence the
+ *  server wrote for it. */
+export interface IntakeAftermath {
+  key: IntakeStepKey | 'asked'
+  /** Empty for the whole-run refusal, which is about no single action. */
+  title: string
+  note: string
+}
+
+/**
+ * What the intake wants to tell you, once it has finished.
+ *
+ * **Every step could already say this and nothing ever listened.** A step's
+ * `note` is written by the server for exactly the moments where the two
+ * numbers beside it would read as a failure — "eighty-four of eighty-five" is
+ * a fine result and a frightening sentence — and the import page's answer to
+ * all of them was to navigate to the deck the instant the job resolved. So the
+ * one thing a run could never tell you was the thing worth knowing: **which
+ * cards it left**.
+ *
+ * That is the omission this exists for. Leaving a card out is the design —
+ * `internal/claude/intake.go` argues it: a card Claude cannot ground is left
+ * alone and its owner writes that one, which is exactly where they were before
+ * the intake ran. What was missing was the sentence, and without it the only
+ * way to find your own card was to read ninety-nine reasons looking for the
+ * gap.
+ *
+ * `unknown` in, because that is honestly what a job's `result` is — the shape
+ * belongs to the job's `kind` and this is the only file that knows which. A
+ * result that is not the shape expected yields nothing to say rather than a
+ * thrown error: the deck is saved either way, and a page that crashed on the
+ * way to reporting good news would be the worse failure by a distance.
+ */
+export function intakeAftermath(result: unknown): IntakeAftermath[] {
+  if (result === null || typeof result !== 'object') return []
+  const done = result as IntakeResult
+
+  // The whole run refused — the stance would not speak — and `reason` is the
+  // only thing it has to say. Its steps are empty by construction, so this is
+  // the sentence or nothing.
+  if (done.asked === false) {
+    return done.reason ? [{ key: 'asked', title: '', note: done.reason }] : []
+  }
+
+  // `?? {}` against a field the type calls required, because the type is a
+  // claim about a wire, and this function is explicitly handed `unknown`. A
+  // result of another shape reached here and threw on the missing `steps`,
+  // which would have taken the page down at the exact moment it was about to
+  // say the deck was safe.
+  const steps: Partial<Record<IntakeStepKey, { note?: string }>> = done.steps ?? {}
+
+  // Walked over the titles rather than over the wire's own keys, because that
+  // record is complete by construction: no step can arrive with something to
+  // say and be dropped for want of a name. Its order is the sheet's order.
+  return (Object.keys(INTAKE_TITLES) as IntakeStepKey[]).flatMap((key) => {
+    const note = steps[key]?.note
+    return note ? [{ key, title: INTAKE_TITLES[key], note }] : []
+  })
 }
