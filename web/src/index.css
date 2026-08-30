@@ -17901,6 +17901,83 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* ── beat one: the same ground, while the paragraph is still being written ──
+ *
+ * `.draft-working` is deliberately `.draft-panel`'s twin — same wash, same
+ * vine fence, same arrival — because the two are one thing in two states, and
+ * a reader should watch the draft *land in the place that was waiting for it*
+ * rather than watch one box vanish and a different box appear somewhere else.
+ *
+ * What moves inside it is three ruled lines taking ink, which is the shape of
+ * the thing being made rather than a generic spinner: a short paragraph, about
+ * to exist. The sweep is a background-position animation on a wide gradient —
+ * no `filter` anywhere (commandment 19's reflex, even with no card in sight),
+ * and `background-size` is in percent of the element, which is exactly what is
+ * wanted here and is the trap when it is not. */
+.draft-working {
+  background: color-mix(in srgb, var(--vine) 7%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--vine) 30%, transparent);
+  border-inline-start: 3px solid color-mix(in srgb, var(--vine) 62%, transparent);
+  animation: draft-arrives 260ms cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+.draft-scribing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.draft-scribing span {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vine) 16%, transparent) 0%,
+    color-mix(in srgb, var(--vine) 52%, transparent) 42%,
+    color-mix(in srgb, var(--vine) 16%, transparent) 84%
+  );
+  background-size: 240% 100%;
+  animation: draft-scribing 1.9s ease-in-out infinite;
+}
+
+/* Ragged, like a paragraph: three equal bars read as a loading skeleton, and
+ * a skeleton is a promise about layout rather than about writing. */
+.draft-scribing span:nth-child(1) {
+  width: 94%;
+}
+
+.draft-scribing span:nth-child(2) {
+  width: 80%;
+  animation-delay: 0.24s;
+}
+
+.draft-scribing span:nth-child(3) {
+  width: 47%;
+  animation-delay: 0.48s;
+}
+
+@keyframes draft-scribing {
+  from {
+    background-position: 130% 0;
+  }
+
+  to {
+    background-position: -70% 0;
+  }
+}
+
+/* The global policy slows a spinner rather than stopping it, "because it is a
+ * status" — and that argument does not reach here, because this panel has a
+ * second-by-second clock in it that says the same thing without moving. So the
+ * ink stops outright and the lines stay: they are still the shape of a
+ * paragraph on its way, which is information, and the seconds carry the rest. */
+@media (prefers-reduced-motion: reduce) {
+  .draft-working,
+  .draft-scribing span {
+    animation: none;
+  }
+}
+
 /* ======================================================= Lane B: the bulk
  *                                                    edit's paste and plan
  *

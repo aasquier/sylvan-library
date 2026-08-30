@@ -819,6 +819,55 @@ function claudeCanAnswer(status: ClaudeStatus | null | undefined): boolean {
 }
 
 /**
+ * Beat one: Claude at work, drawn rather than stated.
+ *
+ * The wait here is ten to twenty seconds, and until 2026-08-30 the only sign
+ * of it was a disabled button whose label read "Reading your list…" — at the
+ * *bottom* of the editor, under an empty textarea and a greyed Save. Aaron's
+ * report was that it "isn't clear ... that Claude is already working on a
+ * draft", which is the same fault the theme interview's clock was built for
+ * and whose comment names it exactly: a working feature that looks like a
+ * broken one.
+ *
+ * Three things carry the state, and they fail independently on purpose.
+ * `.thinking-pulse` breathes (the house's existing mark for a multi-second
+ * call, already reduced-motion guarded). The **elapsed seconds** tick, which is
+ * honest where a progress bar would be a guess and — the point — keeps saying
+ * "still going" when the motion is switched off. And three ruled lines take ink
+ * across them, so the shape on screen is the shape of the thing being made: a
+ * short paragraph.
+ *
+ * Commandment 6 wants the movement; the seconds are what make it safe to stop
+ * the movement for somebody who asked for less of it.
+ */
+function DraftWorking() {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const at = Date.now()
+    const clock = setInterval(
+      () => setElapsed(Math.round((Date.now() - at) / 1000)), 1000)
+    return () => clearInterval(clock)
+  }, [])
+  return (
+    <div className="draft-working space-y-2 rounded-lg p-3">
+      <p className="thinking-pulse text-sm font-medium"
+         style={{ color: 'var(--text-primary)' }}>
+        Claude is reading your deck… {elapsed}s
+      </p>
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        Ten or twenty seconds, usually. It reads every card on your list, then
+        writes a few sentences for somebody who has never seen the deck. You
+        get the last word on all of it.
+      </p>
+      {/* Decoration, and it says so: the sentence above is the whole message. */}
+      <div className="draft-scribing" aria-hidden>
+        <span /><span /><span />
+      </div>
+    </div>
+  )
+}
+
+/**
  * Claude's draft of the deck's description — beside the box, never into it.
  *
  * The mode is `deck-description`, the same one the import intake runs. There it
@@ -826,28 +875,57 @@ function claudeCanAnswer(status: ClaudeStatus | null | undefined): boolean {
  * construction, and the intake skips the step outright for a deck that already
  * says something. **Here the field may already hold a paragraph its owner
  * wrote**, so the route this panel calls writes nothing at all and this panel
- * is where that difference is kept honest:
+ * is where that difference is kept honest.
  *
- * * The draft renders *alongside* the box. Nothing lands in the textarea
- *   until somebody presses a button, and the button's label says what pressing
- *   it will do — "Use this draft" over an empty box, "Replace what you wrote"
- *   over a full one, and no button at all once the box already holds this
- *   draft. No control here is ambiguous about whose words lose.
- * * A replacement is one click from being undone, and the draft stays on
- *   screen after it is used, so neither version is ever the one you cannot get
- *   back.
- * * Nothing reaches the deck file until **Save description**, which is the
- *   same button and the same call a person's own typing goes through.
+ * # Two shapes, because there are two situations and they are not alike
  *
- * This is ADR 8 and ADR 11's principle — no surface writes for you unasked —
- * applied to a field they do not name. The deck's `strategy` is not a card's
- * `why`, and this panel does not pretend it is: there is no `why_by`-style mark
- * on the far side, because ADR 41's mark is dropped the first time a person
- * edits a drafted sentence and here that edit has already had its chance before
- * anything is saved. `claude.DescriptionNever` is the server saying the same
- * thing in the payload, and it renders at the bottom of the panel.
+ * `lead` is the difference, and everything else follows from it.
+ *
+ * **Lead** is the newcomer's path: an empty deck, somebody presses "Ask Claude
+ * for a draft", and this panel *is* the screen — `StrategyEditor` hides the box
+ * while it runs. It reads as two beats and nothing else. **Claude is working on
+ * this**, then **approve this draft**: save it, edit it first, ask for another,
+ * or leave. There is nothing in the box to lose, so approving saves in one
+ * press rather than two, and the press is on a button that says *Save this
+ * description*.
+ *
+ * **Side** is the pen's path, and it is unchanged: somebody opened the editor
+ * to write, and the draft is an offer next to their box. The draft renders
+ * *alongside*, nothing lands in the textarea until a button is pressed, and the
+ * label says what pressing it costs — "Use this draft" over an empty box,
+ * "Replace what you wrote" over a full one, and no button at all once the box
+ * already holds this draft. A replacement is one click from being undone, and
+ * nothing reaches the deck file until **Save description**.
+ *
+ * # What the two-press rule was actually protecting
+ *
+ * This suite used to open by saying a draft never becomes the description
+ * "without somebody choosing it twice". That was one sentence covering two
+ * different risks, and only one of them was real. Over a paragraph somebody
+ * wrote, the second press is the guard on *their words*: the box is where the
+ * undo lives, and a replacement must be recoverable. Over an empty deck it
+ * guarded nothing at all — it made a person press "Use this draft" and then
+ * hunt upward for "Save description" to accept a paragraph they had just been
+ * shown and had no earlier version of.
+ *
+ * So the rule is now stated as what it defends: **a draft never overwrites
+ * words somebody wrote without a second, undoable choice.** Lead mode is
+ * offered only where `current` is empty, and it saves what is on screen through
+ * the same `api.setDeckField` call a person's own typing goes through.
+ *
+ * This is still ADR 8 and ADR 11's principle — no surface writes for you
+ * *unasked* — applied to a field they do not name. A button labelled "Save this
+ * description" is the asking. The deck's `strategy` is not a card's `why`, and
+ * this panel does not pretend it is: there is no `why_by`-style mark on the far
+ * side, because ADR 41's mark is dropped the first time a person edits a
+ * drafted sentence. `claude.DescriptionNever` is the server saying the same
+ * thing in the payload, and it renders at the bottom of the panel in both
+ * shapes.
  */
-function DescriptionAssist({ deck, status, pin, current, autoAsk, onUse }: {
+function DescriptionAssist({
+  deck, status, pin, current, autoAsk, lead = false, saving = false,
+  onUse, onApprove, onLeave,
+}: {
   deck: DeckRef
   status: ClaudeStatus | null | undefined
   pin: string | null
@@ -856,7 +934,20 @@ function DescriptionAssist({ deck, status, pin, current, autoAsk, onUse }: {
   /** Opened by a control that already said "ask", so asking again here would
    *  be a second click for a decision somebody has made. */
   autoAsk?: boolean
+  /** True while this panel is the whole screen rather than an offer beside a
+   *  box. `StrategyEditor` owns the flag, because it owns the box. */
+  lead?: boolean
+  /** The editor's own save is in flight. Lead mode borrows it because in lead
+   *  mode the approve button is the save button, and a control that has been
+   *  pressed and says nothing is a control somebody presses twice. */
+  saving?: boolean
+  /** Put the draft in the box, to be edited before it is saved. */
   onUse: (draft: string) => void
+  /** Save the draft as it stands. Lead mode only — over an empty description,
+   *  where a second press guards nothing. */
+  onApprove?: (draft: string) => void
+  /** Leave the editor entirely, saving nothing. */
+  onLeave?: () => void
 }) {
   const [draft, setDraft] = useState<DeckDescriptionDraft | null>(null)
   const [busy, setBusy] = useState(false)
@@ -887,45 +978,85 @@ function DescriptionAssist({ deck, status, pin, current, autoAsk, onUse }: {
     void askIt()
   }, [autoAsk, status, deck.slug, askIt])
 
-  if (status === undefined) return null
-  if (status === null) {
+  /** The way back to the box when this panel is the whole screen. Every state
+   *  that cannot offer a draft still has to leave somebody somewhere — a lead
+   *  panel with nothing but a sentence in it is a dead end. */
+  const escape = lead && (
+    <div className="flex flex-wrap items-center gap-2">
+      <button onClick={() => onUse('')} className="btn btn-quiet btn-xs">
+        Write it myself
+      </button>
+      {onLeave && (
+        <button onClick={onLeave} className="btn btn-ghost btn-xs">Cancel</button>
+      )}
+    </div>
+  )
+
+  /** One frame for the states that have something to say and no draft to show.
+   *  In side mode it is the quiet line under the box it always was; in lead
+   *  mode it is the screen, so it carries the way out. */
+  function saying(words: React.ReactNode) {
+    if (!lead) {
+      return (
+        <p className="border-t pt-2 text-xs"
+           style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
+          {words}
+        </p>
+      )
+    }
     return (
-      <p className="border-t pt-2 text-xs"
-         style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
-        Claude could not be reached just now. The description is still yours to
-        write, and the box above works either way.
-      </p>
+      <div className="space-y-3">
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          {words}
+        </p>
+        {escape}
+      </div>
     )
   }
-  if (!status.installed || !status.configured) return <ClaudeUnavailable className="text-xs" />
+
+  // Not asked yet. In side mode there is nothing to say; in lead mode the
+  // screen is ours, and a blank one is indistinguishable from a hang.
+  if (status === undefined) {
+    return lead ? <div role="status"><DraftWorking /></div> : null
+  }
+  if (status === null) {
+    return saying('Claude could not be reached just now. The description is '
+      + 'still yours to write, and the box works either way.')
+  }
+  if (!status.installed || !status.configured) {
+    return lead
+      ? <div className="space-y-3"><ClaudeUnavailable className="text-sm" />{escape}</div>
+      : <ClaudeUnavailable className="text-xs" />
+  }
   if (status.stance.axes[0]?.level === 'off') {
     // A real position, not a fault: somebody set the dial to stay silent. Say
     // where the dial is rather than showing a button that would refuse.
-    return (
-      <p className="border-t pt-2 text-xs"
-         style={{ borderColor: 'var(--hairline)', color: 'var(--text-muted)' }}>
-        Claude is set to stay silent for this deck. The dial at the top of the
-        page will let it help you draft this.
-      </p>
-    )
+    return saying('Claude is set to stay silent for this deck. The dial at the '
+      + 'top of the page will let it help you draft this.')
   }
 
   const replacing = current.trim().length > 0
   // Whether the box already holds exactly this draft — true the moment it is
   // used, false again the first time somebody types.
   const inBox = !!draft?.strategy && current.trim() === draft.strategy.trim()
+  const landed = !busy && draft?.asked && !!draft.strategy
 
   return (
-    <div className="space-y-2 border-t pt-2 text-xs"
-         style={{ borderColor: 'var(--hairline)' }}>
-      <div className="flex flex-wrap items-center gap-2">
-        <button onClick={askIt} disabled={busy} className="btn btn-quiet btn-xs">
-          {busy ? 'Reading your list…' : draft ? 'Ask again' : 'Ask Claude for a draft'}
-        </button>
-        <span style={{ color: 'var(--text-muted)' }}>
-          It drafts. You keep the pen — nothing changes up there unless you say so.
-        </span>
-      </div>
+    <div className={lead ? 'space-y-3' : 'space-y-2 border-t pt-2 text-xs'}
+         style={lead ? undefined : { borderColor: 'var(--hairline)' }}>
+      {/* The ask, and in lead mode it is not offered at all: the click that got
+          somebody here already said "ask", and a second button for the same
+          decision is the hole this redesign filled in. */}
+      {!lead && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={askIt} disabled={busy} className="btn btn-quiet btn-xs">
+            {draft ? 'Ask again' : 'Ask Claude for a draft'}
+          </button>
+          <span style={{ color: 'var(--text-muted)' }}>
+            It drafts. You keep the pen — nothing changes up there unless you say so.
+          </span>
+        </div>
+      )}
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
@@ -935,19 +1066,25 @@ function DescriptionAssist({ deck, status, pin, current, autoAsk, onUse }: {
           `ErrorNote` carry for the same reason — commandment 2's "shut out"
           includes shut out by a screen reader. The error is deliberately
           outside it: `ErrorNote` is its own region and nesting two would have
-          one swallow the other. */}
+          one swallow the other.
+
+          **Both beats live in here**, which is the point: a reader hears "Claude
+          is reading your deck" and then hears the draft, from one region, in
+          the order they happened. */}
       <div role="status" className="space-y-2">
-      {draft && !draft.asked && (
+      {busy && <DraftWorking />}
+
+      {!busy && draft && !draft.asked && (
         <p style={{ color: 'var(--text-muted)' }}>{draft.reason}</p>
       )}
 
-      {draft?.asked && !draft.strategy && (
+      {!busy && draft?.asked && !draft.strategy && (
         <p style={{ color: 'var(--text-muted)' }}>
           {draft.reason || 'Nothing usable came back. Ask again, or write your own.'}
         </p>
       )}
 
-      {draft?.asked && draft.strategy && (
+      {landed && draft && (
         <div className="draft-panel space-y-2 rounded-lg p-3">
           {/* ADR 14 boundary 3: the gate's output is reproducible and this is
               not, so they never share a surface without a label. It names the
@@ -962,41 +1099,67 @@ function DescriptionAssist({ deck, status, pin, current, autoAsk, onUse }: {
             <ManaText>{draft.strategy}</ManaText>
           </p>
           {draft.fact && (
-            <p style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Read off your list: {draft.fact}
             </p>
           )}
           {draft.themes.length > 0 && (
-            <p style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               It also read these as the deck’s themes:{' '}
               <span style={{ color: 'var(--text-secondary)' }}>
                 {draft.themes.join(', ')}
               </span>
-              . Shown here only — this box writes the description.
+              . Shown here only — the description is the paragraph above.
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Three states, not two. The label has to name the cost before it
-                is paid — over an empty box this takes a draft, over a full one
-                it takes a paragraph somebody wrote — and once the draft *is*
-                the box, "replace what you wrote" is a sentence about nothing.
-                Said rather than disabled: a greyed control reads as "this is
-                broken" where the truth is "this is already done". */}
-            {inBox ? (
-              <span style={{ color: 'var(--text-secondary)' }}>
-                This draft is in the box above, and yours to edit.
-              </span>
-            ) : (
-              <button onClick={() => onUse(draft.strategy)}
-                      className="btn btn-primary btn-accent-2 btn-xs">
-                {replacing ? 'Replace what you wrote' : 'Use this draft'}
+          {lead ? (
+            // Beat two, and the whole beat is this row: approve, edit, ask
+            // again, leave. One primary and three quiet ones, so which is the
+            // way forward is a matter of looking rather than reading.
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => onApprove?.(draft.strategy)} disabled={saving}
+                      className="btn btn-primary btn-accent-2 btn-sm">
+                {saving ? 'Saving…' : 'Save this description'}
               </button>
-            )}
-            <span style={{ color: 'var(--text-muted)' }}>{draft.never}</span>
-          </div>
+              <button onClick={() => onUse(draft.strategy)} disabled={saving}
+                      className="btn btn-quiet btn-xs">
+                Edit it first
+              </button>
+              <button onClick={askIt} disabled={saving} className="btn btn-quiet btn-xs">
+                Ask for another
+              </button>
+              {onLeave && (
+                <button onClick={onLeave} disabled={saving}
+                        className="btn btn-ghost btn-xs">Cancel</button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Three states, not two. The label has to name the cost before
+                  it is paid — over an empty box this takes a draft, over a full
+                  one it takes a paragraph somebody wrote — and once the draft
+                  *is* the box, "replace what you wrote" is a sentence about
+                  nothing. Said rather than disabled: a greyed control reads as
+                  "this is broken" where the truth is "this is already done". */}
+              {inBox ? (
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  This draft is in the box above, and yours to edit.
+                </span>
+              ) : (
+                <button onClick={() => onUse(draft.strategy)}
+                        className="btn btn-primary btn-accent-2 btn-xs">
+                  {replacing ? 'Replace what you wrote' : 'Use this draft'}
+                </button>
+              )}
+            </div>
+          )}
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{draft.never}</p>
         </div>
       )}
       </div>
+
+      {/* In lead mode a state with no draft in it still needs a way onward. */}
+      {lead && !busy && !landed && escape}
     </div>
   )
 }
@@ -1041,7 +1204,14 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
   // Set by the empty state's "Ask Claude for a draft", which opens the editor
   // *and* asks: the decision was made by the click that opened it, and making
   // somebody press a second button for it is a hole to stare into.
-  const [askOnOpen, setAskOnOpen] = useState(false)
+  //
+  // It also **hides the box** while it is true, which is the 2026-08-30 change.
+  // Somebody who just pressed "Ask Claude for a draft" was landed in an empty
+  // textarea over a greyed-out Save, with the only sign of life a disabled
+  // button at the bottom of the page — a screen that asks them to write while
+  // Claude writes. There is nothing to type into until there is something to
+  // react to, so until then the draft is the screen.
+  const [drafting, setDrafting] = useState(false)
   // Asked only where the answer is needed: a deck this person can write, and
   // either open in the editor or missing a description entirely — those are
   // the two places a control depends on it. A deck being read costs nothing,
@@ -1051,24 +1221,36 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
   function open(from: string, ask: boolean) {
     setText(from)
     setDisplaced(null)
-    setAskOnOpen(ask)
+    setDrafting(ask)
     setEditing(true)
   }
 
-  /** Take a draft into the box, remembering what it displaced. */
+  /** Take a draft into the box, remembering what it displaced. Also the way
+   *  out of lead mode — "Edit it first" and "Write it myself" are both this,
+   *  which is why the box appears with whatever they chose already in it. */
   function useDraft(drafted: string) {
     setDisplaced(text.trim() ? text : null)
     setText(drafted)
+    setDrafting(false)
   }
 
-  async function save() {
-    if (!text.trim()) return
+  /** The value is explicit rather than read off `text` because approving a
+   *  draft saves what is on screen in the same tick it is chosen, and `text`
+   *  would still be the empty string this editor was opened with. */
+  async function save(value: string) {
+    const body = value.trim()
+    if (!body) return
     setBusy(true)
     setError(null)
     try {
-      onDone(await api.setDeckField(deck, 'strategy', text.trim()))
+      onDone(await api.setDeckField(deck, 'strategy', body))
       setEditing(false)
+      setDrafting(false)
     } catch (e) {
+      // The box is where a failed save leaves somebody, with the words intact:
+      // a refusal that also loses the paragraph would be two losses.
+      setText(body)
+      setDrafting(false)
       setError(String((e as Error).message ?? e))
     } finally {
       setBusy(false)
@@ -1077,47 +1259,60 @@ export function StrategyEditor({ deck, value, writable, onDone }: {
 
   if (editing) {
     return (
-      <div className="max-w-3xl space-y-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide"
-                style={{ color: 'var(--text-muted)' }}>
-            What this deck is trying to do
-          </span>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
-                    aria-label="What this deck is trying to do"
-                    placeholder="Golgari Food aristocrats. Gyome turns every nontoken creature into a meal…"
-                    className="w-full rounded-md px-2 py-1.5 text-sm leading-relaxed outline-none focus:ring-2"
-                    style={inputStyle} />
-        </label>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          A few sentences, for somebody who has never seen the list. It shows
-          on your shelf, at the top of this page, and in the printed primer.
-        </p>
-        {displaced !== null && (
-          // The undo for a replacement, and it is only ever offered when there
-          // is something to put back. Nothing has been saved at this point —
-          // the swap happened in this box and nowhere else — but "you can get
-          // it back" is worth more said than inferred.
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <button onClick={() => { setText(displaced); setDisplaced(null) }}
-                    className="btn btn-quiet btn-xs">
-              Put your own words back
-            </button>
-            <span style={{ color: 'var(--text-muted)' }}>
-              Your paragraph is safe until you save this one.
-            </span>
+      <div className="max-w-3xl space-y-3">
+        {/* Hidden while the draft is the screen. Everything below is one
+            element in one position either way, so `DescriptionAssist` keeps
+            its draft across the move out of lead mode rather than remounting
+            and forgetting it. */}
+        {!drafting && (
+          <div className="space-y-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium uppercase tracking-wide"
+                    style={{ color: 'var(--text-muted)' }}>
+                What this deck is trying to do
+              </span>
+              <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
+                        aria-label="What this deck is trying to do"
+                        placeholder="Golgari Food aristocrats. Gyome turns every nontoken creature into a meal…"
+                        className="w-full rounded-md px-2 py-1.5 text-sm leading-relaxed outline-none focus:ring-2"
+                        style={inputStyle} />
+            </label>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              A few sentences, for somebody who has never seen the list. It shows
+              on your shelf, at the top of this page, and in the printed primer.
+            </p>
+            {displaced !== null && (
+              // The undo for a replacement, and it is only ever offered when
+              // there is something to put back. Nothing has been saved at this
+              // point — the swap happened in this box and nowhere else — but
+              // "you can get it back" is worth more said than inferred.
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button onClick={() => { setText(displaced); setDisplaced(null) }}
+                        className="btn btn-quiet btn-xs">
+                  Put your own words back
+                </button>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  Your paragraph is safe until you save this one.
+                </span>
+              </div>
+            )}
+            {error && <ErrorNote>{error}</ErrorNote>}
+            <div className="flex items-center gap-3">
+              <PrimaryButton onClick={() => void save(text)} disabled={busy || !text.trim()}>
+                {busy ? 'Saving…' : 'Save description'}
+              </PrimaryButton>
+              <QuietButton onClick={() => setEditing(false)} disabled={busy}>Cancel</QuietButton>
+            </div>
           </div>
         )}
-        {error && <ErrorNote>{error}</ErrorNote>}
-        <div className="flex items-center gap-3">
-          <PrimaryButton onClick={save} disabled={busy || !text.trim()}>
-            {busy ? 'Saving…' : 'Save description'}
-          </PrimaryButton>
-          <QuietButton onClick={() => setEditing(false)} disabled={busy}>Cancel</QuietButton>
-        </div>
+        {/* A save that failed puts the box back with the words in it, so the
+            error always has the box to live in and needs nothing here. */}
         {writable && (
           <DescriptionAssist deck={deck} status={status} pin={pin} current={text}
-                             autoAsk={askOnOpen} onUse={useDraft} />
+                             autoAsk={drafting} lead={drafting} saving={busy}
+                             onUse={useDraft}
+                             onApprove={(drafted) => void save(drafted)}
+                             onLeave={() => setEditing(false)} />
         )}
       </div>
     )

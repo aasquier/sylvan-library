@@ -1658,9 +1658,24 @@ export default function DeckDetail() {
             </section>
           )}
 
-          {/* Two toys at the foot of the list, both folded into the card
-              they came from, both dessert rather than dinner — and both for
-              readers too, since neither writes anything.
+          {/* The deck's own paperwork ends here, and the sideboard will sit
+              beside it (Aaron, 2026-08-27). Collapsed by default and asking
+              for nothing until it is opened; the component argues the rest.
+
+              **Above the two toys since 2026-08-30**, where it was below them
+              before. The ordering rule is now the simple one and it is worth
+              stating as a rule rather than as a fact about this one section:
+              the toys are always last. Everything that is *about the deck* —
+              the 99, the swap board, the graveyard, what the deck makes —
+              comes first and in whatever order it earns; the Wheel and the
+              deal are the dessert trolley, and dessert does not arrive
+              between courses. A section added later goes above `.deck-toys`
+              unless it is another amusement. */}
+          <TokenShelf deckRef={deckRef} />
+
+          {/* Two toys at the foot of the page, both folded into the card they
+              came from, both dessert rather than dinner — and both for readers
+              too, since neither writes anything.
 
               **Side by side rather than stacked** (Aaron, 2026-08-29), which
               costs the order argument nothing: Ancestral Recall is still
@@ -1679,11 +1694,6 @@ export default function DeckDetail() {
             <OpeningHandDeal deckRef={deckRef} />
             <WheelOfFortune deckRef={deckRef} />
           </div>
-
-          {/* The very bottom, where the sideboard will sit beside it (Aaron,
-              2026-08-27). Collapsed by default and asking for nothing until
-              it is opened; the component argues the rest. */}
-          <TokenShelf deckRef={deckRef} />
         </div>
       )}
 
