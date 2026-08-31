@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -540,6 +541,25 @@ type spawned struct {
 	tail []string
 }
 
+// endGroup kills a match and everything the match started.
+//
+// The group is the point — see the `Setpgid` in [spawn], which is what makes
+// the child a group leader and so makes its pid double as the group's. The
+// fallback is not decoration: if `Setpgid` never took, the child is still in
+// this process's own group, no group carries its pid, the signal comes back
+// as "no such process", and the direct child is then all there is to kill.
+// The order matters in that case, because `-pid` naming *our* group would be
+// the app killing itself.
+func endGroup(p *os.Process) {
+	if p == nil {
+		return
+	}
+	if err := syscall.Kill(-p.Pid, syscall.SIGKILL); err == nil {
+		return
+	}
+	_ = p.Kill()
+}
+
 func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, error) {
 	// Forge writes the card-database complaints to stderr and the results to
 	// stdout, but not reliably — the unsupported-card warning arrives on both.
@@ -548,6 +568,19 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	// coverage check dependable.
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = home
+	// **The match gets a process group of its own, because killing it has to
+	// kill all of it.** On the deployed worker the JVM is not this child: the
+	// image points `MTGLAB_JAVA` at a `/bin/sh` wrapper that runs `xvfb-run`,
+	// and `xvfb-run` is another `/bin/sh` script which *forks* the command it
+	// was handed — it has to outlive it to take the display down again. So the
+	// thing playing the games is a grandchild, [os.Process.Kill] kills a shell,
+	// and the games go on. The pipe below is what turns that into an hour:
+	// a surviving grandchild still holds its write end, so the read loop never
+	// reaches EOF, `spawn` never returns, and the machine counts itself busy
+	// until somebody stops it by hand.
+	//
+	// A negative pid signals the group, which is the whole tree.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -563,31 +596,39 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	// A blocking read honours no deadline of its own, so the deadline is a
 	// timer that kills the JVM — EOF then ends the read loop, and the flag is
 	// what tells a killed run from a finished one.
+	//
+	// Both ways of ending a match early go through `stop`, which raises the
+	// flag its caller came for and then takes the group down. `reaped` is why
+	// it is one function rather than two: once [exec.Cmd.Wait] has returned,
+	// the pid belongs to whoever the kernel hands it to next, and a group kill
+	// names a *group* by that number — so a timer that fires a hair late must
+	// not fire a SIGKILL into somebody else's work.
 	var mu sync.Mutex
-	expired := false
-	timer := time.AfterFunc(opt.Timeout, func() {
+	expired, abandoned, reaped := false, false, false
+	stop := func(mark *bool) {
 		mu.Lock()
-		expired = true
-		mu.Unlock()
-		_ = cmd.Process.Kill()
-	})
+		defer mu.Unlock()
+		if reaped {
+			return
+		}
+		*mark = true
+		endGroup(cmd.Process)
+	}
+
+	timer := time.AfterFunc(opt.Timeout, func() { stop(&expired) })
 
 	// [RunOptions.Abort] kills the same way, and the watcher is wound up when
 	// the read loop ends so a finished match leaves no goroutine behind.
 	// `abandoned` is kept apart from `expired` because they are different news:
 	// a match that ran out of clock is a result nobody got, and a match nobody
 	// was left to watch is not a failure at all.
-	abandoned := false
 	done := make(chan struct{})
 	defer close(done)
 	if opt.Abort != nil {
 		go func() {
 			select {
 			case <-opt.Abort:
-				mu.Lock()
-				abandoned = true
-				mu.Unlock()
-				_ = cmd.Process.Kill()
+				stop(&abandoned)
 			case <-done:
 			}
 		}()
@@ -629,6 +670,7 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	elapsed := time.Since(started).Seconds()
 
 	mu.Lock()
+	reaped = true
 	killed, quit := expired, abandoned
 	mu.Unlock()
 	// Asked before the timeout, because a match killed by both was killed by

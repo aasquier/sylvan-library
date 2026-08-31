@@ -20,9 +20,19 @@ import (
 // path, with `/bin/sh` standing in for the JVM because what is being tested is
 // the killing rather than the playing.
 
-// sleeper is a stand-in for the JVM: a process that starts, says nothing, and
-// would outlive any test left to itself.
-func sleeper() []string { return []string{"/bin/sh", "-c", "sleep 120"} }
+// sleeper is a stand-in for the JVM as the deployed worker actually starts it:
+// **not one process but a small tree**. The image points `MTGLAB_JAVA` at a
+// `/bin/sh` wrapper around `xvfb-run`, which is itself a `/bin/sh` script that
+// forks the command it was given, so the thing playing the games is a
+// grandchild of the process this package holds a handle to.
+//
+// The trailing `:` is the whole of that shape, and it is load-bearing: a shell
+// handed a single command *execs* it and disappears, leaving one process where
+// the deployed worker has three. macOS's `/bin/sh` does exactly that, which is
+// how a kill that could never reach a grandchild passed on the laptop for as
+// long as it did and only ever failed on Linux. Give the shell something to do
+// afterwards and it must stay, and both platforms then ask the same question.
+func sleeper() []string { return []string{"/bin/sh", "-c", "sleep 120; :"} }
 
 func TestAnAbortedMatchKillsItsSubprocess(t *testing.T) {
 	t.Parallel()
@@ -38,9 +48,16 @@ func TestAnAbortedMatchKillsItsSubprocess(t *testing.T) {
 	}()
 
 	// The process is up and reading nothing; now nobody is left to want it.
+	// The pause is also what makes the tree a tree: it puts the fork safely
+	// before the abort, so this is never a test of killing a lone shell.
 	time.Sleep(50 * time.Millisecond)
 	close(abort)
 
+	// **That `spawn` returns at all is the assertion.** It reads the match's
+	// output to EOF, and a pipe reaches EOF only once every process holding
+	// its write end is gone — so a grandchild that survived the abort would
+	// hold this open for the rest of its two minutes, which is the deployed
+	// fault in miniature. Waiting on the error is waiting on the whole tree.
 	select {
 	case err := <-done:
 		if !errors.Is(err, ErrAbandoned) {
