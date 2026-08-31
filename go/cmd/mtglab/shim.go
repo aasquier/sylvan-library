@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net"
@@ -87,14 +88,37 @@ type shimState struct {
 	mu           sync.Mutex
 	lastActivity time.Time
 	inFlight     int
-	// match serialises the JVM. Separate from mu, which is only ever held for
-	// the length of a counter update.
-	match sync.Mutex
+	// match serialises the JVM: one token, held for the length of a match.
+	//
+	// **A channel rather than a `sync.Mutex`, so waiting for it can be given
+	// up on.** A mutex can only be waited on unconditionally, which meant a
+	// queued match played out even when whoever asked for it had long since
+	// gone — and a second bout behind a first one had no way to notice its own
+	// caller hanging up. Waiting on a channel can be raced against a cancelled
+	// request, which is the whole difference.
+	match chan struct{}
 }
 
 func newShimState() *shimState {
-	return &shimState{lastActivity: time.Now()}
+	s := &shimState{lastActivity: time.Now(), match: make(chan struct{}, 1)}
+	s.match <- struct{}{}
+	return s
 }
+
+// takeMatch waits for the one match slot, giving up if `ctx` dies first.
+//
+// Reports whether the slot is held; a false answer means the caller left and
+// there is nothing left to play for.
+func (s *shimState) takeMatch(ctx context.Context) bool {
+	select {
+	case <-s.match:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func (s *shimState) releaseMatch() { s.match <- struct{}{} }
 
 func (s *shimState) begin() {
 	s.mu.Lock()
@@ -124,6 +148,26 @@ type shim struct {
 	log   *log.Logger
 	// forge is the distribution this door serves and the token it demands.
 	forge tier3.Settings
+	// play is how a match is run, and it exists so this door can be driven
+	// without a JVM. Nil means [tier3.Settings.RunGames], which is every
+	// deployment.
+	//
+	// **A seam rather than a mock of the whole door.** What has to be tested
+	// here is what happens to a match when its listener hangs up, and that is a
+	// property of this handler — the abort channel it builds, the writes it
+	// watches, and how quickly it lets go of the machine afterwards. Testing it
+	// against a real Forge would mean a 470MB distribution and minutes per
+	// case; testing it without one meant, until this field, not testing it at
+	// all. The zombie that closed a deployed arena for an hour lived in exactly
+	// that gap.
+	play func(decks []*deck.Deck, opt tier3.RunOptions) (*tier3.SimRun, error)
+}
+
+func (s *shim) runGames(decks []*deck.Deck, opt tier3.RunOptions) (*tier3.SimRun, error) {
+	if s.play != nil {
+		return s.play(decks, opt)
+	}
+	return s.forge.RunGames(decks, opt)
 }
 
 func (s *shim) authorised(r *http.Request) bool {
@@ -183,12 +227,24 @@ func (s *shim) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusBadRequest, "unreadable request: %v", err)
 		return
 	}
+	// **Read to the end, which is what makes a hang-up visible at all.** Go's
+	// server only starts watching a connection for the client going away once
+	// the request body has been consumed — a decoder stops at the closing
+	// brace, so until this line the handler could sit on `r.Context()` for an
+	// hour and never be told the caller had left. Measured: with the body
+	// drained the cancellation arrives in about 200ms, and without it, never.
+	//
+	// It matters for exactly one moment, and it is the moment that mattered: a
+	// match waiting for the arena's one slot has written nothing yet, so this
+	// is its only way to learn there is no longer anybody to play for. Once
+	// the streamed answer starts, a failed write says the same thing.
+	_, _ = io.Copy(io.Discard, r.Body)
 
 	switch r.URL.Path {
 	case "/coverage":
 		s.coverage(w, body)
 	case "/match":
-		s.match(w, body)
+		s.match(w, r, body)
 	default:
 		s.fail(w, http.StatusNotFound, "no route %s", r.URL.Path)
 	}
@@ -236,7 +292,8 @@ type matchAsk struct {
 	Narrate bool `json:"narrate"`
 }
 
-func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
+func (s *shim) match(w http.ResponseWriter, r *http.Request,
+	body map[string]json.RawMessage) {
 	decks, err := decksFromBody(body)
 	if err != nil {
 		s.fail(w, http.StatusBadRequest, "unreadable request: %v", err)
@@ -257,15 +314,21 @@ func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
 		}
 	}
 
-	// One JVM at a time, whatever the caller believes about its own lane.
-	s.state.match.Lock()
-	defer s.state.match.Unlock()
-
-	if ask.Stream {
-		s.matchStreamed(w, decks, ask)
+	// One JVM at a time, whatever the caller believes about its own lane —
+	// and never for a caller who has already gone. A match queued behind
+	// another one used to be played out regardless of whether anybody was
+	// still waiting for it, which is how one abandoned bout became an hour of
+	// a machine playing to an empty room.
+	if !s.state.takeMatch(r.Context()) {
 		return
 	}
-	run, err := s.forge.RunGames(decks, tier3.RunOptions{Games: ask.Games,
+	defer s.state.releaseMatch()
+
+	if ask.Stream {
+		s.matchStreamed(w, r, decks, ask)
+		return
+	}
+	run, err := s.runGames(decks, tier3.RunOptions{Games: ask.Games,
 		Clock: ask.Clock, Seed: ask.Seed, Memory: s.forge.MemoryMB})
 	if err != nil {
 		if errors.Is(err, tier3.ErrForgeNotInstalled) {
@@ -299,20 +362,43 @@ func (s *shim) match(w http.ResponseWriter, body map[string]json.RawMessage) {
 // asks to narrate gets no `events` lines, so an app deployed a few minutes
 // apart from its worker keeps working in both directions and across both
 // flags.
-func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matchAsk) {
+func (s *shim) matchStreamed(w http.ResponseWriter, r *http.Request,
+	decks []*deck.Deck, ask matchAsk) {
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.WriteHeader(http.StatusOK)
 	flusher, _ := w.(http.Flusher)
+	// **Flushed before the JVM starts, so the 200 means "the arena is yours".**
+	// The match slot is taken above this line, and the headers sit in the
+	// server's buffer until something pushes them — so a caller waiting for
+	// this response was really waiting for the first *game*, minutes later,
+	// with no way to tell a queue from a slow match. Flushing here makes the
+	// answer arrive the moment the slot is won, which is what lets the app
+	// bound getting in separately from playing (`tier3.ArenaBudget`).
+	if flusher != nil {
+		flusher.Flush()
+	}
+
+	// **The match ends when nobody is listening.** This used to swallow the
+	// write error and play on, deliberately — "a vanished listener must not
+	// kill the JVM mid-game". That reasoning had the cost backwards: the
+	// request stays in flight for the whole abandoned match, `inFlight` never
+	// falls to zero, and the idle watchdog therefore cannot stop the machine.
+	// On 2026-08-30 that left a worker playing a twenty-game bout to nobody
+	// while every later bout queued behind it, until somebody stopped the
+	// machine by hand. A listener that has gone is the one unambiguous sign
+	// that a match is worth nothing to anybody, so it is now the signal to
+	// stop.
+	abort := make(chan struct{})
+	var once sync.Once
+	gone := func() { once.Do(func() { close(abort) }) }
 
 	emit := func(payload any) {
-		// A vanished listener must not kill the JVM mid-game: the write fails
-		// quietly and the match plays out. The idle watchdog cannot stop the
-		// machine under it — this request is still in flight.
 		raw, err := json.Marshal(payload)
 		if err != nil {
 			return
 		}
 		if _, err := w.Write(append(raw, '\n')); err != nil {
+			gone()
 			return
 		}
 		if flusher != nil {
@@ -320,15 +406,30 @@ func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matc
 		}
 	}
 
+	// Two ways to learn the same thing, because neither is reliable alone: a
+	// write only fails once the peer's close has been noticed, and a request
+	// context is only cancelled once the server's background read sees it. The
+	// watcher is wound up with the handler.
+	watching := make(chan struct{})
+	defer close(watching)
+	go func() {
+		select {
+		case <-r.Context().Done():
+			gone()
+		case <-watching:
+		}
+	}()
+
 	// The row rides the tick (the match theater): the game the parser just
 	// completed crosses beside its count, in the same encoding the final
 	// result will carry it. The beats ride their own line, and only when the
 	// caller asked to hear them — an [tier3.EventLog] crosses as itself, for
 	// the reason `wire.go` gives.
-	run, err := s.forge.RunGames(decks, tier3.RunOptions{Games: ask.Games,
+	run, err := s.runGames(decks, tier3.RunOptions{Games: ask.Games,
 		Clock: ask.Clock, Seed: ask.Seed,
 		Memory:  s.forge.MemoryMB,
 		Narrate: ask.Narrate,
+		Abort:   abort,
 		OnEvents: func(log tier3.EventLog) {
 			emit(map[string]any{"events": log})
 		},
@@ -336,6 +437,14 @@ func (s *shim) matchStreamed(w http.ResponseWriter, decks []*deck.Deck, ask matc
 			emit(map[string]any{"game": n, "row": tier3.GameToWire(g)})
 		}})
 	if err != nil {
+		// An abandoned match has no audience to tell, and saying so on a
+		// socket nobody is reading would only be another failed write. It goes
+		// to the log, where the machine's own operator reads.
+		if errors.Is(err, tier3.ErrAbandoned) {
+			s.log.Printf("forge shim: the match was abandoned by its caller, "+
+				"stopping after %d game(s) asked for", ask.Games)
+			return
+		}
 		kind := "RuntimeError"
 		if errors.Is(err, tier3.ErrForgeNotInstalled) {
 			kind = "ForgeNotInstalled"

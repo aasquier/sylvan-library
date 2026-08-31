@@ -97,6 +97,15 @@ const help = (key: string) => <HelpTip name={key} />
  *  ceiling for the field this replaced. */
 const SHUFFLE_CEILING = 999_999
 
+/** The most games one bout can be, which is `api.ForgeGamesMax` on the other
+ *  side of the wire.
+ *
+ *  Written down here so the field can *say* it rather than only validate
+ *  against it. The arena seats one bout at a time and these are whole games of
+ *  Commander, so the ceiling is real capacity rather than a shy default — and
+ *  the server refuses past it in words, which is the half a person meets. */
+const ARENA_GAMES_MAX = 20
+
 /**
  * A fresh shuffle, drawn for every bout sent in.
  *
@@ -1057,8 +1066,20 @@ export default function ColiseumRoom() {
 
   // ------------------------------------------------------------- the match
 
-  const running = submitting
-    || job?.status === 'queued' || job?.status === 'running'
+  /** Whether a match is still being fought, as far as this room can tell.
+   *
+   *  **A verdict outranks the last tick, and that is what `!error` is doing
+   *  here.** The job in state is whatever the last *successful* poll returned,
+   *  and a watch can end without ever seeing a final one: the arena stops
+   *  answering about the match, `followJob` gives up after its tolerated
+   *  misses, and the newest thing this room was ever told is still `running`.
+   *  Then `submitting` goes false, nothing else moves, and the bar keeps
+   *  turning over a bout that ended minutes ago — a spinner outliving its job,
+   *  which is the one state the resume path could never rescue anybody from
+   *  either. An error is the end of a match by definition, so it ends this
+   *  too. */
+  const running = !error && (submitting
+    || job?.status === 'queued' || job?.status === 'running')
   /** Pressed, and the job has not reported back yet — the seconds a match
    *  spends starting a JVM on another machine, and where "did that click
    *  land?" lives. */
@@ -1343,8 +1364,17 @@ export default function ColiseumRoom() {
                   className="min-w-[11rem] grow basis-full
                              sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map(seatOption)} />
+          {/* **The ceiling is written where the number is typed.** A number
+              input's `max` is validation, not a stop: 25 can be typed into
+              this box and it looks accepted, and the arena will not fight 25
+              bouts. It used to quietly fight 20 of them instead and say
+              nothing, so the bar measured a match nobody had asked for; it now
+              refuses in words. Both halves matter — a field that takes a
+              number its own surface will reject is a small lie told before the
+              big one. */}
           <NumberField label="Games" value={games} onChange={setGames}
-                       min={1} max={20} help={help('sim.forge_games')} />
+                       min={1} max={ARENA_GAMES_MAX} suffix={`of ${ARENA_GAMES_MAX} max`}
+                       help={help('sim.forge_games')} />
           {/* **The gate is a card, and it is why this row is tall.** It comes
               last and it is the one item here that is not a form control's
               shape: a whole `Arena`, portrait, standing about four times the

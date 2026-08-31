@@ -285,7 +285,48 @@ type RunOptions struct {
 	// paces them. That also keeps the stream to one extra line per game
 	// instead of a hundred.
 	OnEvents func(log EventLog)
+	// Abort ends the match early when it closes: the JVM is killed and the
+	// read loop ends the way it does on the whole-subprocess timeout.
+	//
+	// **This exists because nobody could stop a match once it started**, and
+	// that is how a worker became a zombie on the deployed instance
+	// (2026-08-30). The app's side of a bout was cancelled mid-match; the shim
+	// went on playing for whoever was no longer listening, counted itself busy
+	// the whole time, and so its idle watchdog never stopped the machine —
+	// every bout after it queued behind a match with no audience. The only
+	// bound was this subprocess's own ceiling, which on a twenty-game bout is
+	// over an hour.
+	//
+	// A channel rather than a `context.Context` because [RunGames] takes none
+	// and giving it one would imply a cancellation the rest of the call does
+	// not honour; this says exactly what it does. Nil never aborts, which is
+	// every caller that measures rather than watches.
+	Abort <-chan struct{}
 }
+
+// SubprocessBudget is how long the whole Forge subprocess may run: an
+// allowance for JVM start plus one clock per game.
+//
+// **Exported because both sides of the wire have to agree about it.** Forge's
+// own `-c` bounds each game, so this is the honest whole-match ceiling — and
+// the app, waiting on the far end of a socket, must never hold a shorter one.
+// It did: the client bounded a whole bout with a constant sized for a single
+// game while the subprocess it was waiting on had this much rope, so the belt
+// was tighter than the suspenders it was described as backing up. See
+// [MatchBudget], which is this plus what the wire and the boot cost.
+func SubprocessBudget(games, clock int) time.Duration {
+	if games < 1 {
+		games = 1
+	}
+	if clock < 1 {
+		clock = ClockDefault
+	}
+	return time.Duration(60+games*clock) * time.Second
+}
+
+// ClockDefault is Forge's `-c` when a caller names none: seconds before a game
+// is called a draw.
+const ClockDefault = 300
 
 // MemoryDefault is `run_games`'s `memory_mb`.
 const MemoryDefault = 4096
@@ -293,6 +334,15 @@ const MemoryDefault = 4096
 // ErrTimedOut is what a match that outran its whole-subprocess budget returns
 // — `subprocess.TimeoutExpired`, which the shim renders by class name.
 var ErrTimedOut = errors.New("TimeoutExpired")
+
+// ErrAbandoned is a match stopped through [RunOptions.Abort]: whoever asked
+// for it is not there any more.
+//
+// It is not a failure and it is never rendered to anybody — by the time it
+// exists, the person it would have been rendered to has gone. It exists so the
+// shim can tell "the client left" from "Forge fell over" in its own log, and
+// so a stopped match is never mistaken for a result.
+var ErrAbandoned = errors.New("the match was abandoned")
 
 type timedOut struct{ msg string }
 
@@ -323,13 +373,13 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 		opt.Games = 1
 	}
 	if opt.Clock == 0 {
-		opt.Clock = 300
+		opt.Clock = ClockDefault
 	}
 	if opt.Memory == 0 {
 		opt.Memory = MemoryDefault
 	}
 	if opt.Timeout == 0 {
-		opt.Timeout = time.Duration(60+opt.Games*opt.Clock) * time.Second
+		opt.Timeout = SubprocessBudget(opt.Games, opt.Clock)
 	}
 
 	reports, err := s.CheckCoverage(decks)
@@ -522,6 +572,27 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 		_ = cmd.Process.Kill()
 	})
 
+	// [RunOptions.Abort] kills the same way, and the watcher is wound up when
+	// the read loop ends so a finished match leaves no goroutine behind.
+	// `abandoned` is kept apart from `expired` because they are different news:
+	// a match that ran out of clock is a result nobody got, and a match nobody
+	// was left to watch is not a failure at all.
+	abandoned := false
+	done := make(chan struct{})
+	defer close(done)
+	if opt.Abort != nil {
+		go func() {
+			select {
+			case <-opt.Abort:
+				mu.Lock()
+				abandoned = true
+				mu.Unlock()
+				_ = cmd.Process.Kill()
+			case <-done:
+			}
+		}()
+	}
+
 	var text []string
 	finished := 0
 	reader := bufio.NewReaderSize(stdout, 64*1024)
@@ -558,8 +629,14 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	elapsed := time.Since(started).Seconds()
 
 	mu.Lock()
-	killed := expired
+	killed, quit := expired, abandoned
 	mu.Unlock()
+	// Asked before the timeout, because a match killed by both was killed by
+	// whoever stopped listening first — and a bout nobody is waiting on is not
+	// news about the clock.
+	if quit {
+		return nil, ErrAbandoned
+	}
 	if killed {
 		return nil, &timedOut{msg: fmt.Sprintf(
 			"Command '%s' timed out after %v seconds",
