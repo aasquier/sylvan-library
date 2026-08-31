@@ -263,6 +263,20 @@ type RunOptions struct {
 	// Timeout bounds the whole subprocess. Zero means the derived
 	// default.
 	Timeout time.Duration
+	// GameCeiling bounds **one game**, and is the only bound in this package
+	// at that scale. Zero means [GameBudget] of [RunOptions.Clock]; a caller
+	// that wants no per-game cut names a duration longer than the bout.
+	//
+	// [Settings.RunGames] fills it in and [spawn] honours it; a test driving
+	// `spawn` directly and leaving it zero is asking about something else and
+	// gets no pace timer at all.
+	//
+	// **Rearmed by a finished game and by nothing else.** Not by a beat, which
+	// is the distinction the live fault turned on: the game that ran fifteen
+	// minutes past its clock narrated the entire way, so every bound watching
+	// for a *silence* was correct to stay quiet. What was missing was a bound
+	// watching for a *game*.
+	GameCeiling time.Duration
 	// OnGame is called with the count of games finished so far (1, 2, ...)
 	// and the game just parsed, as each result line arrives — what lets a job
 	// tick per game and the match theater show the row behind the tick. Ticks
@@ -305,24 +319,73 @@ type RunOptions struct {
 	Abort <-chan struct{}
 }
 
-// SubprocessBudget is how long the whole Forge subprocess may run: an
-// allowance for JVM start plus one clock per game.
+// bootAllowance is everything a subprocess spends that is not a game: the
+// JVM's own start and the card database it loads before the first hand is
+// dealt, measured at fifteen to twenty-five seconds.
 //
-// **Exported because both sides of the wire have to agree about it.** Forge's
-// own `-c` bounds each game, so this is the honest whole-match ceiling — and
-// the app, waiting on the far end of a socket, must never hold a shorter one.
-// It did: the client bounded a whole bout with a constant sized for a single
-// game while the subprocess it was waiting on had this much rope, so the belt
-// was tighter than the suspenders it was described as backing up. See
-// [MatchBudget], which is this plus what the wire and the boot cost.
+// It is the `60` [SubprocessBudget] has always opened with, named rather than
+// written twice so that [GameBudget] can spend the same allowance for the same
+// reason — the first game of a match is the one that waits behind the boot.
+const bootAllowance = 60 * time.Second
+
+// GameBudget is how long **one game** may take before the run is cut and that
+// game recorded as a clock-out: Forge's own clock, plus [bootAllowance].
+//
+// **This exists because Forge's clock cannot end a game**, which is not what
+// the flag's name suggests and is worth stating in full, because every bound
+// in this package was written believing otherwise.
+//
+// Both programs that play a match — the scribe (`scribe/src/scribe/Main.java`)
+// and Forge's own `sim` — spend the clock the same way, through
+// `forge.view.TimeLimitedCodeBlock.runWithTimeout`. Read out of the shipped jar
+// with `javap -c`, that method is: a single-thread executor, `submit`, then
+// `future.get(clock, SECONDS)`; and when the wait expires, `future.cancel(true)`
+// and the `TimeoutException` is rethrown to the caller. `cancel(true)` sets the
+// game thread's **interrupt flag**, and an interrupt is a request that only a
+// thread which looks at it can honour. Nothing looks: across the 1,139 classes
+// of `forge.game` and `forge.ai` in Forge 2.0.14 there is not one reference to
+// `interrupted`, `isInterrupted` or `InterruptedException`. So the clock bounds
+// how long Forge **waits** for a game, never how long the game **runs** — the
+// wait ends, the game plays on, and because the executor's thread is not a
+// daemon it also keeps the JVM alive after `main` has returned.
+//
+// That is the hole this closes, and it was live: on 2026-08-31 a game of a
+// ten-game bout on the deployed arena ran fifteen minutes past a three-hundred
+// second clock. Nothing cut it. The app's silence budget was right not to — the
+// game narrated the whole way, and [StallBudget] bounds silence — and every
+// other bound in the chain kills the **bout**, so the only ceiling left was one
+// that would have thrown away nine finished games to reach the tenth.
+//
+// The grace is [bootAllowance] because that is what the first game of a segment
+// genuinely waits behind. Forge's own cut fires at exactly `clock` wall-seconds
+// and prints its row immediately after, so a game still running at `clock` plus
+// a whole JVM start is a game Forge has already given up on and failed to stop.
+func GameBudget(clock int) time.Duration {
+	if clock < 1 {
+		clock = ClockDefault
+	}
+	return time.Duration(clock)*time.Second + bootAllowance
+}
+
+// SubprocessBudget is how long **one** Forge subprocess may run: an allowance
+// for JVM start plus one [GameBudget] per game it was asked for.
+//
+// **Exported because both sides of the wire have to agree about it.** The app,
+// waiting on the far end of a socket, must never hold a shorter one. It did:
+// the client bounded a whole bout with a constant sized for a single game while
+// the subprocess it was waiting on had this much rope, so the belt was tighter
+// than the suspenders it was described as backing up. See [MatchBudget], which
+// is this plus a restart's worth of boots and what the wire costs.
+//
+// **A bout may spend several of these.** A game cut at [GameBudget] takes its
+// JVM with it — that is the only mechanism that ends a Forge game, per the
+// argument there — so [Settings.RunGames] plays what is left in a fresh
+// subprocess, and this bounds each one rather than the bout.
 func SubprocessBudget(games, clock int) time.Duration {
 	if games < 1 {
 		games = 1
 	}
-	if clock < 1 {
-		clock = ClockDefault
-	}
-	return time.Duration(60+games*clock) * time.Second
+	return bootAllowance + time.Duration(games)*GameBudget(clock)
 }
 
 // ClockDefault is Forge's `-c` when a caller names none: seconds before a game
@@ -361,11 +424,18 @@ func (e *timedOut) Is(target error) bool { return target == ErrTimedOut }
 // Every deck is pre-flighted first, and the output is checked again
 // afterwards. Both have to pass or this returns an error.
 //
-// `Timeout` bounds the whole subprocess and defaults to something derived
-// rather than to nothing. Forge's own `-c` bounds each *game*, so
-// `games * clock` plus an allowance for JVM start is the honest ceiling — and
-// an unbounded wait is not hypothetical here, since one measured Trostani game
-// ran 134 seconds.
+// `Timeout` bounds one subprocess and defaults to something derived rather than
+// to nothing; `GameCeiling` bounds one game and does the same. Both are needed,
+// because Forge's own clock bounds neither — it ends the *wait* for a game and
+// leaves the game running (see [GameBudget]).
+//
+// **A bout is one subprocess until a game outruns its ceiling, and then it is
+// two.** Killing the JVM is the only way to end a Forge game, and a JVM holds
+// every game the bout had left, so the cut is followed by a fresh subprocess
+// playing what remains. The bout that comes back is whole: `Games` rows, one of
+// them a clock-out. Nine finished games are not thrown away to report the tenth
+// — which is what every ceiling in this package did before, and what a bout on
+// the deployed arena came within minutes of on 2026-08-31.
 func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 	if len(decks) < 2 {
 		return nil, errors.New("a game needs at least two decks")
@@ -379,8 +449,8 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 	if opt.Memory == 0 {
 		opt.Memory = MemoryDefault
 	}
-	if opt.Timeout == 0 {
-		opt.Timeout = SubprocessBudget(opt.Games, opt.Clock)
+	if opt.GameCeiling == 0 {
+		opt.GameCeiling = GameBudget(opt.Clock)
 	}
 
 	reports, err := s.CheckCoverage(decks)
@@ -424,48 +494,60 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 	// built before the scribe existed, or one whose build stage failed, plays
 	// the match through `sim` and narrates from the log — a room with no board
 	// in it rather than a match that will not start.
-	var argv []string
-	var read telling
 	base := []string{java, fmt.Sprintf("-Xmx%dm", opt.Memory),
 		"-Dio.netty.tryReflectionSetAccessible=true", "-Dfile.encoding=UTF-8"}
-	if s.Scribed() {
-		// Positional and dumb, because this is the only place that builds it:
-		//   scribe.Main <clock> <games> <seed|-> <deck.dck> ...
-		seed := "-"
-		if opt.Seed != nil {
-			seed = opt.Seed.String()
+	build := func(games int, seed *big.Int) ([]string, telling) {
+		// **A copy, because this is called once per segment now.** `base` is a
+		// slice literal, so its capacity is its length and appending onto it
+		// allocates today — but the day somebody gives it spare capacity, two
+		// segments would build their command lines into one array and the
+		// second would rewrite the first. It costs four strings, and the bug it
+		// forecloses appears only on a bout that clocked out.
+		argv := append([]string(nil), base...)
+		if s.Scribed() {
+			// Positional and dumb, because this is the only place that builds
+			// it:  scribe.Main <clock> <games> <seed|-> <deck.dck> ...
+			text := "-"
+			if seed != nil {
+				text = seed.String()
+			}
+			argv = append(argv,
+				"-cp", jar+string(os.PathListSeparator)+s.ScribeClasses,
+				"scribe.Main", strconv.Itoa(opt.Clock), strconv.Itoa(games), text)
+			for _, name := range names {
+				argv = append(argv, filepath.Join(deckDir, name))
+			}
+			return argv, NewScribeParser(opt.Narrate)
 		}
-		argv = append(base,
-			"-cp", jar+string(os.PathListSeparator)+s.ScribeClasses,
-			"scribe.Main", strconv.Itoa(opt.Clock), strconv.Itoa(opt.Games), seed)
-		for _, name := range names {
-			argv = append(argv, filepath.Join(deckDir, name))
-		}
-		read = NewScribeParser(opt.Narrate)
-	} else {
-		argv = append(base, "-jar", jar, "sim", "-d")
+		argv = append(argv, "-jar", jar, "sim", "-d")
 		argv = append(argv, names...)
 		argv = append(argv, "-f", "Commander",
-			"-n", strconv.Itoa(opt.Games), "-c", strconv.Itoa(opt.Clock))
+			"-n", strconv.Itoa(games), "-c", strconv.Itoa(opt.Clock))
 		// `-q` is Forge's own flag for "the game result, not the entire game
 		// log", read off its `sim -h`. Narrating is its absence rather than a
 		// flag of its own.
 		if !opt.Narrate {
 			argv = append(argv, "-q")
 		}
-		if opt.Seed != nil {
-			argv = append(argv, "-s", opt.Seed.String())
+		if seed != nil {
+			argv = append(argv, "-s", seed.String())
 		}
-		read = newProseTelling(opt.Narrate)
+		return argv, newProseTelling(opt.Narrate)
 	}
 
-	run, err := spawn(argv, home, opt, read)
-	if err != nil {
-		return nil, err
+	// **A segment is the rest of the bout**, and the loop ends because every
+	// pass makes progress: a segment either finishes games or is cut on one,
+	// and a cut game counts as played. Everything above this line — the
+	// pre-flight, the `.dck` files, the JVM and the jar — was resolved once and
+	// every segment reuses it as it is.
+	run := &SimRun{Seats: seats, Coverage: reports,
+		ForgeVersion: s.ForgeVersion()}
+	for played := 0; played < opt.Games; {
+		played, err = s.playSegment(run, home, opt, played, build)
+		if err != nil {
+			return nil, err
+		}
 	}
-	run.Seats = seats
-	run.Coverage = reports
-	run.ForgeVersion = s.ForgeVersion()
 
 	if !run.Output.Trustworthy() {
 		var lines []string
@@ -478,16 +560,147 @@ func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) 
 		return nil, &untrustworthy{msg: "Forge reported problems that " +
 			"invalidate the run:\n" + strings.Join(lines, "\n")}
 	}
-	if len(run.Output.Games) == 0 {
-		tail := run.tail
+	return run, nil
+}
+
+// resumeSeed is the seed the segment after a clock-out plays under.
+//
+// **A resumed segment must not replay the games already played.** Forge seeds
+// one global generator before the first game is created — `MyRandom.setRandom`,
+// which the scribe marks PARITY 1 — so a fresh JVM handed the same number deals
+// the same opening hands in the same order. A resume on the original seed would
+// replay the games that already finished and walk straight back into the game
+// that wedged, which is a loop rather than a salvage.
+//
+// Advancing by the games already played keeps both properties that matter: the
+// whole bout is still a function of the one number the caller named, and no two
+// segments of it are the same match. `played` is zero for the first segment, so
+// **a bout with no clock-out in it builds byte-identical argv to before this
+// existed** — which is what the parity gate rests on.
+//
+// Nil stays nil: a caller who named no seed is letting Forge pick, and a new
+// JVM picks again on its own.
+func resumeSeed(seed *big.Int, played int) *big.Int {
+	if seed == nil || played == 0 {
+		return seed
+	}
+	return new(big.Int).Add(seed, big.NewInt(int64(played)))
+}
+
+// playSegment runs one subprocess and folds what it produced into `run`,
+// reporting how many games of the bout are now played.
+//
+// The three ways it can end, and only the first is an error:
+//
+//   - **Nothing came out and nothing cut it.** Forge started and produced no
+//     game at all, which is a broken distribution or a deck it could not load —
+//     the diagnosis this package has always raised, with the tail of the output
+//     so somebody can read what happened.
+//   - **A game outran [RunOptions.GameCeiling].** The games before it are real
+//     and kept; the one that was in progress is written here as a clock-out,
+//     because this is the half that knows what number it would have been. The
+//     caller loops and plays the rest in a new subprocess.
+//   - **The segment played everything it was asked for.** `played` reaches the
+//     bout's count and the loop ends.
+//
+// `opt` is the **caller's** options throughout — the bout's count, the bout's
+// seed, the bout's callbacks. The segment's own are derived here and nowhere
+// else, so there is exactly one place that knows the difference between a
+// game's number in this subprocess and its number in the bout.
+func (s Settings) playSegment(run *SimRun, home string, opt RunOptions,
+	played int, build func(int, *big.Int) ([]string, telling)) (int, error) {
+	remaining := opt.Games - played
+	seed := resumeSeed(opt.Seed, played)
+	argv, read := build(remaining, seed)
+	if run.Argv == nil {
+		// The first segment's, which is the command that describes the bout as
+		// it was asked for. A later one differs only in its count and its seed,
+		// and naming it here would make a diagnostic about the whole match read
+		// as though it were about the salvage.
+		run.Argv = argv
+	}
+
+	segment := opt
+	segment.Games, segment.Seed = remaining, seed
+	if opt.Timeout == 0 {
+		segment.Timeout = SubprocessBudget(remaining, opt.Clock)
+	}
+	// The live callbacks count in the bout's numbers rather than the segment's:
+	// a fresh JVM starts its games at one again, and a room that has ticked to
+	// nine must not watch the count fall back to one because the arena changed
+	// underneath it.
+	if opt.OnGame != nil {
+		segment.OnGame = func(finished int, g GameResult) {
+			g.Index = played + finished
+			opt.OnGame(played+finished, g)
+		}
+	}
+	if opt.OnEvents != nil {
+		segment.OnEvents = func(log EventLog) {
+			log.Game += played
+			opt.OnEvents(log)
+		}
+	}
+
+	seg, err := spawn(argv, home, segment, read)
+	if err != nil {
+		return played, err
+	}
+	if len(seg.Output.Games) == 0 && !seg.clockedOut {
+		tail := seg.tail
 		if len(tail) > 15 {
 			tail = tail[len(tail)-15:]
 		}
-		return nil, &untrustworthy{msg: fmt.Sprintf(
+		return played, &untrustworthy{msg: fmt.Sprintf(
 			"Forge produced no game results in %.1fs. Last output:\n%s",
-			run.WallSeconds, strings.Join(tail, "\n"))}
+			seg.WallSeconds, strings.Join(tail, "\n"))}
 	}
-	return &run.SimRun, nil
+
+	// Renumbered into the bout, for the reason the callbacks are: a second JVM
+	// numbers its own games from one, and two rows called "game 1" would be two
+	// rows the room cannot tell apart.
+	for i := range seg.Output.Games {
+		seg.Output.Games[i].Index = played + i + 1
+	}
+	for i := range seg.Events {
+		seg.Events[i].Game += played
+	}
+	run.Output.Games = append(run.Output.Games, seg.Output.Games...)
+	run.Output.Unsupported = append(run.Output.Unsupported,
+		seg.Output.Unsupported...)
+	run.Output.DeckLoadFailures = append(run.Output.DeckLoadFailures,
+		seg.Output.DeckLoadFailures...)
+	run.Events = append(run.Events, seg.Events...)
+	run.WallSeconds += seg.WallSeconds
+	played += len(seg.Output.Games)
+
+	if !seg.clockedOut {
+		return played, nil
+	}
+	played++
+	// **The casualty, written as a row rather than as a failure.** `TimedOut`
+	// is the field this repo has always kept apart from `Draw` — a clock-out is
+	// the measurement giving up, not a game outcome — so nothing downstream
+	// needs teaching: the API masks the winner and the draw off it, the tally
+	// counts it in its own column, and the room says it was stopped by the
+	// clock. The milliseconds are the ceiling, which is the honest floor on how
+	// long the game had been running when it was cut.
+	cut := GameResult{Index: played, TimedOut: true,
+		Milliseconds: int(segment.GameCeiling / time.Millisecond)}
+	run.Output.Games = append(run.Output.Games, cut)
+	if opt.OnGame != nil {
+		// **The tick is load-bearing beyond the room.** The app presumes a
+		// worker dead after [StallBudget] of silence, and a segment restart is
+		// the longest quiet a healthy bout ever has — the cut, and then a whole
+		// JVM boot before another game can end. Saying so here breaks that
+		// silence in two, and each half fits inside the budget on its own.
+		//
+		// The caller's callback rather than the segment's wrapper: this row is
+		// already counted in the bout, and handing it to something whose job is
+		// to add `played` to it would count that twice.
+		opt.OnGame(played, cut)
+	}
+	return played, nil
 }
 
 // telling is whatever is reading the subprocess's output.
@@ -539,6 +752,15 @@ func (t *proseTelling) Output() SimOutput { return t.games.Output }
 type spawned struct {
 	SimRun
 	tail []string
+	// clockedOut is a run cut by [RunOptions.GameCeiling]: the games above are
+	// real and finished, and the one that was in progress is not here at all —
+	// its row is written by [Settings.RunGames], which is the half that knows
+	// what number it would have been.
+	//
+	// Not an error, deliberately. A whole-subprocess timeout has nothing to
+	// hand back and a clock-out has everything except one game, so folding them
+	// together would throw away the bout to report the casualty.
+	clockedOut bool
 }
 
 // endGroup kills a match and everything the match started.
@@ -616,7 +838,7 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	// names a *group* by that number — so a timer that fires a hair late must
 	// not fire a SIGKILL into somebody else's work.
 	var mu sync.Mutex
-	expired, abandoned, reaped := false, false, false
+	expired, abandoned, clocked, reaped := false, false, false, false
 	stop := func(mark *bool) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -628,6 +850,21 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	}
 
 	timer := time.AfterFunc(opt.Timeout, func() { stop(&expired) })
+
+	// **The per-game ceiling, and killing the JVM is the whole mechanism.**
+	// Forge offers nothing else: its own clock ends a *wait* rather than a game
+	// (the argument is on [GameBudget]), so a game that has outrun it is a game
+	// only the kernel can stop. That makes the cut coarse — it takes the games
+	// this subprocess had left with it — which is why [Settings.RunGames] plays
+	// them again in a new one rather than calling the bout over.
+	//
+	// Rearmed by a finished game and by nothing else. A beat is not progress
+	// through the bout; it is the sound the wedge makes.
+	var pace *time.Timer
+	if opt.GameCeiling > 0 {
+		pace = time.AfterFunc(opt.GameCeiling, func() { stop(&clocked) })
+		defer pace.Stop()
+	}
 
 	// [RunOptions.Abort] kills the same way, and the watcher is wound up when
 	// the read loop ends so a finished match leaves no goroutine behind.
@@ -665,6 +902,12 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 				if opt.OnGame != nil {
 					opt.OnGame(finished, *game)
 				}
+				// After the tick rather than before it: a slow listener is not
+				// the next game's fault, and `OnGame` writes to a socket that
+				// can push back.
+				if pace != nil {
+					pace.Reset(opt.GameCeiling)
+				}
 			}
 		}
 		if err != nil {
@@ -683,7 +926,7 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 
 	mu.Lock()
 	reaped = true
-	killed, quit := expired, abandoned
+	killed, quit, cut := expired, abandoned, clocked
 	mu.Unlock()
 	// Asked before the timeout, because a match killed by both was killed by
 	// whoever stopped listening first — and a bout nobody is waiting on is not
@@ -691,6 +934,13 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	if quit {
 		return nil, ErrAbandoned
 	}
+	// The whole-subprocess ceiling is asked before the per-game one, and only
+	// a race can put both here: [SubprocessBudget] is a [GameBudget] per game
+	// plus a boot, so the pace timer is the tighter bound on every game and
+	// fires first by construction. If the outer one did fire, the run has blown
+	// the budget for the games it was asked for, and handing back a partial as
+	// though a single game were the casualty would be a nicer story than the
+	// truth.
 	if killed {
 		return nil, &timedOut{msg: fmt.Sprintf(
 			"Command '%s' timed out after %v seconds",
@@ -700,6 +950,7 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	return &spawned{
 		SimRun: SimRun{Argv: argv, Output: read.Output(), WallSeconds: elapsed,
 			Events: collected},
-		tail: text,
+		tail:       text,
+		clockedOut: cut,
 	}, nil
 }

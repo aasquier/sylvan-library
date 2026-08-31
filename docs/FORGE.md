@@ -484,3 +484,43 @@ table about Forge's AI, not about the decks.
 A game that hits `-c` is recorded as `timed_out` and reported separately from
 draws — the clock giving up is a measurement problem, a draw is a game outcome.
 The default here is 300s rather than Forge's 120s for that reason.
+
+### `-c` bounds the wait for a game, not the game
+
+**Forge's clock cannot end a game**, which is not what the flag's name suggests
+and cost a deployed bout fifteen minutes on 2026-08-31. Read out of the shipped
+jar with `javap -c`, `forge.view.TimeLimitedCodeBlock.runWithTimeout` is:
+
+```
+Executors.newSingleThreadExecutor()   // a NON-daemon thread
+executor.submit(callable)
+executor.shutdown()
+future.get(clock, SECONDS)            // <- the clock is spent here
+  catch TimeoutException -> future.cancel(true); throw
+```
+
+`cancel(true)` sets the game thread's **interrupt flag**, and an interrupt is a
+request that only a thread which looks at it can honour. Nothing looks: across
+the 1,139 classes of `forge.game` and `forge.ai` in Forge 2.0.14 there is not
+one reference to `interrupted`, `isInterrupted` or `InterruptedException`.
+
+```bash
+unzip -q forge-gui-desktop-*.jar 'forge/game/*' 'forge/ai/*' -d /tmp/fg
+grep -rl interrupted /tmp/fg | wc -l     # 0
+```
+
+So the wait ends, `runWithTimeout` throws to its caller, and the game **plays
+on** — in a thread that, not being a daemon, also keeps the JVM alive after
+`main` has returned. Both programs that play a match spend the clock this way:
+Forge's own `sim` (`SimulateMatch`, which then prints "Stopping slow match as
+draw") and the scribe (`scribe/src/scribe/Main.java`, PARITY 5). The scribe's
+listener stays subscribed to the abandoned game's bus, so it keeps narrating —
+which is why a bound watching for *silence* is correct to stay quiet through
+exactly this fault.
+
+The consequence for the runner: **the only thing that ends a runaway Forge game
+is ending its JVM.** `tier3.GameBudget` is the per-game ceiling that does it
+(the clock plus a JVM start of grace), the kill is `spawn`'s process-group kill,
+and because a JVM holds every game the bout had left, `RunGames` plays the
+remainder in a fresh subprocess rather than calling the bout over. One game is
+recorded as a clock-out; the bout comes back whole.

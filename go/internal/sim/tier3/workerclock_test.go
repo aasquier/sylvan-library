@@ -101,9 +101,12 @@ func TestTheBoutsClocksAreBoundAgainstTheAskRatherThanAConstant(t *testing.T) {
 		t.Errorf("a twenty-game bout is given %v and a one-game bout %v — the "+
 			"budget does not grow with the ask", large, small)
 	}
-	if want := 19 * clock * int(time.Second); large-small != time.Duration(want) {
+	// Each of those nineteen games buys the ceiling one game may reach and the
+	// JVM start its own clock-out would cost — because a bout is one subprocess
+	// only until a game outruns [GameBudget], and every cut is a restart.
+	if want := 19 * (GameBudget(clock) + bootAllowance); large-small != want {
 		t.Errorf("nineteen more games bought %v rather than %v of clock",
-			large-small, time.Duration(want))
+			large-small, want)
 	}
 
 	// **The belt must outlast the suspenders.** The far side kills its own
