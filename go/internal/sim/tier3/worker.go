@@ -124,13 +124,28 @@ const (
 
 // MatchBudget is the whole bout's ceiling, and it scales with what was asked.
 //
-// [SubprocessBudget] is the far side's own ceiling for the same match, so this
-// is that plus everything the far side does not count: the machine start, both
-// boots, and the wait for the match slot. Deliberately *larger* than the far
-// side's bound rather than smaller — the app is the belt over those
-// suspenders, and a belt that gives way first is not a belt.
+// [SubprocessBudget] is the far side's ceiling for **one** subprocess, so this
+// is that plus everything it does not count: the machine start, both boots, the
+// wait for the match slot — and a JVM start for every restart the bout might
+// make. Deliberately *larger* than the far side's bound rather than smaller —
+// the app is the belt over those suspenders, and a belt that gives way first is
+// not a belt.
+//
+// **A bout can be more than one subprocess now.** A game that outruns
+// [GameBudget] is ended by ending its JVM, because Forge has no smaller lever
+// (the evidence is on [GameBudget]), and the games it was still holding are
+// then played in a fresh one. Every clock-out therefore costs one more boot,
+// and there can be as many clock-outs as there are games. The ceiling that
+// results is generous — a ten-game bout in which *every* game wedges — and it
+// is meant to be: it is the last resort behind a per-game bound that now fires
+// long before it, where before this it was the only bound there was, and
+// reaching it threw away every finished game in the bout.
 func MatchBudget(games, clock int) time.Duration {
-	return SubprocessBudget(games, clock) + wireOverhead
+	if games < 1 {
+		games = 1
+	}
+	restarts := time.Duration(games) * bootAllowance
+	return SubprocessBudget(games, clock) + restarts + wireOverhead
 }
 
 // StallBudget is how long one silence may last before the worker is presumed

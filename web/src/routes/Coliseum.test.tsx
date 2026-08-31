@@ -686,12 +686,67 @@ describe('the tale of the tape', () => {
     // The two notes the distinction lives in — a bout called off at the clock
     // is the measurement giving up, not a bout that ended level. Separate
     // lines, separate segments, and stated even at zero.
-    expect(screen.getByText(/hit the clock — called off at/)).toBeTruthy()
+    expect(screen.getByText(/hit the clock — called off past/)).toBeTruthy()
     expect(screen.getByText('No draws')).toBeTruthy()
     // And per bout: the clocked row names nobody at all.
     expect(screen.getByText('Stopped by the clock')).toBeTruthy()
     // The wall-clock line speaks Magic, not machinery.
     expect(screen.getByText(/lighting the forge/)).toBeTruthy()
+  })
+
+  // **A whole bout with a casualty in it**, which is the shape a bout takes
+  // now that a game outrunning its clock is cut on its own rather than taking
+  // the match with it. Every game asked for comes back, one of them stopped —
+  // where before this the whole bout failed and the finished games went with
+  // it.
+  //
+  // The row reads *longer* than the clock on purpose, because that is what
+  // happened: the arena gives up waiting at the clock and a game that will not
+  // stop is cut a little after. That is why the note above it says "past" and
+  // not "at", and the two lines are asserted together here so neither can drift
+  // into contradicting the other.
+  it('renders a full bout with one game stopped by the clock', async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      game: i + 1,
+      winner: i === 6 ? null : (i % 2 === 0 ? 'gyome' : 'arahbo'),
+      seconds: i === 6 ? 360.0 : 8.0,
+      turns: i === 6 ? null : 11,
+      draw: false,
+      timed_out: i === 6,
+    }))
+    vi.mocked(api.simForge).mockResolvedValue({
+      ...DONE,
+      result: {
+        ...RESULT,
+        games: 10, played: 10, draws: 0, timed_out: 1,
+        median_seconds: 8.0, max_seconds: 360.0,
+        decks: [
+          { slug: 'gyome', name: 'Gyome Food', address: 'aaron/gyome', wins: 5 },
+          { slug: 'arahbo', name: 'Arahbo Cats', address: 'aaron/arahbo', wins: 4 },
+        ],
+        rows,
+      },
+    } as unknown as Job)
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+    await screen.findByText('The tale of the tape')
+
+    // Ten rows, not nine: the bout was not shortened by its casualty.
+    expect(screen.getAllByRole('listitem')
+      .filter((li) => li.className.split(' ').includes('bout'))).toHaveLength(10)
+    expect(screen.getByText(/10 bouts fought in/)).toBeTruthy()
+    // The one that was stopped belongs to nobody, and says so in words.
+    expect(screen.getByText('Stopped by the clock')).toBeTruthy()
+    expect(screen.getAllByText(/^11 turns · 8s$/)).toHaveLength(9)
+    // Six minutes on the row against a five-minute clock in the note — the
+    // pair that must not read as an arithmetic mistake.
+    expect(screen.getByText('6m')).toBeTruthy()
+    expect(screen.getByText(/1 hit the clock — called off past 5m/)).toBeTruthy()
+    // And it is counted apart from a draw all the way into the band's own
+    // spoken summary, rather than folded in as Forge would fold it.
+    expect(screen.getByText('No draws')).toBeTruthy()
+    expect(screen.getByRole('img',
+      { name: /0 drawn and 1 stopped by the clock/ })).toBeTruthy()
   })
 
   it('reads a length in minutes rather than in a machine\'s seconds', async () => {
@@ -701,7 +756,7 @@ describe('the tale of the tape', () => {
     // The clock is 300 on the wire and five minutes to a person; the wall is
     // 71 seconds and a minute and eleven. Nobody has ever thought about a
     // limit in seconds (commandment 2).
-    expect(await screen.findByText(/called off at 5m/)).toBeTruthy()
+    expect(await screen.findByText(/called off past 5m/)).toBeTruthy()
     expect(screen.getByText(/fought in 1m 11s/)).toBeTruthy()
     // Under a minute stays in seconds, because "0m 5s" is a worse sentence.
     expect(screen.getByText(/Middling bout 5s, longest 38s/)).toBeTruthy()

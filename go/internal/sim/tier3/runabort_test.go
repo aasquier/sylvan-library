@@ -152,8 +152,20 @@ func TestTheSubprocessCeilingGrowsWithTheGamesAsked(t *testing.T) {
 	if twenty <= one {
 		t.Errorf("twenty games are given %v and one game %v", twenty, one)
 	}
-	if want := 19 * 300 * time.Second; twenty-one != want {
+	if want := 19 * GameBudget(300); twenty-one != want {
 		t.Errorf("nineteen more games bought %v rather than %v", twenty-one, want)
+	}
+	// **And a subprocess is never cut before the games inside it are.** The
+	// per-game ceiling is the bound with news in it — one game recorded as a
+	// clock-out, the bout played on — where this one has nothing to hand back,
+	// so it must stay the outer of the two for every ask.
+	for _, games := range []int{1, 5, 20} {
+		if floor := time.Duration(games) * GameBudget(300); SubprocessBudget(
+			games, 300) <= floor {
+			t.Errorf("over %d games the subprocess is cut at %v, inside the %v "+
+				"its own games may take", games,
+				SubprocessBudget(games, 300), floor)
+		}
 	}
 	// A caller that named neither is a caller using the defaults, not one
 	// asking for a match with no time in it.

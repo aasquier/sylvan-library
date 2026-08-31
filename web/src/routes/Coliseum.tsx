@@ -731,9 +731,17 @@ function TaleOfTheTape({ result, homeSlug, commanderOf }: {
         </li>
         <li className={`tape-note${result.timed_out === 0 ? ' is-nil' : ''}`}>
           <span className="tape-note-mark" data-kind="clock" aria-hidden="true" />
+          {/* "past", not "at". A bout called off is not promised to have
+              stopped on the stroke: the clock is when the arena gives up
+              waiting, and a game that will not stop is cut a little after it —
+              which is the whole reason a bout can be stopped at all. The row
+              below then reads a minute longer than this line, and the two must
+              not contradict each other in front of somebody counting. It is
+              also the glossary's own wording for this term, which has said
+              "ran past the time limit" from the beginning. */}
           {result.timed_out === 0
             ? 'None hit the clock'
-            : `${result.timed_out} hit the clock — called off at `
+            : `${result.timed_out} hit the clock — called off past `
               + `${spell(result.clock)}`}
           {help('stat.forge_timed_out')}
         </li>
