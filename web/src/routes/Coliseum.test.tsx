@@ -25,6 +25,7 @@ import type {
   Coliseum, ColiseumArena, ColiseumChampion, ColiseumFact, DeckTile,
   ForgeBeats, ForgeBoard, ForgeResult, Job,
 } from '../lib/api'
+import { ApiError } from '../lib/api'
 import ColiseumRoom from './Coliseum'
 
 
@@ -35,10 +36,19 @@ vi.mock('../lib/api', async () => {
     api: { coliseum: vi.fn(), decks: vi.fn(), forgeStatus: vi.fn(),
            simForge: vi.fn(), job: vi.fn(), glossary: vi.fn(),
            validate: vi.fn() },
+    // **`followJob` has to be mockable, and the reason is worth writing down.**
+    // The real one closes over `api.ts`'s own `api` const, not the object
+    // replaced above — so mocking `api.job` here cannot reach a poll that
+    // `followJob` makes. Every test that hands back an already-finished job
+    // short-circuits before the first poll and never noticed; a test about a
+    // watch that *fails* is exactly the one that has to.
+    followJob: vi.fn(),
   }
 })
 
 const { api } = await import('../lib/api')
+const { followJob } = await import('../lib/api')
+const realApi = await vi.importActual<typeof import('../lib/api')>('../lib/api')
 
 // **The `commander` is fixture furniture that earns its place.** The shelf
 // really does send it, and it is what decides whether a deck's title shortens
@@ -191,6 +201,9 @@ const DONE: Job = {
 } as unknown as Job
 
 beforeEach(() => {
+  // The real watcher unless a test says otherwise, so nothing here is testing
+  // a stand-in by accident.
+  vi.mocked(followJob).mockImplementation(realApi.followJob)
   vi.mocked(api.coliseum).mockReset()
   vi.mocked(api.decks).mockResolvedValue(DECKS)
   vi.mocked(api.forgeStatus).mockResolvedValue({ available: true, why: null })
@@ -870,5 +883,98 @@ describe('the tale of the tape', () => {
       .toMatch(/^Motion inspired by Grand Coliseum, Onslaught — art by Carl Critchlow$/)
     // The still is not left underneath it: one banner, not two stacked.
     expect(container.querySelector('img.coliseum-hero-art')).toBeNull()
+  })
+})
+
+/**
+ * A bout that dies mid-match, and the one state this room could never survive:
+ * an arena that says "running" while nothing runs.
+ *
+ * On 2026-08-30 a twenty-game match on the deployed instance was cancelled by
+ * the app that asked for it, the worker went on playing to nobody, and every
+ * bout after it queued behind the one with no audience. The room's part of
+ * that was the last mile: a progress bar turning over a fight that had already
+ * ended, with nothing on screen to say so and no way back to the gates.
+ *
+ * The server's own sentence is the thing that must arrive — `forgeTrouble`
+ * writes it, and it names nothing that computes (commandment 10). What must
+ * never arrive is a spinner that outlives its job.
+ */
+describe('a bout that falls over', () => {
+  beforeEach(() => { vi.mocked(api.coliseum).mockResolvedValue(room()) })
+
+  /** The gate, found by role: the label lives in a span inside the button. */
+  const gate = () => screen.getByRole('button', {
+    name: /Send them in|Lighting the forge|The match is on/,
+  }) as HTMLButtonElement
+
+  /** The verdict, read whole: React renders "The match failed: " and the
+   *  sentence as two text nodes, so a regex over one of them finds neither. */
+  const verdict = () => screen.getByText(/The match failed/).textContent ?? ''
+
+  const RUNNING: Job = {
+    id: 'j9', kind: 'sim.forge', status: 'running', done: 2, total: 20,
+    percent: 10, label: '', result: null, partial: null, error: null,
+    created_at: '2026-08-30T00:00:00Z',
+  } as unknown as Job
+
+  it("renders a failed match as the arena's own words", async () => {
+    // Exactly what the instance recorded against the job that died.
+    const said = 'the match broke off before it reached a result. Send the '
+      + 'two decks in again'
+    vi.mocked(api.simForge).mockResolvedValue(RUNNING)
+    // A watch that ticks once and then reports the job in error, which is what
+    // a match dying mid-bout looks like from this room.
+    vi.mocked(followJob).mockImplementation((_id, onTick) => {
+      onTick(RUNNING)
+      return { promise: Promise.reject(new Error(said)), cancel: () => {} }
+    })
+
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+
+    await waitFor(() => expect(verdict()).toContain(said))
+    // The verdict is the room's, not the arena's plumbing: nothing that
+    // computes is named.
+    for (const leak of ['machine', 'worker', 'shim', 'HTTP', 'context']) {
+      expect(verdict()).not.toContain(leak)
+    }
+    // And the gates are open again, which is the offer to send them in.
+    await waitFor(() => expect(gate().disabled).toBe(false))
+  })
+
+  it('stops the bar when the arena stops answering about the match', async () => {
+    vi.mocked(api.simForge).mockResolvedValue(RUNNING)
+    // The arena stops answering about the match after saying `running` once.
+    // **A rejection built per call**, never one rejected promise handed out
+    // twice: a shared rejected promise settles once, and every later `catch`
+    // reads the same already-handled result rather than a fresh failure.
+    vi.mocked(followJob).mockImplementation((_id, onTick) => {
+      onTick(RUNNING)
+      return {
+        promise: Promise.reject(new ApiError('no such job', 404)),
+        cancel: () => {},
+      }
+    })
+
+    show()
+    fireEvent.click(await screen.findByText('Send them in'))
+
+    // The last thing this room was ever told was `running`. Nothing will ever
+    // correct it, so the room has to stop on the failure itself — otherwise
+    // the bar turns forever over a bout that ended minutes ago.
+    await waitFor(() => expect(gate().disabled).toBe(false))
+    expect(screen.getByText(/The match failed/)).toBeTruthy()
+  })
+
+  it('says the limit on the games it will fight', async () => {
+    show()
+    await screen.findByText('Send them in')
+    const dial = screen.getByRole('spinbutton', { name: /games/i })
+    // The ceiling is validation *and* words: a number input's `max` does not
+    // stop 25 being typed, and an arena that quietly fought 20 of them was
+    // how a bar came to measure a match nobody had asked for.
+    expect(dial.getAttribute('max')).toBe('20')
+    expect(screen.getByText(/of 20 max/)).toBeTruthy()
   })
 })

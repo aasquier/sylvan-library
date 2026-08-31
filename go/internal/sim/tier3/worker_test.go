@@ -632,8 +632,12 @@ func (h *handTimer) pass(d time.Duration) {
 	}
 }
 
+// Reset re-arms, and un-stops: `time.AfterFunc`'s timer can be stopped and
+// started again, and [readStreamOn] does exactly that around every line it
+// hands to a callback.
 func (h *handTimer) Reset(d time.Duration) bool {
 	h.resets++
+	h.stopped = false
 	h.deadline = h.now + d
 	return true
 }
@@ -714,9 +718,12 @@ func TestTheStallBudgetIsPerReadRatherThanPerMatch(t *testing.T) {
 			"distinguishes a per-read budget from a per-match one",
 			clock.now, budget)
 	}
-	if clock.resets != len(lines) {
-		t.Errorf("the deadline was re-armed %d times for %d lines",
-			clock.resets, len(lines))
+	// Every line but the last re-arms the deadline. The result line ends the
+	// read loop where it stands, and arming a budget for a read that will
+	// never happen would be the one reset that means nothing.
+	if want := len(lines) - 1; clock.resets != want {
+		t.Errorf("the deadline was re-armed %d times for %d lines, want %d",
+			clock.resets, len(lines), want)
 	}
 }
 

@@ -129,11 +129,41 @@ func forgeGames(body map[string]any) (int, error) {
 		return 0, err
 	}
 	// Clamped into [1, ForgeGamesMax] over an unbounded integer.
+	//
+	// **The upper clamp is now unreachable from the route**, which refuses an
+	// over-cap ask in words before this runs (see [forgeGamesAsked]). It stays
+	// because this is the last line of defence on a number that reaches
+	// Forge's command line and every clock in [tier3.MatchBudget]: a caller
+	// that found another way in still cannot ask the arena for a thousand
+	// games. A silent clamp is a poor answer to a person and a fine answer to
+	// a bad request.
 	if n.Cmp(big.NewInt(ForgeGamesMax)) > 0 {
 		return ForgeGamesMax, nil
 	}
 	if n.Cmp(big.NewInt(1)) < 0 {
 		return 1, nil
+	}
+	return int(n.Int64()), nil
+}
+
+// forgeGamesAsked is the games count as it was *asked for*, before any
+// clamping — what the route needs to tell "twenty-five" from "twenty".
+//
+// A number the grammar cannot read is not this function's business: it returns
+// the error and the route lets the recorded 500 happen further down, exactly
+// as before. Above `math.MaxInt` the answer is "more than the cap" without
+// narrowing, because a `*big.Int` asked to be an `int` is a different bug.
+func forgeGamesAsked(body map[string]any) (int, error) {
+	raw, ok := body["games"]
+	if !ok {
+		return ForgeGamesDefault, nil
+	}
+	n, err := claude.IntValue(raw)
+	if err != nil {
+		return 0, err
+	}
+	if !n.IsInt64() || n.Int64() > int64(ForgeGamesMax) {
+		return ForgeGamesMax + 1, nil
 	}
 	return int(n.Int64()), nil
 }
@@ -1242,6 +1272,23 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, addresses[i]+
 			" has no cards in it yet, so no result would mean anything "+
 			"— add its cards and send them in again")
+		return
+	}
+
+	// **The cap is said, not applied behind somebody's back.** This used to
+	// clamp: an ask for twenty-five games became twenty, nothing said so, and
+	// the person who typed twenty-five watched a bar that was measuring a
+	// different match than the one they asked for. Worse than either honest
+	// answer, and the shape the arena's own clocks were being sized against.
+	//
+	// Before the pre-flight for the empty deck's reason: an ask this surface
+	// will not honour should not cost a machine boot to refuse.
+	if asked, err := forgeGamesAsked(body); err == nil && asked > ForgeGamesMax {
+		wire.Detail(w, http.StatusUnprocessableEntity, fmt.Sprintf(
+			"a bout runs to %d games at the most — these are whole games of "+
+				"Commander played end to end, and the arena seats one bout at "+
+				"a time. Ask for %d or fewer and send them in",
+			ForgeGamesMax, ForgeGamesMax))
 		return
 	}
 

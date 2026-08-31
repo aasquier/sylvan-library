@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -264,8 +265,8 @@ func TestTheShimSerialisesMatchesWhateverTheCallerBelieves(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			state.match.Lock()
-			defer state.match.Unlock()
+			state.takeMatch(context.Background())
+			defer state.releaseMatch()
 			counter.Lock()
 			concurrent++
 			if concurrent > peak {

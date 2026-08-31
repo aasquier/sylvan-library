@@ -51,6 +51,19 @@ func forgeTrouble(err error) string {
 	switch {
 	case err == nil:
 		return ""
+	// **Before the not-ready case, because it answers to it.** The arena is
+	// working — it is simply mid-match for somebody else, or still being swept
+	// after one. That is different news from an arena that would not open, and
+	// the difference is worth a person's time: one of them is somebody else's
+	// turn and the other is bad luck.
+	//
+	// This became sayable when a bout stopped waiting for the arena forever.
+	// Before that, a match behind a wedged one had no end and no words: the
+	// room drew a progress bar against a fight that was never going to start.
+	case errors.Is(err, tier3.ErrArenaBusy):
+		return "the arena is still being cleared from the last match, so " +
+			"these two could not be seated. Nothing is wrong with the decks " +
+			"— give it a moment and send them in again"
 	// The machine that plays the games is not answering *yet*. Almost always
 	// the first match after a change lands, because the arena is rebuilt and
 	// the first person through the door waits for it to open. Saying so, and

@@ -51,6 +51,12 @@ func TestTheArenaNeverRecitesTheStack(t *testing.T) {
 		{"a match that broke off",
 			errors.New("forge worker: the match stream ended without a result")},
 		{"a plain unwrapped failure", errors.New("dial tcp 172.19.0.2:8080: i/o timeout")},
+		// An arena mid-match. Its own sentence, and its own leak risk: the
+		// error underneath names a budget in seconds and the thing that was
+		// waited on, neither of which is a player's business.
+		{"an arena somebody else is using", tier3.ArenaBusy(
+			"forge worker: the arena did not take the match within 1m30s — " +
+				"another one is still being played")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

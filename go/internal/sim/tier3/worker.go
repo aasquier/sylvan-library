@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -88,6 +89,95 @@ const BootBudget = 180 * time.Second
 // budget is spent as a series of these rather than as one request.
 const machineWait = 60 * time.Second
 
+// The three clocks a bout runs against, and why there are three.
+//
+// **One constant used to do all of this, and it was sized for a small bout.**
+// A twenty-game match on the deployed instance was cancelled by the app that
+// asked for it, 19m48s in, and the log said `/match failed: context canceled`.
+// The canceller was this file's own stall timer, armed at `clock + 120`
+// seconds — a budget describing *one game* — while the far side had
+// [SubprocessBudget], over an hour for the same bout. A wait that scales with
+// the ask was being bounded by one that does not, so the longer the bout the
+// likelier it was to be killed by its own client. The house principle is that
+// a clock is bound against the question it is asking, so each of these is
+// named for the question it answers.
+const (
+	// ArenaBudget bounds getting *in*: from the ask to the far side accepting
+	// it. The shim plays one match at a time and takes that slot before it
+	// answers, so a bout behind another bout waits here — and used to wait
+	// with no bound at all, because the request carried no deadline and the
+	// client no timeout. That is the spinner that outlived a job: a room
+	// drawing a progress bar against a worker that was never going to answer.
+	//
+	// Ninety seconds because by this point the machine is up and its shim is
+	// answering health checks — [Worker.Ready] has already returned — so the
+	// only thing left to wait for is another match finishing. If that has not
+	// happened in a minute and a half, the arena is occupied rather than slow,
+	// and saying so beats drawing a bar for an hour.
+	ArenaBudget = 90 * time.Second
+
+	// wireOverhead is what the whole bout costs beyond the games themselves:
+	// waking a machine, the shim's boot, the JVM's, and the wire. Spent once,
+	// on top of [SubprocessBudget].
+	wireOverhead = BootBudget + ArenaBudget
+)
+
+// MatchBudget is the whole bout's ceiling, and it scales with what was asked.
+//
+// [SubprocessBudget] is the far side's own ceiling for the same match, so this
+// is that plus everything the far side does not count: the machine start, both
+// boots, and the wait for the match slot. Deliberately *larger* than the far
+// side's bound rather than smaller — the app is the belt over those
+// suspenders, and a belt that gives way first is not a belt.
+func MatchBudget(games, clock int) time.Duration {
+	return SubprocessBudget(games, clock) + wireOverhead
+}
+
+// StallBudget is how long one silence may last before the worker is presumed
+// dead: the longest gap the far side can honestly leave between two lines.
+//
+// A line arrives when a game ends, so one gap is one game — but **Forge's `-c`
+// is game clock, not wall clock**, and the worker is a small shared machine
+// where one match wants two and a half cores. A game that reaches the clock
+// takes longer than the clock in real seconds, which is exactly the case the
+// old `clock + 120` had 120 seconds of slack for and the case that killed the
+// bout. So: two clocks rather than one, plus [BootBudget] for the JVM start
+// the first line waits behind.
+//
+// This stays per-read rather than becoming a share of [MatchBudget], because
+// its question is different — *is anybody still there* — and the answer to
+// that should not get harder to reach as a bout goes on.
+func StallBudget(clock int) time.Duration {
+	if clock < 1 {
+		clock = ClockDefault
+	}
+	return BootBudget + 2*time.Duration(clock)*time.Second
+}
+
+// ErrArenaBusy is a bout that never got in: the far side had a match already
+// and did not take this one inside [ArenaBudget].
+//
+// Its own sentinel because it is its own news. Every other way in here fails,
+// the arena is broken or absent; this one means it is *working*, on somebody
+// else's match, and the whole of what anybody needs to do is come back. It
+// answers to [ErrWorkerNotReady] so callers that only sort transient from
+// permanent keep working without knowing this exists.
+var ErrArenaBusy = errors.New("the arena is busy with another match")
+
+// ArenaBusy wraps a reason as [ErrArenaBusy]. The reason is for the log; the
+// room writes its own words.
+func ArenaBusy(format string, args ...any) error {
+	return &arenaBusy{msg: fmt.Sprintf(format, args...)}
+}
+
+type arenaBusy struct{ msg string }
+
+func (e *arenaBusy) Error() string { return e.msg }
+func (e *arenaBusy) Is(target error) bool {
+	return target == ErrArenaBusy || target == ErrWorkerNotReady ||
+		target == ErrForgeNotInstalled
+}
+
 // Worker is the client. A value rather than package functions so a test can
 // give it its own HTTP client and clock.
 type Worker struct {
@@ -101,8 +191,34 @@ type Worker struct {
 	HTTP *http.Client
 	// Boot is the cold-start budget; zero means [BootBudget].
 	Boot time.Duration
+	// Arena is how long to wait for the far side to take the match; zero means
+	// [ArenaBudget].
+	Arena time.Duration
+	// Stall is how long one silence may last; zero means [StallBudget] of the
+	// ask's clock.
+	//
+	// A seam rather than a constant because the boundary is minutes wide and a
+	// test about a boundary has to be able to reach it. The fault this file
+	// carries could only be reproduced by shrinking the budget by hand until
+	// it landed in seconds — which is a thing a test should be able to do
+	// without editing the code it is testing.
+	Stall time.Duration
 	// Sleep is how the health poll waits, so a test need not.
 	Sleep func(time.Duration)
+}
+
+func (w *Worker) arena() time.Duration {
+	if w.Arena != 0 {
+		return w.Arena
+	}
+	return ArenaBudget
+}
+
+func (w *Worker) stall(clock int) time.Duration {
+	if w.Stall != 0 {
+		return w.Stall
+	}
+	return StallBudget(clock)
 }
 
 func (w *Worker) client() *http.Client {
@@ -499,10 +615,14 @@ type MatchAsk struct {
 // simply never sends the line, and a room that was going to narrate shows the
 // rows it does have.
 //
-// The timeout is per read rather than per match, and `clock + 120` bounds
-// every wait this request can make: the JVM boot before the first line, and
-// one game before each line after it. The subprocess on the far side is
-// already bounded whole, so this is the belt over that suspenders.
+// **Three clocks, and each is bound against its own question** — see the block
+// above [ArenaBudget] for the live fault that made one constant into three.
+// [ArenaBudget] bounds getting in, because the far side takes its one match
+// slot before it answers; [StallBudget] bounds a single silence, because a
+// worker that has died stops mid-stream; and [MatchBudget] bounds the whole
+// bout and is the only one that grows with the games asked for. What this used
+// to have instead was `clock + 120` — one game's worth of rope, holding up a
+// bout of twenty, and shorter than the ceiling the far side was playing to.
 func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck,
 	ask MatchAsk) (*SimRun, error) {
 	base, err := w.Ready(ctx)
@@ -527,10 +647,14 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck,
 	// exchange including the body — on a twenty-game match that would be a
 	// second, worse copy of the far side's own ceiling, and a shorter one.
 	// So the request carries a cancellable context and a timer that is reset
-	// on every line: a stream that goes quiet for longer than one game plus
-	// the JVM's boot is cancelled, and a stream that keeps talking runs as
-	// long as it likes.
-	ctx, cancel := context.WithCancel(ctx)
+	// on every line: a stream that goes quiet for longer than [StallBudget] is
+	// cancelled, and a stream that keeps talking runs as long as it likes.
+	//
+	// Over the top of that sits [MatchBudget], which does scale with the ask —
+	// the outer bound on a bout that neither finishes nor goes quiet. It is
+	// larger than the far side's own ceiling on purpose, so the far side's
+	// answer arrives rather than being cut off by the client waiting for it.
+	ctx, cancel := context.WithTimeout(ctx, MatchBudget(ask.Games, ask.Clock))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/match",
 		bytes.NewReader(raw))
@@ -541,8 +665,32 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck,
 
 	client := *w.client()
 	client.Timeout = 0
+
+	// **Getting in is bounded apart from playing**, and this is where a bout
+	// behind a wedged match used to wait forever. The shim takes its one match
+	// slot *before* it answers, so `Do` does not return until the arena is
+	// ours — with no client timeout and, until now, no deadline on the request
+	// either. Cancelling the request is what unblocks it; the flag is what
+	// tells that apart from the far side hanging up, because both surface as
+	// the same "context canceled" read error.
+	var busy atomic.Bool
+	seated := time.AfterFunc(w.arena(), func() {
+		busy.Store(true)
+		cancel()
+	})
 	resp, err := client.Do(req)
+	// `Stop` on a timer that has already started running does not wait for it,
+	// so the flag is read rather than the timer, everywhere it matters —
+	// including after the stream, for the sliver where the two crossed.
+	seated.Stop()
+	wasBusy := func() error {
+		return ArenaBusy("forge worker: the arena did not take the match "+
+			"within %s — another one is still being played", w.arena())
+	}
 	if err != nil {
+		if busy.Load() {
+			return nil, wasBusy()
+		}
 		return nil, fmt.Errorf("forge worker: /match failed: %w", err)
 	}
 	defer resp.Body.Close()
@@ -564,8 +712,16 @@ func (w *Worker) RunMatch(ctx context.Context, decks []*deck.Deck,
 		return RunFromWire(run), nil
 	}
 
-	return readStream(resp.Body, time.Duration(ask.Clock+120)*time.Second,
-		cancel, ask)
+	run, err := readStream(resp.Body, w.stall(ask.Clock), cancel, ask)
+	if err != nil && busy.Load() {
+		// The acquire timer and the answer crossed: the arena took the match a
+		// hair after this side had given up on it, so the stream died of the
+		// cancel rather than of anything the far side did. It is still the
+		// busy arena's news, and reporting it as a match that broke off would
+		// send somebody looking at their decks.
+		return nil, wasBusy()
+	}
+	return run, err
 }
 
 // streamLine is one newline-delimited line of the match stream. Exactly one of
@@ -615,7 +771,15 @@ func readStreamOn(body io.Reader, perRead time.Duration, stall func(),
 	reader := bufio.NewReaderSize(body, 64*1024)
 	for {
 		raw, err := reader.ReadBytes('\n')
-		quiet.Reset(perRead)
+		// **Held while the line is dealt with, and started again after.** The
+		// question this budget asks is how long the *far side* has been quiet,
+		// and the callbacks below are this side's own work — resolving a
+		// board's paintings takes a pool lease and a query for every new card,
+		// on the first game of every match. Re-arming before them charged all
+		// of that to the worker's next gap, so a slow moment here shortened
+		// the rope the worker was hanging from: a budget measuring the wrong
+		// thing, and one that got tighter exactly when the machine was busiest.
+		quiet.Stop()
 		if len(bytes.TrimSpace(raw)) > 0 {
 			var line streamLine
 			if err := json.Unmarshal(raw, &line); err != nil {
@@ -648,6 +812,7 @@ func readStreamOn(body io.Reader, perRead time.Duration, stall func(),
 				return RunFromWire(*line.Result), nil
 			}
 		}
+		quiet.Reset(perRead)
 		if err != nil {
 			if err == io.EOF {
 				break

@@ -783,6 +783,62 @@ func TestTwoIdenticalAsksAreOneMatch(t *testing.T) {
 	reg.Wait()
 }
 
+// **A field that takes twenty-five and quietly fights twenty is the worst of
+// both**, and it is where the arena's clocks went wrong.
+//
+// The dial used to clamp in silence: an ask above the cap became the cap,
+// nothing said so, and whoever typed the bigger number watched a bar measuring
+// a match they had not asked for. The cap is real — these are whole games of
+// Commander and the arena seats one bout at a time — so it is said, at submit
+// time, in words, before anything is spent on it.
+func TestAskingForMoreGamesThanTheArenaSeatsIsRefusedInWords(t *testing.T) {
+	t.Parallel()
+	shim := &stubShim{stream: true}
+	a, _, _ := forgeAPI(t, shim)
+	srv := forgeServer(t, a)
+
+	status, payload := postForge(t, srv,
+		fmt.Sprintf(`{"a_slug":"kaheera","b_slug":"mono-green","games":%d}`,
+			ForgeGamesMax+5))
+	if status != 422 {
+		t.Fatalf("answered %d, want 422 (%v)", status, payload)
+	}
+	detail, _ := payload["detail"].(string)
+	// The limit is named, because a refusal that does not say the number
+	// leaves somebody guessing at it.
+	if !strings.Contains(detail, fmt.Sprintf("%d", ForgeGamesMax)) {
+		t.Errorf("the refusal never says the limit: %q", detail)
+	}
+	if !strings.Contains(detail, "send them in") {
+		t.Errorf("the refusal does not say what to do next: %q", detail)
+	}
+	// Refused before anything was spent on it — the same rule the empty deck
+	// follows, and for the same reason.
+	for _, seen := range shim.requests() {
+		if seen == "POST /match" {
+			t.Error("a bout the arena will not seat was played anyway")
+		}
+		if seen == "POST /coverage" {
+			t.Error("the arena was woken to refuse a count it could read first")
+		}
+	}
+}
+
+// The cap itself has not moved, and the ask at it is untouched: a refusal that
+// also shifted the boundary would be two changes wearing one name.
+func TestTheGamesTheArenaDoesSeatAreStillPlayed(t *testing.T) {
+	t.Parallel()
+	shim := &stubShim{stream: true}
+	a, _, _ := forgeAPI(t, shim)
+	srv := forgeServer(t, a)
+	status, payload := postForge(t, srv,
+		fmt.Sprintf(`{"a_slug":"kaheera","b_slug":"mono-green","games":%d}`,
+			ForgeGamesMax))
+	if status >= 300 {
+		t.Fatalf("a bout at the cap answered %d (%v)", status, payload)
+	}
+}
+
 // TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred is the pin the
 // [forgeGames] comment promised and, for a while, did not
 // have -- and what it pins moved when the real bytes were measured: the

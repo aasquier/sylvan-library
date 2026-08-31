@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"math/big"
@@ -187,19 +188,21 @@ func TestTheWatchdogJudgesWorkRatherThanTime(t *testing.T) {
 func TestOneMatchAtATime(t *testing.T) {
 	t.Parallel()
 	state := newShimState()
-	state.match.Lock()
+	if !state.takeMatch(context.Background()) {
+		t.Fatal("the first match could not take a free slot")
+	}
 	locked := make(chan struct{})
 	go func() {
-		state.match.Lock()
+		state.takeMatch(context.Background())
 		close(locked)
-		state.match.Unlock()
+		state.releaseMatch()
 	}()
 	select {
 	case <-locked:
 		t.Fatal("two matches held the lock at once")
 	case <-time.After(50 * time.Millisecond):
 	}
-	state.match.Unlock()
+	state.releaseMatch()
 	select {
 	case <-locked:
 	case <-time.After(time.Second):
