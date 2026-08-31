@@ -2,6 +2,7 @@ package tier3
 
 import (
 	"errors"
+	"os/exec"
 	"testing"
 	"time"
 )
@@ -85,6 +86,43 @@ func TestAnAbandonedMatchIsNotReportedAsATimeout(t *testing.T) {
 	}
 	if !errors.Is(err, ErrAbandoned) {
 		t.Fatalf("an abandoned match came back as %v", err)
+	}
+}
+
+// **The fallback in [endGroup], which nothing above can reach.** `spawn` always
+// asks for a group, and [exec.Cmd.Start] returns only once the child has got
+// one, so the group kill is what fires in every test above this line. This
+// drives the other branch by hand: a child deliberately left in *this*
+// process's group, which is the shape a failed `Setpgid` would leave behind.
+//
+// Two claims, and the second is why the order in `endGroup` is written down.
+// The child must die — a signal that missed and no fallback would be a kill
+// path that silently does nothing. And this process must live: the child's pid
+// leads no group, so `-pid` can only come back as "no such process", where a
+// helper that reached for our own group id instead would take the test binary,
+// the suite, and on a deployed machine the app, down with it.
+func TestKillingAMatchThatNeverGotItsOwnGroupStillKillsIt(t *testing.T) {
+	t.Parallel()
+	// No shell and no children: the tree is not the question here, the missing
+	// group is, and a lone process leaves nothing orphaned when it goes.
+	cmd := exec.Command("sleep", "120")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("could not start the stand-in: %v", err)
+	}
+	t.Cleanup(func() { _ = cmd.Process.Kill() })
+
+	endGroup(cmd.Process)
+
+	reaped := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(reaped)
+	}()
+	select {
+	case <-reaped:
+	case <-time.After(30 * time.Second):
+		t.Fatal("a match with no group of its own outlived endGroup — the " +
+			"group kill missed it and nothing else was aimed at it")
 	}
 }
 

@@ -580,6 +580,18 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	// until somebody stops it by hand.
 	//
 	// A negative pid signals the group, which is the whole tree.
+	//
+	// **The cost is stated rather than hidden**, in `ui.go`'s phrase. A group
+	// of its own is also a group the terminal will not reach, so a Ctrl-C on
+	// `mtglab sim forge` no longer reaches the JVM the way it used to — the two
+	// killers below both die with the Go process, and the match is left
+	// orphaned until its own clock. That is a laptop's papercut and it buys the
+	// deployed fault: the worker has no terminal, Fly takes the whole machine
+	// when it stops one, and `/match` is the one caller that wires
+	// [RunOptions.Abort] at all. Covering the signal too means a handler armed
+	// process-wide from a library, which is the bug `ui.go` refuses two hundred
+	// lines up; it wants to be a deliberate change to that command, not a side
+	// effect of this one.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
