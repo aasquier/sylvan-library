@@ -209,9 +209,16 @@ type Edit struct {
 	Category string   // what an added card was filed under
 	Into     string   // "cards" or "swap_board"
 	SwapIn   string   // the card a swap brings in
-	Field    string   // which field a set operation touched
-	Value    any      // and what it was set to; never a rationale
-	Note     string   // which note changed
+	// From names where a swap's incoming card was lifted from: "swap_board"
+	// when the promotion took it off the deck's own board, empty when it came
+	// from the pool at large -- the straight swap, whose recorded sentence
+	// must stay byte-identical. Only that one value renders a clause; an
+	// unrecognised From falls back to the plain sentence rather than printing
+	// a token no player typed (commandment 10).
+	From  string
+	Field string // which field a set operation touched
+	Value any    // and what it was set to; never a rationale
+	Note  string // which note changed
 	// Bulk is the pasted-list rewrite's tallies. A pointer because zero of
 	// everything is a real answer for every other kind, and only this one has
 	// counts at all.
@@ -279,6 +286,14 @@ func Describe(e Edit) (action, summary string) {
 		in := e.SwapIn
 		if in == "" {
 			in = "another card"
+		}
+		if e.From == "swap_board" {
+			// The promotion: the incoming card was staged on the deck's own
+			// board rather than fetched from the pool at large, and the
+			// history says so -- "tried a new card" and "played the stake the
+			// board was holding" are different events to the person reading
+			// back a season of edits.
+			return "swap", fmt.Sprintf("swapped %s out for %s from the swap board", e.Card, in)
 		}
 		return "swap", fmt.Sprintf("swapped %s out for %s", e.Card, in)
 
