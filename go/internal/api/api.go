@@ -30,6 +30,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/flymetrics"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
+	"github.com/aasquier/sylvan-library/go/internal/night"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
@@ -171,6 +172,12 @@ type API struct {
 	simCache       *cache.Store
 	matchLedgerOf  *matchledger.Recorder
 	forgeClient    *tier3.Worker
+	// nightRunner is the Coliseum at Night (ADR 46), handed in through
+	// [API.SetNightRunner] after construction — the door builds this API,
+	// then the runner around this API's player, then ties the knot. Nil is
+	// an instance whose night has nowhere to keep its rows, and the admin
+	// night routes answer 503 in words.
+	nightRunner *night.Runner
 
 	lazy        sync.Mutex
 	lazyDB      *sql.DB
@@ -525,6 +532,13 @@ func (a *API) Routes() []Route {
 		// arena's rebuild cannot honestly be a button here.
 		{Method: http.MethodGet, Pattern: "/api/admin/upkeep", Handler: a.upkeep},
 		{Method: http.MethodPost, Pattern: "/api/admin/library/refresh", Handler: a.refreshLibrary},
+		// The Coliseum at Night's admin surface (ADR 46): open a measurement
+		// run, watch the open (or latest) night's card, end a night early.
+		// Under the admin prefix so the door's 403-by-prefix rule covers all
+		// three before routing, with `requireAdmin` behind it like the rest.
+		{Method: http.MethodPost, Pattern: "/api/admin/night/sample", Handler: a.adminNightSample},
+		{Method: http.MethodPost, Pattern: "/api/admin/night/close", Handler: a.adminNightClose},
+		{Method: http.MethodGet, Pattern: "/api/admin/night", Handler: a.adminNight},
 
 		// The sim family, and with it the two generic job routes.
 		{Method: http.MethodPost, Pattern: "/api/sim/mana", Handler: a.simMana},
