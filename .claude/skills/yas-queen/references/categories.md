@@ -81,7 +81,7 @@ does not.
 **The house exemplar.** The seam itself, and it is deliberate: **IM Fell
 English** (a 17th-century face, licence recorded in
 `web/src/assets/fonts/PROVENANCE.md`) carries the rooms — the séance, the
-reading room, the room signs — with **Parisienne** for a hand-written moment,
+reading room, the room signs — with **Caveat** for a hand-written moment,
 while the workhorse stays `system-ui` (`web/src/index.css:126`) where the eye
 is reading numbers. That is a real typographic decision, not laziness: an
 old-face at 13px in the simulator's grid would be atmosphere bought with

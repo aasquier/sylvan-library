@@ -310,11 +310,13 @@ const INK_PAUSE_STOP = 420     // . ? !
  * and a connected script shapes its letters from their neighbours:
  * OpenType shaping does not cross element boundaries, so Parisienne
  * rendered every letter in its isolated form and "Before" came out
- * "Belore". A word kept whole shapes correctly, and a CONTINUOUS linear
- * wipe across it, timed from its character count, reads as the pen
- * travelling — precisely because in a joined hand the leading edge never
- * leaves a stroke. (Handwriting does not join across spaces, so the word
- * boundary costs nothing.)
+ * "Belore" — and Caveat, its successor, joins by contextual alternates
+ * and is bound by exactly the same rule, so the word span stays and
+ * nothing may ever go back to per-letter spans. A word kept whole shapes
+ * correctly, and one CONTINUOUS wipe across it, timed from its character
+ * count, reads as the pen travelling — precisely because in a joined
+ * hand the leading edge never leaves a stroke. (Handwriting does not
+ * join across spaces, so the word boundary costs nothing.)
  *
  * Each word carries a hair of tilt and drop (deterministic per index — a
  * hand wobbles, a render must not); the ink starts wet-brown and dries
