@@ -43,6 +43,26 @@ real window — the copy becomes a fact the server owns instead of a promise
 the bundle froze. Nothing to do before then; this line is the reminder.
 Ledger: Blue, 2026-09-05.
 
+**Black: the Admin panel now prices last month's tokens at this month's
+rates, and the whole pre-September bill reads ~50% high.** The Sonnet 5
+introductory window closed 2026-09-01 and the price table flipped correctly —
+but `adminstats` prices every window (week, month, all-time) at *today's*
+rate, so every token spent before the flip is billed at rates that were not
+in force when it was spent: the laptop's ledger cost **≈$1.71** at the rates
+actually paid and the panel's formula now answers **≈$2.56** for the same
+rows. Nothing else is wrong — tokens, modes and models are all recorded
+faithfully; only the dollars drift, and only for spend that crossed the
+boundary. · *Cost of leaving it:* the all-time figure is wrong forever (the
+week and month windows heal as they slide past the boundary), on the one
+page that exists to answer "what is Claude costing me". · **Recommendation:**
+yes — price each window segment at the rate in force during it; `prices` can
+derive the boundary dates from its own table and the roll-up needs an
+`until` beside its `since`, ~60–80 lines plus tests, one sitting. Built by
+whoever you hand it to with your call on one small semantics choice: "price
+at spend date" (recommended — it is what "estimated spend" means) versus
+"today's rate, labelled as a projection". It renders on the Admin panel, so
+it wants your eye before it merges. Ledger: Black, 2026-09-05.
+
 ## Open — 2026-08-24
 
 **1. ADR 5's isolation sweep did not cross to Go, and it is the one test that
@@ -114,20 +134,8 @@ and there is no cycle time to wait out. Ledger: Blue, 2026-08-24.
 
 **Black —**
 
-**1. PR #284 is green and unmerged, and nothing in it renders.** Three fixes,
-all backend: `/api/health` answers in **2.0ms instead of 4.4ms** (it was
-asking eight database statements to answer a question that needs two — the
-platform's own health check is one of its callers); the card-search page's
-**opening query drops 87.7ms to 53.1ms** and a type filter 71.6ms to 52.9ms,
-because the search was buying a price for every row the top-sixty was about to
-throw away; and the standing claim *"the served app hotlinks nothing it could
-serve itself"* is now machine-checked over the built bundle instead of
-re-verified by hand every quarter. The JSON on the wire is byte-for-byte what
-it was — same cards, same order, same prices — so there is nothing to walk. ·
-*Cost of leaving it:* the wins sit on a branch, and the hotlink guard is not
-protecting anything until it runs in CI. · **Recommendation:** merge it; it
-only stopped because tonight's harness refused `gh pr merge`. Ledger: Black,
-2026-08-24.
+*(Item 1 — merge PR #284 — answered: merged 2026-08-24T13:32Z and deployed;
+outcome recorded in the ledger, Black 2026-09-05. Items below still open.)*
 
 **2. The Claude spend ledger lost its command line in the crossing, so the
 deployed instance's bill can only be read by signing in.** The accounting
