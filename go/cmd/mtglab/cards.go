@@ -28,7 +28,7 @@ func cardsCommand(cfg config.Config) *cobra.Command {
 func cardsShowCommand(cfg config.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "show <name>...",
-		Short: "A card's facts from the pool: cost, types, identity, text",
+		Short: "A card's facts from the pool: cost, types, identity, stats, text",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
@@ -57,7 +57,7 @@ func cardsShowCommand(cfg config.Config) *cobra.Command {
 					if len(rec.ColorIdentity) > 0 {
 						identity = strings.Join(rec.ColorIdentity, ", ")
 					}
-					fmt.Fprintf(out, "  %s   [%s]\n", rec.TypeLine, identity)
+					fmt.Fprintf(out, "  %s   [%s]%s\n", rec.TypeLine, identity, cardStats(rec))
 					for _, line := range strings.Split(rec.OracleText, "\n") {
 						fmt.Fprintf(out, "    %s\n", line)
 					}
@@ -75,4 +75,19 @@ func cardsShowCommand(cfg config.Config) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// cardStats is the line's tail for the cards that have a size: a creature's
+// power/toughness, a planeswalker's loyalty. This command is rule 1 of the
+// non-negotiables made a command, and until 2026-09-05 it could not answer
+// "how big is Storm Crow" — the session asking fell back to exactly the
+// recall the rule exists to stop. Nil fields (most cards) render nothing.
+func cardStats(rec *pool.CardRecord) string {
+	switch {
+	case rec.Power != nil && rec.Toughness != nil:
+		return "   " + *rec.Power + "/" + *rec.Toughness
+	case rec.Loyalty != nil:
+		return "   loyalty " + *rec.Loyalty
+	}
+	return ""
 }

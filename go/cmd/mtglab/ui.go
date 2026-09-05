@@ -112,13 +112,21 @@ func bootSummary(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 // that refuses here would take the site down for a setting the site does not
 // need to serve a single anonymous page. Loud and serving beats silent and
 // serving; refusing to serve is worse than both.
-func configComplaints(cfg config.Config) []string {
+func configComplaints(cfg config.Config, forge tier3.Settings) []string {
+	var out []string
+	if forge.WorkerHalfSet() {
+		// Not gated on auth: a laptop that sets the worker dial means to reach
+		// the hosted worker, and it is exactly as unreachable from there.
+		out = append(out, "MTGLAB_FORGE_WORKER is set and neither "+
+			"MTGLAB_FLY_API_TOKEN nor MTGLAB_FORGE_WORKER_URL is: the hosted "+
+			"worker stays unconfigured (forge_worker=false above), and Tier 3 "+
+			"falls back to probing for a local Forge instead")
+	}
 	if !cfg.RequireAuth {
 		// Auth off is a laptop, one person, no invites and no reset mail. Every
 		// relationship below is about a deployment.
-		return nil
+		return out
 	}
-	var out []string
 	if cfg.ResendAPIKey == "" {
 		out = append(out, "auth is on and RESEND_API_KEY is unset: invites and "+
 			"password resets are refused rather than sent, because the console "+
@@ -255,7 +263,7 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	// configuration in the log above the error.
 	_, poolErr := os.Stat(cfg.DBPath())
 	log.Info("configuration", bootSummary(cfg, forge, webDist, tarot, poolErr == nil)...)
-	for _, complaint := range configComplaints(cfg) {
+	for _, complaint := range configComplaints(cfg, forge) {
 		log.Warn(complaint)
 	}
 	// The first scheduler this app has ever had says so where a `fly logs`
