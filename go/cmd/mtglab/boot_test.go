@@ -142,9 +142,10 @@ func TestTheComplaintsNameOnlyRelationshipsThatAreActuallyBroken(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name string
-		cfg  config.Config
-		want []string // the variables that must be named; nil means silence
+		name  string
+		cfg   config.Config
+		forge tier3.Settings
+		want  []string // the variables that must be named; nil means silence
 	}{
 		{
 			// Auth off is a laptop: none of these relationships exists to break.
@@ -154,6 +155,34 @@ func TestTheComplaintsNameOnlyRelationshipsThatAreActuallyBroken(t *testing.T) {
 		{
 			name: "a configured deployment complains about nothing",
 			cfg:  whole,
+		},
+		{
+			// The worker dial on with no way to reach a worker: Configured()
+			// reads false and only this complaint says which half is missing.
+			name:  "a half-set Forge worker names the missing token",
+			cfg:   whole,
+			forge: tier3.Settings{WorkerEnabled: true},
+			want:  []string{"MTGLAB_FLY_API_TOKEN"},
+		},
+		{
+			// Not gated on auth: a laptop that sets the dial means to reach the
+			// hosted worker, and it is exactly as unreachable from there.
+			name:  "the half-set worker complains on a laptop too",
+			cfg:   config.Defaults(),
+			forge: tier3.Settings{WorkerEnabled: true},
+			want:  []string{"MTGLAB_FLY_API_TOKEN"},
+		},
+		{
+			// Either missing half supplied is a whole worker, not a complaint:
+			// a token for the Machines API, or a direct URL that needs no API.
+			name:  "a worker with its token is silence",
+			cfg:   whole,
+			forge: tier3.Settings{WorkerEnabled: true, FlyAPIToken: "not_a_real_token"},
+		},
+		{
+			name:  "a worker reached by URL needs no token",
+			cfg:   whole,
+			forge: tier3.Settings{WorkerEnabled: true, WorkerURL: "http://127.0.0.1:8791"},
 		},
 		{
 			// Auth on with none of its partners set: every one of them is a
@@ -188,7 +217,7 @@ func TestTheComplaintsNameOnlyRelationshipsThatAreActuallyBroken(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := configComplaints(tc.cfg)
+			got := configComplaints(tc.cfg, tc.forge)
 			if len(got) != len(tc.want) {
 				t.Fatalf("expected %d complaint(s) %v, got %d: %v",
 					len(tc.want), tc.want, len(got), got)

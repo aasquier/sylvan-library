@@ -3,8 +3,9 @@ package night
 import (
 	"hash/fnv"
 	"math/rand"
-	"sort"
+	"slices"
 	"strconv"
+	"strings"
 )
 
 // The deal: who fights whom tonight, decided once at run open and written as
@@ -98,7 +99,9 @@ func PlanSample(nightKey string, house []string, players []Seat, games int) []Pl
 // playerTurns is the round-robin queue: `turns` passes over the accounts in
 // seeded order, one deck per account per pass. Both shuffles draw from the
 // caller's generator over sorted inputs, so the queue is a function of the
-// night key and the roster and nothing else.
+// night key and the roster and nothing else. The sorts are total — owner ids
+// are unique by construction and one owner cannot hold two decks of one slug
+// — so an unstable sort cannot move a tie and no Stable form is owed.
 func playerTurns(rng *rand.Rand, players []Seat, turns int) []Seat {
 	byOwner := map[int64][]Seat{}
 	owners := []int64{}
@@ -111,13 +114,13 @@ func playerTurns(rng *rand.Rand, players []Seat, turns int) []Seat {
 		}
 		byOwner[*p.Owner] = append(byOwner[*p.Owner], p)
 	}
-	sort.Slice(owners, func(i, j int) bool { return owners[i] < owners[j] })
+	slices.Sort(owners)
 	rng.Shuffle(len(owners), func(i, j int) {
 		owners[i], owners[j] = owners[j], owners[i]
 	})
 	for _, o := range owners {
 		decks := byOwner[o]
-		sort.Slice(decks, func(i, j int) bool { return decks[i].Slug < decks[j].Slug })
+		slices.SortFunc(decks, func(a, b Seat) int { return strings.Compare(a.Slug, b.Slug) })
 		rng.Shuffle(len(decks), func(i, j int) {
 			decks[i], decks[j] = decks[j], decks[i]
 		})
@@ -146,7 +149,7 @@ func opponentFor(a Seat, queue []Seat) int {
 // outlasts the shelf. ok is false when there is no house at all.
 func houseCycle(rng *rand.Rand, house []string) func() (Seat, bool) {
 	shuffled := append([]string(nil), house...)
-	sort.Strings(shuffled)
+	slices.Sort(shuffled)
 	rng.Shuffle(len(shuffled), func(i, j int) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})

@@ -225,6 +225,17 @@ func (s Settings) Configured() bool {
 	return s.WorkerURL != "" || (s.WorkerEnabled && s.FlyAPIToken != "")
 }
 
+// WorkerHalfSet reports the one misconfiguration [Settings.Configured] cannot
+// name: the worker dial is on with no way to reach a worker — no direct URL
+// and no Fly token — so Configured reads false and nothing says which half is
+// missing. The operator who set MTGLAB_FORGE_WORKER and forgot the token sees
+// only `forge_worker=false` in the boot summary; the boot's complaint list
+// asks this predicate so it can say why, at boot, instead of leaving it to be
+// rediscovered from a Tier 3 refusal days later.
+func (s Settings) WorkerHalfSet() bool {
+	return s.WorkerEnabled && s.WorkerURL == "" && s.FlyAPIToken == ""
+}
+
 // env is the one read, trimmed the one way — the same rule `internal/config`
 // applies, restated rather than imported because nothing else here needs that
 // package and a settings type should not drag one in for a two-line helper.
