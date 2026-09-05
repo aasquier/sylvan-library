@@ -120,22 +120,28 @@ describe('the swap board mover', () => {
   })
 
   it('offers the 99 grouped by category, and the filter narrows by name', () => {
-    show()
+    // A stray category rides along so the ordering is observable end to end:
+    // the fixed vocabulary in its own order — not the deck's, not the
+    // alphabet's — and anything outside it filed after. The group labels are
+    // the composer's only uppercase paragraphs, so their document order IS
+    // the rendered order.
+    const { container } = show({
+      cards: [...THE_99, card('Colossal Dreadmaw', 'dinosaur')],
+    })
     openComposer()
-    // The fixed vocabulary's own labels, in its own order.
-    for (const label of ['Lands', 'Ramp', 'Card advantage', 'Threats']) {
-      expect(screen.getByText(label)).toBeTruthy()
-    }
+    const labels = () =>
+      [...container.querySelectorAll('p.uppercase')].map((el) => el.textContent)
+    expect(labels()).toEqual(['Lands', 'Ramp', 'Card advantage', 'Threats', 'dinosaur'])
     expect(screen.getByRole('button', { name: 'Forest' })).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText(/Narrow the 4 by name/),
+    fireEvent.change(screen.getByLabelText(/Narrow the 5 by name/),
                      { target: { value: 'llan' } })
     expect(screen.getByRole('button', { name: 'Llanowar Elves' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Forest' })).toBeNull()
-    expect(screen.queryByText('Lands'), 'an emptied group folds away').toBeNull()
+    expect(labels(), 'an emptied group folds away').toEqual(['Ramp'])
 
     // A filter that matches nothing says so, with the way back out.
-    fireEvent.change(screen.getByLabelText(/Narrow the 4 by name/),
+    fireEvent.change(screen.getByLabelText(/Narrow the 5 by name/),
                      { target: { value: 'zzz' } })
     expect(screen.getByText(/No card in the deck answers to that/)).toBeTruthy()
   })
@@ -145,17 +151,29 @@ describe('the swap board mover', () => {
     openComposer()
     const apply = () =>
       screen.getByRole('button', { name: /Apply swap|Swapping/ }) as HTMLButtonElement
+    const why = () => screen.getByLabelText('Why it earns the slot')
 
     expect(apply().disabled).toBe(true)
 
     // A sentence alone is not enough — nothing has been picked to make room.
-    fireEvent.change(screen.getByLabelText('Why it earns the slot'),
-                     { target: { value: 'The bigger finisher.' } })
+    fireEvent.change(why(), { target: { value: 'The bigger finisher.' } })
     expect(apply().disabled).toBe(true)
 
-    // And the pick states its consequence in plain words before the press.
+    // A pick alone is not enough either. Both halves of the predicate are
+    // visited from both sides on purpose: a test that only ever types before
+    // picking would stay green if the why clause fell out of `ready`.
+    fireEvent.change(why(), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'End-Raze Forerunners' }))
+    // The pick states its consequence in plain words before the press.
     expect(screen.getByText(/goes to the graveyard with its reason kept/)).toBeTruthy()
+    expect(apply().disabled).toBe(true)
+
+    // Whitespace is not a sentence. The server trims before judging, and a
+    // button that armed on three spaces would promise a press it swallows.
+    fireEvent.change(why(), { target: { value: '   ' } })
+    expect(apply().disabled).toBe(true)
+
+    fireEvent.change(why(), { target: { value: 'The bigger finisher.' } })
     expect(apply().disabled).toBe(false)
 
     // Un-picking arms it back off — the pick is a toggle too.

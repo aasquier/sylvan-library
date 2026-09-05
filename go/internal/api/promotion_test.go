@@ -199,6 +199,94 @@ func TestAPromotionStillDemandsAFreshWhy(t *testing.T) {
 	}
 }
 
+// The board entry's quantity travels into the 99: the stake is played at its
+// own size, not re-dealt as a single copy. This is the deviation the PR flags
+// for Aaron's ruling, so the test pins exactly the behaviour being put in
+// front of him.
+func TestAPromotionCarriesTheBoardQuantity(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	// The fixture ends inside the board entry, so an appended line is the
+	// board entry's own.
+	rig.writeDeck(t, "promotion-qty", promotionFixture+"    qty: 2\n")
+
+	status, _, raw := rig.do(t, alice, "POST", "/api/decks/alice/promotion-qty/swap",
+		`{"out":"Sol Ring","into":"Craterhoof Behemoth","why":"Two seats were being held."}`)
+	if status != http.StatusOK {
+		t.Fatalf("the promotion answered %d: %s", status, raw)
+	}
+	if entry := promoted(t, rig, "promotion-qty"); !strings.Contains(entry, "qty: 2") {
+		t.Errorf("the board's quantity did not travel into the 99:\n%s", entry)
+	}
+}
+
+// And the floor under it: a hand-written board entry can say `qty: 0` (the
+// parser keeps an explicit zero; only an absent qty defaults to 1), and the
+// promotion lands it as the single copy it really is. Without the floor the
+// fold would hand back AddCard's "quantity must be at least 1" -- a refusal
+// about a number the user never typed.
+func TestAPromotionFloorsAQuantityBelowOne(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	rig.writeDeck(t, "promotion-zero", promotionFixture+"    qty: 0\n")
+
+	status, _, raw := rig.do(t, alice, "POST", "/api/decks/alice/promotion-zero/swap",
+		`{"out":"Sol Ring","into":"Craterhoof Behemoth","why":"One copy is what it always was."}`)
+	if status != http.StatusOK {
+		t.Fatalf("the promotion answered %d: %s", status, raw)
+	}
+	// A quantity of one is the emitter's silence: the landed entry carries no
+	// qty line at all.
+	if entry := promoted(t, rig, "promotion-zero"); strings.Contains(entry, "qty:") {
+		t.Errorf("a floored quantity still wrote a qty line:\n%s", entry)
+	}
+}
+
+// promoted cuts the landed 99 entry out of a promotion fixture's file: from
+// the incoming card's name line to the board section below it. Failing when
+// the card never landed keeps the quantity tests honest about what they read.
+func promoted(t *testing.T, rig *writeRig, slug string) string {
+	t.Helper()
+	after := rig.textOf(t, slug)
+	at := strings.Index(after, "- name: Craterhoof Behemoth")
+	boardAt := strings.Index(after, "swap_board:")
+	if at < 0 || boardAt < at {
+		t.Fatalf("the incoming card did not land in the 99:\n%s", after)
+	}
+	return after[at:boardAt]
+}
+
+// Only a 99 card holds a slot a promotion can take over. An `out` standing on
+// the board itself passes the route's own checks (findCard reads the board
+// too) and is refused by the fold's first step: EntombCard's frozen sentence,
+// verbatim, with nothing written. The engine's goldens pin the sentence; this
+// pins that THIS input still receives it if the fold is ever reordered.
+func TestAPromotionRefusesAnOutStandingOnTheBoard(t *testing.T) {
+	t.Parallel()
+	rig := newWriteRig(t, noCredential)
+	defer rig.close()
+	rig.writeDeck(t, "promotion-bench", promotionFixture+`  - name: Llanowar Elves
+    category: ramp
+    why: Waiting on the bench beside the hoof.
+`)
+
+	before := rig.textOf(t, "promotion-bench")
+	status, body, _ := rig.do(t, alice, "POST", "/api/decks/alice/promotion-bench/swap",
+		`{"out":"Llanowar Elves","into":"Craterhoof Behemoth","why":"a reason"}`)
+	if status != 422 || fmtDetail(body) !=
+		"'Llanowar Elves' is on the swap board, which has no graveyard; remove it instead" {
+		t.Errorf("an out standing on the board answered %d %v", status, body)
+	}
+	if rig.textOf(t, "promotion-bench") != before {
+		t.Error("a refused promotion changed the file")
+	}
+	if entries := rig.history(t, "promotion-bench", nil); len(entries) != 0 {
+		t.Errorf("a refused promotion was recorded: %+v", entries)
+	}
+}
+
 // The half of the duplicate scan that did not move: a card already in the 99
 // still refuses with the same sentence, on a deck that has a board to relax.
 func TestASwapIntoACardAlreadyInThe99StillRefuses(t *testing.T) {
