@@ -483,8 +483,17 @@ export default function Import() {
         </p>
       </PageMasthead>
 
+      {/* `min-w-0` on both items, or the example decklist's `pre` sets the
+          page's width instead of scrolling. A grid item's minimum is `auto`,
+          so the widest unbreakable line inside it — the `pre` below is 554px
+          of `white-space: pre` monospace — becomes the *column's* minimum,
+          and its own `overflow-x-auto` never engages because it was already
+          given every pixel it asked for. Measured on a 375px viewport: 237px
+          of page-level horizontal scroll, the one thing a page body must
+          never do. Letting the items shrink is what turns that outgrowth
+          back into an inner scrollbar. */}
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-        <section className="space-y-3">
+        <section className="min-w-0 space-y-3">
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-medium uppercase tracking-wide"
                   style={{ color: 'var(--text-muted)' }}>
@@ -622,7 +631,7 @@ export default function Import() {
           </div>
         </section>
 
-        <section className="space-y-3">
+        <section className="min-w-0 space-y-3">
           <TextField label="Deck name" value={name} onChange={setName}
                      placeholder="Arahbo — Cats" />
           <TextField label="Slug" value={effectiveSlug}
