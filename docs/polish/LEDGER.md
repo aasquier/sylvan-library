@@ -2420,15 +2420,180 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19, 2026-08-16, plus
-  two un-run entries from that week — the targeted performance pass and the
-  measuring shelf — both kept below.
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24, 2026-08-19,
+  2026-08-16, plus two un-run entries from that week — the targeted
+  performance pass and the measuring shelf — both kept below.
 - **Everything below the 2026-08-24 block is about the Python app.** `bench
   run`, `bench caches`, `cards/db.py`, `modes.py`, the pandas import storm,
   the cache register: none of those files or commands exist. The *lessons*
   hold and several are why this run went where it went; **no number, path or
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
+
+### 2026-09-05 (rainbow, night)
+
+Night run. The mode table grew from seven to ten since last run and every new
+surface was read; the one fix is test-rig performance (backend-only,
+mergeable); the one new queued item is a pricing correctness finding that
+renders on the Admin panel and therefore wants an eye.
+
+- **Fixed this run: the api suite stopped re-hashing the same constant
+  password at 19 MiB a call.** `newAccountRig` claimed two accounts per
+  construction through `auth.SetPassword`, this package constructs dozens of
+  rigs, and the profile put the bill at **1,748MB of the suite's 2.89GB of
+  allocation — 59.1%** (`pprof -peek auth.SetPassword`, all of it
+  `argon2.initBlocks` at the production profile; this is Red's 2026-08-24
+  queued-12 handoff, re-measured tonight at 76.4% of allocation for argon2
+  overall). The production constants are load-bearing (`NeedsRehash` compares
+  against `MemoryCostKiB`; ADR 5) and were not touched: the seeding now
+  computes goodPassword's hash **once per process** through
+  `auth.HashPassword` itself (`sync.OnceValues`) and writes the PHC string
+  directly — real hash, full cost, paid once. Login verifies and every route
+  that hashes (claim, password change) still pay full price.
+  **Measured: total suite allocation 2.89GB → 1.28GB (−56%); argon2 2,261MB
+  → 570MB; `go test -race ./internal/api/` 54.9s → 47.3s (wall, load ~3.9,
+  indicative only — the allocation number is the finding).**
+  `TestTheSeededHashIsRealAndComputedOnce` derives its three expectations
+  from the mechanism (`auth.Verify`, `auth.NeedsRehash`, and string equality
+  across two calls — sixteen random salt bytes make equality prove single
+  computation). Mutation-verified three ways: hashing a different password
+  fails it AND the login golden; removing `sync.OnceValues` fails the
+  equality leg; a weak-profile hash (m=1024,t=1) fails the `NeedsRehash` leg,
+  which is Red's caveat made a gate.
+- **Queued for Aaron (new): the Admin panel prices every historical ledger
+  row at *today's* rate, so the whole pre-September bill is overstated ~50%.**
+  `adminstats.go:254` calls `prices.Over(priceRows, prices.Today())` for the
+  week, month AND all-time windows, and `Priced.On` correctly flipped Sonnet
+  5 to $3/$15 on 2026-09-01 — so every token spent during the introductory
+  window ($2/$10, which is *all* of the laptop's ledger and most of the
+  instance's) is now priced at rates that were not in force when it was
+  spent. Concrete: the laptop's 89 conversations cost **≈$1.71** at the rates
+  actually paid and the panel's formula now answers **≈$2.56** for the same
+  rows. `prices.go`'s own package rules — "a rate known to move is modelled
+  as a window rather than flattened" and "the figure stays a floor" — are
+  both broken by the call site: the window is modelled in the table and
+  flattened by the caller, and a floor that overstates is not a floor. This
+  is also the standing question answered for this facet: *"the figure stays a
+  floor" is enforced by nothing*, and it silently stopped being true the day
+  the window closed. **Recommendation:** price each window segment at the
+  rate in force during it — `prices` can derive the boundary dates from its
+  own `Table` (the entries with `Until`), and `Summarise` needs an `until`
+  twin of its `since` so the estimate is computed per segment and summed;
+  the token tables themselves are unaffected (tokens are tokens). Queued
+  rather than fixed because the number renders on the Admin panel
+  (commandment 16 wants an eye on a rendered change) and because "price at
+  spend date" vs "price at today's rate, labelled" is a small semantics call
+  that is Aaron's. Sized: ~60–80 lines plus tests, one sitting.
+- **Recorded, not a finding: `/api/health` deliberately un-did #284's 2.0ms
+  on the probe path, and the trade is argued and measured in the code.**
+  #374 gave the health route `pool.UseWithoutHolding` — a probe takes no
+  lease and `releaseQuietly` reaps the idle pool immediately — precisely so
+  two out-of-phase 30s health checks can never again hold the pool file
+  almost continuously against `mtglab data refresh` (the comment carries the
+  measurement; the refresh race was real). Consequence: on an idle instance
+  **every probe pays a fresh ~40ms DuckDB open**, and the #284 staleness memo
+  never hits on that path (it still serves real traffic, which holds ordinary
+  leases the probe rides when present). Local warm p50 tonight: **43.3ms**
+  (was 2.0); live TTFB **275.5ms** (was 171.8). Do not file this as a
+  regression next run, and do not "fix" it back — the refusal-to-hold is the
+  point.
+- **Measurements (2026-09-05, this Mac — ⚠️ load average 3.96 tonight against
+  a quiet Mac last run; every DuckDB-bound number is inflated ~20% by the
+  environment, shown by `q=goblin` inflating identically with an untouched
+  query):**
+  - Local routes, warm, 15 samples p50, own binary on a `lsof`-verified free
+    port: `/api/health` 43.3ms (the designed fresh open, above) · `/api/lore`
+    0.9 · `/api/colors` 0.7 · `/api/glossary` 0.6 · `/api/tarot/reading` 0.6
+    · `/api/themes` 0.6 · `/api/claude/personas` 0.6 · `/` 0.7 ·
+    `search?q=goblin` 47.2 (was 40.4) · `search` no-text 67.7 (was 53.1) ·
+    `search?type_line=creature` 64.7 (was 52.9) · `search?identity=WU` 47.2
+    (was 36.6). No DuckDB bump (only anthropic-sdk-go 1.66→1.68), the search
+    SQL untouched since #284, and the deltas are uniform across changed and
+    unchanged queries — environment, not code. Re-measure on a quiet Mac
+    before believing any of the search deltas.
+  - Live TTFB, 7 samples p50, this Mac → `sjc`: `/api/health` **275.5ms**
+    (design change above) · `/` 175.1 · `/assets/app.js` 169.6 ·
+    `/assets/index.css` 166.7 · `/api/lore` 167.5. Floor is still RTT.
+    Health body sane: pool true, 35,393 / 108,263, bulk 2026-08-30, 17 decks.
+  - Serving contract re-verified live on a real **GET**: `content-encoding:
+    gzip`, `cache-control: no-cache`, `Last-Modified` validator,
+    `If-Modified-Since` → **304, 0 bytes, one RTT (181ms)**. ⚠️ `curl -I`
+    (HEAD) shows **no** `content-encoding`/`vary` and the raw length — the
+    2026-08-19 HEAD trap in a new coat; probe compression with GET only.
+  - **Bundle** (committed `web_dist`, gzip -9): `charts.js` 399,398 /
+    111,241 — **byte-identical to 2026-08-24**; `app.js` 313,099 / 96,751
+    (was 291,776 / 90,938; +5.8kB gz across ~26 landed features);
+    **`index.css` 297,522 / 53,749 — was 104,218 / 22,818, ~2.4× gzipped in
+    twelve days**, all hand-written component styles from the same ~26
+    features (two small SVG data URIs, no embedded assets). Not pathological
+    — CSS is one revalidated fetch — but it is the fastest-growing thing in
+    the bundle; if it doubles again, the instrument is a real browser's
+    coverage tab, which is daylight work. `web_dist/assets` total 9,336KB,
+    video still the weight (motion loops unchanged).
+  - **Static assets over hotlinks: still exactly one runtime fetch host**
+    (`cards.scryfall.io`, White's licensing verdict, the one `preconnect`),
+    and the three #284 guards hold in CI. One **new** external host since
+    last run: `www.tcgplayer.com/massentry` — a plain `<a>` on the token
+    shopping list (#396), a link a person clicks, correctly outside the
+    fetch-shaped guards. `cdn.jsdelivr.net` still appears only as tesseract's
+    overridden default, still guard-held. No CDN, no `@import`, no absolute
+    `url()`.
+  - **Claude spend: the laptop ledger has not moved — zero rows since
+    2026-08-23**, totals identical to last run (89 conversations, 20,301 in /
+    130,261 out / 1,821,915 cache reads, all `claude-sonnet-5`, all
+    `end_turn`). At the rates in force when spent: **≈$1.71, unchanged**; the
+    instance's ledger is still unreadable from a shell (`mtglab claude
+    usage` still unbuilt — daybreak 2026-08-24 Black-2 stands; `mtglab
+    claude` offers exactly `check`). The introductory window closed
+    2026-09-01 with **zero code needing to change** (`Priced.On` verified
+    flipping) — the one caller-side consequence is the queued pricing finding
+    above.
+  - **The mode table is ten, counted from `data/modes.json`** — three new
+    since last run, all landed by ADR 41's intake and its offspring:
+    `rationale-draft` (8,192 / high / 3 pool-deck tools), `intake-filing`
+    (same knobs; categories enforced as a schema enum so an invented one
+    cannot come back), `deck-description` (same knobs; one call, deliberately
+    unchunked). All three `may_write: []` — the boundary held. Posture
+    verified the way the checklist asks: the intake is **one job** with an
+    in-flight dedupe key (`slug + intakeKey(actions)`, `api/intake.go:166`);
+    the describe route is a plain route **with the argument written at the
+    call site** (one call, interview's measured precedent); stance is
+    resolved and refuses **before** any payload is built on every path (no
+    failure spend); chunking is 20 with the tradeoff argued at `IntakeChunk`;
+    a chunk that fails to parse costs its own cards only; answers naming
+    unasked cards are dropped and counted (`Skipped`), and the missing are
+    named (`Unanswered`). Chunk openings ride in the *message*; the mode's
+    instructions stay the cacheable system prefix — chunks 2..n of one
+    intake read chunk 1's cache write.
+  - **All ten prompts scanned for dated-model cruft** (CoT prodding,
+    `<thinking>` tags, JSON-only nagging, prefill, role reassurance): zero
+    hits. `prices.Table` re-verified rate-by-rate against the `claude-api`
+    skill's current table — every rate matches, no roster movement (same
+    nine models), so nothing to queue on the model-choice rule. `Checked =
+    2026-08-18` deliberately not bumped: its contract says *a human read the
+    pricing page*, and tonight's check was against the skill's cached table.
+  - `converse.go` untouched since last run — the system-block breakpoint and
+    the moving tool-result marker did not move; nothing shifted per-turn
+    content into the system prompt.
+- **Carried items, re-checked:** cache-write tokens still invisible
+  (`cache_creation_input_tokens` still nowhere in the tree; still a schema
+  migration, still Aaron's window — and the queued pricing fix above would
+  inherit it as a floor either way). Theme's second breakpoint unchanged
+  (bounded at ~0.8% of that mode's input; converse untouched).
+  Interview/argue cache-or-key deferral: trigger unfired, and the new
+  describe route joins them with its argument written down. Long max-age for
+  media: unchanged, still blocked on content-hashing the media names, still
+  a queued decision.
+- **Closed from daybreak (2026-08-24 Black-1):** PR #284 merged
+  2026-08-24T13:32Z — the health memo, the search price split, and the
+  hotlink guards all landed and deployed; the line leaves DAYBREAK.md this
+  run. Items 2 (spend CLI), 3 (price filter — `deckread.go` still cuts price
+  AFTER the query, re-verified), 4 (memo dies on reap — still keyed per
+  open, re-verified at `pool.go:128`) all still stand and stay queued.
+- **Not touched, deliberately:** `internal/sim` and the determinism kernels
+  (no engine change, no fingerprint rotation, no orphaned cache); no Claude
+  call made — every spend figure read from a ledger, not bought; the live
+  instance only read, never written.
 
 ### 2026-08-24 (rainbow)
 

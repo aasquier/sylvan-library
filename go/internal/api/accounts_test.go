@@ -38,6 +38,66 @@ import (
 
 const goodPassword = "correct-horse-battery-staple"
 
+// seededHash is goodPassword through `auth.HashPassword`, once per process.
+//
+// The rig below claims two accounts per construction and this package
+// constructs dozens of rigs, so hashing the same constant password each time
+// was **59% of this package's entire allocation** — 1,748MB of 2.89GB,
+// measured 2026-09-05 (`pprof -peek auth.SetPassword`), all of it
+// `argon2.initBlocks` at the production 19 MiB profile. That profile is
+// load-bearing and must not be lowered (ADR 5, and `NeedsRehash` compares
+// against it), so the cheap half is the other one: the hash is real and at
+// full cost, computed through the same function production uses — it is
+// simply not recomputed for every rig. Login tests still verify against it
+// for real, and every route that hashes (claim, password change) still pays
+// full price; only the seeding dedupes.
+//
+// Every seeded account sharing one salt is fine *here and only here*: a salt
+// exists so equal passwords do not share a stored hash in a real accounts
+// file, which is a property of the file on the volume, not of a scratch
+// database thrown away at the end of a test.
+var seededHash = sync.OnceValues(func() (string, error) {
+	return auth.HashPassword(goodPassword)
+})
+
+// TestTheSeededHashIsRealAndComputedOnce holds the seeding seam to the three
+// facts every login test in this package silently rests on.
+//
+// The expectations are derived, not restated: `auth.Verify` answers whether
+// the hash really is goodPassword's; `auth.NeedsRehash` answers whether it
+// was made at the production profile — which is the trap this seam must
+// never fall into, a cheap "test profile" hash that a rig login would then
+// flag for rehash and a future reader would compare the wrong constants
+// against; and string equality across two calls answers whether it was
+// computed once, because the salt is sixteen random bytes and two
+// computations could not collide.
+func TestTheSeededHashIsRealAndComputedOnce(t *testing.T) {
+	t.Parallel()
+	hash, err := seededHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !auth.Verify(&hash, goodPassword) {
+		t.Error("the seeded hash does not verify as goodPassword, so every " +
+			"login in this package is signing in with something else")
+	}
+	if auth.Verify(&hash, "wrong-password-but-long-enough") {
+		t.Error("the seeded hash verifies a wrong password")
+	}
+	if auth.NeedsRehash(hash) {
+		t.Error("the seeded hash was made below the production profile -- " +
+			"the seam is only allowed to dedupe the work, never to cheapen it")
+	}
+	again, err := seededHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash != again {
+		t.Error("two calls returned different hashes, so the seam is " +
+			"recomputing what it exists to compute once")
+	}
+}
+
 // recordedSender is the seam. It never opens a socket.
 //
 // The mutex is not decoration. `POST /api/auth/reset` sends from a background
@@ -107,7 +167,19 @@ func newAccountRig(t *testing.T, requireAuth bool) *accountRig {
 			t.Fatalf("seeding %s: %v", seed.name, err)
 		}
 		if seed.claim {
-			if _, err := auth.SetPassword(ctx, db, user.ID, goodPassword); err != nil {
+			// The memoised hash written directly, not `auth.SetPassword`: the
+			// seam is argued at `seededHash`, and on a freshly created user
+			// SetPassword's only other effect (revoking sessions) has nothing
+			// to revoke. Raw SQL against the rig's own scratch database is
+			// this package's normal instrument (`adminstats_test.go` writes
+			// ledger rows the same way).
+			hash, err := seededHash()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.ExecContext(ctx,
+				"UPDATE users SET password_hash = ? WHERE id = ?",
+				hash, user.ID); err != nil {
 				t.Fatal(err)
 			}
 		} else if _, err := auth.IssueToken(ctx, db, user.ID, auth.PurposeInvite); err != nil {
