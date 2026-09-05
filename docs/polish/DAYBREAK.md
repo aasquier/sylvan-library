@@ -14,42 +14,34 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ## Open — 2026-09-05
 
-**White (PR #430, green everywhere but a flake, UNMERGED): three
-licensing/isolation guards built, nothing renders differently, and the
-authenticated determinism replay is owed.** The
-committed-media accounting sweep is a test now
-(`go/cmd/mtglab/mediaprovenance_test.go`), and its first spin caught the four
-PWA icons riding since #380 with no provenance record anywhere — they are our
-own drawn mark (the favicon SVG rasterized), now recorded in
-`web/public/PROVENANCE.md`, which the build ships beside them; the Tesseract
-licence-notice shelf row and the `PublicPaths` allowlist's shape got pins of
-their own. All three mutation-verified, all backend/test-only, full local
-gauntlet green — and **the merge is blocked by item 2's flake, not by this
-diff**: the night-engine settle test timed out on arm64 on the first run and
-on amd64 on the second, so after one honest re-roll the run stopped rather
-than looped. Merge #430 once item 2 is fixed (or on a green re-roll), then
-walk the deploy: `/PROVENANCE.md` flipping from the SPA shell to text is the
-marker that the new build arrived. · *What is owed:* the once-per-cycle determinism replay
-against the deployed instance needs a session (tarot and wheel answer 401
-pre-auth) and Claude never signs in — the local half is byte-identical to the
-2026-08-24 baseline (seed 1909, sha `e406f504…`), so drift is unlikely but
-unwitnessed where users live. · **Recommendation:** nothing to decide — just
-sign the `claude` seat in through Claude-in-Chrome some evening and the next
-White run rides it. Ledger: White, 2026-09-05.
+**White's morning items 1 and 2 both resolved overnight by Blue — nothing
+left to decide, one thing still owed.** The settle-test flake (item 2) is
+fixed the way item 2 asked — an event the test awaits, never a deadline —
+merged as **#431** and green on four straight CI legs; White's **#430 then
+merged clean** and its deploy was walked (the `/PROVENANCE.md` marker flipped
+from the SPA shell to text, health 200, the door renders, the shelves still
+401 pre-auth). Both findings and fixes are recorded in the ledger (White and
+Blue, 2026-09-05). · *Still owed, unchanged:* the once-per-cycle determinism
+replay against the deployed instance — tarot and wheel answer 401 pre-auth
+and Claude never signs in. · **Recommendation:** sign the `claude` seat in
+through Claude-in-Chrome some evening and the next White run rides it; the
+same seat unlocks Blue's owed walks (the fortune-teller's table and the
+`/claude` keeper duty, skipped two runs straight for the same 401).
 
-**2. The night engine's day-old settle test bets five wall-clock seconds and
-lost one on arm64.** `TestABoutSettlesTheWayItsPlayerAnswered`
-(`go/internal/night/runner_test.go`) timed out on White's PR twice in two
-consecutive full runs — `go (arm64)` first, `go (amd64)` on the re-roll,
-same line both times — while green on main's own #429 push run ninety
-minutes earlier. The work-in-flight class white.md names: a background
-settle polled under a 5-second `waitFor`, so greenness is a fact about the
-runner's load, and under tonight's load it fails more often than it passes.
-· *Cost of leaving it:* it is currently **holding White's green PR #430 out
-of main**, and every future PR rolls the same dice. · **Recommendation:** have the fake arena signal each
-settle so the test awaits the event instead of betting seconds — a gate the
-test controls, never a longer deadline; it is a small change in the fake,
-for whoever next works the night engine. Ledger: White, 2026-09-05.
+**Blue: the Settings room says "the torches are not lit yet", and the only
+thing keeping that true is that you have not flipped the switch.** The line
+is hand-written into the bundle (`web/src/routes/Settings.tsx`) and true
+today — the instance has no `MTGLAB_NIGHT_WINDOW` — but the evening you set
+the five night secrets changes no code and rebuilds nothing, so the room
+would keep telling people the arena is dark while it fights, and nothing
+fails when it starts lying. · *Cost of leaving it:* a small untruth on the
+one page where a person decides to enter their decks, starting the first
+scheduled night. · **Recommendation:** when the Coliseum's night shelf lands
+(ADR 46 names it as its own PR), have the settings room read whether a night
+is scheduled off the wire and render either the unlit-torches line or the
+real window — the copy becomes a fact the server owns instead of a promise
+the bundle froze. Nothing to do before then; this line is the reminder.
+Ledger: Blue, 2026-09-05.
 
 ## Open — 2026-08-24
 
