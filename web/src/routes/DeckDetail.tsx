@@ -44,7 +44,7 @@ import { CrossedSwordsGlyph, GoldfishGlyph } from '../components/glyphs'
 import { DeckArtifactsPanel } from '../components/artifacts'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
-import { SwapComposer } from '../components/swap'
+import { ReplaceComposer, SwapComposer } from '../components/swap'
 import { BulkEditPanel } from '../components/bulkedit'
 import { StanceReadout } from '../components/stance'
 import { DeckLabels } from '../components/labels'
@@ -53,7 +53,7 @@ import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 type Tab = 'cards' | 'stats' | 'validation' | 'notes' | 'artifacts' | 'history'
 
 /** What the action bar can do to a card (punch list item 9). */
-type CardAction = 'ask' | 'argue' | 'why' | 'art' | 'entomb'
+type CardAction = 'ask' | 'argue' | 'why' | 'art' | 'swap' | 'entomb'
 
 /** The bar's vocabulary: label, hint while armed, and whether it needs
  *  Claude. Entomb is the one destructive act and is styled apart. */
@@ -75,6 +75,12 @@ const CARD_ACTIONS: {
     hint: 'Pick a card and Claude interviews you about its slot.' },
   { key: 'argue', label: 'Argue slot', claude: true,
     hint: 'Pick a card to hear the case against its slot.' },
+  // The straight swap, whole: one card out, its replacement in, one write.
+  // Not styled apart from the plain actions — the outgoing card is entombed
+  // by the second door and replaced in place by the first, and neither is
+  // the deletion the danger styling warns about.
+  { key: 'swap', label: 'Swap out',
+    hint: 'Pick a card to swap out — you choose what takes its place, and say why.' },
   { key: 'entomb', label: 'Entomb', danger: true,
     hint: 'Pick a card to send to the graveyard — it will ask twice.' },
 ]
@@ -697,6 +703,11 @@ export default function DeckDetail() {
   const [action, setAction] = useState<CardAction | null>(null)
   // The card whose art picker is open (item 8) — set through the action bar.
   const [artFor, setArtFor] = useState<string | null>(null)
+  // The card a straight swap is being composed for — the OUT card; the
+  // composer's finder picks the replacement. Its own state beside `swapping`
+  // above, because that one belongs to the validation tab's shortlist, where
+  // both names are known before the composer opens.
+  const [swapFor, setSwapFor] = useState<string | null>(null)
   // Entomb through the bar keeps ADR 27's two-step: the first pick arms the
   // row, the second within four seconds commits it.
   const [pendingEntomb, setPendingEntomb] = useState<string | null>(null)
@@ -771,6 +782,8 @@ export default function DeckDetail() {
       setArguing(arguing === name ? null : name)
     } else if (action === 'art') {
       setArtFor(artFor === name ? null : name)
+    } else if (action === 'swap') {
+      setSwapFor(swapFor === name ? null : name)
     } else if (pendingEntomb === name) {
       setPendingEntomb(null)
       void entombCard(name)
@@ -799,6 +812,8 @@ export default function DeckDetail() {
       setArguing(name)
     } else if (action === 'art') {
       setArtFor(name)
+    } else if (action === 'swap') {
+      setSwapFor(name)
     }
     setPendingEntomb(null)
     setAction(null)
@@ -1545,6 +1560,15 @@ export default function DeckDetail() {
                        onSave={(why) => saveRationale(card.name, why)}
                        onCancel={() => setEditing(null)} />
                    )}
+                   {swapFor === card.name && (
+                     <ReplaceComposer
+                       deck={deckRef}
+                       out={card.name}
+                       identity={deck.color_identity}
+                       board={deck.swap_board.map((c) => c.name)}
+                       onDone={async () => { await refresh(); setSwapFor(null) }}
+                       onCancel={() => setSwapFor(null)} />
+                   )}
                   </li>
                 ))}
               </ul>
@@ -1579,11 +1603,16 @@ export default function DeckDetail() {
               kept a board had no section at all, and the one feature that
               needed introducing was invisible to exactly the decks that needed
               it. It now renders for anyone who can write the deck, folds like
-              its neighbours, and carries the one control that puts a card on
-              it. `components/swapboard.tsx` argues the rest, including why
-              adding to the board is still not a mover between the two
-              lists. */}
-          <SwapBoard deck={deck.swap_board} deckRef={deckRef}
+              its neighbours, and carries the control that puts a card on it.
+
+              **And, since the swap route grew its second door, the mover**:
+              each board row's "Swap it in" composes the promotion — that card
+              into the 99, a card of the owner's choosing entombed to make
+              room — which is why the section is handed the 99 itself
+              (`cards`): the outgoing card is picked from the deck's own
+              cards, never from the pool. `components/swapboard.tsx` argues
+              the rest. */}
+          <SwapBoard deck={deck.swap_board} cards={deck.cards} deckRef={deckRef}
                      stage={deck.stage} identity={deck.color_identity}
                      total={deck.total_cards} writable={deck.writable}
                      onChanged={() => void refresh()} />

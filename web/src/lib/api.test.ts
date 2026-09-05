@@ -451,6 +451,44 @@ describe('deck URLs', () => {
 })
 
 /**
+ * The swap response's `from` key, which is where the new-wire-key rule bites:
+ * the straight-swap door omits it forever, and every server older than this
+ * bundle omits it too (the deploy swap window renders old payloads with new
+ * code). `api.swapCard` is the one place it is defaulted, so no reader ever
+ * meets `undefined`.
+ */
+describe('swapCard', () => {
+  const ANSWER = {
+    slug: 'goreclaw', stage: 'curated', total_cards: 99, needs_rationale: 0,
+    ok: true, errors: [], warnings: [],
+    swapped_out: 'Primeval Titan', swapped_in: 'Cultivator Colossus',
+    why: 'Not banned, still huge.',
+  }
+
+  function respond(body: unknown) {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => body,
+    }))
+  }
+
+  it('defaults the from key a straight swap (or an older server) never sends', async () => {
+    respond(ANSWER)
+    const r = await api.swapCard({ owner: 'mitch', slug: 'goreclaw' },
+                                 { out: 'Primeval Titan', into: 'Cultivator Colossus',
+                                   why: 'Not banned, still huge.' })
+    expect(r.from).toBe('')
+  })
+
+  it('passes the promotion door through as the server said it', async () => {
+    respond({ ...ANSWER, from: 'swap_board' })
+    const r = await api.swapCard({ owner: 'mitch', slug: 'goreclaw' },
+                                 { out: 'Primeval Titan', into: 'Cultivator Colossus',
+                                   why: 'Not banned, still huge.' })
+    expect(r.from).toBe('swap_board')
+  })
+})
+
+/**
  * The admin stats URLs. Same argument as the deck URLs above: `Admin.tsx`
  * mocks `api`, so its tests pass whatever these functions actually fetch —
  * and a stats call that drifted off `/api/admin/` would stop being refused
