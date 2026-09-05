@@ -14,16 +14,22 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ## Open — 2026-09-05
 
-**White (merged): three licensing/isolation guards landed, nothing renders
-differently, and the authenticated determinism replay is owed.** The
+**White (PR #430, green everywhere but a flake, UNMERGED): three
+licensing/isolation guards built, nothing renders differently, and the
+authenticated determinism replay is owed.** The
 committed-media accounting sweep is a test now
 (`go/cmd/mtglab/mediaprovenance_test.go`), and its first spin caught the four
 PWA icons riding since #380 with no provenance record anywhere — they are our
 own drawn mark (the favicon SVG rasterized), now recorded in
 `web/public/PROVENANCE.md`, which the build ships beside them; the Tesseract
 licence-notice shelf row and the `PublicPaths` allowlist's shape got pins of
-their own. All three mutation-verified, all backend/test-only, merged green
-under the night rule. · *What is owed:* the once-per-cycle determinism replay
+their own. All three mutation-verified, all backend/test-only, full local
+gauntlet green — and **the merge is blocked by item 2's flake, not by this
+diff**: the night-engine settle test timed out on arm64 on the first run and
+on amd64 on the second, so after one honest re-roll the run stopped rather
+than looped. Merge #430 once item 2 is fixed (or on a green re-roll), then
+walk the deploy: `/PROVENANCE.md` flipping from the SPA shell to text is the
+marker that the new build arrived. · *What is owed:* the once-per-cycle determinism replay
 against the deployed instance needs a session (tarot and wheel answer 401
 pre-auth) and Claude never signs in — the local half is byte-identical to the
 2026-08-24 baseline (seed 1909, sha `e406f504…`), so drift is unlikely but
@@ -33,13 +39,14 @@ White run rides it. Ledger: White, 2026-09-05.
 
 **2. The night engine's day-old settle test bets five wall-clock seconds and
 lost one on arm64.** `TestABoutSettlesTheWayItsPlayerAnswered`
-(`go/internal/night/runner_test.go`) timed out on this PR's `go (arm64)` leg
-while green on main's own #429 push run ninety minutes earlier — the
-work-in-flight class white.md names: a background settle polled under a
-5-second `waitFor`, so greenness is a fact about the runner's load. · *Cost
-of leaving it:* intermittent red required checks on unrelated PRs (it cost
-tonight's White branch a re-run), and each red teaches someone to re-run
-instead of read. · **Recommendation:** have the fake arena signal each
+(`go/internal/night/runner_test.go`) timed out on White's PR twice in two
+consecutive full runs — `go (arm64)` first, `go (amd64)` on the re-roll,
+same line both times — while green on main's own #429 push run ninety
+minutes earlier. The work-in-flight class white.md names: a background
+settle polled under a 5-second `waitFor`, so greenness is a fact about the
+runner's load, and under tonight's load it fails more often than it passes.
+· *Cost of leaving it:* it is currently **holding White's green PR #430 out
+of main**, and every future PR rolls the same dice. · **Recommendation:** have the fake arena signal each
 settle so the test awaits the event instead of betting seconds — a gate the
 test controls, never a longer deadline; it is a small change in the fake,
 for whoever next works the night engine. Ledger: White, 2026-09-05.

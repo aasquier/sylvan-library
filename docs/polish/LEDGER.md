@@ -160,8 +160,13 @@ state, never checklists.
   The suite's own standing rule says the fix is **a gate the test controls,
   never a longer deadline** — the fake arena could signal each settle so the
   test awaits the event rather than betting seconds on it. One honest
-  re-run applied after this diagnosis, per the night protocol; the fix
-  belongs to daylight and the night-engine's own thread.
+  re-roll applied after this diagnosis, per the night protocol — **and the
+  re-roll failed the same way on the other architecture** (`go (amd64)`,
+  same line, 5.58s), so under tonight's runner load this test fails more
+  often than it passes. The run stopped there rather than looping: **PR
+  #430 is left green-but-blocked for daylight**, and the flake is the
+  daybreak queue's item 2. The fix belongs to the night-engine's own
+  thread.
 - **Queued for Aaron:** nothing new needing a *ruling*. The two standing
   items (ADR 5's parametrised isolation sweep; the wider docs-rot guard) are
   unchanged and still waiting — this run's route-table read confirms the
