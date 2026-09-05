@@ -19,6 +19,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/door"
+	"github.com/aasquier/sylvan-library/go/internal/night"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
@@ -190,6 +191,18 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	listen func() (net.Listener, error)) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
+	// The night's switches, resolved first and allowed to refuse — the one
+	// exception to `configComplaints`' warnings-never-refusal rule, argued at
+	// [night.SettingsFromConfig]: those complaints are about settings the
+	// site does not need to serve an anonymous page, while a misconfigured
+	// night is a scheduler that would quietly run on the wrong clock at an
+	// hour nobody is watching. Before the ladder and the signal handler,
+	// because nothing has been touched yet and the sentence is the fix.
+	nightSet, err := night.SettingsFromConfig(cfg)
+	if err != nil {
+		return err
+	}
+
 	// **The stop is armed before anything it could have to interrupt** — the
 	// one ordering in this function that is not about the boot.
 	//
@@ -245,6 +258,14 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	for _, complaint := range configComplaints(cfg) {
 		log.Warn(complaint)
 	}
+	// The first scheduler this app has ever had says so where a `fly logs`
+	// tail can see it; an unscheduled night logs nothing, because sample
+	// runs are asked for rather than waited on.
+	if nightSet.Scheduled {
+		log.Info("the coliseum runs at night", "window", nightSet.Window.String(),
+			"zone", nightSet.Zone.String(), "bouts", nightSet.Bouts,
+			"per_account", nightSet.BoutsPerAccount, "games", nightSet.Games)
+	}
 	// The maintainer, reconciled to admin at every start (ADR 17). A no-op
 	// unless MTGLAB_ADMIN_EMAIL is set, which is what a laptop wants.
 	if err := ensureMaintainerAtBoot(cfg); err != nil {
@@ -268,6 +289,9 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 		// Read once here, like every other setting (ADR 39): the routes are
 		// handed where the calls go rather than looking it up per request.
 		Forge: forge, Claude: claude.SettingsFromEnv(),
+		// The Coliseum at Night (ADR 46), already resolved above; the door
+		// starts the runner and stops it with its own Close.
+		Night:  nightSet,
 		Logger: log,
 	})
 	if err != nil {

@@ -1401,126 +1401,159 @@ func (a *API) planForge(decks []*deck.Deck, addresses []string,
 		key += "|narrated"
 	}
 
-	worker := a.forgeWorker()
-	recorder := a.matchLedger()
+	m := forgeMatch{decks: decks, addresses: addresses, ownerIDs: ownerIDs,
+		games: games, seed: seed, narrate: narrate, hosted: hosted}
 	return jobs.Plan{
 		Kind: ForgeKind, Label: label, Lane: jobs.FORGE, Key: key,
 		Run: func(rep jobs.Progress) (any, error) {
-			// **Its own context.** The request is over by the time this runs,
-			// and `r.Context()` is cancelled by net/http the moment the
-			// handler returns — a job that took one would be a match killed
-			// mid-JVM. The recorded lesson, and the one only a real server
-			// test can see.
-			ctx := context.Background()
-			rep.Report(0, games)
-
-			// Forge's output is streamed, so the job ticks once per finished
-			// game — and each tick carries the game it just watched end,
-			// shaped by the same builder the final tally uses and exposed on
-			// the job's `partial` for the client to seat live. Clamped because
-			// a tick is a progress report, not a result. Seat order is the
-			// deck order (both run paths promise it), which is what lets a
-			// slug be named before the run exists. A pre-theater shim streams
-			// counts without rows; the bar still moves and `partial` simply
-			// stays sparse.
-			seats := map[int]string{}
-			// What each seat's command zone holds before a card has moved.
-			// Built here beside the slug map and for the same reason: seat
-			// order is the deck order on both run paths, so the deck at a
-			// seat is known before the run that fills it exists.
-			command := map[int]forgeCommandZone{}
-			for i, d := range decks {
-				seats[i+1] = d.Slug
-				zone := forgeCommandZone{Commanders: d.Commander}
-				if d.Companion != nil {
-					zone.Companion = *d.Companion
-				}
-				command[i+1] = zone
+			out, _, err := a.playForgeMatch(rep, m)
+			if err != nil {
+				return nil, err
 			}
-			var rowsSoFar []forgeRow
-			// The beats of the game that just closed, waiting for the row
-			// that closes it. Both run paths hand over the beats *before* the
-			// row (one pass over Forge's output, the event parser fed first),
-			// so this is never stale by more than the few lines between them —
-			// and publishing them together is what stops the room seeing a
-			// game arrive with its narration one poll behind.
-			// `pending` is the newest game, waiting for the row that closes
-			// it — that is what the live `partial` carries. `played` is every
-			// game, which is what the finished result carries so the match can
-			// be watched back.
-			var pending *forgeBeats
-			var played []forgeBeats
-			// The paintings, resolved once for the whole match: two games of
-			// one pairing name almost the same hundred cards, so the second
-			// game costs a round trip for its tokens and nothing else.
-			painted := map[string]boardArt{}
-			hear := func(log tier3.EventLog) {
-				if log.Board != nil {
-					a.resolveBoardArt(ctx, log.Board.Cards, painted)
-				}
-				shaped := newForgeBeats(log, seats, command, painted)
-				pending = &shaped
-				if len(played) < ForgeReplayGames {
-					played = append(played, shaped)
-				}
-			}
-			tick := func(finished int, game *tier3.GameResult) {
-				if game != nil {
-					var slug *string
-					if game.WinnerSeat != nil {
-						if s, ok := seats[*game.WinnerSeat]; ok {
-							slug = &s
-						}
-					}
-					rowsSoFar = append(rowsSoFar, newForgeRow(*game, slug))
-				}
-				rep.ReportPartial(min(finished, games), games,
-					forgePartial{Rows: append([]forgeRow{}, rowsSoFar...),
-						Beats: pending})
-			}
-
-			// Same match, two places it can run (ADR 35): the worker when the
-			// environment names one, a local subprocess otherwise. The worker
-			// hands back a run rebuilt from the wire and relays the same
-			// per-game ticks, so the shaping and the bar cannot tell the
-			// difference — that is the wire's whole promise.
-			var run *tier3.SimRun
-			var runErr error
-			if hosted {
-				run, runErr = worker.RunMatch(ctx, decks, tier3.MatchAsk{
-					Games: games, Clock: ForgeClock, Seed: seed,
-					Narrate: narrate, OnGame: tick, OnEvents: hear,
-				})
-			} else {
-				run, runErr = a.forge.RunGames(decks, tier3.RunOptions{
-					Games: games, Clock: ForgeClock, Seed: seed,
-					Narrate: narrate, OnEvents: hear,
-					OnGame: func(finished int, game tier3.GameResult) {
-						tick(finished, &game)
-					},
-				})
-			}
-			if runErr != nil {
-				// **The one that reached the live site.** A job's error is
-				// rendered by the room verbatim — "The match failed: ..." —
-				// so this is the last place a machine id and a status code
-				// can be stopped. See `forgeTrouble`.
-				a.log.Error("the Forge match failed", "error", runErr,
-					"decks", strings.Join(addresses, " vs "))
-				return nil, errors.New(forgeTrouble(runErr))
-			}
-			rep.Report(games, games)
-
-			// The match ledger (ADR 36). After the run and before the shaping,
-			// because the shape is for this response and the ledger is for
-			// every question after it — and Record never fails, so a ledger
-			// problem cannot cost anybody a match they just watched finish.
-			recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
-				Seed: seed, Clock: ForgeClock, GamesRequested: games,
-				Hosted: hosted, OwnerIDs: ownerIDs})
-			return shapeForge(decks, addresses, games, seed, run, played), nil
+			return out, nil
 		},
 	}, nil
+}
+
+// forgeMatch is one match as the shared core takes it: decks resolved,
+// everything refusable already refused, the dials read. Both producers fill
+// one — the interactive route through [API.planForge], the night's bout
+// player in night.go — which is ADR 46 decision 7 made structural: one play,
+// one ledger call site, and the record cannot tell who was awake for it.
+type forgeMatch struct {
+	decks     []*deck.Deck
+	addresses []string
+	ownerIDs  []*int64
+	games     int
+	seed      *big.Int
+	narrate   bool
+	hosted    bool
+}
+
+// playForgeMatch is the play-and-record core both run paths drive: the whole
+// match from first tick to ledger row, exactly as the interactive job closure
+// has always run it. It returns the shaped result, the recorded
+// `forge_matches` id — 0 when the ledger declined the row, its own contract —
+// and the error that would fail the job.
+func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int64, error) {
+	decks, addresses, ownerIDs := m.decks, m.addresses, m.ownerIDs
+	games, seed, narrate, hosted := m.games, m.seed, m.narrate, m.hosted
+	worker := a.forgeWorker()
+	recorder := a.matchLedger()
+
+	// **Its own context.** The request is over by the time this runs,
+	// and `r.Context()` is cancelled by net/http the moment the
+	// handler returns — a job that took one would be a match killed
+	// mid-JVM. The recorded lesson, and the one only a real server
+	// test can see.
+	ctx := context.Background()
+	rep.Report(0, games)
+
+	// Forge's output is streamed, so the job ticks once per finished
+	// game — and each tick carries the game it just watched end,
+	// shaped by the same builder the final tally uses and exposed on
+	// the job's `partial` for the client to seat live. Clamped because
+	// a tick is a progress report, not a result. Seat order is the
+	// deck order (both run paths promise it), which is what lets a
+	// slug be named before the run exists. A pre-theater shim streams
+	// counts without rows; the bar still moves and `partial` simply
+	// stays sparse.
+	seats := map[int]string{}
+	// What each seat's command zone holds before a card has moved.
+	// Built here beside the slug map and for the same reason: seat
+	// order is the deck order on both run paths, so the deck at a
+	// seat is known before the run that fills it exists.
+	command := map[int]forgeCommandZone{}
+	for i, d := range decks {
+		seats[i+1] = d.Slug
+		zone := forgeCommandZone{Commanders: d.Commander}
+		if d.Companion != nil {
+			zone.Companion = *d.Companion
+		}
+		command[i+1] = zone
+	}
+	var rowsSoFar []forgeRow
+	// The beats of the game that just closed, waiting for the row
+	// that closes it. Both run paths hand over the beats *before* the
+	// row (one pass over Forge's output, the event parser fed first),
+	// so this is never stale by more than the few lines between them —
+	// and publishing them together is what stops the room seeing a
+	// game arrive with its narration one poll behind.
+	// `pending` is the newest game, waiting for the row that closes
+	// it — that is what the live `partial` carries. `played` is every
+	// game, which is what the finished result carries so the match can
+	// be watched back.
+	var pending *forgeBeats
+	var played []forgeBeats
+	// The paintings, resolved once for the whole match: two games of
+	// one pairing name almost the same hundred cards, so the second
+	// game costs a round trip for its tokens and nothing else.
+	painted := map[string]boardArt{}
+	hear := func(log tier3.EventLog) {
+		if log.Board != nil {
+			a.resolveBoardArt(ctx, log.Board.Cards, painted)
+		}
+		shaped := newForgeBeats(log, seats, command, painted)
+		pending = &shaped
+		if len(played) < ForgeReplayGames {
+			played = append(played, shaped)
+		}
+	}
+	tick := func(finished int, game *tier3.GameResult) {
+		if game != nil {
+			var slug *string
+			if game.WinnerSeat != nil {
+				if s, ok := seats[*game.WinnerSeat]; ok {
+					slug = &s
+				}
+			}
+			rowsSoFar = append(rowsSoFar, newForgeRow(*game, slug))
+		}
+		rep.ReportPartial(min(finished, games), games,
+			forgePartial{Rows: append([]forgeRow{}, rowsSoFar...),
+				Beats: pending})
+	}
+
+	// Same match, two places it can run (ADR 35): the worker when the
+	// environment names one, a local subprocess otherwise. The worker
+	// hands back a run rebuilt from the wire and relays the same
+	// per-game ticks, so the shaping and the bar cannot tell the
+	// difference — that is the wire's whole promise.
+	var run *tier3.SimRun
+	var runErr error
+	if hosted {
+		run, runErr = worker.RunMatch(ctx, decks, tier3.MatchAsk{
+			Games: games, Clock: ForgeClock, Seed: seed,
+			Narrate: narrate, OnGame: tick, OnEvents: hear,
+		})
+	} else {
+		run, runErr = a.forge.RunGames(decks, tier3.RunOptions{
+			Games: games, Clock: ForgeClock, Seed: seed,
+			Narrate: narrate, OnEvents: hear,
+			OnGame: func(finished int, game tier3.GameResult) {
+				tick(finished, &game)
+			},
+		})
+	}
+	if runErr != nil {
+		// **The one that reached the live site.** A job's error is
+		// rendered by the room verbatim — "The match failed: ..." —
+		// so this is the last place a machine id and a status code
+		// can be stopped. See `forgeTrouble`.
+		a.log.Error("the Forge match failed", "error", runErr,
+			"decks", strings.Join(addresses, " vs "))
+		return forgeResult{}, 0, errors.New(forgeTrouble(runErr))
+	}
+	rep.Report(games, games)
+
+	// The match ledger (ADR 36). After the run and before the shaping,
+	// because the shape is for this response and the ledger is for
+	// every question after it — and Record never fails, so a ledger
+	// problem cannot cost anybody a match they just watched finish.
+	matchID := recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
+		Seed: seed, Clock: ForgeClock, GamesRequested: games,
+		Hosted: hosted, OwnerIDs: ownerIDs})
+	return shapeForge(decks, addresses, games, seed, run, played), matchID, nil
 }
 
 // matchLedger is the recorder, or a nil one — which records nothing and warns

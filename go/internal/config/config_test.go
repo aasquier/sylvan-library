@@ -81,6 +81,20 @@ func TestTheDefaultsAreTheOnesTheBootSummaryAsksAbout(t *testing.T) {
 	}
 }
 
+// A laptop that exports nothing schedules no nights: the five night switches
+// come off [Defaults] empty, because their resolution -- defaults included --
+// belongs to `internal/night`'s SettingsFromConfig, the one reader allowed to
+// refuse. A default written here as well would be the same value in two
+// places, one of them silently.
+func TestTheNightSwitchesArriveRawAndEmpty(t *testing.T) {
+	t.Parallel()
+	def := Defaults()
+	if def.NightWindow != "" || def.NightZone != "" || def.NightBouts != "" ||
+		def.NightBoutsPerAccount != "" || def.NightGames != "" {
+		t.Fatalf("a laptop's night switches should all be unset: %+v", def)
+	}
+}
+
 // TestLoadReadsTheEnvironmentOnce is the one test in this package that touches
 // the process, because [Load] is the one function that reads it. It cannot be
 // parallel, and that is the whole point of it being alone: everything else
@@ -93,6 +107,15 @@ func TestLoadReadsTheEnvironmentOnce(t *testing.T) {
 	t.Setenv("MTGLAB_BASE_URL", "https://example.test/")
 	t.Setenv("MTGLAB_EMAIL_FROM", "")
 	t.Setenv("RESEND_API_KEY", "re_not_a_real_key")
+	// The five night switches, each set to a value no other could pass as, so
+	// two wirings swapped in Load land somewhere an assertion notices — the
+	// configrecord gate only proves each *name* is documented, never which
+	// field it reaches.
+	t.Setenv("MTGLAB_NIGHT_WINDOW", "23:30-01:30")
+	t.Setenv("MTGLAB_NIGHT_ZONE", "America/Los_Angeles")
+	t.Setenv("MTGLAB_NIGHT_BOUTS", "4")
+	t.Setenv("MTGLAB_NIGHT_BOUTS_PER_ACCOUNT", "1")
+	t.Setenv("MTGLAB_NIGHT_GAMES", "7")
 
 	c := Load()
 	if c.DataDir != "/data" || c.DecksDir != "/data/decks" {
@@ -109,5 +132,9 @@ func TestLoadReadsTheEnvironmentOnce(t *testing.T) {
 	}
 	if c.ResendAPIKey != "re_not_a_real_key" {
 		t.Errorf("key: %q", c.ResendAPIKey)
+	}
+	if c.NightWindow != "23:30-01:30" || c.NightZone != "America/Los_Angeles" ||
+		c.NightBouts != "4" || c.NightBoutsPerAccount != "1" || c.NightGames != "7" {
+		t.Errorf("the night switches landed on the wrong fields: %+v", c)
 	}
 }

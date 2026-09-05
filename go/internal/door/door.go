@@ -36,6 +36,8 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
+	"github.com/aasquier/sylvan-library/go/internal/library"
+	"github.com/aasquier/sylvan-library/go/internal/night"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
 	"github.com/aasquier/sylvan-library/go/internal/sim/cache"
@@ -99,6 +101,12 @@ type Config struct {
 	// so `/api/forge` answers `available: false` with the reason -- which is
 	// what a door built without one should do.
 	Forge tier3.Settings
+	// Night is the Coliseum at Night resolved (ADR 46), from
+	// `night.SettingsFromConfig` -- the boot refuses to serve on its error,
+	// so what arrives here is already coherent. The zero value schedules
+	// nothing; admin-triggered sample runs still work, which is how the
+	// first real window gets measured before it gets set.
+	Night night.Settings
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -121,6 +129,10 @@ type Door struct {
 	// traffic is the visitor ledger's recorder (schema v9), counting every
 	// request this process answers. Nil on an instance with no app.db.
 	traffic *traffic.Recorder
+	// night is the Coliseum at Night's runner (ADR 46), ticking from New to
+	// Close. Nil on an instance with no app.db -- the night's memory is rows,
+	// so without the file there is nothing a scheduler could honestly do.
+	night *night.Runner
 }
 
 // New builds a door. It opens `app.db` read-only when auth is required (and
@@ -202,11 +214,42 @@ func New(cfg Config) (*Door, error) {
 		EmailSender: cfg.EmailSender, Mail: cfg.Mail,
 		ClientIPHeader: cfg.ClientIPHeader, Claude: cfg.Claude,
 		Forge: cfg.Forge})
+	// The Coliseum at Night (ADR 46), around the routes' own bout player --
+	// the seam has two ends and the door ties them: the runner fights through
+	// the API's player, the API's admin routes read and steer this runner.
+	// Only with a write handle, because the night's whole design is rows: a
+	// door with no app.db has nowhere a restart could resume from, and its
+	// night routes answer 503 in words. Built here, started only after the
+	// last fallible step below, and stopped in [Door.Close], so the ticker
+	// lives exactly as long as a door that actually stood.
+	if d.writeDB != nil {
+		runner := night.NewRunner(night.RunnerConfig{
+			Store:    night.FromDB(d.writeDB, nil),
+			Settings: cfg.Night,
+			Player:   routes.NightPlayer(),
+			// Queued or running, anyone's: the person in the room wins.
+			LaneBusy: func() bool { return d.jobs.LaneBusy(jobs.FORGE) },
+			// The house always plays: every file-tier deck, no flag
+			// consulted (Aaron, 2026-09-05, closing rung 13's open ruling).
+			House: func(ctx context.Context) ([]string, error) {
+				return library.NewFileSource(cfg.DecksDir, false).Slugs(ctx)
+			},
+			Log: cfg.Logger,
+		})
+		routes.SetNightRunner(runner)
+		d.night = runner
+	}
 	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err
 	}
 	d.table = table
+	// The scheduler starts only now that New can no longer fail: a runner
+	// started before the route table stood would, on that error path, keep
+	// ticking against the write handle with nobody holding a Stop.
+	if d.night != nil {
+		d.night.Start()
+	}
 	return d, nil
 }
 
@@ -265,6 +308,15 @@ func (d *Door) Check(ctx context.Context) error {
 // work, and a test sharing a pool across two doors is not damaged by one of
 // them stopping.
 func (d *Door) Close() error {
+	// The night's runner first: Stop waits for the ticker and any waiter,
+	// both of which exit on its context, so nothing of the runner's outlives
+	// the door -- the shutdown stays as leak-free as it was before the app
+	// had a scheduler. A bout's own job is the registry's and finishes into
+	// a record nothing points at, exactly as an interactive match's would;
+	// its row stays `playing` for the next boot's sweep.
+	if d.night != nil {
+		d.night.Stop()
+	}
 	d.traffic.Flush()
 	if d.cfg.Pool != nil {
 		d.cfg.Pool.Close()

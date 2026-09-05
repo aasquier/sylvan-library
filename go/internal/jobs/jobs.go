@@ -138,6 +138,19 @@ const (
 // net.
 var Lanes = []Lane{CPU, FORGE, NET}
 
+// HouseOwner is the owner of work the instance runs for itself — the
+// Coliseum's night bouts (ADR 46) — rather than for anybody in the room.
+//
+// Negative on purpose, and the arithmetic is the whole guarantee: `users.id`
+// is a SQLite rowid and rowids begin at one, and an unauthenticated caller's
+// scope is zero, so no request can ever arrive owning this number. [Registry.Get]
+// and [Registry.All] filter on owner equality as they always have, which is
+// what keeps the house's jobs out of every person's `/api/jobs` listing —
+// and out of the no-auth local user's, whose owner is zero — with no special
+// case anywhere (ADR 5). [Registry.Census] still counts them, because counts
+// cannot carry a name and the admin dashboard should see the load.
+const HouseOwner int64 = -1
+
 // Status is where a job is. The four strings are wire contract, because
 // `web/src/lib/api.ts` compares against them.
 const (

@@ -1,8 +1,8 @@
--- app.db's recorded schema at version 13: what the ladder under
+-- app.db's recorded schema at version 14: what the ladder under
 -- go/internal/auth/migrations/ builds, read back out of sqlite_master.
 -- TestMigrateBuildsTheRecordedSchema holds auth.Migrate to these bytes,
 -- so a new rung updates this record in the same change. Do not hand-edit.
-PRAGMA user_version = 13;
+PRAGMA user_version = 14;
 CREATE TABLE auth_tokens (
         -- The hash of the token, for the same reason `sessions` stores one:
         -- reading this file must not hand over a live credential, and an
@@ -121,6 +121,55 @@ CREATE TABLE login_attempts (
         window_start TEXT NOT NULL,
         failures     INTEGER NOT NULL
     );
+CREATE TABLE night_bouts (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id       INTEGER NOT NULL REFERENCES night_runs(id),
+        -- NULL owner is the house: a deck off the file tier, which plays
+        -- every night and has no `user_decks` row to point at. No REFERENCES
+        -- on either owner, deliberately: a seat records who was entered when
+        -- the night was planned, and an account's later deletion must
+        -- neither be blocked by last night's record nor reach back into it.
+        seat_a_owner INTEGER,
+        seat_a_slug  TEXT    NOT NULL,
+        seat_b_owner INTEGER,
+        seat_b_slug  TEXT    NOT NULL,
+        games        INTEGER NOT NULL,
+        -- Derived and stable per bout, so a night is reproducible in
+        -- principle; stored on the bout because the match ledger must not
+        -- learn it came from the night.
+        seed         INTEGER NOT NULL,
+        -- planned | playing | done | failed | skipped. The last three are
+        -- terminal, and the store refuses to rewrite them.
+        state        TEXT    NOT NULL,
+        -- The skip or failure diagnosis, in log-grade words. Nothing in this
+        -- column ever renders to a player (commandment 10).
+        reason       TEXT,
+        -- forge_matches.id once the ledger recorded the bout -- the join the
+        -- morning shelf reads. NULL on a bout that never recorded, including
+        -- one orphaned by a restart, where staying NULL is the honest state.
+        match_id     INTEGER,
+        created_at   TEXT    NOT NULL,
+        updated_at   TEXT    NOT NULL
+    );
+CREATE TABLE night_runs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        -- The local date the window opened ('2026-09-06') in the configured
+        -- zone; a night that crosses midnight keeps the key of the evening
+        -- it started.
+        night_key   TEXT    NOT NULL,
+        -- 1: an admin-triggered measurement run -- the sample the window's
+        -- first real value is chosen from -- bounded by its own deadline
+        -- rather than by the schedule.
+        sample      INTEGER NOT NULL DEFAULT 0,
+        opened_at   TEXT    NOT NULL,
+        -- The schedule's close, or the sample's deadline. An admin close
+        -- pulls it back to "now"; a bout in flight still finishes (ADR 46
+        -- decision 6).
+        closes_at   TEXT    NOT NULL,
+        -- Set when the runner declares the night over. NULL is the open run,
+        -- and the resume read keys on exactly that.
+        finished_at TEXT
+    );
 CREATE TABLE request_log (
         day          TEXT    NOT NULL,
         route        TEXT    NOT NULL,
@@ -196,6 +245,9 @@ CREATE INDEX claude_usage_by_time ON claude_usage(created_at);
 CREATE INDEX deck_log_by_deck ON deck_log(owner_id, slug, id);
 CREATE INDEX dossier_cache_by_oracle ON dossier_cache(oracle_id);
 CREATE INDEX forge_seats_by_deck ON forge_seats(owner_id, slug);
+CREATE INDEX night_bouts_run ON night_bouts(run_id);
+CREATE UNIQUE INDEX night_runs_one_per_night ON night_runs(night_key)
+        WHERE sample = 0;
 CREATE INDEX sessions_by_user ON sessions(user_id);
 CREATE INDEX sim_cache_by_use ON sim_cache(last_used_at);
 CREATE INDEX user_decks_by_owner
