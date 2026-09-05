@@ -171,3 +171,60 @@ func serve(t *testing.T, a *API, target string) *httptest.ResponseRecorder {
 	t.Fatalf("no route for %s", target)
 	return nil
 }
+
+// The reading engine is the only third-party code this project redistributes,
+// and Apache-2.0's one serving-time condition is that the notices travel with
+// the copy. `worker.min.js` opens with `/*! For license information please
+// see worker.min.js.LICENSE.txt */` — a pointer relative to whatever origin
+// serves the script — so the notice must sit on this shelf, beside the code,
+// behind the same door (`NOTICE.md`, "Tesseract"). The Python era pinned the
+// row with a test that took the name OFF the asset table; the Go port kept
+// the row and dropped the pin (ledger: White, 2026-08-24, deferred). This is
+// the pin, in the same shape: the name is derived, never restated, so
+// deleting the row is the exact mutation that fails it.
+func TestTheReadingEnginesLicenceNoticeTravelsWithTheCode(t *testing.T) {
+	t.Parallel()
+	assets := reference.Runtime().OCR.Assets
+	var notices []string
+	for name := range assets {
+		if strings.HasSuffix(name, ".LICENSE.txt") {
+			notices = append(notices, name)
+		}
+	}
+	if len(notices) != 1 {
+		t.Fatalf("the OCR shelf holds %d licence notices, want exactly one: %v",
+			len(notices), notices)
+	}
+	notice := notices[0]
+	// The notice explains the code asset it is named after, which must be on
+	// the shelf too — a notice for code we stopped serving is decoration.
+	code := strings.TrimSuffix(notice, ".LICENSE.txt")
+	codeAsset, ok := assets[code]
+	if !ok {
+		t.Fatalf("the notice %q explains %q, which is not on the shelf", notice, code)
+	}
+	// Same upstream directory: the pointer in the code's first line is
+	// relative, so a notice pinned from anywhere else is the wrong file.
+	dir := func(url string) string { return url[:strings.LastIndex(url, "/")] }
+	if got, want := dir(assets[notice].URL), dir(codeAsset.URL); got != want {
+		t.Fatalf("the notice is pinned from %s but the code from %s — the "+
+			"relative pointer inside the code breaks", got, want)
+	}
+	// It serves as readable text through the same door as the code.
+	if mt := assets[notice].MediaType; mt != "text/plain" {
+		t.Fatalf("the notice's media type is %q, not text/plain", mt)
+	}
+	sh := offlineShelves(t)
+	a := New(Config{Shelves: sh})
+	if err := os.MkdirAll(sh.OCRDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sh.OCRDir(), notice), []byte("MIT"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rec := serve(t, a, "/api/ocr/"+notice)
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
+		t.Fatalf("GET /api/ocr/%s answered %d %q", notice, rec.Code,
+			rec.Header().Get("Content-Type"))
+	}
+}
