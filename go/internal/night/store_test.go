@@ -563,6 +563,9 @@ func TestCloseRunPullsTheDeadlineAndFinishRunEndsTheNight(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("OpenRun after close: ok=%v err=%v", ok, err)
 	}
+	if !got.Sample {
+		t.Error("the sample mark did not survive the round trip")
+	}
 	if !got.ClosesAt.Before(run.ClosesAt) {
 		t.Errorf("the close did not pull the deadline in: %v -> %v", run.ClosesAt, got.ClosesAt)
 	}
