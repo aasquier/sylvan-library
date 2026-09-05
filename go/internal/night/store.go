@@ -126,12 +126,16 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// ErrRunOpen is [Store.StartRun]'s refusal while a run is unfinished, typed
+// so the admin route can answer it as a 409 without matching prose.
+var ErrRunOpen = errors.New("one night at a time")
+
 // StartRun opens tonight's run. One night at a time: while any run is
-// unfinished this refuses, which keeps "the open run" a phrase with exactly
-// one referent however many tickers, admins and restarts ask at once. The
-// schema adds its own wall behind this one — a second *scheduled* run on the
-// same night_key is refused by `night_runs_one_per_night` even after the
-// first finished.
+// unfinished this refuses with [ErrRunOpen], which keeps "the open run" a
+// phrase with exactly one referent however many tickers, admins and restarts
+// ask at once. The schema adds its own wall behind this one — a second
+// *scheduled* run on the same night_key is refused by
+// `night_runs_one_per_night` even after the first finished.
 func (s *Store) StartRun(ctx context.Context, nightKey string, sample bool,
 	closesAt time.Time) (Run, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -145,7 +149,7 @@ func (s *Store) StartRun(ctx context.Context, nightKey string, sample bool,
 		`SELECT id FROM night_runs WHERE finished_at IS NULL LIMIT 1`).Scan(&openID)
 	switch {
 	case err == nil:
-		return Run{}, fmt.Errorf("run %d is still open; one night at a time", openID)
+		return Run{}, fmt.Errorf("run %d is still open; %w", openID, ErrRunOpen)
 	case !errors.Is(err, sql.ErrNoRows):
 		return Run{}, err
 	}
@@ -331,12 +335,19 @@ func (s *Store) ClaimNext(ctx context.Context, runID int64) (Bout, bool, error) 
 	return b, true, nil
 }
 
-// MarkDone settles a bout that played and recorded: done, carrying the
-// `forge_matches` id the shelf will join on. Only a playing bout can be
-// done — anything else is a caller confused about whose bout it holds, and
-// the error says so instead of rewriting history.
+// MarkDone settles a bout that played: done, carrying the `forge_matches` id
+// the shelf will join on. A matchID of zero or less writes NULL instead —
+// that is the match ledger's own contract for a row it declined, and a bout
+// that played but went unrecorded is done with nothing to join on rather
+// than done pointing at a match that does not exist. Only a playing bout can
+// be done — anything else is a caller confused about whose bout it holds,
+// and the error says so instead of rewriting history.
 func (s *Store) MarkDone(ctx context.Context, boutID, matchID int64) error {
-	return s.settle(ctx, boutID, StateDone, "", &matchID, []State{StatePlaying})
+	var id *int64
+	if matchID > 0 {
+		id = &matchID
+	}
+	return s.settle(ctx, boutID, StateDone, "", id, []State{StatePlaying})
 }
 
 // MarkFailed settles a bout that could not produce a result, with the
