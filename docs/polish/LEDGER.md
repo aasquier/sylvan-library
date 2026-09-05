@@ -4324,8 +4324,153 @@ runs against a cache nobody emptied.
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
-  2026-08-16 (rainbow).
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
+  2026-08-19 (rainbow), 2026-08-16 (rainbow).
+
+### 2026-09-05 (rainbow, night) — PR #438, held for Aaron's eye
+
+**Every timing this run took carries the load caveat Red named: three other
+sessions ran all night (load 4.7–9.9 at measurement), so no wall clock below
+is comparable to the 08-24 baselines, and none is quoted as a trend.**
+
+- **Fixed — `/import` scrolled the whole page sideways on a phone, and the
+  culprit was the example that teaches the `why` format.** Measured at
+  375×812 on the served bundle: **237px of page-level horizontal overflow**,
+  the paste textarea rendered 588px wide on a 375px screen. The mechanism is
+  a grid item's `auto` minimum: the example decklist `pre` is 554px of
+  `white-space: pre` monospace, that min-content became the implicit
+  column's minimum through two `min-width: auto` items, and the pre's own
+  `overflow-x-auto` never engaged because the column had already grown to
+  fit it. `min-w-0` on both grid items (`web/src/routes/Import.tsx`) turns
+  the outgrowth back into an inner scrollbar — re-measured after: overflow
+  **0**, the pre 295px wide and scrolling inside its own box. The test
+  (`Import.test.tsx`) is derived from the mechanism rather than the class
+  strings: every `overflow-x-auto` container inside the grid must sit in an
+  item that may shrink, anti-vacuity floor included, so the next wide
+  example added to either column fails in jsdom instead of on a phone.
+  Mutation-verified (one `min-w-0` stripped → test fails; restored →
+  52/52). jsdom computes no layout, so the numbers above are the browser's
+  own — the known `css-sizing-is-invisible-to-the-suite` shape.
+- **The seeded persona-tile report does not reproduce, measured rather than
+  assumed.** The seed said the tiles on `/new` render as buttons with no
+  accessible name. Driven on the served bundle, both doors: **zero
+  anonymous interactive elements** — 31 on the guided door, 27 with the
+  theme grid open, all eight `reader-tile` buttons named by their contents
+  ("Read my fortune…", "Chat with Claude…"), the dealt spread's face-down
+  cards carrying `aria-label="Turn over …"` and face-up cards
+  `role="img"` with a label, the three door chips `aria-pressed`. Source
+  history shows no recent fix (`tarot.tsx` names unchanged since #75), so
+  the seed was mis-observed rather than healed. Recorded so the next run
+  does not re-chase it.
+- **The phone-width sweep the 08-24 run owed is paid, and the reason it was
+  owed is a rig trap now written into the checklist.** A `resize_window`
+  *preset* reports success while a hidden pane stays 0×0 — every rect and
+  overflow number fiction — which is what voided the 08-24 phone half.
+  Explicit `width`/`height` pixels apply; `innerWidth` read back is the
+  proof. Swept at 375×812: `/`, `/new` (both doors, 8 tiles), `/coliseum`,
+  `/colors/selesnya`, `/learn`, `/import`, `/settings`,
+  `/decks/local/arahbo-cats` — **only `/import` overflowed** (the fix
+  above); everything else 0px. Desktop (1280) same routes: zero anonymous
+  controls, zero images missing `alt`, one `h1` per route, headings sane.
+  The new-since-08-24 surfaces are well made: Coliseum's strip tabs are a
+  real `role="tablist"` with `aria-selected`, Settings' three-state toggles
+  speak `aria-pressed` including `"mixed"`, the games dial is label-wrapped
+  (`NumberField` in `ui.tsx`).
+- **Answered since last run — the Scryfall prune this color queued on 08-24
+  landed as #420, `pool.SweepBulk`** (`go/internal/pool/sweep.go`), and the
+  live volume confirms it: `/data/scryfall` holds exactly two files, both
+  2026-08-30, **98MB — down from 121MB and three dated files on 08-24**.
+  The 08-24 daybreak item (Green queued 3) leaves the queue with this as
+  its outcome.
+- **Retired — 08-24 daybreak Green item 1.** PR #286 merged
+  2026-08-24T14:01Z and deployed; the live regions it added are in the
+  tree and the bundle. The VoiceOver *listen* it asked for is still owed —
+  it needs a machine with a screen reader and the authenticated walk, so it
+  joins the owed-walks pile rather than standing as its own line.
+- **Still open, re-checked, unchanged:** queued 1 (light-theme muted
+  contrast — the masthead still renders `--text-muted` in both palettes);
+  queued 2 (announcing arrivals — the region still lives on the spinner);
+  queued 4 (the three purge functions still have no production caller; the
+  only tickers in the tree are the pool keeper's and the night runner's);
+  queued 5 (no WebKit witness on this hardware); queued 6 ("the local
+  pool" still renders — `Import.tsx:477`, `Library.tsx:407/445/917`,
+  `gate/validate.go:234` — awaiting the house mother's wording).
+- **New queued for Aaron (2026-09-05):**
+  1. **The one-copy rule is violated in the checkout, eleven days and
+     counting.** `decks/` holds eight real decks (arahbo-cats,
+     atla-palani-dinos, goreclaw-stompy, gyome-food, kaheera, mono-green,
+     partners-walk, trostani-tokens), deck.yaml mtimes 2026-08-24/25 —
+     standing local copies of app data, the exact shape that lost two
+     rounds of labels and created this facet. Not deleted tonight because
+     the live local server on 8765 (up since Aug 28, another session's)
+     plausibly serves them, and Red's held walk (#436) needs a writable
+     local deck. *Cost of leaving:* an edit made through any local surface
+     diverges silently from the volume's truth. **Recommendation:** once
+     #436's walk is done, delete the eight (they are scratch — the volume
+     has 17 decks and is the truth), and let future walks pull fresh or
+     point `MTGLAB_DECKS_DIR` at a scratch directory the way the 08-24
+     measurement run did.
+- **Deferred — the pool file more than doubled across one refresh, and the
+  mechanism is in-place reload.** `mtg.duckdb` on the volume: 96MB
+  (08-24) → **214MB** (tonight), across the 08-30 refresh.
+  `pool.load` does `DELETE FROM` + re-append into the same file
+  (`loaders.go:58`), and the engine never truncates — so a refresh
+  fragments toward a plateau near 2× data size. Some of the jump is real
+  growth (`all_parts` for the token sideboard #367, both paintings #398),
+  and a plateau is bounded, so nothing is wrong *yet*. **Trigger:** the
+  next refresh's reading — if the file moves materially past 214MB again,
+  rebuild-to-temp-and-rename becomes worth its diff (it would also make a
+  half-written refresh atomic); if it plateaus, this is the steady state
+  and the entry closes as measured behaviour.
+- **Checklist corrections (2), applied to `references/green.md`:** the
+  one-copy rule's `_template` exception named a directory the Go crossing
+  deleted (nothing by that name exists anywhere in the tree — the claim
+  was unenforced and had already drifted); and the preset-resize trap
+  above, with the instruction to read `innerWidth` back before trusting a
+  phone number.
+- **Measurements (2026-09-05, rainbow, night):**
+  - **Volume: 331MB of 2.9G (12%), 2.4G free** — up from 234MB (9%) on
+    08-24, and the mix moved: `/data/scryfall` **98MB** (↓ from 121 —
+    #420's prune), `mtg.duckdb` **214MB** (↑ from 96 — the deferred item),
+    `/data/cache` 18MB, `/data/decks` 968KB (17 decks), `app.db` 632KB.
+  - **Machine: `shared-cpu-2x`, 2 vCPU, 1GB, `iad`, v353** (tonight's
+    #434 deploy at 22:25Z), 1/1 health passing, event log holds only the
+    deploy — **no OOM, no restarts**. The forge-worker machine remains
+    outside Fly Launch, stopped, costing nothing.
+  - **Snapshots: five, 5-day retention, newest 8h, 970MiB stored** — the
+    pattern Red saw holds (one 802MiB full + ~40MiB dailies, incremental,
+    not a fault). **One timing note:** migration `0014.sql` landed today
+    (#429) and applied at the 22:25Z deploy, so tonight the newest
+    snapshot *predates* the newest migration; the ladder is forward-only
+    so a restore replays it, and the daily cadence heals the window within
+    24h. Red's queued snapshot-at-deploy item is the sharper fix and is
+    already queued.
+  - **Pool: fresh.** Bulk files 2026-08-30 (6 days), `pool_stale: false`,
+    35,393 oracle cards / 108,263 printings / 17 decks on
+    `/api/health` — under the two-week rule, no ban-list announcement in
+    the window.
+  - **Live probes (public, warm, load-caveated):** `GET /` 200 in
+    192–282ms ×3 · `/api/health` 200 in 203–308ms ×3 (the ~275ms
+    fresh-pool-open cost is by design, #374 — not a regression) ·
+    `/api/lore` **401** pre-auth (the middleware holding). Cold numbers
+    not recorded: every pool-touching route is behind auth, and a "cold"
+    figure whose emptying you cannot name is a warm number with a
+    misleading name (the checklist's own rule).
+  - **Design point verified unchanged** (100 accounts / 10 concurrent):
+    CPU lane `GOMAXPROCS`-derived, `netWorkers = 2`, `forgeWorkers = 1`,
+    `MaxJobs = 200`, rate limits the same one `var` block, `fly.toml`
+    `soft_limit=20`/`hard_limit=40`. No new literal that 10× would trip.
+    The concurrency probe was deliberately skipped: with three sessions
+    loading the box all night the numbers would be incomparable to the
+    08-24 baseline and would poison the next comparison; the 08-24 curve
+    stands as baseline.
+  - **Held-awake trigger: not arrived** — four deploys landed tonight
+    before this run; primary development is visibly on. The
+    scale-to-zero block sits commented in `fly.toml` where it has been.
+  - **A11y counts, desktop sweep of seven routes:** 0 anonymous
+    interactive elements, 0 `<img>` missing `alt`, 1 `h1` per route, no
+    page-level overflow at 1280. Touch targets unchanged from the queued
+    reading (nav links 32px et al) — recorded, not re-filed.
 
 ### 2026-08-24 (rainbow) — PR #286
 

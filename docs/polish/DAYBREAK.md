@@ -63,6 +63,37 @@ at spend date" (recommended — it is what "estimated spend" means) versus
 "today's rate, labelled as a projection". It renders on the Admin panel, so
 it wants your eye before it merges. Ledger: Black, 2026-09-05.
 
+**Green: the import page scrolled sideways on every phone, and the culprit
+was the example that teaches the `why` format — fixed on green PR #438, and
+the walk is one narrow window.** At 375px the page panned 237px because the
+example decklist's `pre` set the grid column's minimum width instead of
+scrolling inside it; `min-w-0` on the two grid items is the whole diff, with
+a mechanism-derived test (mutation-verified, 52/52, full gauntlet green).
+*The walk:* start `./mtglab ui` (8765) and `npm --prefix web run dev`
+(5173), open `/import`, and narrow the window below ~700px — or devtools
+device toolbar at 375px. Before: the whole page pans sideways under your
+finger. After: the page holds still and the example scrolls inside its own
+box. Nothing animates, no cycle time, ten seconds. · *Cost of leaving it:*
+the PR sits unmerged and the live import room keeps drifting sideways on
+every phone — the room a newcomer pastes their first deck into. ·
+**Recommendation:** walk it, merge it. (The seeded persona-tile report was
+also chased: it does not reproduce — all eight tiles, both doors and the
+dealt spread carry real accessible names, measured on the served bundle;
+the ledger has the numbers.) Ledger: Green, 2026-09-05.
+
+**Green: eight real decks have stood in the checkout's `decks/` since
+Aug 24–25, and the one-copy rule says the volume is the only standing
+copy.** arahbo-cats through trostani-tokens, deck.yaml mtimes 08-24/25 —
+the exact laptop-standing-copy shape that lost two rounds of labels and
+created the hosted-first facet. Not deleted tonight: the live local server
+on 8765 (another session's, up since Aug 28) plausibly serves them, and
+Red's held walk (#436) needs a writable local deck. · *Cost of leaving it:*
+any edit made through a local surface diverges silently from the volume's
+17-deck truth, and nothing fails when it does. · **Recommendation:** after
+walking #436, delete the eight — they are scratch; future local walks pull
+fresh from the instance or point `MTGLAB_DECKS_DIR` at a scratch directory
+the way the 08-24 measurement run did. Ledger: Green, 2026-09-05.
+
 ## Open — 2026-08-24
 
 **1. ADR 5's isolation sweep did not cross to Go, and it is the one test that
@@ -340,23 +371,12 @@ external monitoring exists. Ledger: Red, 2026-08-24, expiry calendar.
 
 **Green —**
 
-**1. Two guards Green built for itself were deleted by the Go crossing, and for
-five days the browser floor and the reduced-motion promise were held by nothing
-at all.** Both are rebuilt in Go on tonight's PR, ported from the originals
-rather than re-derived, and mutation-verified seven ways. The same PR gives the
-app its **first live regions** — it had none: not one `aria-live`,
-`role="status"` or `role="alert"` anywhere, across thirty surfaces where an
-answer arrives after a wait, which is commandment 2 failing for anyone using a
-screen reader. Two attributes on the shared spinner and the shared error note
-cover 43 call sites at once. · *Cost of leaving it:* the guards protect nothing
-until they run in CI, and every wait in the app stays silent. ·
-**Recommendation:** merge it. **The walk is unusual and cheap: nothing renders
-differently, so there is nothing to look at** — the check is to hear it. Start
-`./mtglab ui` (port 8765) plus `npm --prefix web run dev` (port 5173), turn on
-VoiceOver (⌘F5), and load `/learn`: the "Reading the glossary…" wait should now
-be *spoken* where it used to be silent. Nothing animates and there is no cycle
-time. The change is **unwalked on the deployed instance because it never
-deployed** — nothing merged tonight. Ledger: Green, 2026-08-24.
+*(Items 1 and 4 — answered/landed, verified 2026-09-05: PR #286 merged and
+deployed 2026-08-24T14:01Z, its live regions in the tree and the bundle —
+the VoiceOver listen joins the owed authenticated walks; and the Scryfall
+prune landed since as #420 `pool.SweepBulk`, the volume now holding exactly
+one file of each kind, 98MB, down from 121. Outcomes recorded in the ledger,
+Green 2026-09-05. Items below still open.)*
 
 **2. The light theme's muted grey fails accessibility contrast, and what fails
 is every link in the masthead.** One colour is used for muted text in *both*
@@ -381,19 +401,6 @@ a reader knows a wait started and never hears it end. · **Recommendation:** yes
 as its own pass with the wording written deliberately, and start with the four
 that matter most — the tarot deal, the Wheel stopping, a simulation finishing,
 and the card search's result count. Ledger: Green, 2026-08-24, queued 2.
-
-**4. Nothing ever deletes an old Scryfall download, and the volume doubled in
-five days.** 115 MB on 19 August, **234 MB tonight (9% of 3 GB)** — and all of
-the growth is the downloads directory, 24 MB → 121 MB, now holding three files
-because each refresh saves a new dated one and removes none. A full refresh
-costs about **102 MB forever**, which is roughly **25 refreshes of headroom**
-left. `fly.toml` still sizes the volume for "~98MB of Scryfall downloads", a
-fixed number for something with no ceiling. · *Cost of leaving it:* nothing this
-month; a full volume within a year of ordinary maintenance, and the way it fails
-is a refresh that half-writes. · **Recommendation:** yes — after a refresh
-succeeds, keep the newest file of each kind and delete the rest. Not done
-tonight because it deletes files on the live volume. Ledger: Green, 2026-08-24,
-queued 3.
 
 **5. Three cleanup routines exist, are tested, and nothing calls them.** Expired
 sessions, spent invite and reset links, and old rate-limit windows all have a
