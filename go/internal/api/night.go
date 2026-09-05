@@ -119,7 +119,21 @@ func (a *API) playNightBout(ctx context.Context, b night.Bout) (int64, error) {
 		// a retry bug ever paying for the same bout twice, not a feature.
 		Key: fmt.Sprintf("night|%d", b.ID),
 		Run: func(rep jobs.Progress) (any, error) {
-			out, matchID, err := a.playForgeMatch(rep, m)
+			// The settle must survive a panic. The registry recovers a
+			// panicking job — its containment promise — but that recovery
+			// unwinds *past* this closure, so without the defer below a
+			// panic anywhere in the core would skip the send and park the
+			// runner's waiter until shutdown: `inFlight` stuck at one, every
+			// tick a no-op, the whole night wedged by one bad bout. The
+			// deferred settle fires on that path too, and re-panics so the
+			// registry still logs the stack and errors the job.
+			defer func() {
+				if p := recover(); p != nil {
+					settled <- outcome{0, fmt.Errorf("the bout's core panicked: %v", p)}
+					panic(p)
+				}
+			}()
+			out, matchID, err := a.playCore(rep, m)
 			settled <- outcome{matchID, err}
 			if err != nil {
 				return nil, err
@@ -144,8 +158,10 @@ func (a *API) playNightBout(ctx context.Context, b night.Bout) (int64, error) {
 // nightDeck resolves one seat to its deck: the house's off the file tier,
 // a player's out of their own SQL-tier library — no shared-only veil,
 // because rung 13's flag is the owner's standing consent to exactly this
-// read. The address is log-grade, for rows and labels nobody but the house
-// and the admin ever sees.
+// read, and the runner re-checks that the flag still stands at the bout's
+// own turn before this read ever happens (the store's Entered carries the
+// argument). The address is log-grade, for rows and labels nobody but the
+// house and the admin ever sees.
 func (a *API) nightDeck(ctx context.Context, seat night.Seat) (*deck.Deck, string, *int64, error) {
 	if seat.House() {
 		d, err := library.NewFileSource(a.decksDir, false).Get(ctx, seat.Slug)

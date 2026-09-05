@@ -299,7 +299,39 @@ func (r *Runner) work(ctx context.Context, run Run) {
 	if !ok {
 		return // the card is settled; the close will finish the night
 	}
+	if reason, withdrawn := r.consentWithdrawn(ctx, bout); withdrawn {
+		if err := r.store.MarkSkipped(ctx, bout.ID, reason); err != nil {
+			r.log.Error("a withdrawn bout would not settle", "bout", bout.ID, "error", err)
+			return
+		}
+		r.Nudge() // the seat is free now; the next bout need not wait a minute
+		return
+	}
 	r.fight(bout)
+}
+
+// consentWithdrawn re-checks rung 13's flag at the bout's own turn — the deal
+// read it at run open, but the flag is standing consent and an owner may have
+// stepped back out since; their deck is skipped unread rather than fought on
+// how the flag looked hours ago ([Store.Entered] carries the argument). A
+// failed read plays on: the deal-time consent stands recorded, and a store
+// this broken will fail the bout honestly on its own.
+func (r *Runner) consentWithdrawn(ctx context.Context, b Bout) (string, bool) {
+	for _, seat := range []Seat{b.SeatA, b.SeatB} {
+		if seat.House() {
+			continue // the house always plays
+		}
+		in, err := r.store.Entered(ctx, *seat.Owner, seat.Slug)
+		if err != nil {
+			r.log.Error("the consent re-check would not read", "bout", b.ID, "error", err)
+			return "", false
+		}
+		if !in {
+			return fmt.Sprintf("account %d's %s has left the night",
+				*seat.Owner, seat.Slug), true
+		}
+	}
+	return "", false
 }
 
 // fight hands one claimed bout to the player and parks a waiter on the
@@ -376,8 +408,12 @@ func (r *Runner) StartSample(ctx context.Context, minutes int) (Run, int, error)
 	}
 	if err := r.store.PlanBouts(ctx, run.ID, plans); err != nil {
 		// A sample with no card measures nothing: finish it on the spot so
-		// the failed attempt does not block the next one.
-		if e := r.store.FinishRun(ctx, run.ID); e != nil {
+		// the failed attempt does not block the next one. On the compensation's
+		// own authority, not the caller's — the likeliest way PlanBouts fails
+		// is the admin's connection dropping mid-request, and a cleanup that
+		// dies of the same cancellation leaves the empty run blocking every
+		// night until its deadline.
+		if e := r.store.FinishRun(context.WithoutCancel(ctx), run.ID); e != nil {
 			r.log.Error("an empty sample would not finish", "run", run.ID, "error", e)
 		}
 		return Run{}, 0, err

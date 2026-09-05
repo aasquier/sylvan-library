@@ -177,13 +177,16 @@ func TestATickOpensTonightOnceAndWorksItToTheEnd(t *testing.T) {
 		}
 	}
 
-	// The first bout settles; the second is claimed on the next tick; the
-	// card ends with both done and their match ids on the rows.
+	// The first bout settles; the second is claimed on a later tick; the
+	// card ends with both done and their match ids on the rows. The tick
+	// rides *inside* the wait: the waiter settles the row before it
+	// untracks, so a single hand-driven tick could land in that gap, see a
+	// seat still held, and claim nothing — retrying the tick is the fix.
 	waitFor(t, "the first bout to settle", func() bool {
 		return boutStates(t, s, run.ID)[night.StateDone] == 1
 	})
-	r.Tick(ctx)
 	waitFor(t, "the second bout to settle", func() bool {
+		r.Tick(ctx)
 		return boutStates(t, s, run.ID)[night.StateDone] == 2
 	})
 	final, _ := s.Bouts(ctx, run.ID)
@@ -274,16 +277,19 @@ func TestTheCloseFinishesTheFlightAndSkipsTheRest(t *testing.T) {
 		t.Fatal("the night finished with a bout still fighting")
 	}
 
-	// The bout ends; the next tick skips the remainder with the reason and
-	// declares the night over.
+	// The bout ends; a later tick skips the remainder with the reason and
+	// declares the night over. Ticked inside the wait because the row reads
+	// done a beat before the waiter untracks it, and a tick in that gap
+	// still counts the seat as held.
 	arena.gate <- struct{}{}
 	waitFor(t, "the flight to settle", func() bool {
 		return boutStates(t, s, run.ID)[night.StateDone] == 1
 	})
-	r.Tick(ctx)
-	if _, ok, _ := s.OpenRun(ctx); ok {
-		t.Fatal("the night did not finish once the flight settled")
-	}
+	waitFor(t, "the night to finish once the flight settled", func() bool {
+		r.Tick(ctx)
+		_, ok, _ := s.OpenRun(ctx)
+		return !ok
+	})
 	bouts, _ := s.Bouts(ctx, run.ID)
 	skipped := 0
 	for _, b := range bouts {
@@ -423,8 +429,10 @@ func TestABoutSettlesTheWayItsPlayerAnswered(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < dealt; i++ {
-		r.Tick(ctx)
+		// The tick rides inside the wait: one landing between a settle and
+		// its untrack claims nothing, and the retry is the fix.
 		waitFor(t, "the bout to settle", func() bool {
+			r.Tick(ctx)
 			got := boutStates(t, s, run.ID)
 			return got[night.StatePlanned]+got[night.StatePlaying] == dealt-i-1
 		})
@@ -523,6 +531,164 @@ func TestASamplesKeyWearsTheConfiguredZone(t *testing.T) {
 	}
 	if _, ok, _ := s.OpenRun(ctx); !ok {
 		t.Fatal("the sample did not open")
+	}
+}
+
+func TestAScheduledNightSeatsTheOptedInPlayers(t *testing.T) {
+	t.Parallel()
+	// The whole road from rung 13's rows to a dealt card: the tick musters
+	// the players through the store, not just the house through the seam.
+	// Without this, the roster's player half could return nothing and every
+	// other runner test would stay green — their scratch databases hold no
+	// user_decks at all.
+	s, db := scratchAndDB(t)
+	mustExec(t, db, `INSERT INTO users (id, username, created_at) VALUES
+		(1, 'alice', '2026-09-01T00:00:00+00:00')`)
+	mustExec(t, db, `INSERT INTO user_decks
+		(owner_id, slug, name, yaml, coliseum_at_night, created_at, updated_at) VALUES
+		(1, 'gyome', 'Gyome', 'name: G', 1, '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00'),
+		(1, 'arahbo', 'Arahbo', 'name: A', 0, '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00')`)
+	arena := &fakeArena{}
+	clock := &fakeClock{at: time.Date(2026, 9, 6, 22, 5, 0, 0, time.UTC)}
+	r := night.NewRunner(night.RunnerConfig{Store: s, Settings: tonight(t),
+		Player: arena,
+		House:  func(context.Context) ([]string, error) { return []string{"kaheera", "goreclaw"}, nil },
+		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)), Now: clock.now})
+	t.Cleanup(r.Stop)
+	ctx := context.Background()
+
+	r.Tick(ctx)
+	run, ok, err := s.OpenRun(ctx)
+	if err != nil || !ok {
+		t.Fatalf("the night did not open: ok=%v err=%v", ok, err)
+	}
+	bouts, err := s.Bouts(ctx, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seated := false
+	for _, b := range bouts {
+		for _, seat := range []night.Seat{b.SeatA, b.SeatB} {
+			if seat.Slug == "arahbo" {
+				t.Errorf("a deck whose owner never opted in was seated: %+v", b)
+			}
+			if !seat.House() && *seat.Owner == 1 && seat.Slug == "gyome" {
+				seated = true
+			}
+		}
+	}
+	if !seated {
+		t.Fatal("the opted-in player deck never reached the card; the roster's player half is dead")
+	}
+}
+
+func TestAWithdrawnConsentSkipsTheBoutUnread(t *testing.T) {
+	t.Parallel()
+	// The flag is standing consent, and standing consent can be withdrawn
+	// between the deal and the fight: an owner who steps back out mid-window
+	// gets a skipped row, and the arena never reads the deck. The busy lane
+	// holds the dealt bout planned long enough for the owner to change their
+	// mind — exactly the gap a real night has.
+	s, db := scratchAndDB(t)
+	mustExec(t, db, `INSERT INTO users (id, username, created_at) VALUES
+		(1, 'alice', '2026-09-01T00:00:00+00:00')`)
+	mustExec(t, db, `INSERT INTO user_decks
+		(owner_id, slug, name, yaml, coliseum_at_night, created_at, updated_at) VALUES
+		(1, 'gyome', 'Gyome', 'name: G', 1, '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00')`)
+	arena := &fakeArena{}
+	var busy atomic.Bool
+	busy.Store(true)
+	w, err := night.ParseWindow("22:00-23:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := night.Settings{Scheduled: true, Window: w, Zone: time.UTC,
+		Bouts: 1, BoutsPerAccount: 1, Games: 3}
+	clock := &fakeClock{at: time.Date(2026, 9, 6, 22, 5, 0, 0, time.UTC)}
+	r := night.NewRunner(night.RunnerConfig{Store: s, Settings: set,
+		Player: arena, LaneBusy: busy.Load,
+		House: func(context.Context) ([]string, error) { return []string{"kaheera", "goreclaw"}, nil },
+		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)), Now: clock.now})
+	t.Cleanup(r.Stop)
+	ctx := context.Background()
+
+	r.Tick(ctx)
+	run, ok, _ := s.OpenRun(ctx)
+	if !ok {
+		t.Fatal("the night did not open")
+	}
+	if got := boutStates(t, s, run.ID); got[night.StatePlanned] != 1 {
+		t.Fatalf("the card came out %v, want the one planned bout", got)
+	}
+
+	// The owner steps back out between the deal and the bout's turn.
+	mustExec(t, db, `UPDATE user_decks SET coliseum_at_night = 0 WHERE slug = 'gyome'`)
+	busy.Store(false)
+	r.Tick(ctx)
+	bouts, err := s.Bouts(ctx, run.ID)
+	if err != nil || len(bouts) != 1 {
+		t.Fatalf("the card holds %d bouts: %v", len(bouts), err)
+	}
+	if bouts[0].State != night.StateSkipped ||
+		bouts[0].Reason != "account 1's gyome has left the night" {
+		t.Fatalf("the withdrawn bout settled as %s with %q", bouts[0].State, bouts[0].Reason)
+	}
+	if len(arena.fights()) != 0 {
+		t.Fatal("the arena read a deck whose consent was withdrawn")
+	}
+}
+
+func TestAnAbandonedSampleFinishesItselfAndDoesNotBlockTheNext(t *testing.T) {
+	t.Parallel()
+	// The admin's connection dropping between StartRun and PlanBouts must
+	// not park an open, empty run that blocks every night until its
+	// deadline: the compensating finish runs on its own authority, not the
+	// dead caller's. The cancellation is landed in exactly that seam through
+	// the store's clock — its first look stamps StartRun, its second stamps
+	// PlanBouts — and the assertion below fails loudly rather than
+	// vacuously if that ordering ever moves: a run must exist *and* be
+	// finished, so a cancel landing too early (no run) or the compensation
+	// dying with the caller (an open run) are both caught.
+	path := filepath.Join(t.TempDir(), "app.db")
+	if err := authtest.NewScratchDB(path); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var mu sync.Mutex
+	looks, at := 0, time.Date(2026, 9, 6, 14, 0, 0, 0, time.UTC)
+	storeNow := func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		looks++
+		if looks == 2 {
+			cancel()
+		}
+		at = at.Add(time.Millisecond)
+		return at
+	}
+	s, err := night.NewStore(path, storeNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	clock := &fakeClock{at: time.Date(2026, 9, 6, 14, 0, 0, 0, time.UTC)}
+	r := night.NewRunner(night.RunnerConfig{Store: s, Player: &fakeArena{},
+		House: func(context.Context) ([]string, error) { return []string{"kaheera", "goreclaw"}, nil },
+		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)), Now: clock.now})
+	t.Cleanup(r.Stop)
+
+	if _, _, err := r.StartSample(ctx, 30); err == nil {
+		t.Fatal("the sample survived its caller hanging up mid-plan")
+	}
+	run, ok, err := s.LatestRun(context.Background())
+	if err != nil || !ok || run.Open() {
+		t.Fatalf("the abandoned sample was not finished on the spot: ok=%v open=%v err=%v",
+			ok, ok && run.Open(), err)
+	}
+	// And the next sample opens over the finished wreck.
+	if _, _, err := r.StartSample(context.Background(), 30); err != nil {
+		t.Fatalf("the next sample was blocked by the abandoned one: %v", err)
 	}
 }
 

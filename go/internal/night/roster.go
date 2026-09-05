@@ -1,6 +1,10 @@
 package night
 
-import "context"
+import (
+	"context"
+	"database/sql"
+	"errors"
+)
 
 // The roster's two halves, and why they are read so differently.
 //
@@ -44,4 +48,25 @@ func (s *Store) PlayerDecks(ctx context.Context) ([]Seat, error) {
 		out = append(out, Seat{Owner: &id, Slug: slug})
 	}
 	return out, rows.Err()
+}
+
+// Entered is the same question one deck at a time, asked again at the bout's
+// own turn. The card is dealt from the flag as it stood at run open, but the
+// flag is *standing* consent, and standing consent can be withdrawn between
+// the deal and the fight — an owner who stepped back out at 23:10 must not
+// have their deck read at 23:40 on the strength of how 22:00 looked.
+// Deletion was always honoured (the read fails and the bout skips); this
+// closes the same door for the quieter exit. A deck that has left
+// `user_decks` entirely answers false too, which the fight-time check
+// reports the same way.
+func (s *Store) Entered(ctx context.Context, owner int64, slug string) (bool, error) {
+	var one int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT 1 FROM user_decks WHERE owner_id = ? AND slug = ?`+
+			` AND coliseum_at_night = 1 AND deleted_at IS NULL LIMIT 1`,
+		owner, slug).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
 }

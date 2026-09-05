@@ -283,4 +283,24 @@ func TestPlayerDecksReadsTheStandingConsent(t *testing.T) {
 				decks[i].Slug, *want[i].Owner, want[i].Slug)
 		}
 	}
+
+	// Entered is the same consent read one deck at a time — the fight-time
+	// re-check — and it must agree with the muster on every shape of no:
+	// flag off, in the crypt, never in the library at all.
+	for _, ask := range []struct {
+		owner int64
+		slug  string
+		want  bool
+	}{
+		{1, "gyome", true}, {1, "arahbo", false},
+		{2, "crypted", false}, {2, "never-was", false},
+	} {
+		in, err := s.Entered(ctx, ask.owner, ask.slug)
+		if err != nil {
+			t.Fatalf("Entered(%d, %s): %v", ask.owner, ask.slug, err)
+		}
+		if in != ask.want {
+			t.Errorf("Entered(%d, %s) = %v, want %v", ask.owner, ask.slug, in, ask.want)
+		}
+	}
 }

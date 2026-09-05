@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
@@ -100,6 +101,50 @@ func TestANightBoutAndAnInteractiveMatchDriveTheOneCore(t *testing.T) {
 		if job.Kind == NightForgeKind {
 			t.Fatal("a night bout appeared in a person's job listing")
 		}
+	}
+}
+
+func TestAPanickingCoreStillSettlesTheBout(t *testing.T) {
+	t.Parallel()
+	// The registry recovers a panicking job, but that recovery unwinds past
+	// the night closure — if the settle rode after the core's return alone, a
+	// panic would skip it and the waiter would park until shutdown, wedging
+	// the whole night on one bad bout. The waiter must hear the panic as a
+	// failure instead, and the registry must still contain it as one errored
+	// job. The panic is injected through the core's seam because every real
+	// panic here is by definition a path nobody predicted.
+	shim := &stubShim{stream: true, games: []tier3.WireGame{won(1, 5421, 1, 11)}}
+	a, reg, _, _ := nightAPI(t, shim)
+	a.playCore = func(jobs.Progress, forgeMatch) (forgeResult, int64, error) {
+		panic("the board fell over")
+	}
+	type answer struct {
+		matchID int64
+		err     error
+	}
+	got := make(chan answer, 1)
+	go func() {
+		id, err := a.playNightBout(context.Background(), night.Bout{
+			ID: 11, SeatA: night.Seat{Slug: "kaheera"},
+			SeatB: night.Seat{Slug: "mono-green"}, Games: 1, Seed: 45})
+		got <- answer{id, err}
+	}()
+	select {
+	case o := <-got:
+		if o.err == nil || !strings.Contains(o.err.Error(), "the board fell over") {
+			t.Fatalf("the waiter heard %v, want the panic's own words as a failure", o.err)
+		}
+		if o.matchID != 0 {
+			t.Errorf("a panicked bout claims match %d", o.matchID)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the waiter never heard the settle; a panicking core wedges the night")
+	}
+	// And the containment still held: the job errored, the process lived.
+	reg.Wait()
+	house := reg.All(jobs.HouseOwner)
+	if len(house) != 1 || house[0].Status() != jobs.Errored {
+		t.Fatalf("the house's jobs read %+v, want the one errored bout", house)
 	}
 }
 

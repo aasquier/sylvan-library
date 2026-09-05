@@ -178,6 +178,12 @@ type API struct {
 	// an instance whose night has nowhere to keep its rows, and the admin
 	// night routes answer 503 in words.
 	nightRunner *night.Runner
+	// playCore is the play-and-record core the night's job closure drives:
+	// [API.playForgeMatch] on every API [New] builds, and a seam in the
+	// registry's now/newID style so one test can make the core panic and
+	// prove the settle still reaches the runner's waiter — the wedge that
+	// fake could otherwise only be found by wedging a real night.
+	playCore func(jobs.Progress, forgeMatch) (forgeResult, int64, error)
 
 	lazy        sync.Mutex
 	lazyDB      *sql.DB
@@ -216,7 +222,7 @@ func New(cfg Config) *API {
 	if cfg.Fly == nil {
 		cfg.Fly = &flymetrics.Panel{Log: cfg.Logger}
 	}
-	return &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
+	a := &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
 		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, scryfallDir: cfg.ScryfallDir,
 		dataDir: cfg.DataDir, poolPath: cfg.PoolPath, traffic: cfg.Traffic,
 		fly:        cfg.Fly,
@@ -228,6 +234,8 @@ func New(cfg Config) *API {
 		forgeClient: cfg.ForgeWorker,
 		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader,
 		claude: cfg.Claude, forge: cfg.Forge}
+	a.playCore = a.playForgeMatch
+	return a
 }
 
 // background runs fn after the response has gone, which is, for the one

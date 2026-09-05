@@ -219,8 +219,9 @@ func New(cfg Config) (*Door, error) {
 	// the API's player, the API's admin routes read and steer this runner.
 	// Only with a write handle, because the night's whole design is rows: a
 	// door with no app.db has nowhere a restart could resume from, and its
-	// night routes answer 503 in words. Started here and stopped in
-	// [Door.Close], so the ticker lives exactly as long as the door does.
+	// night routes answer 503 in words. Built here, started only after the
+	// last fallible step below, and stopped in [Door.Close], so the ticker
+	// lives exactly as long as a door that actually stood.
 	if d.writeDB != nil {
 		runner := night.NewRunner(night.RunnerConfig{
 			Store:    night.FromDB(d.writeDB, nil),
@@ -237,13 +238,18 @@ func New(cfg Config) (*Door, error) {
 		})
 		routes.SetNightRunner(runner)
 		d.night = runner
-		runner.Start()
 	}
 	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err
 	}
 	d.table = table
+	// The scheduler starts only now that New can no longer fail: a runner
+	// started before the route table stood would, on that error path, keep
+	// ticking against the write handle with nobody holding a Stop.
+	if d.night != nil {
+		d.night.Start()
+	}
 	return d, nil
 }
 
