@@ -89,6 +89,35 @@ type Config struct {
 	// The one secret this package carries, because the sender has to put it in
 	// a header itself.
 	ResendAPIKey string
+
+	// The five night switches configure the Coliseum at Night (ADR 46), and
+	// they are carried **raw** -- an exception to this struct's resolved-value
+	// rule, made on purpose and worth arguing. [Load] cannot fail, and a
+	// malformed window or an unknown zone must refuse the boot in a plain
+	// sentence rather than become a silently-substituted default: a night
+	// that quietly runs on the wrong clock is the worst version of this
+	// feature. So the one resolver is `internal/night`'s SettingsFromConfig,
+	// which parses all five together, applies the defaults, and is the place
+	// resolution is allowed to say no.
+
+	// NightWindow is MTGLAB_NIGHT_WINDOW: "HH:MM-HH:MM" wall-clock in
+	// [Config.NightZone], and it may cross midnight ("23:30-01:30"). Empty
+	// means no scheduled nights -- admin-triggered sample runs still work.
+	NightWindow string
+	// NightZone is MTGLAB_NIGHT_ZONE: the IANA zone the window is read in
+	// ("America/Los_Angeles"). Required whenever NightWindow is set; the
+	// friends this instance serves are not all on one clock, so there is no
+	// safe default to fall to.
+	NightZone string
+	// NightBouts is MTGLAB_NIGHT_BOUTS: the cap on bouts in one scheduled
+	// night. Empty means 6.
+	NightBouts string
+	// NightBoutsPerAccount is MTGLAB_NIGHT_BOUTS_PER_ACCOUNT: one account's
+	// share of a scheduled night (ADR 46 decision 5). Empty means 2.
+	NightBoutsPerAccount string
+	// NightGames is MTGLAB_NIGHT_GAMES: games per bout, 1 to 20 -- the same
+	// ceiling the Coliseum's own door enforces. Empty means 10.
+	NightGames string
 }
 
 // Defaults are the settings a laptop gets when it exports nothing.
@@ -159,6 +188,11 @@ func Load() Config {
 	}
 	c.ClientIPHeader = env("MTGLAB_CLIENT_IP_HEADER")
 	c.ResendAPIKey = env("RESEND_API_KEY")
+	c.NightWindow = env("MTGLAB_NIGHT_WINDOW")
+	c.NightZone = env("MTGLAB_NIGHT_ZONE")
+	c.NightBouts = env("MTGLAB_NIGHT_BOUTS")
+	c.NightBoutsPerAccount = env("MTGLAB_NIGHT_BOUTS_PER_ACCOUNT")
+	c.NightGames = env("MTGLAB_NIGHT_GAMES")
 	return c
 }
 

@@ -205,8 +205,8 @@ func TestMigrateLeavesTheFileInWAL(t *testing.T) {
 	}
 }
 
-// The embedded ladder has exactly SchemaVersion rungs: a 14th file lying
-// beside a version of 13 would otherwise sit there unapplied, looking
+// The embedded ladder has exactly SchemaVersion rungs: a fifteenth file lying
+// beside a version of fourteen would otherwise sit there unapplied, looking
 // landed.
 func TestTheEmbeddedLadderIsExactlyTheVersion(t *testing.T) {
 	t.Parallel()
@@ -293,6 +293,59 @@ func TestRungThirteenLeavesExistingDecksOutOfTheNightGames(t *testing.T) {
 	// and fail this one.
 	if len(seen) != 2 || seen["gyome"] != 1 || seen["arahbo"] != 0 {
 		t.Errorf("the rung disturbed the decks it climbed past: %v", seen)
+	}
+}
+
+// Rung 14's one schema-held promise: a second *scheduled* run for the same
+// night is refused by the unique partial index, while sample runs -- the
+// admin's measurement -- may recur on a date freely. The runner's manners are
+// tested where the runner lives; this is about what the file itself enforces,
+// which is what still holds when the process restarts mid-night and asks
+// again.
+func TestRungFourteenHoldsOneScheduledRunPerNight(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "app.db")
+	if err := Migrate(path); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	// Foreign keys on, as every request-path handle has them (OpenReadWrite):
+	// the pragma is per-connection, and a test that forgets it is asking the
+	// one connection in the app that never exists.
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	insert := func(key string, sample int) error {
+		_, err := db.Exec(
+			`INSERT INTO night_runs (night_key, sample, opened_at, closes_at)
+			 VALUES (?, ?, '2026-09-06T06:00:00+00:00', '2026-09-06T08:00:00+00:00')`,
+			key, sample)
+		return err
+	}
+	if err := insert("2026-09-06", 0); err != nil {
+		t.Fatalf("the first scheduled run of the night was refused: %v", err)
+	}
+	if err := insert("2026-09-06", 0); err == nil {
+		t.Error("a second scheduled run landed on the same night_key")
+	}
+	if err := insert("2026-09-07", 0); err != nil {
+		t.Errorf("the next night's run was refused: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := insert("2026-09-06", 1); err != nil {
+			t.Errorf("sample run %d on a scheduled night was refused: %v", i+1, err)
+		}
+	}
+	// A bout must name a real run: the foreign key is on, and a row pointing
+	// at a night that never happened is exactly the orphan `foreign_key_check`
+	// signs off against.
+	if _, err := db.Exec(
+		`INSERT INTO night_bouts (run_id, seat_a_slug, seat_b_slug, games, seed,
+		                          state, created_at, updated_at)
+		 VALUES (999, 'gyome', 'arahbo', 10, 7,
+		         'planned', '2026-09-06T06:00:00+00:00', '2026-09-06T06:00:00+00:00')`); err == nil {
+		t.Error("a bout pointing at a run that does not exist was accepted")
 	}
 }
 

@@ -1,7 +1,7 @@
 // The schema ladder for `app.db` — the ladder the deployed instance runs
 // at every boot.
 //
-// The thirteen scripts under `migrations/` are the recorded schema, byte for
+// The fourteen scripts under `migrations/` are the recorded schema, byte for
 // byte: SQLite stores a CREATE statement's exact text in `sqlite_master`,
 // so executing identical SQL is what keeps a freshly-minted `app.db`
 // indistinguishable from every one already in the field — which
@@ -34,7 +34,7 @@ import (
 // SchemaVersion is the ladder's height, stored in SQLite's own
 // `user_version` — no table to migrate, nothing to forget in a dump.
 // Bumped when a script is added under `migrations/`.
-const SchemaVersion = 13
+const SchemaVersion = 14
 
 //go:embed migrations/*.sql
 var migrationFS embed.FS

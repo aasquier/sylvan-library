@@ -19,6 +19,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/config"
 	"github.com/aasquier/sylvan-library/go/internal/door"
+	"github.com/aasquier/sylvan-library/go/internal/night"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
@@ -111,13 +112,21 @@ func bootSummary(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 // that refuses here would take the site down for a setting the site does not
 // need to serve a single anonymous page. Loud and serving beats silent and
 // serving; refusing to serve is worse than both.
-func configComplaints(cfg config.Config) []string {
+func configComplaints(cfg config.Config, forge tier3.Settings) []string {
+	var out []string
+	if forge.WorkerHalfSet() {
+		// Not gated on auth: a laptop that sets the worker dial means to reach
+		// the hosted worker, and it is exactly as unreachable from there.
+		out = append(out, "MTGLAB_FORGE_WORKER is set and neither "+
+			"MTGLAB_FLY_API_TOKEN nor MTGLAB_FORGE_WORKER_URL is: the hosted "+
+			"worker stays unconfigured (forge_worker=false above), and Tier 3 "+
+			"falls back to probing for a local Forge instead")
+	}
 	if !cfg.RequireAuth {
 		// Auth off is a laptop, one person, no invites and no reset mail. Every
 		// relationship below is about a deployment.
-		return nil
+		return out
 	}
-	var out []string
 	if cfg.ResendAPIKey == "" {
 		out = append(out, "auth is on and RESEND_API_KEY is unset: invites and "+
 			"password resets are refused rather than sent, because the console "+
@@ -190,6 +199,18 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	listen func() (net.Listener, error)) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
+	// The night's switches, resolved first and allowed to refuse — the one
+	// exception to `configComplaints`' warnings-never-refusal rule, argued at
+	// [night.SettingsFromConfig]: those complaints are about settings the
+	// site does not need to serve an anonymous page, while a misconfigured
+	// night is a scheduler that would quietly run on the wrong clock at an
+	// hour nobody is watching. Before the ladder and the signal handler,
+	// because nothing has been touched yet and the sentence is the fix.
+	nightSet, err := night.SettingsFromConfig(cfg)
+	if err != nil {
+		return err
+	}
+
 	// **The stop is armed before anything it could have to interrupt** — the
 	// one ordering in this function that is not about the boot.
 	//
@@ -242,8 +263,16 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	// configuration in the log above the error.
 	_, poolErr := os.Stat(cfg.DBPath())
 	log.Info("configuration", bootSummary(cfg, forge, webDist, tarot, poolErr == nil)...)
-	for _, complaint := range configComplaints(cfg) {
+	for _, complaint := range configComplaints(cfg, forge) {
 		log.Warn(complaint)
+	}
+	// The first scheduler this app has ever had says so where a `fly logs`
+	// tail can see it; an unscheduled night logs nothing, because sample
+	// runs are asked for rather than waited on.
+	if nightSet.Scheduled {
+		log.Info("the coliseum runs at night", "window", nightSet.Window.String(),
+			"zone", nightSet.Zone.String(), "bouts", nightSet.Bouts,
+			"per_account", nightSet.BoutsPerAccount, "games", nightSet.Games)
 	}
 	// The maintainer, reconciled to admin at every start (ADR 17). A no-op
 	// unless MTGLAB_ADMIN_EMAIL is set, which is what a laptop wants.
@@ -268,6 +297,9 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 		// Read once here, like every other setting (ADR 39): the routes are
 		// handed where the calls go rather than looking it up per request.
 		Forge: forge, Claude: claude.SettingsFromEnv(),
+		// The Coliseum at Night (ADR 46), already resolved above; the door
+		// starts the runner and stops it with its own Close.
+		Night:  nightSet,
 		Logger: log,
 	})
 	if err != nil {

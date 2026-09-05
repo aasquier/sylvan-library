@@ -19,7 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24, 2026-08-19,
+  2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -27,6 +28,216 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-05 (rainbow, night)
+
+- **Fixed this run:**
+  1. **The committed-media accounting sweep is a gate now, and it caught four
+     files on its first spin.** The hand sweep every White run does — compare
+     `git ls-files` media against what the recipes and PROVENANCE files
+     account for — is `go/cmd/mtglab/mediaprovenance_test.go`: the file set
+     comes off `git ls-files` (a walk cannot tell a tracked stray from a
+     toolbox venv's fixtures — the first draft flagged sympy's test PNGs), and
+     a file is accounted by its directory's PROVENANCE naming it, a recipe's
+     `file:` output naming it, or a recipe's `each:` output in its format (the
+     set convention, under which `animist verify` pins the count — a 79th
+     tarot card fails the toolbox gate, so this test only needs the set to
+     exist). What it caught: **the four PWA icons in `web/public/` (#380,
+     2026-08-28) had no record anywhere** — hand-placed binaries in the exact
+     sense the checklist means. They are the project's own mark (the inline
+     SVG favicon in `web/index.html`, tree over open book, rasterized because
+     iOS takes no SVG for `apple-touch-icon`), so there was no third party and
+     no licence question — but the derivation was recorded nowhere, and the
+     rasterizer used was never written down. `web/public/PROVENANCE.md` now
+     says all of that plainly, including what it cannot say (the exact
+     rasterizer), and the build ships it beside the icons it describes.
+     `parchment-deckle.svg` — last run's "not a finding, but unindexed" — is
+     indexed in the séance PROVENANCE for the same reason: the gate reads the
+     index. **Mutation-verified both legs**: hiding the icons' record fails
+     exactly the four icons; hiding `tarot.recipe.yaml` fails exactly 78
+     cards; both restored, both re-green.
+  2. **The `worker.min.js.LICENSE.txt` deferred item is closed on its own
+     trigger** ("the next White run, whichever is first").
+     `TestTheReadingEnginesLicenceNoticeTravelsWithTheCode` in
+     `go/internal/api/shelves_test.go` is the Python-era pin in its Go shape:
+     the notice's name comes *off* `reference.Runtime().OCR.Assets` (exactly
+     one `.LICENSE.txt`), the code asset it explains must be on the shelf
+     beside it, both pinned from the same upstream directory (the pointer in
+     the code's first line is relative), media type `text/plain`, and the
+     route serves it with the charset. **Mutation-verified**: the row deleted
+     from `shelves.json`, watched to fail on "0 licence notices", restored.
+  3. **`PublicPaths` gets its third direction.** The two derived sweeps hold
+     an entry nothing serves and a served route left off; what neither could
+     see was a served route quietly *added* to the public list — the sweeps
+     would obediently reclassify it. `TestPublicPathsHoldOnlyTheAuthDoorsAndHealth`
+     (`go/internal/door/door_test.go`) holds the list to a rule rather than a
+     roster: the liveness probe plus `/api/auth/*`, nothing else, so a public
+     data route fails a test until somebody writes down why.
+     **Mutation-verified**: `"/api/decks": true` added, watched to fail,
+     removed. The checklist's own liveness mutation also re-run this cycle:
+     an unserved `/api/auth/polish-probe` entry fails
+     `TestEveryPublicPathIsServed` by name.
+- **Verified this run — licensing (triple-check):**
+  - **`animist verify`: 33 recipes, all held** (was 12 — the Coliseum's 21
+    arrived with #377-#425). Committed media 205 tracked files (was 156):
+    +21 coliseum webp, +4 PWA icons, +the build's copies. Every coliseum webp
+    cross-checked by machine: recipe beside it, `animist:begin` block in the
+    dir's PROVENANCE, `verify` holding the bytes. Spot-read three PROVENANCE
+    entries in full (harena, secutor, aegis): Commons/Met sources, PD or CC0
+    per file via the provider APIs at fetch time, obligations-free by
+    deliberate search filter, and the committed-vs-hotlinked argument made
+    per file. Nothing here is Wizards'.
+  - **The licence gate still has no override**, read in the code:
+    `tools/animist/sources.py` raises `LicenceRefused` against the three
+    allowlists; `tools/animist/cli.py` has no `--force`, no bypass — its only
+    "skipped" is the filename guard refusing files, not licences.
+  - **No Wizards image under `git ls-files`**; `PageMasthead`'s `credit` is
+    still required by the type; monetization sweep clean (the only "donated"
+    is Ludevic's flavour text).
+  - **ADR 6 holds**: no bulk data tracked; ci.yml's filename scan still
+    matches `.duckdb`/`.jsonl.gz`/`.json.gz` anywhere (line 116), the image
+    job still probes the container for a pool.
+  - **Dependency licences, swept 2026-09-05 from the packages themselves.**
+    Go: 32 third-party modules — 19 MIT, 10 BSD-3-Clause, 2 Apache-2.0, and
+    `modernc.org/mathutil` still reported Unknown by the classifier and still
+    BSD-3-Clause by its own LICENSE (ruled 2026-08-24; do not respend the
+    hour). npm: 180 packages — 140 MIT, 15 ISC, 10 Apache-2.0, 4 MPL-2.0,
+    3+3 BSD, 2 MIT-0, 1 each BlueOak/CC0/"MIT AND ISC". **Zero
+    AGPL/GPL/SSPL/UNLICENSED on either side.** Both re-swept *after*
+    `npm ci`, because **local `node_modules` was behind the lockfile** — the
+    #427 dependabot bump (7 packages) had never been installed here, the
+    known local-gates-weaker-than-CI trap; synced this run.
+  - **The séance hand swap (Parisienne → Caveat) is NOT on main** — it lives
+    on the unmerged `the-fortune-tellers-hand` branch held for Aaron's eye.
+    Main audited as it is: 4 woff2 (3 IM Fell + Parisienne), PROVENANCE
+    unchanged since the 2026-08-19 three-way verification. The note for the
+    merge day is in this run's handoff, not in that branch.
+- **Verified this run — security & isolation:**
+  - **~20 routes new since 2026-08-24, read against the 403/404 law.** Every
+    new `{owner}` route resolves through the one accessor — directly
+    (`openinghand`, `tokens`, `describe`) or via `writeTarget`, which opens
+    with `a.sourceFor` (`swapboard`, `intake`, `bulk`, `entomb`, `combos`,
+    `coliseum-at-night`). The crypt family, the two master switches and the
+    collection routes deliberately carry **no owner segment** — your shelf is
+    yours, so no path can name somebody else's. `coliseumStandings` scopes by
+    `auth.ScopeFrom` viewer. The three night routes sit under the admin
+    prefix (403 before routing) with `requireAdmin` behind.
+  - **The Coliseum at Night's consent story, read end to end** (ADR 46, rung
+    13): the roster draws only `coliseum_at_night = 1 AND deleted_at IS NULL`,
+    and `runner.consentWithdrawn` re-reads the flag at the bout's own turn —
+    standing consent, checked at deal *and* at fight time. A player's deck is
+    read via an owner-scoped `SQLSource` by the house, which is the designed
+    exception and argued where it stands.
+  - **CodeQL: zero open alerts** — the five stale Python alerts were
+    dismissed since last run (daybreak 2026-08-24 item 3, done), and the six
+    Go dismissals stand unchanged. Nothing new from 135 commits.
+  - **SQL sweep over everything added since 2026-08-24**: `claude/ledger`'s
+    `Summarise` interpolates a column name behind an exact two-value guard
+    (the Python AXES pattern, kept); `wheel.go`'s colour quoting is fed only
+    from `identityColors`, which filters against the five fixed literals;
+    `traffic.go` and `auth` concatenate module constants. Nothing
+    caller-tainted reaches a string.
+  - **Email**: `AsDict(true)` still has exactly one non-test caller
+    (`admin.go:124`). **Tokens**: fragment-only in `web/src`
+    (`Claim.test.tsx` still pins the query-string refusal). **Cookies**:
+    HttpOnly + SameSite=Lax + `Secure` following `config.SecureCookies()`
+    (defaults to RequireAuth), unchanged.
+  - **Live posture** (pre-auth, probed 2026-09-05): `/api/health` 200 —
+    pool fresh (bulk 2026-08-30), 35,393 oracle cards, **17 decks** (was 7;
+    the library is growing) — and `/api/tarot/reading`, `/api/decks`,
+    `/api/admin/users`, `/api/nope` all **401**, the middleware refusing
+    before routing.
+- **Found by this PR's own checks — a day-old test that bets on the
+  machine.** `go (arm64)` went red under
+  `internal/night.TestABoutSettlesTheWayItsPlayerAnswered`:
+  `runner_test.go:434: timed out waiting for the bout to settle`. Not this
+  branch's diff (nothing here is imported by `internal/night`), and not a
+  product bug: the same test was green on main's own push run of #429
+  ninety minutes earlier, on both architectures. The mechanism is the class
+  white.md already names — the bout settles on a background goroutine while
+  `waitFor` polls a **5-second wall-clock deadline** (`runner_test.go:115`),
+  so on a loaded shared runner the greenness is a fact about the machine.
+  The suite's own standing rule says the fix is **a gate the test controls,
+  never a longer deadline** — the fake arena could signal each settle so the
+  test awaits the event rather than betting seconds on it. One honest
+  re-roll applied after this diagnosis, per the night protocol — **and the
+  re-roll failed the same way on the other architecture** (`go (amd64)`,
+  same line, 5.58s), so under tonight's runner load this test fails more
+  often than it passes. The run stopped there rather than looping: **PR
+  #430 is left green-but-blocked for daylight**, and the flake is the
+  daybreak queue's item 2. The fix belongs to the night-engine's own
+  thread.
+- **Queued for Aaron:** nothing new needing a *ruling*. The two standing
+  items (ADR 5's parametrised isolation sweep; the wider docs-rot guard) are
+  unchanged and still waiting — this run's route-table read confirms the
+  ADR 5 gap is still a missing guard rather than a known hole. The night
+  flake above is daybreak-listed as work, not as a question.
+- **Deferred (2026-09-05):**
+  - ~~`worker.min.js.LICENSE.txt` pinned by no test~~ — **closed this run**
+    (fix 2).
+  - **10 of `internal/gate`'s 14 surviving mutants are unnamed.** The first
+    gremlins run reported them but only the tail was captured; the re-run to
+    name them collapsed into the timeout pathology (below). The four named:
+    `validate.go:410` (commander records skipped on nil — companion check
+    runs without the commander), `:424`/`:428` (the "and N more" truncation
+    at exactly six), plus one boundary at `:392`. *Trigger:* next White run,
+    quiet machine, full capture on the first spin.
+  - **`repr.go`'s corpus ruling** and **`--version`/build stamp**: standing,
+    triggers unchanged (2026-08-24).
+- **Measurements (2026-09-05, rainbow, night):** raw output, not a summary.
+  - **Coverage, now measured in CI's own gate formula** (the floor was
+    rebuilt at 90.5 by #387 on 2026-08-28 — the 2026-08-23 open question is
+    settled in code, as a ratchet):
+
+    ```
+    go test -count=1 -coverpkg=./... ./... ; go tool cover -func  →  total: 91.2%   (floor 90.5)
+    go test -count=1 -coverprofile=own.out ./... ; -func          →  total: 89.1%
+    ```
+
+    Own-tests lowest: `wire` 67.7%, `deckread` 68.8% (was 20.4 — the
+    coverage passes since #387), `deckyaml` 70.8%, `shelves` 81.5%, `sim`
+    81.6%. The two 0.0% rows are `authtest` and `pooltest` — the test
+    helpers themselves, exercised by their importers; not findings.
+  - **Suite wall clock: 2m8.1s plain** (`go test -count=1 ./...`, warm
+    cache, 48 packages, 0 failures), against 57.8s on 2026-08-24 — **but the
+    tree nearly doubled** (833 → 1,817 top-level test functions) and the
+    shape changed: the tail flattened. Per-package: `claude` 64.5s, `api`
+    63.7s, `claude/tools` 37.9s, `cards` 35.9s, `config` 35.4s, `deck`
+    32.0s. `api` is no longer 86% of the wall — user 8m32s against 2m8s wall
+    means this 4-core Mac is now saturated by package-level parallelism, and
+    the next second saved lives in the fat middle, not one package.
+  - **`t.Parallel` census: 1,791 of 1,817 top-level tests parallel, 26
+    serial, and all 26 say why where they stand** — CLAUDE.md's claim
+    re-checked by script (the one-second re-check it promises), including
+    the three whose reason is the body's first comment rather than a header.
+    53 `t.Setenv` call sites. **Skip census: 35 `t.Skip` sites, every one
+    conditional on a real absence** — live-Claude/Forge gates, root-uid
+    guards, fixture-drift guards, a busy container port.
+  - **Mutation baseline, `internal/gate` (first spin):** Killed 125, Lived
+    14, Not covered 3 — **efficacy 89.93%**, 5m34s, in a throwaway worktree
+    at `origin/main`. Above every kernel baselined 2026-08-24 except
+    mt19937 (93.08%). **The timeout trap now has a second confirmation and a
+    sharper shape**: the *immediate re-run* of the identical command reported
+    `Killed: 0, Timed out: 139, efficacy 0.00%` — a fabricated score, per the
+    2026-08-24 floats lesson. New wrinkle: the collapse hit a package whose
+    first run was healthy, so "the first run of a fast package is the one to
+    trust" generalises to **capture the first run in full, because the
+    re-run to recover lost output may be worthless**.
+  - **The determinism replay** (a seed is a promise): this tree's own build,
+    on a scratch `MTGLAB_DATA_DIR` and a port verified held by `lsof`,
+    answers `GET /api/tarot/reading?seed=1909` **byte-identical to the
+    2026-08-24 recorded baseline** — 741 bytes, sha256
+    `e406f504c05f962cb6c2ccabb7d9d18fead04235997917639ac93c90135a3928` —
+    across 135 commits. **The port lesson recurred on the way**: the first
+    probe's server never bound (another session's `mtglab`, PID 45197, holds
+    8791) and the squatter answered with the *correct* bytes, which is
+    exactly why a free port is not a held one; redone with the bind proven.
+    **The live authenticated half is owed**: tarot and wheel are 401 without
+    a session, Claude never signs in, and the `claude` seat was not ridden
+    tonight — daybreak carries it.
+  - **`data/app.db` untouched by any of it**: mtime 2026-08-28, sha256
+    `41324f0a…` before and after; the WAL's fresh stamp is the live 8765
+    app's, predating this session.
 
 ### 2026-08-24 (rainbow)
 
@@ -1051,8 +1262,8 @@ kill rate is bad enough to want every mutant rather than a sample.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
-  2026-08-18.
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
+  2026-08-19 (rainbow), 2026-08-18.
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -1062,6 +1273,205 @@ the spirit of Magic*
   column finds why) — but no path, number or test name down there is current.
   The section's own subtitle said "Python craft" until tonight, which is the
   drift this facet exists to catch, sitting on its own heading.
+
+### 2026-09-05 (rainbow, night)
+
+Fresh ground this run: PR #429 (the Coliseum at Night engine, `internal/night`,
+rung 14, five `MTGLAB_NIGHT_*` switches) landed on main the same day, so the
+audit leaned on boot-sequence fit, config doctrine, and idiom drift there
+rather than re-reviewing its logic.
+
+- **Fixed this run:**
+  1. **The night-runner suite stopped betting wall-clock seconds — PR #431,
+     merged, and it was holding White's #430 out of main.**
+     `TestABoutSettlesTheWayItsPlayerAnswered` failed two consecutive loaded
+     CI runs (arm64, then amd64 on the re-roll, same line) while green on
+     every quiet one: every wait in `runner_test.go` polled row state under a
+     5-second `waitFor`, and the settle it polled for happens on a background
+     waiter goroutine, so greenness was a fact about the runner's load. The
+     fix is the shape White's daybreak asked for — events, never deadlines:
+     a `Settled` seam on `RunnerConfig` (fired from the waiter after the row
+     settles *and* the seat untracks, the one transition a caller of `Tick`
+     cannot sequence itself; nil in production, like `LaneBusy`), and an
+     `entered` channel on the fake arena (a blocking send at the top of every
+     `Play`, by which point the claim has already marked the row `playing`).
+     `waitFor` is deleted; so is the 5s bet on `Stop`, whose bare call now
+     hangs a leak into the package timeout's goroutine dump. **Mutation
+     evidence:** deleting the `r.settled(b)` call fails the suite on its
+     timeouts rather than letting it pass vacuously (verified, restored). A
+     second mutant — hook fired *before* untrack — survives five runs: the
+     race it opens is narrow and the suite can only catch it stochastically,
+     so the ordering is held by the comment at the call site; in production
+     the hook is nil and the load-bearing order (untrack before Nudge) is
+     self-healing on the next tick. **Stress evidence:** twenty `-race` runs
+     across four saturated parallel processes, all green. `testing/synctest`
+     was considered and rejected: the suite drives a real scratch `app.db`,
+     and real file I/O has no place in a synctest bubble.
+  2. **Modern-Go sweep, re-measured 2026-09-05, and the one live find was in
+     the day-old package.** Classic tells still zero (`interface{}` 0,
+     `ioutil` 0, `rand.Seed` 0, `strings.Title` 0). `internal/night/pairing.go`
+     arrived written in the old spelling — `sort.Slice` twice, `sort.Strings`
+     once — and is converted: `slices.Sort` for the two scalar sorts,
+     `slices.SortFunc` for the seat sort, the `sort` import gone. The sweep's
+     tie warning was checked, not waved at: owner ids are unique by
+     construction and one owner cannot hold two decks of one slug, so every
+     comparator is total, no tie can move, and no `Stable` form is owed (the
+     argument now sits in `playerTurns`' doc comment so the next run does not
+     re-litigate it — and nothing recorded rests on cross-version deal order
+     anyway; rows are the record, and the package promises "stable", not
+     bit-compatible). **Left standing, deliberately:** `internal/jobs`'
+     two plain `sort.Slice` (2026-08-24's ruling — golden-bearing package,
+     total comparators, pure spelling change is the wrong trade) and the 18
+     `sync.Mutex` (0 are read-mostly maps; unchanged shape). `wg.Add(1)`
+     count is 1 and it is a test's loop over eight goroutines
+     (`shimdoor_test.go`), fine as it stands.
+  3. **The half-set `MTGLAB_FORGE_*` boot complaint landed — the 2026-08-24
+     deferred item, its trigger arrived.** The tier3 sessions since (#424,
+     #425) rebuilt settings as a value (`tier3.Settings`), which made the
+     predicate cheap: `Settings.WorkerHalfSet()` names the one
+     misconfiguration `Configured()` cannot — dial on, no token, no URL —
+     and `configComplaints` (now taking the forge settings) warns at boot,
+     *not* gated on auth, because a laptop that sets the dial means to reach
+     the hosted worker too. Tested by derivation, not restatement:
+     `TestWorkerHalfSetIsExactlyTheDialOnAndTheWholeUnconfigured` holds the
+     predicate equal to `WorkerEnabled && !Configured()` over the full
+     combination space. **Mutation-verified twice:** dropping the URL guard
+     from the predicate fails the derived test at the drifted combination;
+     deleting the complaint fails both new boot cases. Deleted from the
+     deferred list below.
+  4. **CLAUDE.md's architecture block gains `go/internal/night`** — the app's
+     first scheduler was absent from the one map a fresh session reads.
+  5. **Rule 1's own command could not say how big a creature is.** Found by
+     using it as prescribed: fact-checking the lore shelf's "two-mana 1/2
+     flying bird" put `./mtglab cards show 'Storm Crow'` on screen with no
+     power/toughness anywhere — the session asking gets silence from the
+     prescribed lookup and falls back to exactly the recall the rule exists
+     to stop. The pool record already carried Power/Toughness/Loyalty; only
+     the renderer dropped them. `cardStats` now appends `1/2` to a creature's
+     line and `loyalty 3` to a planeswalker's, a card with no size gains no
+     tail, and both paths were verified against the real pool after a
+     rebuild. Mutation-verified: with the tail dropped, the new test names
+     both missing stats (the `*/*` case included). The DFC blanking
+     (`cards-show-blanks-multifaced-cards` in memory) is the older, bigger
+     sibling of this gap and stays open — it needs the faces JSON unpacked,
+     which is more than a tail.
+  6. **Memory audit, two closures and a correction.**
+     `the-night-flag-skips-the-file-tier.md` carried an open ruling ADR 46
+     closed the day it was accepted (the file tier needs no flag: **the house
+     always plays**) — file and index line now say so, with the do-not-fix
+     warnings kept. `the-coverage-floor.md` and its index line quoted floor
+     90.0 while `ci.yml` gates 90.5 — both now read the ratchet's nature and
+     point at `ci.yml` as the source instead of freezing a number that moves.
+- **The boot sequence and configuration, re-measured (the night switches
+  included):** the doctrine held better than the last audit found it —
+  **12 `os.Getenv`/`os.LookupEnv` reads outside tests in 7 files, down from
+  33 in 8** on 2026-08-24 (the tier3 settings-as-a-value work absorbed
+  `worker.go`'s ten; `internal/config` reads through one `env` helper).
+  `configrecord_test.go` still holds `.env.example` equal to the code's names
+  **both `comm` directions empty**, the five `MTGLAB_NIGHT_*` names already
+  on both sides. The five night values riding `config.Config` as raw strings
+  with `night.SettingsFromConfig` as the one resolver is config doctrine
+  holding, not drifting — the resolver that can refuse is the resolver that
+  defaults, argued in the package comment, and the boot calls it first and
+  treats its error as a refusal (the one argued exception to
+  `configComplaints`' warnings-never-refusal rule). The three local readers
+  (`ui.go` `envOr`, `flymetrics` `envOr`, tier3 `envInt`) stand at three;
+  the deferred trigger (a fourth, or a whitespace bug) has not arrived.
+- **The toolchain audit the sweep requires: audited to Go 1.27.1
+  (released 2026-09-01; 1.27.0 on 2026-08-19).** Two facts worth the ledger:
+  **Go 1.27 requires macOS 13 Ventura, and this Mac is at its macOS 12
+  ceiling** — so the laptop cannot run a 1.27 toolchain and `go.mod` stays
+  `go 1.26` (CI reads `go-version-file: go/go.mod`, so it stays on 1.26.x
+  with us; no drift). Go 1.26 receives fixes until Go 1.28 (~Feb 2027), so
+  nothing is exposed today. **Trigger for the queued question this becomes:**
+  the day Go 1.28 releases, 1.26 stops getting security fixes and the only
+  ways forward are a newer Mac or splitting local-dev (1.26) from CI (1.27+),
+  which ADR-grade territory. Point releases: local sdk is go1.26.7;
+  go1.26.8 (2026-09-01, cgo/runtime fixes) exists — an operator `go install`
+  refresh, not a repo change. 1.27 items relevant when adoption unblocks:
+  `strings.CutLast`, `net/url.URL.Clone`, `httptest.NewTestServer` (synctest),
+  the GA goroutine-leak profile, `encoding/json/v2` underneath v1.
+- **TypeScript/React, re-measured:** zero regex lookbehind under `web/src`;
+  zero `forwardRef`/`React.memo`/`defaultProps` — React 19 idiom holds; no
+  new components since the 08-24 audit (the only web changes since are #427's
+  dependency bumps and Red's spinner pass). The five bare `>Loading…<` JSX
+  text nodes from the 08-24 correction are **gone** — every remaining
+  `Loading` string is a `Spinner label=` (App.tsx ×2, Library, DeckDetail,
+  Admin), which is Red's PR having landed; the both-spellings grep is now
+  standard and found nothing bare.
+- **The spirit of Magic:** sweep-half only this run (the flavour candidates
+  from 08-24 — "Shuffling up…" on the two App.tsx spinner labels — still
+  stand deferred; a taste change on a night when two merge chains were
+  already in flight is the wrong third PR). The enrichment shortlist and the
+  fortune-teller's table walk are **owed to the next spirit run with a
+  signed-in seat** — the tarot room and `/claude` answer 401 pre-auth and
+  Claude never signs in (the public walk below is what a night run gets).
+  **Shelf fact-check sample (rule 1: pool and Scryfall, nothing recalled),
+  all five held:** Chaos Orb's oracle says "a height of at least one foot" ✓
+  the curiosity's "a foot in the air"; One with Nothing is a {B} instant
+  reading "Discard your hand.", Saviors of Kamigawa 2005-06-03 ✓ "printed in
+  2005"; Storm Crow is {1}{U}, 1/2, flying ✓ "two-mana 1/2 flying bird"
+  (verified through `cards show` itself once fix 5 landed); phasing's Mirage
+  is 1996-10-08 ✓ "introduced it in 1996"; hybrid's "arrived with the
+  original Ravnica block in 2005" holds (Ravnica: City of Guilds 2005-10-07
+  — Scryfall's earliest hybrid *print date* is the Salvat 2005 partwork's
+  blanket 2005-08-22, a data quirk of a reprint product, not a history
+  correction). Zero wrong facts this sample; 08-24's Library of Alexandria
+  remains the only error the shelves have ever been caught in.
+- **Queued for Aaron (daybreak 2026-09-05):**
+  1. **The Settings room's "torches are not lit yet" copy is a deployment
+     fact checked by nothing.** `web/src/routes/Settings.tsx` renders
+     "Nothing happens tonight — the torches are not lit yet", true today
+     (the deployed instance has no `MTGLAB_NIGHT_WINDOW` set) and false the
+     evening Aaron sets the five secrets — which changes no code and
+     rebuilds no bundle, so the room will tell people the arena is dark
+     while it fights. Nothing fails when that happens; a person notices, or
+     nobody does. **Recommendation:** when the Coliseum's night shelf lands
+     (ADR 46 names it as its own PR), have the settings room read whether a
+     night is scheduled off the wire and render either the unlit-torches
+     line or the real window — the copy becomes a fact the server owns
+     instead of a promise the bundle froze. Until then this line is the only
+     reminder.
+- **The live walk (public surface only — the `claude` seat was not signed in
+  through Claude-in-Chrome tonight, so the authenticated rooms are owed):**
+  after each of tonight's two merges deployed, `/api/health` 200 with a sane
+  body, the door page rendering, and `/PROVENANCE.md` flipping from the SPA
+  shell to text after #430's deploy (White's own marker for the new build).
+  Numbers in the Measured block.
+- **Deferred (unchanged from 2026-08-24, re-checked, minus the closed one):**
+  the three local environment readers (trigger unchanged); the dropped-name
+  counter (still 0 everywhere, still nothing to surface); the spirit flavour
+  candidates (next spirit run, with a seat). The half-set Forge pair is
+  **closed** above. **Skipped honestly this run:** the Anthropic
+  best-practices currency check (last done 2026-08-24; tonight's budget went
+  to the merge chain that unblocked the rainbow) — next Blue run owes it. The
+  Go release-notes audit, its sibling, was done (above).
+- **Measured (2026-09-05, this Mac, during the run):**
+  - **Go gauntlet green at both checkpoints** (once for #431's branch, once
+    for the main branch's fix set): `gofmt -l .` prints nothing;
+    `go vet ./...` clean; `go test -race ./...` **all ok, 48 packages
+    reporting**; `golangci-lint run ./...` **0 issues**.
+  - **Frontend:** `npm --prefix web run check` green — **1,429 tests across
+    81 files** (615/38 on 2026-08-24; the growth is real suite growth).
+  - **Environment switches:** 12 reads outside tests in 7 files (from 33/8);
+    both `comm` directions empty; 3 local readers.
+  - **The instance's half (checked by name, never value):** 7 secrets
+    (`fly secrets list`) + 9 `[env]` names in `fly.toml`, and **every one has
+    exactly one in-code reader — no dead config on the instance, no name in
+    neither list**. The admin pair rides both places by design: `fly.toml`
+    carries the public placeholders and the secrets carry the real values,
+    which wins by Fly's own secrets-over-env precedence (the file's §
+    comment offers both paths; the precedence is Fly's documented rule).
+  - **Modern-Go inventory:** `interface{}` 0 · `ioutil` 0 · `rand.Seed` 0 ·
+    `strings.Title` 0 · `sort.Slice` 4→2 (both `internal/jobs`, ruled) ·
+    `sort.SliceStable` 21 · `sync.RWMutex` 0 · `sync.Mutex` 18 ·
+    `errgroup` 0 · `wg.Add(1)` 1 (a test's loop) · toolchain audited to
+    **go1.27.1**, tree pinned 1.26 by the Mac's OS ceiling.
+  - **Layering, grepped not trusted:** no `duckdb` import outside
+    `internal/pool` (the `config` hit is the `mtg.duckdb` filename);
+    `internal/api` imports `internal/door` nowhere; `internal/night` imports
+    `internal/api` nowhere (the seam holds both ways).
+  - **`data/app.db` mtime unmoved** (Aug 28 20:24) across the whole run.
 
 ### 2026-08-24 (rainbow)
 

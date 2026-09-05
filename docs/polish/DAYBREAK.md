@@ -12,6 +12,37 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ---
 
+## Open — 2026-09-05
+
+**White's morning items 1 and 2 both resolved overnight by Blue — nothing
+left to decide, one thing still owed.** The settle-test flake (item 2) is
+fixed the way item 2 asked — an event the test awaits, never a deadline —
+merged as **#431** and green on four straight CI legs; White's **#430 then
+merged clean** and its deploy was walked (the `/PROVENANCE.md` marker flipped
+from the SPA shell to text, health 200, the door renders, the shelves still
+401 pre-auth). Both findings and fixes are recorded in the ledger (White and
+Blue, 2026-09-05). · *Still owed, unchanged:* the once-per-cycle determinism
+replay against the deployed instance — tarot and wheel answer 401 pre-auth
+and Claude never signs in. · **Recommendation:** sign the `claude` seat in
+through Claude-in-Chrome some evening and the next White run rides it; the
+same seat unlocks Blue's owed walks (the fortune-teller's table and the
+`/claude` keeper duty, skipped two runs straight for the same 401).
+
+**Blue: the Settings room says "the torches are not lit yet", and the only
+thing keeping that true is that you have not flipped the switch.** The line
+is hand-written into the bundle (`web/src/routes/Settings.tsx`) and true
+today — the instance has no `MTGLAB_NIGHT_WINDOW` — but the evening you set
+the five night secrets changes no code and rebuilds nothing, so the room
+would keep telling people the arena is dark while it fights, and nothing
+fails when it starts lying. · *Cost of leaving it:* a small untruth on the
+one page where a person decides to enter their decks, starting the first
+scheduled night. · **Recommendation:** when the Coliseum's night shelf lands
+(ADR 46 names it as its own PR), have the settings room read whether a night
+is scheduled off the wire and render either the unlit-torches line or the
+real window — the copy becomes a fact the server owns instead of a promise
+the bundle froze. Nothing to do before then; this line is the reminder.
+Ledger: Blue, 2026-09-05.
+
 ## Open — 2026-08-24
 
 **1. ADR 5's isolation sweep did not cross to Go, and it is the one test that

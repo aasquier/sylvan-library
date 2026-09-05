@@ -25,6 +25,29 @@ func TestCardsShowPrintsThePoolsFacts(t *testing.T) {
 	}
 }
 
+// The stats tail: a creature answers with its size, a star answers as a star,
+// and a card with no size gains no tail — rule 1's command could not say how
+// big a creature was until this landed, and the session asking fell back to
+// recall, which is the failure the rule exists to stop.
+func TestCardsShowSaysHowBigACreatureIs(t *testing.T) {
+	t.Parallel()
+	out, err := scratchDeployment(t).withPool(t).run(t, "cards", "show",
+		"Goreclaw, Terror of Qal Sisma", "Cultivator Colossus", "Sol Ring")
+	if err != nil {
+		t.Fatalf("show: %v", err)
+	}
+	for _, want := range []string{"[G]   4/3", "*/*"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// A card with no size gains no tail: the artifact's line ends at its
+	// identity.
+	if !strings.Contains(out, "Artifact   [colorless]\n") {
+		t.Errorf("Sol Ring's line grew a tail it has no stats for:\n%s", out)
+	}
+}
+
 func TestCardsShowNamesWhatThePoolLacks(t *testing.T) {
 	t.Parallel()
 	_, err := scratchDeployment(t).withPool(t).run(t,

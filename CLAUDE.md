@@ -268,6 +268,10 @@ go/internal/deck*         model, yaml emitter, edit engine, lifecycle, log
 go/internal/gate          validate + companion + partners
 go/internal/sim           tier1 goldfish, karsten + curve (tier 1.5),
                           mulligan grid, compile, ADR 18 cache, tier3 Forge
+go/internal/night         the Coliseum at Night (ADR 46): rung-14 rows, the
+                          window, the seeded deal, the one-bout runner —
+                          the app's first scheduler; the person in the room
+                          always outranks it
 go/internal/claude        the pipe, stance, personas, every mode — the set is
                           `data/modes.json` and `ModeNames()`, never a number
                           written down here

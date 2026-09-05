@@ -195,6 +195,11 @@ type Job struct {
 	// and when the oldest are evicted.
 	seq uint64
 
+	// lane is which pool this job occupies, set at submit and read by
+	// [Registry.LaneBusy]. Empty on a job born finished, which never
+	// occupied one.
+	lane Lane
+
 	mu      sync.Mutex
 	status  string
 	done    int
@@ -337,6 +342,7 @@ func (r *Registry) Submit(kind string, fn Runner, opt Options) (*Job, error) {
 		}
 	}
 	job := r.newJobLocked(kind, opt.Label, opt.Owner, opt.Key)
+	job.lane = opt.Lane
 	r.fileLocked(job)
 	r.mu.Unlock()
 
@@ -491,6 +497,33 @@ func (r *Registry) invoke(job *Job, fn Runner) (result any, err error) {
 		r.log.Error("job failed", "job", job.ID, "kind", job.Kind, "err", err)
 	}
 	return result, err
+}
+
+// LaneBusy reports whether a lane holds live work — queued or running,
+// anybody's. It exists for one caller: the Coliseum's night runner, whose
+// rule is that the person in the room wins (ADR 46 decision 4) — a nightly
+// bout is submitted only into an idle arena, so a live match, or one already
+// waiting its turn, defers the night by a tick rather than queueing a batch
+// behind a person. Counting queued work too is the point: a job blocked on
+// the lane's token is a person already waiting.
+//
+// Snapshot first, statuses after, in [Registry.Census]'s order — a job's own
+// lock is never taken under the registry's.
+func (r *Registry) LaneBusy(l Lane) bool {
+	r.mu.Lock()
+	inLane := make([]*Job, 0, len(r.jobs))
+	for _, job := range r.jobs {
+		if job.lane == l {
+			inLane = append(inLane, job)
+		}
+	}
+	r.mu.Unlock()
+	for _, job := range inLane {
+		if live(job.Status()) {
+			return true
+		}
+	}
+	return false
 }
 
 // Get answers one job, if it is this owner's. Nil covers both "no such job"
