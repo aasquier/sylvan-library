@@ -432,16 +432,16 @@ func TestABoutSettlesTheWayItsPlayerAnswered(t *testing.T) {
 	bouts, _ := s.Bouts(ctx, run.ID)
 	for _, b := range bouts {
 		pair := b.SeatA.Slug + " vs " + b.SeatB.Slug
-		switch {
-		case b.State == night.StateSkipped:
+		switch b.State {
+		case night.StateSkipped:
 			if b.Reason != "the pre-flight said no" {
 				t.Errorf("%s skipped with %q", pair, b.Reason)
 			}
-		case b.State == night.StateFailed:
+		case night.StateFailed:
 			if b.Reason != "the arena fell over" {
 				t.Errorf("%s failed with %q", pair, b.Reason)
 			}
-		case b.State == night.StateDone:
+		case night.StateDone:
 			if b.MatchID != nil {
 				t.Errorf("%s went unrecorded yet carries match %d", pair, *b.MatchID)
 			}

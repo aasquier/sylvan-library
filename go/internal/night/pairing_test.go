@@ -117,11 +117,14 @@ func TestNoTwoBoutsOfANightShareASeed(t *testing.T) {
 	// The degenerate deal a shared seed would hide in: the same two house
 	// decks fighting again and again.
 	plans := night.PlanScheduled("2026-09-06", []string{"kaheera", "goreclaw"},
-		nil, caps(6, 2, 10))
+		nil, caps(6, 2, 7))
 	seen := map[int64]int{}
 	for i, p := range plans {
 		if p.Seed < 0 {
 			t.Fatalf("bout %d dealt a negative seed %d", i, p.Seed)
+		}
+		if p.Games != 7 {
+			t.Fatalf("bout %d plays %d games, want the settings' 7", i, p.Games)
 		}
 		if prior, ok := seen[p.Seed]; ok {
 			t.Fatalf("bouts %d and %d share seed %d", prior, i, p.Seed)
@@ -176,20 +179,21 @@ func TestTheDrawIsFairAcrossAccounts(t *testing.T) {
 
 func TestTheHouseFillsTheCard(t *testing.T) {
 	t.Parallel()
-	// One player, one deck: the house completes their bouts and the leftover
-	// capacity, with two different decks in every house-only bout.
+	// One player, one deck, a share of three: the house completes their
+	// bouts and the leftover capacity, with two different decks in every
+	// house-only bout.
 	plans := night.PlanScheduled("2026-09-06",
 		[]string{"kaheera", "goreclaw", "atla"}, shelfOf(4, "gyome"),
-		caps(4, 2, 10))
+		caps(4, 3, 10))
 	if len(plans) != 4 {
 		t.Fatalf("dealt %d bouts, want 4", len(plans))
 	}
 	got := appearances(plans)
-	if got[4] != 2 {
-		t.Errorf("the lone player sat in %d bouts, want 2", got[4])
+	if got[4] != 3 {
+		t.Errorf("the lone player sat in %d bouts, want their whole share of 3", got[4])
 	}
-	if got[0] != 6 {
-		t.Errorf("the house filled %d seats, want the remaining 6", got[0])
+	if got[0] != 5 {
+		t.Errorf("the house filled %d seats, want the remaining 5", got[0])
 	}
 	for i, p := range plans {
 		if p.SeatA.House() && p.SeatB.House() && p.SeatA.Slug == p.SeatB.Slug {

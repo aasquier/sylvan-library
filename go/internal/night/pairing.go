@@ -189,5 +189,5 @@ func derive(parts ...string) int64 {
 		_, _ = h.Write([]byte(p))
 		_, _ = h.Write([]byte{0})
 	}
-	return int64(h.Sum64() &^ (1 << 63))
+	return int64(h.Sum64() &^ (1 << 63)) //nolint:gosec // the top bit is cleared, so the conversion cannot overflow
 }
