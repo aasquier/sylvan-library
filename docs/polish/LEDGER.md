@@ -1442,7 +1442,10 @@ rather than re-reviewing its logic.
   the three local environment readers (trigger unchanged); the dropped-name
   counter (still 0 everywhere, still nothing to surface); the spirit flavour
   candidates (next spirit run, with a seat). The half-set Forge pair is
-  **closed** above.
+  **closed** above. **Skipped honestly this run:** the Anthropic
+  best-practices currency check (last done 2026-08-24; tonight's budget went
+  to the merge chain that unblocked the rainbow) — next Blue run owes it. The
+  Go release-notes audit, its sibling, was done (above).
 - **Measured (2026-09-05, this Mac, during the run):**
   - **Go gauntlet green at both checkpoints** (once for #431's branch, once
     for the main branch's fix set): `gofmt -l .` prints nothing;
@@ -1452,6 +1455,13 @@ rather than re-reviewing its logic.
     81 files** (615/38 on 2026-08-24; the growth is real suite growth).
   - **Environment switches:** 12 reads outside tests in 7 files (from 33/8);
     both `comm` directions empty; 3 local readers.
+  - **The instance's half (checked by name, never value):** 7 secrets
+    (`fly secrets list`) + 9 `[env]` names in `fly.toml`, and **every one has
+    exactly one in-code reader — no dead config on the instance, no name in
+    neither list**. The admin pair rides both places by design: `fly.toml`
+    carries the public placeholders and the secrets carry the real values,
+    which wins by Fly's own secrets-over-env precedence (the file's §
+    comment offers both paths; the precedence is Fly's documented rule).
   - **Modern-Go inventory:** `interface{}` 0 · `ioutil` 0 · `rand.Seed` 0 ·
     `strings.Title` 0 · `sort.Slice` 4→2 (both `internal/jobs`, ruled) ·
     `sort.SliceStable` 21 · `sync.RWMutex` 0 · `sync.Mutex` 18 ·
