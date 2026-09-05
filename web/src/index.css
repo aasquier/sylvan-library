@@ -1626,8 +1626,10 @@ button:hover .tarot-fan-card {
 
 @keyframes ink-write-soft {
   0% {
-    /* 100%: the fade band sits wholly past the word's right edge — a
-       word not yet written shows not one speck. */
+    /* 100%: the image is shifted left by a full word-width, so the fade
+       band sits just before the word's LEFT edge and everything to its
+       right is transparent — a word not yet written shows not one speck.
+       (The band only clears the right edge at the 100% frame.) */
     -webkit-mask-position: 100% 0;
     mask-position: 100% 0;
     color: #6d4f22;

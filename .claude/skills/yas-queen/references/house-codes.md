@@ -255,7 +255,7 @@ The through-line. Changing anything here is Aaron's call, never a session's
   is two colours no single glyph can state. Every drawn pip carries
   `role="img"` and its colour's name.
 - **IM Fell English** — a seventeenth-century face for the rooms, with
-  **Parisienne** for a written hand; licences in
+  **Caveat** for a written hand; licences in
   `web/src/assets/fonts/PROVENANCE.md`.
 - **The weather** — fireflies at night, falling leaves by day, drawn in SVG,
   removed entirely under reduced motion.
