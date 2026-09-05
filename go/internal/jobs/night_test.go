@@ -36,6 +36,23 @@ func TestLaneBusyReadsTheQueueAsWellAsTheRunner(t *testing.T) {
 	if r.LaneBusy(NET) || r.LaneBusy(CPU) {
 		t.Fatal("the arena's work reads busy on another lane")
 	}
+
+	// The queued half alone. The assertion above cannot isolate it — job
+	// "a" keeps the lane busy whether or not the queue is counted — and no
+	// outside driving can: a queued job with nothing running is promoted the
+	// instant the token frees, so the state lasts only scheduling latency.
+	// Built by hand instead, the way the registry's own seams are used: a
+	// job filed on the lane, still queued, nothing running. This is the
+	// person the night must not submit ahead of.
+	solo := quietRegistry(t, Config{})
+	solo.mu.Lock()
+	job := solo.newJobLocked("sim.forge", "waiting", 0, "")
+	job.lane = FORGE
+	solo.fileLocked(job)
+	solo.mu.Unlock()
+	if !solo.LaneBusy(FORGE) {
+		t.Fatal("a queued match with nothing running reads idle")
+	}
 }
 
 func TestLaneBusyClearsWhenTheWorkIsDone(t *testing.T) {
