@@ -80,9 +80,9 @@ In order:
    (Goreclaw's is deliberate — the live invalid example stays). Deck facts
    are volume facts; verify before acting.
 7. **Ledger stragglers** (`docs/polish/LEDGER.md`): uptime watching,
-   cache-write tokens (schema v11), the phone's touch targets, region-scoped
-   motion (Syr Gwyn's torch flame), and — checked by nothing today — the
-   measuring shelf's rebuild.
+   cache-write tokens (wants a rung of its own), the phone's touch targets,
+   region-scoped motion (Syr Gwyn's torch flame), and — checked by nothing
+   today — the measuring shelf's rebuild.
 
 ## The longer arc
 
