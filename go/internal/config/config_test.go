@@ -81,6 +81,20 @@ func TestTheDefaultsAreTheOnesTheBootSummaryAsksAbout(t *testing.T) {
 	}
 }
 
+// A laptop that exports nothing schedules no nights: the five night switches
+// come off [Defaults] empty, because their resolution -- defaults included --
+// belongs to `internal/night`'s SettingsFromConfig, the one reader allowed to
+// refuse. A default written here as well would be the same value in two
+// places, one of them silently.
+func TestTheNightSwitchesArriveRawAndEmpty(t *testing.T) {
+	t.Parallel()
+	def := Defaults()
+	if def.NightWindow != "" || def.NightZone != "" || def.NightBouts != "" ||
+		def.NightBoutsPerAccount != "" || def.NightGames != "" {
+		t.Fatalf("a laptop's night switches should all be unset: %+v", def)
+	}
+}
+
 // TestLoadReadsTheEnvironmentOnce is the one test in this package that touches
 // the process, because [Load] is the one function that reads it. It cannot be
 // parallel, and that is the whole point of it being alone: everything else
