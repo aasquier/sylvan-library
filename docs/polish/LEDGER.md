@@ -147,10 +147,26 @@ state, never checklists.
     the library is growing) — and `/api/tarot/reading`, `/api/decks`,
     `/api/admin/users`, `/api/nope` all **401**, the middleware refusing
     before routing.
-- **Queued for Aaron:** nothing new. The two standing items (ADR 5's
-  parametrised isolation sweep; the wider docs-rot guard) are unchanged and
-  still waiting — this run's route-table read confirms the ADR 5 gap is
-  still a missing guard rather than a known hole.
+- **Found by this PR's own checks — a day-old test that bets on the
+  machine.** `go (arm64)` went red under
+  `internal/night.TestABoutSettlesTheWayItsPlayerAnswered`:
+  `runner_test.go:434: timed out waiting for the bout to settle`. Not this
+  branch's diff (nothing here is imported by `internal/night`), and not a
+  product bug: the same test was green on main's own push run of #429
+  ninety minutes earlier, on both architectures. The mechanism is the class
+  white.md already names — the bout settles on a background goroutine while
+  `waitFor` polls a **5-second wall-clock deadline** (`runner_test.go:115`),
+  so on a loaded shared runner the greenness is a fact about the machine.
+  The suite's own standing rule says the fix is **a gate the test controls,
+  never a longer deadline** — the fake arena could signal each settle so the
+  test awaits the event rather than betting seconds on it. One honest
+  re-run applied after this diagnosis, per the night protocol; the fix
+  belongs to daylight and the night-engine's own thread.
+- **Queued for Aaron:** nothing new needing a *ruling*. The two standing
+  items (ADR 5's parametrised isolation sweep; the wider docs-rot guard) are
+  unchanged and still waiting — this run's route-table read confirms the
+  ADR 5 gap is still a missing guard rather than a known hole. The night
+  flake above is daybreak-listed as work, not as a question.
 - **Deferred (2026-09-05):**
   - ~~`worker.min.js.LICENSE.txt` pinned by no test~~ — **closed this run**
     (fix 2).

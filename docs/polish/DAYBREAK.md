@@ -31,6 +31,19 @@ unwitnessed where users live. · **Recommendation:** nothing to decide — just
 sign the `claude` seat in through Claude-in-Chrome some evening and the next
 White run rides it. Ledger: White, 2026-09-05.
 
+**2. The night engine's day-old settle test bets five wall-clock seconds and
+lost one on arm64.** `TestABoutSettlesTheWayItsPlayerAnswered`
+(`go/internal/night/runner_test.go`) timed out on this PR's `go (arm64)` leg
+while green on main's own #429 push run ninety minutes earlier — the
+work-in-flight class white.md names: a background settle polled under a
+5-second `waitFor`, so greenness is a fact about the runner's load. · *Cost
+of leaving it:* intermittent red required checks on unrelated PRs (it cost
+tonight's White branch a re-run), and each red teaches someone to re-run
+instead of read. · **Recommendation:** have the fake arena signal each
+settle so the test awaits the event instead of betting seconds — a gate the
+test controls, never a longer deadline; it is a small change in the fake,
+for whoever next works the night engine. Ledger: White, 2026-09-05.
+
 ## Open — 2026-08-24
 
 **1. ADR 5's isolation sweep did not cross to Go, and it is the one test that
