@@ -1071,6 +1071,37 @@ describe('DeckDetail graveyard', () => {
       .toHaveBeenCalledWith(REF, 'Nissa, Who Shakes the World'))
   })
 
+  it('one decision is one edit — a second click cannot double the return', async () => {
+    // The bug this pins: Return had no busy state, so a double click was two
+    // writes — ADR 28 records both — and the second came back as a refusal
+    // for a card the first click had already brought home. The commandment 17
+    // shape is both halves or neither: the label answers the press and the
+    // button stops listening.
+    vi.mocked(api.deck).mockResolvedValue(BURIED)
+    const gates: Array<() => void> = []
+    vi.mocked(api.returnCard).mockImplementation(() =>
+      new Promise((resolve) => gates.push(() => resolve(undefined as never))))
+    renderUnfolded()
+    await screen.findByText(/graveyard/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Return' }))
+
+    // The press is answered while the server is asked…
+    const busy = screen.getByRole('button', { name: 'Returning…' })
+    expect(busy.hasAttribute('disabled')).toBe(true)
+    // …and a second press lands on a control that is no longer listening.
+    // jsdom refuses the click exactly as a browser does (measured: with the
+    // attribute mutated away, this click reaches the handler and the count
+    // below goes to 2) — so `disabled` is the mechanism under test here.
+    fireEvent.click(busy)
+
+    gates.forEach((open) => open())
+    // The refresh after the write is the settled state; only then is the
+    // count meaningful — asserting immediately would pass before a rogue
+    // second call had the chance to land.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
+    expect(api.returnCard).toHaveBeenCalledTimes(1)
+  })
+
   it('exile arms first, like every permanent thing here', async () => {
     vi.mocked(api.deck).mockResolvedValue(BURIED)
     renderUnfolded()
@@ -1123,6 +1154,46 @@ describe('DeckDetail graveyard', () => {
     renderUnfolded()
     await screen.findByText(DECK.name)
     expect(screen.queryByRole('checkbox', { name: /choose/i })).toBeNull()
+  })
+})
+
+/**
+ * The pilot line's save — the other write on this page that used to keep
+ * accepting clicks after the first one. It has two doors: the Save button
+ * and Enter on the input, and only the button can wear `disabled`, so the
+ * guard has to live in `save()` itself. Enter is how this test proves it.
+ */
+describe('DeckDetail pilot line', () => {
+  const PILOTED = { ...DECK, pilot: 'the kids' } as Deck
+
+  it('saves the pilot once, however eagerly Save is asked', async () => {
+    vi.mocked(api.deck).mockResolvedValue(PILOTED)
+    const gates: Array<() => void> = []
+    vi.mocked(api.setDeckField).mockImplementation(() =>
+      new Promise((resolve) => gates.push(() => resolve(undefined as never))))
+    renderUnfolded()
+    await screen.findByText(/piloted by/i)
+    fireEvent.click(screen.getByRole('button', { name: 'change' }))
+    const box = screen.getByLabelText('Pilot')
+    fireEvent.change(box, { target: { value: 'a partner' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    // The press is answered: the label says so and the button stops
+    // listening — Cancel too, because backing out of a write already on the
+    // wire would be a lie about what is about to happen.
+    const busy = screen.getByRole('button', { name: 'Saving…' })
+    expect(busy.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Cancel' })
+      .hasAttribute('disabled')).toBe(true)
+    // The second door: Enter inside the input reaches `save()` with no
+    // `disabled` in the way, so only the in-function guard can close it.
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    gates.forEach((open) => open())
+    // Settled means the editor closed and the page re-read the deck; only
+    // then does asserting the call count prove the second write never left.
+    await waitFor(() => expect(screen.queryByLabelText('Pilot')).toBeNull())
+    expect(api.setDeckField).toHaveBeenCalledTimes(1)
   })
 })
 
