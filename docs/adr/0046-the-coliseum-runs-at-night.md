@@ -1,9 +1,11 @@
 # 46. The Coliseum runs at night
 
-**Status:** Proposed — the record reads the ledger today; nothing runs on a
-clock yet · **Recorded:** 2026-08-26 · Consumes [ADR
+**Status:** Accepted · **Recorded:** 2026-08-26 · **Accepted:** 2026-09-05
+with Aaron, as the engine landed — rung 14, `internal/night`, and the sample
+trigger the first window will be measured with · Consumes [ADR
 36](0036-the-match-ledger-records-declared-labels.md)'s dataset and is bounded
-by [ADR 35]'s single worker.
+by [ADR 35]'s single worker. The dated notes below amend individual decisions
+as they were built; nothing that stands above them was rewritten.
 
 ## Context
 
@@ -95,6 +97,16 @@ read belongs. `shared` already made this trade and already carries the
 two-tier split; a second flag doing it differently would be two rules to
 remember and one of them to get wrong.
 
+*Amended at acceptance (2026-09-05).* Only the column half was built, and
+that is the recorded ruling rather than a shortcut: rung 13 landed the flag
+in `user_decks` alone — the owner's appetite is a fact about the owner, not
+about the 99 cards — and left the file tier's half as an open question. Aaron
+closed it the day this was accepted: the file tier needs no flag at all,
+because **the house always plays**. The showcase decks are the house's, in
+every night, no opt-out — so the `deckedit` setter sketched above was never
+written, and the runner enumerates the house through the library instead of
+consulting a flag that would always have read yes.
+
 ### 2. Night is a window, and the window is configuration
 
 Not a moment. A run that starts at exactly 02:00 and takes ninety minutes is a
@@ -102,6 +114,14 @@ run that either finishes or does not, with nothing in between to reason about.
 A window — open, run until it closes — makes overrun a *state* rather than an
 accident, and the zone is configuration because the friends this instance
 serves are not all in one.
+
+*Amended at acceptance (2026-09-05).* The window's first value is measured,
+never guessed: an admin trigger opens the night right now for a bounded
+stretch (`POST /api/admin/night/sample`, a full round-robin with the caps
+off), Aaron runs it for an hour and counts what an hour holds, and the
+configuration is set to what the count argues for — likely around two hours
+a night. Until then no window is set, and unset is a working state: no
+scheduled nights, sample runs on demand.
 
 ### 3. The runner is a ticker in the served process, and its progress is on disk
 
@@ -159,6 +179,11 @@ Coliseum at night" is the whole vocabulary this needs.
   so.
 - **Whether the night runs on the hosted worker or its own machine.** The
   design above is correct either way; the second is a cost question.
+- **How the morning reads.** Recorded at acceptance so the shape is not
+  invented twice: the morning read is a night shelf in the Coliseum, its own
+  PR, answered by joining `night_bouts.match_id` to `forge_matches` — which
+  is exactly how "last night's games" is asked without the record gaining a
+  marker (decision 7 holding).
 
 ## Consequences
 
@@ -174,7 +199,11 @@ Coliseum at night" is the whole vocabulary this needs.
   after any deploy times out on a cold image, and its idle timeout is 180
   seconds. A run that starts cold will lose its first match to that, every
   time, until the fault is fixed — which makes fixing it a prerequisite rather
-  than a nice-to-have.
+  than a nice-to-have. *Closed before acceptance (2026-09-05):* the image
+  pre-pull keeps the worker's boot off the match's clock, and #424/#425 gave
+  the arena real ceilings — per-boot, per-stall, per-game and per-match
+  budgets, with a clocked-out game resuming the bout instead of ending it —
+  so a cold first bout is a slow one rather than a lost one.
 - **The record gets denser fast**, which is the point: the small-sample rules
   in `ledger.Board` exist precisely so a board is honest while the ledger is
   thin, and a night's work is how it stops being thin.

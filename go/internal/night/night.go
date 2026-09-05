@@ -1,6 +1,7 @@
-// Package night is the Coliseum at Night's substrate (ADR 46): the rows a
-// night's work lives in, the window it runs inside, and the settings that
-// open it.
+// Package night is the Coliseum at Night's engine (ADR 46): the rows a
+// night's work lives in, the window it runs inside, the settings that open
+// it, the seeded deal that decides who fights whom, and the ticker that
+// works the card one bout at a time.
 //
 // The night is the app's first scheduler, and everything here follows from
 // one fact about the ground it stands on: merging deploys (ADR 23), so the
@@ -36,8 +37,13 @@
 // refusal to serve rather than a surprise at 23:30.
 //
 // The actual playing of a bout is deliberately not in this package: the
-// runner submits through an interface the wiring layer implements, so nothing
-// here imports `internal/api` and every piece is testable against a fake.
+// [Runner] fights through [BoutPlayer], an interface the route layer
+// implements around the same play-and-record core the interactive match
+// drives, so nothing here imports `internal/api` and every piece is testable
+// against a fake. The same seam carries the two facts of the world the loop
+// must respect but cannot own — whether the arena's one lane is busy with a
+// person's work, and which decks are the house's — as functions handed in at
+// construction.
 package night
 
 import (

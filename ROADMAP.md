@@ -51,11 +51,10 @@ In order:
 2. **The bout's own follow-ups** (#376 landed the combat square-off: the
    arrows are gone and a block opens a fight on the centre stage, the
    attacker out of its own seat's edge and the wall ranked across the
-   defender's, against Gérôme's `Ave Caesar`). What it left open: nobody
-   has watched it run *at pace* in a browser, so the 2000ms hold is a
-   number picked by reasoning rather than by watching; and the faceoff
-   wants a resolution — which creatures lived and which died — where the
-   outcome is usually mixed.
+   defender's, against Gérôme's `Ave Caesar`; #377 landed the faceoff's
+   resolution — which creatures lived and which died). What remains owed:
+   nobody has watched it run *at pace* in a browser, so the 2000ms hold is
+   a number picked by reasoning rather than by watching.
 3. **The Simulator learns, continued**: deck ratings and land-count
    regression over the match ledger (ADR 36), then the Tier 2 question —
    adversarial simulation between decks — which starts as a design
@@ -65,27 +64,25 @@ In order:
    (reproducible), the simulator (seeded measurement), and Claude's slot
    argument (an opinion, ADR 25). The three problems to solve first are
    recorded in git history with the original design.
-5. **Coliseum at Night**: the arena running matches after dark, unattended,
-   over the decks whose owners entered them. **The consent is already
-   collected** — the settings room (`/settings`) carries the per-deck flag
-   and a master switch for the whole shelf, so the first night can be played
-   with decks somebody chose rather than with whatever the library held. What
-   is left is the whole feature: what a night run *is* (how many games, which
-   pairings, on whose schedule), where the results land, and how a player
-   reads them in the morning. Two facts to design around rather than
-   rediscover: the flag lives only where a player's own decks live, so the
-   showcase cannot be entered and the room says so; and Forge wants 2.3–2.5
-   cores for one match, which is the constraint that decides how many games a
-   night can hold on this machine.
+5. **Coliseum at Night**: the engine is landing — rung 14's rows, the
+   `internal/night` ticker with its seeded pairing, the play-and-record core
+   shared with the interactive match, and the admin triggers, all per ADR 46
+   (Accepted 2026-09-05). The consent was collected earlier (the settings
+   room's per-deck flag and master switch), and Aaron closed the showcase
+   question the day the engine landed: **the house always plays** — every
+   file-tier deck, every night, no flag. What comes next, in order: run
+   `POST /api/admin/night/sample` on the deployed instance for an hour and
+   count what an hour holds; set `MTGLAB_NIGHT_WINDOW`/`_ZONE` to what the
+   count argues for (likely ~2h/night); then the two follow-up PRs — the
+   Coliseum's **night shelf**, the morning read that joins the night's rows
+   to the match ledger, and the header gear popup's **opt-all** action.
 6. **Open deck rulings**: two banned cards still need replacements chosen
    (Goreclaw's is deliberate — the live invalid example stays). Deck facts
    are volume facts; verify before acting.
-7. **Ledger stragglers** (`docs/polish/LEDGER.md`): repository settings
-   (secret scanning, push protection), uptime watching, the wrong-painter
-   credit (needs a pool schema change and a refresh), cache-write tokens
-   (schema v11), the phone's touch targets, region-scoped motion (Syr
-   Gwyn's torch flame). Two more that nothing checks today: the measuring
-   shelf's rebuild, and the `deploy` job's `needs` list.
+7. **Ledger stragglers** (`docs/polish/LEDGER.md`): uptime watching,
+   cache-write tokens (schema v11), the phone's touch targets, region-scoped
+   motion (Syr Gwyn's torch flame), and — checked by nothing today — the
+   measuring shelf's rebuild.
 
 ## The longer arc
 
