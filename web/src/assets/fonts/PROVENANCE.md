@@ -9,7 +9,8 @@ Every face here is under the **SIL Open Font License 1.1**, whose text is at
 second condition asks that the copyright notice and the licence travel with
 each copy; the notice travels *inside* each file — checked, not assumed, by
 reading the `name` table of every woff2 here (nameID 0 carries the copyright
-and reserved font name, nameID 14 the OFL's URL) — and the licence text
+and, where the foundry reserved one, the reserved font name; nameID 14 the
+OFL's URL) — and the licence text
 travels beside them. `NOTICE.md` records that check.
 
 ## IM Fell English, IM Fell English SC
@@ -43,26 +44,39 @@ named only in `@font-face` declarations.
 The 1909 Rider tarot scans these sit beside have their own argument in
 `assets/tarot/PROVENANCE.md`.
 
-## Parisienne
+## Caveat
 
-- `parisienne-regular.woff2`
+- `caveat-variable.woff2`
 
-The fortune-teller's handwriting (the séance question card). Chosen by
-Aaron off a board of five OFL script faces, 2026-08-17: a casual joined
-hand — and the joins are the point. The ink animation reveals each
-character left to right, and in a connected face that reveal reads as the
-pen travelling, since the leading edge never leaves a stroke; in the Fell
-italic it could only ever read as a wipe. Parisienne beat the two
-copperplates (Mrs Saint Delafield, Herr Von Muellerhoff) on commandment 2
-grounds — their hairlines go faint at reading size — and Allura on
-Aaron's taste.
+The fortune-teller's handwriting (the séance question card), succeeding
+Parisienne on 2026-09-05 — Aaron's call, on commandment 2 grounds. The
+hand's history: Parisienne won the original board of five OFL script
+faces on 2026-08-17 — over the two copperplates (Mrs Saint Delafield,
+Herr Von Muellerhoff), whose hairlines go faint at reading size, and over
+Allura on Aaron's taste — and its joins were the point: the ink animation
+reveals each word left to right, and in a connected face that reveal
+reads as the pen travelling, since the leading edge never leaves a
+stroke; in the Fell italic it could only ever read as a wipe. But
+Parisienne is a tall-looped cursive with a small x-height, and a newcomer
+squinting at the fortune-teller's own question is commandment 2 failing
+at the exact table built for them. Caveat keeps the joins — a connected
+hand still, shaped by contextual alternates, so the reveal still reads as
+writing — on a taller, more open semi-print body that stays legible at
+reading size. One variable file carries the whole weight range (400–700),
+so the hand's weight is a tuning knob rather than another download.
 
-**Licence: SIL Open Font License 1.1** (Astigmatic One Eye Typographic
-Institute). Same terms as the Fell faces above; bundled in a free
-application, named only in `@font-face`.
+**Licence: SIL Open Font License 1.1** (The Caveat Project Authors;
+designed by Impallari Type). Same terms as the Fell faces above; bundled
+in a free application, named only in `@font-face`. No reserved font name.
 
-- Upstream: Astigmatic (Brian J. Bonislawsky), via Google Fonts, family
-  "Parisienne".
-- Fetched: 2026-08-17, as the latin woff2 subset from fonts.gstatic.com.
-- Verified: OFL 1.1 text read at fetch time on the family's Google Fonts
-  page; no reserved-name conflict (the name appears only in CSS).
+- Upstream: Impallari Type, via Google Fonts, family "Caveat"
+  (<https://github.com/googlefonts/caveat>).
+- Fetched: 2026-09-05, as the latin variable woff2 (wght 400–700) from
+  fonts.gstatic.com.
+- Verified: the family's own OFL.txt read at fetch time, its licence body
+  diffed identical to `licenses/OFL-1.1.txt`; the binary's `name` table
+  read the way `NOTICE.md` records for its neighbours — nameID 0 carries
+  the copyright ("Copyright 2014 The Caveat Project Authors"), nameID 14
+  the OFL's URL. The head of `licenses/OFL-1.1.txt` now carries Caveat's
+  copyright statement where Parisienne's stood, since the notice must
+  travel with the faces actually shipped.

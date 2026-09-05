@@ -104,11 +104,18 @@ both copyright statements at its head.
 Verified 2026-08-19, three ways: against Google Fonts' own `OFL.txt` and
 `METADATA.pb` for each family; against the licence bodies being identical
 across the two foundries; and — the one that actually decides it — against the
-binaries. Each woff2 carries its copyright and reserved font name in the
-`name` table (nameID 0) and the OFL's URL beside it (nameID 14), which is the
-"machine-readable metadata fields within binary files" the OFL's second
-condition names. The notice therefore travels inside the font; the licence
-text now travels beside it.
+binaries. Each woff2 carries its copyright — and, where the foundry reserved
+one, its reserved font name — in the `name` table (nameID 0) and the OFL's URL
+beside it (nameID 14), which is the "machine-readable metadata fields within
+binary files" the OFL's second condition names. The notice therefore travels
+inside the font; the licence text now travels beside it.
+
+One face has been swapped since: on 2026-09-05 Caveat (The Caveat Project
+Authors, designed by Impallari Type; no reserved font name) replaced
+Parisienne as the fortune-teller's hand, verified the same three ways at
+fetch time, and the copyright statement at the head of
+`licenses/OFL-1.1.txt` was swapped with it — the notice travels with the
+faces actually shipped. `PROVENANCE.md` carries the why.
 
 ## Forge
 
