@@ -74,6 +74,16 @@ type RunnerConfig struct {
 	Now func() time.Time
 	// Interval is the ticker's, zero taking the minute ADR 46 sketched.
 	Interval time.Duration
+	// Settled, when non-nil, is called from the waiter goroutine after a
+	// fought bout's row settles and its seat untracks — the exact moment a
+	// new Tick can claim the next bout. It exists because that settle is the
+	// one transition a caller of Tick cannot sequence itself (every other
+	// state change is the Tick's own synchronous work), so without it a test
+	// can only poll row state under a wall-clock deadline — and greenness
+	// becomes a fact about the machine's load, which is how this package's
+	// own suite failed two loaded CI runs in a row. Production wiring leaves
+	// it nil, like LaneBusy's nil.
+	Settled func(b Bout)
 }
 
 // Runner is the loop and the one piece of memory it is allowed: which bouts
@@ -87,6 +97,7 @@ type Runner struct {
 	log      *slog.Logger
 	now      func() time.Time
 	interval time.Duration
+	settled  func(b Bout)
 
 	// ctx is the runner's lifetime: Play calls take it, the ticker selects
 	// on it, and Stop cancels it. Held on the struct because the goroutines
@@ -122,10 +133,13 @@ func NewRunner(cfg RunnerConfig) *Runner {
 	if cfg.House == nil {
 		cfg.House = func(context.Context) ([]string, error) { return nil, nil }
 	}
+	if cfg.Settled == nil {
+		cfg.Settled = func(Bout) {}
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Runner{store: cfg.Store, set: cfg.Settings, player: cfg.Player,
 		laneBusy: cfg.LaneBusy, house: cfg.House, log: cfg.Log, now: cfg.Now,
-		interval: cfg.Interval, ctx: ctx, cancel: cancel,
+		interval: cfg.Interval, settled: cfg.Settled, ctx: ctx, cancel: cancel,
 		nudge: make(chan struct{}, 1), inFlight: map[int64]bool{}}
 }
 
@@ -371,8 +385,11 @@ func (r *Runner) fight(b Bout) {
 			}
 		}
 		// Untracked after the settle (see above) and before the nudge, so
-		// the tick the nudge wakes finds the seat genuinely empty.
+		// the tick the nudge wakes finds the seat genuinely empty. Settled
+		// fires between the two: by the time an observer hears it, a fresh
+		// Tick is guaranteed to find both the row settled and the seat free.
 		r.untrack(b.ID)
+		r.settled(b)
 		r.Nudge()
 	})
 }

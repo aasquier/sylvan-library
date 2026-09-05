@@ -19,6 +19,18 @@ import (
 // The runner over a fake clock, a fake arena and a real scratch app.db.
 // Every assertion reads rows or the fake's log — the tick is driven and its
 // effects are read back, never reproduced by hand.
+//
+// Every wait in this file is a channel receive on an event the runner or the
+// fake signals — never a poll of row state under a wall-clock deadline. The
+// first draft polled with a 5-second budget, and that greenness was a fact
+// about the runner's load: it failed two consecutive loaded CI runs at the
+// same line while passing every quiet one. Two events cover every wait: the
+// arena's `entered` (the bout is claimed and fighting) and the runner's
+// Settled seam (the row is settled and the seat is free, so the next Tick
+// can claim). A wait that can no longer time out can still hang on a real
+// bug — that is the package timeout's job, and its goroutine dump names the
+// parked waiter, which is a better diagnosis than "timed out waiting" ever
+// was.
 
 // fakeClock is [ticking]'s guarded sibling: the runner's waiters read it from
 // their own goroutines, so this one takes a lock and moves a millisecond per
@@ -51,12 +63,22 @@ type fakeArena struct {
 	answer func(b night.Bout) (int64, error)
 	// gate, when non-nil, holds every Play until the test sends one release.
 	gate chan struct{}
+	// entered, when non-nil, takes one blocking send at the top of every
+	// Play. The claim precedes the fight, so by the time a test receives
+	// this the bout's row is already `playing` and the run is open — the
+	// event that replaces polling for either. Blocking on purpose: a Play
+	// the test did not expect parks the waiter, and the package timeout's
+	// dump names it.
+	entered chan struct{}
 }
 
 func (f *fakeArena) Play(ctx context.Context, b night.Bout) (int64, error) {
 	f.mu.Lock()
 	f.played = append(f.played, b)
 	f.mu.Unlock()
+	if f.entered != nil {
+		f.entered <- struct{}{}
+	}
 	if f.gate != nil {
 		select {
 		case <-f.gate:
@@ -89,7 +111,7 @@ func tonight(t *testing.T) night.Settings {
 }
 
 func quietRunner(t *testing.T, set night.Settings, arena night.BoutPlayer,
-	busy func() bool, house []string) (*night.Runner, *night.Store, *fakeClock) {
+	busy func() bool, house []string) (*night.Runner, *night.Store, *fakeClock, chan night.Bout) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "app.db")
 	if err := authtest.NewScratchDB(path); err != nil {
@@ -103,25 +125,18 @@ func quietRunner(t *testing.T, set night.Settings, arena night.BoutPlayer,
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
+	// Buffered past any test's bout count, so a waiter never blocks sending
+	// a settle a test has not received yet (or never will — Stop waits on
+	// that waiter, and a blocked send would turn cleanup into a hang).
+	settled := make(chan night.Bout, 16)
 	r := night.NewRunner(night.RunnerConfig{Store: s, Settings: set,
 		Player: arena, LaneBusy: busy,
 		House: func(context.Context) ([]string, error) { return house, nil },
 		Log:   slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Now:   clock.now, Interval: time.Hour})
+		Now:   clock.now, Interval: time.Hour,
+		Settled: func(b night.Bout) { settled <- b }})
 	t.Cleanup(r.Stop)
-	return r, s, clock
-}
-
-func waitFor(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for %s", what)
+	return r, s, clock, settled
 }
 
 func boutStates(t *testing.T, s *night.Store, runID int64) map[night.State]int {
@@ -141,7 +156,7 @@ func TestATickOpensTonightOnceAndWorksItToTheEnd(t *testing.T) {
 	t.Parallel()
 	arena := &fakeArena{}
 	house := []string{"kaheera", "goreclaw", "atla"}
-	r, s, clock := quietRunner(t, tonight(t), arena, nil, house)
+	r, s, clock, settled := quietRunner(t, tonight(t), arena, nil, house)
 	ctx := context.Background()
 
 	// Before the window: nothing opens.
@@ -177,18 +192,16 @@ func TestATickOpensTonightOnceAndWorksItToTheEnd(t *testing.T) {
 		}
 	}
 
-	// The first bout settles; the second is claimed on a later tick; the
-	// card ends with both done and their match ids on the rows. The tick
-	// rides *inside* the wait: the waiter settles the row before it
-	// untracks, so a single hand-driven tick could land in that gap, see a
-	// seat still held, and claim nothing — retrying the tick is the fix.
-	waitFor(t, "the first bout to settle", func() bool {
-		return boutStates(t, s, run.ID)[night.StateDone] == 1
-	})
-	waitFor(t, "the second bout to settle", func() bool {
-		r.Tick(ctx)
-		return boutStates(t, s, run.ID)[night.StateDone] == 2
-	})
+	// The first bout settles; the second is claimed on the next tick; the
+	// card ends with both done and their match ids on the rows. Each settle
+	// is awaited on the seam, which fires only after the seat untracks — so
+	// the tick after a receive is guaranteed to find the seat free and claim.
+	<-settled
+	r.Tick(ctx)
+	<-settled
+	if got := boutStates(t, s, run.ID); got[night.StateDone] != 2 {
+		t.Fatalf("the card did not finish done: %v", got)
+	}
 	final, _ := s.Bouts(ctx, run.ID)
 	for _, b := range final {
 		if b.MatchID == nil || *b.MatchID != 1000+b.ID {
@@ -229,7 +242,7 @@ func TestThePersonInTheRoomWins(t *testing.T) {
 	arena := &fakeArena{}
 	var busy atomic.Bool
 	busy.Store(true)
-	r, s, clock := quietRunner(t, tonight(t), arena, busy.Load,
+	r, s, clock, settled := quietRunner(t, tonight(t), arena, busy.Load,
 		[]string{"kaheera", "goreclaw", "atla"})
 	ctx := context.Background()
 
@@ -249,22 +262,27 @@ func TestThePersonInTheRoomWins(t *testing.T) {
 	// The room empties; the next tick fights.
 	busy.Store(false)
 	r.Tick(ctx)
-	waitFor(t, "the first bout", func() bool { return len(arena.fights()) == 1 })
+	<-settled
+	if len(arena.fights()) != 1 {
+		t.Fatalf("the empty room got %d fights, want 1", len(arena.fights()))
+	}
 }
 
 func TestTheCloseFinishesTheFlightAndSkipsTheRest(t *testing.T) {
 	t.Parallel()
 	arena := &fakeArena{gate: make(chan struct{})}
-	r, s, clock := quietRunner(t, tonight(t), arena, nil,
+	r, s, clock, settled := quietRunner(t, tonight(t), arena, nil,
 		[]string{"kaheera", "goreclaw", "atla"})
 	ctx := context.Background()
 
 	clock.set(time.Date(2026, 9, 6, 22, 5, 0, 0, time.UTC))
 	r.Tick(ctx)
 	run, _, _ := s.OpenRun(ctx)
-	waitFor(t, "a bout in flight", func() bool {
-		return boutStates(t, s, run.ID)[night.StatePlaying] == 1
-	})
+	// The claim is the tick's own synchronous work: the row is `playing`
+	// before Tick returns, gate or no gate.
+	if got := boutStates(t, s, run.ID); got[night.StatePlaying] != 1 {
+		t.Fatalf("the tick did not put a bout in flight: %v", got)
+	}
 
 	// The window closes mid-bout: the flight is left to finish (ADR 46
 	// decision 6) and the night stays open for it.
@@ -277,19 +295,16 @@ func TestTheCloseFinishesTheFlightAndSkipsTheRest(t *testing.T) {
 		t.Fatal("the night finished with a bout still fighting")
 	}
 
-	// The bout ends; a later tick skips the remainder with the reason and
-	// declares the night over. Ticked inside the wait because the row reads
-	// done a beat before the waiter untracks it, and a tick in that gap
-	// still counts the seat as held.
+	// The bout ends; the next tick skips the remainder with the reason and
+	// declares the night over. The settle receive is what makes one tick
+	// enough — it fires after the seat untracks, so the tick cannot land in
+	// the settled-but-still-held gap.
 	arena.gate <- struct{}{}
-	waitFor(t, "the flight to settle", func() bool {
-		return boutStates(t, s, run.ID)[night.StateDone] == 1
-	})
-	waitFor(t, "the night to finish once the flight settled", func() bool {
-		r.Tick(ctx)
-		_, ok, _ := s.OpenRun(ctx)
-		return !ok
-	})
+	<-settled
+	r.Tick(ctx)
+	if _, ok, _ := s.OpenRun(ctx); ok {
+		t.Fatal("the night did not finish once its flight settled")
+	}
 	bouts, _ := s.Bouts(ctx, run.ID)
 	skipped := 0
 	for _, b := range bouts {
@@ -307,32 +322,30 @@ func TestTheCloseFinishesTheFlightAndSkipsTheRest(t *testing.T) {
 
 func TestAStopAbandonsNothingAndTheNextBootFailsTheOrphan(t *testing.T) {
 	t.Parallel()
-	arena := &fakeArena{gate: make(chan struct{})}
+	arena := &fakeArena{gate: make(chan struct{}), entered: make(chan struct{})}
 	house := []string{"kaheera", "goreclaw", "atla"}
-	r, s, clock := quietRunner(t, tonight(t), arena, nil, house)
+	r, s, clock, _ := quietRunner(t, tonight(t), arena, nil, house)
 	ctx := context.Background()
 
 	clock.set(time.Date(2026, 9, 6, 22, 5, 0, 0, time.UTC))
 	r.Start()
 	r.Nudge()
-	run, ok := night.Run{}, false
-	waitFor(t, "a bout in flight", func() bool {
-		if !ok {
-			run, ok, _ = s.OpenRun(ctx)
-		}
-		return ok && boutStates(t, s, run.ID)[night.StatePlaying] == 1
-	})
+	// The arena's entered signal: by its receive the nudged tick has opened
+	// the night, claimed the bout, and parked the fight on the gate.
+	<-arena.entered
+	run, ok, _ := s.OpenRun(ctx)
+	if !ok {
+		t.Fatal("a bout entered the arena with no open run")
+	}
+	if got := boutStates(t, s, run.ID); got[night.StatePlaying] != 1 {
+		t.Fatalf("the entered bout is not in flight: %v", got)
+	}
 
 	// The stop returns even with a bout parked in the arena — the doneness
 	// assertion: Stop waits for every goroutine the runner started, so its
-	// return *is* the leak check.
-	stopped := make(chan struct{})
-	go func() { r.Stop(); close(stopped) }()
-	select {
-	case <-stopped:
-	case <-time.After(5 * time.Second):
-		t.Fatal("Stop hung on a bout in flight; the runner leaks its waiter")
-	}
+	// return *is* the leak check. A leaked waiter hangs right here, and the
+	// package timeout's goroutine dump names it.
+	r.Stop()
 
 	// The row was left honestly in flight, and the next process — a fresh
 	// runner over the same rows — fails it as the orphan it is, match_id
@@ -340,10 +353,12 @@ func TestAStopAbandonsNothingAndTheNextBootFailsTheOrphan(t *testing.T) {
 	if got := boutStates(t, s, run.ID); got[night.StatePlaying] != 1 {
 		t.Fatalf("the stop rewrote the flight: %v", got)
 	}
+	rebornSettled := make(chan night.Bout, 16)
 	reborn := night.NewRunner(night.RunnerConfig{Store: s, Settings: tonight(t),
 		Player: &fakeArena{},
 		House:  func(context.Context) ([]string, error) { return house, nil },
-		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)), Now: clock.now})
+		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)), Now: clock.now,
+		Settled: func(b night.Bout) { rebornSettled <- b }})
 	t.Cleanup(reborn.Stop)
 	reborn.Tick(ctx)
 	bouts, _ := s.Bouts(ctx, run.ID)
@@ -359,9 +374,12 @@ func TestAStopAbandonsNothingAndTheNextBootFailsTheOrphan(t *testing.T) {
 	if orphans != 1 {
 		t.Fatalf("%d orphans failed, want 1", orphans)
 	}
-	waitFor(t, "the night to carry on past the orphan", func() bool {
-		return boutStates(t, s, run.ID)[night.StateDone] == 1
-	})
+	// The same tick that failed the orphan claimed the next bout; its settle
+	// is the proof the night carried on rather than wedging on the wreck.
+	<-rebornSettled
+	if got := boutStates(t, s, run.ID); got[night.StateDone] != 1 {
+		t.Fatalf("the night did not carry on past the orphan: %v", got)
+	}
 }
 
 func TestASampleDealsTheWholeRosterAndRefusesASecond(t *testing.T) {
@@ -370,7 +388,7 @@ func TestASampleDealsTheWholeRosterAndRefusesASecond(t *testing.T) {
 	// No window, no zone: the sample is how the window gets chosen, so it
 	// must run on a deployment that has not chosen one.
 	set := night.Settings{Bouts: 2, BoutsPerAccount: 1, Games: 5}
-	r, s, clock := quietRunner(t, set, arena, nil,
+	r, s, clock, _ := quietRunner(t, set, arena, nil,
 		[]string{"kaheera", "goreclaw", "atla"})
 	ctx := context.Background()
 	clock.set(time.Date(2026, 9, 6, 14, 0, 0, 0, time.UTC))
@@ -419,7 +437,7 @@ func TestABoutSettlesTheWayItsPlayerAnswered(t *testing.T) {
 		}
 	}}
 	set := night.Settings{Bouts: 3, BoutsPerAccount: 1, Games: 3}
-	r, s, clock := quietRunner(t, set, arena, nil,
+	r, s, clock, settled := quietRunner(t, set, arena, nil,
 		[]string{"kaheera", "goreclaw", "atla"})
 	ctx := context.Background()
 	clock.set(time.Date(2026, 9, 6, 14, 0, 0, 0, time.UTC))
@@ -428,14 +446,13 @@ func TestABoutSettlesTheWayItsPlayerAnswered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Each hand-driven tick claims exactly one bout, and its settle is
+	// received on the seam before the next tick — which is what guarantees
+	// that tick finds the seat free rather than landing in the gap where a
+	// settling bout still holds it.
 	for i := 0; i < dealt; i++ {
-		// The tick rides inside the wait: one landing between a settle and
-		// its untrack claims nothing, and the retry is the fix.
-		waitFor(t, "the bout to settle", func() bool {
-			r.Tick(ctx)
-			got := boutStates(t, s, run.ID)
-			return got[night.StatePlanned]+got[night.StatePlaying] == dealt-i-1
-		})
+		r.Tick(ctx)
+		<-settled
 	}
 	bouts, _ := s.Bouts(ctx, run.ID)
 	for _, b := range bouts {
@@ -517,7 +534,7 @@ func TestASamplesKeyWearsTheConfiguredZone(t *testing.T) {
 		t.Fatal(err)
 	}
 	set := night.Settings{Bouts: 2, BoutsPerAccount: 1, Games: 3, Zone: zone}
-	r, s, clock := quietRunner(t, set, arena, nil, []string{"kaheera", "goreclaw"})
+	r, s, clock, _ := quietRunner(t, set, arena, nil, []string{"kaheera", "goreclaw"})
 	ctx := context.Background()
 	// 03:00 UTC on the 7th is still the evening of the 6th on the west
 	// coast, and the sample's key says whose evening it was.
@@ -694,25 +711,26 @@ func TestAnAbandonedSampleFinishesItselfAndDoesNotBlockTheNext(t *testing.T) {
 
 func TestASettledBoutNudgesTheNextWithoutWaitingForTheTicker(t *testing.T) {
 	t.Parallel()
-	arena := &fakeArena{gate: make(chan struct{})}
+	arena := &fakeArena{gate: make(chan struct{}), entered: make(chan struct{})}
 	set := night.Settings{Bouts: 2, BoutsPerAccount: 1, Games: 3}
-	r, _, clock := quietRunner(t, set, arena, nil,
+	r, _, clock, _ := quietRunner(t, set, arena, nil,
 		[]string{"kaheera", "goreclaw", "atla"})
 	clock.set(time.Date(2026, 9, 6, 14, 0, 0, 0, time.UTC))
 
-	// The ticker's interval is an hour, so everything below moves on nudges
-	// alone: the sample's own, then the one each settled bout sends.
+	// The ticker's interval is an hour, so every entry below happens on
+	// nudges alone: the sample's own, then the one each settled bout sends.
+	// Each gate release lets one bout settle; the next entered receive is
+	// the proof its nudge — and nothing else — woke the loop to claim again.
 	r.Start()
 	if _, _, err := r.StartSample(context.Background(), 60); err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, "the first bout", func() bool { return len(arena.fights()) == 1 })
+	<-arena.entered // the first bout, on the sample's nudge
 	arena.gate <- struct{}{}
-	waitFor(t, "the second bout, on the settle's nudge", func() bool {
-		return len(arena.fights()) == 2
-	})
+	<-arena.entered // the second, on the settle's nudge
 	arena.gate <- struct{}{}
-	waitFor(t, "the third bout, on the settle's nudge", func() bool {
-		return len(arena.fights()) == 3
-	})
+	<-arena.entered // the third, on the settle's nudge
+	if got := len(arena.fights()); got != 3 {
+		t.Fatalf("%d bouts entered the arena, want 3", got)
+	}
 }
