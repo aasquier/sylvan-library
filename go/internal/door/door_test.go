@@ -870,3 +870,26 @@ func TestTheDoorCountsWhatItAnswers(t *testing.T) {
 		t.Errorf("extra templates recorded: %v (every request lands exactly once)", counts)
 	}
 }
+
+// PublicPaths is the one place a route can be reclassified as reachable with
+// no session, and the two derived sweeps above hold it in both directions —
+// an entry nothing serves, a served route left off. What neither can see is
+// a served route quietly *added* here: the sweeps would obediently reclassify
+// it. This is the third direction, and it is a rule rather than a roster, so
+// it costs nothing to maintain: the public list may hold the liveness probe
+// and the doors a person with no session needs in order to get one, and
+// nothing else. Making a data route public is an ADR 5 decision that should
+// fail a test until somebody writes down why — as `/api/health` has its
+// argument written where it stands.
+func TestPublicPathsHoldOnlyTheAuthDoorsAndHealth(t *testing.T) {
+	t.Parallel()
+	if len(PublicPaths) == 0 {
+		t.Fatal("PublicPaths is empty; the login door itself would be unreachable")
+	}
+	for p := range PublicPaths {
+		if p != "/api/health" && !strings.HasPrefix(p, "/api/auth/") {
+			t.Errorf("PublicPaths names %s, which is neither the liveness probe "+
+				"nor an auth door — a public data route is a decision, not a listing", p)
+		}
+	}
+}

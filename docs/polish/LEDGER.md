@@ -19,7 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24, 2026-08-19,
+  2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -27,6 +28,195 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-05 (rainbow, night)
+
+- **Fixed this run:**
+  1. **The committed-media accounting sweep is a gate now, and it caught four
+     files on its first spin.** The hand sweep every White run does — compare
+     `git ls-files` media against what the recipes and PROVENANCE files
+     account for — is `go/cmd/mtglab/mediaprovenance_test.go`: the file set
+     comes off `git ls-files` (a walk cannot tell a tracked stray from a
+     toolbox venv's fixtures — the first draft flagged sympy's test PNGs), and
+     a file is accounted by its directory's PROVENANCE naming it, a recipe's
+     `file:` output naming it, or a recipe's `each:` output in its format (the
+     set convention, under which `animist verify` pins the count — a 79th
+     tarot card fails the toolbox gate, so this test only needs the set to
+     exist). What it caught: **the four PWA icons in `web/public/` (#380,
+     2026-08-28) had no record anywhere** — hand-placed binaries in the exact
+     sense the checklist means. They are the project's own mark (the inline
+     SVG favicon in `web/index.html`, tree over open book, rasterized because
+     iOS takes no SVG for `apple-touch-icon`), so there was no third party and
+     no licence question — but the derivation was recorded nowhere, and the
+     rasterizer used was never written down. `web/public/PROVENANCE.md` now
+     says all of that plainly, including what it cannot say (the exact
+     rasterizer), and the build ships it beside the icons it describes.
+     `parchment-deckle.svg` — last run's "not a finding, but unindexed" — is
+     indexed in the séance PROVENANCE for the same reason: the gate reads the
+     index. **Mutation-verified both legs**: hiding the icons' record fails
+     exactly the four icons; hiding `tarot.recipe.yaml` fails exactly 78
+     cards; both restored, both re-green.
+  2. **The `worker.min.js.LICENSE.txt` deferred item is closed on its own
+     trigger** ("the next White run, whichever is first").
+     `TestTheReadingEnginesLicenceNoticeTravelsWithTheCode` in
+     `go/internal/api/shelves_test.go` is the Python-era pin in its Go shape:
+     the notice's name comes *off* `reference.Runtime().OCR.Assets` (exactly
+     one `.LICENSE.txt`), the code asset it explains must be on the shelf
+     beside it, both pinned from the same upstream directory (the pointer in
+     the code's first line is relative), media type `text/plain`, and the
+     route serves it with the charset. **Mutation-verified**: the row deleted
+     from `shelves.json`, watched to fail on "0 licence notices", restored.
+  3. **`PublicPaths` gets its third direction.** The two derived sweeps hold
+     an entry nothing serves and a served route left off; what neither could
+     see was a served route quietly *added* to the public list — the sweeps
+     would obediently reclassify it. `TestPublicPathsHoldOnlyTheAuthDoorsAndHealth`
+     (`go/internal/door/door_test.go`) holds the list to a rule rather than a
+     roster: the liveness probe plus `/api/auth/*`, nothing else, so a public
+     data route fails a test until somebody writes down why.
+     **Mutation-verified**: `"/api/decks": true` added, watched to fail,
+     removed. The checklist's own liveness mutation also re-run this cycle:
+     an unserved `/api/auth/polish-probe` entry fails
+     `TestEveryPublicPathIsServed` by name.
+- **Verified this run — licensing (triple-check):**
+  - **`animist verify`: 33 recipes, all held** (was 12 — the Coliseum's 21
+    arrived with #377-#425). Committed media 205 tracked files (was 156):
+    +21 coliseum webp, +4 PWA icons, +the build's copies. Every coliseum webp
+    cross-checked by machine: recipe beside it, `animist:begin` block in the
+    dir's PROVENANCE, `verify` holding the bytes. Spot-read three PROVENANCE
+    entries in full (harena, secutor, aegis): Commons/Met sources, PD or CC0
+    per file via the provider APIs at fetch time, obligations-free by
+    deliberate search filter, and the committed-vs-hotlinked argument made
+    per file. Nothing here is Wizards'.
+  - **The licence gate still has no override**, read in the code:
+    `tools/animist/sources.py` raises `LicenceRefused` against the three
+    allowlists; `tools/animist/cli.py` has no `--force`, no bypass — its only
+    "skipped" is the filename guard refusing files, not licences.
+  - **No Wizards image under `git ls-files`**; `PageMasthead`'s `credit` is
+    still required by the type; monetization sweep clean (the only "donated"
+    is Ludevic's flavour text).
+  - **ADR 6 holds**: no bulk data tracked; ci.yml's filename scan still
+    matches `.duckdb`/`.jsonl.gz`/`.json.gz` anywhere (line 116), the image
+    job still probes the container for a pool.
+  - **Dependency licences, swept 2026-09-05 from the packages themselves.**
+    Go: 32 third-party modules — 19 MIT, 10 BSD-3-Clause, 2 Apache-2.0, and
+    `modernc.org/mathutil` still reported Unknown by the classifier and still
+    BSD-3-Clause by its own LICENSE (ruled 2026-08-24; do not respend the
+    hour). npm: 180 packages — 140 MIT, 15 ISC, 10 Apache-2.0, 4 MPL-2.0,
+    3+3 BSD, 2 MIT-0, 1 each BlueOak/CC0/"MIT AND ISC". **Zero
+    AGPL/GPL/SSPL/UNLICENSED on either side.** Both re-swept *after*
+    `npm ci`, because **local `node_modules` was behind the lockfile** — the
+    #427 dependabot bump (7 packages) had never been installed here, the
+    known local-gates-weaker-than-CI trap; synced this run.
+  - **The séance hand swap (Parisienne → Caveat) is NOT on main** — it lives
+    on the unmerged `the-fortune-tellers-hand` branch held for Aaron's eye.
+    Main audited as it is: 4 woff2 (3 IM Fell + Parisienne), PROVENANCE
+    unchanged since the 2026-08-19 three-way verification. The note for the
+    merge day is in this run's handoff, not in that branch.
+- **Verified this run — security & isolation:**
+  - **~20 routes new since 2026-08-24, read against the 403/404 law.** Every
+    new `{owner}` route resolves through the one accessor — directly
+    (`openinghand`, `tokens`, `describe`) or via `writeTarget`, which opens
+    with `a.sourceFor` (`swapboard`, `intake`, `bulk`, `entomb`, `combos`,
+    `coliseum-at-night`). The crypt family, the two master switches and the
+    collection routes deliberately carry **no owner segment** — your shelf is
+    yours, so no path can name somebody else's. `coliseumStandings` scopes by
+    `auth.ScopeFrom` viewer. The three night routes sit under the admin
+    prefix (403 before routing) with `requireAdmin` behind.
+  - **The Coliseum at Night's consent story, read end to end** (ADR 46, rung
+    13): the roster draws only `coliseum_at_night = 1 AND deleted_at IS NULL`,
+    and `runner.consentWithdrawn` re-reads the flag at the bout's own turn —
+    standing consent, checked at deal *and* at fight time. A player's deck is
+    read via an owner-scoped `SQLSource` by the house, which is the designed
+    exception and argued where it stands.
+  - **CodeQL: zero open alerts** — the five stale Python alerts were
+    dismissed since last run (daybreak 2026-08-24 item 3, done), and the six
+    Go dismissals stand unchanged. Nothing new from 135 commits.
+  - **SQL sweep over everything added since 2026-08-24**: `claude/ledger`'s
+    `Summarise` interpolates a column name behind an exact two-value guard
+    (the Python AXES pattern, kept); `wheel.go`'s colour quoting is fed only
+    from `identityColors`, which filters against the five fixed literals;
+    `traffic.go` and `auth` concatenate module constants. Nothing
+    caller-tainted reaches a string.
+  - **Email**: `AsDict(true)` still has exactly one non-test caller
+    (`admin.go:124`). **Tokens**: fragment-only in `web/src`
+    (`Claim.test.tsx` still pins the query-string refusal). **Cookies**:
+    HttpOnly + SameSite=Lax + `Secure` following `config.SecureCookies()`
+    (defaults to RequireAuth), unchanged.
+  - **Live posture** (pre-auth, probed 2026-09-05): `/api/health` 200 —
+    pool fresh (bulk 2026-08-30), 35,393 oracle cards, **17 decks** (was 7;
+    the library is growing) — and `/api/tarot/reading`, `/api/decks`,
+    `/api/admin/users`, `/api/nope` all **401**, the middleware refusing
+    before routing.
+- **Queued for Aaron:** nothing new. The two standing items (ADR 5's
+  parametrised isolation sweep; the wider docs-rot guard) are unchanged and
+  still waiting — this run's route-table read confirms the ADR 5 gap is
+  still a missing guard rather than a known hole.
+- **Deferred (2026-09-05):**
+  - ~~`worker.min.js.LICENSE.txt` pinned by no test~~ — **closed this run**
+    (fix 2).
+  - **10 of `internal/gate`'s 14 surviving mutants are unnamed.** The first
+    gremlins run reported them but only the tail was captured; the re-run to
+    name them collapsed into the timeout pathology (below). The four named:
+    `validate.go:410` (commander records skipped on nil — companion check
+    runs without the commander), `:424`/`:428` (the "and N more" truncation
+    at exactly six), plus one boundary at `:392`. *Trigger:* next White run,
+    quiet machine, full capture on the first spin.
+  - **`repr.go`'s corpus ruling** and **`--version`/build stamp**: standing,
+    triggers unchanged (2026-08-24).
+- **Measurements (2026-09-05, rainbow, night):** raw output, not a summary.
+  - **Coverage, now measured in CI's own gate formula** (the floor was
+    rebuilt at 90.5 by #387 on 2026-08-28 — the 2026-08-23 open question is
+    settled in code, as a ratchet):
+
+    ```
+    go test -count=1 -coverpkg=./... ./... ; go tool cover -func  →  total: 91.2%   (floor 90.5)
+    go test -count=1 -coverprofile=own.out ./... ; -func          →  total: 89.1%
+    ```
+
+    Own-tests lowest: `wire` 67.7%, `deckread` 68.8% (was 20.4 — the
+    coverage passes since #387), `deckyaml` 70.8%, `shelves` 81.5%, `sim`
+    81.6%. The two 0.0% rows are `authtest` and `pooltest` — the test
+    helpers themselves, exercised by their importers; not findings.
+  - **Suite wall clock: 2m8.1s plain** (`go test -count=1 ./...`, warm
+    cache, 48 packages, 0 failures), against 57.8s on 2026-08-24 — **but the
+    tree nearly doubled** (833 → 1,817 top-level test functions) and the
+    shape changed: the tail flattened. Per-package: `claude` 64.5s, `api`
+    63.7s, `claude/tools` 37.9s, `cards` 35.9s, `config` 35.4s, `deck`
+    32.0s. `api` is no longer 86% of the wall — user 8m32s against 2m8s wall
+    means this 4-core Mac is now saturated by package-level parallelism, and
+    the next second saved lives in the fat middle, not one package.
+  - **`t.Parallel` census: 1,791 of 1,817 top-level tests parallel, 26
+    serial, and all 26 say why where they stand** — CLAUDE.md's claim
+    re-checked by script (the one-second re-check it promises), including
+    the three whose reason is the body's first comment rather than a header.
+    53 `t.Setenv` call sites. **Skip census: 35 `t.Skip` sites, every one
+    conditional on a real absence** — live-Claude/Forge gates, root-uid
+    guards, fixture-drift guards, a busy container port.
+  - **Mutation baseline, `internal/gate` (first spin):** Killed 125, Lived
+    14, Not covered 3 — **efficacy 89.93%**, 5m34s, in a throwaway worktree
+    at `origin/main`. Above every kernel baselined 2026-08-24 except
+    mt19937 (93.08%). **The timeout trap now has a second confirmation and a
+    sharper shape**: the *immediate re-run* of the identical command reported
+    `Killed: 0, Timed out: 139, efficacy 0.00%` — a fabricated score, per the
+    2026-08-24 floats lesson. New wrinkle: the collapse hit a package whose
+    first run was healthy, so "the first run of a fast package is the one to
+    trust" generalises to **capture the first run in full, because the
+    re-run to recover lost output may be worthless**.
+  - **The determinism replay** (a seed is a promise): this tree's own build,
+    on a scratch `MTGLAB_DATA_DIR` and a port verified held by `lsof`,
+    answers `GET /api/tarot/reading?seed=1909` **byte-identical to the
+    2026-08-24 recorded baseline** — 741 bytes, sha256
+    `e406f504c05f962cb6c2ccabb7d9d18fead04235997917639ac93c90135a3928` —
+    across 135 commits. **The port lesson recurred on the way**: the first
+    probe's server never bound (another session's `mtglab`, PID 45197, holds
+    8791) and the squatter answered with the *correct* bytes, which is
+    exactly why a free port is not a held one; redone with the bind proven.
+    **The live authenticated half is owed**: tarot and wheel are 401 without
+    a session, Claude never signs in, and the `claude` seat was not ridden
+    tonight — daybreak carries it.
+  - **`data/app.db` untouched by any of it**: mtime 2026-08-28, sha256
+    `41324f0a…` before and after; the WAL's fresh stamp is the live 8765
+    app's, predating this session.
 
 ### 2026-08-24 (rainbow)
 

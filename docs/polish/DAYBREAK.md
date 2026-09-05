@@ -12,6 +12,25 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ---
 
+## Open — 2026-09-05
+
+**White (merged): three licensing/isolation guards landed, nothing renders
+differently, and the authenticated determinism replay is owed.** The
+committed-media accounting sweep is a test now
+(`go/cmd/mtglab/mediaprovenance_test.go`), and its first spin caught the four
+PWA icons riding since #380 with no provenance record anywhere — they are our
+own drawn mark (the favicon SVG rasterized), now recorded in
+`web/public/PROVENANCE.md`, which the build ships beside them; the Tesseract
+licence-notice shelf row and the `PublicPaths` allowlist's shape got pins of
+their own. All three mutation-verified, all backend/test-only, merged green
+under the night rule. · *What is owed:* the once-per-cycle determinism replay
+against the deployed instance needs a session (tarot and wheel answer 401
+pre-auth) and Claude never signs in — the local half is byte-identical to the
+2026-08-24 baseline (seed 1909, sha `e406f504…`), so drift is unlikely but
+unwitnessed where users live. · **Recommendation:** nothing to decide — just
+sign the `claude` seat in through Claude-in-Chrome some evening and the next
+White run rides it. Ledger: White, 2026-09-05.
+
 ## Open — 2026-08-24
 
 **1. ADR 5's isolation sweep did not cross to Go, and it is the one test that
