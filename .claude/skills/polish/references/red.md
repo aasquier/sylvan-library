@@ -63,14 +63,17 @@ gh api repos/aasquier/sylvan-library/branches/main/protection \
   --jq .required_status_checks.contexts
 ```
 
-This file named six for months and the answer is now eight; the list changed
-under it twice without a word of prose noticing, which is precisely why
-CLAUDE.md calls it a read-back rather than a count. Two structural facts about
-that list *are* worth holding, because they are what a count hides:
+This file named six for months while the answer changed under it twice
+without a word of prose noticing, which is precisely why CLAUDE.md calls it a
+read-back rather than a count — and why no count is written here. Two
+structural facts about that list *are* worth holding, because they are what a
+count hides:
 
 - **A matrix leg gates separately.** `go` is a two-architecture matrix, so it
-  supplies `go (amd64)` and `go (arm64)` as distinct contexts, and `image` has
-  an arm64 sibling. Adding an architecture adds a required check.
+  supplies `go (amd64)` and `go (arm64)` as distinct contexts. Adding an
+  architecture adds a required check — and removing one removes it, which is
+  a *repository setting* beside the workflow edit (ADR 47's `image-arm64`
+  removal needed both).
 - **CodeQL is not among them, deliberately.** It runs on every pull request
   and on a schedule, and `codeql.yml`'s own header argues the case: a scanner
   that blocks merges on a query-pack update is a gate that gets disabled in

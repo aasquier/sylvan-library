@@ -2,8 +2,8 @@ Copyright (c) 2010, Igino Marini (mail@iginomarini.com),
 with Reserved Font Names "IM FELL English Roman", "IM FELL English Italic"
 and "IM FELL English SC".
 
-Copyright (c) 2012 by Brian J. Bonislawsky DBA Astigmatic (AOETI)
-(astigma@astigmatic.com), with Reserved Font Name "Parisienne".
+Copyright 2014 The Caveat Project Authors
+(https://github.com/googlefonts/caveat).
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

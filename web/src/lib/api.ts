@@ -117,10 +117,12 @@ export interface DeckSummary {
  * no such field and a type claiming one there would be fiction.
  *
  * It says this owner is the curated six's: the maintainer, or `local` on a
- * laptop. ADR 22 says the showcase is always visible, so it sits in the default
- * shelf beside your own decks while everybody else's go behind the browse tab.
- * The client cannot work this out for itself — `writable` identifies *your*
- * decks and nothing else identifies the maintainer's.
+ * laptop. ADR 22 says the showcase is always visible, and since Aaron's
+ * 2026-09-05 ruling the library answers that with a tab of its own — "The
+ * showcase", offered whenever the shelf behind it holds anything — rather than
+ * by mixing the six in beside your own decks. The client cannot work this out
+ * for itself — `writable` identifies *your* decks and nothing else identifies
+ * the maintainer's.
  */
 export interface DeckTile extends DeckSummary {
   showcase: boolean

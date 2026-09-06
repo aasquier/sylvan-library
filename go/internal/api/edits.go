@@ -36,8 +36,7 @@ import (
 // the change did to the gate, and no caller can change a deck without the
 // change being recorded (ADR 28). That it is one function rather than ten is
 // the whole design -- and it has now been proved rather than argued: the tenth
-// route, the bulk edit, arrived on 2026-08-29 and inherited both without
-// touching either.
+// route, the bulk edit, arrived and inherited both without touching either.
 //
 // Three refusals, and which is which is a decision rather than a default.
 // A deck the caller may not *see* is absent from their source, so every verb
@@ -187,8 +186,8 @@ func (a *API) answer(w http.ResponseWriter, r *http.Request, src library.Source,
 // readBody parses a JSON object body, answering the recorded validation
 // 422 for everything that is not one.
 //
-// It answered `missing` for all four failures until 2026-08-22, and a wire
-// diff is what said so: `POST /api/decks` with a body of `{` and no
+// It once answered `missing` for all four failures, and a wire diff is what
+// said so: `POST /api/decks` with a body of `{` and no
 // content type is `dict_type`, because a body whose content type does not
 // say JSON is never parsed -- the raw bytes stand
 // as a string, and a string is not a dictionary. Every write route

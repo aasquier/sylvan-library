@@ -135,8 +135,7 @@ func (a *API) refuseClaude(w http.ResponseWriter, where string, err error) bool 
 	case errors.As(err, &notInDeck):
 		wire.Detail(w, http.StatusUnprocessableEntity, notInDeck.Error())
 	case errors.Is(err, claude.ErrStanceRejected):
-		// **422, since 2026-08-23 -- and it was 502 for a day,
-		// deliberately.**
+		// **422 -- and it was 502 for a day, deliberately.**
 		//
 		// The recorded route *intended* a 422 for a malformed stance and
 		// never reached it: the branch was DEAD CODE, because the stance

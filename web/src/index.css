@@ -244,16 +244,18 @@ body {
   font-display: swap;
 }
 
-/* The fortune-teller's hand (Aaron's pick off the five-face board): a
+/* The fortune-teller's hand (Caveat, succeeding Parisienne 2026-09-05 —
+   the fonts directory's PROVENANCE.md carries the argument): still a
    joined script, because the ink animation's left-to-right reveal only
-   reads as a pen travelling when the leading edge never leaves a
-   stroke. */
+   reads as a pen travelling when the leading edge never leaves a stroke —
+   but taller and more open than the old hand, so a newcomer can read what
+   the reader writes. One variable file carries the whole weight range. */
 @font-face {
-  font-family: 'Parisienne';
+  font-family: 'Caveat';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('./assets/fonts/parisienne-regular.woff2') format('woff2');
+  src: url('./assets/fonts/caveat-variable.woff2') format('woff2');
 }
 
 @font-face {
@@ -1513,25 +1515,27 @@ button:hover .tarot-fan-card {
 
 .seance-scroll .thinking-pulse,
 .seance-question {
-  /* The reader WRITES; the app around her prints. Parisienne is the
-     writing — a joined hand, so the character-by-character reveal is a
-     pen travelling — and the Fell italic stays as the fallback press.
-     A script face runs small on its body, so the size steps up to keep
-     the same reading size the Fell had. */
-  font-family: 'Parisienne', 'IM Fell English', 'Iowan Old Style', Georgia,
+  /* The reader WRITES; the app around her prints. Caveat is the
+     writing — still a joined hand, so the reveal is a pen travelling —
+     and the Fell italic stays as the fallback press. The size and
+     weight below are the knobs to tune by eye: Caveat is a variable
+     face (400–700), and it carries far more x-height on its body than
+     Parisienne did, so the size steps back down toward the Fell's. */
+  font-family: 'Caveat', 'IM Fell English', 'Iowan Old Style', Georgia,
     serif;
-  font-size: 1.45rem;
-  line-height: 1.58;
+  font-weight: 500;
+  font-size: 1.32rem;
+  line-height: 1.5;
 }
 
-/* The hand writing (`InkText` in theme.tsx). The unit is the CHARACTER
-   (the brief's front two): each glyph is revealed by its own
-   left-to-right wipe on the shared schedule, so the line fills stroke by
-   stroke rather than word-blocks arriving. The word span survives around
-   the characters — it is what lets lines wrap at spaces, and it carries
-   the per-word tilt and drop. Ink starts wet-brown and dries dark. The
-   negative vertical insets keep ascenders and descenders out of the
-   clip. */
+/* The hand writing (`InkText` in theme.tsx). The unit of TIMING is the
+   character, the unit of MARKUP is the word (theme.tsx argues why the
+   difference matters — OpenType shaping cannot cross element
+   boundaries), and each word is revealed by one left-to-right wipe timed
+   from its character count, so the line fills stroke by stroke rather
+   than word-blocks arriving. The word span is what lets lines wrap at
+   spaces, and it carries the per-word tilt and drop. Ink starts
+   wet-brown and dries dark. */
 .ink-text {
   position: relative;
   display: inline-block;
@@ -1542,9 +1546,11 @@ button:hover .tarot-fan-card {
 /* The word is ONE text node — a connected script shapes its letters from
    their neighbours, and OpenType shaping does not cross element
    boundaries (per-glyph spans rendered "Before" as "Belore"). The wipe is
-   linear and timed from the word's character count, so it moves at the
-   pen's own speed; in a joined face its leading edge never leaves a
-   stroke, which is what makes a reveal read as writing. */
+   timed from the word's character count, so it moves at the pen's own
+   speed; in a joined face its leading edge never leaves a stroke, which
+   is what makes a reveal read as writing. Browsers with mask support get
+   the soft wet edge in the `@supports` block below; the rest run the
+   hard-edged `ink-write` clip. */
 .ink-word {
   display: inline-block;
   transform: rotate(var(--ink-tilt, 0deg)) translateY(var(--ink-drop, 0px));
@@ -1560,9 +1566,13 @@ button:hover .tarot-fan-card {
 .ink-text.is-dry .ink-word {
   animation: none;
   clip-path: none;
+  -webkit-mask: none;
+  mask: none;
   color: #2b2013;
 }
 
+/* The hard wipe — now the fallback for browsers without mask support,
+   kept so no browser is ever left with unrevealed text. */
 @keyframes ink-write {
   0% {
     /* 102% right inset: a word not yet written shows not one speck. The
@@ -1576,6 +1586,68 @@ button:hover .tarot-fan-card {
   }
   100% {
     clip-path: inset(-30% -4% -30% -2%);
+    color: #2b2013;
+  }
+}
+
+/* The soft nib (the 2026-09-05 refinement): where masks exist, the hard
+   clip becomes a sliding gradient mask, and the wet edge is a 0.5em fade
+   rather than a cut. The geometry is deliberate: the mask image is the
+   word's own width doubled plus a fixed hem (`calc(200% + 0.8em)`), with
+   the fade pinned an em-measure either side of halfway, so sliding the
+   mask from 100% to 0% sweeps the edge across the word at almost exactly
+   the quill's own speed (`box.width * frac` in theme.tsx) for EVERY word
+   length — a plain 250%-and-percentages mask would sweep half again as
+   fast and leave the quill chasing ink already dry. The uneven stops are
+   the pen hesitating mid-word — brisk set-off, a breath around the
+   middle, steady finish — the same unevenness the between-word pauses
+   already give the line. The padding (given straight back by the
+   negative margin, so layout never moves) grows the border box a mask is
+   clipped to, keeping the loops and exit strokes that overhang the line
+   box out of the mask's shears — the same job the clip-path fallback
+   does with negative insets. Deliberately NOT an animated custom
+   property: @property registration is off the table on this site's
+   Safari floor. */
+@supports (mask-size: 250% 100%) or (-webkit-mask-size: 250% 100%) {
+  .ink-word {
+    padding: 0.15em;
+    margin: -0.15em;
+    -webkit-mask-image: linear-gradient(90deg,
+      #000 calc(50% - 0.35em), rgba(0, 0, 0, 0) calc(50% + 0.15em));
+    mask-image: linear-gradient(90deg,
+      #000 calc(50% - 0.35em), rgba(0, 0, 0, 0) calc(50% + 0.15em));
+    -webkit-mask-size: calc(200% + 0.8em) 100%;
+    mask-size: calc(200% + 0.8em) 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation-name: ink-write-soft;
+  }
+}
+
+@keyframes ink-write-soft {
+  0% {
+    /* 100%: the image is shifted left by a full word-width, so the fade
+       band sits just before the word's LEFT edge and everything to its
+       right is transparent — a word not yet written shows not one speck.
+       (The band only clears the right edge at the 100% frame.) */
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+    color: #6d4f22;
+  }
+  42% {
+    -webkit-mask-position: 52% 0;
+    mask-position: 52% 0;
+  }
+  55% {
+    color: #54401e;
+  }
+  58% {
+    -webkit-mask-position: 44% 0;
+    mask-position: 44% 0;
+  }
+  100% {
+    -webkit-mask-position: 0% 0;
+    mask-position: 0% 0;
     color: #2b2013;
   }
 }
@@ -2103,6 +2175,8 @@ button:hover .tarot-fan-card {
   .ink-word {
     animation: none;
     clip-path: none;
+    -webkit-mask: none;
+    mask: none;
     color: #2b2013;
     transform: none;
   }
@@ -4205,9 +4279,16 @@ button:hover .tarot-fan-card {
   color: var(--text-primary);
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.card-action:hover {
+.card-action:hover:not(:disabled) {
   border-color: var(--text-muted);
   background: var(--gridline);
+}
+/* Same face as `.btn:disabled`, for the same reason: a control that has
+ * stopped listening must stop answering the hand — a disabled button whose
+ * hover still lights up is promising a press it will not take. */
+.card-action:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* The action bar (deck page, punch list item 9): press an action, pick a
@@ -4268,7 +4349,7 @@ button:hover .tarot-fan-card {
   color: var(--status-critical);
   border-color: color-mix(in srgb, var(--status-critical) 45%, transparent);
 }
-.card-action-danger:hover {
+.card-action-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--status-critical) 12%, transparent);
   border-color: var(--status-critical);
 }
