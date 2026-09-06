@@ -601,6 +601,29 @@ export function WheelOfFortune({ deckRef }: { deckRef: DeckRef }) {
             {spinning ? 'The wheel turns…' : 'Spin the wheel'}
           </button>
 
+          {/* Where it stopped, said out loud.
+              Everything the wheel does while it turns is a picture — the disc,
+              the pawl, the clicker, the storm — and every one of them is
+              `aria-hidden`, correctly, because a turning wheel is nothing at
+              all to describe. The *landing* is the answer, and until this it
+              was as silent as the theatre: the label, the meaning and the card
+              simply appeared in a panel nobody was told to look at.
+
+              One sentence, in the order the panel reads: the fate, what it
+              means, and the card it turned up. The caveat below the card is
+              deliberately not in here — it is the same paragraph every spin
+              and reading it aloud four times running is how a live region
+              becomes something people switch off. */}
+          <span className="sr-only" role="status">
+            {spinning || !revealed || !spin
+              ? ''
+              : spin.symbol && spin.label
+                ? `The wheel stops: ${spin.label}.`
+                  + (spin.meaning ? ` ${spin.meaning}` : '')
+                  + (spin.card ? ` It turns up ${spin.card.name}.` : '')
+                : (spin.message ?? '')}
+          </span>
+
           {error && (
             <p className="text-xs" style={{ color: 'var(--status-critical)' }}>
               {error}

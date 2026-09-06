@@ -401,11 +401,19 @@ function LibraryMasthead({ decks, health }: {
       credit={<>
         <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal.
       </>}>
+      {/* "On the shelves". The old wording placed the cards on the reader's
+          own machine — written on a laptop, where it was true, and then
+          rendered to every visitor of a hosted library that is emphatically
+          not theirs. The shelves are the house word for those cards
+          everywhere else in the app — `Admin` gathers them, the Coliseum
+          fights on them — so this is the room using its own vocabulary
+          rather than reaching for a new euphemism.
+          `hostedcopy.test.ts` holds it. */}
       <p>
         {decks} deck{decks === 1 ? '' : 's'} ·{' '}
         {health?.pool
-          ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
-          : 'no card pool yet — the library awaits its first stocking'}
+          ? `${health.oracle_cards.toLocaleString()} cards on the shelves`
+          : 'no cards on the shelves yet — the library awaits its first stocking'}
       </p>
     </PageMasthead>
   )
@@ -447,9 +455,10 @@ function FirstRun({ showcase = false }: { showcase?: boolean }) {
         <p className="mt-2 max-w-xl text-sm leading-relaxed"
            style={{ color: 'var(--text-secondary)' }}>
           Paste a decklist from Moxfield, Archidekt, Arena or anywhere else.
-          Names resolve against the local pool, the gate checks legality and
-          colour identity immediately, and the deck arrives as a draft — with a
-          count of the cards whose slot you have not argued for yet.
+          Names resolve against the library&rsquo;s own cards, the gate checks
+          legality and colour identity immediately, and the deck arrives as a
+          draft — with a count of the cards whose slot you have not argued for
+          yet.
         </p>
         <Link to="/import"
               className="mt-6 inline-block rounded-lg px-4 py-2 text-sm font-medium"
@@ -950,10 +959,12 @@ export default function Library() {
       ) : (
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Deck library</h1>
+          {/* The masthead's line, in the plain heading's voice. Same
+              sentence, same reason: see `LibraryMasthead`. */}
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {health?.pool
-              ? `${health.oracle_cards.toLocaleString()} cards in the local pool`
-              : 'no card pool yet — the library awaits its first stocking'}
+              ? `${health.oracle_cards.toLocaleString()} cards on the shelves`
+              : 'no cards on the shelves yet — the library awaits its first stocking'}
           </p>
         </div>
       )}

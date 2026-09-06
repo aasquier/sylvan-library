@@ -733,6 +733,13 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
 
   const cards = reading?.cards ?? []
   const allTurned = cards.length > 0 && table.turned.length >= cards.length
+  // What the ball is showing: the card most recently turned face up. Indexed
+  // through `turned` rather than tracked separately, so a table restored from
+  // a stash scries its last card too.
+  const lastTurnedIndex = table.turned[table.turned.length - 1]
+  const lastTurned = lastTurnedIndex === undefined
+    ? null
+    : cards[lastTurnedIndex] ?? null
 
   // The reveal gets to land before the table folds itself away.
   //
@@ -819,6 +826,48 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     setError(null)
   }
 
+  /**
+   * The table, said out loud — the deal landing, and then each card as it
+   * comes up.
+   *
+   * The shuffle already speaks: `ShufflingDeck` sits under a line of text, and
+   * the deck itself is `aria-hidden`, correctly, because a stack of card backs
+   * is nothing to describe. What was silent was everything *after* — three
+   * cards arriving on the felt, and then the reveal, which is the whole reason
+   * anybody sat down. A face-up card is a `role="img"` with a label, which a
+   * reader announces when you move to it and never when it turns; nothing on
+   * this table was a live region at all.
+   *
+   * **Both beats, in one region, because the deal is not the answer.** The
+   * cards land face down: the arrival says what is there and what to do with
+   * it, and the turn is the thing that was waited for. Announcing only the
+   * first would put the same silence one beat later, on the surface
+   * commandment 15 says gets the best of everything.
+   *
+   * The turn's sentence is `TarotCard`'s own face-up label, deliberately: a
+   * card that has just turned and a card you have arrowed to must not be
+   * described two different ways.
+   *
+   * **It is declared here, above the early returns, and rendered first in
+   * every branch below that can reach a deal — and that placement is the
+   * whole mechanism.** A live region has to be in the document *before* its
+   * text changes; a region that mounts with its sentence already in it is
+   * initial content, which readers do not announce. The shuffle and the table
+   * are two different returns from this component, so the region has to be
+   * the first child of both or the deal remounts it and says nothing. Empty
+   * while shuffling for the same reason in reverse: the emptying is what makes
+   * the next deal a change rather than a re-render of the same string.
+   */
+  const said = shuffling || cards.length === 0
+    ? ''
+    : lastTurned === null
+      ? `The deal is done: ${cards.length} `
+        + `card${cards.length === 1 ? '' : 's'} face down on the table. `
+        + 'Turn them over when you are ready.'
+      : `${lastTurned.position}: ${lastTurned.face_name}`
+        + `${lastTurned.reversed ? ', reversed' : ''}.`
+  const say = <span className="sr-only" role="status">{said}</span>
+
   if (error && !roster) {
     return (
       <div className="card-surface rounded-xl px-6 py-8">
@@ -839,6 +888,8 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
 
   if (!chosen || shuffling) {
     return (
+      <>
+      {say}
       <section className="space-y-6">
         <div className="flex flex-wrap items-start gap-3">
           <div>
@@ -886,6 +937,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
             </div>
             )}
       </section>
+      </>
     )
   }
 
@@ -897,13 +949,6 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   const dealing = chosen.deals && !(allTurned && settled && table.read)
   const lingering = chosen.deals && allTurned && settled && !table.read
   const takeReading = () => setTable((t) => ({ ...t, read: true }))
-  // What the ball is showing: the card most recently turned face up. Indexed
-  // through `turned` rather than tracked separately, so a table restored from
-  // a stash scries its last card too.
-  const lastTurnedIndex = table.turned[table.turned.length - 1]
-  const lastTurned = lastTurnedIndex === undefined
-    ? null
-    : cards[lastTurnedIndex] ?? null
   // Every voice frames its own table. The dealing reader talks about the
   // cards; everyone else introduces themselves with the same words their
   // tile used — so the screen the conversation opens on belongs to the voice
@@ -922,6 +967,8 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
       }
 
   return (
+    <>
+    {say}
     <section className="space-y-6">
       {/* One heading, and only while the cards are the event. Once the
           conversation starts the reader supplies its own (`intro` below), and
@@ -1068,5 +1115,6 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                         intro={intro} onPick={onPick} onLeave={onLeave} />
       )}
     </section>
+    </>
   )
 }

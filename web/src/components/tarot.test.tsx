@@ -87,3 +87,56 @@ describe('the place printed on the cloth', () => {
     }
   })
 })
+
+/**
+ * The table says what it is doing, for somebody who cannot watch it.
+ *
+ * Green's 08-24 pass made every *wait* audible and left every *arrival*
+ * silent, because the region it added lives on the spinner and goes when the
+ * spinner does. This table is one of the four surfaces that got the other half
+ * — and the mechanism it needs is not the sentence, it is the region being in
+ * the document before the sentence appears. The shuffle and the dealt table
+ * are two different returns from one component, so the region has to be the
+ * first child of both or the deal remounts it and a reader hears nothing.
+ * That is what the first test below is really pinning.
+ */
+describe('the table, said out loud', () => {
+  /** The live region, wherever it is standing. */
+  function region(): HTMLElement | null {
+    return document.querySelector('[role="status"]')
+  }
+
+  it('has its live region up before the cards land, not with them', async () => {
+    render(<TarotTable onPick={() => {}} onLeave={() => {}} />)
+    const reader = await screen.findByRole('button', { name: /Read my fortune/ })
+
+    // Standing, and silent, while nobody has sat down.
+    expect(region()).not.toBeNull()
+    expect(region()!.textContent).toBe('')
+    const before = region()
+
+    reader.click()
+    await waitFor(() => {
+      expect(document.querySelectorAll('.tarot-slot')).toHaveLength(3)
+    }, { timeout: 4000 })
+
+    // The very same node, now carrying the deal: a region that were replaced
+    // here would be announcing initial content, which readers do not announce.
+    expect(region()).toBe(before)
+    expect(region()!.textContent)
+      .toBe('The deal is done: 3 cards face down on the table. '
+        + 'Turn them over when you are ready.')
+  })
+
+  it('names each card as it is turned, the way the card names itself', async () => {
+    const slots = await deal()
+    const hinge = slots[1]!.querySelector('button')!
+    hinge.click()
+
+    // `TarotCard`'s own face-up label, deliberately — the card you turn and
+    // the card you arrow to must not be described two different ways.
+    await waitFor(() => {
+      expect(region()!.textContent).toBe('THE TURNING: four-of-cups.')
+    })
+  })
+})

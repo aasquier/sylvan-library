@@ -434,12 +434,30 @@ export function Badge({
  * starts; without one there is nothing to announce and nothing is, which is
  * correct rather than a gap.
  *
- * **What this does not do, deliberately.** The region lives on the spinner, so
- * it goes when the spinner goes — the wait is announced, the *answer* is not.
- * Announcing arrivals means keeping one region mounted across both states at
- * each surface, which is a per-surface change and a design call; it is queued
- * rather than smuggled in here. Half the promise kept out loud beats all of it
- * kept in silence.
+ * **What this cannot do, and where the other half lives.** The region is on
+ * the spinner, so it goes when the spinner goes — this announces the wait and
+ * can never announce the *answer*. Arrivals are a per-surface sentence, so
+ * they are written per surface, and the shape is always the same three lines:
+ *
+ * ```tsx
+ * <span className="sr-only" role="status">{arrived ? '…' : ''}</span>
+ * ```
+ *
+ * mounted **across both states** and empty while the work is out. Both halves
+ * of that matter and neither is obvious. A region that mounts together with
+ * its sentence is initial content, which readers do not announce — so it has
+ * to be standing before the answer lands, which on a surface with early
+ * returns means being the first child of every branch that can reach one
+ * (`tarot.tsx` is the worked example). And emptying is what makes the *next*
+ * arrival a change: two identical searches in a row are two answers, and a
+ * region still holding the first one says nothing about the second.
+ *
+ * The four Aaron chose to go first have it — the tarot deal, the Wheel
+ * stopping, a simulation finishing, the card search's count — alongside
+ * `cardfinder` and `openinghand`, which had it before this pass. That is six
+ * arrivals against 27 `<Spinner>` sites in 20 files (measured 2026-09-05, and
+ * a claim to re-count rather than inherit): most of this app still announces
+ * only its wait, and the ones left are deliberately the small ones.
  */
 export function Spinner({ label }: { label?: string }) {
   return (

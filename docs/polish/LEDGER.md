@@ -29,6 +29,27 @@ state, never checklists.
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
 
+### 2026-09-05 (cleanup)
+
+- **Queued item closed: ADR 5's isolation sweep is parametrised now** (08-24
+  White 1), landed on #442. The route lists are held equal to
+  `New(Config{}).Routes()` in both directions — a served route that is never
+  swept fails, and so does a swept route no longer served, which is the
+  quieter fault because it makes the sweep look wider than it is. The stranger
+  sweep drives the reads too, which is the half that would leak a decklist.
+  **A number in this section's 08-24 record is corrected by it:** that entry
+  says the sweep covered "22 `/api/decks/{owner}/…` patterns"; 22 was the
+  *swept* list and the app serves **35**, which is exactly the gap the guard
+  now closes. **And ADR 5's structural half was confirmed by measurement
+  rather than by reading** — with `SourceFor`'s stranger branch mutated, all
+  35 routes leaked, which proves every one of them resolves through the one
+  accessor. No live hole was found.
+- **Still open, narrowed: the docs-rot guard outside `.claude/skills/`** (08-24
+  White 2). Its condition was met — #440 built the skills half — so the item
+  is no longer waiting on a ruling, only on somebody deciding the wider prose
+  is worth a third extractor. Re-worded in `DAYBREAK.md` with that stated.
+- Full accounting in the **Cleanup** section's 2026-09-05 entry.
+
 ### 2026-09-05 (rainbow, night)
 
 - **Fixed this run:**
@@ -2438,6 +2459,38 @@ applies to each. Ordered by cost:
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
 
+### 2026-09-05 (cleanup)
+
+Four queued items closed, all on #442 and #441.
+
+- **The bill is read at the rates it was paid at** (09-05 Black). `adminstats`
+  priced every window with `prices.Today()`, so the morning Sonnet 5's
+  introductory rate closed, all pre-September spend started being billed at a
+  rate that was not in force when it was spent. `prices.Segments` now cuts a
+  window at the boundaries the table itself knows and `ledger.Summarise` takes
+  an `until`. **A consequence Aaron should expect rather than diagnose: the
+  Admin panel's estimated spend will drop when this deploys.** That is the
+  fix. The all-time figure was the wrong one forever; the week and month
+  windows were already healing as they slid past 2026-09-01.
+- **`mtglab claude usage` exists again** (08-24 Black 2), printing both axes
+  with dollars beside the models and none beside the modes — Aaron's delegated
+  ruling, argued in the Cleanup entry. Read-only through `mode=ro`, and it
+  never runs the schema ladder: a reporting verb that could create an accounts
+  database by being asked a question is one nobody should trust.
+- **A price limit is a condition of the search now** (08-24 Black 3), not a
+  sieve over its answer — a semi-join on the printings that are in budget
+  rather than a cut over the sixty rows the query already chose. "Sixty cards
+  under $1" answered 23 before and answers sixty now.
+- **The card pool's memory survives the reaper** (08-24 Black 4), on #441.
+  **One standing fact this changes, worth knowing rather than discovering:**
+  the memory now rests entirely on the pool file's stamp — mtime in
+  nanoseconds plus size. Before this, handing the file back wiped it, so the
+  stamp only had to be right about the *handle*; it is now the whole
+  guarantee. A pool file replaced by a different one with an identical
+  nanosecond mtime *and* identical size would be served from stale memory.
+  Every real refresh moves both.
+- Full accounting in the **Cleanup** section's 2026-09-05 entry.
+
 ### 2026-09-05 (rainbow, night)
 
 Night run. The mode table grew from seven to ten since last run and every new
@@ -3580,6 +3633,42 @@ runs against a cache nobody emptied.
   2026-08-19 (rainbow), 2026-08-18 (punch-list item 5, with Blue), and
   2026-08-16 (rainbow), the first Red run and the baseline the numbers below
   are a trend against.
+
+*(Two headings added by the 2026-09-05 cleanup so this section reads like the
+other five. No content below them was changed.)*
+
+### 2026-09-05 (cleanup)
+
+- **Queued item 12 is closed.** The seven never-disabling async controls from
+  the 08-24 census have all four fates now: two writes fixed and merged as
+  **#436** (walked and merged 2026-09-05, which is what its queue line asked
+  for); three healed on their own since 08-24; one — `App.tsx`'s `signOut()` —
+  fixed on the cleanup's "what renders" branch, both halves, `Signing out…`
+  and `disabled`; and one, `artifacts.tsx`'s clipboard copy, is a standing
+  exemption with its reason written down.
+- **And the census is a test now, which is the durable half.** Four hand
+  counts of one invariant in three weeks was the signal.
+  `web/src/asynccontrols.test.ts` discovers every `<button>` whose click
+  starts something that finishes later and requires either `disabled` or a
+  named exemption; a third test fails when an exemption stops matching
+  anything, so a permission expires with the control it was granted for. The
+  measured tree: **46 async controls of 217 buttons, 9 undisabled** — against
+  21/7 by hand on 08-24, because a scan keyed on the click's own words misses
+  every handler that does not say `async` at the call site.
+- **One exemption's stated reason did not survive checking**, and the
+  correction is in the Cleanup entry: the "Gather it now" button is safe
+  because it unmounts on the press, not because a second POST joins the first
+  (`refreshLibrary` answers 409). The 09-05 entry below is left as the record
+  of what that run said.
+- **Still open, unchanged:** the coverage floor's one-leg change (ruled yes;
+  it needs a quiet pipeline and a watched run), `tools` as a required check
+  (a repository setting — read back 2026-09-05, still seven contexts and
+  `tools` is not one), the restore drill, and the key rotation (`fly secrets
+  list` prints no dates, so nothing here can see whether it happened).
+- Full accounting in the **Cleanup** section's 2026-09-05 entry.
+
+### 2026-09-05 (rainbow, night)
+
 - **Fixed this run (2026-09-05, rainbow, night): the two writes that never
   stopped accepting clicks — queued item 12's own recommendation, built to a
   green PR and held for Aaron's eye (nightbound: controls render).** The
@@ -4506,6 +4595,67 @@ user adaptability · hosted-first alignment*
 - **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
   2026-08-19 (rainbow), 2026-08-16 (rainbow).
 
+### 2026-09-05 (cleanup)
+
+Green carried more of this cleanup than any other colour: five queued items
+closed across three branches.
+
+- **Arrivals are announced now, on the four Aaron chose** (08-24 Green 3).
+  The 08-24 pass put `role="status"` on the shared `Spinner`, which made every
+  *wait* audible at once and could never make an *arrival* audible at all —
+  the region goes when the spinner goes. Each arrival is a per-surface
+  sentence, so four were written on purpose: **the tarot deal** ("The deal is
+  done: 3 cards face down on the table. Turn them over when you are ready."),
+  then each card as it turns, in `TarotCard`'s own face-up words; **the Wheel
+  stopping** (the fate, its meaning, and the card it turned up — the caveat
+  deliberately left out, because the same paragraph read aloud every spin is
+  how a live region gets switched off); **a simulation finishing**, which says
+  whether the numbers were computed now or kept from an identical run, because
+  ADR 18 says a cached number is quoted as cached and the `Provenance` line
+  beside the figures says the same thing to an eye; and **the card search's
+  count**, in the same words the visible line uses, capped list included. That
+  is six arrival regions in the app now (`cardfinder` and `openinghand` had it
+  first) against 27 `<Spinner>` sites in 20 files, so most of the app still
+  announces only its wait — deliberately, and the ones left are the small
+  ones.
+  **The mechanism is the part that generalises, and it is not the sentence.**
+  A region that mounts *with* its text is initial content, which readers do
+  not announce, so it has to be standing before the answer lands — on a
+  component with early returns that means being the first child of every
+  branch that can reach one, which is why `tarot.tsx` returns a fragment from
+  two different branches and the test pins the region's *node identity* across
+  the deal. And it has to empty between answers, or two identical results in a
+  row are one silent re-render. `ui.tsx`'s `Spinner` comment now carries the
+  three-line shape for the next surface that wants one.
+- **The site no longer tells visitors the cards are on their own machine**
+  (08-24 Green 7). The item named four strings; sweeping for the *claim*
+  rather than for the phrase found five. The masthead reads "35,393 cards on
+  the shelves" — "the shelves" being the word this app already uses for those
+  cards everywhere else, in `Admin`, `Learn`, `ColorPage`, `Simulator` and
+  `shelf.tsx` — the bare state says "no cards on the shelves yet", and names
+  resolve "against the library's own cards". `web/src/hostedcopy.test.ts`
+  holds the old wordings to zero across every source under `src/`, comments
+  included, and says in its own comment what it cannot do: it stops *these*
+  words, not the next sentence that relocates the shelves some other way. The
+  server's gate message still says "local pool" and is deliberately out of
+  scope — three frozen `.report.json` goldens pin that string, and
+  regenerating a frozen golden is a decision rather than a tidy-up.
+- **The import page's sideways scroll** (09-05 Green) merged as #438 and was
+  walked, which is what its queue line asked for.
+- **The three purge routines have a caller** (08-24 Green 5) and **the
+  Scryfall prune's sizing comment is honest** (08-24 Green 4), both on #441.
+  The accounts database measured **643 KB** on the instance on 2026-09-05,
+  against the "348 KB today" that item recorded on 08-24 — the framing holds
+  ("a shape rather than a crisis") and the shape is moving.
+- **The Safari ruling** (08-24 Green 6) is Aaron's, delegated and answered:
+  the claim is struck rather than the rig built. Landed on #440, argued in the
+  Cleanup entry.
+- **Still open:** the eight scratch decks in the checkout's `decks/`. Their
+  reason to stay expired when #436 merged; cleanup did not delete files under
+  a running process it did not start (port 8765, another session's, answering
+  200 tonight).
+- Full accounting in the **Cleanup** section's 2026-09-05 entry.
+
 ### 2026-09-05 (rainbow, night) — PR #438, held for Aaron's eye
 
 **Every timing this run took carries the load caveat Red named: three other
@@ -5383,6 +5533,27 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-09-05 (cleanup)
+
+- **The daybreak's two-places rule has a guard** (08-24 Colorless 1), landed
+  on #440 as `go/cmd/mtglab/daybreakrecord_test.go`. Every open item must name
+  a ledger section, with the section names read out of `LEDGER.md`'s own `##`
+  headings rather than restated, and **an empty queue is a failure by design**
+  — a queue with no items reads exactly like a broken extractor. This
+  cleanup's own queue rewrite was run against it before it was pushed, which
+  is the first time the rule has been enforced rather than remembered.
+- **The sim-cache ruling is written down** (08-24 Colorless 2), on #440 and in
+  `colorless.md`: prose-only edits in the five fingerprinted packages are
+  never made, and a comment that is genuinely wrong there is queued with its
+  cost attached and fixed beside a real change to the same package. Every lane
+  of this cleanup ran under it.
+- **The 14MB `build/lib/mtglab/` shadow is gone** (09-05 Colorless) —
+  verified absent from the checkout, not assumed.
+- **The queue depth this phase moved: 25 → 9**, both counted with the guard's
+  own extractor rather than by hand, which is this section's standing
+  complaint about counted claims applied to itself.
+- Full accounting in the **Cleanup** section's 2026-09-05 entry.
 
 ### 2026-09-05 (rainbow, night)
 
@@ -6714,7 +6885,164 @@ for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
 
+### 2026-09-05 (cleanup) — the first run
+
+**Queue depth: 25 open items before, 9 after.** Both counted mechanically off
+`DAYBREAK.md` with the same extractor `daybreakrecord_test.go` uses (a
+paragraph under an `## Open` heading carrying the queue's own
+`**Recommendation:**` marker), because a hand count of a queue is the thing
+this phase exists to distrust.
+
+**What Aaron ruled: yes to all**, answered in one pass on the morning of
+2026-09-05 — which is the shape step 2 asks for and the first time it has
+happened. Two of the twenty-five were questions he handed back rather than
+answered, and both defaults are recorded below as rulings in their own right.
+
+**The run was split across five branches**, one per lane, because sixteen
+items across Go, the frontend, the volume and the documents is more than one
+branch should carry and far more than the phase's "surgical over structural"
+cap allows in one diff. The lanes owned disjoint files by design; the only
+overlap in the whole run was `docs/HOSTING.md`, and `git merge-tree` cleared
+it before either branch was pushed.
+
+**The two rulings Aaron delegated.**
+
+1. **The old-Safari rig: the claim is struck, not built** (08-24 Green 6).
+   The Green checklist told every run to test real WebKit through a pinned
+   Playwright rig with its story in the engineering doc; no such dependency
+   has ever existed in the tree, the engineering doc had no such story, and
+   this laptop's own Safari is *older* than the floor the site declares. Both
+   `green.md` and `docs/ENGINEERING.md` now say plainly that the floor is
+   checked statically and witnessed on Aaron's phone. Landed on #440. The
+   principle is worth keeping separately from the outcome: **a checklist that
+   instructs a run to use a tool that does not exist is worse than a checklist
+   that admits the gap**, because the run that follows it reports a check it
+   never made.
+2. **`mtglab claude usage` prints both axes, with dollars beside the models
+   and none beside the modes** (08-24 Black 2). Per surface *and* per Claude,
+   because the two answer different questions and the command exists so that
+   `fly ssh console -C "mtglab claude usage"` answers both from anywhere. No
+   dollar figure sits beside a mode, deliberately: a mode is spread across
+   every model that served it, so a number there would read as arithmetic
+   somebody could check and is not. Landed on #442.
+
+**Landed — sixteen items, by lane.**
+
+- **Guards** (#440, <https://github.com/aasquier/sylvan-library/pull/440>) —
+  four items. ADR 38's dead `docs/go-migration/` cite gets ADR 50 as a
+  forwarding address (08-23 item 2); the polish skill's unenforced prose gets
+  `skillrecord_test.go`, which resolves every repo path and every
+  `mtglab`/`animist` verb a skill names against the tree and the CLIs' own
+  command tables (08-23 item 5); the daybreak's own two-places rule gets
+  `daybreakrecord_test.go` (08-24 Colorless 1); and the sim-cache ruling is
+  written down beside the skill's fix step (08-24 Colorless 2) — prose-only
+  edits in the five fingerprinted packages are never made. Plus the Safari
+  ruling above.
+- **Volume and memory** (#441,
+  <https://github.com/aasquier/sylvan-library/pull/441>) — three items. The
+  card pool's remembered lookups now survive the reaper handing an idle pool
+  back, keyed on the pool file's stamp rather than on the open (08-24 Black
+  4); `auth.Sweeper` gives the three purge routines nothing called a caller,
+  once at boot and then daily, stopped with the door (08-24 Green 5); and the
+  Scryfall prune's remaining half — `fly.toml`'s sizing comment — is replaced
+  with rules and a dated measurement rather than two numbers that had rotted
+  (08-24 Green 4).
+- **Reads and rates** (#442,
+  <https://github.com/aasquier/sylvan-library/pull/442>) — four items. The
+  Admin panel prices each window at the rate in force during it rather than
+  today's (09-05 Black); `mtglab claude usage` exists again (08-24 Black 2);
+  a price limit is a condition of the card search rather than a sieve over
+  its answer, so "sixty cards under $1" means sixty (08-24 Black 3); and ADR
+  5's isolation sweep derives its route list from the served route table in
+  both directions and drives the reads as a stranger (08-24 White 1).
+- **What renders** (this branch) — three items. The four arrivals Aaron chose
+  now speak (08-24 Green 3); four strings and a fifth stop telling visitors
+  the cards are on their own machine (08-24 Green 7); and the last async
+  control that never stopped listening is fixed, with the census turned into
+  a guard (the Red section's queued item 12, remainder).
+- **Answered by the world rather than by a branch** — two items. #436 (the
+  two writing controls) and #438 (the import page's sideways scroll) were
+  both walked and merged on 2026-09-05, which is what their queue lines
+  asked for; and the 14MB `build/lib/mtglab/` shadow of the deleted Python
+  app is gone from the checkout (verified, not assumed — 09-05 Colorless).
+
+**Still in hand — nine, each with what would have to be true**, written out
+in `DAYBREAK.md` rather than here so the morning read stays one file. The
+short form: three wait on Aaron at a keyboard (the `claude` seat's sign-in,
+the key rotation, the repository's required-checks setting), two wait on an
+hour he is willing to spend (the restore drill, and the coverage-floor change
+that only a watched CI run can prove), two wait on other work (Blue's torches
+copy rides the night shelf; the eight scratch decks wait on another session's
+server letting go of port 8765), and two are genuinely landable by a colored
+run rather than by cleanup (the dev-local pprof mount, and the docs-rot guard
+outside `.claude/skills/`). **None of the nine is a silent carry-forward**,
+which is the only rule this phase has about its own leftovers.
+
+**The extra cleanup step — what landing the work taught, which is the whole
+reason the rule exists.** Six findings, all of them produced by touching
+queued work rather than by auditing:
+
+1. **A list of four was a list of five.** 08-24 Green 7 named four strings
+   saying "the local pool". Sweeping for the *claim* rather than for the
+   phrase found a fifth in the card search — "the whole printed history,
+   queried locally" — same untruth, different words, invisible to a grep for
+   the list. This is the wording-sweep trap in its exact recorded form, and
+   the guard that replaced the list (`web/src/hostedcopy.test.ts`) says
+   plainly in its own comment that it stops *these* words and not the next
+   sentence that relocates the shelves some other way.
+2. **A hand census of controls was low by more than half, and low for a
+   reason.** 08-24 counted 21 async controls and 7 undisabled by reading the
+   `onClick` text; running the same question over the tree finds **46 of 217
+   buttons, 9 undisabled** — because half the offenders never say `async` at
+   the call site (`onClick={() => choose(c)}` looks synchronous and starts a
+   card search). Four hand counts of one invariant across three weeks is what
+   finally made it a test.
+3. **An exemption inherited from a ledger entry did not survive checking.**
+   The 09-05 Red entry justifies the Admin panel's "Gather it now" as "a
+   second POST follows the first instead of starting another". It does not:
+   `refreshLibrary` answers **409** with the running job's id. The control is
+   still fine and for a better reason — `gather()` clears `asking` before it
+   awaits anything and the button renders only in the `asking` branch, so the
+   second click has nothing under it — and the difference matters, because an
+   exemption resting on a server behaviour has to be re-checked whenever that
+   handler moves. The corrected reason is in `asynccontrols.test.ts`; the Red
+   entry is left as the record of what that run said.
+4. **A guard nothing can fail is not a guard.** The simulator's arrival
+   sentence was first written `running ? '' : …`, which reads like the clause
+   keeping the region quiet during a run and is not — `run()` clears every
+   result before it awaits, so no render can reach it. Mutating it broke
+   nothing. It was removed and the emptiness now rests where it comes from,
+   with a test that fails if the clearing goes. Same lesson as `returnCard`'s
+   missing in-function guard, found the same way: by breaking it.
+5. **An anti-vacuity floor over two globs is satisfied by either one.** The
+   copy guard reads `.ts` and `.tsx` and asserted "more than 40 sources"
+   across both; the tree holds 39 and 70, so blanking the `.ts` half left the
+   whole of `lib/` unswept and the test still green. Measured, not reasoned
+   about. Each glob now carries its own floor.
+6. **A live region announces the last answer when the next one fails.** The
+   card search keeps the previous results on screen after a failed search —
+   correct for an eye, which can see the error above them — so a region keyed
+   only on "not busy, have cards" re-announced the old count immediately
+   after `ErrorNote`'s `role="alert"`. The reader would hear the failure and
+   then hear a number.
+
+**Two numbers in the ledger that this run corrected**, both the ordinary kind
+of rot rather than anything's fault: 08-24 White 1's record says the isolation
+sweep covered "22 `/api/decks/{owner}/…` patterns" — 22 was the swept list,
+and the app serves **35**; and 08-24 Green 5 says the accounts database is
+"348 KB today" — measured on the instance on 2026-09-05 it is **643 KB**,
+which does not change that item's framing ("a shape rather than a crisis") but
+does show the shape moving.
+
 ### Not yet run
+
+*(Kept as the record of what the first run inherited. Two of the three items
+below are closed as of 2026-09-05 — ADR 38 by #440's ADR 50, and the `needs`
+guard by #285's `pipeline_test.go`, which derives the expected job set from
+`ci.yml`'s own keys. The third, the measuring shelf's Go rebuild, was never a
+queue item and is not closed: it remains the standing question Colorless asks
+each run, and its own honest answer is still "smaller than the tool that
+retired".)*
 
 The phase was created 2026-08-23 at Aaron's ask, alongside the skill's
 Go-toolchain refresh. Its first run has a standing backlog waiting for it:

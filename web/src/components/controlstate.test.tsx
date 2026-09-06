@@ -25,8 +25,9 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { openTags } from '../tagscan'
 
-/** Every `.tsx` in the app, as source text. Tests excluded by the glob. */
+/** Every `.tsx` in the app, as source text. Tests are skipped by `openTags`. */
 const sources = import.meta.glob('../**/*.tsx', {
   query: '?raw', import: 'default', eager: true,
 }) as Record<string, string>
@@ -43,50 +44,18 @@ const STATEFUL = /chip-toggle|strip-tab/
 const SAYS_STATE = /aria-(selected|pressed|expanded|current)/
 
 /**
- * Finds the end of a JSX opening tag.
+ * Every `<button>` in the tree whose class marks it a place or a setting.
  *
- * Written rather than regexed because `onClick={() => setTab(t.id)}` contains
- * a `>` and a lazy `[\s\S]*?>` stops on the arrow — which is not a hypothetical
- * failure mode, it is the one this file's first draft had, and it silently
- * reported four of the six real sites as clean.
+ * The tag reader moved to `src/tagscan.ts` when a second guard needed it —
+ * `asynccontrols.test.ts`, which asks whether a control that starts work stops
+ * listening. Its argument for being written rather than regexed is recorded
+ * there, and it is this file's argument: a lazy `<button[\s\S]*?>` stops at
+ * the `>` inside `onClick={() => setTab(t.id)}`, which is the bug this file's
+ * first draft shipped with, and it reported four of the six real sites as
+ * clean.
  */
-function tagEnd(src: string, from: number): number {
-  let depth = 0
-  let inTick = false
-  for (let i = from; i < src.length; i++) {
-    const c = src[i]
-    if (c === '`') inTick = !inTick
-    if (inTick) continue
-    if (c === '{') depth++
-    else if (c === '}') depth--
-    else if (c === '>' && depth === 0 && src[i - 1] !== '=') return i
-  }
-  return -1
-}
-
-/** Every `<button>` in the tree whose class marks it a place or a setting. */
 function statefulButtons() {
-  const found: { where: string; tag: string }[] = []
-  for (const [path, src] of Object.entries(sources)) {
-    if (path.includes('.test.')) continue
-    const re = /<button\b/g
-    let m: RegExpExecArray | null
-    while ((m = re.exec(src))) {
-      const end = tagEnd(src, m.index + '<button'.length)
-      if (end < 0) continue
-      const tag = src.slice(m.index, end + 1)
-      if (!STATEFUL.test(tag)) continue
-      const line = src.slice(0, m.index).split('\n').length
-      // Anchored, and the anchor is the point: `import.meta.glob` hands back
-      // keys relative to this file (`../routes/Admin.tsx`), so only a leading
-      // `../` is the prefix being rewritten. A bare `.replace('../', …)`
-      // rewrites the first occurrence wherever it falls, which is a different
-      // rule that happens to agree on today's paths — and CodeQL was right to
-      // say so rather than wait for the day they disagree.
-      found.push({ where: `${path.replace(/^\.\.\//, 'src/')}:${line}`, tag })
-    }
-  }
-  return found
+  return openTags(sources, 'button').filter((b) => STATEFUL.test(b.tag))
 }
 
 describe('a control that is a place or a setting', () => {

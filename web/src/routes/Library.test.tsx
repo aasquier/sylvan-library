@@ -424,6 +424,25 @@ describe('Library', () => {
     expect(art.getAttribute('aria-hidden')).toBeNull()
     expect(art.getAttribute('alt')).toMatch(/Yeong-Hao Han/)
   })
+
+  // The source guard in `src/hostedcopy.test.ts` proves the old wording is
+  // nowhere in the tree; this proves the new one actually reaches the page.
+  // Both halves, because a phrase held to zero is satisfied by a masthead
+  // that says nothing at all about the cards.
+  it('counts the cards without claiming they are the reader’s own', async () => {
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    const nameplate = screen.getByRole('heading', { level: 1 }).closest('section')!
+    expect(nameplate.textContent).toMatch(/35,000 cards on the shelves/)
+  })
+
+  it('says the shelves are bare rather than naming what holds them', async () => {
+    vi.mocked(api.health).mockResolvedValue({ pool: false, oracle_cards: 0, printings: 0 })
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    const nameplate = screen.getByRole('heading', { level: 1 }).closest('section')!
+    expect(nameplate.textContent).toMatch(/no cards on the shelves yet/)
+  })
 })
 
 // ---------------------------------------------------------------- mana pips
@@ -1000,9 +1019,9 @@ describe('Library crypt', () => {
     await openCrypt()
 
     expect(await screen.findByText(/entombed 5 minutes ago/)).toBeTruthy()
-    // Read off the row, not off the page: the masthead says "35,000 cards in
-    // the local pool", and a loose `/0 cards/` matches *that* — which is how
-    // this assertion passed against the wrong element on the first run.
+    // Read off the row, not off the page: the masthead says "35,000 cards on
+    // the shelves", and a loose `/0 cards/` matches *that* — which is how this
+    // assertion passed against the wrong element on the first run.
     expect(screen.getByRole('listitem').textContent).not.toMatch(/cards/)
   })
 
