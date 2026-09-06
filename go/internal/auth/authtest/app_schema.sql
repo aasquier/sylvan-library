@@ -1,8 +1,8 @@
--- app.db's recorded schema at version 14: what the ladder under
+-- app.db's recorded schema at version 17: what the ladder under
 -- go/internal/auth/migrations/ builds, read back out of sqlite_master.
 -- TestMigrateBuildsTheRecordedSchema holds auth.Migrate to these bytes,
 -- so a new rung updates this record in the same change. Do not hand-edit.
-PRAGMA user_version = 14;
+PRAGMA user_version = 17;
 CREATE TABLE auth_tokens (
         -- The hash of the token, for the same reason `sessions` stores one:
         -- reading this file must not hand over a live credential, and an
@@ -86,7 +86,7 @@ CREATE TABLE forge_games (
         milliseconds INTEGER NOT NULL,
         turns        INTEGER,
         draw         INTEGER NOT NULL,
-        timed_out    INTEGER NOT NULL,
+        timed_out    INTEGER NOT NULL, kill_amount  INTEGER, kill_card    TEXT, kill_sources INTEGER, kill_combat  INTEGER, kill_seat    INTEGER, kill_turn    INTEGER, big_card      TEXT, big_power     INTEGER, big_toughness INTEGER, big_seat      INTEGER, big_turn      INTEGER, stack_card    TEXT, stack_count   INTEGER, stack_seat    INTEGER, stack_turn    INTEGER,
         PRIMARY KEY (match_id, game_index)
     );
 CREATE TABLE forge_matches (
@@ -121,6 +121,22 @@ CREATE TABLE login_attempts (
         window_start TEXT NOT NULL,
         failures     INTEGER NOT NULL
     );
+CREATE TABLE night_bout_seats (
+        bout_id  INTEGER NOT NULL REFERENCES night_bouts(id) ON DELETE CASCADE,
+        -- 1-based, and it is the order the decks are handed to Forge, which is
+        -- what `forge_games.winner_seat` will point at once the bout records.
+        -- The same contract `forge_seats.seat` carries, deliberately: a bout's
+        -- seat 3 and its match's seat 3 are the same chair.
+        seat     INTEGER NOT NULL,
+        -- NULL owner is the house, exactly as the old columns meant it. No
+        -- REFERENCES to `users`, for the reason rung 14 already argued: a seat
+        -- records who was entered when the night was planned, and an account's
+        -- later deletion must neither be blocked by last night's record nor
+        -- reach back into it.
+        owner_id INTEGER,
+        slug     TEXT    NOT NULL,
+        PRIMARY KEY (bout_id, seat)
+    );
 CREATE TABLE night_bouts (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id       INTEGER NOT NULL REFERENCES night_runs(id),
@@ -129,10 +145,6 @@ CREATE TABLE night_bouts (
         -- on either owner, deliberately: a seat records who was entered when
         -- the night was planned, and an account's later deletion must
         -- neither be blocked by last night's record nor reach back into it.
-        seat_a_owner INTEGER,
-        seat_a_slug  TEXT    NOT NULL,
-        seat_b_owner INTEGER,
-        seat_b_slug  TEXT    NOT NULL,
         games        INTEGER NOT NULL,
         -- Derived and stable per bout, so a night is reproducible in
         -- principle; stored on the bout because the match ledger must not
@@ -150,7 +162,7 @@ CREATE TABLE night_bouts (
         match_id     INTEGER,
         created_at   TEXT    NOT NULL,
         updated_at   TEXT    NOT NULL
-    );
+    , clock INTEGER NOT NULL DEFAULT 300);
 CREATE TABLE night_runs (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         -- The local date the window opened ('2026-09-06') in the configured
@@ -244,7 +256,14 @@ CREATE INDEX auth_tokens_by_user ON auth_tokens(user_id, purpose);
 CREATE INDEX claude_usage_by_time ON claude_usage(created_at);
 CREATE INDEX deck_log_by_deck ON deck_log(owner_id, slug, id);
 CREATE INDEX dossier_cache_by_oracle ON dossier_cache(oracle_id);
+CREATE INDEX forge_games_by_big ON forge_games(big_power DESC)
+        WHERE big_power IS NOT NULL;
+CREATE INDEX forge_games_by_kill ON forge_games(kill_amount DESC)
+        WHERE kill_amount IS NOT NULL;
+CREATE INDEX forge_games_by_stack ON forge_games(stack_count DESC)
+        WHERE stack_count IS NOT NULL;
 CREATE INDEX forge_seats_by_deck ON forge_seats(owner_id, slug);
+CREATE INDEX night_bout_seats_bout ON night_bout_seats(bout_id);
 CREATE INDEX night_bouts_run ON night_bouts(run_id);
 CREATE UNIQUE INDEX night_runs_one_per_night ON night_runs(night_key)
         WHERE sample = 0;

@@ -2,6 +2,7 @@ package tier3_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1042,5 +1043,191 @@ func TestADetachCrossesTheWireAsAZeroRatherThanNothing(t *testing.T) {
 	const want = `[{"id":1,"attached_to":0},{"id":2,"attached_to":7},{"id":3}]`
 	if string(raw) != want {
 		t.Errorf("the changes crossed as\n  %s\nwant\n  %s", raw, want)
+	}
+}
+
+// The killing blow, read off the recorded match — and read on **both** paths,
+// which is the property that matters: the night does not narrate, so a blow
+// that only appeared for a watcher would be a blow no scheduled bout ever
+// recorded.
+//
+// The numbers are the corpus's own. Game one ends with six combat sources
+// landing on Atla Palani at once — 5, 4, 2, 2, 2 and 1 — and then a single
+// life line of −13. Sixteen damage, six sources, and Gyome, Master Chef named
+// as the one that hit hardest. Reading the *last* line instead would call this
+// a Spirit Token for one, which is the mistake this test exists to keep out.
+func TestTheKillingBlowIsTheWholeLethalSwing(t *testing.T) {
+	t.Parallel()
+	for _, watching := range []bool{true, false} {
+		_, games := scribed(t, watching)
+		if len(games) < 1 {
+			t.Fatalf("watching=%v: the corpus produced no games", watching)
+		}
+		k := games[0].Killer
+		if k == nil {
+			t.Fatalf("watching=%v: game 1 ends in a kill and recorded none", watching)
+		}
+		if k.Amount != 16 {
+			t.Errorf("watching=%v: the blow was %d, want the whole 16-damage swing",
+				watching, k.Amount)
+		}
+		if k.Sources != 6 {
+			t.Errorf("watching=%v: the blow counted %d sources, want 6", watching, k.Sources)
+		}
+		if k.Card != "Gyome, Master Chef" {
+			t.Errorf("watching=%v: the blow is credited to %q, want the hardest hitter",
+				watching, k.Card)
+		}
+		if !k.Combat {
+			t.Errorf("watching=%v: an alpha strike is combat damage", watching)
+		}
+		if k.Seat != 2 {
+			t.Errorf("watching=%v: seat %d died, want 2", watching, k.Seat)
+		}
+		if k.Turn <= 0 {
+			t.Errorf("watching=%v: the blow landed on turn %d", watching, k.Turn)
+		}
+	}
+}
+
+// Damage to a permanent is not a blow against a player, and a seat that ends
+// at zero without any damage on record — decked, an effect, commander damage
+// on Forge's own tracker — records nothing rather than guessing.
+func TestABloodlessEndRecordsNoKillingBlow(t *testing.T) {
+	t.Parallel()
+	p := tier3.NewScribeParser(false)
+	for _, line := range []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,"seat":1,"who":"A","life":40}`,
+		`{"t":"seat","game":1,"seat":2,"who":"B","life":40}`,
+		// Damage to a creature, not a player: no against_seat.
+		`{"t":"damage","game":1,"amount":9,"target_id":5,"target":"Egg Token","card":"Shock"}`,
+		// And the seat that dies took none of it.
+		`{"t":"life","game":1,"seat":2,"who":"B","life":0}`,
+		`{"t":"result","game":1,"milliseconds":100,"seat":1,"winner":"A"}`,
+	} {
+		if _, game := p.Feed(line); game != nil && game.Killer != nil {
+			t.Fatalf("a bloodless end recorded a blow: %+v", game.Killer)
+		}
+	}
+}
+
+// A gain of life closes the batch: damage taken before it is not part of the
+// swing that kills later. Without this a player chipped for two on turn four
+// and killed on turn twenty would carry a two-damage head start into the blow.
+func TestLifeGainClosesTheBatch(t *testing.T) {
+	t.Parallel()
+	p := tier3.NewScribeParser(false)
+	var last *tier3.GameResult
+	for _, line := range []string{
+		`{"t":"game","game":1}`,
+		`{"t":"seat","game":1,"seat":1,"who":"A","life":40}`,
+		`{"t":"seat","game":1,"seat":2,"who":"B","life":40}`,
+		`{"t":"damage","game":1,"amount":2,"combat":true,"against_seat":2,"card":"Early Chip"}`,
+		`{"t":"life","game":1,"seat":2,"who":"B","life":38}`,
+		`{"t":"damage","game":1,"amount":38,"combat":true,"against_seat":2,"card":"The Haymaker"}`,
+		`{"t":"life","game":1,"seat":2,"who":"B","life":0}`,
+		`{"t":"result","game":1,"milliseconds":100,"seat":1,"winner":"A"}`,
+	} {
+		if _, game := p.Feed(line); game != nil {
+			last = game
+		}
+	}
+	if last == nil || last.Killer == nil {
+		t.Fatal("no blow recorded")
+	}
+	if last.Killer.Amount != 38 || last.Killer.Sources != 1 ||
+		last.Killer.Card != "The Haymaker" {
+		t.Errorf("the blow read %+v, want the 38 from one source", last.Killer)
+	}
+}
+
+// The two feats, read off the recorded match on both paths (Aaron,
+// 2026-09-06). Like the killing blow, these are row fields and the night does
+// not narrate, so a record that only existed for a watcher would be a record
+// no scheduled bout ever kept.
+func TestTheGamesFeatsAreReadOnBothPaths(t *testing.T) {
+	t.Parallel()
+	var watched, quiet []tier3.GameResult
+	for _, watching := range []bool{true, false} {
+		_, games := scribed(t, watching)
+		if watching {
+			watched = games
+		} else {
+			quiet = games
+		}
+		if len(games) == 0 {
+			t.Fatalf("watching=%v: no games", watching)
+		}
+		big := games[0].Biggest
+		if big == nil {
+			t.Fatalf("watching=%v: the corpus has creatures and recorded none", watching)
+		}
+		if big.Power <= 0 || big.Card == "" {
+			t.Errorf("watching=%v: the biggest creature reads %+v", watching, big)
+		}
+		// It stood on somebody's battlefield, so it has an owner — that is
+		// the whole reason the parser keeps an id-to-seat map, since a
+		// `stats` line names a card and never a player.
+		if big.Seat <= 0 {
+			t.Errorf("watching=%v: the biggest creature belongs to nobody: %+v",
+				watching, big)
+		}
+		stack := games[0].TallestStack
+		if stack == nil {
+			t.Fatalf("watching=%v: gyome-food made tokens and none was counted", watching)
+		}
+		if stack.Count < 2 || stack.Card == "" || stack.Seat <= 0 {
+			t.Errorf("watching=%v: the tallest stack reads %+v", watching, stack)
+		}
+	}
+	// And the two paths agree, which is the property that matters: a row is a
+	// row whether or not a board was built beside it.
+	if watched[0].Biggest.Power != quiet[0].Biggest.Power ||
+		watched[0].Biggest.Card != quiet[0].Biggest.Card {
+		t.Errorf("the paths disagree about the biggest creature: %+v vs %+v",
+			watched[0].Biggest, quiet[0].Biggest)
+	}
+	if watched[0].TallestStack.Count != quiet[0].TallestStack.Count {
+		t.Errorf("the paths disagree about the tallest stack: %+v vs %+v",
+			watched[0].TallestStack, quiet[0].TallestStack)
+	}
+}
+
+// A stack is the deepest pile held **at once**, not a count of tokens made:
+// a deck that makes three Food and eats each one never had a stack of three.
+// And two seats holding two apiece is two stacks of two, never one of four.
+func TestATokenStackIsWhatIsHeldAtOnce(t *testing.T) {
+	t.Parallel()
+	p := tier3.NewScribeParser(false)
+	in := func(seat, id int) string {
+		return fmt.Sprintf(`{"t":"zone","game":1,"zone":"Battlefield","mode":"in",`+
+			`"seat":%d,"id":%d,"card":"Food Token","token":true,"types":"Artifact - Food"}`,
+			seat, id)
+	}
+	out := func(seat, id int) string {
+		return fmt.Sprintf(`{"t":"zone","game":1,"zone":"Battlefield","mode":"out",`+
+			`"seat":%d,"id":%d,"card":"Food Token","token":true,"types":"Artifact - Food"}`,
+			seat, id)
+	}
+	var last *tier3.GameResult
+	for _, line := range []string{
+		`{"t":"game","game":1}`,
+		in(1, 1), out(1, 1), // made and eaten: never a stack of two
+		in(1, 2), in(1, 3), // two at once
+		out(1, 2), out(1, 3),
+		in(2, 4), in(2, 5), // the other seat, also two
+		`{"t":"result","game":1,"milliseconds":100,"seat":1,"winner":"A"}`,
+	} {
+		if _, game := p.Feed(line); game != nil {
+			last = game
+		}
+	}
+	if last == nil || last.TallestStack == nil {
+		t.Fatal("no stack recorded")
+	}
+	if last.TallestStack.Count != 2 {
+		t.Errorf("the tallest stack is %d, want 2 — seats do not pool and an "+
+			"eaten token was never in the pile", last.TallestStack.Count)
 	}
 }

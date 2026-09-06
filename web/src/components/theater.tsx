@@ -233,6 +233,31 @@ export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
               {r.turns != null ? `T${turnsTaken(r.turns)}` : '—'}
             </span>
             <span className="theater-row-secs tabular">{r.seconds}s</span>
+            {/* The blow that ended it, inside the row rather than beside it:
+                `.theater-row:nth-child(odd)` stripes on siblings, so a second
+                element per game would have banded the list by half-rows. It
+                spans the grid instead.
+
+                The picture is the whole card, which is how every card in this
+                room is credited — a full image carries its own artist and
+                copyright line printed on it. No filter touches it; the light
+                is a layer above (commandment 19). */}
+            {r.killer && (
+              <div className="theater-blow">
+                {r.killer.image && (
+                  <img className="theater-blow-card" src={r.killer.image}
+                       alt={r.killer.card} loading="lazy" width={30} height={42} />
+                )}
+                <span className="theater-blow-said">
+                  <strong>{r.killer.card}</strong>
+                  {r.killer.sources > 1 && ` and ${r.killer.sources - 1} more`}
+                  {r.killer.combat ? ' struck for ' : ' burned for '}
+                  <strong className="theater-blow-amount tabular">
+                    {r.killer.amount}
+                  </strong>
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>

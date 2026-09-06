@@ -59,8 +59,9 @@ func appearances(plans []night.Plan) map[int64]int {
 		out[*s.Owner]++
 	}
 	for _, p := range plans {
-		count(p.SeatA)
-		count(p.SeatB)
+		for _, s := range p.Seats {
+			count(s)
+		}
 	}
 	return out
 }
@@ -168,11 +169,19 @@ func TestTheDrawIsFairAcrossAccounts(t *testing.T) {
 			t.Errorf("account %d sat in %d bouts, want everyone's 2", owner, got[owner])
 		}
 	}
-	// And on a scheduled night nobody is seated against themselves.
+	// And on a scheduled night nobody sits at their own table twice — which a
+	// pod makes a real question rather than a formality, because four chairs
+	// give an eager shelf three chances to meet itself.
 	for i, p := range plans {
-		if p.SeatA.Owner != nil && p.SeatB.Owner != nil &&
-			*p.SeatA.Owner == *p.SeatB.Owner {
-			t.Errorf("bout %d seats account %d against itself", i, *p.SeatA.Owner)
+		seen := map[int64]bool{}
+		for _, s := range p.Seats {
+			if s.Owner == nil {
+				continue
+			}
+			if seen[*s.Owner] {
+				t.Errorf("bout %d seats account %d against itself", i, *s.Owner)
+			}
+			seen[*s.Owner] = true
 		}
 	}
 }
@@ -180,11 +189,11 @@ func TestTheDrawIsFairAcrossAccounts(t *testing.T) {
 func TestTheHouseFillsTheCard(t *testing.T) {
 	t.Parallel()
 	// One player, one deck, a share of three: the house completes their
-	// bouts and the leftover capacity, with two different decks in every
-	// house-only bout.
+	// tables and the leftover capacity, and no deck is ever at one table
+	// twice — the property that matters once a table can hold four.
 	plans := night.PlanScheduled("2026-09-06",
-		[]string{"kaheera", "goreclaw", "atla"}, shelfOf(4, "gyome"),
-		caps(4, 3, 10))
+		[]string{"kaheera", "goreclaw", "atla", "trostani", "tivit"},
+		shelfOf(4, "gyome"), caps(4, 3, 10))
 	if len(plans) != 4 {
 		t.Fatalf("dealt %d bouts, want 4", len(plans))
 	}
@@ -192,12 +201,73 @@ func TestTheHouseFillsTheCard(t *testing.T) {
 	if got[4] != 3 {
 		t.Errorf("the lone player sat in %d bouts, want their whole share of 3", got[4])
 	}
-	if got[0] != 5 {
-		t.Errorf("the house filled %d seats, want the remaining 5", got[0])
+	// Every chair the player did not take is the house's, so the two counts
+	// have to add up to the seats the mix dealt. Derived rather than written
+	// down: a hardcoded total is a number that goes stale the day the mix or
+	// the bout cap moves, and this is the invariant either way.
+	seats := 0
+	for _, p := range plans {
+		seats += len(p.Seats)
+	}
+	if got[0]+got[4] != seats {
+		t.Errorf("the seats do not add up: house %d + player %d != %d dealt",
+			got[0], got[4], seats)
 	}
 	for i, p := range plans {
-		if p.SeatA.House() && p.SeatB.House() && p.SeatA.Slug == p.SeatB.Slug {
-			t.Errorf("bout %d seats the house deck %q against itself", i, p.SeatA.Slug)
+		seen := map[string]bool{}
+		for _, s := range p.Seats {
+			if seen[s.Slug] {
+				t.Errorf("bout %d seats %q twice", i, s.Slug)
+			}
+			seen[s.Slug] = true
+		}
+	}
+}
+
+// The mix Aaron chose on 2026-09-06, asserted as arithmetic rather than
+// sampled: two pods to every duel, interleaved so a night cut short by its
+// window loses whole groups rather than all of one kind.
+func TestTheNightDealsTwoPodsToEveryDuel(t *testing.T) {
+	t.Parallel()
+	plans := night.PlanScheduled("2026-09-06",
+		[]string{"kaheera", "goreclaw", "atla", "trostani", "tivit", "arahbo"},
+		nil, caps(9, 2, 10))
+	if len(plans) != 9 {
+		t.Fatalf("dealt %d bouts, want 9", len(plans))
+	}
+	pods, duels := 0, 0
+	for i, p := range plans {
+		switch {
+		case p.Pod():
+			pods++
+			if p.Games != night.PodGames {
+				t.Errorf("pod %d plays %d games, want %d", i, p.Games, night.PodGames)
+			}
+			if p.Clock != night.PodClock {
+				t.Errorf("pod %d runs at clock %d, want %d", i, p.Clock, night.PodClock)
+			}
+			if len(p.Seats) != night.PodSeats {
+				t.Errorf("pod %d has %d chairs, want %d", i, len(p.Seats), night.PodSeats)
+			}
+		default:
+			duels++
+			if p.Games != 10 {
+				t.Errorf("duel %d plays %d games, want the settings' 10", i, p.Games)
+			}
+			if p.Clock != night.DuelClock {
+				t.Errorf("duel %d runs at clock %d, want %d", i, p.Clock, night.DuelClock)
+			}
+		}
+	}
+	if pods != 6 || duels != 3 {
+		t.Errorf("dealt %d pods and %d duels, want 6 and 3", pods, duels)
+	}
+	// Interleaved, not grouped: the duel is the last of each three.
+	for i, p := range plans {
+		wantDuel := (i+1)%3 == 0
+		if p.Pod() == wantDuel {
+			t.Errorf("bout %d is a pod=%v; the third of every three is the duel",
+				i, p.Pod())
 		}
 	}
 }
@@ -207,7 +277,7 @@ func TestAnEmptyLibraryDealsNothing(t *testing.T) {
 	if plans := night.PlanScheduled("2026-09-06", nil, nil, caps(6, 2, 10)); len(plans) != 0 {
 		t.Fatalf("an empty roster dealt %d bouts", len(plans))
 	}
-	if plans := night.PlanSample("2026-09-06", nil, nil, 10); len(plans) != 0 {
+	if plans := night.PlanSample("2026-09-06", nil, nil, caps(0, 0, 10)); len(plans) != 0 {
 		t.Fatalf("an empty sample dealt %d bouts", len(plans))
 	}
 	// A house of one deck has nobody to fight either.
@@ -221,8 +291,9 @@ func TestASampleDealsTheFullRoundRobin(t *testing.T) {
 	t.Parallel()
 	house := []string{"kaheera", "goreclaw", "atla"}
 	players := append(shelfOf(1, "gyome", "arahbo"), shelfOf(2, "tivit")...)
-	plans := night.PlanSample("2026-09-06", house, players, 10)
-	// Six decks, every pair once, caps nowhere in sight: 15 bouts.
+	set := caps(0, 0, 10) // a sample ignores both caps
+	plans := night.PlanSample("2026-09-06", house, players, set)
+	// Six decks, every pair seeding one bout, caps nowhere in sight: 15.
 	if len(plans) != 15 {
 		t.Fatalf("the sample dealt %d bouts, want the full 15", len(plans))
 	}
@@ -232,9 +303,14 @@ func TestASampleDealsTheFullRoundRobin(t *testing.T) {
 		}
 		return fmt.Sprintf("%d/%s", *s.Owner, s.Slug)
 	}
+	// **The pair still meets exactly once**, and that is now a claim about
+	// the first two chairs rather than about the whole table: a pod's other
+	// two seats are filled from the roster, so two decks may well share a
+	// pod having already had their own bout. The round-robin is what decides
+	// *who is measured against whom*; the fill is scenery.
 	seen := map[string]bool{}
 	for _, p := range plans {
-		a, b := key(p.SeatA), key(p.SeatB)
+		a, b := key(p.Seats[0]), key(p.Seats[1])
 		if a > b {
 			a, b = b, a
 		}
@@ -243,12 +319,26 @@ func TestASampleDealsTheFullRoundRobin(t *testing.T) {
 			t.Errorf("the sample dealt %s twice", pair)
 		}
 		seen[pair] = true
-		if p.Games != 10 {
-			t.Errorf("%s plays %d games, want 10", pair, p.Games)
+		// A sample measures the mix it will actually run, so its bouts carry
+		// the same dials a scheduled night's do.
+		if p.Games != night.GamesFor(len(p.Seats), set) {
+			t.Errorf("%s plays %d games, want %d",
+				pair, p.Games, night.GamesFor(len(p.Seats), set))
+		}
+		if p.Clock != night.ClockFor(len(p.Seats)) {
+			t.Errorf("%s runs at clock %d, want %d",
+				pair, p.Clock, night.ClockFor(len(p.Seats)))
+		}
+		for i, s := range p.Seats {
+			for j := i + 1; j < len(p.Seats); j++ {
+				if s.Slug == p.Seats[j].Slug {
+					t.Errorf("%s seats %q twice", pair, s.Slug)
+				}
+			}
 		}
 	}
 	// Deterministic like the scheduled deal.
-	if again := night.PlanSample("2026-09-06", house, players, 10); !reflect.DeepEqual(plans, again) {
+	if again := night.PlanSample("2026-09-06", house, players, set); !reflect.DeepEqual(plans, again) {
 		t.Fatal("the same sample dealt two different cards")
 	}
 }

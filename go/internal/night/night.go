@@ -52,6 +52,7 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // Default values for the settings that have one, applied by
@@ -68,6 +69,29 @@ const (
 	DefaultBoutsPerAccount = 2
 	// DefaultGames is games per bout when nobody says.
 	DefaultGames = 10
+	// PodSeats is how many chairs a pod has: a Commander table.
+	PodSeats = 4
+	// PodGames is games in a pod bout, and it is one on purpose (Aaron,
+	// 2026-09-06). Ten games is a *measurement* — it is how a duel's win
+	// rate gets a usable denominator — and a pod is a *scene*. The arithmetic
+	// agrees with the taste: at a measured ~135s median per pod game, one
+	// game is a ~3 minute bout and ten is a ~26 minute one, so ten games a
+	// pod turns a night of twenty-eight bouts into a night of three.
+	PodGames = 1
+	// PodClock and DuelClock are Forge's per-game seconds at each size of
+	// table. **Aliases rather than numbers**: the rule lives in
+	// `tier3.ClockForSeats`, beside `ClockDefault` and `GameBudget`, because
+	// the interactive route needs the same answer and two copies of a clock
+	// is how one of them ends up stale. See there for the measurement that
+	// chose 900.
+	PodClock  = tier3.ClockPod
+	DuelClock = tier3.ClockDefault
+	// PodShare is how much of a scheduled night is pods rather than duels:
+	// two bouts in three (Aaron, 2026-09-06). Expressed as a fraction of the
+	// bout cap rather than a probability, so a night's shape is the same
+	// every night and a test can assert it.
+	PodShareNumerator   = 2
+	PodShareDenominator = 3
 	// GamesMax is the ceiling on games per bout — the same one the
 	// Coliseum's door enforces on an interactive match (`api.ForgeGamesMax`,
 	// and a test holds the two equal, because a copied number is a number

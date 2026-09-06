@@ -3,6 +3,7 @@ package tier3
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -206,6 +207,19 @@ type ScribeParser struct {
 	board     *board
 	// seats is the roster, for turning an outcome sentence back into a seat.
 	seats map[int]string
+	// lastBlow is the most recent player damage each seat took, and killer is
+	// the one that proved lethal. Both per game and both read on the unwatched
+	// path, because the blow is a row's field — see [ScribeParser.watchForTheKill].
+	lastBlow map[int]KillingBlow
+	killer   *KillingBlow
+	// owner maps a card id to the seat whose battlefield it is on, which is
+	// the only way a `stats` line -- which names a card and never a player --
+	// can be attributed. tokens is the live count of each token per seat,
+	// keyed "seat|name"; biggest and tallest are this game's two records.
+	owner   map[int]int
+	tokens  map[string]int
+	biggest *BigCreature
+	tallest *TokenStack
 	// phantoms is every card id this reader has refused as Forge's own
 	// bookkeeping. Per game, like Forge's ids. [ScribeParser.refused] argues
 	// why the answer is remembered rather than asked again.
@@ -232,7 +246,9 @@ type ScribeParser struct {
 func NewScribeParser(watching bool) *ScribeParser {
 	return &ScribeParser{prose: NewStreamParser(), watching: watching, game: 1,
 		board: newBoard(), seats: map[int]string{}, phantoms: map[int]bool{},
-		sidelined: map[int]bool{}, companions: map[int]bool{}}
+		sidelined: map[int]bool{}, companions: map[int]bool{},
+		lastBlow: map[int]KillingBlow{}, owner: map[int]int{},
+		tokens: map[string]int{}}
 }
 
 // Output is the run's tally — the complaints, and the games.
@@ -282,8 +298,152 @@ func (p *ScribeParser) Feed(raw string) (*EventLog, *GameResult) {
 		return p.finishGame(l)
 	}
 
+	// The killing blow, on both paths and for the same reason the turn count
+	// is: it is a row's field. Two lines carry it between them — the damage
+	// says how much and from what, the life that follows says whether it was
+	// lethal — so this watches for the pair rather than for either alone.
+	p.watchForTheKill(l)
+	p.watchTheFeats(l)
+
 	p.fold(l)
 	return nil, nil
+}
+
+// watchTheFeats keeps this game's two records: the biggest creature that stood
+// on a battlefield, and the deepest stack of one token a seat held at once.
+//
+// On both paths, like the killing blow and for the same reason — these are a
+// row's fields, and the night does not narrate. Cheap by construction: three
+// small maps and a comparison, no board built.
+func (p *ScribeParser) watchTheFeats(l scribeLine) {
+	switch l.Kind {
+	case "zone":
+		// The id-to-seat map every other reading here leans on. A `stats`
+		// line names a card and never a player, so a creature pumped to
+		// fifteen would belong to nobody without this.
+		if l.Seat > 0 && l.ID > 0 {
+			p.owner[l.ID] = l.Seat
+		}
+		if l.Zone != "Battlefield" {
+			return
+		}
+		if l.Token && l.Card != "" && l.Seat > 0 {
+			p.countToken(l)
+		}
+		// Only an arrival, so a creature leaving does not re-measure itself
+		// on the way to the graveyard.
+		if l.Mode == "in" {
+			p.noteCreature(l)
+		}
+	case "stats":
+		// A stats line only ever describes something in play, which is what
+		// makes it safe to read without checking a zone.
+		p.noteCreature(l)
+	}
+}
+
+// countToken follows one token's arrival or departure and keeps the deepest
+// pile seen. Keyed by seat and name together: two players each holding nine
+// Cats is two stacks of nine, never one of eighteen.
+func (p *ScribeParser) countToken(l scribeLine) {
+	key := strconv.Itoa(l.Seat) + "|" + l.Card
+	switch l.Mode {
+	case "in":
+		p.tokens[key]++
+		if n := p.tokens[key]; p.tallest == nil || n > p.tallest.Count {
+			p.tallest = &TokenStack{Card: l.Card, Count: n, Seat: l.Seat,
+				Turn: p.turn}
+		}
+	case "out":
+		// Never below zero: a token this reader never saw arrive — one that
+		// existed before the first line it read — must not push the count
+		// negative and hide the next real stack under it.
+		if p.tokens[key] > 0 {
+			p.tokens[key]--
+		}
+	}
+}
+
+// noteCreature keeps the largest creature by power. See [BigCreature] for why
+// power rather than the pair, and why the battlefield rather than every zone.
+func (p *ScribeParser) noteCreature(l scribeLine) {
+	if l.Card == "" || !strings.Contains(l.Types, "Creature") {
+		return
+	}
+	if p.biggest != nil && l.Power <= p.biggest.Power {
+		return
+	}
+	p.biggest = &BigCreature{Card: l.Card, Power: l.Power,
+		Toughness: l.Toughness, Seat: p.owner[l.ID], Turn: p.turn}
+}
+
+// watchForTheKill keeps the last blow each seat took and promotes it the
+// moment that seat's life reaches zero.
+//
+// **Why two lines and not one.** Forge's player-damage event carries the
+// amount and the source but not the resulting life, and the life event that
+// follows carries the total but not what caused it. Neither alone can say
+// "this is what killed them", and the scribe emits them in that order — the
+// damage, then the life it produced — so the pairing is the reading.
+//
+// A seat that drops to zero without any damage on record — decked, an
+// effect that says you lose, commander damage, which Forge reports on its
+// own tracker rather than as the blow — promotes nothing, and the game's
+// `Killer` stays nil. That is the honest answer rather than a missing one.
+func (p *ScribeParser) watchForTheKill(l scribeLine) {
+	switch l.Kind {
+	case "damage":
+		// Player damage only. `AgainstSeat` is zero on damage to a permanent,
+		// which is the same stream's other kind of damage line.
+		if l.AgainstSeat > 0 && l.Amount > 0 {
+			p.lastBlow[l.AgainstSeat] = p.lastBlow[l.AgainstSeat].add(l)
+		}
+	case "life":
+		if l.Seat <= 0 {
+			return
+		}
+		batch, ok := p.lastBlow[l.Seat]
+		// The life line closes the batch either way — a seat that gained life
+		// has ended whatever was being dealt to it, and the next damage
+		// begins a fresh swing.
+		delete(p.lastBlow, l.Seat)
+		if !ok || l.Life == nil || *l.Life > 0 || batch.Amount == 0 {
+			return
+		}
+		// The *last* kill of the game wins, because that is the one that
+		// ended it: in a pod three players die and only the third closes the
+		// game. Overwriting is the whole mechanism.
+		kill := batch
+		kill.Seat, kill.Turn = l.Seat, p.turn
+		p.killer = &kill
+	}
+}
+
+// add folds one damage line into the batch being dealt to a seat.
+//
+// **A batch and not a line, because a lethal alpha strike is one blow.** Forge
+// announces combat damage one source at a time and then prints the victim's
+// new life once, so the recorded corpus ends its first game with six lines —
+// 5, 4, 2, 2, 2 and 1 — followed by a single life of −13. Reading "the last
+// damage before the life" off that would call the killing blow a Spirit Token
+// for one, when what actually happened was sixteen damage arriving at once on
+// a player who had three life. The batch is the swing; a leaderboard of
+// killing blows built on the other reading would rank the smallest creature in
+// every alpha strike.
+//
+// `Card` therefore names the *largest* contributor rather than the last, which
+// is the one a player would say did it, and `Sources` says how many joined in
+// so a solo haymaker and a team effort can be told apart.
+func (k KillingBlow) add(l scribeLine) KillingBlow {
+	k.Amount += l.Amount
+	k.Sources++
+	if l.Amount > k.biggest {
+		k.biggest, k.Card = l.Amount, l.Card
+	}
+	// Combat if any part of it was: a swing finished off by a drain trigger is
+	// still a combat kill in every sense a reader cares about.
+	k.Combat = k.Combat || l.Combat
+	return k
 }
 
 // startGame resets everything that is per game.
@@ -299,6 +459,9 @@ func (p *ScribeParser) startGame(number int) {
 	p.seats = map[int]string{}
 	p.phantoms = map[int]bool{}
 	p.sidelined, p.companions = map[int]bool{}, map[int]bool{}
+	p.lastBlow, p.killer = map[int]KillingBlow{}, nil
+	p.owner, p.tokens = map[int]int{}, map[string]int{}
+	p.biggest, p.tallest = nil, nil
 	p.turn, p.outcomeTurn = 0, 0
 }
 
@@ -891,7 +1054,8 @@ func (p *ScribeParser) finishGame(l scribeLine) (*EventLog, *GameResult) {
 		turns = (p.turn + 1) / 2
 	}
 	game := GameResult{Index: l.Game, Milliseconds: l.Milliseconds,
-		Draw: l.Draw, TimedOut: l.TimedOut}
+		Draw: l.Draw, TimedOut: l.TimedOut, Killer: p.killer,
+		Biggest: p.biggest, TallestStack: p.tallest}
 	if turns > 0 {
 		game.Turns = &turns
 	}
@@ -914,6 +1078,12 @@ func (p *ScribeParser) finishGame(l scribeLine) (*EventLog, *GameResult) {
 	p.board = newBoard()
 	p.phantoms = map[int]bool{}
 	p.turn, p.outcomeTurn = 0, 0
+	// The blow belongs to the game that just closed; the next one starts with
+	// nobody dead. `startGame` clears these too — this is the other door, for
+	// a run whose games arrive back to back with no `game` line between them.
+	p.lastBlow, p.killer = map[int]KillingBlow{}, nil
+	p.owner, p.tokens = map[int]int{}, map[string]int{}
+	p.biggest, p.tallest = nil, nil
 	return log, &game
 }
 

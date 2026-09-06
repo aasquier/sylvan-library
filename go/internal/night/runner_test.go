@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -51,6 +52,17 @@ func (c *fakeClock) set(t time.Time) {
 	c.mu.Lock()
 	c.at = t
 	c.mu.Unlock()
+}
+
+// slugsOf names a bout the way these tests talk about one — every seat in
+// seat order, joined. A pod has four, so the old "a vs b" no longer names a
+// bout on its own.
+func slugsOf(b night.Bout) string {
+	out := make([]string, 0, len(b.Seats))
+	for _, s := range b.Seats {
+		out = append(out, s.Slug)
+	}
+	return strings.Join(out, " vs ")
 }
 
 // fakeArena is the BoutPlayer the tests seat: it logs what it was asked to
@@ -186,7 +198,7 @@ func TestATickOpensTonightOnceAndWorksItToTheEnd(t *testing.T) {
 		t.Fatalf("the card holds %d bouts, want %d", len(bouts), len(want))
 	}
 	for i, b := range bouts {
-		got := night.Plan{SeatA: b.SeatA, SeatB: b.SeatB, Games: b.Games, Seed: b.Seed}
+		got := night.Plan{Seats: b.Seats, Games: b.Games, Clock: b.Clock, Seed: b.Seed}
 		if !reflect.DeepEqual(got, want[i]) {
 			t.Errorf("bout %d is %+v, want the recomputed %+v", i, got, want[i])
 		}
@@ -400,15 +412,26 @@ func TestASampleDealsTheWholeRosterAndRefusesASecond(t *testing.T) {
 	if !run.Sample {
 		t.Fatal("the sample run is not marked sample")
 	}
-	// Three decks, caps ignored: the full round-robin of 3, at the settings'
-	// games — and the deadline is the asked-for hour.
+	// Three decks, caps ignored: the full round-robin of 3 — and the deadline
+	// is the asked-for hour.
 	if dealt != 3 {
 		t.Fatalf("the sample dealt %d bouts, want 3", dealt)
 	}
+	// A sample carries the same per-table dials a scheduled night does, which
+	// is the whole reason it can be trusted to measure one: a duel plays the
+	// settings' games at the duel clock, a pod plays [night.PodGames] at
+	// [night.PodClock].
 	bouts, _ := s.Bouts(ctx, run.ID)
 	for _, b := range bouts {
-		if b.Games != 5 {
-			t.Errorf("bout %d plays %d games, want 5", b.ID, b.Games)
+		wantGames, wantClock := 5, night.DuelClock
+		if b.Pod() {
+			wantGames, wantClock = night.PodGames, night.PodClock
+		}
+		if b.Games != wantGames {
+			t.Errorf("%s plays %d games, want %d", slugsOf(b), b.Games, wantGames)
+		}
+		if b.Clock != wantClock {
+			t.Errorf("%s runs at clock %d, want %d", slugsOf(b), b.Clock, wantClock)
 		}
 	}
 	if wait := run.ClosesAt.Sub(run.OpenedAt); wait < 59*time.Minute || wait > 61*time.Minute {
@@ -426,16 +449,27 @@ func TestABoutSettlesTheWayItsPlayerAnswered(t *testing.T) {
 	// and a match that played but whose ledger declined the row — done with
 	// match_id NULL, because pointing at a match that does not exist would
 	// be worse than pointing at nothing.
-	arena := &fakeArena{answer: func(b night.Bout) (int64, error) {
-		switch b.SeatA.Slug + " vs " + b.SeatB.Slug {
-		case "kaheera vs goreclaw", "goreclaw vs kaheera":
+	// Keyed on the bout's order rather than on its seats: with pods in the mix
+	// a table is four slugs in a dealt order, and a switch over spellings of
+	// "a vs b" was only ever a way of naming the first, second and third bout.
+	// Naming them directly says what the test means and cannot silently stop
+	// matching the day the deal changes.
+	//
+	// The count comes off the arena's own mutex-guarded log rather than a
+	// captured int: `Play` records the bout before it calls `answer`, so the
+	// length is this bout's ordinal, and a plain counter here would be shared
+	// state between the runner's waiter goroutines with no edge to order it.
+	arena := &fakeArena{}
+	arena.answer = func(night.Bout) (int64, error) {
+		switch len(arena.fights()) {
+		case 1:
 			return 0, night.Skip{Reason: "the pre-flight said no"}
-		case "kaheera vs atla", "atla vs kaheera":
+		case 2:
 			return 0, errors.New("the arena fell over")
 		default:
 			return 0, nil // played, unrecorded
 		}
-	}}
+	}
 	set := night.Settings{Bouts: 3, BoutsPerAccount: 1, Games: 3}
 	r, s, clock, settled := quietRunner(t, set, arena, nil,
 		[]string{"kaheera", "goreclaw", "atla"})
@@ -456,7 +490,7 @@ func TestABoutSettlesTheWayItsPlayerAnswered(t *testing.T) {
 	}
 	bouts, _ := s.Bouts(ctx, run.ID)
 	for _, b := range bouts {
-		pair := b.SeatA.Slug + " vs " + b.SeatB.Slug
+		pair := slugsOf(b)
 		switch b.State {
 		case night.StateSkipped:
 			if b.Reason != "the pre-flight said no" {
@@ -585,7 +619,7 @@ func TestAScheduledNightSeatsTheOptedInPlayers(t *testing.T) {
 	}
 	seated := false
 	for _, b := range bouts {
-		for _, seat := range []night.Seat{b.SeatA, b.SeatB} {
+		for _, seat := range b.Seats {
 			if seat.Slug == "arahbo" {
 				t.Errorf("a deck whose owner never opted in was seated: %+v", b)
 			}

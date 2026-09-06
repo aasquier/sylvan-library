@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -63,10 +64,10 @@ func (a *API) playNightBout(ctx context.Context, b night.Bout) (int64, error) {
 		return 0, errors.New("no arena to play in")
 	}
 
-	decks := make([]*deck.Deck, 0, 2)
-	addresses := make([]string, 0, 2)
-	ownerIDs := make([]*int64, 0, 2)
-	for _, seat := range []night.Seat{b.SeatA, b.SeatB} {
+	decks := make([]*deck.Deck, 0, len(b.Seats))
+	addresses := make([]string, 0, len(b.Seats))
+	ownerIDs := make([]*int64, 0, len(b.Seats))
+	for _, seat := range b.Seats {
 		d, address, ownerID, err := a.nightDeck(ctx, seat)
 		if err != nil {
 			var missing library.ErrNotFound
@@ -102,7 +103,7 @@ func (a *API) playNightBout(ctx context.Context, b night.Bout) (int64, error) {
 		plural = ""
 	}
 	m := forgeMatch{decks: decks, addresses: addresses, ownerIDs: ownerIDs,
-		games: b.Games, seed: big.NewInt(b.Seed), hosted: hosted}
+		games: b.Games, clock: b.Clock, seed: big.NewInt(b.Seed), hosted: hosted}
 	// The settle rides a channel out of the closure because the registry's
 	// contract is a polled payload, and the runner is not a poller. Buffered:
 	// the job must never block on a waiter that gave up at shutdown.
@@ -111,9 +112,13 @@ func (a *API) playNightBout(ctx context.Context, b night.Bout) (int64, error) {
 		err     error
 	}
 	settled := make(chan outcome, 1)
+	slugs := make([]string, 0, len(b.Seats))
+	for _, seat := range b.Seats {
+		slugs = append(slugs, seat.Slug)
+	}
 	plan := jobs.Plan{Kind: NightForgeKind, Lane: jobs.FORGE,
-		Label: fmt.Sprintf("Night: %s vs %s, %d game%s",
-			b.SeatA.Slug, b.SeatB.Slug, b.Games, plural),
+		Label: fmt.Sprintf("Night: %s, %d game%s",
+			strings.Join(slugs, " vs "), b.Games, plural),
 		// Keyed per bout id. Bout ids are unique and a bout is claimed once,
 		// so no second submit can exist to join — the key is a guard against
 		// a retry bug ever paying for the same bout twice, not a feature.
@@ -325,11 +330,15 @@ func (a *API) adminNight(w http.ResponseWriter, r *http.Request) {
 		if b.MatchID != nil {
 			match = *b.MatchID
 		}
+		seats := make([]any, 0, len(b.Seats))
+		for _, s := range b.Seats {
+			seats = append(seats, nightSeat(s))
+		}
 		card = append(card, wire.OrderedMap{
 			{Key: "id", Value: b.ID},
-			{Key: "seat_a", Value: nightSeat(b.SeatA)},
-			{Key: "seat_b", Value: nightSeat(b.SeatB)},
+			{Key: "seats", Value: seats},
 			{Key: "games", Value: b.Games},
+			{Key: "clock", Value: b.Clock},
 			{Key: "seed", Value: b.Seed},
 			{Key: "state", Value: string(b.State)},
 			{Key: "reason", Value: reason},

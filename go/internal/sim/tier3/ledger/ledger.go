@@ -45,6 +45,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"slices"
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
@@ -206,11 +207,17 @@ func (r *Recorder) record(ctx context.Context, m Match) (int64, error) {
 	for _, g := range m.Run.Games() {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO forge_games (match_id, game_index,`+
-				` winner_seat, milliseconds, turns, draw, timed_out)`+
-				` VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			matchID, g.Index, nullableSeat(g.WinnerSeat), g.Milliseconds,
-			nullableSeat(g.Turns), boolToInt(g.Draw),
-			boolToInt(g.TimedOut)); err != nil {
+				` winner_seat, milliseconds, turns, draw, timed_out,`+
+				` kill_amount, kill_card, kill_sources, kill_combat,`+
+				` kill_seat, kill_turn,`+
+				` big_card, big_power, big_toughness, big_seat, big_turn,`+
+				` stack_card, stack_count, stack_seat, stack_turn)`+
+				` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,`+
+				`         ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			slices.Concat([]any{matchID, g.Index, nullableSeat(g.WinnerSeat),
+				g.Milliseconds, nullableSeat(g.Turns), boolToInt(g.Draw),
+				boolToInt(g.TimedOut)}, killColumns(g.Killer),
+				bigColumns(g.Biggest), stackColumns(g.TallestStack))...); err != nil {
 			return 0, err
 		}
 	}
@@ -242,6 +249,34 @@ func seedForSQL(seed *big.Int) (any, error) {
 		return nil, fmt.Errorf("seed %s does not fit the ledger's 64-bit integer column", seed)
 	}
 	return seed.Int64(), nil
+}
+
+// killColumns is a blow's six columns, or six NULLs. All-or-nothing on
+// purpose: a row with an amount and no card, or a card and no amount, would be
+// a blow nobody can render, and there is no path that produces one — the
+// parser fills the whole struct or hands back nil.
+func killColumns(k *tier3.KillingBlow) []any {
+	if k == nil {
+		return []any{nil, nil, nil, nil, nil, nil}
+	}
+	return []any{k.Amount, k.Card, k.Sources, boolToInt(k.Combat), k.Seat, k.Turn}
+}
+
+// bigColumns and stackColumns are the two feats' columns, or NULLs. All-or-
+// nothing like [killColumns], and for the same reason: a half-written record
+// is one no board can render, and no path produces one.
+func bigColumns(b *tier3.BigCreature) []any {
+	if b == nil {
+		return []any{nil, nil, nil, nil, nil}
+	}
+	return []any{b.Card, b.Power, b.Toughness, b.Seat, b.Turn}
+}
+
+func stackColumns(s *tier3.TokenStack) []any {
+	if s == nil {
+		return []any{nil, nil, nil, nil}
+	}
+	return []any{s.Card, s.Count, s.Seat, s.Turn}
 }
 
 func nullableSeat(v *int) any {

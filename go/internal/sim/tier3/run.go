@@ -388,6 +388,28 @@ func SubprocessBudget(games, clock int) time.Duration {
 	return bootAllowance + time.Duration(games)*GameBudget(clock)
 }
 
+// ClockForSeats is Forge's `-c` for a table of this size, and it is the one
+// place that rule lives — the night reads it for a scheduled bout and the
+// interactive route reads it for a match somebody is watching, because a pod
+// at a duel's clock is wrong whoever asked for it.
+//
+// **A duel's clock cannot hold a pod, and the failure is silent.** Measured
+// 2026-09-06 over six four-seat games — 45s, 47s, 86s, 185s, 218s and one that
+// needed ~349s — about one in six runs past [ClockDefault], where it is
+// recorded as a clock-out, which [GameResult.TimedOut] makes a draw with no
+// winner, and then plays on invisibly because Forge honours no interrupt (the
+// argument is on [GameBudget]). 900 clears the whole measured spread with room
+// for the tail.
+func ClockForSeats(seats int) int {
+	if seats > 2 {
+		return ClockPod
+	}
+	return ClockDefault
+}
+
+// ClockPod is [ClockForSeats] for a table of more than two.
+const ClockPod = 900
+
 // ClockDefault is Forge's `-c` when a caller names none: seconds before a game
 // is called a draw.
 const ClockDefault = 300
@@ -954,3 +976,9 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 		clockedOut: cut,
 	}, nil
 }
+
+// SeatSlug names one seat's deck, or "" when the run has no such chair — the
+// lookup [SimRun.WinnerSlug] does for a winner, exported for every other
+// question a seat number asks. A killing blow records the seat that died, and
+// a seat number is not something a browser can render.
+func (r *SimRun) SeatSlug(seat int) string { return r.Seats[seat] }

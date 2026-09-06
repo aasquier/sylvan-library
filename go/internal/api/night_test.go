@@ -66,8 +66,7 @@ func TestANightBoutAndAnInteractiveMatchDriveTheOneCore(t *testing.T) {
 
 	// The night's half: one bout, played through the player seam.
 	matchID, err := a.playNightBout(context.Background(), night.Bout{
-		ID: 7, SeatA: night.Seat{Slug: "kaheera"},
-		SeatB: night.Seat{Slug: "mono-green"}, Games: 3, Seed: 41})
+		ID: 7, Seats: []night.Seat{{Slug: "kaheera"}, {Slug: "mono-green"}}, Games: 3, Seed: 41})
 	if err != nil {
 		t.Fatalf("the bout failed: %v", err)
 	}
@@ -125,8 +124,7 @@ func TestAPanickingCoreStillSettlesTheBout(t *testing.T) {
 	got := make(chan answer, 1)
 	go func() {
 		id, err := a.playNightBout(context.Background(), night.Bout{
-			ID: 11, SeatA: night.Seat{Slug: "kaheera"},
-			SeatB: night.Seat{Slug: "mono-green"}, Games: 1, Seed: 45})
+			ID: 11, Seats: []night.Seat{{Slug: "kaheera"}, {Slug: "mono-green"}}, Games: 1, Seed: 45})
 		got <- answer{id, err}
 	}()
 	select {
@@ -154,8 +152,7 @@ func TestACoverageFailureSkipsTheBoutWithTheCounts(t *testing.T) {
 		Checked: 100, Missing: []string{"Kaheera, the Orphanguard"}}}}
 	a, _, _, _ := nightAPI(t, shim)
 	_, err := a.playNightBout(context.Background(), night.Bout{
-		ID: 8, SeatA: night.Seat{Slug: "kaheera"},
-		SeatB: night.Seat{Slug: "mono-green"}, Games: 3, Seed: 42})
+		ID: 8, Seats: []night.Seat{{Slug: "kaheera"}, {Slug: "mono-green"}}, Games: 3, Seed: 42})
 	var skip night.Skip
 	if !errors.As(err, &skip) {
 		t.Fatalf("a failed pre-flight answered %v, want a skip", err)
@@ -172,8 +169,7 @@ func TestAMissingSeatAndAnEmptyDeckAreSkipsNotFailures(t *testing.T) {
 
 	// A house deck that has left the library since the card was dealt.
 	_, err := a.playNightBout(context.Background(), night.Bout{
-		ID: 9, SeatA: night.Seat{Slug: "no-such-deck"},
-		SeatB: night.Seat{Slug: "mono-green"}, Games: 3, Seed: 43})
+		ID: 9, Seats: []night.Seat{{Slug: "no-such-deck"}, {Slug: "mono-green"}}, Games: 3, Seed: 43})
 	var skip night.Skip
 	if !errors.As(err, &skip) || !strings.Contains(skip.Reason, "has left the library") {
 		t.Fatalf("a vanished seat answered %v, want a skip naming it", err)
@@ -184,8 +180,7 @@ func TestAMissingSeatAndAnEmptyDeckAreSkipsNotFailures(t *testing.T) {
 	// standing consent to exactly this read.
 	owner := int64(2)
 	_, err = a.playNightBout(context.Background(), night.Bout{
-		ID: 10, SeatA: night.Seat{Owner: &owner, Slug: "bobs-private"},
-		SeatB: night.Seat{Slug: "mono-green"}, Games: 3, Seed: 44})
+		ID: 10, Seats: []night.Seat{{Owner: &owner, Slug: "bobs-private"}, {Slug: "mono-green"}}, Games: 3, Seed: 44})
 	if !errors.As(err, &skip) || !strings.Contains(skip.Reason, "has no cards in it") {
 		t.Fatalf("an empty deck answered %v, want a skip saying so", err)
 	}
@@ -255,10 +250,24 @@ func TestTheNightRoutesAnswerTheAdminAndOnlyTheAdmin(t *testing.T) {
 	if bouts := watch["bouts"].([]any); len(bouts) != 36 {
 		t.Errorf("the card lists %d bouts", len(bouts))
 	} else {
+		// The wire carries a seat *list* now, because a bout may be a pod
+		// (ADR 46's follow-up, 2026-09-06). Its length is the table's size and
+		// its order is the order the decks reach Forge.
 		first := bouts[0].(map[string]any)
-		seat := first["seat_a"].(map[string]any)
-		if seat["owner"] != nil || seat["slug"] == "" {
-			t.Errorf("the first seat reads %v", seat)
+		seats := first["seats"].([]any)
+		if len(seats) < 2 {
+			t.Fatalf("the first bout seats %d, want a table: %v", len(seats), first)
+		}
+		if first["clock"].(float64) <= 0 {
+			t.Errorf("the first bout carries no clock: %v", first)
+		}
+		for i, raw := range seats {
+			seat := raw.(map[string]any)
+			// Every deck in this fixture is the house's, so `owner` is null
+			// and the slug is the whole address.
+			if seat["owner"] != nil || seat["slug"] == "" {
+				t.Errorf("seat %d reads %v", i+1, seat)
+			}
 		}
 	}
 

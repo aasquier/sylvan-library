@@ -72,7 +72,29 @@ const (
 	// the cap is what keeps one enthusiastic request from parking the Forge
 	// for an hour.
 	ForgeGamesMax = 20
+	// ForgeSeatsMax is the largest table this route will seat: a Commander
+	// pod. Four rather than "however many decks were named" because the pod
+	// is the format's own table and because a pod game already runs about ten
+	// times a duel's — measured 2026-09-06, ~135s median against ~16s — so
+	// a fifth chair would be a request that parks the one-wide lane for a
+	// very long time on a shape nobody plays.
+	ForgeSeatsMax = 4
+	// ForgeSeatsMin is a game: two decks. `tier3.RunGames` bounds this too,
+	// and refusing here means the refusal is a 422 with words rather than an
+	// error surfacing from three layers down.
+	ForgeSeatsMin = 2
 )
+
+// forgeSeatKeys are the request's seat letters, in seat order — the order the
+// decks reach Forge, and so the order `winner_seat` indexes.
+//
+// **Letters rather than an array, and `c`/`d` optional**, which keeps the
+// recorded request shape exactly as it was: `a_slug`/`b_slug` are what the
+// Coliseum's own link has always carried, and a pod is those two plus as many
+// more as were named. A `seats: []` array would have been the tidier design
+// for a route with no history; this one has a corpus and a room built on the
+// letters.
+var forgeSeatKeys = []string{"a", "b", "c", "d"}
 
 // forgeStatus answers: is the Forge reachable from this process?
 // A fact about the environment.
@@ -207,9 +229,48 @@ type forgeRow struct {
 	Turns    *int         `json:"turns"`
 	Draw     bool         `json:"draw"`
 	TimedOut bool         `json:"timed_out"`
+	// Killer is the blow that ended the game, for the theater to draw.
+	//
+	// **`omitempty`, unlike every other field here**, and the exception is
+	// deliberate rather than a slip. `testdata/forge.json` is a frozen golden
+	// (CLAUDE.md: never regenerate them), and an always-present `"killer":
+	// null` would have rewritten every recorded row in it to add a key that
+	// says nothing. Omitted, a game with no blow marshals to exactly the
+	// bytes it always did and the corpus keeps its whole meaning.
+	//
+	// It reads as the better shape anyway: `winner` is a fact every row has
+	// an answer to, and a blow is a thing most games simply do not have —
+	// a clock-out, a decking, a commander kill, a concession. The client
+	// defaults an absent key, which is the rule for every new payload field.
+	Killer *forgeBlow `json:"killer,omitempty"`
 }
 
-func newForgeRow(g tier3.GameResult, slug *string) forgeRow {
+// forgeBlow is [tier3.KillingBlow] as the room receives it: the swing, what
+// hit hardest, and how many joined in.
+//
+// The victim is a **slug**, not a seat, for the reason every beat in this file
+// names a deck rather than a chair — a seat number is an index into an
+// argument list the browser never saw.
+type forgeBlow struct {
+	Amount  int    `json:"amount"`
+	Card    string `json:"card"`
+	Sources int    `json:"sources"`
+	Combat  bool   `json:"combat"`
+	Turn    int    `json:"turn"`
+	Victim  string `json:"victim"`
+	// Image is the whole card, and **whole** is the compliance decision
+	// rather than a framing preference: a full card image carries its own
+	// artist and copyright line printed on it, which is how every card on the
+	// board is credited (see [boardCard.FaceImages]). An art crop would be a
+	// picture with its credit cut off, and commandment 19 asks for the artist
+	// and the printing in the same room as the painting.
+	//
+	// Empty when the pool cannot answer the name — a token, a card the pool
+	// has not got — and the room then says the blow in words alone.
+	Image string `json:"image,omitempty"`
+}
+
+func newForgeRow(g tier3.GameResult, slug *string, seatSlug func(int) string) forgeRow {
 	row := forgeRow{Game: g.Index,
 		Seconds:  floats.Float(floats.RoundTo(float64(g.Milliseconds)/1000, 1)),
 		Turns:    g.Turns,
@@ -217,6 +278,11 @@ func newForgeRow(g tier3.GameResult, slug *string) forgeRow {
 		TimedOut: g.TimedOut}
 	if !g.TimedOut {
 		row.Winner = slug
+	}
+	if k := g.Killer; k != nil {
+		row.Killer = &forgeBlow{Amount: k.Amount, Card: k.Card,
+			Sources: k.Sources, Combat: k.Combat, Turn: k.Turn,
+			Victim: seatSlug(k.Seat)}
 	}
 	return row
 }
@@ -650,6 +716,48 @@ func facePicturesOf(rec *pool.CardRecord, faces []string) []string {
 		out[i] = *face.ImageNormal
 	}
 	return out
+}
+
+// paintTheKillers fills in each killing blow's card image, one pool read for
+// the whole match however many games it ran.
+//
+// Best-effort by construction, like [API.resolveBoardArt] above it: a name the
+// pool cannot answer leaves the image empty and the room says the blow in
+// words, which is a smaller loss than failing a finished match over a picture.
+// Tokens are the common miss and that is correct — a token's name is not a
+// card name, and the board has its own path for those.
+func (a *API) paintTheKillers(ctx context.Context, rows []forgeRow) {
+	want := map[string]bool{}
+	for _, r := range rows {
+		if r.Killer != nil && r.Killer.Card != "" {
+			want[r.Killer.Card] = true
+		}
+	}
+	if len(want) == 0 {
+		return
+	}
+	names := make([]string, 0, len(want))
+	for n := range want {
+		names = append(names, n)
+	}
+	images := map[string]string{}
+	_ = a.usePool(ctx, func(c *pool.Conn) error {
+		found, err := c.GetCards(ctx, names)
+		if err != nil {
+			return err
+		}
+		for _, rec := range found {
+			if rec.ImageNormal != nil {
+				images[rec.Name] = *rec.ImageNormal
+			}
+		}
+		return nil
+	})
+	for i := range rows {
+		if rows[i].Killer != nil {
+			rows[i].Killer.Image = images[rows[i].Killer.Card]
+		}
+	}
 }
 
 // resolveBoardArt fills `known` with the paintings for any card in `cards` it
@@ -1087,7 +1195,7 @@ type forgePartial struct {
 // only by convention — nothing refuses the request — and pinned by
 // `TestADeckPlayedAgainstItselfShowsTheCombinedWins`, because the guard beats
 // the fix for a wart nobody has hit.
-func shapeForge(decks []*deck.Deck, addresses []string, games int,
+func shapeForge(decks []*deck.Deck, addresses []string, games, clock int,
 	seed *big.Int, run *tier3.SimRun, beats []forgeBeats) forgeResult {
 	wins := map[string]int{}
 	for _, d := range decks {
@@ -1109,7 +1217,7 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 			s := slug
 			winner = &s
 		}
-		rows = append(rows, newForgeRow(game, winner))
+		rows = append(rows, newForgeRow(game, winner, run.SeatSlug))
 	}
 
 	seconds := make([]float64, 0, len(rows))
@@ -1124,11 +1232,15 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		Played:         len(rows),
 		StartupSeconds: floats.Float(floats.RoundTo(run.StartupSeconds(), 1)),
 		WallSeconds:    floats.Float(floats.RoundTo(run.WallSeconds, 1)),
-		Clock:          ForgeClock,
-		Seed:           seed,
-		Rows:           rows,
-		Caveat:         ForgeCaveat,
-		Beats:          beats,
+		// The clock the match actually ran at, not the constant. A pod runs
+		// at [tier3.ClockPod], and a payload that said 300 while the games
+		// were played at 900 would be a room telling a viewer the wrong thing
+		// about the match in front of them.
+		Clock:  clock,
+		Seed:   seed,
+		Rows:   rows,
+		Caveat: ForgeCaveat,
+		Beats:  beats,
 	}
 	if len(out.Beats) > ForgeReplayGames {
 		out.Beats = out.Beats[:ForgeReplayGames]
@@ -1197,14 +1309,30 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 
 	type pair struct{ owner, slug string }
 	var pairs []pair
-	for _, side := range []string{"a", "b"} {
+	for i, side := range forgeSeatKeys {
 		raw := body[side+"_slug"]
 		// The raw value's truthiness, before the stringification. A `0`
 		// or an empty list is falsy and refused here; a non-empty list is
 		// truthy and becomes a slug that no deck has, which is a 404.
 		if !truthy(raw) {
-			wire.Detail(w, http.StatusUnprocessableEntity, side+"_slug is required")
-			return
+			if i < ForgeSeatsMin {
+				wire.Detail(w, http.StatusUnprocessableEntity, side+"_slug is required")
+				return
+			}
+			// **A gap ends the table rather than being skipped**, so
+			// `d_slug` sent without `c_slug` is refused instead of quietly
+			// seating three. Seat order is the order decks reach Forge and
+			// the order `winner_seat` indexes, so a table assembled out of a
+			// caller's typo would be a match whose results point at the
+			// wrong decks.
+			for _, rest := range forgeSeatKeys[i+1:] {
+				if truthy(body[rest+"_slug"]) {
+					wire.Detail(w, http.StatusUnprocessableEntity,
+						rest+"_slug was given without "+side+"_slug; seats are filled in order")
+					return
+				}
+			}
+			break
 		}
 		owner := str(body, side+"_owner")
 		if owner == "" {
@@ -1425,9 +1553,13 @@ type forgeMatch struct {
 	addresses []string
 	ownerIDs  []*int64
 	games     int
-	seed      *big.Int
-	narrate   bool
-	hosted    bool
+	// clock is Forge's `-c` for this match. Zero takes [ForgeClock], which
+	// is what every interactive match asks for; the night sets it per bout,
+	// because a pod cannot be held by a duel's clock (see night.PodClock).
+	clock   int
+	seed    *big.Int
+	narrate bool
+	hosted  bool
 }
 
 // playForgeMatch is the play-and-record core both run paths drive: the whole
@@ -1438,6 +1570,19 @@ type forgeMatch struct {
 func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int64, error) {
 	decks, addresses, ownerIDs := m.decks, m.addresses, m.ownerIDs
 	games, seed, narrate, hosted := m.games, m.seed, m.narrate, m.hosted
+	// One resolution, before anything reads it: the clock goes onto Forge's
+	// command line, into every bound in [tier3.MatchBudget], and into the
+	// ledger row, and those three disagreeing is the shape of the bug where a
+	// match is cut by a budget sized for a different clock.
+	clock := m.clock
+	if clock <= 0 {
+		// **Derived from the table, not defaulted to a duel's.** The night
+		// sets this per bout; an interactive match does not, and a pod handed
+		// `ForgeClock` would have about one game in six recorded as a draw
+		// with no winner — wrong whoever asked for it, which is why the rule
+		// lives in tier3 and both callers read the same function.
+		clock = tier3.ClockForSeats(len(decks))
+	}
 	worker := a.forgeWorker()
 	recorder := a.matchLedger()
 
@@ -1507,7 +1652,8 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 					slug = &s
 				}
 			}
-			rowsSoFar = append(rowsSoFar, newForgeRow(*game, slug))
+			rowsSoFar = append(rowsSoFar, newForgeRow(*game, slug,
+				func(seat int) string { return seats[seat] }))
 		}
 		rep.ReportPartial(min(finished, games), games,
 			forgePartial{Rows: append([]forgeRow{}, rowsSoFar...),
@@ -1523,12 +1669,12 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 	var runErr error
 	if hosted {
 		run, runErr = worker.RunMatch(ctx, decks, tier3.MatchAsk{
-			Games: games, Clock: ForgeClock, Seed: seed,
+			Games: games, Clock: clock, Seed: seed,
 			Narrate: narrate, OnGame: tick, OnEvents: hear,
 		})
 	} else {
 		run, runErr = a.forge.RunGames(decks, tier3.RunOptions{
-			Games: games, Clock: ForgeClock, Seed: seed,
+			Games: games, Clock: clock, Seed: seed,
 			Narrate: narrate, OnEvents: hear,
 			OnGame: func(finished int, game tier3.GameResult) {
 				tick(finished, &game)
@@ -1551,9 +1697,11 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 	// every question after it — and Record never fails, so a ledger
 	// problem cannot cost anybody a match they just watched finish.
 	matchID := recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
-		Seed: seed, Clock: ForgeClock, GamesRequested: games,
+		Seed: seed, Clock: clock, GamesRequested: games,
 		Hosted: hosted, OwnerIDs: ownerIDs})
-	return shapeForge(decks, addresses, games, seed, run, played), matchID, nil
+	out := shapeForge(decks, addresses, games, clock, seed, run, played)
+	a.paintTheKillers(ctx, out.Rows)
+	return out, matchID, nil
 }
 
 // matchLedger is the recorder, or a nil one — which records nothing and warns
