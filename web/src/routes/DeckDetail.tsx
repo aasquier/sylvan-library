@@ -387,7 +387,7 @@ function DeckHero({ deck, deckRef, report, dossier, claude, onRefresh }: {
               editing, because the reading is the server's. Until this
               existed the only label editor was the CLI, which meant
               relabelling the deployed library over `fly ssh`. */}
-          <DeckLabels deck={deck} deckRef={deckRef} onRefresh={onRefresh} />
+          <DeckLabels deck={deck} deckRef={deckRef} claude={claude} onRefresh={onRefresh} />
 
           {/* The identity, loud — it constrains all 99 other cards and it used
               to be a row of 12px dots. The mana cost deliberately sits on the

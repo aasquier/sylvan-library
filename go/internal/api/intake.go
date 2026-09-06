@@ -478,16 +478,36 @@ func (run *intakeRun) describe(ctx context.Context) wire.OrderedMap {
 	if err != nil {
 		return intakeFailed(err, run.req.Endpoint)
 	}
+	// The index terms, held to the vocabulary before they are written
+	// (`claude.DescribeDeck`) so an import cannot hand the gate an
+	// `unknown-theme` warning about a word nobody typed.
+	//
+	// **The failure is no longer swallowed.** This read `if err == nil` and
+	// carried on, which meant a themes write that could not be made left a
+	// deck with a description, no labels, and nobody told -- the paragraph
+	// landing was proof enough that the step had "worked". The description is
+	// the one this step exists for and it is already written by here, so a
+	// themes failure refuses the whole step rather than half-reporting it.
+	themed := false
 	if len(got.Themes) > 0 {
-		if withThemes, err := deckedit.SetDeckField(updated, "themes", got.Themes); err == nil {
-			updated = withThemes
+		withThemes, err := deckedit.SetDeckField(updated, "themes", got.Themes)
+		if err != nil {
+			return intakeFailed(err, run.req.Endpoint)
 		}
+		updated, themed = withThemes, true
 	}
 	if err := writer.WriteText(ctx, run.slug, updated); err != nil {
 		return intakeFailed(err, run.req.Endpoint)
 	}
 	run.api.recorder().Record(ctx, run.slug, run.owner, run.actor,
 		decklog.Edit{Kind: decklog.EditSetDeck, Field: "strategy"})
+	if themed {
+		// ADR 28: every deck edit is recorded. Two fields were written, and
+		// the log said one -- so a deck's labels could change with nothing in
+		// its history saying when or by what.
+		run.api.recorder().Record(ctx, run.slug, run.owner, run.actor,
+			decklog.Edit{Kind: decklog.EditSetDeck, Field: "themes"})
+	}
 	run.reload(ctx)
 	return intakeStep(1, 1, "")
 }

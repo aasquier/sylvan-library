@@ -112,6 +112,24 @@ export function useStance(): [StancePin, (pin: StancePin) => void] {
  * Returns `undefined` rather than `null` when there is nothing to send, so it
  * drops straight into a request body without a conditional at each call site.
  */
+/**
+ * Can Claude answer at all, on this instance, for this deck?
+ *
+ * Three facts, and all three are ordinary states rather than faults: the
+ * feature may not be installed, the instance may have no key, and the dial may
+ * be set to stay silent (ADR 15 — "off is a real position"). A surface that
+ * offers a control anyway gets a refusal a beginner reads as a broken site.
+ *
+ * Lived in `components/deckedit.tsx` until 2026-09-06, when a second surface
+ * needed it and the copy nobody made would have been the bug: the themes
+ * editor shipped an "Ask Claude" button that, on an instance with no key,
+ * could only ever fail.
+ */
+export function claudeCanAnswer(status: ClaudeStatus | null | undefined): boolean {
+  return !!status?.installed && !!status.configured
+    && status.stance.axes[0]?.level !== 'off'
+}
+
 export function effectivePin(pin: StancePin, status: ClaudeStatus | null): string | undefined {
   if (pin === null) return undefined
   if (!status) return pin           // Nothing to check against; let the server rule.

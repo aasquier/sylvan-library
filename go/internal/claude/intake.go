@@ -32,6 +32,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
+	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
 // IntakeChunk is how many cards go into one call.
@@ -251,7 +252,11 @@ func FileCards(ctx context.Context, d *deck.Deck, cards []string,
 type Description struct {
 	Strategy string   `json:"strategy"`
 	Themes   []string `json:"themes"`
-	Fact     string   `json:"fact"`
+	// ThemesDropped is what came back that the vocabulary cannot file. Never
+	// written anywhere; carried so a surface can say "it also read these, and
+	// this library has no label for them" instead of losing them silently.
+	ThemesDropped []string `json:"-"`
+	Fact          string   `json:"fact"`
 }
 
 // DescribeDeck asks what the deck is trying to do.
@@ -282,7 +287,42 @@ func DescribeDeck(ctx context.Context, d *deck.Deck,
 		return Description{}, IntakeOutcome{Stance: effective, Asked: true,
 			Reason: "No description came back, so the deck keeps the one it had."}, nil
 	}
+	payload.Themes, payload.ThemesDropped = keptThemes(payload.Themes)
 	return payload, IntakeOutcome{Stance: effective, Asked: true}, nil
+}
+
+// keptThemes holds the answer's index terms to the vocabulary the app actually
+// files decks by, and returns what it could not use.
+//
+// **The mode is asked for words, not for a list to choose from**, and that is
+// deliberate: `cats`, `food`, `landfall` are how a deck is described out loud,
+// and handing the model 43 options would have it reaching for the nearest one
+// rather than saying it does not know. The cost is that a word can come back
+// that nothing in this app can file -- and a theme the vocabulary does not hold
+// is not a label, it is a `unknown-theme` warning on the gate and a filter that
+// finds nothing.
+//
+// So the unusable ones are **dropped and counted**, the way an unresolvable
+// card name is in the reference prose. Counted rather than swallowed, because
+// "it read four themes and could file two" is a fact the person should see: it
+// is the difference between a deck the vocabulary covers and one it does not,
+// and the second is a gap worth knowing about.
+func keptThemes(offered []string) (kept, dropped []string) {
+	kept, dropped = []string{}, []string{}
+	seen := map[string]bool{}
+	for _, theme := range offered {
+		word := strings.ToLower(strings.TrimSpace(theme))
+		if word == "" || seen[word] {
+			continue
+		}
+		seen[word] = true
+		if reference.IsTheme(word) {
+			kept = append(kept, word)
+		} else {
+			dropped = append(dropped, word)
+		}
+	}
+	return kept, dropped
 }
 
 func describeOpening(d *deck.Deck) string {

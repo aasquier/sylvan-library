@@ -3526,9 +3526,20 @@ export interface DeckDescriptionDraft {
   /** The paragraph. Empty when nothing usable came back, in which case
    *  `reason` says so. */
   strategy: string
-  /** The deck's index terms. Always a list — `[]` and never null, so a
-   *  component may map it without a guard that would read as a fact. */
+  /** The deck's index terms, held to the app's own vocabulary so that ticking
+   *  them cannot hand the gate an `unknown-theme` warning about a word nobody
+   *  typed. Always a list — `[]` and never null, so a component may map it
+   *  without a guard that would read as a fact. */
   themes: string[]
+  /** What it read that this library has no label for. Counted rather than
+   *  swallowed: a surface showing two themes where four were offered otherwise
+   *  reads as a thin answer, when what happened is a narrow vocabulary.
+   *
+   *  **Optional, and defaulted at every use** — an instance serving a payload
+   *  from before this key existed sends nothing here, and the browser is the
+   *  half that gets the new bundle first. A deploy changes both halves and the
+   *  browser is the one that lies. */
+  themes_dropped?: string[]
   /** What the draft rests on: counts, the commander's ability, the cards that
    *  make the theme. Shown beside the paragraph, because a draft whose facts
    *  are visible is one somebody can disagree with. */
