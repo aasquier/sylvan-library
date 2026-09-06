@@ -64,6 +64,7 @@ they differ.
 | [48](0048-light-lands-on-a-card-and-never-through-it.md) | Light lands on a card, and never through it | Accepted — widens [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) to every surface, and corrects its misquotation of Scryfall's imagery guidelines |
 | [49](0049-an-import-may-name-the-hand-behind-its-rationales.md) | An import may name the hand behind its rationales | Accepted — extends [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md)'s mark to reasons that arrive with the paste |
 | [50](0050-the-crossings-working-documents-live-in-git-history.md) | The crossing's working documents live in git history | Accepted — supersedes the `docs/go-migration/` pointers in [38](0038-the-served-backend-is-rewritten-in-go.md), the pointers and never the decision |
+| [51](0051-a-rulebreaker-clause-is-read-from-the-card.md) | A Rulebreaker clause is read from the card, and its one choice is read from the deck | Accepted |
 
 **A note on the numbering.** For a while this table said there was no 41 and
 never had been. There is — [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md)
