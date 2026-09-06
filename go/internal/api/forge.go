@@ -343,7 +343,7 @@ type forgeBoardSeat struct {
 	// was known.
 	//
 	// **The zone has exactly three legal shapes and a list of ids names none
-	// of them** (Aaron, 2026-08-26: *"at most it should just be two slots for
+	// of them** (Aaron: *"at most it should just be two slots for
 	// partners, one for a singular commander, or a second companion devoted
 	// slot… those are the only combinations possible in that zone"*). Two ids
 	// in [forgeBoardSeat.Commanders] and one commander that happens to have
@@ -429,11 +429,11 @@ type forgeBoardCard struct {
 	// the middle of the arena goes looking for a card called Stomp among cards
 	// called Bonecrusher Giant, finds nothing, and sets the name in type on a
 	// dark plate. A whole black card with a title on it, in the one moment the
-	// room exists to show a spell (Aaron, 2026-08-28).
+	// room exists to show a spell (Aaron).
 	//
 	// **This was once only the layouts printing both names on one picture, and
-	// a modal double-faced card drew that same black plate for it** (Aaron,
-	// 2026-08-29: *"MDF cards are not rendering intelligently... blanked out
+	// a modal double-faced card drew that same black plate for it** (Aaron:
+	// *"MDF cards are not rendering intelligently... blanked out
 	// black card with just the text when it is played as a creature... and same
 	// deal when played as a land"*). The old rule was right while the record
 	// carried one painting: answering to a back face's name with a front face's
@@ -484,7 +484,7 @@ type forgeBoardCard struct {
 	//
 	// It exists for one layout rule and is a *card fact* rather than that
 	// rule: a player keeps mana rocks back with the lands, because what those
-	// rows answer is "what can this deck pay for" (Aaron, 2026-08-25: "mana
+	// rows answer is "what can this deck pay for" (Aaron: "mana
 	// producing artifacts could really stay back with the lands"). Which row
 	// that becomes is the browser's business; whether Sol Ring makes mana is
 	// the pool's.
@@ -760,7 +760,7 @@ func (a *API) resolveBoardArt(ctx context.Context, cards []tier3.BoardCard,
 // for the printing lives here, because this is the layer that already resolves
 // every card to paint it. Kaheera standing beside a Beast is the case: the
 // Beast's live set holds Vigilance, its printing does not, so the vigilance is
-// something else's doing and the board can finally show it (Aaron, 2026-08-26).
+// something else's doing and the board can finally show it (Aaron).
 //
 // **It says that a keyword was granted, never by what.** Forge erases
 // attribution at its view boundary — `KeywordView` carries the word, the enum,

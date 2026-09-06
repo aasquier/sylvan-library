@@ -22,8 +22,8 @@ import (
 // it**: *"If refreshing by hand turns out to be forgotten in practice, the
 // next step is an authenticated admin endpoint that starts a refresh as a
 // background job, called on a schedule from outside. Build that only after
-// forgetting it twice."* Aaron asked for the button on 2026-08-28, which
-// settles the forgetting question, so this is that clause cashed in -- the
+// forgetting it twice."* Aaron asked for the button, which settles the
+// forgetting question, so this is that clause cashed in -- the
 // endpoint ADR 6 described, with the constraints it attached still load-
 // bearing:
 //

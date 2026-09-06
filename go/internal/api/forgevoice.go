@@ -20,10 +20,9 @@ import (
 // A host's control plane, the app's name, a machine id, an HTTP verb, a status
 // code and raw JSON — to a newcomer who pressed one button in a room about
 // Magic. Commandment 10 says no technology backing this site ever renders, and
-// that renders all of it. Found on 2026-08-25 by playing a real match on the
-// deployed instance, which is the only place it exists; Aaron asked for it
-// fixed on 2026-08-28, and named it first of the two because it is the one that
-// hurts a beginner.
+// that renders all of it. Found by playing a real match on the deployed
+// instance, which is the only place it exists; Aaron asked for it fixed, and
+// named it first of the two because it is the one that hurts a beginner.
 //
 // **The detail is not deleted, it is redirected.** Everything above is exactly
 // what somebody fixing the arena wants, and none of it is what somebody
