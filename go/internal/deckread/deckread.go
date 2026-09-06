@@ -652,9 +652,8 @@ type SearchQuery struct {
 //
 // Requires a live pool. Left `internal/api`'s handler in Phase 6 so the Claude
 // tools search the same index the card-search page searches, with the same
-// filters applied in the same order -- the price cut and the commander rule
-// both run AFTER the query, and a second implementation would put them
-// somewhere subtly different.
+// filters applied in the same order -- the commander rule still runs AFTER the
+// query, and a second implementation would put it somewhere subtly different.
 func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard, error) {
 	text, identity, typeLine := q.Text, q.Identity, q.TypeLine
 	identityExact, commandersOnly := q.IdentityExact, q.CommandersOnly
@@ -703,6 +702,27 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 	if haveCMC {
 		where = append(where, "cmc <= ?")
 		params = append(params, cmcMax)
+	}
+	// **A budget is a condition of the search, not a sieve over its answer.**
+	// It used to be the latter, and the arithmetic of that is unkind in exactly
+	// the place it matters: the page asks for sixty, the query handed back the
+	// sixty best-known cards whatever they cost, and the cut then threw most of
+	// them away -- so "sixty cards under $1" answered 23 while two hundred
+	// under the same dollar answered 74. Somebody new to the game, who is the
+	// likeliest person in the world to set a budget, read that as the whole of
+	// what they could afford.
+	//
+	// A semi-join rather than the `min(price_usd) <= ?` the old cut computed:
+	// a card is in budget when ANY printing of it is, which is the same
+	// question asked without the aggregate, and the set of cheap oracle ids is
+	// built once instead of once per surviving row (the shape #284 removed from
+	// this query -- see the note above the SQL). The unpriced stay out, exactly
+	// as the cut left them out: a card nobody has priced is not evidence of a
+	// cheap card.
+	if havePrice {
+		where = append(where, "o.oracle_id IN (SELECT oracle_id FROM printings"+
+			" WHERE price_usd IS NOT NULL AND price_usd <= ?)")
+		params = append(params, priceMax)
 	}
 	order := map[string]string{
 		"edhrec": "edhrec_rank NULLS LAST",
@@ -773,15 +793,6 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 		if usd, ok := cheapest[oracleIDs[i]]; ok {
 			found[i].PriceUSD = &usd
 		}
-	}
-	if havePrice {
-		kept := found[:0]
-		for _, card := range found {
-			if card.PriceUSD != nil && *card.PriceUSD <= priceMax {
-				kept = append(kept, card)
-			}
-		}
-		found = kept
 	}
 	if commandersOnly {
 		// After the query rather than in SQL, because the rule reads

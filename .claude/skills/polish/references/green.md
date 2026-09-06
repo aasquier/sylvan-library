@@ -26,14 +26,14 @@ screen reader or a keyboard.
   it. Check newer JS/CSS features against 16.4 — `:has()`, container queries,
   `structuredClone`, top-level await in served code. When Vite's target and
   reality disagree, reality is the phone that renders white.
-- **There is no WebKit witness on this machine, and the sentence that said
-  there was is a live daybreak question (Green, 2026-08-24, queued 5).**
-  **Safari 15.6 on macOS 12 is below the floor**, so the dev browser stopped
-  being a witness — and the Playwright/WebKit 17.4 rig this file used to name
-  as its replacement is not in the tree and never was. Until Aaron rules
-  (stand it up, or strike the claim), treat the floor as *statically* checked
-  by the test above and witnessed only on his phone, and do not record a
-  WebKit result you did not actually obtain.
+- **There is no local WebKit rig, and none is claimed — Aaron ruled it
+  (2026-09-05): strike the claim, do not stand the rig up.** **Safari 15.6
+  on macOS 12 is below the floor**, so the dev browser is not a witness —
+  and the Playwright/WebKit 17.4 rig this file once named as its replacement
+  was never in the tree. The floor is checked *statically* by the test above
+  and witnessed on Aaron's phone; that pair is the whole story. Never record
+  a WebKit result you did not actually obtain, and do not propose the rig
+  again as a helpful fix — it was offered and declined.
 - **Audit `web_dist/assets/`, not `web/src`, and run
   the bundle-floor check rather than grepping.** This is the correction
   that run earned the hard way: the floor moved from 15 to 16.4 the day

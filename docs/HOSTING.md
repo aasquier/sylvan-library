@@ -287,6 +287,22 @@ visitor ledger (requests per day by status class and route template — a
 census, never a surveillance), and Claude's ledger (tokens per mode,
 honestly labelled a floor on the bill).
 
+**The spend, from a terminal**, when a browser is not to hand — and it is
+the same roll-up the panel renders, from the same code, so the two cannot
+drift apart:
+
+```bash
+fly ssh console -C "mtglab claude usage"
+```
+
+Both axes (which surface spent it, which Claude spent it), tokens, and
+dollars beside the models. Each stretch of a window is priced at the rates
+that were in force while it was being spent, so a window crossing a price
+change is not repriced at this morning's. `--since 2026-09-01` narrows it.
+The figure stays a floor: cache writes bill above input and are recorded
+nowhere. A model with no rate in the table is named here rather than
+charged at nothing, which is what `/admin` sends you to a terminal for.
+
 The far-seeing glass on `/admin` needs one secret — a read-only platform
 token — and stays absent until it has one:
 
