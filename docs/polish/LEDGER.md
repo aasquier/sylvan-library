@@ -3576,9 +3576,86 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-19 (rainbow),
-  2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
-  first Red run and the baseline the numbers below are a trend against.
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
+  2026-08-19 (rainbow), 2026-08-18 (punch-list item 5, with Blue), and
+  2026-08-16 (rainbow), the first Red run and the baseline the numbers below
+  are a trend against.
+- **Fixed this run (2026-09-05, rainbow, night): the two writes that never
+  stopped accepting clicks — queued item 12's own recommendation, built to a
+  green PR and held for Aaron's eye (nightbound: controls render).** The
+  pilot line's `save()` and the graveyard's `returnCard()` in
+  `web/src/routes/DeckDetail.tsx` both started a write on click and kept
+  listening, so a double click was two recorded edits (ADR 28 keeps both) and
+  the second came back as a refusal for a thing the first had already done.
+  Both now follow the house pattern the same file's rationale editor and
+  share toggle already model — a busy flag driving `disabled` *and* a visible
+  pending state (`Saving…` / `Returning…`), both halves — plus, for the pilot
+  save only, an in-function `if (busy) return`, because that write has a
+  second door (`Enter` on the input) that `disabled` cannot close.
+  `returnCard` deliberately carries **no** in-function guard: its only door
+  is the button, and a guard no test can reach is a LIVED mutant by
+  construction — measured, not assumed, see the jsdom note below. CSS half:
+  `.card-action` had **no `:disabled` face at all** and its `:hover` answered
+  disabled buttons too; it now has the `.btn:disabled` face (opacity 0.4) and
+  both `.card-action` hovers wear the file's own `:hover:not(:disabled)`
+  idiom (`web/src/index.css`). **Mutation-verified four ways** (two new tests
+  in `routes/DeckDetail.test.tsx`): stripping Return's `disabled` fails the
+  double-click test at two calls; stripping its label swap fails on
+  `Returning…`; stripping the pilot guard fails via the Enter door; stripping
+  Save's `disabled` fails the attribute assertion. **A measured fact worth
+  keeping: jsdom refuses a click on a disabled button exactly as a browser
+  does** — the first draft asserted the opposite in a comment and its
+  in-function-guard mutation *survived*, which is what exposed the guard as
+  unreachable belt and reshaped the fix. Suite 1431/1431; bundle rebuilt
+  (only `DeckDetail.js` and `index.css` moved).
+- **Controls, re-measured 2026-09-05 — and the seven from 08-24 have three
+  fates.** 212 `<button>` tags outside tests (was 131; the growth is the
+  Coliseum, the colour rooms, the tarot overhaul), 890 inline `style={{`
+  props (was 643), 24 sites using the `void`-async click idiom. Of the
+  seven never-disabling async controls from queued item 12: **two fixed
+  tonight** (the writes, above); **three healed since 08-24 without this
+  pass** — `ArmedButton` now arms-then-dwells so a double press cannot
+  double-fire (`components/ui.tsx`, its comment records the fix),
+  `Research.tsx`'s example slips land in an `ask()` that self-guards on
+  `busy` *and* unmount while busy, and `dossier.tsx`'s disclosure `load()`
+  latches on `fetched`; **one remains** — `App.tsx`'s `signOut()`, whose
+  double-fire costs only a swallowed 401 on the second logout, left for the
+  reads pass. **Examined and deliberately left, with reasons:** the two
+  clipboard copies (`components/artifacts.tsx`, `components/tokens.tsx`) are
+  idempotent, local, and answer the press with a `Copied` label — disabling
+  a copy button is not the convention anywhere; and `Admin.tsx`'s "Gather it
+  now" never disables but the server enforces one gathering at a time (a
+  second POST follows the first instead of starting another, the file's own
+  comment argues it) and the whole panel swaps to the progress view on
+  response.
+- **Queue movement since 2026-08-24, verified against the world rather than
+  assumed:** item **10 is closed** — the five Python-ghost CodeQL alerts are
+  dismissed and the open list is **zero**, so a nonzero count now means
+  something new. Item **5 is closed by Black's #434** (2026-09-05): the
+  patrol re-measured `internal/api` at **1,112MB total allocation (was
+  ~1,981MB same-shape run), argon2 570MB/51.2%** — exactly the "legitimate
+  remainder" Black predicted; do not chase it further. Daybreak items **1
+  and 3 of the 08-24 Red block are answered** (the spinner/tools PR #285
+  merged 2026-08-24T13:52Z and deployed; the alert dismissal is item 10's
+  closure) and their lines leave the queue tonight. Item **12 is half
+  landed** (this PR) — the remaining read is `signOut()`. Items **2, 4
+  (restore drill), 6, 9, 11** are unchanged and still Aaron's; the restore
+  drill's overdue-ness *grew* — the ladder is at rung 14 now and no drill
+  has ever crossed any of it.
+- **New queued for Aaron (2026-09-05): the coverage floor runs twice and one
+  of the runs is a quarter of the pipeline's clock.** The `Coverage floor`
+  step (new since 08-24, floor 90.5 ratcheted) runs the full suite a second
+  time un-raced on **both** matrix legs — 84s on amd64, 47s on arm64 —
+  computing the same statement-coverage number twice: the tree has **zero
+  arch-tagged non-test Go files** (measured: `go:build` grep), so the number
+  cannot differ by architecture. `go (amd64)` is the critical path in
+  essentially every run (median 347.5s vs `image` 181s), so running the
+  floor on the arm64 leg only would take ~84s off the clock and leave the
+  two legs nearly tied (~253s vs ~255s). It is queued rather than done
+  because it changes what a required gate measures (one architecture's
+  coverage instead of two identical ones) and because a `ci.yml` semantics
+  change is only provable by CI itself — not a night fix. Recommendation in
+  DAYBREAK.md.
   **Everything below the 2026-08-24 block is Python-era and reads as such** —
   `test (3.11)`, `test (3.12)`, `contract`, `src/mtglab`, `tests/test_packaging.py`.
   The Go crossing (#272) replaced the pipeline's whole middle; the 2026-08-19
@@ -3980,6 +4057,100 @@ runs against a cache nobody emptied.
     fails; the Fly cert covers the apex only). Harmless until a friend types
     it. Trigger: anyone reports the site not loading and turns out to have
     typed `www.`.
+- **Measurements (2026-09-05, rainbow, night):**
+  - **Required contexts, read back: SEVEN** — `frontend`, `image`,
+    `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`,
+    `go (arm64)`, `go-lint`. Down one from 08-24: `image-arm64` left with
+    ADR 47 (the removal was both a workflow edit and this repository
+    setting, done together). `tools` is **still absent** — queued item 9,
+    open with Aaron since 08-24, re-verified tonight.
+  - **CI per-job medians, n=24** (every run back to 2026-08-31, computed
+    from per-job `started_at`/`completed_at`): `go (amd64)` **347.5s**
+    (270–482, was 197) · `go (arm64)` **208.5s** (169–281, was 118) ·
+    `image` **181s** (32–351, was 136.5) · `deploy` **171s** (n=11, was
+    175) · `frontend` **78s** (64–85, was 48.5) · `go-lint` **35s** ·
+    `tools` **33s** · `no-secrets-or-card-data` **6s**. **The +76% on
+    `go (amd64)` has two named causes, read from step timings, not
+    guessed:** a **`Coverage floor` step that did not exist on 08-24**
+    (84s amd64 / 47s arm64 — a second full un-raced suite run per leg),
+    and the race-detected test step growing **171s → ~203s** while the
+    suite gained the night engine and the tier3 work. Tonight's newest run
+    (33995517094, the first with Black's #434) ran the amd64 test step at
+    203s — the argon2 fix bought allocation, not wall clock, and one run
+    is a lead, not a baseline. **The critical path is `go (amd64)` by
+    ~166s over `image`** — no longer remotely a tie; the honest levers are
+    the coverage step (new queued item, above) and the suite itself.
+  - **Cache health: all hits, read from run 33995517094's log** —
+    setup-go x64 ~225MB (shared by `go (amd64)` and `go-lint`), setup-go
+    arm64 ~724MB, npm ~65MB, buildx 33 `CACHED` layers on `image`.
+  - **Concurrency verified by observation:** three superseded PR runs
+    cancelled tonight as designed (33993782031, 33992689545, 33990000969).
+  - **Actions hygiene:** 27 `uses:` refs across 12 distinct actions, every
+    one a 40-char SHA; **two workflows new since the 08-24 count** —
+    `mutants.yml` and `forge-release.yml` — both `permissions: contents:
+    read` (forge-release's job adds `issues: write`, scoped). No
+    `pull_request_target`. `allowed_actions` still `"all"`,
+    `secret_scanning_non_provider_patterns` still `disabled` (queued 9's
+    free flips, unchanged); secret scanning + push protection on, 0 alerts.
+  - **Scanner backlog: CodeQL 0 open** (the five Python ghosts dismissed —
+    queued 10 closed) · Dependabot **9** (unchanged cluster) · secret
+    scanning 0 on an enabled scanner.
+  - **Live probe (2026-09-05 ~22:40Z, v353, sylvan-libraries.com):**
+    `GET /` **200** 174–268ms (5,756 bytes — the door grew from 1,897; the
+    shell carries more now) · `GET /api/health` **200** 224–263ms ·
+    `GET /api/decks` **401** 185ms · `GET /api/glossary` **401** 176ms ·
+    `HEAD /` still **405** (queued item 2's monitor-config caveat,
+    unchanged). Health TTFB ~225–275ms is **the new healthy by design** —
+    #374's `UseWithoutHolding` pays a fresh pool open per probe (Black's
+    08-24→09-05 note absorbed into this baseline; do not file it as a
+    regression). Health body: pool true, **35,393 oracle / 108,263
+    printings, 17 decks**, bulk 2026-08-30, `pool_stale` false — still no
+    `app_db`/`disk_free_mb`/`schema_version` (queued item 3 unchanged).
+  - **Hot-spot patrol — the load caveat first: load average was 120** (four
+    sessions on this Mac all night), so every wall-clock number tonight is
+    junk and the patrol leaned on **allocation, which load cannot inflate.**
+    The race suite ranking ran anyway (48 packages, 1,358 pkg-seconds — not
+    comparable to 08-24's 473 for exactly that reason): `internal/claude`
+    197s · `internal/api` 109s · `claude/tools` 49s · `cards` 46s · `auth`
+    46s. **The patrol's finding, handed to Black (Red finds where):**
+    `internal/claude`'s suite allocates **4,746MB and more than half is the
+    Go typechecker** — `go/types.(*Checker).recordTypeAndValue` alone is
+    1,668MB (35.2%), plus `recordUse` 342MB, `go/parser` 169MB —
+    driven by `boundary_test.go`'s **two separate `packages.Load` calls**
+    (lines 93 and 222), each typechecking the tree. The test is
+    load-bearing security (it is what keeps model output away from the
+    write engine) — the question for Black is only whether the two loads
+    can share one pass, never whether they run. CPU profile agrees by
+    symptom: `runtime.madvise` 32% flat is a GC returning that memory.
+    `internal/api` after #434: **1,112MB total, argon2 570MB/51.2%** —
+    the handoff closed and verified; second place is `sim/tier1`
+    (`SimulateGame` 197MB cum), which is real simulation work.
+    `internal/night` (new since last patrol): 34MB total, nothing to see.
+    `api` CPU is still the documented cgo blind spot (`runtime.cgocall`
+    74.5% flat) — unchanged shape, clock the DB at the query.
+  - **The expiry calendar, nearest first: the Anthropic key, ~2026-09-10 —
+    FIVE DAYS.** Flagged to Aaron this morning; nothing watches it; from
+    next week a 401 on every Claude surface reads as a broken integration
+    and is actually this date. Renewal is two steps: a fresh key from the
+    Anthropic console, then `fly secrets set ANTHROPIC_API_KEY=…` (which
+    restarts the machine — seconds of downtime). Then comfortable: **TLS
+    2026-11-11** (same cert as 08-24, Fly renews ~30 days out — check it
+    turned over on the next run), **domain 2027-08-13**, **`FLY_API_TOKEN`
+    2027-08-14**. The Sonnet 5 introductory-pricing date came and went
+    2026-09-01 exactly as the 08-24 calendar said it would; Black's ledger
+    carries the aftermath (the admin panel's backdated pricing).
+  - **Alerting posture — unchanged in every line that matters:** Fly HTTP
+    check GET `/api/health` passing (does not restart on failure) ·
+    restart policy fires on process exit only · deploy-job failure email ·
+    **external uptime monitoring: none · phone alerting: none** (queued
+    item 1, still the biggest gap). Self-healing delta: none since secret
+    scanning's partner path landed.
+  - **Instance:** machine `84e19ef25041e8` **v353** (was 208 on 08-24 —
+    145 deploys in 12 days), `iad`, started, 1/1 checks. Volume 3GB
+    encrypted; **5 snapshots, newest 8h, 5-day retention, 970MiB stored**
+    — the 4-day-old one holds 802MiB and the four after it 39–48MiB each.
+    Restore drill still never walked; the ladder it must cross is at rung
+    **14** now (queued 11 / daybreak 08-24 item 4, unchanged).
 - **Measurements (2026-08-24, rainbow):**
   - **CI per-job medians, n=22** — every successful `ci.yml` run back to
     2026-08-23, computed from `started_at`/`completed_at` per job. **This is a

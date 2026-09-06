@@ -4279,9 +4279,16 @@ button:hover .tarot-fan-card {
   color: var(--text-primary);
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.card-action:hover {
+.card-action:hover:not(:disabled) {
   border-color: var(--text-muted);
   background: var(--gridline);
+}
+/* Same face as `.btn:disabled`, for the same reason: a control that has
+ * stopped listening must stop answering the hand — a disabled button whose
+ * hover still lights up is promising a press it will not take. */
+.card-action:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* The action bar (deck page, punch list item 9): press an action, pick a
@@ -4342,7 +4349,7 @@ button:hover .tarot-fan-card {
   color: var(--status-critical);
   border-color: color-mix(in srgb, var(--status-critical) 45%, transparent);
 }
-.card-action-danger:hover {
+.card-action-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--status-critical) 12%, transparent);
   border-color: var(--status-critical);
 }

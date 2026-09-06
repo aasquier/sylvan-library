@@ -192,10 +192,17 @@ function PilotLine({ deck, deckRef, onRefresh }: {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(deck.pilot)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   if (!deck.pilot && !deck.writable) return null
 
   async function save() {
+    // Two doors into this write — the Save button and Enter on the input —
+    // and `disabled` only closes the first, so the guard lives here too. A
+    // second call while the first is out is a second recorded edit (ADR 28
+    // keeps both) for one decision.
+    if (busy) return
+    setBusy(true)
     try {
       setError(null)
       await api.setDeckField(deckRef, 'pilot', value.trim())
@@ -203,6 +210,8 @@ function PilotLine({ deck, deckRef, onRefresh }: {
       onRefresh()
     } catch (e) {
       setError(errorMessage(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -245,11 +254,12 @@ function PilotLine({ deck, deckRef, onRefresh }: {
                  style={{ background: 'var(--surface-1)',
                           border: '1px solid var(--hairline)',
                           color: 'var(--text-primary)' }} />
-          <button type="button" onClick={() => void save()}
+          <button type="button" onClick={() => void save()} disabled={busy}
                   className="btn btn-ghost btn-ghost-accent btn-xs font-medium">
-            Save
+            {busy ? 'Saving…' : 'Save'}
           </button>
           <button type="button" onClick={() => setEditing(false)}
+                  disabled={busy}
                   className="btn btn-ghost btn-xs">
             Cancel
           </button>
@@ -856,13 +866,25 @@ export default function DeckDetail() {
     }
   }
 
+  /** The card a Return is in flight for, or null. One at a time — the rows a
+   *  return rewrites are the rows the next click would aim at — and the
+   *  `disabled` this drives is the load-bearing half: a browser refuses every
+   *  click on a disabled button, and the button is this write's only door.
+   *  The bug this closes was a double click recording two edits (ADR 28
+   *  keeps both) and answering the second with a "not in the graveyard"
+   *  refusal for a card the first click had already brought home. */
+  const [returning, setReturning] = useState<string | null>(null)
+
   async function returnCard(name: string) {
+    setReturning(name)
     setEditError(null)
     try {
       await api.returnCard(deckRef, name)
       await refresh()
     } catch (e) {
       setEditError(errorMessage(e))
+    } finally {
+      setReturning(null)
     }
   }
 
@@ -1654,9 +1676,10 @@ export default function DeckDetail() {
                         <div className="flex shrink-0 items-center gap-2">
                           <button
                             onClick={() => void returnCard(card.name)}
+                            disabled={returning !== null}
                             title={`Return ${card.name} to the 99, rationale intact`}
                             className="card-action rounded-md px-2 py-1 text-[11px] font-medium">
-                            Return
+                            {returning === card.name ? 'Returning…' : 'Return'}
                           </button>
                           {/* The only permanent delete left — and it can only
                               ever act on a card already entombed, so exiling
