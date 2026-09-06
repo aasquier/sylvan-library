@@ -344,6 +344,96 @@ func TestSearchPricesEachCardAtItsCheapestPrintingOrNotAtAll(t *testing.T) {
 	}
 }
 
+// A budget names how many cards it wants and gets that many, which is the
+// property a filter over an already-chosen page cannot have.
+//
+// The old shape asked for the sixty best-known cards and then threw away the
+// ones over the limit, so "sixty cards under a dollar" answered with whatever
+// fraction of the sixty happened to be cheap — 23 of the 74 that matched, on
+// the real pool. The number is not the finding; the *shape* is, and the shape
+// is what this asks about: for every count the fixture can satisfy, asking for
+// that many must return that many.
+//
+// Nothing here is typed from the fixture. The in-budget population is measured
+// first and every expectation is derived from it, so the test still means what
+// it says if a recorded price ever moves — and the two guards at the top fail
+// loudly rather than passing vacuously if the fixture stops being able to
+// demonstrate the property at all.
+func TestABudgetIsAConditionOfTheSearchRatherThanASieveOverIt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	p := pool.New(pooltest.Build(t), nil)
+	t.Cleanup(p.Close)
+	// A ceiling with cards on both sides of it in the recorded fixture: the
+	// point is that the search must skip the dearer ones rather than count
+	// them against the asked-for total.
+	const budget = 30.0
+	if err := p.Use(ctx, func(c *pool.Conn) error {
+		everything, err := SearchCards(ctx, c, SearchQuery{Limit: 200})
+		if err != nil {
+			return err
+		}
+		inBudget, err := SearchCards(ctx, c,
+			SearchQuery{PriceMax: budget, HavePrice: true, Limit: 200})
+		if err != nil {
+			return err
+		}
+		if len(inBudget) < 2 {
+			t.Fatalf("only %d cards are under $%v in the fixture: this test "+
+				"cannot tell a condition from a sieve without at least two",
+				len(inBudget), budget)
+		}
+		if len(inBudget) >= len(everything) {
+			t.Fatalf("every one of the %d cards is under $%v: the ceiling is "+
+				"not binding, so nothing here is being asked",
+				len(everything), budget)
+		}
+
+		// The property. Asking for k returns k, and each of them is affordable
+		// — where the sieve returned however many of its own top k survived.
+		for k := 1; k <= len(inBudget); k++ {
+			got, err := SearchCards(ctx, c,
+				SearchQuery{PriceMax: budget, HavePrice: true, Limit: k})
+			if err != nil {
+				return err
+			}
+			if len(got) != k {
+				t.Errorf("asked for %d cards under $%v and got %d -- %d match",
+					k, budget, len(got), len(inBudget))
+			}
+			for _, card := range got {
+				if card.PriceUSD == nil || *card.PriceUSD > budget {
+					t.Errorf("a search capped at $%v returned %s at %s",
+						budget, card.Name, showPrice(card.PriceUSD))
+				}
+			}
+		}
+
+		// And the condition changes *which* cards are reachable, never which
+		// cards exist: the budgeted answer is the unbudgeted one with the
+		// dear and the unpriced removed, in the same order. This is the half
+		// that would notice a WHERE clause that quietly dropped a card the old
+		// cut would have kept.
+		want := []string{}
+		for _, card := range everything {
+			if card.PriceUSD != nil && *card.PriceUSD <= budget {
+				want = append(want, card.Name)
+			}
+		}
+		got := []string{}
+		for _, card := range inBudget {
+			got = append(got, card.Name)
+		}
+		if strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("a capped search answered\n  %v\nthe uncapped search's own "+
+				"affordable rows are\n  %v", got, want)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("searching: %v", err)
+	}
+}
+
 // showPrice renders a nullable price for a failure message. Without it a
 // `%v` on a *float64 prints the address, which is the one number nobody
 // wants at the moment a test breaks.

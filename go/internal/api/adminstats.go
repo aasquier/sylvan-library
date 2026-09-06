@@ -217,6 +217,13 @@ func intOrNil(v *int64) any {
 // per-model rollup only, since pricing per-mode rows would price
 // `(various)` and the guess would look like arithmetic. The caveat rides in
 // the payload because it must ride with the numbers anywhere they go.
+//
+// **The roll-up and the pricing both happen in `ledger.Window`**, which is
+// also what `mtglab claude usage` reads, so the page and the shell cannot
+// disagree about the same rows. That includes pricing each stretch of a
+// window at the rates in force during it: this handler used to hand every
+// window `prices.Today()`, which quietly overstated the whole pre-September
+// bill by half the morning Sonnet 5's introductory window closed.
 func (a *API) statsClaude(w http.ResponseWriter, r *http.Request) {
 	if a.requireAdmin(w, r) {
 		return
@@ -229,29 +236,16 @@ func (a *API) statsClaude(w http.ResponseWriter, r *http.Request) {
 	if rec == nil && present {
 		rec = ledger.RecorderFrom(db, a.log)
 	}
+	today := prices.Today()
 	window := func(since string) (wire.OrderedMap, error) {
-		byMode, byModel := []ledger.Summary{}, []ledger.Summary{}
-		if rec != nil {
-			var err error
-			if byMode, err = rec.Summarise(r.Context(), "mode", since); err != nil {
-				return nil, err
-			}
-			if byModel, err = rec.Summarise(r.Context(), "model", since); err != nil {
-				return nil, err
-			}
-		}
-		priceRows := make([]prices.Row, 0, len(byModel))
-		for _, row := range byModel {
-			priceRows = append(priceRows, prices.Row{Model: row.Model,
-				Conversations: int64(row.Conversations),
-				InputTokens:   int64(row.InputTokens),
-				OutputTokens:  int64(row.OutputTokens),
-				CacheRead:     int64(row.CacheReadTokens)})
+		roll, err := rec.Window(r.Context(), since, today)
+		if err != nil {
+			return nil, err
 		}
 		return wire.OrderedMap{
-			{Key: "by_mode", Value: labelled(byMode, "mode")},
-			{Key: "by_model", Value: labelled(byModel, "model")},
-			{Key: "estimated_usd", Value: prices.Over(priceRows, prices.Today()).AsDict()},
+			{Key: "by_mode", Value: labelled(roll.ByMode, "mode")},
+			{Key: "by_model", Value: labelled(roll.ByModel, "model")},
+			{Key: "estimated_usd", Value: roll.Cost.AsDict()},
 		}, nil
 	}
 	week, err := window(ago(7))
@@ -274,7 +268,10 @@ func (a *API) statsClaude(w http.ResponseWriter, r *http.Request) {
 					{Key: "checked", Value: prices.Checked},
 					{Key: "source", Value: prices.Source},
 					{Key: "note", Value: "Estimated from list rates read by a " +
-						"person on the date above, not from an invoice. A " +
+						"person on the date above, not from an invoice. Each " +
+						"stretch of a window is priced at the rates that were " +
+						"in force while it was being spent, so a window that " +
+						"crosses a change is not repriced at today's. A " +
 						"conversation whose model is not in the table is " +
 						"counted, never priced at zero."},
 				}},
