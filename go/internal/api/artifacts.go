@@ -73,7 +73,7 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 	// a pool that has never heard of any of these cards and every one of them
 	// comes back `unknown-card`.
 	//
-	// This built an empty map until 2026-08-22 -- an inherited wrinkle:
+	// This once built an empty map -- an inherited wrinkle:
 	// on a pool-less instance the validate route warned `unverified` while
 	// this one refused the
 	// build outright, because only one of the two distinguished "no pool"
@@ -173,8 +173,8 @@ func (a *API) baselineDeck(r *http.Request, src library.Source, slug string) (*d
 //
 // `baseline` is the field worth reading -- `current`, `different` or
 // `unknown` -- and it is why the shelf route exists at all. Every artifact on
-// the volume was eight days older than its deck on 2026-08-21 and nothing in
-// the app could say so. It is computed by comparing the stored snapshot
+// the volume was once eight days older than its deck and nothing in the app
+// could say so. It is computed by comparing the stored snapshot
 // against the deck rather than by looking at a timestamp, so reverting an edit
 // correctly makes the artifacts current again.
 func (a *API) artifactsJSON(r *http.Request, src library.Source, d *deck.Deck) ([]wire.KV, error) {

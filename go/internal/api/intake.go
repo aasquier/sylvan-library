@@ -466,7 +466,7 @@ func (run *intakeRun) describe(ctx context.Context) wire.OrderedMap {
 	}
 	// **The deck's own `strategy`, which is what "the description" means.** It
 	// is the paragraph the library shelf, the deck page and the primer all
-	// render, and until 2026-08-29 nothing in this app could write it: the
+	// render, and for a while nothing in this app could write it: the
 	// editor left it out of `SettableDeckFields` on the grounds that prose
 	// belongs to `SetNote`, and `SetNote` can only reach the `notes:` mapping.
 	//
