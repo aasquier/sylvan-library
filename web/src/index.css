@@ -7831,6 +7831,44 @@ button:hover .tarot-fan-card {
 .field-side-near { grid-area: near; }
 .field-transport { grid-area: transport; }
 
+/* **Four seats sit around the anvil rather than across it.**
+ *
+ * The duel's stage is three columns — champion, anvil, challenger — and a pod
+ * given the same row showed as two tiles with two more shoved past the edge
+ * (Aaron, 2026-09-06: "Our preview is only two tiles on four player too").
+ * Four tiles are a table: two by two, with the anvil centred over the gap
+ * between them, because a column of anvil between two pairs is not a table,
+ * it is two duels standing next to each other. */
+.theater-stage.is-pod {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+}
+.theater-stage.is-pod .theater-anvil {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  /* Off the tiles it floats over, so the count stays readable against art. */
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--surface, rgba(20, 16, 10, 0.82));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 40rem) {
+  /* A phone has no room for two columns of card art; the table becomes a
+     stack and the anvil returns to the flow between the pairs. */
+  .theater-stage.is-pod { grid-template-columns: minmax(0, 1fr); }
+  .theater-stage.is-pod .theater-anvil {
+    position: static;
+    transform: none;
+    justify-self: center;
+  }
+}
+
 /* The count on a record tab: quieter than the label it follows, because it is
    the evidence behind the word rather than the word. */
 .record-tab-n {

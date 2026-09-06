@@ -832,6 +832,24 @@ export default function ColiseumRoom() {
   const [c, setC] = useState(params.get('c') ?? '')
   const [d, setD] = useState(params.get('d') ?? '')
   const [pod, setPod] = useState(Boolean(params.get('c') || params.get('d')))
+  /** The seat a deck is sitting in twice, or none.
+   *
+   *  **The door refuses this too**, and that is the guard that counts: all
+   *  four seats ride in the link, so a URL naming the same deck twice would
+   *  walk straight past a disabled button. This one exists so the answer
+   *  arrives before the press rather than as a 422 after it. */
+  const twiceSeated = ((): { deck: string; seat: number; first: number } | null => {
+    // Plain, not memoised: four strings and an `indexOf`, and the compiler
+    // could not prove the memo held anyway.
+    const seats: string[] = pod ? [a, b, c, d] : [a, b]
+    for (let i = 0; i < seats.length; i++) {
+      const here = seats[i]
+      if (!here) continue
+      const first = seats.indexOf(here)
+      if (first < i) return { deck: here, seat: i + 1, first: first + 1 }
+    }
+    return null
+  })()
   const [decks, setDecks] = useState<DeckTile[]>([])
   // The gate (ADR 35). Where Forge is not installed the gates simply do not
   // open — no greyed-out button, no excuse. The room is still worth walking
@@ -1493,8 +1511,23 @@ export default function ColiseumRoom() {
               than here, so there is one place to read them and one to change
               them. */}
           <SendThemIn running={running} lighting={lighting}
-                      disabled={running || !a || !b || (pod && (!c || !d))}
+                      disabled={running || !a || !b || (pod && (!c || !d))
+                                || Boolean(twiceSeated)}
                       onPress={() => void sendThemIn()} />
+
+          {/* **A shut gate says why it is shut.** A greyed control with no
+              sentence beside it is the room refusing without explaining,
+              which is exactly what commandment 2 rules out — a newcomer who
+              cannot tell a disabled button from a broken one has been told
+              nothing. The seat is named, so the fix is obvious. */}
+          {twiceSeated && (
+            <p className="basis-full text-sm" role="status"
+               style={{ color: 'var(--text-secondary)' }}>
+              {deckAt(twiceSeated.deck)?.name ?? slugOf(twiceSeated.deck)} is in
+              seat {twiceSeated.first} already — give seat {twiceSeated.seat} a
+              different deck. A deck cannot fight itself.
+            </p>
+          )}
         </div>
       )}
 
@@ -1538,8 +1571,11 @@ export default function ColiseumRoom() {
         <div className="mt-6">
           <MatchTheater
             key={job.id}
-            a={aDeck} b={bDeck}
-            aSlug={slugOf(a)} bSlug={slugOf(b)}
+            seats={pod
+              ? [{ deck: aDeck, slug: slugOf(a) }, { deck: bDeck, slug: slugOf(b) },
+                 { deck: deckAt(c) ?? null, slug: slugOf(c) },
+                 { deck: deckAt(d) ?? null, slug: slugOf(d) }]
+              : [{ deck: aDeck, slug: slugOf(a) }, { deck: bDeck, slug: slugOf(b) }]}
             games={forge ? forge.games : (job.total || games)}
             rows={rows}
             running={running}

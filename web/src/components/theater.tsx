@@ -143,17 +143,27 @@ function Champion({ deck, slug, wins, games, side }: {
  * which phase it is in. Everything else on the stage is derived from those
  * rows, so the two phases cannot describe the same match differently.
  */
-export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
-  a: DeckSummary | null
-  b: DeckSummary | null
-  aSlug: string
-  bSlug: string
+/** One chair in the theater: the deck if the shelf has handed it over yet,
+ *  and the slug it was submitted under either way. */
+export interface TheaterSeat {
+  deck: DeckSummary | null
+  slug: string
+}
+
+export function MatchTheater({ seats, games, rows, running }: {
+  /** Every seat of the match, in the order the decks reached Forge.
+   *
+   *  **A list rather than `a` and `b`** since 2026-09-06: a pod seats four,
+   *  and a theater that could only hold two showed a four-player match as a
+   *  duel between its first two decks (Aaron: "Our preview is only two tiles
+   *  on four player too"). */
+  seats: TheaterSeat[]
   games: number
   rows: ForgeGameRow[]
   running: boolean
 }) {
-  const winsA = rows.filter((r) => r.winner === aSlug).length
-  const winsB = rows.filter((r) => r.winner === bSlug).length
+  const pod = seats.length > 2
+  const winsOf = (slug: string) => rows.filter((r) => r.winner === slug).length
   const played = rows.length
   // The gauge reads off the rows rather than off `job.percent`, so it agrees
   // with the pips beside it even on the tick where one has arrived and the
@@ -169,22 +179,35 @@ export function MatchTheater({ a, b, aSlug, bSlug, games, rows, running }: {
   // The commander rides along because the cut is decided by lookup rather
   // than by punctuation: only a deck named for its general loses its
   // epithet, and a deck called "Life, Uh, Finds a Way" keeps every word.
-  const name = (slug: string | null) =>
-    slug === aSlug ? shortName(a?.name ?? aSlug, a?.commander)
-      : slug === bSlug ? shortName(b?.name ?? bSlug, b?.commander)
-        : null
+  const name = (slug: string | null) => {
+    const seat = seats.find((s) => s.slug === slug)
+    return seat ? shortName(seat.deck?.name ?? seat.slug, seat.deck?.commander) : null
+  }
 
   return (
     <section className="theater card-surface rounded-xl p-5">
-      <div className="theater-stage">
-        <Champion deck={a} slug={aSlug} wins={winsA} games={games} side="left" />
+      {/* Two seats face each other across the anvil; four sit around it. The
+          anvil is the middle of the table either way — for a pod it is
+          centred over the gap between the four tiles rather than standing in
+          a column of its own, because a column between two pairs is not a
+          table, it is two duels. */}
+      <div className={`theater-stage${pod ? ' is-pod' : ''}`}>
+        {seats.slice(0, pod ? 2 : 1).map((s, i) => (
+          <Champion key={s.slug || i} deck={s.deck} slug={s.slug}
+                    wins={winsOf(s.slug)} games={games}
+                    side={i % 2 === 0 ? 'left' : 'right'} />
+        ))}
         <div className="theater-anvil">
           <Anvil size={36} />
           <span className="theater-anvil-label tabular">
             {played} / {games}
           </span>
         </div>
-        <Champion deck={b} slug={bSlug} wins={winsB} games={games} side="right" />
+        {seats.slice(pod ? 2 : 1).map((s, i) => (
+          <Champion key={s.slug || i} deck={s.deck} slug={s.slug}
+                    wins={winsOf(s.slug)} games={games}
+                    side={(i + (pod ? 0 : 1)) % 2 === 0 ? 'left' : 'right'} />
+        ))}
       </div>
 
       {/* The forge heat: iron at rest, ember through orange to white at the

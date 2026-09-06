@@ -16,7 +16,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DeckSummary, ForgeGameRow } from '../lib/api'
-import { MatchTheater } from './theater'
+import { MatchTheater, type TheaterSeat } from './theater'
 
 afterEach(cleanup)
 
@@ -45,11 +45,14 @@ const opponent = deck({
   commander: ['Goreclaw, Terror of Qal Sisma'],
 })
 
-function stage(rows: ForgeGameRow[], over: { games?: number; running?: boolean } = {}) {
+function stage(rows: ForgeGameRow[],
+  over: { games?: number; running?: boolean; seats?: TheaterSeat[] } = {}) {
   return render(
-    <MatchTheater a={deck()} b={opponent} aSlug="arahbo-cats"
-                  bSlug="goreclaw-stompy" games={over.games ?? 8} rows={rows}
-                  running={over.running ?? true} />,
+    <MatchTheater
+      seats={over.seats ?? [{ deck: deck(), slug: 'arahbo-cats' },
+                            { deck: opponent, slug: 'goreclaw-stompy' }]}
+      games={over.games ?? 8} rows={rows}
+      running={over.running ?? true} />,
   )
 }
 
@@ -137,9 +140,10 @@ describe('the stage', () => {
 
   it('prints a commander line when the deck is not named for them', () => {
     const { container } = render(
-      <MatchTheater a={deck({ name: 'The Cat Deck' })} b={opponent}
-                    aSlug="arahbo-cats" bSlug="goreclaw-stompy" games={4}
-                    rows={[row()]} running />,
+      <MatchTheater
+        seats={[{ deck: deck({ name: 'The Cat Deck' }), slug: 'arahbo-cats' },
+                { deck: opponent, slug: 'goreclaw-stompy' }]}
+        games={4} rows={[row()]} running />,
     )
     const lines = [...container.querySelectorAll('.theater-commander')]
     expect(lines).toHaveLength(1)
@@ -148,8 +152,10 @@ describe('the stage', () => {
 
   it('seats a deck the shelf has not handed it yet, under its slug', () => {
     render(
-      <MatchTheater a={null} b={null} aSlug="arahbo-cats"
-                    bSlug="goreclaw-stompy" games={2} rows={[]} running />,
+      <MatchTheater
+        seats={[{ deck: null, slug: 'arahbo-cats' },
+                { deck: null, slug: 'goreclaw-stompy' }]}
+        games={2} rows={[]} running />,
     )
     expect(screen.getByText('arahbo-cats')).toBeTruthy()
     expect(screen.getByText('goreclaw-stompy')).toBeTruthy()
@@ -163,5 +169,40 @@ describe('the stage', () => {
     cleanup()
     const { container: done } = stage([row()], { running: false })
     expect(done.querySelector('.theater-gauge-lit')).toBeFalsy()
+  })
+})
+
+// A pod seats four, and the theater showed two: the stage was three columns —
+// champion, anvil, challenger — so seats three and four had nowhere to go
+// (Aaron, 2026-09-06: "Our preview is only two tiles on four player too").
+describe('a four-player match', () => {
+  const pod: TheaterSeat[] = [
+    { deck: deck(), slug: 'arahbo-cats' },
+    { deck: opponent, slug: 'goreclaw-stompy' },
+    { deck: null, slug: 'atla-palani-dinos' },
+    { deck: null, slug: 'gyome-food' },
+  ]
+
+  it('seats all four, not the first two', () => {
+    const { container } = stage([], { seats: pod })
+    expect(container.querySelectorAll('.theater-champion')).toHaveLength(4)
+    // A seat the shelf has not handed over yet is named by its slug, which is
+    // what it was submitted under — so the two unnamed chairs prove the third
+    // and fourth seats are really rendered rather than merely counted.
+    expect(screen.getByText('atla-palani-dinos')).toBeTruthy()
+    expect(screen.getByText('gyome-food')).toBeTruthy()
+  })
+
+  it('lays the four out as a table rather than a duel', () => {
+    const { container } = stage([], { seats: pod })
+    expect(container.querySelector('.theater-stage')?.className)
+      .toContain('is-pod')
+  })
+
+  it('leaves the duel stage alone', () => {
+    const { container } = stage([])
+    expect(container.querySelectorAll('.theater-champion')).toHaveLength(2)
+    expect(container.querySelector('.theater-stage')?.className)
+      .not.toContain('is-pod')
   })
 })
