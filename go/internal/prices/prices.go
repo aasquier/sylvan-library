@@ -3,12 +3,23 @@
 //
 // The standing rules, all load-bearing: rates are dated and the date
 // renders beside every figure; a rate known to move is modelled as a window
-// rather than flattened; a model the table does not know is priced at
-// nothing and **counted**, because charging it zero silently would read as
-// "cheap"; and the figure stays a floor, since cache writes bill at 1.25x
-// input and are recorded nowhere. Re-check rates by reading the pricing
+// rather than flattened; **a window is priced at the rates that were in force
+// during it**, not at this morning's; a model the table does not know is
+// priced at nothing and **counted**, because charging it zero silently would
+// read as "cheap"; and the figure stays a floor, since cache writes bill at
+// 1.25x input and are recorded nowhere. Re-check rates by reading the pricing
 // page and editing `Table`; the corpus test holds the table to the recorded
 // rates, so a rate never drifts silently.
+//
+// The third rule is the one that was broken by a caller rather than by this
+// file, which is why `Segments` lives here now. `Over` prices a set of rows at
+// one date, and every caller passed `Today()` — correct until the day a rate
+// moved, then wrong forever for everything spent before it, by exactly the
+// size of the move. Sonnet 5's introductory window closed on 2026-08-31 and
+// the whole recorded bill before it started reading ~50% high the next
+// morning. A caller with a date range asks `Segments` to cut it at the
+// boundaries the table itself knows, prices each piece at the rate that was in
+// force, and adds them with `Sum`.
 package prices
 
 import (
@@ -157,3 +168,118 @@ func (e Estimate) AsDict() wire.OrderedMap {
 
 // Today is the local day as an ISO date — on the instance, UTC.
 func Today() string { return time.Now().Format("2006-01-02") }
+
+// ---- pricing a window that crosses a rate change --------------------------
+
+// Segment is one stretch of time over which every rate in Table held still:
+// `[Since, Until)`, and `When` is a date inside it, which is all `Cost` needs
+// to pick the rate that was in force.
+//
+// Both bounds are compared as text against `created_at`, which is ISO-8601
+// UTC — so a bare date is a perfectly good instant here, and midnight is where
+// it lands. An empty `Since` is "from the beginning" and an empty `Until` is
+// "up to now"; both are the absence of a bound rather than a bound at zero.
+type Segment struct {
+	Since string
+	Until string
+	When  string
+}
+
+// Boundaries are the dates the table's rates change, sorted, deduplicated —
+// the first day each new rate applies, which is the day AFTER the `Until` a
+// Priced records as the last day of the old one.
+//
+// Derived from Table rather than written down beside it, because a second
+// list of the same dates is a second thing to forget when a rate moves.
+func Boundaries() []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, priced := range Table {
+		if priced.Until == "" || priced.Then == nil {
+			continue
+		}
+		day, err := time.Parse("2006-01-02", priced.Until)
+		if err != nil {
+			// An unparseable Until cannot be turned into a boundary, and
+			// guessing one would price a window at the wrong rate silently.
+			// `Priced.On` still compares it as text, so the table keeps working;
+			// what is lost is only the split, which is the honest failure.
+			continue
+		}
+		changeover := day.AddDate(0, 0, 1).Format("2006-01-02")
+		if !seen[changeover] {
+			seen[changeover] = true
+			out = append(out, changeover)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Segments splits `[since, now]` at every boundary it crosses.
+//
+// **This is what "estimated spend" means.** Pricing a whole window at today's
+// rate is not an estimate of what was spent, it is an estimate of what the
+// same traffic would cost if it were bought again this morning — and when a
+// rate moves by half, as Sonnet 5's introductory window did on 2026-09-01,
+// the two answers differ by half. The ledger records when each conversation
+// happened; this is what lets a roll-up use that.
+//
+// `now` bounds the split rather than the sum: a boundary that has not arrived
+// yet cannot have any rows past it, so a segment beginning after today is left
+// out instead of costing a query that can only answer zero.
+func Segments(since, now string) []Segment {
+	cuts := []string{since}
+	for _, boundary := range Boundaries() {
+		// `>` and not `>=`: a boundary at exactly the window's start has
+		// already taken effect, so there is nothing before it to price.
+		if boundary > since && boundary <= now {
+			cuts = append(cuts, boundary)
+		}
+	}
+	out := make([]Segment, 0, len(cuts))
+	for i, start := range cuts {
+		seg := Segment{Since: start, When: now}
+		if i+1 < len(cuts) {
+			seg.Until = cuts[i+1]
+			// A date inside the segment: the day before the next change, which
+			// is the last day this segment's rates were in force. Any date in
+			// the range would pick the same rate; this one always exists.
+			seg.When = dayBefore(seg.Until)
+		}
+		out = append(out, seg)
+	}
+	return out
+}
+
+func dayBefore(date string) string {
+	day, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return date
+	}
+	return day.AddDate(0, 0, -1).Format("2006-01-02")
+}
+
+// Sum folds one estimate per segment into the window's own.
+//
+// The dollars are added in segment order with `Over`'s rounding, so the sum is
+// the same arithmetic done in the same sequence rather than a second kind of
+// addition. The unpriced counts add; the unpriced model names are a set, since
+// a model the table cannot price is unpriceable in every segment it appears in
+// and naming it three times would read as three problems.
+func Sum(parts []Estimate) Estimate {
+	out := Estimate{}
+	seen := map[string]bool{}
+	for _, part := range parts {
+		out.USD = floats.Rounded(out.USD + part.USD)
+		out.Unpriced += part.Unpriced
+		for _, model := range part.UnpricedModels {
+			if !seen[model] {
+				seen[model] = true
+				out.UnpricedModels = append(out.UnpricedModels, model)
+			}
+		}
+	}
+	sort.Strings(out.UnpricedModels)
+	return out
+}

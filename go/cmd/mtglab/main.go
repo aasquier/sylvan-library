@@ -1,6 +1,6 @@
 // Command mtglab is the binary that carries the whole deployed surface and
 // its runbook: `ui` serves the app, `forge-shim` is the worker's door, and
-// `users`, `decks`, `sim`, `data` and `claude check` are what a
+// `users`, `decks`, `sim`, `data` and the two `claude` verbs are what a
 // `fly ssh console` reaches for. The dev bench -- `animist` and
 // `cardmotion`, and nothing else -- lives in `tools/` under its own name and
 // never ships. (`bench` and `mutate` were Python-era subcommands of this
@@ -54,7 +54,7 @@ func newRoot(cfg config.Config, forge tier3.Settings, pipe claude.Endpoint) *cob
 	root.AddCommand(decksCommand(cfg))
 	root.AddCommand(simCommand(cfg, forge))
 	root.AddCommand(cardsCommand(cfg))
-	root.AddCommand(claudeCommand(pipe))
+	root.AddCommand(claudeCommand(cfg, pipe))
 	root.AddCommand(probeCommand())
 	return root
 }
