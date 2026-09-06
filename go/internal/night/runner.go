@@ -331,7 +331,7 @@ func (r *Runner) work(ctx context.Context, run Run) {
 // failed read plays on: the deal-time consent stands recorded, and a store
 // this broken will fail the bout honestly on its own.
 func (r *Runner) consentWithdrawn(ctx context.Context, b Bout) (string, bool) {
-	for _, seat := range []Seat{b.SeatA, b.SeatB} {
+	for _, seat := range b.Seats {
 		if seat.House() {
 			continue // the house always plays
 		}
@@ -418,7 +418,7 @@ func (r *Runner) StartSample(ctx context.Context, minutes int) (Run, int, error)
 		return Run{}, 0, err
 	}
 	key := r.sampleKey(now)
-	plans := PlanSample(key, house, players, r.set.Games)
+	plans := PlanSample(key, house, players, r.set)
 	run, err := r.store.StartRun(ctx, key, true, now.Add(time.Duration(minutes)*time.Minute))
 	if err != nil {
 		return Run{}, 0, err

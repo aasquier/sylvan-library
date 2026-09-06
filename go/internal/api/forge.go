@@ -1425,9 +1425,13 @@ type forgeMatch struct {
 	addresses []string
 	ownerIDs  []*int64
 	games     int
-	seed      *big.Int
-	narrate   bool
-	hosted    bool
+	// clock is Forge's `-c` for this match. Zero takes [ForgeClock], which
+	// is what every interactive match asks for; the night sets it per bout,
+	// because a pod cannot be held by a duel's clock (see night.PodClock).
+	clock   int
+	seed    *big.Int
+	narrate bool
+	hosted  bool
 }
 
 // playForgeMatch is the play-and-record core both run paths drive: the whole
@@ -1438,6 +1442,14 @@ type forgeMatch struct {
 func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int64, error) {
 	decks, addresses, ownerIDs := m.decks, m.addresses, m.ownerIDs
 	games, seed, narrate, hosted := m.games, m.seed, m.narrate, m.hosted
+	// One resolution, before anything reads it: the clock goes onto Forge's
+	// command line, into every bound in [tier3.MatchBudget], and into the
+	// ledger row, and those three disagreeing is the shape of the bug where a
+	// match is cut by a budget sized for a different clock.
+	clock := m.clock
+	if clock <= 0 {
+		clock = ForgeClock
+	}
 	worker := a.forgeWorker()
 	recorder := a.matchLedger()
 
@@ -1523,12 +1535,12 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 	var runErr error
 	if hosted {
 		run, runErr = worker.RunMatch(ctx, decks, tier3.MatchAsk{
-			Games: games, Clock: ForgeClock, Seed: seed,
+			Games: games, Clock: clock, Seed: seed,
 			Narrate: narrate, OnGame: tick, OnEvents: hear,
 		})
 	} else {
 		run, runErr = a.forge.RunGames(decks, tier3.RunOptions{
-			Games: games, Clock: ForgeClock, Seed: seed,
+			Games: games, Clock: clock, Seed: seed,
 			Narrate: narrate, OnEvents: hear,
 			OnGame: func(finished int, game tier3.GameResult) {
 				tick(finished, &game)
@@ -1551,7 +1563,7 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 	// every question after it — and Record never fails, so a ledger
 	// problem cannot cost anybody a match they just watched finish.
 	matchID := recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
-		Seed: seed, Clock: ForgeClock, GamesRequested: games,
+		Seed: seed, Clock: clock, GamesRequested: games,
 		Hosted: hosted, OwnerIDs: ownerIDs})
 	return shapeForge(decks, addresses, games, seed, run, played), matchID, nil
 }

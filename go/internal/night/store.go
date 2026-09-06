@@ -55,13 +55,22 @@ type Seat struct {
 // House reports whether this seat is the house's.
 func (s Seat) House() bool { return s.Owner == nil }
 
-// Bout is one planned pairing and what became of it.
+// Bout is one planned seating and what became of it.
+//
+// **Seats rather than a pair since 2026-09-06**: the night deals four-seat
+// pods as well as duels, so the count is data. `Seats` is in seat order —
+// index 0 is seat 1 — and it is the order the decks are handed to Forge, so
+// it is the order `forge_games.winner_seat` will point into.
 type Bout struct {
 	ID    int64
 	RunID int64
-	SeatA Seat
-	SeatB Seat
+	Seats []Seat
 	Games int
+	// Clock is Forge's per-game seconds for this bout. A duel's 300 cannot
+	// hold a pod: measured 2026-09-06, a four-seat game runs ~135s median
+	// against a duel's ~16s, with a tail past 349s, so a pod at 300 is cut
+	// about one game in six and written down as a draw with no winner.
+	Clock int
 	// Seed is derived and stable per bout, so a night is reproducible in
 	// principle.
 	Seed  int64
@@ -79,11 +88,19 @@ type Bout struct {
 
 // Plan is one bout as the roster hands it over, before it has a row.
 type Plan struct {
-	SeatA Seat
-	SeatB Seat
+	Seats []Seat
 	Games int
+	Clock int
 	Seed  int64
 }
+
+// Pod reports whether this seating is a pod rather than a duel — more than
+// two chairs. The word the night uses for the shape, in one place, so a
+// reader never has to remember which side of `> 2` means what.
+func (p Plan) Pod() bool { return len(p.Seats) > 2 }
+
+// Pod is [Plan.Pod] for a written bout.
+func (b Bout) Pod() bool { return len(b.Seats) > 2 }
 
 // Store holds the night's rows in `app.db`. Reads and writes both return
 // their errors: unlike the match ledger, whose Record must never fail the
@@ -183,15 +200,28 @@ func (s *Store) PlanBouts(ctx context.Context, runID int64, plans []Plan) error 
 	defer func() { _ = tx.Rollback() }()
 	at := stamp(s.now())
 	for _, p := range plans {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO night_bouts (run_id, seat_a_owner, seat_a_slug,`+
-				` seat_b_owner, seat_b_slug, games, seed, state,`+
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO night_bouts (run_id, games, clock, seed, state,`+
 				` created_at, updated_at)`+
-				` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			runID, nullableID(p.SeatA.Owner), p.SeatA.Slug,
-			nullableID(p.SeatB.Owner), p.SeatB.Slug, p.Games, p.Seed,
-			string(StatePlanned), at, at); err != nil {
+				` VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			runID, p.Games, p.Clock, p.Seed, string(StatePlanned), at, at)
+		if err != nil {
 			return err
+		}
+		boutID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		// Seat numbers are the slice's order, 1-based, and they are written
+		// here rather than carried on [Seat] so that the one place that
+		// decides the order is the one place that records it.
+		for i, seat := range p.Seats {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO night_bout_seats (bout_id, seat, owner_id, slug)`+
+					` VALUES (?, ?, ?, ?)`,
+				boutID, i+1, nullableID(seat.Owner), seat.Slug); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()
@@ -241,9 +271,7 @@ func (s *Store) HasScheduledRun(ctx context.Context, nightKey string) (bool, err
 // Bouts reads a run's bouts in the order they were planned.
 func (s *Store) Bouts(ctx context.Context, runID int64) ([]Bout, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, run_id, seat_a_owner, seat_a_slug, seat_b_owner,`+
-			` seat_b_slug, games, seed, state, reason, match_id,`+
-			` created_at, updated_at`+
+		boutColumns+
 			` FROM night_bouts WHERE run_id = ? ORDER BY id`, runID)
 	if err != nil {
 		return nil, err
@@ -257,7 +285,25 @@ func (s *Store) Bouts(ctx context.Context, runID int64) ([]Bout, error) {
 		}
 		out = append(out, b)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, s.seatEach(ctx, runID, out)
+}
+
+// seatEach fills in the seats of bouts already read, from one query.
+func (s *Store) seatEach(ctx context.Context, runID int64, bouts []Bout) error {
+	if len(bouts) == 0 {
+		return nil
+	}
+	seats, err := s.seatsForRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+	for i := range bouts {
+		bouts[i].Seats = seats[bouts[i].ID]
+	}
+	return nil
 }
 
 // Playing reads a run's bouts currently marked in flight — after a restart,
@@ -265,9 +311,7 @@ func (s *Store) Bouts(ctx context.Context, runID int64) ([]Bout, error) {
 // re-marks failed.
 func (s *Store) Playing(ctx context.Context, runID int64) ([]Bout, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, run_id, seat_a_owner, seat_a_slug, seat_b_owner,`+
-			` seat_b_slug, games, seed, state, reason, match_id,`+
-			` created_at, updated_at`+
+		boutColumns+
 			` FROM night_bouts WHERE run_id = ? AND state = ? ORDER BY id`,
 		runID, string(StatePlaying))
 	if err != nil {
@@ -282,7 +326,10 @@ func (s *Store) Playing(ctx context.Context, runID int64) ([]Bout, error) {
 		}
 		out = append(out, b)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, s.seatEach(ctx, runID, out)
 }
 
 // ClaimNext moves the run's next planned bout into playing and hands it
@@ -309,15 +356,21 @@ func (s *Store) ClaimNext(ctx context.Context, runID int64) (Bout, bool, error) 
 	}
 
 	b, err := scanBout(tx.QueryRowContext(ctx,
-		`SELECT id, run_id, seat_a_owner, seat_a_slug, seat_b_owner,`+
-			` seat_b_slug, games, seed, state, reason, match_id,`+
-			` created_at, updated_at`+
+		boutColumns+
 			` FROM night_bouts WHERE run_id = ? AND state = ?`+
 			` ORDER BY id LIMIT 1`, runID, string(StatePlanned)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Bout{}, false, nil
 	}
 	if err != nil {
+		return Bout{}, false, err
+	}
+
+	// Inside the transaction, beside the row it belongs to: a bout handed
+	// over without its seats is a bout the runner cannot fight, and reading
+	// them after the commit would be a second chance to fail with the row
+	// already marked playing.
+	if b.Seats, err = s.seatsFor(ctx, tx, b.ID); err != nil {
 		return Bout{}, false, err
 	}
 
@@ -500,14 +553,24 @@ func scanRun(row scanner) (Run, error) {
 	return r, nil
 }
 
+// boutColumns is the bout row every read selects, in the order [scanBout]
+// reads them. One string because three call sites had the same list written
+// out three times, and a column added to two of them is a scan that fails on
+// the third.
+//
+// The seats are deliberately not here: they are rows in `night_bout_seats`
+// now, and a join would multiply the bout row by its seat count. Every read
+// pairs this with [Store.seatsFor] or [Store.seatsForRun] instead.
+const boutColumns = `SELECT id, run_id, games, clock, seed, state, reason,` +
+	` match_id, created_at, updated_at`
+
 func scanBout(row scanner) (Bout, error) {
 	var b Bout
 	var state string
 	var reason sql.NullString
 	var created, updated string
-	if err := row.Scan(&b.ID, &b.RunID, &b.SeatA.Owner, &b.SeatA.Slug,
-		&b.SeatB.Owner, &b.SeatB.Slug, &b.Games, &b.Seed, &state, &reason,
-		&b.MatchID, &created, &updated); err != nil {
+	if err := row.Scan(&b.ID, &b.RunID, &b.Games, &b.Clock, &b.Seed, &state,
+		&reason, &b.MatchID, &created, &updated); err != nil {
 		return Bout{}, err
 	}
 	b.State = State(state)
@@ -520,6 +583,61 @@ func scanBout(row scanner) (Bout, error) {
 		return Bout{}, err
 	}
 	return b, nil
+}
+
+// seatsForRun reads every seat of every bout of one run, keyed by bout, in
+// seat order — one query for the whole card rather than one per bout, which
+// is the difference between a night's watching read costing two queries and
+// costing three hundred.
+func (s *Store) seatsForRun(ctx context.Context, runID int64) (map[int64][]Seat, error) {
+	return s.seatRows(ctx,
+		`SELECT bout_id, owner_id, slug FROM night_bout_seats`+
+			` WHERE bout_id IN (SELECT id FROM night_bouts WHERE run_id = ?)`+
+			` ORDER BY bout_id, seat`, runID)
+}
+
+// seatsFor reads one bout's seats, for the claim that hands a single bout
+// over. `q` is the transaction when the caller has one: the claim reads its
+// seats inside the same transaction that marked the bout playing, so no
+// second claimant can see a half-built bout.
+func (s *Store) seatsFor(ctx context.Context, q querier, boutID int64) ([]Seat, error) {
+	rows, err := s.seatRowsOn(ctx, q,
+		`SELECT bout_id, owner_id, slug FROM night_bout_seats`+
+			` WHERE bout_id = ? ORDER BY seat`, boutID)
+	if err != nil {
+		return nil, err
+	}
+	return rows[boutID], nil
+}
+
+func (s *Store) seatRows(ctx context.Context, query string, args ...any) (
+	map[int64][]Seat, error) {
+	return s.seatRowsOn(ctx, s.db, query, args...)
+}
+
+func (s *Store) seatRowsOn(ctx context.Context, q querier, query string,
+	args ...any) (map[int64][]Seat, error) {
+	rows, err := q.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[int64][]Seat{}
+	for rows.Next() {
+		var boutID int64
+		var seat Seat
+		if err := rows.Scan(&boutID, &seat.Owner, &seat.Slug); err != nil {
+			return nil, err
+		}
+		out[boutID] = append(out[boutID], seat)
+	}
+	return out, rows.Err()
+}
+
+// querier is the half of *sql.DB and *sql.Tx the seat reads use, so one
+// helper serves both the plain read and the one inside a claim.
+type querier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
 // stamp writes the app's recorded timestamp; parseStamp reads it back. The

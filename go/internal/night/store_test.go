@@ -46,9 +46,9 @@ func house(slug string) night.Seat { return night.Seat{Slug: slug} }
 
 func plans() []night.Plan {
 	return []night.Plan{
-		{SeatA: owned(1, "gyome"), SeatB: house("goreclaw"), Games: 10, Seed: 41},
-		{SeatA: owned(2, "tivit"), SeatB: owned(1, "arahbo"), Games: 10, Seed: 42},
-		{SeatA: house("atla"), SeatB: house("trostani"), Games: 10, Seed: 43},
+		{Seats: []night.Seat{owned(1, "gyome"), house("goreclaw")}, Games: 10, Clock: 300, Seed: 41},
+		{Seats: []night.Seat{owned(2, "tivit"), owned(1, "arahbo")}, Games: 10, Clock: 300, Seed: 42},
+		{Seats: []night.Seat{house("atla"), house("trostani")}, Games: 10, Clock: 300, Seed: 43},
 	}
 }
 
@@ -91,15 +91,27 @@ func TestARunAndItsBoutsRoundTrip(t *testing.T) {
 		if b.State != night.StatePlanned || b.Reason != "" || b.MatchID != nil {
 			t.Errorf("bout %d was born %s/%q/%v, want planned and blank", i, b.State, b.Reason, b.MatchID)
 		}
-		if b.Games != want.Games || b.Seed != want.Seed ||
-			b.SeatA.Slug != want.SeatA.Slug || b.SeatB.Slug != want.SeatB.Slug {
+		if b.Games != want.Games || b.Clock != want.Clock || b.Seed != want.Seed {
 			t.Errorf("bout %d read back different: %+v", i, b)
 		}
-		if b.SeatA.House() != want.SeatA.House() || b.SeatB.House() != want.SeatB.House() {
-			t.Errorf("bout %d confused the house with a player: %+v", i, b)
+		if len(b.Seats) != len(want.Seats) {
+			t.Fatalf("bout %d came back with %d seats, want %d",
+				i, len(b.Seats), len(want.Seats))
 		}
-		if want.SeatA.Owner != nil && (b.SeatA.Owner == nil || *b.SeatA.Owner != *want.SeatA.Owner) {
-			t.Errorf("bout %d lost seat A's owner: %+v", i, b.SeatA)
+		// Seat order is the contract: it is the order the decks reach Forge,
+		// so a read that returns the right seats in the wrong chairs would
+		// point `winner_seat` at the wrong deck.
+		for n, w := range want.Seats {
+			got := b.Seats[n]
+			if got.Slug != w.Slug {
+				t.Errorf("bout %d seat %d is %q, want %q", i, n+1, got.Slug, w.Slug)
+			}
+			if got.House() != w.House() {
+				t.Errorf("bout %d seat %d confused the house with a player: %+v", i, n+1, got)
+			}
+			if w.Owner != nil && (got.Owner == nil || *got.Owner != *w.Owner) {
+				t.Errorf("bout %d seat %d lost its owner: %+v", i, n+1, got)
+			}
 		}
 	}
 	// The order the pairing dealt is the order the night plays.
@@ -473,10 +485,10 @@ func TestAMangledTimestampIsAnErrorNotAZeroTime(t *testing.T) {
 		t.Errorf("a mangled finished_at should be an error carrying the bad bytes: %v", err)
 	}
 	if _, err := db.Exec(
-		`INSERT INTO night_bouts (run_id, seat_a_slug, seat_b_slug, games, seed,
+		`INSERT INTO night_bouts (run_id, games, clock, seed,
 		                          state, created_at, updated_at)
-		 VALUES (1, 'gyome', 'arahbo', 10, 7, 'planned', 'dawn', ?),
-		        (2, 'tivit', 'atla', 10, 8, 'planned', ?, 'dusk')`,
+		 VALUES (1, 10, 300, 7, 'planned', 'dawn', ?),
+		        (2, 10, 300, 8, 'planned', ?, 'dusk')`,
 		good, good); err != nil {
 		t.Fatalf("seeding the mangled bouts: %v", err)
 	}

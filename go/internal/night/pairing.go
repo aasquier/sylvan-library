@@ -40,30 +40,119 @@ func PlanScheduled(nightKey string, house []string, players []Seat,
 
 	plans := []Plan{}
 	for len(plans) < set.Bouts {
-		var a, b Seat
-		if len(queue) > 0 {
-			a, queue = queue[0], queue[1:]
-			if i := opponentFor(a, queue); i >= 0 {
-				b = queue[i]
-				queue = append(queue[:i:i], queue[i+1:]...)
-			} else if h, ok := nextHouse(); ok {
-				b = h
-			} else {
-				continue // nobody to fight: the deck sits out
-			}
-		} else {
-			// The house fills the leftover capacity — two different decks,
-			// or the card is as full as it can honestly be.
-			h1, ok1 := nextHouse()
-			h2, ok2 := nextHouse()
-			if !ok1 || !ok2 || h1.Slug == h2.Slug {
-				break
-			}
-			a, b = h1, h2
+		table, ok := seatTable(tableSize(len(plans)), &queue, nextHouse)
+		if !ok {
+			break // the shelf cannot fill another table honestly
 		}
-		plans = append(plans, plan(nightKey, a, b, set.Games, len(plans)))
+		plans = append(plans, plan(nightKey, table, set, len(plans)))
 	}
 	return plans
+}
+
+// tableSize decides whether bout `index` is a pod or a duel, and it is
+// arithmetic rather than a coin so that a night's shape is the same every
+// night and a test can assert it rather than sample it.
+//
+// Two in three are pods (Aaron, 2026-09-06), and the duel is the *last* of
+// each group of three rather than the first: a night that is cut short by
+// its window — which is the ordinary case, since the deal oversaturates —
+// then loses whole groups rather than losing all of one kind. Interleaving
+// is the whole point; a night of pods followed by a night's worth of duels
+// would satisfy the ratio and still be the wrong night.
+func tableSize(index int) int {
+	if (index+1)%PodShareDenominator == 0 {
+		return 2
+	}
+	return PodSeats
+}
+
+// seatTable draws one table of `size` chairs: players first, in queue order
+// and never two decks of one account at the same table, then the house fills
+// whatever is left. It reports false when the table cannot be filled — which
+// on a served instance means the house shelf ran out of distinct decks, since
+// a served instance always has a showcase.
+//
+// The queue is a pointer because a drawn deck leaves it: a scheduled night
+// spends each account's turns, and a deck that sat down must not sit down
+// again at the same table or later in the same night on somebody else's turn.
+func seatTable(size int, queue *[]Seat, nextHouse func() (Seat, bool)) ([]Seat, bool) {
+	table := make([]Seat, 0, size)
+	// The players who are owed a turn, skipping any whose account is already
+	// seated here. A skipped deck keeps its place in the queue for the next
+	// table rather than being spent.
+	for i := 0; i < len(*queue) && len(table) < size; {
+		cand := (*queue)[i]
+		if seatedOwner(table, cand) {
+			i++
+			continue
+		}
+		table = append(table, cand)
+		*queue = append((*queue)[:i:i], (*queue)[i+1:]...)
+	}
+	// The house fills the rest, and never twice at one table: two copies of
+	// one deck is a mirror nobody asked for and a seat map with a duplicate
+	// slug in it.
+	for len(table) < size {
+		h, ok := nextHouse()
+		if !ok {
+			return nil, false
+		}
+		if seatedSlug(table, h.Slug) {
+			// The cycle has wrapped onto a deck already at this table, so the
+			// shelf is smaller than the table. Take the honest smaller table
+			// rather than spinning: two is still a bout.
+			break
+		}
+		table = append(table, h)
+	}
+	if len(table) < 2 {
+		return nil, false
+	}
+	return table, true
+}
+
+// seatedOwner reports whether this seat's account already holds a chair.
+// The house never collides here — it has no account — and is handled by
+// [seatedSlug] instead.
+func seatedOwner(table []Seat, cand Seat) bool {
+	if cand.Owner == nil {
+		return false
+	}
+	for _, s := range table {
+		if s.Owner != nil && *s.Owner == *cand.Owner {
+			return true
+		}
+	}
+	return false
+}
+
+func seatedSlug(table []Seat, slug string) bool {
+	for _, s := range table {
+		if s.Slug == slug {
+			return true
+		}
+	}
+	return false
+}
+
+// GamesFor and ClockFor are the two dials a table's size chooses, and they
+// are functions rather than fields so that one seating cannot be given a
+// pod's clock and a duel's game count.
+func GamesFor(seats int, set Settings) int {
+	if seats > 2 {
+		return PodGames
+	}
+	return set.Games
+}
+
+// ClockFor is Forge's per-game seconds for a table of this size. A pod at a
+// duel's clock is cut about one game in six and recorded as a draw; see
+// [PodClock].
+func ClockFor(seats int) int {
+	if seats > 2 {
+		return PodClock
+	}
+	return DuelClock
 }
 
 // PlanSample deals a measurement run: a full round-robin over the entire
@@ -72,7 +161,13 @@ func PlanScheduled(nightKey string, house []string, players []Seat,
 // measured rather than guessed. The deadline is the only bound; whatever the
 // window does not reach is skipped when it closes, and that skip count is
 // itself part of the measurement.
-func PlanSample(nightKey string, house []string, players []Seat, games int) []Plan {
+// A sample deals the same **mix** a scheduled night would — two pods to every
+// duel — because that is the whole point of it: the count it measures has to
+// be the count the window will actually hold, and a sample of pure duels
+// would over-report a mixed night by an order of magnitude (a duel game runs
+// ~16s against a pod's ~135s median).
+func PlanSample(nightKey string, house []string, players []Seat,
+	set Settings) []Plan {
 	seats := make([]Seat, 0, len(house)+len(players))
 	for _, slug := range house {
 		seats = append(seats, Seat{Slug: slug})
@@ -89,9 +184,26 @@ func PlanSample(nightKey string, house []string, players []Seat, games int) []Pl
 	rng := rand.New(rand.NewSource(derive("sample", nightKey))) //nolint:gosec // seeded on purpose: the deal must replay
 	rng.Shuffle(len(pairs), func(i, j int) { pairs[i], pairs[j] = pairs[j], pairs[i] })
 
+	// The round-robin decides *who*; the mix decides *how many chairs*. A pod
+	// takes its first two seats from the pair and fills the rest from the
+	// shuffled roster, skipping anyone already at the table, so every pair
+	// still meets exactly once and the pod's other two are a deal rather than
+	// a repeat of the pair before it.
+	fill := 0
 	plans := make([]Plan, 0, len(pairs))
 	for _, p := range pairs {
-		plans = append(plans, plan(nightKey, p.a, p.b, games, len(plans)))
+		table := []Seat{p.a, p.b}
+		for len(table) < tableSize(len(plans)) {
+			cand := seats[fill%len(seats)]
+			fill++
+			if !seatedSlug(table, cand.Slug) && !seatedOwner(table, cand) {
+				table = append(table, cand)
+			}
+			if fill > len(seats)*2 {
+				break // the roster is too small to fill a pod; the pair plays
+			}
+		}
+		plans = append(plans, plan(nightKey, table, set, len(plans)))
 	}
 	return plans
 }
@@ -164,13 +276,23 @@ func houseCycle(rng *rand.Rand, house []string) func() (Seat, bool) {
 	}
 }
 
-// plan is one bout with its stable seed: night key, both seats, and the
-// bout's place on the card, hashed — so replanning the same night deals the
-// same seed to the same fight, and no two bouts of a night share one.
-func plan(nightKey string, a, b Seat, games, index int) Plan {
-	return Plan{SeatA: a, SeatB: b, Games: games,
-		Seed: derive("bout", nightKey, seatKey(a), a.Slug, seatKey(b), b.Slug,
-			strconv.Itoa(index))}
+// plan is one bout with its stable seed: night key, every seat in order, and
+// the bout's place on the card, hashed — so replanning the same night deals
+// the same seed to the same fight, and no two bouts of a night share one.
+//
+// The seats go into the hash in seat order, which means a pod dealt the same
+// four decks in a different order is a different seed. That is correct rather
+// than incidental: seat order is turn order, and turn order is most of what a
+// four-player game is.
+func plan(nightKey string, seats []Seat, set Settings, index int) Plan {
+	parts := make([]string, 0, 2+len(seats)*2)
+	parts = append(parts, "bout", nightKey)
+	for _, s := range seats {
+		parts = append(parts, seatKey(s), s.Slug)
+	}
+	parts = append(parts, strconv.Itoa(index))
+	return Plan{Seats: seats, Games: GamesFor(len(seats), set),
+		Clock: ClockFor(len(seats)), Seed: derive(parts...)}
 }
 
 // seatKey names a seat's owner for the seed derivation: the account id, or
