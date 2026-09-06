@@ -137,6 +137,19 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 		}
 	}
 
+	// The commanders' own records, read here rather than with the rest of the
+	// card-level checks because one Rulebreaker clause changes how big the
+	// deck is allowed to be, and the size check is above. `cards` may be nil;
+	// indexing a nil map is the same "not found" every missing name gets, so
+	// no pool means no clauses and the size check below is untouched.
+	cmdRecords := []*pool.CardRecord{}
+	for _, c := range d.Commander {
+		if rec := cards[c]; rec != nil {
+			cmdRecords = append(cmdRecords, rec)
+		}
+	}
+	breakers := ReadRulebreakers(cmdRecords)
+
 	reasons := []string{}
 	if len(d.Commander) > 1 {
 		expectedSize -= len(d.Commander) - 1
@@ -154,13 +167,26 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 		rep.add("error", "too-many-commanders", fmt.Sprintf("%d commanders listed; Commander allows at "+
 			"most two, and only with a pairing ability", len(d.Commander)), "")
 	}
-	if total := d.TotalCards(); total != expectedSize {
+	// A Rulebreaker clause can lift the ceiling off the deck (Whtz), which
+	// turns the number into a floor: too few cards is still an error, too many
+	// is the card doing what it says. Nothing here touches the singleton rule,
+	// which is a separate rule and still applies to all 200 of them.
+	noCeiling := breakers.NoMaximumDeckSize()
+	total := d.TotalCards()
+	tooFew, tooMany := total < expectedSize, total > expectedSize && !noCeiling
+	if tooFew || tooMany {
 		because := ""
 		if len(reasons) > 0 {
 			because = " (" + strings.Join(reasons, ", ") + ")"
 		}
-		rep.add("error", "deck-size", fmt.Sprintf("deck has %d cards in the 99, expected %d%s",
-			total, expectedSize, because), "")
+		if noCeiling {
+			rep.add("error", "deck-size", fmt.Sprintf("deck has %d cards in the 99, expected at least %d%s "+
+				"-- the commander's Rulebreaker lifts the maximum, not the minimum",
+				total, expectedSize, because), "")
+		} else {
+			rep.add("error", "deck-size", fmt.Sprintf("deck has %d cards in the 99, expected %d%s",
+				total, expectedSize, because), "")
+		}
 	}
 
 	seen := map[string]int{}
@@ -248,12 +274,6 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 		}
 	}
 
-	cmdRecords := []*pool.CardRecord{}
-	for _, c := range d.Commander {
-		if rec := cards[c]; rec != nil {
-			cmdRecords = append(cmdRecords, rec)
-		}
-	}
 	var identity map[string]bool
 	if len(cmdRecords) > 0 {
 		identity = map[string]bool{}
@@ -280,14 +300,38 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 				rep.add("error", "illegal-pairing", problem, "")
 			}
 		}
+		// A clause nobody could read is said out loud. The identity check
+		// below then runs as though the clause were not printed, which will
+		// call legal cards illegal -- so the deck is told that is what
+		// happened, rather than left to argue with a report that is quietly
+		// working from a rule it could not read.
+		for _, rb := range breakers.Unread() {
+			rep.add("warn", "rulebreaker-unread", fmt.Sprintf("its Rulebreaker was NOT applied -- %s. "+
+				"Colour identity below was checked as though the card did not have one, so any card the "+
+				"clause makes legal is reported as an error. Clause: %s",
+				rb.Unsupported, rb.Text), rb.Commander)
+		}
+		// Tolabow's clause is a colour the deck picks by playing it; the loop
+		// collects what the instants and sorceries actually reach, and the
+		// count is judged once, after.
+		chosen := []Entry{}
 		for _, card := range d.Cards {
 			rec := cards[card.Name]
 			if rec == nil {
 				continue
 			}
 			if illegal := minus(setOf(rec.ColorIdentity), identity); len(illegal) > 0 {
-				rep.add("error", "color-identity", fmt.Sprintf("identity %s includes %s, outside the commander's %s",
-					braces(setOf(rec.ColorIdentity)), braces(illegal), bracesOrC(identity)), card.Name)
+				switch {
+				case breakers.AnyIdentity(rec):
+					// The commander says so in as many words: not an error,
+					// and not a warning either. A legal card is legal.
+				case breakers.OneChosenColor(rec):
+					chosen = append(chosen, Entry{Name: card.Name, Rec: rec})
+				default:
+					rep.add("error", "color-identity", fmt.Sprintf("identity %s includes %s, outside the commander's %s%s",
+						braces(setOf(rec.ColorIdentity)), braces(illegal), bracesOrC(identity),
+						breakers.Why()), card.Name)
+				}
 			}
 			if !rec.LegalCommander {
 				rep.add("error", "banned", "not legal in Commander", card.Name)
@@ -300,6 +344,16 @@ func Validate(d *deck.Deck, cards map[string]*pool.CardRecord, expectedSize int)
 				rep.add("warn", "category-mismatch", fmt.Sprintf("is a land but filed under %s",
 					wire.Quote(card.Category)), card.Name)
 			}
+		}
+		if colors, by := breakers.ColorChoice(chosen, identity); len(colors) > 1 {
+			reach := []string{}
+			for _, c := range colors {
+				reach = append(reach, fmt.Sprintf("{%s} (%s)", c, strings.Join(shortList(by[c]), ", ")))
+			}
+			rep.add("error", "rulebreaker-color-choice", fmt.Sprintf("the commander's Rulebreaker lets these "+
+				"cards reach ONE colour past the commander's %s, and this deck reaches %d: %s. Keep the "+
+				"colour you want and cut the rest, or move them to the swap board",
+				bracesOrC(identity), len(colors), strings.Join(reach, "; ")), "")
 		}
 	}
 
@@ -388,6 +442,13 @@ func checkCompanion(d *deck.Deck, name string, cards map[string]*pool.CardRecord
 	if !rec.LegalCommander {
 		rep.add("error", "companion-banned", "not legal in Commander, so it cannot be your companion", name)
 	}
+	// **A Rulebreaker clause deliberately does not reach here.** Every printed
+	// one says what "a deck with this commander can have", and a companion is
+	// not in the deck -- it waits outside the hundred and is bought into the
+	// hand. The reading is also moot in fact: no companion is an Angel, an
+	// Aura, a Phyrexian, an Equipment, a land or a seven-drop, so none of the
+	// clauses names one. It is written down because the next reader will
+	// wonder, and a silence is not an answer.
 	if identity != nil {
 		if illegal := minus(setOf(rec.ColorIdentity), identity); len(illegal) > 0 {
 			rep.add("error", "companion-color-identity", fmt.Sprintf("identity %s includes %s, outside the commander's %s",
@@ -439,6 +500,15 @@ func checkCompanion(d *deck.Deck, name string, cards map[string]*pool.CardRecord
 		rep.add(level, "companion-restriction", fmt.Sprintf("%d card(s) break the companion "+
 			"restriction%s: %s. Condition: %s", len(result.Violations), detail, text, result.Condition), name)
 	}
+}
+
+// shortList is the report's house habit -- name a few, count the rest -- for a
+// message that has to fit beside two or three others on one line.
+func shortList(names []string) []string {
+	if len(names) <= 3 {
+		return names
+	}
+	return append(append([]string{}, names[:3]...), fmt.Sprintf("and %d more", len(names)-3))
 }
 
 func contains(list []string, s string) bool {

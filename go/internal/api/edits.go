@@ -1115,9 +1115,20 @@ func checkCategory(category string) (string, error) {
 // is a guess. It has to exist, be legal in Commander, and sit inside the
 // commander's colour identity -- which comes from Scryfall's own
 // `color_identity`, never from the mana cost (rule 2).
+//
+// **The commander may widen that identity, and this path has to know it too.**
+// A Rulebreaker clause (`gate.ReadRulebreakers`) is read off the commander's own
+// card; without it this refusal would hold the door shut on cards the gate
+// itself now passes, which is the worse half of the same bug -- a report that
+// is merely wrong can be argued with, and a write that is refused cannot.
 func (a *API) playableCard(ctx context.Context, d *deck.Deck, name, noPool string) (*pool.CardRecord, error) {
 	var rec *pool.CardRecord
 	var identity map[string]bool
+	var breakers gate.Rulebreakers
+	// reach is Tolabow's one chosen colour, read back off the instants and
+	// sorceries already in the deck -- and only for a card that clause could
+	// cover, so the ordinary add still costs one lookup.
+	var reach []string
 	err := a.usePool(ctx, func(c *pool.Conn) error {
 		found, err := c.GetCards(ctx, []string{name})
 		if err != nil {
@@ -1130,7 +1141,16 @@ func (a *API) playableCard(ctx context.Context, d *deck.Deck, name, noPool strin
 		if !rec.LegalCommander {
 			return rejectf("%s is not legal in Commander", rec.Name)
 		}
-		identity, err = commanderIdentity(ctx, c, d)
+		cmdRecords, err := commanderRecords(ctx, c, d)
+		if err != nil {
+			return err
+		}
+		identity = identityOf(cmdRecords)
+		breakers = gate.ReadRulebreakers(cmdRecords)
+		if !breakers.OneChosenColor(rec) {
+			return nil
+		}
+		reach, err = chosenColorReach(ctx, c, d, breakers, identity)
 		return err
 	})
 	if errors.Is(err, pool.ErrNoPool) {
@@ -1145,39 +1165,94 @@ func (a *API) playableCard(ctx context.Context, d *deck.Deck, name, noPool strin
 			outside = append(outside, colour)
 		}
 	}
-	if len(outside) > 0 {
-		have := strings.Join(sortedKeysOf(identity), "")
-		if have == "" {
-			have = "C"
-		}
-		return nil, rejectf("%s's identity {%s} includes {%s}, outside the commander's {%s}",
-			rec.Name, strings.Join(sortedColours(rec.ColorIdentity), ""),
-			strings.Join(outside, ""), have)
+	if len(outside) == 0 || breakers.AnyIdentity(rec) {
+		return rec, nil
 	}
-	return rec, nil
+	if breakers.OneChosenColor(rec) {
+		// The clause grants one colour past the commander. Adding this card is
+		// fine while the instants and sorceries -- this one included -- still
+		// reach only that one.
+		widened := map[string]bool{}
+		for _, colour := range append(append([]string{}, reach...), outside...) {
+			widened[colour] = true
+		}
+		if len(widened) <= 1 {
+			return rec, nil
+		}
+		return nil, rejectf("%s's identity {%s} would make your instants and sorceries reach {%s}, and the "+
+			"commander's Rulebreaker grants one colour past {%s}, not %d. Cut the ones in the colour you "+
+			"are not keeping first", rec.Name, strings.Join(sortedColours(rec.ColorIdentity), ""),
+			strings.Join(sortedKeysOf(widened), ""), identityOrC(identity), len(widened))
+	}
+	return nil, rejectf("%s's identity {%s} includes {%s}, outside the commander's {%s}%s",
+		rec.Name, strings.Join(sortedColours(rec.ColorIdentity), ""),
+		strings.Join(outside, ""), identityOrC(identity), breakers.Why())
 }
 
-// commanderIdentity is `service._identity_of`: the union of the commanders'
-// own colour identities, and empty for a deck whose commander the pool lacks.
-func commanderIdentity(ctx context.Context, c *pool.Conn, d *deck.Deck) (map[string]bool, error) {
-	identity := map[string]bool{}
+// identityOrC renders a commander identity the way every refusal here does,
+// with a colourless commander reading {C} rather than {}.
+func identityOrC(identity map[string]bool) string {
+	if have := strings.Join(sortedKeysOf(identity), ""); have != "" {
+		return have
+	}
+	return "C"
+}
+
+// chosenColorReach is the colours the deck's instants and sorceries already
+// reach past the commander -- Tolabow's choice, read back off the deck rather
+// than stored anywhere (`gate.Rulebreakers.ColorChoice` argues why).
+func chosenColorReach(ctx context.Context, c *pool.Conn, d *deck.Deck,
+	breakers gate.Rulebreakers, identity map[string]bool) ([]string, error) {
+	names := make([]string, 0, len(d.Cards))
+	for _, entry := range d.Cards {
+		names = append(names, entry.Name)
+	}
+	found, err := c.GetCards(ctx, names)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]gate.Entry, 0, len(names))
+	for _, entry := range d.Cards {
+		if r := found[entry.Name]; r != nil {
+			entries = append(entries, gate.Entry{Name: entry.Name, Rec: r})
+		}
+	}
+	colors, _ := breakers.ColorChoice(entries, identity)
+	return colors, nil
+}
+
+// commanderRecords is `service._identity_of`'s lookup, stopped one step earlier
+// than it used to be, because a commander's own card carries more than its
+// colours: a Rulebreaker clause is printed on it and is read from the record
+// rather than from any list kept here. Empty for a deck whose commander the
+// pool lacks, which is the same degraded answer the identity had before.
+func commanderRecords(ctx context.Context, c *pool.Conn, d *deck.Deck) ([]*pool.CardRecord, error) {
 	if len(d.Commander) == 0 {
-		return identity, nil
+		return nil, nil
 	}
 	found, err := c.GetCards(ctx, d.Commander)
 	if err != nil {
 		return nil, err
 	}
+	records := []*pool.CardRecord{}
 	for _, name := range d.Commander {
-		rec := found[name]
-		if rec == nil {
-			continue
+		if rec := found[name]; rec != nil {
+			records = append(records, rec)
 		}
+	}
+	return records, nil
+}
+
+// identityOf is `service._identity_of`: the union of the commanders' own colour
+// identities.
+func identityOf(records []*pool.CardRecord) map[string]bool {
+	identity := map[string]bool{}
+	for _, rec := range records {
 		for _, colour := range rec.ColorIdentity {
 			identity[colour] = true
 		}
 	}
-	return identity, nil
+	return identity
 }
 
 // checkPrintingOf is `service._check_printing_of`: is this id a printing of

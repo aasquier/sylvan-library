@@ -265,7 +265,8 @@ go/internal/auth          app.db: schema ladder, accounts, sessions, tokens,
                           rate limit, Argon2id, EnsureMaintainer (ADR 17)
 go/internal/pool          the card pool: DuckDB, refresh (Appender), leases
 go/internal/deck*         model, yaml emitter, edit engine, lifecycle, log
-go/internal/gate          validate + companion + partners
+go/internal/gate          validate + companion + partners + rulebreaker
+                          (ADR 51: the clause is read off the commander's card)
 go/internal/sim           tier1 goldfish, karsten + curve (tier 1.5),
                           mulligan grid, compile, ADR 18 cache, tier3 Forge
 go/internal/night         the Coliseum at Night (ADR 46): rung-14 rows, the
