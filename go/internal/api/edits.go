@@ -288,6 +288,27 @@ func str(body map[string]any, key string) string {
 // swapCard is `POST .../swap`. The operation the whole
 // editor was written for, and the one that carries rule 4 at the boundary as
 // well as inside the editor.
+//
+// **Two doors, one route**, told apart by where the incoming card stands:
+//
+//   - From the pool at large -- the straight swap, unchanged since ADR 11:
+//     `deckedit.ReplaceCard` rewrites the slot in place, and the outgoing
+//     card's rationale survives only in `swaps.md`.
+//   - From the deck's own swap board -- the **promotion**. The board is where
+//     a swap is staged (its `why` argues why the card has NOT made it in), so
+//     a swap into a card standing there is the stake being played, not a
+//     duplicate to refuse. The outgoing card is ENTOMBED with its rationale
+//     intact -- entombed, never deleted -- the incoming card lifts off the
+//     board, and it lands in the outgoing card's category: the slot's
+//     semantics, the same category-keeping ReplaceCard has always had.
+//
+// The promotion invents no text surgery. It is a fold of three verified
+// operations -- EntombCard, RemoveCard, AddCard -- over the file's text, the
+// `entombCards`/`ApplyBulk` precedent: every intermediate text satisfies the
+// editor's own document oracle, and one failed step refuses the whole thing
+// with nothing written. Both doors demand a fresh, human-typed `why` (rule
+// 4); the board entry's own rationale argued the opposite decision and is
+// never reused or prefilled.
 func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 	src, d, ok := a.writeTarget(w, r)
 	if !ok {
@@ -312,10 +333,21 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wanted := strings.ToLower(strings.TrimSpace(into))
-	for _, c := range append(append([]deck.CardEntry{}, d.Cards...), d.SwapBoard...) {
+	for _, c := range d.Cards {
 		if strings.ToLower(c.Name) == wanted {
 			a.refuseWrite(w, "swap", rejectf("%s is already in this deck", wire.Quote(into)))
 			return
+		}
+	}
+	// The line door 2 relaxed. The board used to be scanned in the same loop
+	// as the 99 and refused with the same sentence, which made it a place a
+	// card could never leave: a card standing there is a promotion candidate,
+	// not a duplicate. The 99's own refusal above is untouched.
+	var board *deck.CardEntry
+	for i := range d.SwapBoard {
+		if strings.ToLower(d.SwapBoard[i].Name) == wanted {
+			board = &d.SwapBoard[i]
+			break
 		}
 	}
 	for _, c := range d.Commander {
@@ -325,6 +357,9 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Run on both doors, deliberately: a board card was checked when it was
+	// staged, but the pool may have moved since -- a refresh can unlearn a
+	// spelling or flip a legality -- and rule 1 does not age out.
 	rec, err := a.playableCard(r.Context(), d, into, "swapping needs the card pool -- run `mtglab data refresh`")
 	if a.refuseWrite(w, "swap", err) {
 		return
@@ -334,6 +369,45 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 	if a.refuseWrite(w, "swap", err) {
 		return
 	}
+
+	if board != nil {
+		// Door 2 -- the promotion, composed from verified operations and
+		// nothing else: no operation's semantics changed, and the recorded
+		// goldens stand. All-or-nothing like `entombCards`: a failed step
+		// hands its own sentence back with nothing written -- which is how
+		// AddCard's graveyard refusal and EntombCard's refusal of an `out`
+		// standing on the board itself both reach the caller verbatim (only a
+		// 99 card holds a slot a promotion can take over).
+		updated, err := deckedit.EntombCard(text, entry.Name)
+		if err == nil {
+			updated, err = deckedit.RemoveCard(updated, board.Name)
+		}
+		if err == nil {
+			// The incoming entry travels as itself -- its quantity is the
+			// board's -- but the CATEGORY is the outgoing card's: a promotion
+			// fills the slot it empties, which is ReplaceCard's
+			// category-keeping worn by a different fold. The board entry's
+			// own `why` stays behind on purpose: it argued why the card was
+			// NOT in the deck, and the fresh `why` argues the reversal.
+			qty := board.Qty
+			if qty < 1 {
+				qty = 1
+			}
+			updated, err = deckedit.AddCard(updated, rec.Name, entry.Category,
+				strings.TrimSpace(why), qty, "cards")
+		}
+		a.answer(w, r, src, updated, commitOutcome{
+			// `from` says which door this was. Deliberately absent on a
+			// straight swap, so what an old payload and door 1 share is the
+			// client's default rather than a value.
+			extra: map[string]any{"swapped_out": entry.Name, "swapped_in": rec.Name,
+				"why": strings.TrimSpace(why), "from": "swap_board"},
+			edit: decklog.Edit{Kind: decklog.EditSwap, Card: entry.Name,
+				SwapIn: rec.Name, From: "swap_board"},
+		}, err)
+		return
+	}
+
 	updated, err := deckedit.ReplaceCard(text, entry.Name, rec.Name, strings.TrimSpace(why), nil)
 	a.answer(w, r, src, updated, commitOutcome{
 		extra: map[string]any{"swapped_out": entry.Name, "swapped_in": rec.Name,

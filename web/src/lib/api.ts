@@ -1423,6 +1423,13 @@ export interface SwapResult extends EditResult {
   swapped_out: string
   swapped_in: string
   why: string
+  /** Which door served the swap: `"swap_board"` when the incoming card was
+   *  promoted off the deck's own swap board, `""` for the straight swap.
+   *  Optional on the wire — the server omits it on a straight swap, and every
+   *  payload sent before the key existed omits it too (the deploy swap
+   *  window renders old payloads with this bundle) — so `api.swapCard`
+   *  defaults it before anything reads it. */
+  from?: '' | 'swap_board'
 }
 
 /** The intake sheet: what an imported deck is being asked to have done to it
@@ -3012,8 +3019,12 @@ export const api = {
    *  separates two of them, and telling the two apart takes a card pool. */
   checkCommander: (q: string) =>
     get<CommanderCheck>(`/api/cards/commander?q=${encodeURIComponent(q)}`),
+  // `from` is defaulted here, once, rather than by every reader: a new wire
+  // key arrives `undefined` from any server older than this bundle (the
+  // deploy swap window), and from the straight-swap door forever.
   swapCard: (ref: DeckRef, body: { out: string; into: string; why: string }) =>
-    post<SwapResult>(deckPath(ref, '/swap'), body),
+    post<SwapResult>(deckPath(ref, '/swap'), body)
+      .then((r) => ({ ...r, from: r.from ?? '' })),
   addCard: (
     ref: DeckRef,
     body: { name: string; category: string; why?: string; qty?: number; to?: string },

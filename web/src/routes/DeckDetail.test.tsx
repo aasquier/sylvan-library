@@ -35,6 +35,9 @@ vi.mock('../lib/api', async () => ({
   api: {
     deck: vi.fn(), stats: vi.fn(), validate: vi.fn(), suggestions: vi.fn(),
     deckLog: vi.fn(),
+    // The straight-swap composer's finder asks this the moment somebody
+    // types a replacement's name.
+    suggestCards: vi.fn(),
     swapCard: vi.fn(), addCard: vi.fn(), entombCard: vi.fn(),
     entombCards: vi.fn(), returnCard: vi.fn(), exileCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),
@@ -423,7 +426,17 @@ beforeEach(() => {
     slug: 'goreclaw-stompy', swapped_out: 'Primeval Titan',
     swapped_in: 'Cultivator Colossus', why: 'because', ok: true,
     errors: [], warnings: [], stage: 'curated', total_cards: 99,
-    needs_rationale: 0,
+    needs_rationale: 0, from: '',
+  })
+  // One offer, so the straight-swap composer's finder has a card to choose.
+  vi.mocked(api.suggestCards).mockReset().mockResolvedValue({
+    cards: [{
+      name: 'Cultivator Colossus', mana_cost: '{4}{G}{G}{G}',
+      type_line: 'Creature — Plant Beast', oracle_text: 'Trample.',
+      color_identity: ['G'], image: 'https://example.test/colossus-full.jpg',
+      artist: 'Chris Rahn', legal_commander: true, is_land: false,
+      score: 0.99, via: 'holds',
+    }],
   })
   for (const fn of [api.addCard, api.entombCard, api.entombCards,
                     api.returnCard, api.exileCard, api.setCardField, api.setNote,
@@ -1031,6 +1044,101 @@ describe('DeckDetail rationale editor', () => {
     fireEvent.click(target)
 
     await screen.findByText(/read-only/)
+  })
+})
+
+/**
+ * The straight swap, from the cards tab (door 1). The bar's sixth action:
+ * arm "Swap out", pick the row, and the composer under it holds the finder,
+ * the why box, and rule 4's discipline — nothing fires until a card is
+ * chosen AND a human sentence is typed. The route is the same `api.swapCard`
+ * the validation tab's shortlist has always used.
+ */
+describe('DeckDetail straight swap', () => {
+  /** The row the composer mounts under, anchored on the card's name. */
+  function row() {
+    const el = screen.getAllByText('Primeval Titan').find((n) => n.closest('li'))
+    return within(el!.closest('li')!)
+  }
+
+  /** Arm the bar's swap and pick the fixture's one card. */
+  async function openComposer() {
+    renderUnfolded()
+    await screen.findByText(DECK.name)
+    fireEvent.click(screen.getByRole('button', { name: 'Swap out' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Swap out: Primeval Titan' }))
+  }
+
+  /** Type into the composer's finder and choose the one offered card. Scoped
+   *  to the row: the page holds other comboboxes (the add form's finder). */
+  async function chooseColossus() {
+    fireEvent.change(row().getByRole('combobox'), { target: { value: 'coloss' } })
+    const offered = await row().findByRole('option', { name: /Cultivator Colossus/ })
+    fireEvent.pointerDown(offered)
+  }
+
+  it('offers the action as a plain chip and opens the composer under the row', async () => {
+    await openComposer()
+    // The finder is aimed at the picked slot by name, and nothing has been
+    // asked of the server yet — arming is free.
+    expect(screen.getByText('Card to swap in for Primeval Titan')).toBeTruthy()
+    expect(api.swapCard).not.toHaveBeenCalled()
+    // No Apply until a card is chosen: the composer that owns the why box
+    // arrives with the pick, so there is nothing here to press too early.
+    expect(screen.queryByRole('button', { name: /Apply swap/ })).toBeNull()
+  })
+
+  it('sends the swap only after a card is chosen and a why is typed', async () => {
+    await openComposer()
+    await chooseColossus()
+
+    // Rule 4 at the boundary: the box opens empty and Apply stays off until
+    // a human writes the sentence.
+    const apply = screen.getByRole('button', { name: 'Apply swap' }) as HTMLButtonElement
+    expect(apply.disabled).toBe(true)
+    fireEvent.change(screen.getByPlaceholderText(/Why does this card earn the slot/),
+                     { target: { value: 'Not banned, still huge.' } })
+    expect(apply.disabled).toBe(false)
+
+    fireEvent.click(apply)
+    await waitFor(() => expect(api.swapCard).toHaveBeenCalledWith(REF, {
+      out: 'Primeval Titan', into: 'Cultivator Colossus',
+      why: 'Not banned, still huge.',
+    }))
+    // The page re-reads what the write invalidated, like every composer.
+    await waitFor(() => expect(api.deck).toHaveBeenCalledTimes(2))
+  })
+
+  it('says so, quietly, when the picked card is waiting on the swap board', async () => {
+    vi.mocked(api.deck).mockResolvedValue({
+      ...DECK,
+      swap_board: [{
+        name: 'Cultivator Colossus', category: 'threat',
+        why: 'Waiting for a slot.', qty: 1, known: true,
+        color_identity: ['G'],
+      }],
+    } as Deck)
+    await openComposer()
+    // Not said before the pick lands on a board card…
+    expect(screen.queryByText(/lifted from there/)).toBeNull()
+    await chooseColossus()
+    // …and said plainly once it does: the server promotes it now, where it
+    // used to refuse with "already in this deck".
+    expect(screen.getByText(/lifted from there/)).toBeTruthy()
+    expect(screen.getByText(/goes to the graveyard with its reason kept/)).toBeTruthy()
+  })
+
+  it('surfaces the route’s refusal in the composer rather than swallowing it', async () => {
+    vi.mocked(api.swapCard).mockRejectedValue(
+      new Error("'Cultivator Colossus' is already in this deck"))
+    await openComposer()
+    await chooseColossus()
+    fireEvent.change(screen.getByPlaceholderText(/Why does this card earn the slot/),
+                     { target: { value: 'Not banned, still huge.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply swap' }))
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent)
+      .toContain('already in this deck'))
   })
 })
 
