@@ -179,8 +179,8 @@ func TestNoWriteReportsSuccessOverAPoolThatWillNotAnswer(t *testing.T) {
 	t.Parallel()
 	a := failingPoolAPI(t)
 
-	for _, route := range writeRoutes {
-		target := "/api/decks/alice/gyome" + route.suffix
+	for _, route := range writes() {
+		target := route.path(t, "alice", "gyome")
 		status, _, raw := callAs(t, a, alice, route.method, target, route.payload)
 		if status == http.StatusOK && needsThePool(route.suffix) {
 			t.Errorf("%s %s reported success over a pool that will not answer: %s",

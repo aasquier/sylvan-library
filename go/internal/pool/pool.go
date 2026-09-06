@@ -22,7 +22,13 @@
 // Caching is keyed on the stamp, because the stamp
 // is what makes a cache of a read-only file honest: a refresh rewrites the
 // file, changes `mtime_ns` and size, and every entry keyed on the old stamp
-// becomes unreachable.
+// becomes unreachable. That key means the remembered answers **outlive a
+// hand-back**: the reaper closing an idle pool and a refresh rewriting it are
+// different events, and only the second makes an old answer wrong — so a
+// re-open of a file whose stamp has not moved keeps its memory, and a re-open
+// of a changed file starts clean (Aaron, 2026-09-05; the lore shelf was
+// paying 84× on the first request after every ten-second gap for answers
+// that were still true).
 //
 // The driver is github.com/duckdb/duckdb-go (the community driver that used
 // to live at marcboeker/go-duckdb), which links a prebuilt libduckdb per
@@ -123,11 +129,18 @@ type Pool struct {
 	// sealed is the library shut for a rewrite -- see [Pool.Seal]. Under mu
 	// like everything else here, because the goroutine that seals and the
 	// request goroutines that read it are never the same one.
-	sealed  bool
-	columns map[string]map[string]bool // per open: table -> column set
-	cards   *cardCache                 // per open: get_cards memo
-	stale   *bool                      // per open: the staleness verdict
-	memos   map[string]*counts         // per open: each memo's hits and misses
+	sealed bool
+	// The pool's memory, keyed on the stamp rather than the open: every
+	// answer below is a property of the pool *file*, so closing the handle
+	// does not invalidate any of it. `closeLocked` leaves these standing and
+	// `acquire` throws them away the moment the file's stamp no longer
+	// matches the one they were learned under -- a reap hands back the
+	// handle, a refresh hands back the truth, and only the second empties
+	// the memory (see the package comment).
+	columns map[string]map[string]bool // table -> column set
+	cards   *cardCache                 // the get_cards memo
+	stale   *bool                      // the staleness verdict
+	memos   map[string]*counts         // each memo's hits and misses
 }
 
 // The memo names `counts` are kept under. Named constants rather than
@@ -142,13 +155,15 @@ const (
 	MemoStale   = "staleness"
 )
 
-// counts is one memo's answers since the pool was opened.
+// counts is one memo's answers since the memory was last emptied -- the
+// stamp's lifetime, not the open's, because the counters live and die with
+// the answers they instrument.
 //
 // **A cache can be correct, tested, and never once used**, and no test finds
 // that -- the standing example in this tree was keyed on a per-request handle
 // in an app where every request opened its own, so every entry was written and
 // thrown away by the connection that owned it. Only a hit count finds that
-// shape. These are the smallest instrument that does: per open, beside the
+// shape. These are the smallest instrument that does: beside the
 // memos themselves, read by the package's tests, which is what holds each memo
 // to being a memo rather than a decoration.
 //
@@ -167,8 +182,9 @@ func (p *Pool) note(name string, hit bool) {
 }
 
 func (p *Pool) noteLocked(name string, hit bool) {
-	// nil between opens: a memo answer with no memo behind it is not a hit
-	// rate, and counting it would make a closed pool look busy.
+	// nil only before the pool's first ever open: a memo answer with no memo
+	// behind it is not a hit rate, and counting it would make a pool that has
+	// never stood look busy.
 	if p.memos == nil {
 		return
 	}
@@ -247,11 +263,18 @@ func (p *Pool) acquire(ctx context.Context) (*Conn, error) {
 		// A handful of connections is plenty; DuckDB parallelises inside one.
 		db.SetMaxOpenConns(4)
 		p.db = db
+		// The memory's one gate. A stamp that still matches is the same file
+		// this memory was learned from, so a pool handed back by the reaper
+		// wakes remembering; a stamp that moved is a refresh, and every
+		// answer keyed under the old one is thrown away here. The nil check
+		// is the first ever open, when there is no memory to keep.
+		if p.stamp != now || p.columns == nil {
+			p.columns = map[string]map[string]bool{}
+			p.cards = newCardCache()
+			p.stale = nil
+			p.memos = map[string]*counts{}
+		}
 		p.stamp = now
-		p.columns = map[string]map[string]bool{}
-		p.cards = newCardCache()
-		p.stale = nil
-		p.memos = map[string]*counts{}
 		if !p.reaping {
 			p.reaping = true
 			go p.reap()
@@ -346,19 +369,19 @@ func (p *Pool) releaseQuietly() {
 	p.mu.Unlock()
 }
 
-// closeLocked drops the open database. Callers hold p.mu.
+// closeLocked drops the open database and nothing else. The memory stays,
+// still keyed under `p.stamp`, because handing the file back does not make
+// anything remembered about it wrong -- `acquire` is where the memory is
+// judged, against the stamp of whatever file the next open finds. Callers
+// hold p.mu.
 func (p *Pool) closeLocked() {
 	if p.db != nil {
 		_ = p.db.Close()
 	}
 	p.db = nil
-	p.columns = nil
-	p.cards = nil
-	p.stale = nil
-	p.memos = nil
 }
 
-// staleness is the memoised verdict, if this open has one yet.
+// staleness is the memoised verdict, if this file has one yet.
 func (c *Conn) staleness() (bool, bool) {
 	c.pool.mu.Lock()
 	defer c.pool.mu.Unlock()
@@ -370,9 +393,9 @@ func (c *Conn) staleness() (bool, bool) {
 	return *c.pool.stale, true
 }
 
-// rememberStaleness files the verdict for the rest of this open. A Conn that
-// outlived its open (a shutdown) files nothing rather than teaching the next
-// open an answer about the previous pool.
+// rememberStaleness files the verdict for as long as this file stands. A Conn
+// that outlived its open (a shutdown) files nothing rather than teaching the
+// memory an answer about a pool it may no longer describe.
 func (c *Conn) rememberStaleness(answer bool) {
 	c.pool.mu.Lock()
 	defer c.pool.mu.Unlock()
@@ -445,17 +468,24 @@ func (p *Pool) Close() {
 func (c *Conn) DB() *sql.DB { return c.db }
 
 // Columns is the columns `table` actually has
-// on this pool, memoised per open. Needed because the read-only handle
+// on this pool, memoised for as long as the pool file stands unchanged.
+// Needed because the read-only handle
 // cannot migrate itself, so a pool built before a column existed must
 // degrade to "we do not know" rather than fail to bind.
 func (c *Conn) Columns(ctx context.Context, table string) (map[string]bool, error) {
+	// The memo is the *current* open's memory, so a Conn that outlived its
+	// open (a shutdown, a pool that vanished mid-use) steps past it entirely
+	// -- it may not read answers that could describe a newer file, and below,
+	// it may not teach them either. It still answers from its own handle.
 	c.pool.mu.Lock()
-	if cols, ok := c.pool.columns[table]; ok {
-		c.pool.noteLocked(MemoColumns, true)
-		c.pool.mu.Unlock()
-		return cols, nil
+	if c.pool.db == c.db {
+		if cols, ok := c.pool.columns[table]; ok {
+			c.pool.noteLocked(MemoColumns, true)
+			c.pool.mu.Unlock()
+			return cols, nil
+		}
+		c.pool.noteLocked(MemoColumns, false)
 	}
-	c.pool.noteLocked(MemoColumns, false)
 	c.pool.mu.Unlock()
 	rows, err := c.db.QueryContext(ctx,
 		"SELECT column_name FROM information_schema.columns WHERE table_name = ?", table)
@@ -475,7 +505,7 @@ func (c *Conn) Columns(ctx context.Context, table string) (map[string]bool, erro
 		return nil, err
 	}
 	c.pool.mu.Lock()
-	if c.pool.columns != nil {
+	if c.pool.db == c.db && c.pool.columns != nil {
 		c.pool.columns[table] = cols
 	}
 	c.pool.mu.Unlock()

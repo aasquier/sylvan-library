@@ -77,8 +77,8 @@ func TestAPoolWithUnsignedPaintingsIsStale(t *testing.T) {
 }
 
 // The verdict is a property of the pool FILE — the pool is opened read-only
-// and a refresh re-opens it — so the walk above runs once per open and every
-// later ask reads the answer. It matters because of *who asks*: `/api/health`
+// and a refresh moves its stamp — so the walk above runs once per file and
+// every later ask reads the answer. It matters because of *who asks*: `/api/health`
 // asks on every call, the platform's health check is one of its callers, and
 // the walk is four probes plus two `Columns` lookups. Eight statements were
 // answering a question that needs two.
@@ -86,7 +86,7 @@ func TestAPoolWithUnsignedPaintingsIsStale(t *testing.T) {
 // The instrument is the memo's own hit count rather than a stopwatch, for the
 // reason the whole counter exists: a cache can be correct, tested and never
 // once used, and only a counter tells the difference.
-func TestTheStalenessVerdictIsWalkedOncePerOpen(t *testing.T) {
+func TestTheStalenessVerdictIsWalkedOncePerFile(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := pool.New(pooltest.Build(t), nil)
@@ -113,12 +113,15 @@ func TestTheStalenessVerdictIsWalkedOncePerOpen(t *testing.T) {
 		t.Fatalf("columns memo %d hits / %d misses, want 0/2", hits, misses)
 	}
 
-	// Per open, and the counters are too: a pool handed back and re-opened
-	// re-asks, because the file it re-opens may not be the file it closed.
+	// A hand-back is not a refresh (Aaron, 2026-09-05): the pool re-opened
+	// against an unchanged file keeps its verdict, because the stamp it was
+	// learned under still names the file on disk. The file it re-opens may
+	// not be the file it closed -- which is exactly what the stamp check
+	// answers, and memory_test.go drives the half where it really is not.
 	p.Close()
 	ask()
-	if hits, misses := p.Memo(pool.MemoStale); hits != 0 || misses != 1 {
-		t.Fatalf("after a re-open the staleness memo reads %d/%d, want 0 hits / 1 miss",
+	if hits, misses := p.Memo(pool.MemoStale); hits != 5 || misses != 1 {
+		t.Fatalf("after a hand-back the staleness memo reads %d/%d, want 5 hits / 1 miss",
 			hits, misses)
 	}
 }

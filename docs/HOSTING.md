@@ -287,6 +287,22 @@ visitor ledger (requests per day by status class and route template — a
 census, never a surveillance), and Claude's ledger (tokens per mode,
 honestly labelled a floor on the bill).
 
+**The spend, from a terminal**, when a browser is not to hand — and it is
+the same roll-up the panel renders, from the same code, so the two cannot
+drift apart:
+
+```bash
+fly ssh console -C "mtglab claude usage"
+```
+
+Both axes (which surface spent it, which Claude spent it), tokens, and
+dollars beside the models. Each stretch of a window is priced at the rates
+that were in force while it was being spent, so a window crossing a price
+change is not repriced at this morning's. `--since 2026-09-01` narrows it.
+The figure stays a floor: cache writes bill above input and are recorded
+nowhere. A model with no rate in the table is named here rather than
+charged at nothing, which is what `/admin` sends you to a terminal for.
+
 The far-seeing glass on `/admin` needs one secret — a read-only platform
 token — and stays absent until it has one:
 
@@ -316,3 +332,21 @@ Auth is invite-only; there is no self-signup. The maintainer account is
 reconciled at boot from `MTGLAB_ADMIN_EMAIL` (ADR 17), and everything else
 — invites, resets, deletions — is the Admin page. `mtglab users` exists for
 the same operations at a terminal.
+
+**Three of `app.db`'s tables clean themselves, and nobody has to remember
+to.** The door hires a sweeper beside the night runner and starts it as it
+stands: one pass immediately, then one a day, over expired sessions, spent
+invite and reset links, and rate-limit windows older than a day. Nothing is
+taken that anything could still read — a lapsed window is already no window
+at all to the limiter — and a purge that fails is logged and left for
+tomorrow rather than taken as a reason to refuse to serve. Each pass says
+what it removed, so the record is in the log:
+
+```bash
+fly logs | grep "the accounts database was swept"
+```
+
+Zeros are the ordinary answer on an instance swept yesterday. The one table
+that grows without anybody signing up is `login_attempts` — its rows are
+keyed per client address rather than per account — and it is the reason this
+runs at all.

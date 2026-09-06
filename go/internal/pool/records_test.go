@@ -235,7 +235,9 @@ func TestTheLeaseHandsThePoolBack(t *testing.T) {
 	if p.Held() {
 		t.Fatal("the lease did not expire")
 	}
-	// And it opens again on the next ask, with an empty memo.
+	// And it opens again on the next ask, remembering -- the file did not
+	// change, so nothing it knew went stale (memory_test.go holds both
+	// halves of that rule).
 	use(t, p, func(c *pool.Conn) {
 		if _, err := c.GetCards(context.Background(), []string{"Sol Ring"}); err != nil {
 			t.Fatal(err)

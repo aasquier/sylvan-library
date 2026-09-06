@@ -256,7 +256,7 @@ hole; a TIMED OUT one was caught, bluntly.
 
 ```
 go/cmd/mtglab             the binary: ui, data, users, decks, sim, cards,
-                          claude check, forge-shim, probe
+                          claude check + usage, forge-shim, probe
 go/internal/door          the HTTP server: auth middleware (deny before
                           routing), router with its own 404/405, session
                           touch, gzip, static tiers, the visitor ledger

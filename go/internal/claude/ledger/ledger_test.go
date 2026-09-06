@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
+	"github.com/aasquier/sylvan-library/go/internal/prices"
 	"github.com/aasquier/sylvan-library/go/internal/tiers"
 )
 
@@ -38,7 +40,7 @@ func TestARecordedConversationCanBeRolledUp(t *testing.T) {
 		r.Record(ctx, row)
 	}
 
-	byMode, err := r.Summarise(ctx, "mode", "")
+	byMode, err := r.Summarise(ctx, "mode", "", "")
 	if err != nil {
 		t.Fatalf("rolling up by mode: %v", err)
 	}
@@ -63,7 +65,7 @@ func TestARecordedConversationCanBeRolledUp(t *testing.T) {
 			top.Model, Various)
 	}
 
-	byModel, err := r.Summarise(ctx, "model", "")
+	byModel, err := r.Summarise(ctx, "model", "", "")
 	if err != nil {
 		t.Fatalf("rolling up by model: %v", err)
 	}
@@ -99,14 +101,14 @@ func TestSinceFiltersOnTheTextTimestamp(t *testing.T) {
 	// created_at is ISO-8601 UTC text, so string comparison is date
 	// comparison. An instant in the past keeps the row; one in the future
 	// drops it, and neither needs a date type.
-	kept, err := r.Summarise(ctx, "mode", "2000-01-01T00:00:00.000000+00:00")
+	kept, err := r.Summarise(ctx, "mode", "2000-01-01T00:00:00.000000+00:00", "")
 	if err != nil {
 		t.Fatalf("since in the past: %v", err)
 	}
 	if len(kept) != 1 {
 		t.Errorf("a past `since` dropped the row: %+v", kept)
 	}
-	dropped, err := r.Summarise(ctx, "mode", "2999-01-01T00:00:00.000000+00:00")
+	dropped, err := r.Summarise(ctx, "mode", "2999-01-01T00:00:00.000000+00:00", "")
 	if err != nil {
 		t.Fatalf("since in the future: %v", err)
 	}
@@ -126,7 +128,7 @@ func TestAnUnknownAxisIsRefusedRatherThanInterpolated(t *testing.T) {
 		"", "slug", "MODE", "mode; DROP TABLE claude_usage",
 		"mode)--", "1", "created_at",
 	} {
-		out, err := r.Summarise(context.Background(), bad, "")
+		out, err := r.Summarise(context.Background(), bad, "", "")
 		if err == nil {
 			t.Errorf("%q was accepted as a grouping axis, returning %+v", bad, out)
 			continue
@@ -136,7 +138,7 @@ func TestAnUnknownAxisIsRefusedRatherThanInterpolated(t *testing.T) {
 		}
 	}
 	// And the table is still there, which is the point of the paragraph above.
-	if _, err := r.Summarise(context.Background(), "mode", ""); err != nil {
+	if _, err := r.Summarise(context.Background(), "mode", "", ""); err != nil {
 		t.Fatalf("the table did not survive the refusals: %v", err)
 	}
 }
@@ -207,6 +209,186 @@ func TestTheRowIsCountersAndNeverAChatLog(t *testing.T) {
 	}
 }
 
+// at writes one row with a timestamp of the test's choosing. `Record` stamps
+// `now()`, which is right for the app and useless for a question about
+// windows, so the seam tests insert directly -- exactly as the corpus test
+// does, and for the same reason.
+func at(t *testing.T, r *Recorder, stamp string, row Row) {
+	t.Helper()
+	if _, err := r.db.ExecContext(context.Background(),
+		"INSERT INTO claude_usage (created_at, mode, model, stop_reason,"+
+			" requests, input_tokens, output_tokens, cache_read_tokens)"+
+			" VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		stamp, row.Mode, row.Model, row.StopReason, row.Requests,
+		row.InputTokens, row.OutputTokens, row.CacheReadTokens); err != nil {
+		t.Fatalf("seeding a row at %s: %v", stamp, err)
+	}
+}
+
+// scheduledChange is a model whose rate is known to move, and the two days
+// that straddle the move -- read off the price table rather than typed here,
+// so this test still asks the right question after the next rate change lands
+// and the current one is history.
+func scheduledChange(t *testing.T) (model, lastOldDay, firstNewDay string) {
+	t.Helper()
+	for name, priced := range prices.Table {
+		if priced.Then == nil || priced.Until == "" {
+			continue
+		}
+		day, err := time.Parse("2006-01-02", priced.Until)
+		if err != nil {
+			t.Fatalf("%s: Until %q is not a date", name, priced.Until)
+		}
+		return name, priced.Until, day.AddDate(0, 0, 1).Format("2006-01-02")
+	}
+	t.Skip("no rate in the table is scheduled to move; nothing to straddle")
+	return "", "", ""
+}
+
+// **The finding this window was built for.** Tokens spent under one rate and
+// tokens spent under the next are two different bills, and a roll-up that
+// prices the whole window at today's rate answers the second one twice.
+//
+// Both halves here are identical in every way but the day they happened on, so
+// the only thing that can make the total differ from double-one-half is the
+// rate -- and the test computes both candidate answers from the price table
+// rather than restating a figure, which is what keeps it true when the table
+// moves.
+func TestAWindowThatCrossesARateChangeIsPricedOnBothSidesOfIt(t *testing.T) {
+	t.Parallel()
+	model, before, after := scheduledChange(t)
+	r := scratch(t)
+	spend := Row{Mode: "commander-dossier", Model: model, StopReason: "end_turn",
+		Requests: 4, InputTokens: 1_000_000, OutputTokens: 100_000,
+		CacheReadTokens: 2_000_000}
+	at(t, r, before+"T09:00:00.000000+00:00", spend)
+	at(t, r, after+"T09:00:00.000000+00:00", spend)
+
+	// A `now` past the change, so the window genuinely spans it.
+	roll, err := r.Window(context.Background(), "", after)
+	if err != nil {
+		t.Fatalf("rolling the window up: %v", err)
+	}
+
+	half := prices.Row{Model: model, Conversations: 1,
+		InputTokens: int64(spend.InputTokens), OutputTokens: int64(spend.OutputTokens),
+		CacheRead: int64(spend.CacheReadTokens)}
+	honest := prices.Sum([]prices.Estimate{
+		prices.Over([]prices.Row{half}, before),
+		prices.Over([]prices.Row{half}, after),
+	})
+	if roll.Cost.USD != honest.USD {
+		t.Errorf("the window came to %v; the two halves at their own rates come "+
+			"to %v", roll.Cost.USD, honest.USD)
+	}
+
+	// And the answer the old shape gave -- everything at the later rate -- is a
+	// different number, which is what makes this a fix rather than a
+	// rearrangement. If the two ever agree the test is asking nothing.
+	flat := prices.Over([]prices.Row{half, half}, after)
+	if flat.USD == honest.USD {
+		t.Fatalf("both rates price this spend at %v, so nothing here is being "+
+			"asked -- pick a model whose rates actually differ", flat.USD)
+	}
+	if roll.Cost.USD == flat.USD {
+		t.Errorf("the window was priced entirely at %s's rate (%v)", after, flat.USD)
+	}
+
+	// The per-model figure is the same arithmetic, since one model spent all
+	// of it -- which is what the shell's `est. USD` column renders.
+	if got := roll.CostOf[model]; got.USD != roll.Cost.USD {
+		t.Errorf("%s's own figure is %v and the window's is %v",
+			model, got.USD, roll.Cost.USD)
+	}
+}
+
+// `until` is exclusive and `since` inclusive, so two abutting windows tile:
+// every row lands in exactly one of them. A seam that included both ends would
+// bill the instant twice, which is precisely the arithmetic the segments do.
+func TestAbuttingWindowsTileRatherThanOverlap(t *testing.T) {
+	t.Parallel()
+	r := scratch(t)
+	ctx := context.Background()
+	const seam = "2026-09-01T00:00:00.000000+00:00"
+	at(t, r, "2026-08-31T23:59:59.999999+00:00", Row{"research", "claude-sonnet-5", "end_turn", 1, 10, 1, 0})
+	at(t, r, seam, Row{"research", "claude-sonnet-5", "end_turn", 1, 100, 1, 0})
+	at(t, r, "2026-09-01T00:00:00.000001+00:00", Row{"research", "claude-sonnet-5", "end_turn", 1, 1000, 1, 0})
+
+	below, err := r.Summarise(ctx, "mode", "", seam)
+	if err != nil {
+		t.Fatal(err)
+	}
+	above, err := r.Summarise(ctx, "mode", seam, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	whole, err := r.Summarise(ctx, "mode", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(below) != 1 || len(above) != 1 || len(whole) != 1 {
+		t.Fatalf("one mode should give one row each: %d/%d/%d",
+			len(below), len(above), len(whole))
+	}
+	if below[0].Conversations != 1 {
+		t.Errorf("the window below the seam holds %d conversations, want 1 -- "+
+			"the row AT the seam belongs above it", below[0].Conversations)
+	}
+	if below[0].InputTokens+above[0].InputTokens != whole[0].InputTokens {
+		t.Errorf("%d + %d tokens across the seam, %d in the whole window",
+			below[0].InputTokens, above[0].InputTokens, whole[0].InputTokens)
+	}
+	if below[0].Conversations+above[0].Conversations != whole[0].Conversations {
+		t.Errorf("%d + %d conversations across the seam, %d in the whole window",
+			below[0].Conversations, above[0].Conversations, whole[0].Conversations)
+	}
+}
+
+// A window with no ledger under it is nothing rather than an error: an
+// instance before its first boot has an honest answer to "what has this cost",
+// and it is zero.
+func TestAWindowWithNoLedgerIsEmptyRatherThanAFailure(t *testing.T) {
+	t.Parallel()
+	var absent *Recorder
+	roll, err := absent.Window(context.Background(), "", "2026-09-05")
+	if err != nil {
+		t.Fatalf("a missing ledger answered with an error: %v", err)
+	}
+	if len(roll.ByMode) != 0 || len(roll.ByModel) != 0 || roll.Cost.USD != 0 {
+		t.Errorf("a missing ledger answered %+v", roll)
+	}
+	// Empty rather than nil, because the panel serialises these straight to
+	// the wire and `null` where a list belongs is a different payload.
+	if roll.ByMode == nil || roll.ByModel == nil || roll.CostOf == nil {
+		t.Error("a missing ledger answered with nil collections, which reach " +
+			"the wire as null rather than as an empty list")
+	}
+}
+
+// A model the table cannot price is counted, never charged at nothing --
+// and the count reaches the roll-up, which is what the Admin panel's warning
+// and the shell's `unpriced` line both read.
+func TestAModelWithNoRateIsCountedRatherThanPricedAtZero(t *testing.T) {
+	t.Parallel()
+	r := scratch(t)
+	at(t, r, "2026-09-02T09:00:00.000000+00:00",
+		Row{"research", "claude-from-the-future", "end_turn", 1, 10_000, 500, 0})
+	roll, err := r.Window(context.Background(), "", "2026-09-05")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if roll.Cost.Unpriced != 1 {
+		t.Errorf("%d unpriced conversations, want 1", roll.Cost.Unpriced)
+	}
+	if len(roll.Cost.UnpricedModels) != 1 ||
+		roll.Cost.UnpricedModels[0] != "claude-from-the-future" {
+		t.Errorf("the unpriced model is named %v", roll.Cost.UnpricedModels)
+	}
+	if roll.Cost.USD != 0 {
+		t.Errorf("a model with no rate contributed %v to the total", roll.Cost.USD)
+	}
+}
+
 type ledgerCorpus struct {
 	Columns []string `json:"columns"`
 	Rows    [][]any  `json:"rows"`
@@ -265,7 +447,7 @@ func TestTheRollUpAgreesWithTheCorpus(t *testing.T) {
 		if q.Since != nil {
 			since = *q.Since
 		}
-		got, err := r.Summarise(ctx, q.By, since)
+		got, err := r.Summarise(ctx, q.By, since, "")
 		if err != nil {
 			t.Errorf("by=%s since=%q: %v", q.By, since, err)
 			continue
