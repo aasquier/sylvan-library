@@ -17,6 +17,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
+	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
@@ -271,7 +272,21 @@ func Rank(target *pool.CardRecord, candidates []*pool.CardRecord, why string, li
 // CandidatePool is `suggest.candidate_pool`: everything legal that could
 // plausibly fill the slot -- a prefilter to a few hundred, inside the
 // identity, roughly the right cost and sort of card.
-func CandidatePool(ctx context.Context, c *pool.Conn, target *pool.CardRecord, identity map[string]bool, poolSize int) ([]*pool.CardRecord, error) {
+//
+// **`breakers` widens the identity where the commander's own card says it is
+// wider** (ADR 51). Without it a Seluma deck is never offered an off-colour
+// Angel, which is not an error anybody sees -- it is the suggestion list
+// quietly skipping the best cards in the deck, and the sort of silence that is
+// only ever found by wondering why.
+//
+// The widening is a two-step on purpose. The query is loosened with the type
+// *words* the clause mentions, which is a superset (see
+// `gate.Rulebreakers.TypeHints`), and the rows that come back are then held to
+// `AnyIdentity`, which is the rule. Nothing here re-implements the clause in
+// SQL: a prefilter that is too generous costs a few rows, and a second copy of
+// the predicate would cost a fact kept in two places.
+func CandidatePool(ctx context.Context, c *pool.Conn, target *pool.CardRecord,
+	identity map[string]bool, breakers gate.Rulebreakers, poolSize int) ([]*pool.CardRecord, error) {
 	colors := []string{}
 	for _, col := range []string{"W", "U", "B", "R", "G"} {
 		if identity[col] {
@@ -286,17 +301,57 @@ func CandidatePool(ctx context.Context, c *pool.Conn, target *pool.CardRecord, i
 		}
 		listed = strings.Join(quoted, ", ")
 	}
+	// **Params are appended in the order their `?` appears in the WHERE, and
+	// nothing else keeps them in step.** The identity clause carried no
+	// placeholder until the widening put two there, ahead of the mana-value
+	// pair -- which bound a float to a LIKE and produced a binder error rather
+	// than a wrong answer, this once.
+	params := []any{}
+	fits := fmt.Sprintf("len(list_filter(color_identity, x -> x NOT IN (%s))) = 0", listed)
+	// A deck with no Rulebreaker commander sends the query it always sent,
+	// down to the byte.
+	if hints := breakers.TypeHints(); len(hints) > 0 {
+		likes := make([]string, len(hints))
+		for i, word := range hints {
+			likes[i] = "type_line LIKE ?"
+			params = append(params, "%"+word+"%")
+		}
+		fits = "(" + fits + " OR " + strings.Join(likes, " OR ") + ")"
+	}
 	where := []string{
 		"json_extract_string(legalities, 'commander') = 'legal'",
-		fmt.Sprintf("len(list_filter(color_identity, x -> x NOT IN (%s))) = 0", listed),
+		fits,
 		"cmc BETWEEN ? AND ?",
 	}
-	params := []any{math.Max(0, target.CMC-2), target.CMC + 2}
+	params = append(params, math.Max(0, target.CMC-2), target.CMC+2)
 	if kind := PrimaryType(target.TypeLine); kind != "" {
 		where = append(where, "type_line LIKE ?")
 		params = append(params, "%"+kind+"%")
 	}
-	return c.Search(ctx, strings.Join(where, " AND "), params, poolSize, "edhrec_rank NULLS LAST", 0)
+	found, err := c.Search(ctx, strings.Join(where, " AND "), params, poolSize, "edhrec_rank NULLS LAST", 0)
+	if err != nil || len(breakers) == 0 {
+		return found, err
+	}
+	// The loose half of the prefilter, taken back: what the query let through
+	// on a type word, the clause itself now has to admit.
+	kept := found[:0]
+	for _, rec := range found {
+		if withinIdentity(rec.ColorIdentity, identity) || breakers.AnyIdentity(rec) {
+			kept = append(kept, rec)
+		}
+	}
+	return kept, nil
+}
+
+// withinIdentity: does this card sit inside the commander's own colours,
+// before any Rulebreaker clause is consulted?
+func withinIdentity(colors []string, identity map[string]bool) bool {
+	for _, c := range colors {
+		if !identity[c] {
+			return false
+		}
+	}
+	return true
 }
 
 // ReplacementsFor is `suggest.replacements_for`: suggestions for one card in
@@ -307,8 +362,10 @@ func ReplacementsFor(ctx context.Context, c *pool.Conn, d *deck.Deck, cards map[
 		return []Candidate{}, nil
 	}
 	identity := map[string]bool{}
+	cmdRecords := []*pool.CardRecord{}
 	for _, commander := range d.Commander {
 		if rec := cards[commander]; rec != nil {
+			cmdRecords = append(cmdRecords, rec)
 			for _, col := range rec.ColorIdentity {
 				identity[col] = true
 			}
@@ -331,7 +388,7 @@ func ReplacementsFor(ctx context.Context, c *pool.Conn, d *deck.Deck, cards map[
 	for _, commander := range d.Commander {
 		already[commander] = true
 	}
-	candidates, err := CandidatePool(ctx, c, target, identity, 400)
+	candidates, err := CandidatePool(ctx, c, target, identity, gate.ReadRulebreakers(cmdRecords), 400)
 	if err != nil {
 		return nil, err
 	}

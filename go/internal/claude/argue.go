@@ -12,6 +12,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
+	"github.com/aasquier/sylvan-library/go/internal/gate"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
@@ -171,6 +172,14 @@ func noneDropped() emptyDropped {
 // therefore is not. Rule 2: the pool's `color_identity` already accounts for
 // back faces, so it is read and never derived.
 //
+// **`breakers` is where the commander says the identity is wider** (ADR 51). It
+// matters more here than anywhere else the clause reaches, because this filter
+// does not merely hide a card -- it files it under `off_colour` and hands the
+// user a list of the model's supposed mistakes. Under Seluma an off-colour
+// Angel is the *right* suggestion, and reporting it as an error would be the
+// misleading answer this doc comment already warns about, arrived at from the
+// other direction.
+//
 // `inDeck` is the fourth: the pool spellings, casefolded, of every card the
 // deck already runs. Checked **first** of the four verdicts because it is the
 // most specific true thing to say -- Goreclaw's Primeval Titan is both banned
@@ -180,7 +189,7 @@ func noneDropped() emptyDropped {
 // double-faced card is the full `A // B` name: naming both faces is what makes
 // an off-colour verdict on Ajani legible rather than baffling.
 func ResolveAlternatives(ctx context.Context, conn *pool.Conn, names []any,
-	identity []string, inDeck map[string]bool) ([]deckread.NamedCard, DroppedAlternatives, error) {
+	identity []string, breakers gate.Rulebreakers, inDeck map[string]bool) ([]deckread.NamedCard, DroppedAlternatives, error) {
 	wanted := []string{}
 	seen := map[string]bool{}
 	for _, raw := range names {
@@ -256,7 +265,7 @@ func ResolveAlternatives(ctx context.Context, conn *pool.Conn, names []any,
 			dropped.Banned = append(dropped.Banned, record.Name)
 			continue
 		}
-		if !withinIdentity(record.ColorIdentity, allowed) {
+		if !withinIdentity(record.ColorIdentity, allowed) && !breakers.AnyIdentity(asRecord(record)) {
 			dropped.OffColour = append(dropped.OffColour, record.Name)
 			continue
 		}
@@ -275,6 +284,18 @@ func contains(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// asRecord is the three fields a Rulebreaker clause reads -- the type line, the
+// mana value and the identity -- lifted out of the wire shape this function
+// works in. `CardsNamed` hands back `NamedCard`s and `gate` reads pool records;
+// this is the seam between them rather than a card being rebuilt.
+func asRecord(c deckread.NamedCard) *pool.CardRecord {
+	rec := &pool.CardRecord{Name: c.Name, CMC: c.CMC, ColorIdentity: c.ColorIdentity}
+	if c.TypeLine != nil {
+		rec.TypeLine = *c.TypeLine
+	}
+	return rec
 }
 
 func withinIdentity(colors []string, allowed map[string]bool) bool {
@@ -441,6 +462,32 @@ func Argue(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 		inDeck[strings.ToLower(*d.Companion)] = true
 	}
 
+	// The commanders' own cards, for the clause printed on them (ADR 51). The
+	// brief carries the identity as five letters and a clause is not five
+	// letters, so this is a lookup rather than a read of what the model saw --
+	// and it is the deck's own commanders, so there is nothing here the model
+	// could have influenced.
+	//
+	// **A nil `conn` is a real state on this path, not a defensive habit.**
+	// `deckread.CardsNamed` handles it a dozen lines into `ResolveAlternatives`
+	// -- a base install has no pool and this mode still answers -- and
+	// `pool.Conn.GetCards` has no such guard, so calling it here unguarded
+	// would turn "no card pool yet" into a panic. No pool means no commander
+	// card, which means no clause, which is the same degraded answer every
+	// other pool-backed check gives.
+	cmdRecords := []*pool.CardRecord{}
+	if conn != nil {
+		commanders, err := conn.GetCards(ctx, d.Commander)
+		if err != nil {
+			return nil, err
+		}
+		for _, cmdName := range d.Commander {
+			if rec := commanders[cmdName]; rec != nil {
+				cmdRecords = append(cmdRecords, rec)
+			}
+		}
+	}
+
 	// **Loud, not silent.** `Brief` takes this straight from `DeckPayload`,
 	// where it is a `[]string`, so a failed assertion means that shape moved
 	// underneath this file. The quiet version -- fall back to an empty
@@ -453,7 +500,7 @@ func Argue(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 			" -- the deck payload's shape moved", kv(deckFacts, "color_identity"))
 	}
 	alternatives, altDropped, err := ResolveAlternatives(ctx, conn,
-		payload.Alternatives, identity, inDeck)
+		payload.Alternatives, identity, gate.ReadRulebreakers(cmdRecords), inDeck)
 	if err != nil {
 		return nil, err
 	}

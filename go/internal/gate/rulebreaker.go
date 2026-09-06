@@ -383,6 +383,46 @@ func (rs Rulebreakers) Why() string {
 	return " -- and " + strings.Join(quoted, "; ")
 }
 
+// TypeHints is the type-line words a clause mentions, for a caller that has to
+// narrow a card index before it can apply the clause properly.
+//
+// **It is deliberately a superset, and [Rulebreakers.AnyIdentity] remains the
+// only authority.** The words come back flat, so The Everforger's "artifact
+// creature and Equipment" yields artifact, creature and Equipment separately: a
+// caller matching *any* of them sees every card the clause covers plus some it
+// does not -- a plain artifact, a creature that is not one. That is the right
+// shape for a prefilter and the wrong shape for a rule, and the difference is
+// the reason this returns words rather than a predicate. A second copy of the
+// predicate, in SQL, would be a fact kept in two places by hand, and this repo
+// has had five of those rot.
+//
+// Empty when no clause names a type, which is the caller's signal that there is
+// nothing to widen and its own query should go out unchanged.
+func (rs Rulebreakers) TypeHints() []string {
+	seen := map[string]bool{}
+	for _, rb := range rs {
+		if rb.Unsupported != "" {
+			continue
+		}
+		for _, a := range rb.allow {
+			if a.anyLand || a.basicLand {
+				seen["Land"] = true
+			}
+			for _, group := range a.types {
+				for _, word := range group {
+					seen[word] = true
+				}
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for w := range seen {
+		out = append(out, w)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // ColorChoice is Tolabow's clause settled without storing anything, and the
 // argument is worth writing down because the obvious design is a field in the
 // deck file.
