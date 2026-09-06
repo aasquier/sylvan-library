@@ -35,7 +35,7 @@ import (
 // on an instance with no key at all. Only the Anthropic call is queued, on
 // the NET lane, keyed on the cache key so that a second click inside the
 // four-minute window joins the run already going rather than paying twice
-// (2026-08-13, two paid runs for one commander, concurrently, on the
+// (measured: two paid runs for one commander, concurrently, on the
 // instance).
 //
 // The GET is a **different function from the POST rather than the same one

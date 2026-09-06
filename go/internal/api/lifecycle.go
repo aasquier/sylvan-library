@@ -1182,7 +1182,7 @@ func reportedLines(lines []decklist.Line) []map[string]any {
 
 // orEmpty is a nil slice rendered as `[]` and never as `null`.
 //
-// Generic since 2026-08-28, and the reason is a bug this had already caused:
+// Generic deliberately, and the reason is a bug this had already caused:
 // `notes` went through here and `read` did not, so an import where nothing
 // needed respelling sent `read: null` -- `Respell` returns a nil slice when it
 // makes no corrections -- against a wire type declaring `Correction[]`. The

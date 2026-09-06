@@ -94,30 +94,40 @@ walking #436, delete the eight — they are scratch; future local walks pull
 fresh from the instance or point `MTGLAB_DECKS_DIR` at a scratch directory
 the way the 08-24 measurement run did. Ledger: Green, 2026-09-05.
 
+**Colorless: a 14MB shadow of the deleted Python app still stands at the
+repo root, and the zero-trace ruling never saw it because git cannot.**
+`build/lib/mtglab/` is a setuptools build of the old `src/mtglab` — `cli.py`,
+`animist/`, a full copy of the tarot art — gitignored, untracked, mtimes
+2026-08-13, found by the relic sweep counting 100 recipe files where the
+tree holds 33. · *Cost of leaving it:* nothing runs it, but any future sweep
+or grep over the checkout that forgets an exclude inherits a phantom Python
+app the crossing erased from the tree — the exact false-conclusion shape the
+completeness-list trap records. · **Recommendation:** delete it
+(`rm -rf build/`) — a build artifact of a package that no longer exists, no
+personal data in it (checked: code and public art only), and the zero-trace
+ruling already wants it gone; queued rather than done only because a relic
+is a decision, never a silent deletion. Ledger: Colorless, 2026-09-05.
+
 ## Open — 2026-08-24
 
-**1. ADR 5's isolation sweep did not cross to Go, and it is the one test that
-ADR itself calls the highest-value test in the whole auth story.** Its decision
-text reads: *"For every user-scoped endpoint, a test logs in as user B,
-requests user A's resource and asserts 404, not 403 … **parametrised over the
-route table, so an endpoint added without scoping fails the suite.**"* Python
-had it — 57 routes classified, each filed with its argument. The Go tree has no
-equivalent: the door's sweeps derive public-vs-protected and the admin prefix
-from the route table (both genuinely machine-checked), but *whose data a route
-serves* is checked only by a scattering of hand-written per-route 404 tests
-with no completeness guard over the 22 `/api/decks/{owner}/…` patterns. The
-structural half ADR 5 also asked for **is** in place — one accessor,
-`api.sourceFor` → `library.SourceFor`, and every deck handler read this run
-goes through it — so this is a missing guard rather than a known hole, and no
-leak was found by spot-check. · *Cost of leaving it:* the next deck route
-written without the accessor ships silently; nothing in the suite notices, and
-the thing it would leak is another person's decklist. · **Recommendation:**
-rebuild it, and in ADR 5's own parametrised form rather than as more one-off
-tests — iterate the served route table, and for every pattern carrying
-`{owner}` drive it as a signed-in stranger against a private deck and assert
-404. Deliberately **not** attempted tonight: mis-filing one route as shared
-would certify a hole as shut, which is worse than the gap, and that judgement
-wants daylight. Ledger: White, 2026-08-24.
+**1. ADR 5's isolation sweep is half-built now, and the missing half is the
+completeness guard.** *(Narrowed 2026-09-05 — the sweeps themselves landed
+with #290:* `go/internal/api/refusals_test.go` *asks every deck route about a
+deck that is not there, an owner that is not there, and — the ADR 5 sweep —
+another account's deck, absent not forbidden.)* What did **not** land is the
+parametrised form the ADR asks for: the route lists are hand-typed in the
+test file rather than derived from the served route table, so an `{owner}`
+route added without being listed is unswept and nothing notices — and the
+stranger sweep drives only the write routes, with the reads still uncovered.
+White's 2026-09-05 run re-read the route table and confirms this is still a
+missing guard rather than a known hole (one accessor, every handler through
+it). · *Cost of leaving it:* the next deck route written without the accessor
+ships silently, and the thing it would leak is another person's decklist. ·
+**Recommendation:** finish it in ADR 5's own form — derive the pattern set
+from the served route table, hold the test's lists equal to it, and drive the
+read routes as a stranger too. Mis-filing a shared route certifies a hole as
+shut, which is why it wants daylight. Ledger: White, 2026-08-24; narrowed
+Colorless, 2026-09-05.
 
 **2. `NOTICE.md`'s dead anchors are fixed, but nothing stops the next four.**
 This run repaired three dead repo paths and a dead command name in the
@@ -134,34 +144,13 @@ the wider docs-rot question, and it is the same shape as daybreak item 5 from
 implementation reuse this test's two helpers rather than write a second pair —
 both halves are built, tested and mutation-verified.
 
-**3. Five code-scanning alerts are permanently red and can never close by
-themselves.** All five are Python findings on files the Go crossing deleted,
-and the Python analysis never runs again — so nothing will ever mark them
-fixed, and the list will read "5 open" forever. The cost is not the findings
-(the code is gone); it is that a permanently-red alert list teaches everyone
-to stop looking at code scanning, which is the one place a real finding would
-appear. The six *Go* alerts are already dismissed, each with a sound argument.
-· *Cost of leaving it:* nothing today, and a genuine alert missed on the day
-there is one. · **Recommendation:** dismiss all five as "no longer relevant"
-— it is your account and your call, which is the only reason this is a
-question rather than a fix. Ledger: Blue, 2026-08-24.
-
-**4. A one-word correction to the artists shelf is built, green, and waiting
-for your eye.** The lore shelf tells a reader that Library of Alexandria is
-"Alpha's own". It is not: its first printing is Arabian Nights, 1993-12-17,
-and Alpha is the 295 cards of 1993-08-05 (read out of the Scryfall bulk, not
-recalled — Mark Poole did paint it, so only the set is wrong). It renders, so
-it stopped at a green PR rather than merging. · *Cost of leaving it:* the
-shelf teaches a newcomer something false about the game's own history, to the
-one audience most likely to notice. · **Recommendation:** merge it. **The walk
-is cheaper than it looks, and here is the honest version:** the diff is one
-word in checked-in prose and touches no render path, so the two-second check
-is `curl -s localhost:8765/api/lore | grep -o "Mark Poole[^\"]*"`. If you want
-it on the page: `.claude/launch.json`'s `mtglab-ui` entry (or `go/mtglab ui
---port 8765`), then http://127.0.0.1:8765/ — the shelf sits under the Library
-masthead and shows **one fact at a time from a random opening offset**, so
-finding this one means clicking **Another** up to 42 times. Nothing animates
-and there is no cycle time to wait out. Ledger: Blue, 2026-08-24.
+*(Items 3 and 4 — answered/landed, verified 2026-09-05: the five Python
+CodeQL ghosts are dismissed and the open-alert list reads **0** (API
+read-back tonight), so a nonzero count now means something real; and the
+Library of Alexandria correction merged as #283, 2026-08-24T13:48Z — the
+lore shelf says "Magic's first expansion", read back from `lore.json`.
+Outcomes recorded in the ledger, Colorless 2026-09-05. White's item 2 above
+still open.)*
 
 **Black —**
 
@@ -219,20 +208,11 @@ the rule the code already says it follows. It is a change to how long
 something is remembered rather than to what is remembered, which is the only
 reason it waited for daylight. Ledger: Black, 2026-08-24.
 
-**5. Five of the seven `Loading…` labels are flat text with no motion, and one
-of them is the door into the fortune-teller's table.** Blue found them by
-driving the real site (their ledger has the list); this run timed what each
-one is waiting for, because "it feels slow" and "it *is* slow" want different
-answers. **It is not slow.** Every one of the five waits on a single request
-that the server answers in well under a millisecond — so there is nothing to
-speed up, and the whole of it is the page sitting still while it waits. ·
-*Cost of leaving it:* the site's promise is that it is alive and moving, and
-the five places it visibly is not include the way in to the reading — the one
-room that is meant to get the best of everything. · **Recommendation:** yes —
-give them the same treatment the two good ones already have (`App.tsx` uses a
-proper spinner in both of its waits), or a held frame so nothing jumps when
-the answer lands. It renders, so it wants your eye before it merges. Ledger:
-Blue and Black, 2026-08-24.
+*(Item 5 — the five motionless `Loading…` labels — answered/landed, verified
+2026-09-05: Red built the spinner pass the same morning and it merged as
+#285, 2026-08-24T13:52Z, "five pages stop holding still", walked and
+deployed since; the shared `Spinner` now turns in those waits. Outcome
+recorded in the ledger, Colorless 2026-09-05.)*
 
 **Colorless —**
 
@@ -252,9 +232,10 @@ person answering. · **Recommendation:** yes — a small test asserting every op
 item here names the ledger section holding its record, with the section names
 read out of `LEDGER.md`'s own headings rather than restated, and a failure when
 it finds no items at all so an inert guard cannot pass quietly. It was not
-built tonight because the whole 2026-08-23 block would fail it — none of those
-six names a ledger section and four have none to name — and repairing them
-means editing that block, which this rainbow was told to leave alone.
+built on 2026-08-24 because the whole 2026-08-23 block would have failed it;
+*that blocker is gone* — the 2026-09-05 colorless run retired that block's
+answered items and gave every survivor its ledger pointer, so the file would
+pass the guard today and a yes can be built on directly.
 Ledger: Colorless, 2026-08-24.
 
 **2. Editing a comment in five particular packages silently throws away the
@@ -378,18 +359,13 @@ prune landed since as #420 `pool.SweepBulk`, the volume now holding exactly
 one file of each kind, 98MB, down from 121. Outcomes recorded in the ledger,
 Green 2026-09-05. Items below still open.)*
 
-**2. The light theme's muted grey fails accessibility contrast, and what fails
-is every link in the masthead.** One colour is used for muted text in *both*
-themes; against the dark background it is fine, against the light one it is
-**3.41:1** where the standard asks 4.5. Measured on the live site with a real
-contrast calculation, not by eye: dark theme 0 failures, light theme 21 — the
-nav links, the card count, your username, the art credits, the pentagram's
-legend. · *Cost of leaving it:* a newcomer on a light-themed phone reads the way
-to the Learn room in the faintest text on the page. · **Recommendation:** yes —
-give the light palette its own muted grey and leave dark's untouched. `#747370`
-is the smallest darkening of the same colour that clears the bar (computed:
-4.51:1). It renders, so it wants your eye, and probably the house mother's.
-Ledger: Green, 2026-08-24, queued 1.
+*(Item 2 — the light theme's muted grey — answered/landed, verified
+2026-09-05: it merged as #405 on 2026-08-29 and went further than the ask —
+seven tokens re-stepped for the light page, `--text-muted` now `#73716c` at
+4.62:1 with dark's untouched, and `palettecontrast_test.go` gates the whole
+light palette so the next un-stepped ink fails a test instead of a reader.
+Outcome recorded in the ledger, Colorless 2026-09-05. Items below still
+open.)*
 
 **3. Announcing that an answer *arrived*, not just that a wait began.** The PR
 above makes every wait and every refusal audible, which is the half that
@@ -444,42 +420,13 @@ better anyway; the card-art path is the one to answer first because it is
 already the written runbook. Ledger: Green, 2026-08-24, queued 6.
 ## Open — 2026-08-23
 
-**1. The 95% coverage floor is gone, and the drop is half unit-change and half
-real.** CI's `-cover` prints a number and gates on nothing; no threshold
-exists in `ci.yml`, `.golangci.yml` or any doc, and only the polish skill
-still asserted it. Measured 2026-08-23: **80.3%** of statements across the
-whole suite (`-coverpkg=./...`, the figure comparable to the old floor).
-
-The old gate covered `src/mtglab` at 95.749% on **11,573 Python statements**.
-The same product in Go is **16,050 statements** — 39% more for identical
-behaviour, because Go writes its error paths as code where Python's exceptions
-propagate invisibly. Classifying all 3,158 uncovered statements by reading
-their source: **33% are error handling** (`if err != nil` and its returns),
-lines that largely did not exist to be counted before. Excluding error paths
-from the denominator puts it at **86.0%**.
-
-The other **54% (1,714 statements) is ordinary logic, and that part is a real
-regression** — and it is not diffuse. `pyproject.toml`'s own coverage note
-records what bought the last five points in Python on 2026-08-14: the CLI's
-Claude renderers, the theme modes faked at `Turn`, **Forge's run path faked at
-`subprocess`**, **the Scryfall ingest against fake bulk files**, and the SQL
-deck tier. Those are precisely today's gaps — `sim/tier3` sits at **25.6%**
-(`run.go` 169 uncovered, `worker.go` 110), `pool/refresh.go` 111,
-`cmd/mtglab/users.go` 126, plus the admin/sim/shelf route families.
-**The fakes were not rebuilt in Go.** The migration's safety net was
-byte-identical output diffing across a case matrix — stronger than coverage
-for proving the port, but it leaves no unit tests behind for the paths it
-exercised. · *Cost of leaving it:* Forge's run path and the pool refresh are
-both live code with no test holding them.
-
-· **Recommendation, two parts:** (a) make coverage a *watched* number, not a
-gate — record it every White run, treat a fall as a finding — since a
-threshold set today either fails CI at once or certifies nothing; and (b)
-queue the three fakes for rebuild in Go, in this order: the shim/subprocess
-fake for `tier3` (biggest single gap, and the only one covering code that
-talks to a worker machine), the bulk-file fake for `pool/refresh`, then the
-CLI's pool-backed commands. That is the honest path back, and it is worth
-more than any number.
+*(Item 1 — the coverage floor — answered/landed, verified 2026-09-05: the
+floor came back with #290 on 2026-08-24 and got the fakes with it — the
+`refusals`/`unreadable` sweeps, tier3's worker and install tests, the pool
+download tests — then ratcheted 89.5 → 90.0 → 90.5 (#387), where it gates
+today in `ci.yml`'s own formula with `docs/polish/COVERAGE.md` as its story;
+the tree measures 90.8 against it, up from 80.3 when this was asked. Outcome
+recorded in the ledger, Colorless 2026-09-05.)*
 
 **2. ADR 38 cites `docs/go-migration/`, twice, and the directory is gone.**
 The zero-trace sweep deleted it; the ADR links it in its header and its
@@ -487,20 +434,22 @@ context. ADRs are immutable. · *Cost of leaving it:* an accepted record points
 at nothing, and every future reader of ADR 38 hits it. · **Recommendation:** a
 short superseding note recording that the directory was deliberately removed
 and where its content went — cheaper than restoring it, and honest about why.
+*(Re-verified still open 2026-09-05 — ADRs run to 0049 and none supersedes
+the cite.)* Ledger: Cleanup — the "Not yet run" backlog.
 
-**3. The `deploy` job's `needs` list is checked by nothing.** The test that
-derived the expected job set from `ci.yml`'s own job list died with the old
-suite. A job added without `needs` now deploys off a partial suite, silently.
-· *Cost of leaving it:* one forgotten line ships an unverified deploy. ·
-**Recommendation:** rebuild it in Go as a test that parses `ci.yml` and
-derives the set — it was a real guard and it is a small one.
+*(Item 3 — the unchecked `needs` list — answered/landed, verified 2026-09-05:
+rebuilt by Red as `go/cmd/mtglab/pipeline_test.go` on #285, 2026-08-24,
+deriving the expected set from `ci.yml`'s own `jobs:` keys — and the hole it
+was written against had already fired once, which Red's 2026-08-24 entry
+records. Outcome in the ledger, Colorless 2026-09-05.)*
 
-**4. Does night work merge itself?** The skill's current rule, written
-2026-08-23 and derived from commandments 14 and 16 rather than from a ruling:
-anything a user can see stops at a green PR for Aaron's eye; everything else
-may merge when the required checks are green. · *Cost of leaving it:* nothing
-— it is already the conservative reading. · **Recommendation:** confirm it, or
-tighten it to "a night run never merges" if a 3am deploy is unwelcome at all.
+*(Item 4 — does night work merge itself — answered in use, recorded
+2026-09-05: the Nightbound section of the skill settles the commandment 16
+reading, and Aaron's own rainbow invocations since instruct it verbatim —
+user-visible work stops at a green PR, everything else merges on green
+required checks; three night merges rode that rule on 2026-09-05 alone, each
+deploy walked. The stricter reading remains one sentence away if a 3am
+deploy ever proves unwelcome. Outcome in the ledger, Colorless 2026-09-05.)*
 
 **5. The polish skill is entirely unenforced prose, which is the one thing it
 tells every run to hunt.** Its own standing question is "which absolute claim
@@ -517,7 +466,9 @@ subcommands they name, and asserts each resolves — paths against the tree,
 subcommands against the CLI's own command table. Perhaps sixty lines, it
 derives its expectation from the source of truth rather than restating it (the
 pass's own rule), and it would have caught four of the five above at commit
-time. A colorless run's natural first job.
+time. A colorless run's natural first job. *(Still open 2026-09-05; the
+implementation note it needs — five implied roots, 42 tokens measured — is in
+the ledger.)* Ledger: Colorless, 2026-08-24 (recovered records).
 
 **6. A pprof mount, so the hot-spot patrol can profile the serving process
 itself.** Red's new patrol profiles at the package seam because the door has
@@ -534,7 +485,8 @@ door change with a real caveat: **heap profiles carry process memory**, and
 this process's memory holds session tokens and Argon2id parameters, so live
 would mean CPU-profile-only and admin-gated, and commandment 10 keeps it
 invisible to users either way. (b) is your call, and it can wait for a hot
-spot the local mount cannot explain.
+spot the local mount cannot explain. *(Still open 2026-09-05 — the tree still
+contains no pprof.)* Ledger: Colorless, 2026-08-24 (recovered records).
 
 ---
 

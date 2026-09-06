@@ -66,13 +66,21 @@ Two habits, and the first is the one that keeps this alive:
   deprecations, `go vet` checks and language changes each get one question:
   *does this tree contain the thing it replaces?* This is the same shape as
   the Anthropic-currency bullet below, for the same reason — the platform
-  moves and prose does not.
+  moves and prose does not. **One recorded ceiling binds the whole habit:
+  Go 1.27+ requires macOS 13 and this Mac is 12 forever, so never
+  "modernize" `go.mod` past 1.26.** The trigger that reopens it is Go 1.28's
+  release ending 1.26 security fixes (~Feb 2027) — and crossing it then
+  means losing the dev machine's ability to build, which is Aaron's call and
+  ADR-grade, never a sweep's.
 - **Grep for the old spelling, not for the new one.** The tree cannot tell
   you what it is missing; it can tell you what it still has. A sweep is a
-  list of *outgoing* forms, and this one starts from a real inventory taken
-  2026-08-23: `interface{}` 0, `ioutil` 0, `rand.Seed` 0, `strings.Title` 0
-  — this tree is already clean of the classic tells — against
-  **`sort.Slice` 18**, which is the live one.
+  list of *outgoing* forms, and this one starts from a real inventory —
+  re-taken 2026-09-05: `interface{}` 0, `ioutil` 0, `rand.Seed` 0,
+  `strings.Title` 0 — this tree is already clean of the classic tells — and
+  **`sort.Slice` is down to 2, both in `internal/jobs/registry.go` and both
+  ruled** (2026-08-24: golden-bearing package, total comparators, a pure
+  spelling change is the wrong trade). A raw count without its rulings
+  attached invites re-litigating them; carry the ruling with the number.
 
 The sweep list, roughly by how much the replacement buys:
 
@@ -84,7 +92,7 @@ The sweep list, roughly by how much the replacement buys:
 | a `for` loop counting to n | `for range n` | |
 | a loop variable copied into the body | nothing — per-iteration since 1.22 | delete the copy, keep the comment if it explains *why it used to be there* |
 | `errors.Is` chains built by hand | `errors.Join`, `%w` | |
-| a mutex guarding a read-mostly map | `sync.RWMutex`, or `atomic.Pointer` for swap-whole | **0 `RWMutex` against 15 `sync.Mutex`** — worth one honest look, not a blanket conversion |
+| a mutex guarding a read-mostly map | `sync.RWMutex`, or `atomic.Pointer` for swap-whole | **0 `RWMutex` against 18 `sync.Mutex`** (2026-09-05: 0 of the 18 are read-mostly maps — Blue's reading) — one honest look, not a blanket conversion |
 | `var wg sync.WaitGroup` + `wg.Add(1)` + `go func(){defer wg.Done()…}` | `wg.Go(func(){…})` | one line, and it cannot leak an `Add`/`Done` mismatch |
 | a `WaitGroup` plus a shared error variable | `errgroup.Group` | **already available**: `golang.org/x/sync` is an indirect dependency, so this costs no new module — only promoting it to direct |
 | `time.Sleep` in a concurrency test | `testing/synctest` | fake clock; the flake goes away rather than getting a longer sleep |

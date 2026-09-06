@@ -186,8 +186,11 @@ one you are running, and only that one; the others are for their own runs.
 
 ## The measuring shelf
 
-The shelf is thinner than it looks: there is no `bench` command and no cache
-register, and **building both over the Go packages is an open ledger item.**
+The shelf is thinner than it looks: there is no `bench` command, and the
+cache register is half-built — `mtglab sim cache` lists what the Tier 1 cache
+holds and can clear it, but **nothing anywhere counts hits**, so a cache can
+still be correct, tested, and never once used with no number saying so.
+**Building the bench suite and the counter half is an open ledger item.**
 Mutation sampling is the exception — `gremlins` is the tool, installed on
 demand, and White's testing facet carries the protocol. Otherwise the stock
 Go toolchain is the instrument set — richer than a purpose-built shelf would
