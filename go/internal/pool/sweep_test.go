@@ -359,3 +359,59 @@ func TestAnOracleOnlyRefreshSweepsOnlyTheOracleCopies(t *testing.T) {
 		t.Errorf("the shelf holds\n  %v\nwant\n  %v", got, want)
 	}
 }
+
+// **A shelf that will not sweep is not a failed refresh** -- the daybreak
+// ruling's other half (Aaron, 2026-09-05), pinned because it is one dropped
+// error in `sweepLeavings` and nothing else held it: the rows are in, every
+// caller's report is true, and a stuck tidy-up must never send an operator
+// looking for a broken pool that is sitting there fully loaded. The shelf is
+// made unsweepable the one way that leaves everything else working -- execute
+// without read, so exact paths still open (the downloads, the loads) and only
+// the sweep's directory listing is refused.
+func TestAShelfThatWillNotSweepDoesNotFailTheRefresh(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		t.Skip("root reads an unreadable directory anyway; the fault cannot be staged")
+	}
+	oracle, printings := sweepFixtureCards(t)
+	scryfall := newBothKinds(t, oracle, printings)
+
+	dir := t.TempDir()
+	shelf := filepath.Join(dir, "scryfall")
+	seedShelf(t, shelf, "oracle_cards-2026-08-20.jsonl", 100)
+	seedShelf(t, shelf, "default_cards-2026-08-20.jsonl", 200)
+	if err := os.Chmod(shelf, 0o311); err != nil {
+		t.Fatal(err)
+	}
+	// Restored before the temp dir's own cleanup tries to list it -- and
+	// again in the body below, so the shelf can be inspected.
+	t.Cleanup(func() { _ = os.Chmod(shelf, 0o750) })
+
+	counts, err := pool.Refresh(context.Background(), pool.RefreshOptions{
+		DBPath:      filepath.Join(dir, "pool.duckdb"),
+		ScryfallDir: shelf,
+		IndexURL:    scryfall.URL + "/bulk-data",
+	}, pool.RefreshWatcher{})
+	if err != nil {
+		t.Fatalf("a refresh whose only fault was an unsweepable shelf failed: %v", err)
+	}
+	if counts.Oracle == 0 || counts.Printings == 0 {
+		t.Fatalf("the refresh loaded nothing (%+v); this test measures nothing", counts)
+	}
+	// Zero is the honest count for a sweep that could not run.
+	if counts.Swept.Files != 0 || counts.Swept.Bytes != 0 {
+		t.Errorf("an unsweepable shelf reported sweeping %+v", counts.Swept)
+	}
+	if err := os.Chmod(shelf, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"default_cards-2026-08-20.jsonl",
+		"default_cards-2026-08-24.jsonl",
+		"oracle_cards-2026-08-20.jsonl",
+		"oracle_cards-2026-08-24.jsonl",
+	}
+	if got := onTheShelf(t, shelf); !slices.Equal(got, want) {
+		t.Errorf("the shelf holds\n  %v\nwant everything, swept by nobody:\n  %v", got, want)
+	}
+}

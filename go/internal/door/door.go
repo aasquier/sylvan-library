@@ -133,6 +133,11 @@ type Door struct {
 	// Close. Nil on an instance with no app.db -- the night's memory is rows,
 	// so without the file there is nothing a scheduler could honestly do.
 	night *night.Runner
+	// sweeper is the accounts database's janitor: the three purges (expired
+	// sessions, spent links, lapsed rate-limit windows) run once at start and
+	// then daily, from the door and stopped with it. Nil on an instance with
+	// no app.db, for the night runner's reason -- no rows, nothing to sweep.
+	sweeper *auth.Sweeper
 }
 
 // New builds a door. It opens `app.db` read-only when auth is required (and
@@ -238,17 +243,27 @@ func New(cfg Config) (*Door, error) {
 		})
 		routes.SetNightRunner(runner)
 		d.night = runner
+		// The accounts sweep rides the same condition for the same reason:
+		// its whole job is deleting rows, so a door with no write handle has
+		// nothing to sweep and builds no sweeper.
+		d.sweeper = auth.NewSweeper(auth.SweeperConfig{DB: d.writeDB, Log: cfg.Logger})
 	}
 	table, err := newRouteTable(routes.Routes())
 	if err != nil {
 		return nil, err
 	}
 	d.table = table
-	// The scheduler starts only now that New can no longer fail: a runner
+	// The schedulers start only now that New can no longer fail: a runner
 	// started before the route table stood would, on that error path, keep
-	// ticking against the write handle with nobody holding a Stop.
+	// ticking against the write handle with nobody holding a Stop. The
+	// sweeper's Start also runs the boot sweep itself -- three DELETEs of
+	// rows nothing can read again -- so a door that stood is standing over
+	// an accounts database already swept.
 	if d.night != nil {
 		d.night.Start()
+	}
+	if d.sweeper != nil {
+		d.sweeper.Start()
 	}
 	return d, nil
 }
@@ -316,6 +331,11 @@ func (d *Door) Close() error {
 	// its row stays `playing` for the next boot's sweep.
 	if d.night != nil {
 		d.night.Stop()
+	}
+	// The accounts sweep stops on the same promise: Stop waits out its one
+	// goroutine, so the shutdown stays leak-free.
+	if d.sweeper != nil {
+		d.sweeper.Stop()
 	}
 	d.traffic.Flush()
 	if d.cfg.Pool != nil {

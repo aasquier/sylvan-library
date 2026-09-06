@@ -18,8 +18,9 @@ import (
 // half the pool and paper printings essentially all name a painter, so a
 // current database answers immediately.
 //
-// **Memoised per open**, for the reason `Columns` is: the pool is read-only,
-// so the verdict is a property of the *file*, and a refresh re-opens. Cheap
+// **Memoised on the file's stamp**, for the reason `Columns` is: the pool is
+// read-only, so the verdict is a property of the *file*, and a refresh moves
+// the stamp. Cheap
 // is not free -- the walk below is four probes and two `Columns` lookups, and
 // even a DuckDB query that answers off an index costs about half a
 // millisecond, so `/api/health` spent eight statements answering a question
