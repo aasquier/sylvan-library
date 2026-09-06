@@ -7930,8 +7930,13 @@ button:hover .tarot-fan-card {
   /* Half the width means a smaller card, worked out from the same geometry
      the rest of the board uses rather than picked: the lean and the turning
      clearance come off `--field-card-full`, so naming only this keeps a
-     quadrant's cards able to turn. */
-  .field.is-pod { --field-card-full: 42px; }
+     quadrant's cards able to turn.
+
+     **38 rather than 42** (Aaron, 2026-09-06, looking at it): at 42 the
+     two-by-two stood about 672px and a laptop with browser chrome had to
+     scroll for the bottom row. This is the one number to move if it ever
+     needs moving again — everything else in the quadrant follows it. */
+  .field.is-pod { --field-card-full: 38px; }
   /* Nobody is collapsed on a wide screen; the grip is just the plate. */
   .field-quad-grip { cursor: default; }
   .field-quad-grip:hover { background: transparent; }
