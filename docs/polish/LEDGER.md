@@ -1446,6 +1446,14 @@ rather than re-reviewing its logic.
   best-practices currency check (last done 2026-08-24; tonight's budget went
   to the merge chain that unblocked the rainbow) — next Blue run owes it. The
   Go release-notes audit, its sibling, was done (above).
+- **Filed by Colorless, 2026-09-05, for the next Blue run:** `ROADMAP.md`'s
+  "Where things stand" block says *"the Claude surfaces (seven modes behind
+  the stance dial)"* — `data/modes.json` holds **ten** (counted tonight:
+  the seven plus `rationale-draft`, `intake-filing`, `deck-description`).
+  CLAUDE.md's own rule is that the mode count is never written down; the fix
+  is to drop the number from the sentence, not to correct it to ten. One
+  word, rides any Blue branch (or tonight's cleanup) — filed here because a
+  colorless diff does not touch product docs.
 - **Measured (2026-09-05, this Mac, during the run):**
   - **Go gauntlet green at both checkpoints** (once for #431's branch, once
     for the main branch's fix set): `gofmt -l .` prints nothing;
@@ -5047,9 +5055,10 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-08-24 (rainbow). Previous: 2026-08-21 (scoped — the relic
-  sweep only), 2026-08-19 (rainbow, the first colorless run with five colors to
-  audit), 2026-08-19 (the run that created this section).
+- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
+  2026-08-21 (scoped — the relic sweep only), 2026-08-19 (rainbow, the first
+  colorless run with five colors to audit), 2026-08-19 (the run that created
+  this section).
 - **Read everything below the 2026-08-24 block as history, not as state.** It
   is all about the Python app, and its instruments are gone: `mtglab bench`,
   `mtglab bench caches`, `mtglab bench profile`, `mtglab mutate` and
@@ -5058,6 +5067,231 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-09-05 (rainbow, night)
+
+The sixth leg of tonight's rainbow. All five parts run; the relic sweep ran
+all six passes. The five color legs ahead of this one merged three PRs
+(#431, #430, #432 — plus Black's #434) and held two for Aaron's eye (#436
+Red, #438 Green), which shapes everything below: Red's and Green's ledger
+sections and daybreak edits live on their unmerged branches, so corrections
+touching their subjects are filed *here* per the open-branch precedent, and
+this branch's daybreak edits will conflict with theirs at rebase — expected,
+anticipated in Red's own notes, and resolved by whoever merges second.
+
+- **Fixed this run:**
+  1. **The daybreak queue is pruned against the tree for the first time since
+     it was created — seven retirements, one narrowing, every one verified
+     rather than inherited.** Retired with outcomes written into their items:
+     08-24 Blue 3 (the five Python CodeQL ghosts — open-alert list reads
+     **0** by API read-back tonight), 08-24 Blue 4 (Library of Alexandria —
+     merged as #283 2026-08-24T13:48Z; `lore.json` says "Magic's first
+     expansion", read back), 08-24 Black/Blue 5 (the five motionless
+     `Loading…` labels — landed as #285 the same morning, "five pages stop
+     holding still"), 08-24 Green 2 (the light muted grey — landed as #405
+     on 2026-08-29, seven tokens re-stepped, `--text-muted` `#73716c` at
+     4.62:1, gated by `palettecontrast_test.go`), 08-23 item 1 (the coverage
+     floor — back with #290, ratcheted 89.5 → 90.0 → 90.5 by #387, gating in
+     `ci.yml` at a measured 90.8), 08-23 item 3 (the `needs` guard — Red's
+     `pipeline_test.go` on #285, deriving from `ci.yml`'s own `jobs:` keys),
+     08-23 item 4 (the night-merge rule — answered in use: the skill's
+     Nightbound section states it and Aaron's rainbow invocations instruct
+     it verbatim; three night merges rode it tonight alone, each deploy
+     walked). **Narrowed, not closed:** 08-24 White 1 — see finding 2.
+     The three surviving 08-23 items (ADR 38's dead cite, the skill-prose
+     guard, the pprof mount) were re-verified still open and now carry
+     ledger pointers, which removes the recorded blocker on Colorless
+     queued item 1 (the two-places guard): the whole file would pass it
+     today.
+  2. **The morning audit's own list was a claim to re-check, and one entry
+     was wrong in a way worth recording.** It called #290 "White 1's
+     isolation sweep"; #290 is the coverage-floor PR — *and* it quietly
+     carries the closest thing to that sweep that exists:
+     `go/internal/api/refusals_test.go` asks every deck route about a deck
+     that is not there, an owner that is not there, and another account's
+     deck (absent, never confirmed — ADR 5's shape). What it is **not** is
+     the parametrised form ADR 5's decision text asks for: `deckRoutes` /
+     `writeRoutes` are hand-typed lists with no completeness guard against
+     the served route table's `{owner}` patterns, and the stranger sweep
+     drives only the write routes — the reads go unswept as bob. White's own
+     2026-09-05 block already re-confirms the gap from the route-table side,
+     so no new White entry is owed; the daybreak item is rewritten to the
+     remaining half so Aaron's yes lands on the right ask.
+  3. **A correction to Green's carry, filed here because Green's branch is
+     open tonight** (the same precedent as 2026-08-24's Green 5a note):
+     Green's 2026-09-05 notes enumerate its open queue as "items
+     2/3/5/6/7", but item 2 — the light theme's muted grey — had been
+     **closed for seven days** when that was written: #405, merged
+     2026-08-29, re-stepped seven tokens and left a gating test. This is
+     the carried-item-already-landed class part one exists for, now seen in
+     a *same-night* carry; it belongs beside Green's queue list once #438
+     lands.
+  4. **The comment sweep, slice `go/internal/api` (non-test) — the densest
+     residue outside the fingerprint** (verified against `engineSources`
+     before touching anything: api is not embedded). **Dated comments 23 →
+     1, `#NNN`/`vNNN` residue 2 → 0**, across 14 files. The one keep is
+     `upkeep.go:406`, where `2026-08-24` is a format example — the date *is*
+     the fact. Six of the cuts were dates on Aaron's rulings ("Aaron,
+     2026-08-26:" → "Aaron:"), per the 2026-08-24 precedent that a ruling is
+     stronger undated; the rest were when-it-happened/when-it-was-fixed
+     clauses whose arguments all stayed (every "what went wrong and why the
+     obvious alternative loses" paragraph survives, shorn of its diary).
+     **Slices done:** `internal/sim/{cache,compile,curve,tier3}`
+     (2026-08-24), `internal/api` non-test (2026-09-05). **Not sweepable:**
+     the five fingerprinted packages, unchanged.
+  5. **Three checklist corrections, all in the pass's own surface.**
+     (a) `references/blue.md`'s modern-sweep inventory said "`sort.Slice`
+     18, which is the live one" — spent: the tree is at **2**, both in
+     `internal/jobs/registry.go`, both ruled 2026-08-24; the line now
+     carries the ruling with the number so it cannot be re-litigated by
+     count alone, the RWMutex row reads tonight's 18 (with Blue's 0-of-18
+     read), and the toolchain habit gains its recorded ceiling — **Go 1.27+
+     requires macOS 13, this Mac is 12 forever, never modernize `go.mod`
+     past 1.26; trigger ~Feb 2027 (Go 1.28 ends 1.26 security fixes), and
+     crossing it is Aaron's and ADR-grade.** (b) `SKILL.md`'s measuring
+     shelf and this file's part three both said "no cache register" — half
+     false since #270 (2026-08-23, the day before the last colorless run
+     wrote it): `mtglab sim cache` lists the Tier 1 cache's contents and
+     can clear them. The claims now say what exists and what is still
+     missing — **no hit counter anywhere**, so the shelf's "a cache can be
+     correct, tested and never once used" rule still has no instrument.
+     (c) Two lessons into the shared memory ledger from Red's notes: jsdom
+     refuses clicks on disabled buttons exactly like a browser (in-function
+     re-entry guards on button-only paths are unreachable belt that reads
+     as LIVED mutants), and mutation runs restore from scratchpad copies,
+     never `git checkout <file>`.
+- **Part one — is the ledger telling the truth? The two-places rule held
+  this cycle, for the first time since it was named.** All five of tonight's
+  color legs wrote both places: White/Blue/Black verified on main (each
+  daybreak line names a ledger section that exists and carries the record),
+  Red/Green verified on their unmerged branches. Zero daybreak-only items
+  opened tonight, against four of six on 2026-08-24. Spot-checks of tonight's
+  claimed fixes, five taken, five hold: Blue's `slices.Sort` conversion is in
+  `night/pairing.go` (117/123/152), Blue's `WorkerHalfSet` predicate exists
+  and `ui.go:117` calls it, Blue's `cards show` stats line renders loyalty
+  (`cards.go:90`), Black's `sync.OnceValues` seeded hash is in
+  `accounts_test.go:59`, White's `mediaprovenance_test.go` is on main — and
+  it closes the 2026-08-24 "filed to White" finding from this section
+  (recipe-less asset directories now accounted by PROVENANCE naming rather
+  than invisible).
+- **Part two — the checklists, against what tonight's runs actually found.**
+  White: earning it — the media gate caught four unrecorded icons on its
+  first spin, and the deferred licence-notice item closed on its own trigger.
+  Blue: earning it — the modern sweep caught the *day-old* package written in
+  the old spelling, and rule 1's stats gap was found by using the prescribed
+  command rather than reciting it. Black: earning it — Red's queued-12
+  handoff landed at −56% suite allocation, the where/whether division
+  working as written. Red: earning it — the controls audit closed the 08-24
+  seven with honest per-item verdicts, and the coverage-floor duplicate
+  computation was found by reading the pipeline it had just helped build.
+  Green: earning it with one carried-item failure (finding 3) — the import
+  overflow fix is mechanism-derived, and the run corrected its own reference
+  twice (the `_template` ghost, the preset-resize trap). Green's
+  preset-trap generalization was **considered for promotion into `SKILL.md`
+  and left in `green.md`**: promotion's recorded test is two colors finding
+  it independently, and only Green has; the shared memory ledger already
+  carries the rig-lies-about-the-browser family for every session.
+- **Part three — the tooling.** `animist verify`: **33 recipes, 33 `held`,
+  exit 0** — up from 12 on 2026-08-24; the growth is the Coliseum's 21,
+  landed since, every one held. Count-before-reading caught a stray: `find`
+  sees 100 `*.recipe.yaml` where the tree holds 33 — the extras are worktree
+  duplicates plus **one relic**, `build/lib/mtglab/assets/tarot/` (part
+  four's find). The shelf's live question, asked again: the Go rebuild's
+  answer *moved* — the cache register's contents half exists (`sim cache`),
+  so what the stock toolchain still cannot do is down to **hit counting and
+  a benchmark ledger**; the rebuild's scope should shrink to exactly that.
+- **Part four — the relic sweep, all six passes run.**
+  - **Pass 1 (every tracked directory) — clean.** 49 `go/internal` packages
+    (47 on 08-24 + `night`, `opening`), **49 with a package doc, 0
+    without**; every directory names a purpose the current shape needs.
+  - **Pass 2 (odd file types) — clean.** Fuzz seeds, tier3's recorded
+    game/match fixtures, `scribe/LICENSE` (the GPL boundary), `.nvmrc`, the
+    four PWA icons (now provenance-recorded), the committed bundle.
+  - **Pass 3 (arrived by era, since 08-25) — clean.** Coliseum assets, the
+    night engine, scry references, ADRs 42–49: all current-era, nothing
+    orphaned by the shape that shipped it.
+  - **Pass 4 (every doc by its own title) — clean.** 12 non-ADR docs plus
+    ten PROVENANCE files, each title a live purpose; `web_dist/PROVENANCE.md`
+    is the built copy of `web/public`'s, by design (White, #430).
+  - **Pass 5 (every command and flag) — clean, four commands new since the
+    last enumeration** (`data backup`, `sim cache`, `sim matches`, `users
+    tier`), each with live data behind it; the hidden `probe` still serves
+    the HEALTHCHECK. Nothing runs on a dead purpose.
+  - **Pass 6 (non-source files nothing names) — 13 rows, all the migration
+    ladder** (0001–0014 minus 0007), reached by the embed glob. The missing
+    fourteenth row is the documented mechanic working: `0007.sql` is named
+    in Black's own ledger block, and naming a file here makes it referenced.
+  - **One relic found, and the enumerative rule found it where memory never
+    would: `build/` at the repo root** — 14MB, gitignored, untracked, a
+    setuptools build of the deleted Python-era `src/mtglab` (its `cli.py`,
+    `animist/`, and a full duplicate of the tarot art), mtimes 2026-08-13.
+    The zero-trace sweep could not see it because git cannot. **Queued for
+    Aaron** (a relic is a decision): recommend `rm -rf build/` — no personal
+    data in it (checked), nothing references it, and any future
+    checkout-wide grep inherits a phantom Python app from it.
+- **Part four's leftovers.** (a) The Blue-3/Red-3 daybreak pair were the
+  same five CodeQL alerts queued twice under two colors — both now retired
+  (Red's on #436, Blue's here), and the duplicate cost nothing this time but
+  is the two-owners shape part four exists to name. (b) The 2026-08-24
+  deferred item in this section — **move the shared documents-versus-tree
+  helpers out of `licenserecord_test.go` — its trigger has fired** (#282,
+  #285, #286 all merged 2026-08-24); handed to tonight's cleanup by name.
+  (c) The 2026-08-24 recovered-record note that the pprof item "should be
+  filed into Red's section by the next cleanup" is still owed — same
+  hand-off. (d) `ROADMAP.md`'s stale mode count — filed to Blue's section,
+  where its facet lives.
+- **Checked and current, recorded so the next run compares instead of
+  re-deriving:** ADR 46 and ROADMAP item 5 were rewritten today by #429 and
+  the ledger's night-related entries do **not** trail them — the Settings
+  torches daybreak item's citation ("the night shelf, its own PR") matches
+  ADR 46's own "How the morning reads" text post-#429, and White's "rung 13"
+  is the consent flag's rung, correctly distinct from #429's rung 14.
+- **Measurements (2026-09-05, rainbow, night):** raw output, not a summary.
+
+      $ cd tools && .venv/bin/animist verify
+      33 recipes printed, 33 held, exit 0   (2026-08-24: 12/12)
+
+      dated comments, go/**.go                      205 → 183   (2026-08-24: 89)
+      dated comments, go/**.go outside _test.go     111 → 89    (2026-08-24: 60)
+      dated comments, web/src (ts/tsx/css)          368         (2026-08-24: 87)
+      slice internal/api non-test                   23 → 1   (the keep is a
+                                                    format example)
+      #NNN / vNNN residue, internal/api non-test    2 → 0
+
+      The growth in the totals is the tree growing (Coliseum, the night
+      engine, the scry era), and it now outpaces the sweep's one-slice-a-run
+      budget; web/src has never had a slice and is 4.2x its old baseline.
+
+      daybreak queue: 31 numbered items → 23 (raw header grep; one of the
+      31 is a bold "3.41:1" artifact, so honestly 30 → 23: seven retired,
+      one narrowed, zero opened tonight by the five color legs, one opened
+      by this run)
+      two-places audit: 5 of 5 tonight's legs clean (2026-08-24: 2 of 6)
+      CodeQL open alerts: 0 (API read-back)
+      coverage floor: 90.5 in ci.yml, set at a measured 90.8
+      relic pass 1: 49 packages, 49 package docs; pass 6: 13 rows, 0 findings
+
+- **Queued for Aaron (2026-09-05):** one — the `build/` relic above, in
+  `DAYBREAK.md` under Colorless with the recommendation attached. The two
+  2026-08-24 colorless questions (the two-places guard, the fingerprint
+  comment-edit ruling) still stand; the guard's recorded blocker is now
+  removed (fix 1), so a yes can be built on directly.
+- **Deferred (2026-09-05), with triggers:**
+  - **The helpers move out of `licenserecord_test.go`** — trigger fired;
+    handed to tonight's cleanup. If cleanup cannot land it, the next
+    carrier states why (the three-cleanups rule).
+  - **A `web/src` comment-sweep slice** — trigger: the next colorless run;
+    368 dated lines and no slice ever taken there. Choose one route family.
+- **Staleness, honestly stated** for the next bare `/polish`: after tonight
+  every color carries a 2026-09-05 tag and Cleanup — running next — inherits
+  a queue that is, for once, verified current. Substance orders the next
+  cycle: **White first** (the isolation completeness guard is the one
+  standing gap in the auth story, and the determinism replay plus every
+  authenticated walk unlocks the evening the `claude` seat gets signed in),
+  then **Black** (the Admin panel's segment-pricing fix, queued tonight,
+  renders and wants a session), then Blue/Red/Green by date. The comment
+  sweep's budget question (the tree outgrowing one slice a run) is a shape
+  for the next colorless run to re-scope, not a crisis.
 
 ### 2026-08-24 (rainbow)
 

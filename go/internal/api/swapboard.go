@@ -20,7 +20,7 @@ import (
 // for. Nothing about that changes here -- `deckedit.AddCard` still refuses,
 // and the recorded corpus still says so on nine fixture decks.
 //
-// What was missing was the sentence that *asks* for a board. Until 2026-08-29
+// What was missing was the sentence that *asks* for a board. Until this route,
 // no surface in the app could say it, so a deck that had never kept a swap
 // board could never start one: the section did not render, and the one route
 // that could have written to it answered 422. Aaron: "when a deck doesn't

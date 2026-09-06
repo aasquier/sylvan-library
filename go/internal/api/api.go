@@ -535,7 +535,7 @@ func (a *API) Routes() []Route {
 		// Upkeep: the two things about this instance that go out of date on
 		// their own. `GET` is a reading of both; the one `POST` is ADR 6's
 		// long-specified "authenticated admin endpoint that starts a refresh
-		// as a background job", cashed in on 2026-08-28. There is deliberately
+		// as a background job", cashed in. There is deliberately
 		// no second POST beside it -- `upkeep.go` argues at length why the
 		// arena's rebuild cannot honestly be a button here.
 		{Method: http.MethodGet, Pattern: "/api/admin/upkeep", Handler: a.upkeep},

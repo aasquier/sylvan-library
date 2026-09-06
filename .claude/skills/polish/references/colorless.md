@@ -81,9 +81,11 @@ run reports green, and the bugs are somewhere the file never looks.
 ## Part three — the tooling
 
 The developer shelf is artifacts in the plainest sense — and much of it is
-currently an absence: there is no bench suite and no cache register, and
-**building them over the Go packages is this part's standing item** until it
-lands. Mutation sampling has left that list — `gremlins` is the tool now, and
+currently an absence: there is no bench suite, and the cache register is
+half-built (`mtglab sim cache`, since #270, lists the Tier 1 cache's contents
+and can clear them — no hit counter anywhere), and **building the bench suite
+and the counter half over the Go packages is this part's standing item** until
+it lands. Mutation sampling has left that list — `gremlins` is the tool now, and
 White's testing facet owns it. What else survives is `animist verify` in
 `tools/`, plus the stock Go toolchain the other colors measure with (the
 shelf section in `SKILL.md` lists it). Nothing else in the cycle owns the
