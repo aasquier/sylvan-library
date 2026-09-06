@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { api, errorMessage } from '../lib/api'
 import type { Card, CardOffer, DeckRef, EditResult } from '../lib/api'
@@ -42,15 +42,22 @@ import { CardArt, CardHover, ErrorNote, ManaCost, ManaText, Select } from './ui'
  * furniture to everybody else, and a reader has no use for a control they
  * cannot press.
  *
- * ## Adding, and what is deliberately not here
+ * ## Adding — and the mover, which exists now
  *
  * The read-only version of this section carried a comment arguing that moving
  * a card between the two lists is a surgical edit belonging to the edit panel
- * (ADR 12), "not to a second door onto the same operation". That argument
- * stands and nothing here weakens it: **there is still no mover**. Putting a
- * card *on* the board is a different act from moving one *between* lists — the
- * first adds a card the deck never had, the second is the swap the edit panel
- * exists for.
+ * (ADR 12), "not to a second door onto the same operation". For a long time
+ * "there is still no mover" was this file's standing answer. It is not any
+ * more: **the mover is each row's "Swap it in"**, the swap route's second
+ * door. The board card joins the 99 in the slot of a card the owner picks
+ * from their own deck, the picked card is entombed with its rationale intact
+ * — entombed, never deleted — and the whole exchange is one write and one
+ * history row ("swapped X out for Y from the swap board"). `PromoteComposer`
+ * below composes it; `api.swapCard` carries it.
+ *
+ * What has not changed is the *add*: putting a card on the board is still a
+ * different act from moving one between lists — the first weighs a card the
+ * deck never had, the second plays the stake the board was holding.
  *
  * The add goes through `api.addToBoard`, which is `POST .../board` rather than
  * the `/cards` route with a `to`. The two are not interchangeable: `/cards`
@@ -86,8 +93,12 @@ import { CardArt, CardHover, ErrorNote, ManaCost, ManaText, Select } from './ui'
  * survive a reload, deliberately: "collapsed by default" is what was asked
  * for, and a remembered fold is a different feature.
  */
-export function SwapBoard({ deck, deckRef, stage, identity, total, writable, onChanged }: {
+export function SwapBoard({ deck, cards, deckRef, stage, identity, total, writable, onChanged }: {
   deck: Card[]
+  /** The deck's own 99, for the mover: swapping a board card in means picking
+   *  which of these makes room, and the pool is the wrong instrument for
+   *  choosing among cards you already have. */
+  cards: Card[]
   deckRef: DeckRef
   stage: string
   /** The deck's colour identity, so a card outside it is marked while it is
@@ -101,6 +112,9 @@ export function SwapBoard({ deck, deckRef, stage, identity, total, writable, onC
   onChanged: () => void
 }) {
   const [open, setOpen] = useState(false)
+  // The board card whose promotion is being composed, if any. One at a time,
+  // like every under-the-row composer on the deck page.
+  const [promoting, setPromoting] = useState<string | null>(null)
 
   // A reader has no use for an empty shelf: no cards to read and no control to
   // press. The owner gets it either way, because the empty state is where a
@@ -187,7 +201,30 @@ export function SwapBoard({ deck, deckRef, stage, identity, total, writable, onC
                         </p>
                       )}
                     </div>
+                    {/* The mover (the graveyard rows' per-row-chip shape). A
+                        toggle rather than a one-shot: it opens the composer
+                        below, and the deliberate second step — a card picked
+                        to make room, a fresh why — lives there, which is why
+                        this needs no arming. */}
+                    {writable && (
+                      <button type="button"
+                              onClick={() => {
+                                setPromoting(promoting === card.name ? null : card.name)
+                              }}
+                              aria-pressed={promoting === card.name}
+                              className="card-action shrink-0 rounded-md px-2 py-1 text-[11px] font-medium">
+                        Swap it in
+                      </button>
+                    )}
                   </div>
+                  {promoting === card.name && (
+                    <PromoteComposer
+                      deckRef={deckRef}
+                      card={card}
+                      cards={cards}
+                      onDone={() => { setPromoting(null); onChanged() }}
+                      onCancel={() => setPromoting(null)} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -231,6 +268,165 @@ function EmptyBoard({ total }: { total: number }) {
         against the {total} — putting one here changes nothing about the deck.
         It is somewhere to think out loud.
       </p>
+    </div>
+  )
+}
+
+/**
+ * The mover — the swap route's second door, composed from this side.
+ *
+ * The incoming card is fixed: it is the board row that opened this. What the
+ * owner chooses is which of their own cards makes room, and that choice is a
+ * **client-side list of the deck's 99, grouped by category** rather than the
+ * card finder — the pool is the wrong instrument for choosing among cards you
+ * already have, and the categories are how an owner actually thinks about
+ * where a newcomer fits ("this replaces a threat", not "this replaces the
+ * fourth card alphabetically").
+ *
+ * The board entry's own `why` is shown as context and **never prefilled into
+ * the box** (rule 4, ADR 8): it argued why the card was *waiting*, and the
+ * sentence this form collects argues the reversal. The server refuses a blank
+ * `why` on this door for drafts too — the route's rule, not this form's — so
+ * the button stays disabled until a human has written one.
+ *
+ * What the server does with the request, in plain words below the pick: the
+ * outgoing card is entombed with its rationale intact — entombed, never
+ * deleted — and the board card takes over its slot. One write, one history
+ * row: "swapped X out for Y from the swap board".
+ */
+function PromoteComposer({ deckRef, card, cards, onDone, onCancel }: {
+  deckRef: DeckRef
+  /** The board card coming in — fixed by the row that opened this. */
+  card: Card
+  /** The deck's own 99, to pick the outgoing card from. */
+  cards: Card[]
+  onDone: () => void
+  onCancel: () => void
+}) {
+  const [out, setOut] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
+  const [why, setWhy] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  // The 99 in the order the deck page shows them: the known categories in
+  // their fixed vocabulary order, any stray key after, and the filter
+  // narrowing by name inside that shape rather than flattening it.
+  const groups = useMemo(() => {
+    const needle = filter.trim().toLowerCase()
+    const kept = needle
+      ? cards.filter((c) => c.name.toLowerCase().includes(needle))
+      : cards
+    const by = new Map<string, Card[]>()
+    for (const c of kept) {
+      const bucket = by.get(c.category) ?? []
+      bucket.push(c)
+      by.set(c.category, bucket)
+    }
+    const known = Object.keys(CATEGORY_LABELS)
+    const strays = [...by.keys()].filter((k) => !known.includes(k)).sort()
+    return [...known, ...strays]
+      .filter((k) => by.has(k))
+      .map((k) => [k, by.get(k) ?? []] as const)
+  }, [cards, filter])
+
+  const ready = out !== null && why.trim() !== ''
+
+  async function apply() {
+    if (out === null || !why.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.swapCard(deckRef, { out, into: card.name, why: why.trim() })
+      onDone()
+    } catch (e: unknown) {
+      // The server's own sentence, verbatim — it owns every rule this form
+      // obeys, and a paraphrase here would be a second implementation.
+      setError(errorMessage(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card-surface mt-2 w-full space-y-3 rounded-lg p-3">
+      <p className="text-xs font-medium">
+        Swap {card.name} in — pick which card makes room.
+      </p>
+      {/* Context, never a prefill: this sentence argued why the card was
+          waiting, and the box below collects the opposite claim. */}
+      {card.why && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Why it was waiting: <ManaText>{card.why}</ManaText>
+        </p>
+      )}
+
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          Narrow the {cards.length} by name
+        </span>
+        <input value={filter} onChange={(e) => { setFilter(e.target.value) }}
+               placeholder="Type part of a card name…"
+               className="swap-field w-full rounded-md px-2 py-1.5 text-xs outline-none" />
+      </label>
+
+      {groups.length === 0 && (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          No card in the deck answers to that. Clear the filter to see all of
+          them again.
+        </p>
+      )}
+      {groups.map(([key, list]) => (
+        <div key={key} className="space-y-1">
+          <p className="text-[10px] uppercase tracking-wide"
+             style={{ color: 'var(--text-muted)' }}>
+            {categoryLabel(key)}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {list.map((c) => (
+              <button key={c.name} type="button"
+                      onClick={() => { setOut(out === c.name ? null : c.name); setError('') }}
+                      aria-pressed={out === c.name}
+                      className="card-action rounded-md px-2 py-1 text-[11px] font-medium">
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {out !== null && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          {out} goes to the graveyard with its reason kept — it can come back —
+          and {card.name} takes over its slot.
+        </p>
+      )}
+
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          Why it earns the slot
+        </span>
+        <textarea value={why} onChange={(e) => { setWhy(e.target.value) }} rows={2}
+                  placeholder="Why does this card earn the slot? Required — the gate will not accept a card without a rationale."
+                  className="swap-field w-full rounded-md px-2 py-1.5 text-xs outline-none" />
+      </label>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => { void apply() }}
+                disabled={!ready || busy}
+                className="btn btn-primary btn-accent-1 btn-sm">
+          {busy ? 'Swapping…' : 'Apply swap'}
+        </button>
+        <button type="button" onClick={onCancel} className="btn btn-ghost btn-xs">
+          Cancel
+        </button>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Writes deck.yaml. The History tab records the swap.
+        </span>
+      </div>
     </div>
   )
 }

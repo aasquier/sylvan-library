@@ -11,12 +11,15 @@
  * and Claude's alternatives are different advisers, but the write path is the
  * same and so is the requirement.
  *
- * The server re-checks everything anyway (`service.swap_card`: the incoming
- * card must exist, be Commander-legal, fit the identity, not already be in
- * the deck) — this component's job is composing the request, not vetting it.
+ * The server re-checks everything anyway (the swap route: the incoming card
+ * must exist, be Commander-legal, fit the identity, not already be among the
+ * 99 — a card standing on the deck's own swap board is not a duplicate any
+ * more, it is promoted off the board by the route's second door) — this
+ * component's job is composing the request, not vetting it.
  */
 import { useState } from 'react'
-import { api, errorMessage, type DeckRef } from '../lib/api'
+import { api, errorMessage, type CardOffer, type DeckRef } from '../lib/api'
+import { CardFinder } from './cardfinder'
 import { ErrorNote } from './ui'
 
 export function SwapComposer({ deck, out, into, onDone, onCancel }: {
@@ -79,6 +82,66 @@ export function SwapComposer({ deck, out, into, onDone, onCancel }: {
           Writes deck.yaml. The History tab records the swap.
         </span>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The straight swap, started from the card rather than from a suggestion.
+ *
+ * `SwapComposer` above has always needed both names handed to it — its two
+ * callers are the banned-card shortlist and the slot argument, where the
+ * replacement is the very thing being offered. This wraps it for the deck
+ * page's action bar, where only the *outgoing* card is known: the finder
+ * chooses the incoming one, and the moment it is chosen the composer above
+ * takes over, contract intact. Wrapping rather than loosening, deliberately:
+ * a `SwapComposer` whose `into` could be empty would let a caller compose a
+ * swap with no card in it.
+ *
+ * One sentence changes with the second door (the promotion): a picked card
+ * that is standing on this deck's own swap board is not refused as a
+ * duplicate any more — the server lifts it off the board and entombs the
+ * outgoing card with its rationale. The composer says so quietly when it
+ * happens, because "already in this deck" was the sentence this used to end
+ * in and a person who has met it deserves to hear the rule changed.
+ */
+export function ReplaceComposer({ deck, out, identity, board, onDone, onCancel }: {
+  deck: DeckRef
+  /** The card leaving the 99 — named by the row the action bar picked. */
+  out: string
+  /** The deck's colour identity, so the finder marks an outside card at the
+   *  moment it is chosen rather than after a rationale has been written. */
+  identity: string[]
+  /** The names standing on the deck's swap board, so the composer can say
+   *  out loud when the picked card will be lifted from there. */
+  board: string[]
+  onDone: () => void | Promise<void>
+  onCancel: () => void
+}) {
+  const [into, setInto] = useState<CardOffer | null>(null)
+  const fromBoard = into !== null
+    && board.some((n) => n.toLowerCase() === into.name.toLowerCase())
+
+  return (
+    <div className="mt-2 space-y-3 rounded-lg p-3"
+         style={{ background: 'var(--surface-1)' }}>
+      <CardFinder value={into} onChange={setInto} identity={identity}
+                  label={`Card to swap in for ${out}`} />
+      {fromBoard && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          {into.name} is waiting on this deck&rsquo;s swap board — it will be
+          lifted from there, and {out} goes to the graveyard with its reason
+          kept.
+        </p>
+      )}
+      {into !== null
+        ? <SwapComposer deck={deck} out={out} into={into.name}
+                        onDone={onDone} onCancel={onCancel} />
+        : (
+          <button type="button" onClick={onCancel} className="btn btn-ghost btn-xs">
+            Cancel
+          </button>
+        )}
     </div>
   )
 }
