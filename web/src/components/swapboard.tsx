@@ -115,6 +115,9 @@ export function SwapBoard({ deck, cards, deckRef, stage, identity, total, writab
   // The board card whose promotion is being composed, if any. One at a time,
   // like every under-the-row composer on the deck page.
   const [promoting, setPromoting] = useState<string | null>(null)
+  // The two composers are mutually exclusive: opening one closes the other, so
+  // a row never shows two contradictory forms for the same card.
+  const [moving, setMoving] = useState<string | null>(null)
 
   // A reader has no use for an empty shelf: no cards to read and no control to
   // press. The owner gets it either way, because the empty state is where a
@@ -201,20 +204,43 @@ export function SwapBoard({ deck, cards, deckRef, stage, identity, total, writab
                         </p>
                       )}
                     </div>
-                    {/* The mover (the graveyard rows' per-row-chip shape). A
-                        toggle rather than a one-shot: it opens the composer
-                        below, and the deliberate second step — a card picked
-                        to make room, a fresh why — lives there, which is why
-                        this needs no arming. */}
+                    {/* The two movers (the graveyard rows' per-row-chip
+                        shape). Toggles rather than one-shots: each opens a
+                        composer below, and the deliberate second step — a
+                        fresh why, and for a swap a card picked to make room —
+                        lives there, which is why neither needs arming.
+
+                        **Two, because a board card had exactly one way into
+                        the deck and it was the wrong one for a deck being
+                        built.** A swap demands a card to send the other way,
+                        so a 62-card list with an Angel waiting had to entomb
+                        something it wanted in order to promote something else
+                        it wanted. "Move it up" is the empty-slot door: the
+                        card lifts off the board, nothing is entombed, and the
+                        composer says what the deck will count afterwards so
+                        overshooting the hundred is visible before it
+                        happens. */}
                     {writable && (
-                      <button type="button"
-                              onClick={() => {
-                                setPromoting(promoting === card.name ? null : card.name)
-                              }}
-                              aria-pressed={promoting === card.name}
-                              className="card-action shrink-0 rounded-md px-2 py-1 text-[11px] font-medium">
-                        Swap it in
-                      </button>
+                      <div className="flex shrink-0 gap-1.5">
+                        <button type="button"
+                                onClick={() => {
+                                  setMoving(null)
+                                  setPromoting(promoting === card.name ? null : card.name)
+                                }}
+                                aria-pressed={promoting === card.name}
+                                className="card-action shrink-0 rounded-md px-2 py-1 text-[11px] font-medium">
+                          Swap it in
+                        </button>
+                        <button type="button"
+                                onClick={() => {
+                                  setPromoting(null)
+                                  setMoving(moving === card.name ? null : card.name)
+                                }}
+                                aria-pressed={moving === card.name}
+                                className="card-action shrink-0 rounded-md px-2 py-1 text-[11px] font-medium">
+                          Move it up
+                        </button>
+                      </div>
                     )}
                   </div>
                   {promoting === card.name && (
@@ -224,6 +250,14 @@ export function SwapBoard({ deck, cards, deckRef, stage, identity, total, writab
                       cards={cards}
                       onDone={() => { setPromoting(null); onChanged() }}
                       onCancel={() => setPromoting(null)} />
+                  )}
+                  {moving === card.name && (
+                    <MoveUpComposer
+                      deckRef={deckRef}
+                      card={card}
+                      total={total}
+                      onDone={() => { setMoving(null); onChanged() }}
+                      onCancel={() => setMoving(null)} />
                   )}
                 </li>
               ))}
@@ -294,6 +328,114 @@ function EmptyBoard({ total }: { total: number }) {
  * deleted — and the board card takes over its slot. One write, one history
  * row: "swapped X out for Y from the swap board".
  */
+/**
+ * The empty-slot door: a board card into the 99, with nothing sent the other
+ * way.
+ *
+ * `PromoteComposer` below is the other one, and the difference between them is
+ * the whole reason this exists. That one plays the board's stake — a card comes
+ * out, entombed with its reason, and the incoming card takes its slot and its
+ * category. This one is for a deck that still has room, where demanding a
+ * casualty is the interface inventing a rule the game does not have.
+ *
+ * It asks for two things and no more: the category the card will be filed
+ * under, and a fresh `why`. The board entry's own rationale argued why the card
+ * had NOT made the deck, so it is shown as context and never as a prefill —
+ * rule 4, the same line `PromoteComposer` holds.
+ *
+ * The count is stated rather than policed. A deck that is already full can
+ * still move a card up and will be told it now has a hundred; refusing here
+ * would be the surface deciding, when the gate is the thing that diagnoses
+ * ("an invalid deck is simulated, not refused").
+ */
+function MoveUpComposer({ deckRef, card, total, onDone, onCancel }: {
+  deckRef: DeckRef
+  /** The board card going up — fixed by the row that opened this. */
+  card: Card
+  /** What the 99 counts today, so the sentence below can say what it will
+   *  count afterwards. */
+  total: number
+  onDone: () => void
+  onCancel: () => void
+}) {
+  const [category, setCategory] = useState(card.category)
+  const [why, setWhy] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const qty = card.qty > 1 ? card.qty : 1
+
+  async function apply() {
+    if (!why.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.addCard(deckRef, { name: card.name, category, why: why.trim(), qty })
+      onDone()
+    } catch (e: unknown) {
+      // The server's own sentence, verbatim — it owns every rule this form
+      // obeys, and a paraphrase here would be a second implementation.
+      setError(errorMessage(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card-surface mt-2 w-full space-y-3 rounded-lg p-3">
+      <p className="text-xs font-medium">
+        Move {card.name} up into the 99 — nothing comes out for it.
+      </p>
+      {card.why && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Why it was waiting: <ManaText>{card.why}</ManaText>
+        </p>
+      )}
+
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          File it under
+        </span>
+        <select value={category} onChange={(e) => { setCategory(e.target.value) }}
+                className="swap-field w-full rounded-md px-2 py-1.5 text-xs outline-none">
+          {Object.keys(CATEGORY_LABELS).map((key) => (
+            <option key={key} value={key}>{categoryLabel(key)}</option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        The deck counts {total} now, and {total + qty} after this.
+      </p>
+
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)' }}>
+          Why it earns the slot
+        </span>
+        <textarea value={why} onChange={(e) => { setWhy(e.target.value) }} rows={2}
+                  placeholder="Why does this card earn the slot? Required — the gate will not accept a card without a rationale."
+                  className="swap-field w-full rounded-md px-2 py-1.5 text-xs outline-none" />
+      </label>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => { void apply() }}
+                disabled={!why.trim() || busy}
+                className="btn btn-primary btn-accent-2 btn-sm">
+          {busy ? 'Moving…' : 'Move it up'}
+        </button>
+        <button type="button" onClick={onCancel} className="btn btn-ghost btn-xs">
+          Cancel
+        </button>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Writes deck.yaml. The History tab records the move.
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function PromoteComposer({ deckRef, card, cards, onDone, onCancel }: {
   deckRef: DeckRef
   /** The board card coming in — fixed by the row that opened this. */
@@ -512,7 +654,7 @@ function AddToBoardForm({ deckRef, stage, identity, started, onDone }: {
       {/* The finder gets the full width: it carries a painting and a list, and
           a card squeezed into a third of a grid is the thing it exists to
           stop. */}
-      <CardFinder value={card} onChange={pick} identity={identity} />
+      <CardFinder value={card} onChange={pick} identity={identity} deck={deckRef} />
 
       <Select label="What it would do" value={category}
               onChange={(v) => { setCategory(v); setFiled(true) }}

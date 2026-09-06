@@ -16,6 +16,24 @@
  * all along, which is the same argument as "an invalid deck is simulated, not
  * refused".
  *
+ * ## The correction, 2026-09-06
+ *
+ * "One implementation of the rule" was the intent and not the fact: the
+ * identity half was worked out *here*, from `color_identity` against the
+ * commander's colours. That is correct for exactly as long as colour identity
+ * has no exceptions — and Mystery Booster Commander Edition printed eight
+ * commanders that bend it (ADR 51). A mono-white Seluma deck may hold a
+ * black-and-white Angel, and this file told the user, in a sentence written to
+ * be believed by a beginner, that it could not. **A false refusal is the worst
+ * thing this surface can say.** It is not a warning somebody argues with; it
+ * is the sentence they trust, and then they stop.
+ *
+ * So the verdict now comes from the code that owns it — `card.playable`,
+ * answered by the same `gate.Rulebreakers` the write path consults — and this
+ * file writes the sentence. The local reading below survives as the fallback
+ * for a card nobody measured: the commander field, the card-search page, and
+ * a payload from before the key existed.
+ *
  * Split out of `components/cardfinder.tsx` so they can be tested as what they
  * are — two pure readings of a card against a deck — rather than through a
  * combobox.
@@ -42,16 +60,39 @@ export function outsideIdentity(card: CardOffer, identity: string[]): string[] {
  * anything (commandment 2).
  */
 export function cardWarning(card: CardOffer, identity: string[]): string {
-  if (!card.legal_commander) {
+  const banned = card.playable ? card.playable.banned : !card.legal_commander
+  if (banned) {
     return `${card.name} is banned in Commander, so this deck will not take it.`
   }
-  const outside = outsideIdentity(card, identity)
+  // The server's answer when there is one, the local reading when nobody
+  // asked. Never both: a card the library has cleared must not be second-
+  // guessed here, which is the whole of the 2026-09-06 correction above.
+  const outside = card.playable
+    ? card.playable.outside
+    : outsideIdentity(card, identity)
   if (outside.length > 0) {
     const colours = outside.map(colourWord).join(' and ')
     return `${card.name} is ${colours}, and your commander is not — `
       + 'so it cannot go in this deck.'
   }
   return ''
+}
+
+/**
+ * The happy version of the same sentence: a card that is off-colour and legal
+ * anyway, because the commander says so.
+ *
+ * Said out loud rather than left as silence, and that is the point of it. A
+ * player who has been taught that colour identity is absolute — which is every
+ * player until this set — sees a black Angel accepted into a white deck and
+ * has to decide whether the library is broken. One line tells them it is a
+ * rule, whose rule it is, and that their deck is fine (commandment 2).
+ */
+export function cardAllowance(card: CardOffer): string {
+  const by = card.playable?.allowed_by
+  if (!by || !card.playable?.ok) return ''
+  return `${card.name} sits outside your commander's colours, and `
+    + `${by}'s Rulebreaker allows it anyway.`
 }
 
 /** A colour letter as the word the game prints. Spelled out rather than left

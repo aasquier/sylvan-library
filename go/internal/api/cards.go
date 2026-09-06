@@ -101,6 +101,94 @@ type offeredCard struct {
 	// knows which happened.
 	Score float64 `json:"score"`
 	Via   string  `json:"via"`
+	// Playable is this deck's answer about this card, present only when the
+	// caller named a deck it may read. Absent is not "no" -- it is "nobody
+	// asked", and the browser falls back to its own reading of the identity.
+	Playable *playable `json:"playable,omitempty"`
+}
+
+// playable is what one deck can say about one offered card, and it exists to
+// end a second implementation of a rule.
+//
+// The browser used to answer this itself, from `color_identity` and the deck's
+// commander colours -- two lines of TypeScript that were correct for as long as
+// colour identity had no exceptions. Mystery Booster Commander Edition printed
+// one (ADR 51), and the finder started telling people that a card their
+// commander expressly allows "cannot go in this deck". A false refusal is the
+// worst thing this surface can say: it is the sentence a newcomer believes, and
+// they stop.
+//
+// So the question is asked of the code that owns the answer. The fields are
+// facts rather than sentences on purpose -- the wording is the browser's, and
+// `web/src/lib/cardoffer.ts` argues every word of it in front of a beginner.
+type playable struct {
+	// OK is the whole answer: may this deck hold this card?
+	OK bool `json:"ok"`
+	// Banned is the format's refusal, which no commander bends.
+	Banned bool `json:"banned"`
+	// Outside is the colours this card carries that the deck cannot -- empty
+	// when a Rulebreaker clause covers it, because then they are not outside
+	// anything.
+	Outside []string `json:"outside"`
+	// AllowedBy is the clause that let an off-identity card through, so the
+	// interface can say WHY rather than merely fall silent. Empty for a card
+	// that needed no exception.
+	AllowedBy string `json:"allowed_by"`
+}
+
+// playableIn answers [playable] for one card against one deck's commanders.
+func playableIn(rec *pool.CardRecord, identity map[string]bool, breakers gate.Rulebreakers) *playable {
+	out := &playable{Banned: !rec.LegalCommander, Outside: []string{}}
+	for _, colour := range sortedColours(rec.ColorIdentity) {
+		if !identity[colour] {
+			out.Outside = append(out.Outside, colour)
+		}
+	}
+	if len(out.Outside) > 0 && breakers.AnyIdentity(rec) {
+		out.Outside = []string{}
+		for _, rb := range breakers {
+			if rb.Unsupported == "" {
+				out.AllowedBy = rb.Commander
+				break
+			}
+		}
+	}
+	out.OK = !out.Banned && len(out.Outside) == 0
+	return out
+}
+
+// deckAsked is the optional `deck=<owner>/<slug>` on a card route: the deck
+// whose rules the offers should be measured against.
+//
+// **A deck this caller may not read comes back as no deck at all**, never as a
+// refusal and never as a 404 of its own. The response is then byte-identical to
+// one where nobody asked, which is the only shape that cannot be used to ask
+// whether somebody else's deck exists (ADR 5). `library.SourceFor` already
+// answers that question correctly for the routes that are *about* a deck; this
+// one is about cards, and it declines to become an oracle.
+func (a *API) deckAsked(r *http.Request, c *pool.Conn) (map[string]bool, gate.Rulebreakers) {
+	ref := last(r.URL.Query(), "deck")
+	owner, slug, found := strings.Cut(ref, "/")
+	if !found || owner == "" || slug == "" || c == nil {
+		return nil, nil
+	}
+	lib, err := a.library(r.Context())
+	if err != nil {
+		return nil, nil
+	}
+	src, err := lib.SourceFor(r.Context(), owner)
+	if err != nil {
+		return nil, nil
+	}
+	d, err := src.Get(r.Context(), slug)
+	if err != nil || d == nil {
+		return nil, nil
+	}
+	records, err := commanderRecords(r.Context(), c, d)
+	if err != nil {
+		return nil, nil
+	}
+	return identityOf(records), gate.ReadRulebreakers(records)
 }
 
 // suggest is `GET /api/cards/suggest` -- the typeahead behind "add a card".
@@ -114,9 +202,17 @@ type offeredCard struct {
 // does not exist, and the person is left retyping a name that was right all
 // along. The same argument as "an invalid deck is simulated, not refused" --
 // removing the diagnosis exactly when it is wanted. So a banned card is
-// listed and *marked*, the deck's identity is checked in the browser against
-// `color_identity` and *marked*, and the authoritative refusal stays where it
-// has always been: `playableCard`, one implementation of the rule.
+// listed and *marked*, never hidden, and the authoritative refusal stays where
+// it has always been: `playableCard`, one implementation of the rule.
+//
+// **The marking is computed here now, and that is the correction.** It used to
+// be computed in the browser, from `color_identity` against the commander's
+// colours -- which was one implementation of the rule too many the moment a
+// commander could widen it (ADR 51), and the finder began telling people that
+// a card their own commander allows could not go in the deck. Pass
+// `deck=<owner>/<slug>` and every offer carries [playable], answered by the
+// same `gate.Rulebreakers` the write path consults. Omit it and nothing is
+// annotated, which is what the commander field and the card-search page want.
 func (a *API) suggest(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var errs []wire.ValidationError
@@ -128,6 +224,8 @@ func (a *API) suggest(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []offeredCard{}
 	err := a.usePool(r.Context(), func(c *pool.Conn) error {
+		identity, breakers := a.deckAsked(r, c)
+		asked := identity != nil
 		found, err := cards.Suggest(r.Context(), c, text, limit)
 		if err != nil {
 			return err
@@ -148,13 +246,17 @@ func (a *API) suggest(w http.ResponseWriter, r *http.Request) {
 				// behind it is a row somebody would click.
 				continue
 			}
-			out = append(out, offeredCard{
+			offer := offeredCard{
 				Name: rec.Name, ManaCost: rec.ManaCost, TypeLine: rec.TypeLine,
 				OracleText: rec.OracleText, ColorIdentity: rec.ColorIdentity,
 				Image: rec.ImageNormal, Artist: rec.Artist,
 				LegalCommander: rec.LegalCommander, IsLand: rec.IsLand(),
 				Score: math.Round(s.Score*10000) / 10000, Via: s.Via,
-			})
+			}
+			if asked {
+				offer.Playable = playableIn(rec, identity, breakers)
+			}
+			out = append(out, offer)
 		}
 		return nil
 	})

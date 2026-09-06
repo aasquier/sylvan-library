@@ -125,7 +125,7 @@ export function ReplaceComposer({ deck, out, identity, board, onDone, onCancel }
   return (
     <div className="mt-2 space-y-3 rounded-lg p-3"
          style={{ background: 'var(--surface-1)' }}>
-      <CardFinder value={into} onChange={setInto} identity={identity}
+      <CardFinder value={into} onChange={setInto} identity={identity} deck={deck}
                   label={`Card to swap in for ${out}`} />
       {fromBoard && (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>

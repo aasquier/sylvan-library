@@ -62,8 +62,8 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import { api, ApiError, type CardOffer } from '../lib/api'
-import { cardWarning } from '../lib/cardoffer'
+import { api, ApiError, type CardOffer, type DeckRef } from '../lib/api'
+import { cardAllowance, cardWarning } from '../lib/cardoffer'
 import { CardHover, ManaCost, ManaText } from './ui'
 
 /** How long a keystroke waits before it becomes a question for the library.
@@ -90,13 +90,22 @@ export interface CardFinderProps {
   onChange: (card: CardOffer | null) => void
   /** The deck's colour identity, so a card outside it is marked at the moment
    *  it is chosen rather than at the moment it is refused. Empty is a
-   *  colourless commander, which is a real deck and not a missing value. */
+   *  colourless commander, which is a real deck and not a missing value.
+   *
+   *  **The fallback, since 2026-09-06.** When `deck` is given the library
+   *  answers this question itself and this is not consulted — see
+   *  `lib/cardoffer.ts`. It stays for the surfaces that have no deck to
+   *  measure against, and for a payload from before that key existed. */
   identity: string[]
+  /** The deck these offers are for, so the library measures each one against
+   *  that deck's own rules — including a commander's Rulebreaker clause,
+   *  which this component cannot read and must not guess at (ADR 51). */
+  deck?: DeckRef
   /** The field's label, and the id the label points at. */
   label?: string
 }
 
-export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFinderProps) {
+export function CardFinder({ value, onChange, identity, deck, label = 'Card' }: CardFinderProps) {
   const [typed, setTyped] = useState('')
   // **The answer carries the question it answers**, so "have we got results
   // for what is in the box right now" is derived during render rather than
@@ -147,11 +156,19 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
   // answer to the current one, which on a shaky connection is how a list ends
   // up showing the results for four letters ago.
   const token = useRef(0)
+  // **The deck rides in as two strings, not as the object.** A `DeckRef` is
+  // built fresh by the page on every render, so depending on it would restart
+  // the debounce on every keystroke anywhere on the page — the exact stutter
+  // the timer above exists to prevent. Its two fields are primitives and
+  // change only when the deck does.
+  const owner = deck?.owner
+  const slug = deck?.slug
   useEffect(() => {
     if (!asked) return
     const mine = ++token.current
+    const ref = owner && slug ? { owner, slug } : undefined
     const timer = setTimeout(() => {
-      api.suggestCards(query, OFFERS)
+      api.suggestCards(query, OFFERS, ref)
         .then((r) => {
           if (token.current !== mine) return
           // A `message` means the library could not look anything up. It
@@ -177,7 +194,7 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
         })
     }, SETTLE_MS)
     return () => clearTimeout(timer)
-  }, [query, asked])
+  }, [query, asked, owner, slug])
 
   // A click anywhere else puts the list down. Hung only while it is up, so a
   // deck page with a closed finder on it costs nothing.
@@ -273,6 +290,10 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
 
   const warning = useMemo(
     () => (shown ? cardWarning(shown, identity) : ''), [shown, identity])
+  // The other half of the same answer: an off-colour card the commander
+  // expressly allows, said out loud so nobody has to wonder whether the
+  // library is broken.
+  const allowance = useMemo(() => (shown ? cardAllowance(shown) : ''), [shown])
   const chosen = value !== null && value.name === typed
 
   return (
@@ -401,7 +422,10 @@ export function CardFinder({ value, onChange, identity, label = 'Card' }: CardFi
             {shown && warning && (
               <p className="finder-warning" role="status">{warning}</p>
             )}
-            {shown && !warning && chosen && (
+            {shown && !warning && allowance && (
+              <p className="finder-ok" role="status">{allowance}</p>
+            )}
+            {shown && !warning && !allowance && chosen && (
               <p className="finder-ok" role="status">
                 Legal in Commander, and inside your commander&rsquo;s colours.
               </p>
