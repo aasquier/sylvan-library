@@ -423,8 +423,8 @@ func (a *API) planMana(ctx context.Context, src library.Source, slug string, bod
 		// The job's own context, NOT the request's. net/http cancels the
 		// request's context the moment the handler returns, and this runs
 		// after that -- so a write through `ctx` failed with `context
-		// canceled`, warned, and stored nothing. **From v183 to 2026-08-23
-		// the Go sim cache never stored a row**: every run paid full price
+		// canceled`, warned, and stored nothing. **The Go sim cache once
+		// stored no row from this path at all**: every run paid full price
 		// and every second ask recomputed. Found by the dossier lane, which
 		// had to decide what context a Claude job runs under and asked the
 		// same question of its siblings; proved by a test that drives this
@@ -718,8 +718,7 @@ func (a *API) sweep(ctx context.Context, slug string, d *deck.Deck, commander *s
 // the record says "['x']".
 //
 // The same shape as `converse` handing the model `no deck 'x'` where the
-// record hands it the slug -- fixed there first, found here on 2026-08-23 by
-// a wire diff. It is unreachable from the app's own
+// record hands it the slug -- fixed there first, found here by a wire diff. It is unreachable from the app's own
 // client (nothing offers a deck that is not on the shelf), which is exactly
 // why nothing had noticed.
 func deferredFailure(err error) jobs.Runner {

@@ -107,9 +107,8 @@ func (a *API) claudeScan(w http.ResponseWriter, r *http.Request) {
 	// capture, and every one of its refusals is a 422 the page acts on.
 	// Every way a capture can fail is one 422, including the one that used
 	// to be a 500: an image that is neither a string nor bytes once escaped
-	// as an uncaught crash. Ruled with Aaron 2026-08-23
-	// alongside the theme proposal's identical budget wart, and the 422 is
-	// the contract. See `claude.scanPayload`.
+	// as an uncaught crash. Ruled with Aaron alongside the theme proposal's
+	// identical budget wart, and the 422 is the contract. See `claude.scanPayload`.
 	ask, data, err := claude.ScanMessage(image, mediaType)
 	if err != nil {
 		wire.Detail(w, http.StatusUnprocessableEntity, err.Error())

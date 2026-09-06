@@ -119,7 +119,7 @@ func (a *API) claudeThemeProposal(w http.ResponseWriter, r *http.Request) {
 	// The budget read: a falsy budget is no budget, and anything else
 	// that will not read as a number is a 422 in one sentence.
 	//
-	// **This was a wart until 2026-08-23, and the ruling is recorded here
+	// **This was a wart, and the ruling is recorded here
 	// because the comment that stood here is what raised it.** The old read
 	// caught only some of what a bad budget can raise: a list
 	// or an object escaped as an unhandled 500 -- plain text, no envelope --
@@ -161,7 +161,7 @@ func (a *API) claudeThemeProposal(w http.ResponseWriter, r *http.Request) {
 // **The job's context is its own.** `r.Context()` is cancelled by net/http the
 // moment the handler returns, and the handler returns as soon as the job id is
 // written -- so a worker that reached for it would be cancelled before it
-// spoke to anybody. The sim cache stored nothing at all from v183 for exactly
+// spoke to anybody. The sim cache once stored nothing at all for exactly
 // this reason. The pool is leased *inside* the job for the same reason, and
 // nil when the instance has none: the conversation half needs no pool, and the
 // proposal then drops every commander it names, which is the honest answer
