@@ -165,7 +165,8 @@ func TestTheRowIsTheSameShapeLiveAndInTheTally(t *testing.T) {
 	corpus := loadShapeCorpus(t)
 	for _, c := range corpus.Shape.Rows {
 		t.Run(c.Note, func(t *testing.T) {
-			got, err := json.Marshal(newForgeRow(tier3.GameFromWire(c.Game), c.Slug))
+			got, err := json.Marshal(newForgeRow(tier3.GameFromWire(c.Game), c.Slug,
+				func(int) string { return "" }))
 			if err != nil {
 				t.Fatal(err)
 			}

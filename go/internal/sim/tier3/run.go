@@ -954,3 +954,9 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 		clockedOut: cut,
 	}, nil
 }
+
+// SeatSlug names one seat's deck, or "" when the run has no such chair — the
+// lookup [SimRun.WinnerSlug] does for a winner, exported for every other
+// question a seat number asks. A killing blow records the seat that died, and
+// a seat number is not something a browser can render.
+func (r *SimRun) SeatSlug(seat int) string { return r.Seats[seat] }

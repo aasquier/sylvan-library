@@ -852,6 +852,29 @@ export interface ForgeDeckRow {
   wins: number
 }
 
+/** The swing that ended a game.
+ *
+ *  A *swing*, not a single strike: Forge announces combat damage one source at
+ *  a time and prints the victim's new life once afterwards, so `amount` is the
+ *  whole lethal batch and `sources` is how many cards were in it. `card` names
+ *  the one that hit hardest, which is what a player says out loud.
+ *
+ *  Who *dealt* it is deliberately absent — Forge's damage event names the
+ *  source card and the victim and nothing else, so a dealer would be a guess.
+ */
+export interface ForgeKillingBlow {
+  amount: number
+  card: string
+  sources: number
+  combat: boolean
+  turn: number
+  victim: string
+  /** The whole card, whose printed line is its own credit. Empty when the
+   *  pool cannot answer the name — a token, usually — and the row then says
+   *  the blow in words alone. */
+  image?: string
+}
+
 export interface ForgeGameRow {
   game: number
   winner: string | null
@@ -859,6 +882,11 @@ export interface ForgeGameRow {
   turns: number | null
   draw: boolean
   timed_out: boolean
+  /** Absent on every game that ended without a blow — a clock-out, a decking,
+   *  a commander kill — and absent on every payload written before this
+   *  existed, which is the same thing to a reader. Optional on purpose: see
+   *  the `omitempty` argument on the server's `forgeRow.Killer`. */
+  killer?: ForgeKillingBlow | null
 }
 
 /** One beat of a game, as the Coliseum receives it.

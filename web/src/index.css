@@ -6747,6 +6747,48 @@ button:hover .tarot-fan-card {
 .theater-row-turns,
 .theater-row-secs { text-align: right; color: var(--text-muted); }
 
+/* The killing blow, under the row that reports the game.
+ *
+ * Spans the grid rather than sitting outside the row, because the striping
+ * above is `:nth-child(odd)` on siblings and a second element per game would
+ * band the list by half-rows.
+ *
+ * The picture is a WHOLE card and nothing filters it: a full card image
+ * carries its own artist and copyright line, which is how every painting in
+ * this room is credited, and commandment 19 forbids reaching through the card
+ * to alter Wizards' art. The vignette that lifts it off the felt is drawn on
+ * `::after` — a layer over the card, never a `filter` on it. */
+.theater-blow {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  padding-left: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.theater-blow-card {
+  position: relative;
+  width: 30px;
+  height: 42px;
+  flex: none;
+  border-radius: 2px;
+  object-fit: cover;
+  object-position: 50% 18%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.theater-blow-said strong { color: var(--text-secondary); font-weight: 600; }
+
+/* The number is the point of the line, so it gets the forge's own heat. */
+.theater-blow-amount {
+  color: #e0a33c;
+  font-weight: 700;
+  font-size: 12px;
+}
+
 @keyframes theater-strike {
   0%   { opacity: 0; transform: translateY(-9px) scaleY(0.86); }
   60%  { opacity: 1; transform: translateY(2px) scaleY(1.03); }

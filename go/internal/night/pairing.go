@@ -18,20 +18,22 @@ import (
 // these bits — the promise is "stable", not "bit-compatible with a golden".
 
 // PlanScheduled deals one scheduled night: round-robin across accounts
-// (ADR 46 decision 5), each account in at most `set.BoutsPerAccount` bouts,
+// (ADR 46 decision 5), each account owed at most `set.BoutsPerAccount` turns,
 // at most `set.Bouts` bouts in all, and the house filling every remaining
-// seat and any leftover capacity — house against house is a fine bout, it
-// densifies the record.
+// chair — house against house is a fine bout, it densifies the record.
+//
+// **A bout is a table rather than a pair since 2026-09-06**, and [tableSize]
+// decides how many chairs each one has: two pods to every duel. So the unit
+// the caps count is a *seat at a table*, not an opponent.
 //
 // The turn order is "one deck per account in turn": account order and each
 // account's deck order are seeded shuffles, and an account with fewer decks
 // than turns plays a deck again rather than sitting out — the cap is a share
-// of the night, and a small shelf densifies what its owner is tuning. Two
-// decks of one account are never seated against each other on a scheduled
-// night; when no other account's deck is waiting, the opponent is the
-// house's, and a deck with no opponent at all sits out unplanned. (A served
-// instance always has a house — the showcase — so that last case is a test's,
-// not a night's.)
+// of the night, and a small shelf densifies what its owner is tuning. No
+// account holds two chairs at one table, and no deck appears at one table
+// twice; [seatTable] keeps both. A table the shelf cannot fill honestly ends
+// the deal rather than seating a mirror. (A served instance always has a
+// house — the showcase — so a short card is a test's case, not a night's.)
 func PlanScheduled(nightKey string, house []string, players []Seat,
 	set Settings) []Plan {
 	rng := rand.New(rand.NewSource(derive("deal", nightKey))) //nolint:gosec // seeded on purpose: the deal must replay
@@ -161,11 +163,13 @@ func ClockFor(seats int) int {
 // measured rather than guessed. The deadline is the only bound; whatever the
 // window does not reach is skipped when it closes, and that skip count is
 // itself part of the measurement.
-// A sample deals the same **mix** a scheduled night would — two pods to every
-// duel — because that is the whole point of it: the count it measures has to
-// be the count the window will actually hold, and a sample of pure duels
-// would over-report a mixed night by an order of magnitude (a duel game runs
-// ~16s against a pod's ~135s median).
+//
+// **It deals the same mix a scheduled night would**, two pods to every duel,
+// because that is the whole point of a sample: the count it measures has to
+// be the count the window will actually hold. A sample of pure duels would
+// over-report a mixed night by an order of magnitude — a duel game runs ~16s
+// against a pod's ~135s median — which is exactly the error the first sample
+// hour made on 2026-09-06, before pods existed to be dealt.
 func PlanSample(nightKey string, house []string, players []Seat,
 	set Settings) []Plan {
 	seats := make([]Seat, 0, len(house)+len(players))
@@ -245,16 +249,6 @@ func playerTurns(rng *rand.Rand, players []Seat, turns int) []Seat {
 		}
 	}
 	return queue
-}
-
-// opponentFor finds the first queued deck from a different account, or -1.
-func opponentFor(a Seat, queue []Seat) int {
-	for i, cand := range queue {
-		if *cand.Owner != *a.Owner {
-			return i
-		}
-	}
-	return -1
 }
 
 // houseCycle deals the house's decks in seeded order, wrapping when the card
