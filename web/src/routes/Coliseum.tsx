@@ -922,13 +922,27 @@ export default function ColiseumRoom() {
     api.decks().then((d) => {
       if (!alive) return
       setDecks(d)
-      // Both seats start occupied, because a form whose first state is
+      // Every seat starts occupied, because a form whose first state is
       // invalid scolds before anybody has touched it. A link that named the
-      // fighters wins over the shelf's first two.
-      const first = d[0]
-      const second = d[1] ?? first
-      if (first) setA((cur) => cur || `${first.owner}/${first.slug}`)
-      if (second) setB((cur) => cur || `${second.owner}/${second.slug}`)
+      // fighters wins over the shelf's first few.
+      //
+      // **Four different decks, not the first one four times.** A `<select>`
+      // with no value shows its first option, so seats three and four both
+      // came up reading the same deck as seat one — a table of three Arahbos
+      // that looked deliberate (Aaron, 2026-09-06, from the screenshot). The
+      // shelf is walked rather than indexed twice, and a shelf too short to
+      // seat four falls back to what it has rather than leaving a seat blank.
+      const at = (i: number) => d[i] ?? d[d.length - 1] ?? d[0]
+      const seat = (i: number) => {
+        const deck = at(i)
+        return deck ? `${deck.owner}/${deck.slug}` : ''
+      }
+      if (d.length) {
+        setA((cur) => cur || seat(0))
+        setB((cur) => cur || seat(1))
+        setC((cur) => cur || seat(2))
+        setD((cur) => cur || seat(3))
+      }
     }).catch((e) => { if (alive) setError(errorMessage(e)) })
     // Asked once, like `/api/claude`: a fact about the environment, and a
     // failed ask means the gates stay shut, which is the honest floor.
@@ -1413,6 +1427,22 @@ export default function ColiseumRoom() {
               the basis alone, and the basis is what makes them take their own
               line on a real phone. The ellipsis on a long deck name survives:
               a `<select>` truncates its own option text at any width. */}
+          {/* **A pod's four seats want a line of their own.**
+              Four selects fill the row, so the games dial and the gate wrapped
+              onto a second line and the gate — a whole portrait card, four
+              times a select's height — stood marooned in the middle with a
+              third of the panel empty beside it (Aaron, 2026-09-06: "Fight
+              button looks weird on four-player").
+
+              `display: contents` on the duel, so its row is exactly the row it
+              has always been: the wrapper is not in the layout at all, and the
+              two selects, the dial and the gate share one line as before. On
+              the pod the wrapper takes the full basis and the four seats get
+              their own row, which puts the dial and the gate back together on
+              the next one. */}
+          <div className={pod
+            ? 'flex w-full basis-full flex-wrap items-end gap-3'
+            : 'contents'}>
           <Select label={pod ? 'First seat' : 'Champion'} value={a} onChange={setA}
                   className="min-w-[11rem] grow basis-full
                              sm:basis-[13rem] sm:max-w-[15rem]"
@@ -1437,6 +1467,7 @@ export default function ColiseumRoom() {
                       options={decks.map(seatOption)} />
             </>
           )}
+          </div>
           {/* **The ceiling is written where the number is typed.** A number
               input's `max` is validation, not a stop: 25 can be typed into
               this box and it looks accepted, and the arena will not fight 25
