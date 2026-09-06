@@ -70,8 +70,13 @@ type DescriptionReport struct {
 	Stance     StanceReadout `json:"stance"`
 	Strategy   string        `json:"strategy"`
 	Themes     []string      `json:"themes"`
-	Fact       string        `json:"fact"`
-	Never      string        `json:"never"`
+	// ThemesDropped is what it read that this library has no label for. On the
+	// wire because the alternative is a surface quietly showing two themes
+	// where four were offered, which reads as the model being thin rather than
+	// as the vocabulary being narrow.
+	ThemesDropped []string `json:"themes_dropped"`
+	Fact          string   `json:"fact"`
+	Never         string   `json:"never"`
 }
 
 // DescriptionFor renders what DescribeDeck answered as the shape a client
@@ -82,15 +87,16 @@ type DescriptionReport struct {
 // terms -- so they are one shape on the wire rather than two.
 func DescriptionFor(slug string, got Description, outcome IntakeOutcome) DescriptionReport {
 	return DescriptionReport{
-		AnsweredBy: "claude",
-		Mode:       ModeDeckDescription,
-		Slug:       slug,
-		Asked:      outcome.Asked,
-		Reason:     outcome.Reason,
-		Stance:     Describe(outcome.Stance),
-		Strategy:   got.Strategy,
-		Themes:     nonNil(got.Themes),
-		Fact:       got.Fact,
-		Never:      DescriptionNever,
+		AnsweredBy:    "claude",
+		Mode:          ModeDeckDescription,
+		Slug:          slug,
+		Asked:         outcome.Asked,
+		Reason:        outcome.Reason,
+		Stance:        Describe(outcome.Stance),
+		Strategy:      got.Strategy,
+		Themes:        nonNil(got.Themes),
+		ThemesDropped: nonNil(got.ThemesDropped),
+		Fact:          got.Fact,
+		Never:         DescriptionNever,
 	}
 }

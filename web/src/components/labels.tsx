@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 
 import { api, errorMessage } from '../lib/api'
-import type { DeckDetail, DeckRef, ThemeVocabulary } from '../lib/api'
+import type {
+  ClaudeStatus, DeckDescriptionDraft, DeckDetail, DeckRef, ThemeVocabulary,
+} from '../lib/api'
+import { claudeCanAnswer } from '../lib/stance'
 import { Badge, ErrorNote } from './ui'
 
 /**
@@ -24,9 +27,13 @@ import { Badge, ErrorNote } from './ui'
  * names the class words as class words — that is a fact about the vocabulary,
  * served in `archetypes` — and the deck shows its archetype again once saved.
  */
-export function DeckLabels({ deck, deckRef, onRefresh }: {
+export function DeckLabels({ deck, deckRef, claude, onRefresh }: {
   deck: DeckDetail
   deckRef: DeckRef
+  /** Whether Claude can answer here at all — null until known. An absent
+   *  control is how ADR 15's "off is a real position" renders; a control that
+   *  can only refuse is how it renders wrong. */
+  claude?: ClaudeStatus | null
   onRefresh: () => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -46,7 +53,7 @@ export function DeckLabels({ deck, deckRef, onRefresh }: {
   return (
     <div className="mt-3">
       {editing ? (
-        <LabelEditor deck={deck} deckRef={deckRef}
+        <LabelEditor deck={deck} deckRef={deckRef} claude={claude}
                      onDone={() => setEditing(false)}
                      onRefresh={onRefresh} />
       ) : (
@@ -89,9 +96,10 @@ export function DeckLabels({ deck, deckRef, onRefresh }: {
  * label choice here that carries a consequence beyond identity: it decides
  * which rating board this deck's Forge results may share.
  */
-function LabelEditor({ deck, deckRef, onDone, onRefresh }: {
+function LabelEditor({ deck, deckRef, claude, onDone, onRefresh }: {
   deck: DeckDetail
   deckRef: DeckRef
+  claude?: ClaudeStatus | null
   onDone: () => void
   onRefresh: () => void
 }) {
@@ -99,6 +107,44 @@ function LabelEditor({ deck, deckRef, onDone, onRefresh }: {
   const [chosen, setChosen] = useState<string[]>(deck.themes ?? [])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // What Claude read off the list, when it has been asked. `null` is "not
+  // asked", which is a different thing from an empty answer and reads
+  // differently on the screen.
+  const [read, setRead] = useState<DeckDescriptionDraft | null>(null)
+  const [asking, setAsking] = useState(false)
+
+  /**
+   * Ask Claude which of these words fit, and tick them.
+   *
+   * **It ticks, it does not save.** The chips it turns on are chips, sitting in
+   * the same editor with the same save button somebody was already looking at,
+   * and the row that appears says which ones it added so they can be unticked
+   * one at a time. The pen stays where the panel above the description keeps
+   * it: it drafts, you keep the pen.
+   *
+   * **Added to what is already chosen, never instead of it.** The obvious
+   * implementation replaces the selection, and the obvious implementation
+   * throws away the labels somebody chose by hand a moment ago -- for a
+   * suggestion they have not read yet.
+   *
+   * No stance is sent, so the server resolves this deck's own default and
+   * clamps it to the deployment's ceiling; what actually applied comes back in
+   * the report, and `asked: false` with a reason is a real answer rather than
+   * a failure (a dial set to stay silent costs nothing and says so).
+   */
+  async function ask() {
+    try {
+      setError(null)
+      setAsking(true)
+      const got = await api.describeDeck(deckRef, {})
+      setRead(got)
+      setChosen(prev => [...new Set([...prev, ...(got.themes ?? [])])])
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setAsking(false)
+    }
+  }
 
   useEffect(() => {
     let live = true
@@ -156,9 +202,62 @@ function LabelEditor({ deck, deckRef, onDone, onRefresh }: {
       </p>
       <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
         Pick as many as are true — themes are an identity, not a single
-        category. They are the deck&rsquo;s own words, so nothing here is
-        guessed from the decklist.
+        category. They stay the deck&rsquo;s own words
+        {claudeCanAnswer(claude)
+          ? <>: Claude will read the list and tick what it recognises, and every
+              one of them is yours to untick before you save.</>
+          : <>, so nothing here is guessed from the decklist.</>}
       </p>
+
+      {/* Offered only where it can be answered. An instance with no key, a
+          build without the feature, or a dial set to stay silent are three
+          ordinary states, and a button that refuses in all three tells a
+          newcomer the site is broken when it is doing what it was told
+          (ADR 15, commandment 2). */}
+      {claudeCanAnswer(claude) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => { void ask() }} disabled={asking || saving}
+                  className="btn btn-quiet btn-xs">
+            {asking ? 'Reading the list…' : read ? 'Ask again' : 'Ask Claude which fit'}
+          </button>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            It ticks boxes. Nothing is saved until you press save.
+          </span>
+        </div>
+      )}
+
+      {/* ADR 14 boundary 3: what Claude answered never shares a surface with
+          the gate's output unlabelled, and the label names the system rather
+          than anything that computes it (commandment 10). */}
+      {read && !read.asked && (
+        <p className="mt-2 text-xs" role="status" style={{ color: 'var(--text-muted)' }}>
+          {read.reason}
+        </p>
+      )}
+      {read?.asked && (
+        <div className="mt-2 space-y-1 text-xs" role="status">
+          <p style={{ color: 'var(--text-muted)' }}>
+            {read.themes.length > 0
+              ? <>Claude read the list and ticked{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {read.themes.join(', ')}
+                  </span>. Untick anything it got wrong.</>
+              : <>Claude read the list and found nothing in this vocabulary that
+                  fits. The words below are still yours to pick from.</>}
+          </p>
+          {(read.themes_dropped ?? []).length > 0 && (
+            // Counted rather than swallowed: "it read four and could file two"
+            // is the difference between a thin answer and a narrow vocabulary,
+            // and only one of those is worth doing anything about.
+            <p style={{ color: 'var(--text-muted)' }}>
+              It also read{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                {(read.themes_dropped ?? []).join(', ')}
+              </span>, which this library has no label for yet.
+            </p>
+          )}
+        </div>
+      )}
 
       <p className="mt-3 text-xs font-medium"
          style={{ color: 'var(--text-secondary)' }}>

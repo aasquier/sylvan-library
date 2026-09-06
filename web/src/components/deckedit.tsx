@@ -22,7 +22,7 @@ import {
 } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { presetLabel } from '../lib/claudecopy'
-import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
+import { claudeCanAnswer, effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { CardArt, CardHover, ErrorNote, ManaCost, ManaText, Select } from '../components/ui'
 import { CardFinder } from './cardfinder'
 import { SwapComposer } from './swap'
@@ -813,11 +813,6 @@ function useClaudeStatus(deck: DeckRef, enabled: boolean) {
  *  off. The same three-part answer the dossier button and the deck page use —
  *  a control that appears and then refuses is worse than one that is honestly
  *  absent (ADR 15). */
-function claudeCanAnswer(status: ClaudeStatus | null | undefined): boolean {
-  return !!status?.installed && !!status.configured
-    && status.stance.axes[0]?.level !== 'off'
-}
-
 /**
  * Beat one: Claude at work, drawn rather than stated.
  *
