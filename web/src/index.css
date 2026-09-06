@@ -7986,6 +7986,43 @@ button:hover .tarot-fan-card {
   .field-quad .field-hand-fan,
   .field-quad .field-pool { display: none; }
   .field-quad .field-hand { padding-top: 2px; padding-bottom: 2px; }
+
+  /* **The hand's tray swings sideways on a wide screen, and a quadrant is the
+     wrong shape for that.**
+   *
+   * The rule above this one sends it `left: calc(100% + 6px)` — out of the
+   * hand and to the right — and the sentence that justifies it is "hands are
+   * the left column now, so their trays swing right into the arena". True of
+   * the duel, where the hand is a narrow column with the whole arena beside
+   * it. A quadrant's hand is a full-width row, so `100%` is the quadrant's
+   * whole width: the left-hand seats threw their tray into the neighbouring
+   * quadrant and the right-hand seats threw theirs clean off the screen
+   * (Aaron, 2026-09-06, looking at it — "can't see the ones on the right and
+   * left ones are way to the right").
+   *
+   * This is the same stale-sentence fault the block above already records
+   * having made twice. Here the tray opens **upward, over its own seat's
+   * sand**, which is space the seat already owns at either row of the table,
+   * and it is clamped to the quadrant so it cannot reach a neighbour. */
+  /* **Named through the facing, and that is not decoration.** The rule being
+     overridden is `.field-hand-far .field-hand-tray` — two classes, and it
+     sits *later* in this file than this block does, so a two-class selector
+     here loses the tie and the tray stays off the screen. Measured before
+     believing it: seat 1's tray opened 495px to the right of its own
+     quadrant and seats 2 and 4 ran to x=1438 on a 1280 screen. Three
+     classes wins on specificity at any order. */
+  .field-quad .field-hand-far .field-hand-tray,
+  .field-quad .field-hand-near .field-hand-tray {
+    top: auto;
+    bottom: calc(100% + 4px);
+    left: 0;
+    right: auto;
+    max-width: min(100%, 320px);
+    transform: translateY(7px) scale(0.97);
+    transform-origin: bottom left;
+  }
+  .field-quad .field-hand-far .field-hand-tray.is-open,
+  .field-quad .field-hand-near .field-hand-tray.is-open { transform: none; }
 }
 
 /* **A hand travels with its seat.** One shared rail is right on a wide screen
