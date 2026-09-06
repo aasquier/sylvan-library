@@ -606,3 +606,59 @@ func TestTheBiggestKillingBlowsRankFirst(t *testing.T) {
 		}
 	}
 }
+
+// The two feat boards Aaron asked for on 2026-09-06, each largest-first and
+// each resolving its seat to a deck through the match's own roster.
+func TestTheFeatBoardsRankLargestFirst(t *testing.T) {
+	t.Parallel()
+	rec, _ := scratch(t)
+	a := deckNamed(t, "cats", "Arahbo, Roar of the World", "cats")
+	b := deckNamed(t, "dinos", "Atla Palani, Nest Tender", "dinosaurs")
+
+	for _, n := range []int{4, 19, 7, 40, 12} {
+		games := splitGames(1, 1)
+		games[0].Biggest = &tier3.BigCreature{Card: "Giant " + strconv.Itoa(n),
+			Power: n, Toughness: n + 1, Seat: 1, Turn: 9}
+		games[0].TallestStack = &tier3.TokenStack{Card: "Cat Token",
+			Count: n * 2, Seat: 2, Turn: 9}
+		rec.Record(t.Context(), matchOf(big.NewInt(int64(n)), games,
+			[]*deck.Deck{a, b}))
+	}
+	board, err := rec.Board(t.Context(), open)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantPower := []int{40, 19, 12, 7, 4}
+	if len(board.Giants) != len(wantPower) {
+		t.Fatalf("the giants board holds %d, want %d", len(board.Giants), len(wantPower))
+	}
+	for i, g := range board.Giants {
+		if g.Power != wantPower[i] {
+			t.Errorf("giant %d is %d power, want %d", i, g.Power, wantPower[i])
+		}
+	}
+	top := board.Giants[0]
+	if top.Card != "Giant 40" || top.Toughness != 41 || top.Turn != 9 {
+		t.Errorf("the top giant reads %+v", top)
+	}
+	// Seat 1 is `cats`, resolved through the roster rather than guessed.
+	if top.Deck != "cats" {
+		t.Errorf("the top giant stood for %q, want cats", top.Deck)
+	}
+
+	wantCount := []int{80, 38, 24, 14, 8}
+	if len(board.Stacks) != len(wantCount) {
+		t.Fatalf("the stacks board holds %d, want %d", len(board.Stacks), len(wantCount))
+	}
+	for i, s := range board.Stacks {
+		if s.Count != wantCount[i] {
+			t.Errorf("stack %d is %d, want %d", i, s.Count, wantCount[i])
+		}
+	}
+	// Seat 2 is `dinos` — a different seat from the giants, so a board that
+	// joined on the wrong column would show cats here.
+	if board.Stacks[0].Deck != "dinos" || board.Stacks[0].Card != "Cat Token" {
+		t.Errorf("the top stack reads %+v", board.Stacks[0])
+	}
+}

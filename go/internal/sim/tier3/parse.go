@@ -83,6 +83,12 @@ type GameResult struct {
 	// than finishing. Folded into `Draw` by Forge, separated here because a
 	// clock-out is a measurement problem and a real draw is a game outcome.
 	TimedOut bool
+	// Biggest is the largest creature that stood on the battlefield in this
+	// game, and TallestStack the deepest pile of one token a seat held at
+	// once. Both nil when the game had none — a game with no creature in it
+	// is rare and a game with no token in it is not.
+	Biggest      *BigCreature
+	TallestStack *TokenStack
 	// Killer is the blow that ended the game, and nil whenever nothing did.
 	//
 	// **Nil is the ordinary case for a great many games**, and it is not a
@@ -130,6 +136,43 @@ type KillingBlow struct {
 	// state of the fold, not a fact about the blow, and `Card` is the answer
 	// it exists to produce.
 	biggest int
+}
+
+// BigCreature is the largest thing that stood on a battlefield in one game
+// (Aaron, 2026-09-06).
+//
+// **Ranked on power, and that is a judgement.** A Magic player says "a 15/15"
+// and means the first number: power is what kills, and a wall with enormous
+// toughness is not the thing anybody tells a story about. Toughness rides
+// along so the row can print the pair properly.
+//
+// **Battlefield only.** A creature in a library or a graveyard has printed
+// stats and no presence, and counting those would rank a deck by the biggest
+// card it owns rather than by the biggest thing it ever got into play.
+type BigCreature struct {
+	Card      string `json:"card"`
+	Power     int    `json:"power"`
+	Toughness int    `json:"toughness"`
+	// Seat is whose battlefield it stood on, resolved through the id-to-seat
+	// map the parser keeps — a `stats` line names the card and never the
+	// player, so without that map a pumped creature would be nobody's.
+	Seat int `json:"seat"`
+	Turn int `json:"turn"`
+}
+
+// TokenStack is the deepest pile of one token a seat held at once.
+//
+// **At once**, which is the whole difference between this and a count of
+// tokens made: a deck that makes forty Food over a long game and eats each one
+// never has a stack, and a deck that assembles nineteen Cats in a turn does.
+// The parser tracks live battlefield membership per seat and per token name,
+// and keeps the high-water mark.
+type TokenStack struct {
+	// Card is the token's name as Forge gives it — "Food Token", "Cat Token".
+	Card  string `json:"card"`
+	Count int    `json:"count"`
+	Seat  int    `json:"seat"`
+	Turn  int    `json:"turn"`
 }
 
 // SimOutput is everything the run said, parsed.

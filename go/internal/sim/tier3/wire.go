@@ -145,6 +145,12 @@ type WireGame struct {
 	WinnerSeat   *int    `json:"winner_seat"`
 	Turns        *int    `json:"turns"`
 	TimedOut     bool    `json:"timed_out"`
+	// Biggest and TallestStack are the game's two feats, `omitempty` for the
+	// same reason Killer is: most games have neither, and an old worker sends
+	// neither key. Absent decodes to nil, which is "nobody knows" rather than
+	// a creature of zero power.
+	Biggest      *BigCreature `json:"biggest,omitempty"`
+	TallestStack *TokenStack  `json:"tallest_stack,omitempty"`
 	// Killer is the blow that ended the game, and `omitempty` because most
 	// games have none: a clock-out, a decking and a commander kill all end
 	// without one, and a worker image built before this field existed sends

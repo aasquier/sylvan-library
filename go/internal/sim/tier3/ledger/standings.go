@@ -225,8 +225,13 @@ type Standings struct {
 	Decks      []DeckRecord  `json:"decks"`
 	Archetypes []ClassRecord `json:"archetypes"`
 	Meetings   []Meeting     `json:"meetings"`
-	// Blows is the ten biggest killing blows on record, largest first.
-	Blows []KillRecord `json:"blows"`
+	// Blows is the ten biggest killing blows on record, largest first;
+	// Giants the ten biggest creatures, and Stacks the ten deepest piles of
+	// one token. Three leaderboards, each largest-first and each read off its
+	// own partial index.
+	Blows  []KillRecord  `json:"blows"`
+	Giants []GiantRecord `json:"giants"`
+	Stacks []StackRecord `json:"stacks"`
 	// Floor and Proven travel with the board so one surface cannot drift
 	// from another about what "too few" means, and so the copy can say the
 	// number rather than hard-coding it in two languages.
@@ -291,6 +296,7 @@ func (r *Recorder) Board(ctx context.Context, s Scope) (*Standings, error) {
 	if r == nil || r.db == nil {
 		return &Standings{Decks: []DeckRecord{}, Archetypes: []ClassRecord{},
 			Meetings: []Meeting{}, Blows: []KillRecord{},
+			Giants: []GiantRecord{}, Stacks: []StackRecord{},
 			Floor: RateFloor, Proven: Proven}, nil
 	}
 	where, args := s.visible()
@@ -323,7 +329,111 @@ func (r *Recorder) Board(ctx context.Context, s Scope) (*Standings, error) {
 	if out.Blows, err = r.topBlows(ctx, where, args); err != nil {
 		return nil, err
 	}
+	if out.Giants, err = r.topGiants(ctx, where, args); err != nil {
+		return nil, err
+	}
+	if out.Stacks, err = r.topStacks(ctx, where, args); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+// GiantRecord is one line of the biggest-creatures board.
+//
+// Ranked on power — a player says "a 15/15" and means the first number — with
+// toughness beside it so the row prints the pair.
+type GiantRecord struct {
+	MatchID   int64  `json:"match_id"`
+	Game      int    `json:"game"`
+	Card      string `json:"card"`
+	Power     int    `json:"power"`
+	Toughness int    `json:"toughness"`
+	Turn      int    `json:"turn"`
+	Seats     int    `json:"seats"`
+	// Deck is whose battlefield it stood on, by slug.
+	Deck     string `json:"deck"`
+	PlayedAt string `json:"played_at"`
+}
+
+// StackRecord is one line of the deepest-token-pile board.
+//
+// **Held at once**, never a running total of tokens made: a deck that makes
+// forty Food across a game and eats each one never had a stack.
+type StackRecord struct {
+	MatchID  int64  `json:"match_id"`
+	Game     int    `json:"game"`
+	Card     string `json:"card"`
+	Count    int    `json:"count"`
+	Turn     int    `json:"turn"`
+	Seats    int    `json:"seats"`
+	Deck     string `json:"deck"`
+	PlayedAt string `json:"played_at"`
+}
+
+// topGiants reads the biggest creatures the viewer may see.
+func (r *Recorder) topGiants(ctx context.Context, where string, args []any) (
+	[]GiantRecord, error) {
+	rows, err := r.db.QueryContext(ctx, featQuery(
+		`g.big_card, g.big_power, COALESCE(g.big_toughness, 0),`+
+			` COALESCE(g.big_turn, 0)`, "g.big_power", "g.big_seat", where),
+		append(append([]any{}, args...), TopBlows)...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := []GiantRecord{}
+	for rows.Next() {
+		var k GiantRecord
+		if err := rows.Scan(&k.MatchID, &k.Game, &k.Card, &k.Power,
+			&k.Toughness, &k.Turn, &k.Deck, &k.PlayedAt, &k.Seats); err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// topStacks reads the deepest token piles the viewer may see.
+func (r *Recorder) topStacks(ctx context.Context, where string, args []any) (
+	[]StackRecord, error) {
+	rows, err := r.db.QueryContext(ctx, featQuery(
+		`g.stack_card, g.stack_count, COALESCE(g.stack_turn, 0)`,
+		"g.stack_count", "g.stack_seat", where),
+		append(append([]any{}, args...), TopBlows)...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := []StackRecord{}
+	for rows.Next() {
+		var k StackRecord
+		if err := rows.Scan(&k.MatchID, &k.Game, &k.Card, &k.Count, &k.Turn,
+			&k.Deck, &k.PlayedAt, &k.Seats); err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// featQuery builds one leaderboard's SQL: the same join skeleton every feat
+// board needs, with the columns and the ranking column named per board.
+//
+// One builder rather than three hand-written queries, because the parts that
+// have to be identical across the boards — the visibility `where`, the seat
+// join that turns a seat number into a deck, the tie-break, the limit — are
+// exactly the parts a copy would drift on. `cols`, `rank` and `seat` are
+// package literals at every call site and never user input.
+func featQuery(cols, rank, seat, where string) string {
+	return `SELECT g.match_id, g.game_index, ` + cols +
+		`, COALESCE(d.slug, ''), m.created_at,` +
+		` (SELECT COUNT(*) FROM forge_seats s WHERE s.match_id = m.id)` +
+		` FROM forge_games g` +
+		` JOIN forge_matches m ON m.id = g.match_id` +
+		` LEFT JOIN forge_seats d ON d.match_id = g.match_id AND d.seat = ` + seat +
+		` WHERE ` + rank + ` IS NOT NULL AND ` + where +
+		` ORDER BY ` + rank + ` DESC, g.match_id DESC, g.game_index` +
+		` LIMIT ?`
 }
 
 // KillRecord is one line of the top ten: the blow, and enough of the game

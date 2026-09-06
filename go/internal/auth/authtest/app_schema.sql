@@ -1,8 +1,8 @@
--- app.db's recorded schema at version 16: what the ladder under
+-- app.db's recorded schema at version 17: what the ladder under
 -- go/internal/auth/migrations/ builds, read back out of sqlite_master.
 -- TestMigrateBuildsTheRecordedSchema holds auth.Migrate to these bytes,
 -- so a new rung updates this record in the same change. Do not hand-edit.
-PRAGMA user_version = 16;
+PRAGMA user_version = 17;
 CREATE TABLE auth_tokens (
         -- The hash of the token, for the same reason `sessions` stores one:
         -- reading this file must not hand over a live credential, and an
@@ -86,7 +86,7 @@ CREATE TABLE forge_games (
         milliseconds INTEGER NOT NULL,
         turns        INTEGER,
         draw         INTEGER NOT NULL,
-        timed_out    INTEGER NOT NULL, kill_amount  INTEGER, kill_card    TEXT, kill_sources INTEGER, kill_combat  INTEGER, kill_seat    INTEGER, kill_turn    INTEGER,
+        timed_out    INTEGER NOT NULL, kill_amount  INTEGER, kill_card    TEXT, kill_sources INTEGER, kill_combat  INTEGER, kill_seat    INTEGER, kill_turn    INTEGER, big_card      TEXT, big_power     INTEGER, big_toughness INTEGER, big_seat      INTEGER, big_turn      INTEGER, stack_card    TEXT, stack_count   INTEGER, stack_seat    INTEGER, stack_turn    INTEGER,
         PRIMARY KEY (match_id, game_index)
     );
 CREATE TABLE forge_matches (
@@ -256,8 +256,12 @@ CREATE INDEX auth_tokens_by_user ON auth_tokens(user_id, purpose);
 CREATE INDEX claude_usage_by_time ON claude_usage(created_at);
 CREATE INDEX deck_log_by_deck ON deck_log(owner_id, slug, id);
 CREATE INDEX dossier_cache_by_oracle ON dossier_cache(oracle_id);
+CREATE INDEX forge_games_by_big ON forge_games(big_power DESC)
+        WHERE big_power IS NOT NULL;
 CREATE INDEX forge_games_by_kill ON forge_games(kill_amount DESC)
         WHERE kill_amount IS NOT NULL;
+CREATE INDEX forge_games_by_stack ON forge_games(stack_count DESC)
+        WHERE stack_count IS NOT NULL;
 CREATE INDEX forge_seats_by_deck ON forge_seats(owner_id, slug);
 CREATE INDEX night_bout_seats_bout ON night_bout_seats(bout_id);
 CREATE INDEX night_bouts_run ON night_bouts(run_id);

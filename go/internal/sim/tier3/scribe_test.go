@@ -2,6 +2,7 @@ package tier3_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1138,5 +1139,95 @@ func TestLifeGainClosesTheBatch(t *testing.T) {
 	if last.Killer.Amount != 38 || last.Killer.Sources != 1 ||
 		last.Killer.Card != "The Haymaker" {
 		t.Errorf("the blow read %+v, want the 38 from one source", last.Killer)
+	}
+}
+
+// The two feats, read off the recorded match on both paths (Aaron,
+// 2026-09-06). Like the killing blow, these are row fields and the night does
+// not narrate, so a record that only existed for a watcher would be a record
+// no scheduled bout ever kept.
+func TestTheGamesFeatsAreReadOnBothPaths(t *testing.T) {
+	t.Parallel()
+	var watched, quiet []tier3.GameResult
+	for _, watching := range []bool{true, false} {
+		_, games := scribed(t, watching)
+		if watching {
+			watched = games
+		} else {
+			quiet = games
+		}
+		if len(games) == 0 {
+			t.Fatalf("watching=%v: no games", watching)
+		}
+		big := games[0].Biggest
+		if big == nil {
+			t.Fatalf("watching=%v: the corpus has creatures and recorded none", watching)
+		}
+		if big.Power <= 0 || big.Card == "" {
+			t.Errorf("watching=%v: the biggest creature reads %+v", watching, big)
+		}
+		// It stood on somebody's battlefield, so it has an owner — that is
+		// the whole reason the parser keeps an id-to-seat map, since a
+		// `stats` line names a card and never a player.
+		if big.Seat <= 0 {
+			t.Errorf("watching=%v: the biggest creature belongs to nobody: %+v",
+				watching, big)
+		}
+		stack := games[0].TallestStack
+		if stack == nil {
+			t.Fatalf("watching=%v: gyome-food made tokens and none was counted", watching)
+		}
+		if stack.Count < 2 || stack.Card == "" || stack.Seat <= 0 {
+			t.Errorf("watching=%v: the tallest stack reads %+v", watching, stack)
+		}
+	}
+	// And the two paths agree, which is the property that matters: a row is a
+	// row whether or not a board was built beside it.
+	if watched[0].Biggest.Power != quiet[0].Biggest.Power ||
+		watched[0].Biggest.Card != quiet[0].Biggest.Card {
+		t.Errorf("the paths disagree about the biggest creature: %+v vs %+v",
+			watched[0].Biggest, quiet[0].Biggest)
+	}
+	if watched[0].TallestStack.Count != quiet[0].TallestStack.Count {
+		t.Errorf("the paths disagree about the tallest stack: %+v vs %+v",
+			watched[0].TallestStack, quiet[0].TallestStack)
+	}
+}
+
+// A stack is the deepest pile held **at once**, not a count of tokens made:
+// a deck that makes three Food and eats each one never had a stack of three.
+// And two seats holding two apiece is two stacks of two, never one of four.
+func TestATokenStackIsWhatIsHeldAtOnce(t *testing.T) {
+	t.Parallel()
+	p := tier3.NewScribeParser(false)
+	in := func(seat, id int) string {
+		return fmt.Sprintf(`{"t":"zone","game":1,"zone":"Battlefield","mode":"in",`+
+			`"seat":%d,"id":%d,"card":"Food Token","token":true,"types":"Artifact - Food"}`,
+			seat, id)
+	}
+	out := func(seat, id int) string {
+		return fmt.Sprintf(`{"t":"zone","game":1,"zone":"Battlefield","mode":"out",`+
+			`"seat":%d,"id":%d,"card":"Food Token","token":true,"types":"Artifact - Food"}`,
+			seat, id)
+	}
+	var last *tier3.GameResult
+	for _, line := range []string{
+		`{"t":"game","game":1}`,
+		in(1, 1), out(1, 1), // made and eaten: never a stack of two
+		in(1, 2), in(1, 3), // two at once
+		out(1, 2), out(1, 3),
+		in(2, 4), in(2, 5), // the other seat, also two
+		`{"t":"result","game":1,"milliseconds":100,"seat":1,"winner":"A"}`,
+	} {
+		if _, game := p.Feed(line); game != nil {
+			last = game
+		}
+	}
+	if last == nil || last.TallestStack == nil {
+		t.Fatal("no stack recorded")
+	}
+	if last.TallestStack.Count != 2 {
+		t.Errorf("the tallest stack is %d, want 2 — seats do not pool and an "+
+			"eaten token was never in the pile", last.TallestStack.Count)
 	}
 }
