@@ -147,6 +147,19 @@ type DeckRecord struct {
 	Themes    []string `json:"themes"`
 	Matches   int      `json:"matches"`
 	Record    Record   `json:"record"`
+	// Duel and Pod are the same games split by the size of the table they
+	// were played at (Aaron, 2026-09-06), and the split is not cosmetic: a
+	// deck's win rate heads-up and its win rate in a four-player pod are
+	// answers to different questions, and pooling them hides both.
+	//
+	// **A pod's baseline is 25%, a duel's is 50%**, so the same 30% win rate
+	// is a bad duellist and a good pod deck. Nothing here does that division
+	// for the reader — `Record` carries the interval and the floor as always
+	// — but keeping the two apart is what makes the comparison possible at
+	// all. `Record` above stays the pooled total, because a deck's whole
+	// record is still a thing somebody asks for.
+	Duel Record `json:"duel"`
+	Pod  Record `json:"pod"`
 }
 
 // ClassRecord is one archetype's line: Aaron's "type win rates".
@@ -201,13 +214,19 @@ type Standings struct {
 	// Games is every game recorded, clock-outs included: the honest count of
 	// what the Forge actually ran. The per-record `played` figures will sum
 	// to less, and TimedOut is where the difference went.
-	Games      int           `json:"games"`
-	TimedOut   int           `json:"timed_out"`
-	Since      string        `json:"since"`
-	Until      string        `json:"until"`
+	Games    int    `json:"games"`
+	TimedOut int    `json:"timed_out"`
+	Since    string `json:"since"`
+	Until    string `json:"until"`
+	// Duels and Pods are how many recorded matches were played at each size
+	// of table. They sum to Matches.
+	Duels      int           `json:"duels"`
+	Pods       int           `json:"pods"`
 	Decks      []DeckRecord  `json:"decks"`
 	Archetypes []ClassRecord `json:"archetypes"`
 	Meetings   []Meeting     `json:"meetings"`
+	// Blows is the ten biggest killing blows on record, largest first.
+	Blows []KillRecord `json:"blows"`
 	// Floor and Proven travel with the board so one surface cannot drift
 	// from another about what "too few" means, and so the copy can say the
 	// number rather than hard-coding it in two languages.
@@ -271,7 +290,8 @@ func (s Scope) visible() (string, []any) {
 func (r *Recorder) Board(ctx context.Context, s Scope) (*Standings, error) {
 	if r == nil || r.db == nil {
 		return &Standings{Decks: []DeckRecord{}, Archetypes: []ClassRecord{},
-			Meetings: []Meeting{}, Floor: RateFloor, Proven: Proven}, nil
+			Meetings: []Meeting{}, Blows: []KillRecord{},
+			Floor: RateFloor, Proven: Proven}, nil
 	}
 	where, args := s.visible()
 
@@ -299,7 +319,98 @@ func (r *Recorder) Board(ctx context.Context, s Scope) (*Standings, error) {
 	out.Decks = deckBoard(seats)
 	out.Archetypes = classBoard(seats)
 	out.Meetings = meetings(seats)
+	out.Duels, out.Pods = tableSizes(seats)
+	if out.Blows, err = r.topBlows(ctx, where, args); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+// KillRecord is one line of the top ten: the blow, and enough of the game
+// around it to know whose it was.
+//
+// **The victim is named and the dealer is not**, which reads oddly until you
+// know why: Forge's player-damage event carries the source *card* and the
+// player it hit, and nothing else. Who controlled that card is a question the
+// board could answer and the night — which does not build a board — could not,
+// so naming a dealer would mean one path guessing and the other going blank.
+// The card is the honest attribution, and it is also the one a player says out
+// loud: "Gyome hit for sixteen".
+type KillRecord struct {
+	MatchID int64 `json:"match_id"`
+	Game    int   `json:"game"`
+	// Amount is the whole lethal swing; Sources is how many cards were in it.
+	Amount  int    `json:"amount"`
+	Card    string `json:"card"`
+	Sources int    `json:"sources"`
+	Combat  bool   `json:"combat"`
+	// Turn is player-turns, not the halved rounds `Record` counts elsewhere.
+	Turn int `json:"turn"`
+	// Seats is the size of the table, so a pod kill and a duel kill can be
+	// told apart at a glance.
+	Seats int `json:"seats"`
+	// Victim is the deck that died, by slug, and Killer is the deck whose
+	// seat is credited — empty when the seat cannot be resolved to a deck,
+	// which a match recorded before rung 16 will be.
+	Victim   string `json:"victim"`
+	PlayedAt string `json:"played_at"`
+}
+
+// TopBlows is how many the leaderboard holds.
+const TopBlows = 10
+
+// topBlows reads the biggest killing blows the viewer may see, largest first.
+//
+// Joined to `forge_seats` for the victim's name rather than resolved in Go:
+// the blow records a seat number, and a seat number without its match's roster
+// beside it is not a deck.
+func (r *Recorder) topBlows(ctx context.Context, where string, args []any) (
+	[]KillRecord, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT g.match_id, g.game_index, g.kill_amount, g.kill_card,`+
+			` COALESCE(g.kill_sources, 1), COALESCE(g.kill_combat, 0),`+
+			` COALESCE(g.kill_turn, 0), COALESCE(v.slug, ''), m.created_at,`+
+			` (SELECT COUNT(*) FROM forge_seats s WHERE s.match_id = m.id)`+
+			` FROM forge_games g`+
+			` JOIN forge_matches m ON m.id = g.match_id`+
+			` LEFT JOIN forge_seats v ON v.match_id = g.match_id`+
+			`   AND v.seat = g.kill_seat`+
+			` WHERE g.kill_amount IS NOT NULL AND `+where+
+			` ORDER BY g.kill_amount DESC, g.match_id DESC, g.game_index`+
+			` LIMIT ?`, append(append([]any{}, args...), TopBlows)...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := []KillRecord{}
+	for rows.Next() {
+		var k KillRecord
+		var combat int
+		if err := rows.Scan(&k.MatchID, &k.Game, &k.Amount, &k.Card,
+			&k.Sources, &combat, &k.Turn, &k.Victim, &k.PlayedAt,
+			&k.Seats); err != nil {
+			return nil, err
+		}
+		k.Combat = combat != 0
+		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// tableSizes counts the distinct matches at each size of table.
+func tableSizes(seats []seatRow) (duels, pods int) {
+	sizes := map[int64]int{}
+	for _, s := range seats {
+		sizes[s.matchID] = s.seats
+	}
+	for _, n := range sizes {
+		if n > 2 {
+			pods++
+		} else {
+			duels++
+		}
+	}
+	return duels, pods
 }
 
 // seatRow is one seat of one match with that match's games already tallied
@@ -402,10 +513,19 @@ func deckBoard(seats []seatRow) []DeckRecord {
 		out[i].Themes = s.themes
 		matches[k][s.matchID] = true
 		add(&out[i].Record, s.tally)
+		// `seats` is the size of the table this match was played at, so the
+		// split is a property of the row rather than a second query.
+		if s.seats > 2 {
+			add(&out[i].Pod, s.tally)
+		} else {
+			add(&out[i].Duel, s.tally)
+		}
 	}
 	for i := range out {
 		out[i].Matches = len(matches[deckKey(out[i].OwnerID, out[i].Slug)])
 		out[i].Record = closeOut(out[i].Record)
+		out[i].Duel = closeOut(out[i].Duel)
+		out[i].Pod = closeOut(out[i].Pod)
 	}
 	sortBoard(out, func(d DeckRecord) (Record, string) { return d.Record, d.Slug })
 	return out

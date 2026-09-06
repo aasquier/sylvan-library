@@ -3,6 +3,7 @@ package ledger
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/deck"
@@ -508,5 +509,100 @@ func TestTheLabelsShownAreTheLatestOnesWorn(t *testing.T) {
 	}
 	if !classes["aggro"] || !classes["midrange"] {
 		t.Errorf("the class board forgot a class the deck played as: %v", classes)
+	}
+}
+
+// The split Aaron asked for on 2026-09-06: a deck's duel record and its pod
+// record are separate questions, because the baselines differ — 50% heads-up
+// against 25% at a four-seat table — and pooling them answers neither.
+func TestADecksDuelAndPodRecordsAreKeptApart(t *testing.T) {
+	t.Parallel()
+	rec, _ := scratch(t)
+	a := deckNamed(t, "cats", "Arahbo, Roar of the World", "cats")
+	b := deckNamed(t, "dinos", "Atla Palani, Nest Tender", "dinosaurs")
+	c := deckNamed(t, "bears", "Goreclaw, Terror of Qal Sisma", "stompy")
+	d := deckNamed(t, "food", "Gyome, Master Chef", "food")
+
+	// Six of ten heads-up, then three of four in a pod.
+	played(t, rec, a, b, 6, 10)
+	rec.Record(t.Context(), matchOf(big.NewInt(4), splitGames(3, 4),
+		[]*deck.Deck{a, b, c, d}))
+
+	board, err := rec.Board(t.Context(), open)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cats := find(t, board, "cats")
+	if cats.Duel.Played != 10 || cats.Duel.Wins != 6 {
+		t.Errorf("the duel record reads %d/%d, want 6 of 10",
+			cats.Duel.Wins, cats.Duel.Played)
+	}
+	if cats.Pod.Played != 4 || cats.Pod.Wins != 3 {
+		t.Errorf("the pod record reads %d/%d, want 3 of 4",
+			cats.Pod.Wins, cats.Pod.Played)
+	}
+	// And the pooled record is still the whole of it, so nothing is lost by
+	// the split — only separated.
+	if cats.Record.Played != 14 || cats.Record.Wins != 9 {
+		t.Errorf("the pooled record reads %d/%d, want 9 of 14",
+			cats.Record.Wins, cats.Record.Played)
+	}
+	if board.Duels != 1 || board.Pods != 1 {
+		t.Errorf("the board counted %d duels and %d pods, want one of each",
+			board.Duels, board.Pods)
+	}
+	if board.Duels+board.Pods != board.Matches {
+		t.Errorf("%d duels + %d pods != %d matches",
+			board.Duels, board.Pods, board.Matches)
+	}
+}
+
+// The top ten, largest first — and it holds ten however many are recorded.
+func TestTheBiggestKillingBlowsRankFirst(t *testing.T) {
+	t.Parallel()
+	rec, _ := scratch(t)
+	a := deckNamed(t, "cats", "Arahbo, Roar of the World", "cats")
+	b := deckNamed(t, "dinos", "Atla Palani, Nest Tender", "dinosaurs")
+
+	// Twelve games, each with a blow of a different size, recorded as one
+	// match per game so every blow has its own row.
+	for _, n := range []int{7, 41, 3, 19, 60, 12, 5, 33, 28, 2, 51, 16} {
+		games := splitGames(1, 1)
+		games[0].Killer = &tier3.KillingBlow{Amount: n, Card: "Blow " + strconv.Itoa(n),
+			Sources: 1, Combat: true, Seat: 2, Turn: 11}
+		rec.Record(t.Context(), matchOf(big.NewInt(int64(n)), games,
+			[]*deck.Deck{a, b}))
+	}
+	board, err := rec.Board(t.Context(), open)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(board.Blows) != TopBlows {
+		t.Fatalf("the leaderboard holds %d blows, want %d", len(board.Blows), TopBlows)
+	}
+	want := []int{60, 51, 41, 33, 28, 19, 16, 12, 7, 5}
+	for i, k := range board.Blows {
+		if k.Amount != want[i] {
+			t.Errorf("row %d is %d, want %d", i, k.Amount, want[i])
+		}
+	}
+	top := board.Blows[0]
+	if top.Card != "Blow 60" || top.Sources != 1 || !top.Combat || top.Turn != 11 {
+		t.Errorf("the top blow reads %+v", top)
+	}
+	// The seat that died is resolved to a deck through the match's roster,
+	// which is the whole reason that join exists.
+	if top.Victim != "dinos" {
+		t.Errorf("the top blow killed %q, want dinos", top.Victim)
+	}
+	if top.Seats != 2 {
+		t.Errorf("the top blow was at a table of %d, want 2", top.Seats)
+	}
+	// A game with no blow contributes no row: the two below the cut are 3
+	// and 2, and nothing null-ish is on the board.
+	for _, k := range board.Blows {
+		if k.Amount <= 0 || k.Card == "" {
+			t.Errorf("a blank blow reached the board: %+v", k)
+		}
 	}
 }
