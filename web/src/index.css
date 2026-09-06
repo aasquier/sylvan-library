@@ -7831,6 +7831,112 @@ button:hover .tarot-fan-card {
 .field-side-near { grid-area: near; }
 .field-transport { grid-area: transport; }
 
+/* ================= A table of four ==================================
+ *
+ * **Four battlefields cannot stack, and that is measured rather than felt.**
+ * One seat's half is 272px on an iPhone viewport and four of them are 1,088px
+ * against 812px of screen — one and a third screens of sand before a hand, a
+ * seam or the transport. Aaron called it before the tape measure did
+ * (2026-09-06).
+ *
+ * So the pod has two behaviours over **one** DOM, which is the whole trick
+ * here: every seat is always rendered, and the narrow screen collapses the
+ * ones it is not showing. Two React trees would have been two things to keep
+ * in step, and the board has been bitten by that before.
+ *
+ * The mirror is the duel's own, applied on both axes. Seats one and two face
+ * down the table and seats three and four face up it, so every creature row
+ * is against the middle and every land row is at its own player's back —
+ * which is what four people around a table actually looks like.
+ */
+.field.is-pod {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'table'
+    'transport';
+}
+
+.field-table {
+  grid-area: table;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-quad {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  border-radius: 8px;
+}
+
+/* The seat's own plate, and the control that holds it open. A button because
+   it changes this page rather than leaving it (commandment 20), and it answers
+   the hand three ways because everything here does (commandment 17). */
+.field-quad-grip {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.field-quad-grip:hover { background: rgba(201, 162, 39, 0.10); }
+.field-quad-grip:focus-visible {
+  outline: 2px solid var(--field-brass);
+  outline-offset: 2px;
+}
+.field-quad-grip:active { transform: translateY(1px); }
+.field-quad-grip.is-pinned {
+  background: rgba(201, 162, 39, 0.16);
+  box-shadow: inset 0 0 0 1px var(--field-brass);
+}
+
+/* The seat holding the camera reads as the lit one. */
+.field-quad.is-on-turn { box-shadow: inset 0 0 0 1px rgba(201, 162, 39, 0.35); }
+
+/* ---- Narrow: one seat open, the rest as rails ---------------------- */
+@media (max-width: 61.999rem) {
+  /* A closed seat keeps its plate — life, commander, counters — and gives up
+     its sand and its hand. Nothing is unmounted: the seat is still in the
+     tree, so opening it is a class change rather than a remount, and no
+     animation restarts because a reader looked at somebody else. */
+  .field-quad:not(.is-open) > .field-side,
+  .field-quad:not(.is-open) > .field-hand {
+    display: none;
+  }
+  .field-quad:not(.is-open) {
+    border: 1px solid rgba(201, 162, 39, 0.18);
+  }
+  /* The open seat gets the whole width and the rails sit above it, so the
+     table reads top-to-bottom as "who is here" then "what is happening". */
+  .field-quad.is-open { order: 2; }
+  .field-quad:not(.is-open) { order: 1; }
+  .field-table { display: flex; flex-direction: column; }
+}
+
+/* ---- Wide: the two-by-two ------------------------------------------ */
+@media (min-width: 62rem) {
+  .field-table {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+  /* Half the width means a smaller card, worked out from the same geometry
+     the rest of the board uses rather than picked: the lean and the turning
+     clearance come off `--field-card-full`, so naming only this keeps a
+     quadrant's cards able to turn. */
+  .field.is-pod { --field-card-full: 42px; }
+  /* Nobody is collapsed on a wide screen; the grip is just the plate. */
+  .field-quad-grip { cursor: default; }
+  .field-quad-grip:hover { background: transparent; }
+}
+
 /* **A hand travels with its seat.** One shared rail is right on a wide screen
    and wrong on a narrow one: there the rail becomes a strip at the foot, and
    the far player's hand ends up stacked under the near player's, two seats
