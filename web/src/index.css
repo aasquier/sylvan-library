@@ -7854,6 +7854,15 @@ button:hover .tarot-fan-card {
   grid-template-areas:
     'table'
     'transport';
+  /* **The rows have to be named too, and forgetting them is not a small
+     miss.** `.field` is given `grid-template-rows: var(--half-h) auto
+     var(--half-h) auto` in the wide block — four rows for the duel's four
+     areas — and a two-area template laid onto a four-row grid does not
+     rearrange itself: the table was clamped into a 231px row and overflowed
+     it, and the transport was placed 231px down, which put it straight
+     through the middle of the top two quadrants. Two areas, two rows, both
+     sized by what is in them. */
+  grid-template-rows: auto auto;
 }
 
 .field-table {
@@ -7866,9 +7875,35 @@ button:hover .tarot-fan-card {
 
 .field-quad {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  /* Content, not `1fr`: a quadrant is as tall as the plate, the sand and the
+     hand it actually holds. A fractional row would have sized the sand to
+     whatever was left and clipped it. */
+  grid-template-rows: auto auto auto;
   min-width: 0;
   border-radius: 8px;
+}
+
+/* **The duel's area names do not exist in here, and an unmatched grid area is
+   not an error — it is an overlap.**
+ *
+ * `.field-side-far` carries `grid-area: far` and `.field-hand-far` carries
+ * `grid-area: handsfar`, both named for the `.field` grid one level up. Inside
+ * a quadrant neither name resolves, so both fell back to the same implicit
+ * slot and drew on top of each other: the sand and the hand at identical
+ * coordinates, and the plate squeezed into a column beside them.
+ *
+ * **It is invisible to a bounding-box check of the quadrants**, which is how
+ * it shipped past a measurement that said the two-by-two was perfect — the
+ * quads *were* perfect, and everything inside one was piled up. Aaron saw it
+ * in a second. Reset the four placements the shorthand set and let the rows
+ * above do the placing, in DOM order: plate, sand, hand.
+ */
+.field-quad > .field-quad-grip,
+.field-quad > .field-side,
+.field-quad > .field-hand {
+  grid-area: auto;
+  grid-column: 1 / -1;
 }
 
 /* The seat's own plate, and the control that holds it open. A button because
@@ -7940,6 +7975,17 @@ button:hover .tarot-fan-card {
   /* Nobody is collapsed on a wide screen; the grip is just the plate. */
   .field-quad-grip { cursor: default; }
   .field-quad-grip:hover { background: transparent; }
+
+  /* **A quadrant keeps the count of a hand and not the cards in it.**
+     Uncrushed, a quadrant came to 419px — plate 75, sand 231, hand 114 — and
+     four of those is 847px, which is a table nobody can see at once. The hand
+     is the part to give up: at four seats a reader is watching the table, not
+     counting somebody's grip, and the label already says whose hand it is and
+     how many cards are in it. The fan and the mana bar come back on the
+     narrow layout, where one seat is open and there is room for them. */
+  .field-quad .field-hand-fan,
+  .field-quad .field-pool { display: none; }
+  .field-quad .field-hand { padding-top: 2px; padding-bottom: 2px; }
 }
 
 /* **A hand travels with its seat.** One shared rail is right on a wide screen
