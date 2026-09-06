@@ -474,9 +474,9 @@ export default function Import() {
         </>}>
         <p className="max-w-2xl">
           Paste an export from Moxfield, Archidekt, Arena or anywhere else.
-          Names are resolved against the local pool — anything that does not
-          resolve is reported, never guessed. Add a quoted reason to any line
-          and it becomes that card&rsquo;s <code>why</code>.{' '}
+          Names are resolved against the library&rsquo;s own cards — anything
+          that does not resolve is reported, never guessed. Add a quoted reason
+          to any line and it becomes that card&rsquo;s <code>why</code>.{' '}
           <Link to="/" className="underline" style={{ color: 'var(--series-1)' }}>
             Back to the library
           </Link>

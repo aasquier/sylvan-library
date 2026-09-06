@@ -282,11 +282,44 @@ export default function App() {
   // "logged out" from "this instance stopped requiring a login".
   useEffect(() => onSessionLost(() => { void refreshAuth() }), [refreshAuth])
 
+  /**
+   * The last control in the app that started work and kept listening.
+   *
+   * Two clicks used to be two logouts: the first ends the session, the second
+   * arrives at a door that is already shut and comes back a refusal, which the
+   * client swallows — so the cost was never an error on screen, it was a
+   * button that answered a deliberate press with nothing at all. On a slow
+   * connection that reads as a click that missed, and the reasonable next move
+   * is to press it again.
+   *
+   * The house pattern is both halves or neither (`DeckDetail`'s writes, the
+   * Simulator's run button): a busy flag driving `disabled` *and* a visible
+   * pending state, because disabling with no visible change reads as broken
+   * and a label change with no `disabled` still double-submits. `signingOut`
+   * is that flag; the label says `Signing out…` while it is out.
+   *
+   * Cleared in a `finally` rather than on success: when the logout takes, the
+   * shell is replaced by the gate and the flag stops mattering — but on the
+   * path where it does not take (the network refused, the session survives)
+   * the button has to come back, or the only way out is a reload.
+   *
+   * **No in-function `if (busy) return`, deliberately**, and the reason is the
+   * one `DeckDetail`'s `returnCard` records: this button is the only door into
+   * `signOut`, and jsdom refuses a click on a disabled button exactly as a
+   * browser does — so a second guard behind the first is code no test can
+   * reach, which is a surviving mutant by construction. The pilot line's save
+   * carries one because it has a second door (Enter on the input); this has
+   * none.
+   */
+  const [signingOut, setSigningOut] = useState(false)
   async function signOut() {
+    setSigningOut(true)
     try {
       await api.logout()
     } finally {
+      // `refreshAuth` swallows its own failures, so this always settles.
       await refreshAuth()
+      setSigningOut(false)
     }
   }
 
@@ -409,9 +442,9 @@ export default function App() {
                 <span className="hidden text-xs sm:inline" style={{ color: 'var(--text-muted)' }}>
                   {auth?.user?.username}
                 </span>
-                <button onClick={() => void signOut()}
+                <button onClick={() => void signOut()} disabled={signingOut}
                         className="btn btn-quiet btn-sm whitespace-nowrap">
-                  Sign out
+                  {signingOut ? 'Signing out…' : 'Sign out'}
                 </button>
               </span>
             )}

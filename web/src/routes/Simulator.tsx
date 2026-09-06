@@ -310,6 +310,55 @@ export default function Simulator() {
   const running = submitting || shelfBusy
     || job?.status === 'queued' || job?.status === 'running'
 
+  /**
+   * The run's ending, said out loud.
+   *
+   * The progress panel speaks the *wait* — `Spinner` carries `role="status"`
+   * and a label — and then unmounts with the answer, so somebody using a
+   * reader knew a run had started and never heard it stop. This is the other
+   * half, and it is a per-surface sentence rather than something the spinner
+   * could have said: what arrives here is a report, and the one thing a
+   * report has to declare about itself is whether these numbers were computed
+   * now or kept from an identical run (ADR 18 — quote a cached number as
+   * cached).
+   *
+   * **It borrows `Provenance`'s own clause, and that is not laziness.** That
+   * line is what an eye reads two inches below this sentence; if the two
+   * described the same fact in two different ways, a reader user and a sighted
+   * user comparing notes would be comparing two claims instead of one. So
+   * "same deck, same parameters, same numbers" is quoted rather than
+   * paraphrased, and "computed just now" with it. The word `Provenance` uses
+   * that this does not is *Cached*, which a sentence read aloud does not need
+   * and commandment 10 would rather it did without.
+   *
+   * Empty while a run is out, so the region goes quiet and fills again: that
+   * emptying is what makes two identical runs in a row two announcements
+   * rather than one silent re-render — a region still holding the last
+   * sentence is a region React never touches, and an untouched region says
+   * nothing.
+   *
+   * **And nothing here tests `running`, deliberately.** The obvious first
+   * draft opened with `running ? '' : …`, which reads like the thing keeping
+   * the region quiet and is not: `run()` clears `mana`, `lands`, `shelf` and
+   * `policy` before it awaits anything, so there is no render in which a
+   * result stands while a run is out. The clause was measured, not reasoned
+   * about — removing it broke no test, because no test could reach it — and
+   * a guard nothing can fail is the LIVED mutant `DeckDetail`'s `returnCard`
+   * records. So the emptiness rests where it actually comes from, `run()`'s
+   * own clearing, and `empties while the next run is out` is the test that
+   * fails if that clearing ever goes.
+   */
+  const arrived = mana ?? lands ?? policy
+  const finished =
+    arrived
+      ? 'The simulation is finished. ' + (arrived.cached
+        ? 'Same deck, same parameters, same numbers as a run from before — '
+          + 'they are below.'
+        : 'Computed just now. The numbers are below.')
+      : shelf
+        ? 'The mana question is answered. The numbers are below.'
+        : ''
+
   return (
     <div className="space-y-6">
       <PageMasthead
@@ -423,6 +472,9 @@ export default function Simulator() {
       {/* What a run will leave out, before it is paid for. */}
       <DeckCaution report={checks[address(slug, owner)]}
                    name={deckOf(slug, owner)?.name ?? slug} />
+
+      {/* Mounted across both states — see `finished` above. */}
+      <span className="sr-only" role="status">{finished}</span>
 
       {error && <ErrorNote>Simulation failed: {error}</ErrorNote>}
 

@@ -84,8 +84,13 @@ export default function CardSearch() {
           <em>Demonic Tutor</em> by Anato Finnstark, Strixhaven Mystical
           Archive — search your library for a card.
         </>}>
+        {/* This line used to say the history was queried on the reader's own
+            machine. It was found by sweeping for the *claim* rather than for
+            the four known strings that made it — same untruth, different
+            words, and a grep for the phrase walks straight past it.
+            `hostedcopy.test.ts` is the guard. */}
         <p>
-          The whole printed history, queried locally. Identity is a subset filter:
+          The whole printed history, on the shelves. Identity is a subset filter:
           asking for Golgari returns colorless and mono-black cards too, because
           those are legal in the deck.
         </p>
@@ -110,6 +115,40 @@ export default function CardSearch() {
                   { value: 'newest', label: 'Newest' },
                 ]} />
       </div>
+
+      {/* How many came back, for the hand that cannot see the grid.
+          `Spinner` announces that a search began (`role="status"` lives on it)
+          and then unmounts with the answer, so the arrival was silence — the
+          half the 08-24 live-region pass deliberately left. This region is
+          mounted across both states, which is what an arrival needs: it holds
+          nothing while a search is out and fills when one lands, and a
+          filled-to-empty-to-filled region is the change a polite reader
+          announces.
+
+          It says what the paragraph below says, in the same words. A sighted
+          person and a reader user should be told the same thing about the
+          same page, and "Search finished" would be a different, worse
+          sentence — the count *is* the answer.
+
+          Silent while `error` stands, and that clause is load-bearing rather
+          than tidy. A failed search leaves the *previous* results in `cards`
+          and clears `busy`, so without it a search that did not happen
+          announces the last one's count as though it had — and it would land
+          straight after `ErrorNote`'s `role="alert"`, so the reader would hear
+          the failure and then hear a number, in that order. The grid below
+          keeps showing the old cards on purpose (they were true a moment ago
+          and the eye can see the error above them); a spoken count arriving
+          fresh cannot be read that way. */}
+      <span className="sr-only" role="status">
+        {busy || error || !cards
+          ? ''
+          : cards.length === 0
+            ? 'Nothing matched. Try loosening a filter.'
+            : `${cards.length} result${cards.length === 1 ? '' : 's'}`
+              + (cards.length === 60
+                ? ', and the list is capped — narrow the filters for more.'
+                : '.')}
+      </span>
 
       {error && <ErrorNote>{error}</ErrorNote>}
       {message && (

@@ -399,6 +399,52 @@ describe('with auth on and somebody signed in', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy()
   })
 
+  // The last control in the app that started work and kept listening (Red's
+  // 08-24 census, item 12). Two presses used to be two logouts, and the second
+  // one's refusal is swallowed by the client — so the whole cost was a
+  // deliberate press answered by nothing, which on a slow connection reads as
+  // a click that missed.
+  //
+  // The logout is held open here rather than raced, because the busy state
+  // against a local stub lives for microseconds: without a gate this test
+  // would pass on a build with the fix removed, having simply never looked
+  // during the window.
+  it('stops listening while the sign-out is out, and says so', async () => {
+    let release!: () => void
+    const held = new Promise<void>((settle) => { release = settle })
+    let logouts = 0
+    // Delegated to rather than replaced, so `paths()` still sees every call
+    // and the routing table above still answers them.
+    const inner = fetchMock as unknown as (i: string, o?: RequestInit) => Promise<unknown>
+    vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+      if (String(input).split('?')[0] === '/api/auth/logout') {
+        logouts += 1
+        await held
+      }
+      return inner(input, init)
+    }))
+
+    renderApp()
+    const out = await screen.findByRole('button', { name: 'Sign out' })
+    fireEvent.click(out)
+
+    // Both halves, or neither: a disabled button with no visible change reads
+    // as broken, and a changed label with no `disabled` still double-submits.
+    await waitFor(() => expect(out.textContent).toBe('Signing out…'))
+    expect((out as HTMLButtonElement).disabled).toBe(true)
+
+    // jsdom refuses a click on a disabled button exactly as a browser does,
+    // which is what makes the two presses below an assertion about the fix
+    // rather than about the test.
+    fireEvent.click(out)
+    fireEvent.click(out)
+    expect(logouts).toBe(1)
+
+    routes['/api/auth/me'] = { body: auth({ auth_required: true, is_admin: false }) }
+    await act(async () => { release() })
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy()
+  })
+
   it('falls back to the login screen when a session expires under it', async () => {
     // The real chain: a 401 from any endpoint reaches the interceptor in
     // api.ts, which announces a lost session; the shell re-asks the one
