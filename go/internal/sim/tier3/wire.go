@@ -145,6 +145,13 @@ type WireGame struct {
 	WinnerSeat   *int    `json:"winner_seat"`
 	Turns        *int    `json:"turns"`
 	TimedOut     bool    `json:"timed_out"`
+	// Killer is the blow that ended the game, and `omitempty` because most
+	// games have none: a clock-out, a decking and a commander kill all end
+	// without one, and a worker image built before this field existed sends
+	// no such key at all. Absent decodes to nil, which is the same "nobody
+	// knows" those three already mean — so an old worker keeps working and
+	// says nothing rather than claiming a blow of zero.
+	Killer *KillingBlow `json:"killer,omitempty"`
 }
 
 // GameToWire encodes one game.

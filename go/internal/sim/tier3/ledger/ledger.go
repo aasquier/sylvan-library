@@ -206,11 +206,13 @@ func (r *Recorder) record(ctx context.Context, m Match) (int64, error) {
 	for _, g := range m.Run.Games() {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO forge_games (match_id, game_index,`+
-				` winner_seat, milliseconds, turns, draw, timed_out)`+
-				` VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			matchID, g.Index, nullableSeat(g.WinnerSeat), g.Milliseconds,
-			nullableSeat(g.Turns), boolToInt(g.Draw),
-			boolToInt(g.TimedOut)); err != nil {
+				` winner_seat, milliseconds, turns, draw, timed_out,`+
+				` kill_amount, kill_card, kill_sources, kill_combat,`+
+				` kill_seat, kill_turn)`+
+				` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			append([]any{matchID, g.Index, nullableSeat(g.WinnerSeat),
+				g.Milliseconds, nullableSeat(g.Turns), boolToInt(g.Draw),
+				boolToInt(g.TimedOut)}, killColumns(g.Killer)...)...); err != nil {
 			return 0, err
 		}
 	}
@@ -242,6 +244,17 @@ func seedForSQL(seed *big.Int) (any, error) {
 		return nil, fmt.Errorf("seed %s does not fit the ledger's 64-bit integer column", seed)
 	}
 	return seed.Int64(), nil
+}
+
+// killColumns is a blow's six columns, or six NULLs. All-or-nothing on
+// purpose: a row with an amount and no card, or a card and no amount, would be
+// a blow nobody can render, and there is no path that produces one — the
+// parser fills the whole struct or hands back nil.
+func killColumns(k *tier3.KillingBlow) []any {
+	if k == nil {
+		return []any{nil, nil, nil, nil, nil, nil}
+	}
+	return []any{k.Amount, k.Card, k.Sources, boolToInt(k.Combat), k.Seat, k.Turn}
 }
 
 func nullableSeat(v *int) any {

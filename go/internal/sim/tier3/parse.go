@@ -83,6 +83,53 @@ type GameResult struct {
 	// than finishing. Folded into `Draw` by Forge, separated here because a
 	// clock-out is a measurement problem and a real draw is a game outcome.
 	TimedOut bool
+	// Killer is the blow that ended the game, and nil whenever nothing did.
+	//
+	// **Nil is the ordinary case for a great many games**, and it is not a
+	// gap in the reading: a game can end by commander damage, by drawing from
+	// an empty library, by an effect that says "you lose the game", by a
+	// concession, or by the clock — and none of those is a blow. It is also
+	// nil on the prose path, which never sees an event at all.
+	Killer *KillingBlow
+}
+
+// KillingBlow is the last damage a player took before their life reached
+// zero, on the game's final kill (Aaron, 2026-09-06). The *final* one: a pod
+// kills three players and only the last of them ends the game, so this
+// records the blow that closed it rather than the first one that landed.
+//
+// **Read on both paths through [ScribeParser.Feed], never behind the watching
+// gate.** This is a row's field, exactly as `Turns` is, and the night does
+// not narrate — so a killing blow gated on somebody watching would be a
+// killing blow that only ever existed for a match in a browser.
+//
+// The JSON tags are the worker wire's (see [WireGame.Killer]); this struct
+// crosses inside a game rather than on its own, so it carries them here.
+type KillingBlow struct {
+	// Amount is the damage the blow dealt: the number the top ten ranks on.
+	Amount int `json:"amount"`
+	// Card is what dealt it, by name — a creature, a burn spell, a token.
+	Card string `json:"card"`
+	// Combat is whether it was combat damage rather than an effect's.
+	Combat bool `json:"combat"`
+	// Seat is the chair that died, 1-based like every other seat here. Who
+	// *dealt* it is deliberately absent: the scribe's player-damage line
+	// names the source card and the victim, and inferring a controller from
+	// the board would be a guess on the one path (the night's) where there is
+	// no board to read.
+	Seat int `json:"seat"`
+	// Turn is the player-turn the blow landed on, so a nine-turn kill and a
+	// fortieth-turn one can be told apart.
+	Turn int `json:"turn"`
+	// Sources is how many cards contributed to the blow — one for a solo
+	// haymaker, six for the alpha strike that ends the recorded corpus's
+	// first game. See [KillingBlow.add] for why the blow is a batch.
+	Sources int `json:"sources"`
+	// biggest is the largest single contribution seen so far, which is how
+	// `Card` picks its name. Unexported and unserialised: it is the running
+	// state of the fold, not a fact about the blow, and `Card` is the answer
+	// it exists to produce.
+	biggest int
 }
 
 // SimOutput is everything the run said, parsed.
