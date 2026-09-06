@@ -650,13 +650,19 @@ describe('Library deck deletion', () => {
 })
 
 /**
- * Two shelves, and which decks land on which (ADR 22).
+ * Three shelves, and which decks land on which (ADR 22, re-read on Aaron's
+ * 2026-09-05 ruling: the showcase is its own tab, not a mixture into yours).
  *
- * The rule the whole tab rests on is that both tests come from the server:
- * `writable` is the caller's own decks, `showcase` is the curated six's owner.
- * Neither is a comparison this client could make — it is never told who the
- * maintainer is — so a browser that tried to infer the split from the order of
- * the response would be reading an ordering that is not a contract.
+ * Yours is the default, the showcase sits behind a tab of its own, and
+ * everybody else's stay behind browse. The rule the whole strip rests on is
+ * that every test comes from the server: `writable` is the caller's own decks,
+ * `showcase` is the curated six's owner. Neither is a comparison this client
+ * could make — it is never told who the maintainer is — so a browser that
+ * tried to infer the split from the order of the response would be reading an
+ * ordering that is not a contract. And the house test is `showcase &&
+ * !writable`, because on the maintainer's own instance both flags are true on
+ * every tile at once — a bare `showcase` would move their whole library into
+ * a room they own.
  */
 describe('Library, browsing by player', () => {
   /** The maintainer's showcase, this reader's own deck, and two strangers'. */
@@ -680,6 +686,10 @@ describe('Library, browsing by player', () => {
     fireEvent.click(screen.getByRole('tab', { name: /other players/i }))
   }
 
+  function openShowcase() {
+    fireEvent.click(screen.getByRole('tab', { name: /the showcase/i }))
+  }
+
   it('offers no tabs at all when nobody else has shared anything', async () => {
     // The default: a laptop, and any instance where the showcase is the only
     // library. A tab strip here would be the "something in the way" ADR 22
@@ -689,24 +699,29 @@ describe('Library, browsing by player', () => {
     expect(screen.queryByRole('tab')).toBeNull()
   })
 
-  it('keeps your own decks and the showcase together, and the rest behind a tab',
-     async () => {
+  it('gives the showcase its own tab', async () => {
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    // The showcase is "always visible", so it is here rather than filed under
-    // its owner's username with the strangers.
-    await waitFor(() => expect(shownNames()).toEqual(['Goreclaw', 'Mine']))
-    expect(screen.queryByText('Zoe deck')).toBeNull()
+    // My decks is exactly what this reader can write — the showcase is a
+    // place they visit now, not something mixed in beside their own.
+    await waitFor(() => expect(shownNames()).toEqual(['Mine']))
+    expect(screen.queryByText('Goreclaw')).toBeNull()
 
+    // The showcase's room: the h2 names it, the decks sit under h3s.
+    openShowcase()
+    expect(browsedNames()).toEqual(['Goreclaw'])
+    expect(screen.queryByText('Mine')).toBeNull()
+
+    // And it is not filed under its owner's username with the strangers.
     openBrowse()
     expect(browsedNames()).toEqual(['Amy deck', 'Zoe deck'])
-    expect(screen.queryByText('Mine')).toBeNull()
+    expect(screen.queryByText('Goreclaw')).toBeNull()
   })
 
   it('groups the browse shelf by username, alphabetically', async () => {
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
     openBrowse()
 
     const owners = screen.getAllByRole('heading', { level: 2 })
@@ -718,23 +733,76 @@ describe('Library, browsing by player', () => {
   it('counts each shelf on its own tab', async () => {
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
-    expect(screen.getByRole('tab', { name: /my decks/i }).textContent).toContain('2')
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
+    // My decks counts only what this reader can write; the showcase and the
+    // strangers each carry their own number.
+    expect(screen.getByRole('tab', { name: /my decks/i }).textContent).toContain('1')
+    expect(screen.getByRole('tab', { name: /the showcase/i }).textContent).toContain('1')
     expect(screen.getByRole('tab', { name: /other players/i }).textContent).toContain('2')
   })
 
+  it('grows no showcase tab on the maintainer\'s own view', async () => {
+    // The trap the split's `!writable` exists for: on the maintainer's own
+    // instance — and on any laptop with auth off — `writable` and `showcase`
+    // are both true on the same tiles, and a bare `showcase` test would move
+    // their whole library into a room of its own. Their decks stay My decks;
+    // the one stranger is what makes the strip render at all.
+    vi.mocked(api.decks).mockResolvedValue([
+      ...DECKS,
+      deck({ slug: 'zoe-deck', name: 'Zoe deck', owner: 'zoe',
+             showcase: false, writable: false }),
+    ])
+    renderLibrary()
+    await waitFor(() => expect(shownNames()).toHaveLength(3))
+    expect(screen.getByRole('tab', { name: /my decks/i }).textContent).toContain('3')
+    expect(screen.queryByRole('tab', { name: /showcase/i })).toBeNull()
+  })
+
+  it('greets a newcomer on My decks and offers the showcase beside it', async () => {
+    // Zero own decks and a visible showcase: the first-run greeting is
+    // finally reachable on a stocked instance, and the tab next to it says
+    // the room next door is open.
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'goreclaw', name: 'Goreclaw', owner: 'aasquier',
+             showcase: true, writable: false }),
+    ])
+    renderLibrary()
+    await screen.findByText('Nothing on the shelf yet.')
+    expect(screen.getByRole('tab', { name: /my decks/i })
+      .getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /the showcase/i })).toBeTruthy()
+  })
+
+  it('points the greeting at the showcase only when there is one to see', async () => {
+    vi.mocked(api.decks).mockResolvedValue([
+      deck({ slug: 'goreclaw', name: 'Goreclaw', owner: 'aasquier',
+             showcase: true, writable: false }),
+    ])
+    renderLibrary()
+    await screen.findByText('Nothing on the shelf yet.')
+    expect(screen.getByText(/the showcase tab above/i)).toBeTruthy()
+
+    // A truly empty library has no showcase to point at, and a line pointing
+    // at a tab that is not there would be the page telling a small lie.
+    cleanup()
+    vi.mocked(api.decks).mockResolvedValue([])
+    renderLibrary()
+    await screen.findByText('Nothing on the shelf yet.')
+    expect(screen.queryByText(/the showcase tab above/i)).toBeNull()
+  })
+
   it('wraps the strip, so a third shelf can never widen a phone', async () => {
-    // Two tabs and their counts fit a 375px phone with room to spare today,
+    // Three tabs and their counts fit a 375px phone with room to spare today,
     // which is exactly why this is worth a line: the same strip on the deck
     // page grew to six tabs and pushed 81px of horizontal scroll onto every
     // page of the site before anybody noticed. One word stops that happening
-    // here, and it costs nothing while there are only two.
+    // here, and the showcase tab just proved the point by arriving free.
     //
     // jsdom has no layout, so this holds the class and never the width — see
     // the note over the matching case in `DeckDetail.test.tsx`.
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
     const strip = screen.getByRole('tablist', { name: 'Whose decks' })
     expect(strip.className).toContain('flex-wrap')
     expect(strip.className).toContain('flex ')
@@ -747,7 +815,7 @@ describe('Library, browsing by player', () => {
              writable: false, bracket: 5 }),
     ])
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
     openBrowse()
     expect(browsedNames()).toHaveLength(3)
 
@@ -760,20 +828,23 @@ describe('Library, browsing by player', () => {
   it('names the owner on somebody else\'s deck and not on your own', async () => {
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
-    const showcase = screen.getByText('Goreclaw').closest('a')!
-    const own = screen.getByText('Mine').closest('a')!
-    expect(within(showcase).getByText('aasquier')).toBeTruthy()
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
     // Not "mitch" on the reader's own tile: a label reading "yours" on every
     // deck is not information.
+    const own = screen.getByText('Mine').closest('a')!
     expect(within(own).queryByText('mitch')).toBeNull()
+    // The showcase tile still wears its owner's badge — redundant beside the
+    // room's own heading now, and harmlessly so.
+    openShowcase()
+    const showcase = screen.getByText('Goreclaw').closest('a')!
+    expect(within(showcase).getByText('aasquier')).toBeTruthy()
   })
 
   it('marks your own deck private, and never claims that about anyone else\'s',
      async () => {
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
     // `shared: false` on the reader's own deck: only they can see it.
     expect(within(screen.getByText('Mine').closest('a')!)
       .getByText('private')).toBeTruthy()
@@ -788,15 +859,16 @@ describe('Library, browsing by player', () => {
     // skipped: `/decks/goreclaw` is a route that no longer exists server-side.
     vi.mocked(api.decks).mockResolvedValue(MIXED)
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
-    expect(screen.getByText('Goreclaw').closest('a')!.getAttribute('href'))
-      .toBe('/decks/aasquier/goreclaw')
+    await waitFor(() => expect(shownNames()).toHaveLength(1))
     expect(screen.getByText('Mine').closest('a')!.getAttribute('href'))
       .toBe('/decks/mitch/my-deck')
+    openShowcase()
+    expect(screen.getByText('Goreclaw').closest('a')!.getAttribute('href'))
+      .toBe('/decks/aasquier/goreclaw')
   })
 
   it('deletes the deck of the owner whose tile was clicked', async () => {
-    // Two owners with the same slug: the shelf must drop one tile, not both.
+    // Two owners with the same slug: the page must drop one tile, not both.
     vi.mocked(api.decks).mockResolvedValue([
       deck({ slug: 'goreclaw', name: 'My Goreclaw', owner: 'mitch',
              showcase: false, writable: true }),
@@ -804,16 +876,21 @@ describe('Library, browsing by player', () => {
              showcase: true, writable: false }),
     ])
     renderLibrary()
-    await waitFor(() => expect(shownNames()).toHaveLength(2))
+    await waitFor(() => expect(shownNames()).toEqual(['My Goreclaw']))
     fireEvent.click(screen.getByRole('button', { name: 'Entomb My Goreclaw' }))
     const dialog = screen.getByRole('dialog')
     fireEvent.change(within(dialog).getByRole('textbox'),
                      { target: { value: 'bury' } })
     fireEvent.click(within(dialog).getByRole('button', { name: /entomb this deck/i }))
 
-    await waitFor(() => expect(shownNames()).toEqual(['Their Goreclaw']))
+    // The reader's only deck is gone, so My decks is a beginning again…
+    await waitFor(() =>
+      expect(shownNames()).toEqual(['Nothing on the shelf yet.']))
     expect(api.deleteDeck).toHaveBeenCalledWith(
       expect.objectContaining({ owner: 'mitch', slug: 'goreclaw' }), 'bury')
+    // …and the namesake with the other owner survives, in its own room.
+    openShowcase()
+    expect(browsedNames()).toEqual(['Their Goreclaw'])
   })
 })
 

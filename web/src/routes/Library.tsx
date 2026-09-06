@@ -417,8 +417,13 @@ function LibraryMasthead({ decks, health }: {
  * Distinct from "no decks match those filters", which is a dead end you get
  * out of by changing a filter. An empty library is a beginning, and until
  * import existed there was nothing to offer here but a shrug.
+ *
+ * `showcase` is whether the house shelf has anything on it. When it does,
+ * one extra line points there — a newcomer with no decks of their own
+ * should be told the room next door is open before being asked to build
+ * (commandment 2).
  */
-function FirstRun() {
+function FirstRun({ showcase = false }: { showcase?: boolean }) {
   return (
     <section className="card-surface relative overflow-hidden rounded-xl">
       {/* `hero-art`, `hero-lift` and `hero-scrim` live in index.css because
@@ -451,6 +456,13 @@ function FirstRun() {
               style={{ background: 'var(--series-1)', color: '#fff' }}>
           Import a decklist
         </Link>
+        {showcase && (
+          <p className="mt-4 max-w-xl text-sm leading-relaxed"
+             style={{ color: 'var(--text-secondary)' }}>
+            Or wander first: the showcase tab above holds finished decks, kept
+            on display for everyone here.
+          </p>
+        )}
         <p className="mt-8 text-[11px]" style={{ color: 'var(--text-muted)' }}>
           Art: <em>Sylvan Library</em> by Yeong-Hao Han, Commander&rsquo;s Arsenal.
         </p>
@@ -716,7 +728,7 @@ function TheCrypt({ entombed, error, busy, failed, onReturn, onEmpty, justEmptie
 }
 
 /** Which shelf is being looked at. See the `split` memo below. */
-type Shelf = 'mine' | 'players' | 'crypt'
+type Shelf = 'mine' | 'house' | 'players' | 'crypt'
 
 export default function Library() {
   const [decks, setDecks] = useState<DeckTile[] | null>(null)
@@ -810,21 +822,31 @@ export default function Library() {
   }
 
   /**
-   * The two shelves ADR 22 asks for: yours, and everybody else's.
+   * The three shelves, and Aaron's ruling that made the middle one a place:
+   * "I think instead of other users seeing Gyome's decks through a filter of
+   * some kind, lets have that be its own tab on users menu" (2026-09-05).
    *
-   * Other players' decks are "a tab somebody opts into rather than something
-   * in the way", and the maintainer's showcase is "always visible" — so the
-   * default shelf is what you can write plus the six, and the browse tab is
-   * the remainder.
+   * So yours is the default shelf, the showcase sits behind a tab of its own,
+   * and everybody else's stay behind browse. This is a re-reading of ADR 22's
+   * "always visible", not a reversal — the showcase's tab is always *offered*
+   * when there is one to see, which is visibility as a room rather than as a
+   * mixture into somebody's My-decks.
    *
-   * Both tests come from the server. `writable` is the caller's own decks and
-   * `showcase` is the curated six's owner; neither is a comparison this client
-   * could make, because it is never told who the maintainer is.
+   * All three tests come from the server. `writable` is the caller's own decks
+   * and `showcase` is the curated six's owner; neither is a comparison this
+   * client could make, because it is never told who the maintainer is.
+   *
+   * **The house test is `showcase && !writable`, and the `!writable` is
+   * load-bearing.** On the maintainer's own instance — and on any laptop with
+   * auth off — both flags are true on the same tiles at once, and a bare
+   * `showcase` would empty their My-decks tab into a room they own. The
+   * showcase is only a separate place for the people it does not belong to.
    */
-  const [mine, players] = useMemo(() => {
+  const [mine, house, players] = useMemo(() => {
     const list = decks ?? []
     return [
-      list.filter((d) => d.writable || d.showcase),
+      list.filter((d) => d.writable),
+      list.filter((d) => d.showcase && !d.writable),
       list.filter((d) => !d.writable && !d.showcase),
     ]
   }, [decks])
@@ -833,7 +855,7 @@ export default function Library() {
     // The crypt is not a shelf of tiles and is rendered by itself; `shown` is
     // still computed so the filter row keeps its options while the crypt is
     // open, and so switching back does not blink.
-    let list = shelf === 'players' ? players : mine
+    let list = shelf === 'players' ? players : shelf === 'house' ? house : mine
     if (bracket !== 'all') list = list.filter((d) => String(d.bracket) === bracket)
     if (color !== 'all') list = list.filter((d) => d.color_identity.includes(color))
     if (status !== 'all') list = list.filter((d) => d.status === status)
@@ -849,7 +871,7 @@ export default function Library() {
           ? b.total_cards - a.total_cards
           : a.name.localeCompare(b.name),
     )
-  }, [mine, players, shelf, bracket, color, status, stage, pilot, sort])
+  }, [mine, house, players, shelf, bracket, color, status, stage, pilot, sort])
 
   /** The browse shelf, grouped under the username it belongs to.
    *
@@ -875,10 +897,19 @@ export default function Library() {
   // single-player library never grows a control about nobody.
   const pilots = [...new Set(decks.map((d) => d.pilot).filter(Boolean))].sort()
 
+  // Every deck on the house shelf has the same owner — that is what the shelf
+  // *is* — so the room can name whose it is off any tile on it.
+  const houseOwner = house[0]?.owner ?? ''
+
   /**
-   * The strip's tabs, built rather than listed, because two of the three are
+   * The strip's tabs, built rather than listed, because three of the four are
    * conditional and for the same reason: a tab about nobody is exactly the
    * "something in the way" ADR 22 asked the browse view not to be.
+   *
+   * The showcase appears when its shelf holds anything. For the maintainer —
+   * and on any auth-off laptop — it never does: their showcase decks are
+   * `writable` and live under My decks, so no tab appears over a library that
+   * is all one person's.
    *
    * The crypt appears when there is something in it — or when the crypt could
    * not be read, which is a *different* answer and gets a tab with **no
@@ -892,6 +923,7 @@ export default function Library() {
    * back to the shelf. A tab you are standing on is never hidden.
    */
   const tabs: [Shelf, string, number | null][] = [['mine', 'My decks', mine.length]]
+  if (house.length > 0) tabs.push(['house', 'The showcase', house.length])
   if (players.length > 0) tabs.push(['players', 'Other players', players.length])
   if (crypt === null) tabs.push(['crypt', 'Crypt', null])
   else if (crypt.length > 0 || shelf === 'crypt') tabs.push(['crypt', 'Crypt', crypt.length])
@@ -906,8 +938,14 @@ export default function Library() {
           full size, so showing the nameplate too would introduce the app
           twice — but dropping the nameplate silently dropped the only
           top-level heading with it, which is what the first version of this
-          did. */}
-      {mine.length > 0 ? (
+          did.
+
+          Keyed off the WHOLE visible library, not the player's own shelf: a
+          newcomer who can see the showcase is standing in a stocked room, and
+          the nameplate is the room introducing itself. The count it carries
+          stays `mine.length`, because since the showcase got its own tab that
+          number finally means exactly what it says: your decks. */}
+      {decks.length > 0 ? (
         <LibraryMasthead decks={mine.length} health={health} />
       ) : (
         <div>
@@ -920,7 +958,7 @@ export default function Library() {
         </div>
       )}
 
-      {mine.length > 0 && <TheShelves />}
+      {decks.length > 0 && <TheShelves />}
 
       {/* Offered only when there is more than one place to be. On a laptop
           nobody has shared with and nobody has deleted from, a strip here
@@ -1064,7 +1102,7 @@ export default function Library() {
                   failed={returnError} onReturn={(id) => void returnDeck(id)}
                   onEmpty={() => setEmptying(true)} justEmptied={emptied !== null} />
       ) : shelf === 'mine' && mine.length === 0 ? (
-        <FirstRun />
+        <FirstRun showcase={house.length > 0} />
       ) : shown.length === 0 ? (
         <div className="card-surface rounded-lg px-4 py-8 text-center text-sm"
              style={{ color: 'var(--text-secondary)' }}>
@@ -1072,6 +1110,23 @@ export default function Library() {
         </div>
       ) : shelf === 'mine' ? (
         <DeckGrid decks={shown} onDelete={setDeleting} />
+      ) : shelf === 'house' ? (
+        // The showcase's own room. One heading naming it and whose it is,
+        // one sentence saying why it is here, and the decks under `h3` the
+        // way the browse groups keep theirs — the room's name is the `h2`.
+        <section className="space-y-4">
+          <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
+            The showcase
+            <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+              {houseOwner}
+            </span>
+          </h2>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            The library&rsquo;s own shelf — {houseOwner}&rsquo;s decks, kept on
+            display for everyone here.
+          </p>
+          <DeckGrid decks={shown} onDelete={setDeleting} heading="h3" />
+        </section>
       ) : (
         // Grouped under the username, which is what ADR 22 asked browsing to
         // be organised by — and the path shape gives it for free, since the
