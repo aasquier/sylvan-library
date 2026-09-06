@@ -163,7 +163,7 @@ export function Combos({ combos = [], deckRef, stage, identity, writable, onChan
                   {editing === i
                     ? (
                       <ComboForm
-                        combo={combo} identity={identity}
+                        combo={combo} identity={identity} deckRef={deckRef}
                         onSave={(entry) => write(withEntryAt(combos, i, entry))}
                         onCancel={() => { setEditing(null) }} />
                       )
@@ -183,7 +183,7 @@ export function Combos({ combos = [], deckRef, stage, identity, writable, onChan
           {writable && (editing === -1
             ? (
               <ComboForm
-                combo={null} identity={identity}
+                combo={null} identity={identity} deckRef={deckRef}
                 onSave={(entry) => write([...combos.map(toDraft), entry])}
                 onCancel={() => { setEditing(null) }} />
               )
@@ -532,9 +532,12 @@ function Trade({ needs, cut, deckRef, stage, writable, onAdded }: {
  * true. It composes a `ComboDraft` and hands it up; the section assembles the
  * whole block and writes it in one call, which is the only write there is.
  */
-function ComboForm({ combo, identity, onSave, onCancel }: {
+function ComboForm({ combo, identity, deckRef, onSave, onCancel }: {
   combo: Combo | null
   identity: string[]
+  /** The deck these pieces belong to, so the library measures each offer
+   *  against its rules rather than the finder guessing at them (ADR 51). */
+  deckRef: DeckRef
   onSave: (entry: ComboDraft) => Promise<void>
   onCancel: () => void
 }) {
@@ -603,7 +606,7 @@ function ComboForm({ combo, identity, onSave, onCancel }: {
             and a card squeezed into a third of a grid is the thing it exists
             to stop. */}
         <CardFinder value={picking} onChange={addPiece} identity={identity}
-                    label="Add a piece" />
+                    deck={deckRef} label="Add a piece" />
         <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
           The heading is the pieces, joined — there is no separate name to
           write.
@@ -655,9 +658,9 @@ function ComboForm({ combo, identity, onSave, onCancel }: {
       {near && (
         <div className="combo-trade space-y-3 rounded-md p-2.5">
           <NameField label="The card it needs" value={needs} onChange={setNeeds}
-                     identity={identity} />
+                     identity={identity} deckRef={deckRef} />
           <NameField label="What would come out for it" value={cut} onChange={setCut}
-                     identity={identity} />
+                     identity={identity} deckRef={deckRef} />
           <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
             A card to bring in is only a suggestion once there is a slot for
             it, so name the cut as well.
@@ -698,11 +701,12 @@ function ComboForm({ combo, identity, onSave, onCancel }: {
  * with no painting. Clearing it is a real operation, so the chosen name is
  * shown with a way to take it off again.
  */
-function NameField({ label, value, onChange, identity }: {
+function NameField({ label, value, onChange, identity, deckRef }: {
   label: string
   value: string
   onChange: (name: string) => void
   identity: string[]
+  deckRef: DeckRef
 }) {
   const [picking, setPicking] = useState<CardOffer | null>(null)
   if (value) {
@@ -724,7 +728,7 @@ function NameField({ label, value, onChange, identity }: {
     <CardFinder value={picking} onChange={(chosen) => {
       setPicking(null)
       if (chosen) onChange(chosen.name)
-    }} identity={identity} label={label} />
+    }} identity={identity} deck={deckRef} label={label} />
   )
 }
 

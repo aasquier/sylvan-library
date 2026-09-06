@@ -230,6 +230,27 @@ export interface CommanderCheck {
   message?: string
 }
 
+/** One deck's answer about one card, computed by the code that owns the rule.
+ *
+ *  The browser used to work this out itself, from `color_identity` against the
+ *  commander's colours — correct for exactly as long as colour identity had no
+ *  exceptions. A commander can now widen it (ADR 51), and the finder began
+ *  telling people that a card their own commander allows could not go in the
+ *  deck. The facts come from the server; the sentence is still written here,
+ *  because the wording is what a beginner reads. */
+export interface CardPlayable {
+  /** May this deck hold this card? */
+  ok: boolean
+  /** Banned in Commander, which no commander bends. */
+  banned: boolean
+  /** The colours this card carries that the deck cannot — empty when a
+   *  commander's clause covers it, because then they are outside nothing. */
+  outside: string[]
+  /** The commander whose clause let an off-identity card through, so the
+   *  interface can say why rather than merely fall quiet. */
+  allowed_by: string
+}
+
 export interface CardOffer {
   name: string
   mana_cost: string | null
@@ -253,6 +274,11 @@ export interface CardOffer {
    *  being the only one that is a guess, and the only one the interface says
    *  so about. */
   via: 'exact' | 'holds' | 'words' | 'near'
+  /** What one deck says about this card, when the request named a deck this
+   *  caller may read. **Undefined is "nobody asked", not "no"** — a payload
+   *  from before this key existed lands in a browser that has it, and the
+   *  reading falls back to the local one rather than to a refusal. */
+  playable?: CardPlayable
 }
 
 /**
@@ -3009,9 +3035,16 @@ export const api = {
    *  Unlike `searchCards` this does **not** filter to legal cards: a banned
    *  card is offered and marked, because a card hidden from the list is
    *  indistinguishable from a card that does not exist. */
-  suggestCards: (q: string, limit = 8) =>
+  /** `deck` asks the library to measure every offer against that deck's own
+   *  rules, so the finder stops keeping a second copy of them. Omitted where
+   *  there is no deck to measure against — the commander field, the card
+   *  search page — and a deck the caller may not read comes back unmeasured
+   *  rather than refused, which is the only answer that cannot be used to ask
+   *  whether somebody else's deck exists. */
+  suggestCards: (q: string, limit = 8, deck?: DeckRef) =>
     get<{ cards: CardOffer[]; message?: string }>(
-      `/api/cards/suggest?q=${encodeURIComponent(q)}&limit=${limit}`),
+      `/api/cards/suggest?q=${encodeURIComponent(q)}&limit=${limit}`
+      + (deck ? `&deck=${encodeURIComponent(`${deck.owner}/${deck.slug}`)}` : '')),
   /** Ask what the commander box is holding.
    *
    *  Sent whole and never split here, for the same reason the import body is:

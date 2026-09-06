@@ -419,6 +419,28 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 }
 
 // addCard is `POST .../cards` -- `service.add_card`.
+//
+// **The third door onto the swap board, and the one that was missing.** A card
+// standing on the board could reach the 99 by exactly one route: a swap, which
+// demands a card to send the other way. That is the right shape for a deck that
+// is full and the wrong shape for a deck that is being built -- a 62-card list
+// with an Angel waiting on the board had to entomb something it wanted in order
+// to promote something else it wanted, and the alternative the interface
+// offered was `deckedit.AddCard`'s duplicate refusal: "already in the swap
+// board; change its quantity or rationale instead of adding a second entry",
+// which is true, unhelpful, and the end of the road.
+//
+// So an add whose card is standing on this deck's own board is a promotion into
+// an empty slot: the board entry is lifted, the card lands in the 99, and
+// nothing is entombed because nothing left. It is the swap route's door 2 with
+// the entombment removed, composed the same way -- a fold of RemoveCard and
+// AddCard over the text, every intermediate document valid, one failed step
+// refusing the whole thing with nothing written.
+//
+// It demands a fresh `why` for the same reason the promotion does: the board
+// entry's rationale argued why the card had NOT made it in, and reusing it to
+// argue the reversal would put words in somebody's mouth (rule 4). The add form
+// already asks for one.
 func (a *API) addCard(w http.ResponseWriter, r *http.Request) {
 	src, d, ok := a.writeTarget(w, r)
 	if !ok {
@@ -456,8 +478,51 @@ func (a *API) addCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The promotion, and only into the 99: a card already on the board being
+	// "added" to the board is a real duplicate and keeps its old refusal.
+	var board *deck.CardEntry
+	if into == "cards" {
+		wanted := strings.ToLower(strings.TrimSpace(rec.Name))
+		for i := range d.SwapBoard {
+			if strings.ToLower(d.SwapBoard[i].Name) == wanted {
+				board = &d.SwapBoard[i]
+				break
+			}
+		}
+	}
+	if board != nil && strings.TrimSpace(str(body, "why")) == "" {
+		// Rule 4, said here rather than left to `AddCard`, because on this
+		// path the card HAS a rationale already -- the board's -- and the
+		// sentence has to be clear that it is not the one being asked for.
+		a.refuseWrite(w, "add", rejectf("%s is on the swap board, and its rationale there "+
+			"argues why it has NOT made the deck. Promoting it needs a fresh `why` that "+
+			"argues the slot", wire.Quote(rec.Name)))
+		return
+	}
+
 	text, err := src.ReadText(r.Context(), r.PathValue("slug"))
 	if a.refuseWrite(w, "add", err) {
+		return
+	}
+	if board != nil {
+		qty := board.Qty
+		if qty < 1 {
+			qty = 1
+		}
+		updated, err := deckedit.RemoveCard(text, board.Name)
+		if err == nil {
+			updated, err = deckedit.AddCard(updated, rec.Name, category,
+				strings.TrimSpace(str(body, "why")), qty, "cards")
+		}
+		a.answer(w, r, src, updated, commitOutcome{
+			// `from` marks the door, exactly as the swap route marks its own.
+			// Absent on an ordinary add, so an old client reading a new
+			// payload falls back to its default rather than to a value.
+			extra: map[string]any{"added": rec.Name, "category": category,
+				"into": into, "from": "swap_board"},
+			edit: decklog.Edit{Kind: decklog.EditAdd, Card: rec.Name,
+				Category: category, Into: into, From: "swap_board"},
+		}, err)
 		return
 	}
 	updated, err := deckedit.AddCard(text, rec.Name, category, str(body, "why"), qty, into)

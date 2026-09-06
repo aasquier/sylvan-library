@@ -663,7 +663,7 @@ export function AddCardForm({ deck, stage, identity, onDone }: {
       {/* The finder gets the full width rather than a quarter of the grid: it
           carries a painting and a list, and a card squeezed into a 25% column
           is the thing this change exists to stop. */}
-      <CardFinder value={card} onChange={pick} identity={identity} />
+      <CardFinder value={card} onChange={pick} identity={identity} deck={deck} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Select label="Category" value={category}
