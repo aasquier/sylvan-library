@@ -7831,6 +7831,13 @@ button:hover .tarot-fan-card {
 .field-side-near { grid-area: near; }
 .field-transport { grid-area: transport; }
 
+/* The count on a record tab: quieter than the label it follows, because it is
+   the evidence behind the word rather than the word. */
+.record-tab-n {
+  opacity: 0.65;
+  font-size: 0.85em;
+}
+
 /* ================= A table of four ==================================
  *
  * **Four battlefields cannot stack, and that is measured rather than felt.**

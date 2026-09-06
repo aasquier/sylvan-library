@@ -188,7 +188,9 @@ function Section({
   )
 }
 
-function DeckBoard({ decks, floor }: { decks: ColiseumDeckRecord[]; floor: number }) {
+function DeckBoard({ decks, floor, table }: {
+  decks: ColiseumDeckRecord[]; floor: number; table: Table
+}) {
   return (
     <ul className="record-board">
       {decks.map((d) => (
@@ -199,11 +201,19 @@ function DeckBoard({ decks, floor }: { decks: ColiseumDeckRecord[]; floor: numbe
             <>
               {d.slug}
               {d.archetype && <> · {d.archetype}</>}
-              {' · '}
-              {d.matches === 1 ? 'one outing' : `${d.matches} outings`}
+              {/* **Outings are only honest on the pooled board.** `matches` is
+                  every match this deck ever played, so printing it beside a
+                  duels-only record would say "twelve outings" over a tally of
+                  four. The filtered boards let the tally speak for itself. */}
+              {table === 'all' && (
+                <>
+                  {' · '}
+                  {d.matches === 1 ? 'one outing' : `${d.matches} outings`}
+                </>
+              )}
             </>
           }
-          record={d.record}
+          record={forTable(d, table)}
           floor={floor}
         />
       ))}
@@ -318,7 +328,30 @@ function Header({ board }: { board: ColiseumStandings }) {
   )
 }
 
+/** Which table's record is being read. */
+type Table = 'all' | 'duel' | 'pod'
+
+/** One deck's record for the table being read.
+ *
+ *  Named rather than inlined because three places want the same answer, and a
+ *  board where the rows, the count and the "still shy" note disagreed about
+ *  which record they were reading would be the worst kind of wrong: quietly
+ *  plausible. */
+function forTable(d: ColiseumDeckRecord, table: Table): ColiseumRecord {
+  return table === 'duel' ? d.duel : table === 'pod' ? d.pod : d.record
+}
+
 export function ColiseumRecord({ board }: { board: ColiseumStandings }) {
+  // **Duels and pods are kept apart** (Aaron, 2026-09-06). A pod's baseline is
+  // 25% against a duel's 50%, so pooling them answers neither question — and
+  // the split is free of any migration, because it is derived from each
+  // match's own recorded seat count rather than from a flag written when it
+  // played. Every bout already in the ledger was filed correctly the moment
+  // the column existed.
+  //
+  // Tabs rather than a filter, for the reason the sand uses them: these are
+  // two records, not one record with a lens on it.
+  const [table, setTable] = useState<Table>('all')
   // Something to say only when there is something in it. A board with matches
   // but no decks cannot happen, but a nil-safe read costs nothing.
   const empty = board.matches === 0 || board.decks.length === 0
@@ -328,8 +361,16 @@ export function ColiseumRecord({ board }: { board: ColiseumStandings }) {
   // note below and the sections agree, and so the copy can be specific
   // instead of hedging at everybody.
   const shy = useMemo(
-    () => board.decks.filter((d) => d.record.rate === null).length,
-    [board.decks],
+    () => board.decks.filter((d) => forTable(d, table).rate === null).length,
+    [board.decks, table],
+  )
+
+  // The decks that actually sat at this table. A deck with no pod bouts is
+  // not a deck with a 0% pod record — it has no record here at all, and
+  // listing it with an empty band would read as a losing one.
+  const decks = useMemo(
+    () => board.decks.filter((d) => forTable(d, table).played > 0),
+    [board.decks, table],
   )
 
   // The legend is opened by the reader, not forced on them: most people read
@@ -342,6 +383,33 @@ export function ColiseumRecord({ board }: { board: ColiseumStandings }) {
   return (
     <div className="record-sheet">
       <Header board={board} />
+
+      {/* **Two records, not one record with a filter on it.** A pod's baseline
+          is 25% and a duel's is 50%, so a deck's two records are answers to
+          different questions and reading them in one column would flatter the
+          pod deck and libel the duellist. Tabs for the same reason the sand
+          uses them — these are places, and `.strip-tab` is what this project
+          dresses a place in (commandment 17).
+
+          "Every table" stays first and default: the pooled record is still a
+          real thing to ask for, and it is what this board has always shown. */}
+      <div role="tablist" aria-label="Which table"
+           className="record-tables mt-3 flex flex-wrap gap-2">
+        {([['all', 'Every table', board.matches],
+           ['duel', 'Duels', board.duels],
+           ['pod', 'Four-player', board.pods]] as const).map(([key, label, n]) => (
+          <button key={key} type="button" role="tab"
+                  aria-selected={table === key}
+                  onClick={() => setTable(key)}
+                  className={`strip-tab rounded-lg px-3 py-1.5 text-sm
+                              font-medium${table === key ? ' is-active' : ''}`}>
+            {label}
+            {/* The count is the honest half of a tab: a "Four-player" tab with
+                nothing behind it should say so before it is pressed. */}
+            <span className="record-tab-n tabular"> {n}</span>
+          </button>
+        ))}
+      </div>
 
       <p className="record-caution">
         A record is only ever as good as the bouts behind it, so the house shows
@@ -393,7 +461,7 @@ export function ColiseumRecord({ board }: { board: ColiseumStandings }) {
         blurb="Every deck that has taken the sand, and how it has fared across
                everything it has fought."
       >
-        <DeckBoard decks={board.decks} floor={floor} />
+        <DeckBoard decks={decks} floor={floor} table={table} />
       </Section>
 
       {board.archetypes.length > 0 && (

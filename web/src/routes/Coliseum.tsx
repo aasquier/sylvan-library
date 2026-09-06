@@ -821,6 +821,17 @@ export default function ColiseumRoom() {
   // both fighters: `/coliseum?a=aaron/gyome&b=aaron/arahbo`.
   const [a, setA] = useState(params.get('a') ?? '')
   const [b, setB] = useState(params.get('b') ?? '')
+  // **Two more chairs, and a tab that says which table is laid** (Aaron,
+  // 2026-09-06). The pod is not a wider duel — it is a different game, with a
+  // different baseline and a different board — so it is a place you go rather
+  // than a dial you turn, which is what the strip above already uses tabs for.
+  //
+  // The chairs live in the link like the first two, so a four-player match is
+  // as sendable as a duel; and the table is read back from them on the way in,
+  // because a link carrying four decks means a link to a pod.
+  const [c, setC] = useState(params.get('c') ?? '')
+  const [d, setD] = useState(params.get('d') ?? '')
+  const [pod, setPod] = useState(Boolean(params.get('c') || params.get('d')))
   const [decks, setDecks] = useState<DeckTile[]>([])
   // The gate (ADR 35). Where Forge is not installed the gates simply do not
   // open — no greyed-out button, no excuse. The room is still worth walking
@@ -967,9 +978,13 @@ export default function ColiseumRoom() {
       const next = new URLSearchParams(cur)
       if (a) next.set('a', a); else next.delete('a')
       if (b) next.set('b', b); else next.delete('b')
+      // The extra chairs leave the link when the duel table is laid, so a
+      // link sent from a duel cannot seat somebody else a pod.
+      if (pod && c) next.set('c', c); else next.delete('c')
+      if (pod && d) next.set('d', d); else next.delete('d')
       return next
     }, { replace: true })
-  }, [a, b, setParams])
+  }, [a, b, c, d, pod, setParams])
 
   /** The handle on the match being watched, for as long as it is worth
    *  holding: the job's own once it exists, and the one the link arrived with
@@ -1113,6 +1128,13 @@ export default function ColiseumRoom() {
       const submitted = await api.simForge({
         a_slug: slugOf(a), a_owner: a.slice(0, Math.max(0, a.indexOf('/'))),
         b_slug: slugOf(b), b_owner: b.slice(0, Math.max(0, b.indexOf('/'))),
+        // Sent only when the pod is laid: the door fills seats in order and
+        // refuses a gap, so an empty `c` beside a filled `d` is a 422 rather
+        // than a quietly three-handed game.
+        ...(pod ? {
+          c_slug: slugOf(c), c_owner: c.slice(0, Math.max(0, c.indexOf('/'))),
+          d_slug: slugOf(d), d_owner: d.slice(0, Math.max(0, d.indexOf('/'))),
+        } : {}),
         games, seed: dealt,
         // This room watches, so this room narrates. The measuring surfaces do
         // not ask, and Forge stays quiet for them.
@@ -1332,9 +1354,36 @@ export default function ColiseumRoom() {
           never greyed out with an excuse, which is the rule the Ask Claude
           surfaces set and this inherits. The room itself is worth walking
           through either way, so nothing else on the page depends on it. */}
+      {/* **Which table is laid.** A pod is not a wider duel: the baseline is
+          25% rather than 50%, the board is a two-by-two rather than two halves
+          facing off, and a game runs about ten times as long. So it is a place
+          you go, and it wears `.strip-tab` for the same reason the strip above
+          does (commandment 17) — these are places, not actions.
+
+          Inside the sand rather than beside "The record", because the record
+          holds both kinds and always did; the choice being made here is only
+          about the match you are about to send in. */}
+      {onSand && forgeReady && (
+        <div role="tablist" aria-label="The table"
+             className="mt-5 flex flex-wrap gap-2">
+          <button type="button" role="tab" aria-selected={!pod}
+                  onClick={() => setPod(false)}
+                  className={`strip-tab rounded-lg px-3 py-1.5 text-sm
+                              font-medium${!pod ? ' is-active' : ''}`}>
+            Duel
+          </button>
+          <button type="button" role="tab" aria-selected={pod}
+                  onClick={() => setPod(true)}
+                  className={`strip-tab rounded-lg px-3 py-1.5 text-sm
+                              font-medium${pod ? ' is-active' : ''}`}>
+            Four-player
+          </button>
+        </div>
+      )}
+
       {onSand && forgeReady && (
         <div data-open={running ? 'true' : 'false'}
-             className="card-surface gatehouse mt-5 flex flex-wrap items-end
+             className="card-surface gatehouse mt-3 flex flex-wrap items-end
                         gap-3 rounded-xl p-4">
           {/* **The selects carry a floor, and that is the whole fix.**
               Three rounds of this bug, and the first two treated a
@@ -1364,14 +1413,30 @@ export default function ColiseumRoom() {
               the basis alone, and the basis is what makes them take their own
               line on a real phone. The ellipsis on a long deck name survives:
               a `<select>` truncates its own option text at any width. */}
-          <Select label="Champion" value={a} onChange={setA}
+          <Select label={pod ? 'First seat' : 'Champion'} value={a} onChange={setA}
                   className="min-w-[11rem] grow basis-full
                              sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map(seatOption)} />
-          <Select label="Challenger" value={b} onChange={setB}
+          <Select label={pod ? 'Second seat' : 'Challenger'} value={b} onChange={setB}
                   className="min-w-[11rem] grow basis-full
                              sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map(seatOption)} />
+          {/* **Champion and Challenger are a duel's words.** Four decks are
+              not a champion and three challengers — they are a table, and
+              seats at a table are numbered. The first two are renamed rather
+              than joined by two oddly-named strangers. */}
+          {pod && (
+            <>
+              <Select label="Third seat" value={c} onChange={setC}
+                      className="min-w-[11rem] grow basis-full
+                                 sm:basis-[13rem] sm:max-w-[15rem]"
+                      options={decks.map(seatOption)} />
+              <Select label="Fourth seat" value={d} onChange={setD}
+                      className="min-w-[11rem] grow basis-full
+                                 sm:basis-[13rem] sm:max-w-[15rem]"
+                      options={decks.map(seatOption)} />
+            </>
+          )}
           {/* **The ceiling is written where the number is typed.** A number
               input's `max` is validation, not a stop: 25 can be typed into
               this box and it looks accepted, and the arena will not fight 25
@@ -1397,7 +1462,7 @@ export default function ColiseumRoom() {
               than here, so there is one place to read them and one to change
               them. */}
           <SendThemIn running={running} lighting={lighting}
-                      disabled={running || !a || !b}
+                      disabled={running || !a || !b || (pod && (!c || !d))}
                       onPress={() => void sendThemIn()} />
         </div>
       )}

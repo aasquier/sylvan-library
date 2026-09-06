@@ -2946,6 +2946,18 @@ export interface ColiseumDeckRecord {
   themes: string[]
   matches: number
   record: ColiseumRecord
+  /** The same bouts split by the size of the table they were played at.
+   *
+   *  **Not a preference — a different question.** A pod's baseline is 25% and
+   *  a duel's is 50%, so the same 30% is a poor duellist and a strong pod
+   *  deck, and one pooled number answers neither. `record` above stays the
+   *  whole of it, because a deck's total record is still a thing to ask for.
+   *
+   *  Both are derived from each match's recorded seat count rather than from
+   *  a flag written when it played, so every bout already in the ledger is
+   *  filed correctly and nothing had to be regenerated. */
+  duel: ColiseumRecord
+  pod: ColiseumRecord
 }
 
 export interface ColiseumClassRecord {
@@ -2977,6 +2989,10 @@ export interface ColiseumStandings {
   /** Every bout run, clock-outs included. The records will sum to fewer. */
   games: number
   timed_out: number
+  /** How many recorded matches were played at each size of table. They sum
+   *  to `matches`. */
+  duels: number
+  pods: number
   since: string
   until: string
   decks: ColiseumDeckRecord[]
@@ -2987,6 +3003,55 @@ export interface ColiseumStandings {
    *  the real number rather than hard-coding it in a second language. */
   floor: number
   proven: number
+  /** The three feat boards, largest first: the biggest killing blows, the
+   *  biggest creatures, and the deepest piles of one token. Each holds ten. */
+  blows: ColiseumBlow[]
+  giants: ColiseumGiant[]
+  stacks: ColiseumStack[]
+}
+
+/** One line of the biggest-killing-blows board.
+ *
+ *  `amount` is the whole lethal swing and `sources` how many cards were in
+ *  it — Forge announces combat damage one source at a time, so a six-card
+ *  alpha strike is one blow rather than six. `card` names the hardest hitter,
+ *  which is what a player says out loud. */
+export interface ColiseumBlow {
+  match_id: number
+  game: number
+  amount: number
+  card: string
+  sources: number
+  combat: boolean
+  turn: number
+  seats: number
+  victim: string
+  played_at: string
+}
+
+export interface ColiseumGiant {
+  match_id: number
+  game: number
+  card: string
+  power: number
+  toughness: number
+  turn: number
+  seats: number
+  deck: string
+  played_at: string
+}
+
+/** The deepest pile of one token a seat held **at once** — never a count of
+ *  tokens made, which is a different and much less interesting number. */
+export interface ColiseumStack {
+  match_id: number
+  game: number
+  card: string
+  count: number
+  turn: number
+  seats: number
+  deck: string
+  played_at: string
 }
 
 export const api = {
