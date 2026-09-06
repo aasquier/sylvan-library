@@ -51,7 +51,7 @@ they differ.
 | [35](0035-the-forge-joins-the-simulator-and-a-worker-runs-it-hosted.md) | The Forge joins the Simulator, and a worker runs it hosted | Accepted |
 | [36](0036-the-match-ledger-records-declared-labels.md) | The match ledger records real games, and the labels it snapshots are declared | Accepted |
 | [37](0037-the-archetype-is-a-reading-of-the-themes.md) | The archetype is a reading of the themes, not a second declaration | Accepted — supersedes the labelling half of 36 |
-| [38](0038-the-served-backend-is-rewritten-in-go.md) | The served backend is rewritten in Go, and the bench stays Python | Accepted |
+| [38](0038-the-served-backend-is-rewritten-in-go.md) | The served backend is rewritten in Go, and the bench stays Python | Accepted — its `docs/go-migration/` pointers superseded by [50](0050-the-crossings-working-documents-live-in-git-history.md); the decision stands whole |
 | [39](0039-configuration-is-a-value-and-tests-run-in-parallel.md) | Configuration is a value, resolved once and passed, and tests run in parallel | Accepted — supersedes the "read at call time" reasoning in [`internal/config`](../../go/internal/config/config.go) |
 | [40](0040-the-second-injection-reaches-the-command-tree.md) | The second injection reaches the command tree | Accepted |
 | [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md) | The intake is asked for, and the hand that wrote it is named | Accepted |
@@ -63,6 +63,7 @@ they differ.
 | [47](0047-one-architecture-and-a-required-check-gates-something-real.md) | One architecture, and a required check gates something real | Accepted — supersedes the *two-architecture check* clause of [23](0023-a-green-main-deploys-itself.md) |
 | [48](0048-light-lands-on-a-card-and-never-through-it.md) | Light lands on a card, and never through it | Accepted — widens [32](0032-card-art-motion-is-derived-at-runtime-and-never-committed.md) to every surface, and corrects its misquotation of Scryfall's imagery guidelines |
 | [49](0049-an-import-may-name-the-hand-behind-its-rationales.md) | An import may name the hand behind its rationales | Accepted — extends [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md)'s mark to reasons that arrive with the paste |
+| [50](0050-the-crossings-working-documents-live-in-git-history.md) | The crossing's working documents live in git history | Accepted — supersedes the `docs/go-migration/` pointers in [38](0038-the-served-backend-is-rewritten-in-go.md), the pointers and never the decision |
 
 **A note on the numbering.** For a while this table said there was no 41 and
 never had been. There is — [41](0041-the-intake-is-asked-for-and-the-hand-is-named.md)
@@ -235,9 +236,11 @@ section for the shape that was refused (a long branch, on a repository whose
 `main` deploys itself), and its Decision for the two things most likely to
 be relitigated: the asset pipeline staying Python, which is the one real
 "Python gains us something", and cobra as a requirement rather than a
-proposal. The plan, the baseline and the rulings behind it are in
-[`docs/go-migration/`](../go-migration/README.md), which is the working
-document; the ADR is the decision.
+proposal. The plan, the baseline and the rulings behind it were working
+documents in `docs/go-migration/`, which the zero-trace crossing deliberately
+removed once the migration closed —
+[50](0050-the-crossings-working-documents-live-in-git-history.md) records the
+removal and the `git show` that still reads them; the ADR is the decision.
 
 ## Where the longer arguments live
 

@@ -98,6 +98,11 @@ and `go/cmd/mtglab/reducedmotion_test.go` (every animating rule reachable by a
 because every feature that has ever moved this floor arrived through a
 dependency rather than through a file we wrote.
 
+That static check plus Aaron's phone is the floor's whole witness story:
+there is no WebKit rig on the dev Mac (its own Safari, 15.6, is below the
+floor) and none is claimed — Aaron ruled on 2026-09-05 to strike the claim
+rather than stand a rig up.
+
 ## 5. CI/CD
 
 The repository is public and `main` is protected. The settings, recorded so
