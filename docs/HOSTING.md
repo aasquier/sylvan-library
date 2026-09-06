@@ -316,3 +316,21 @@ Auth is invite-only; there is no self-signup. The maintainer account is
 reconciled at boot from `MTGLAB_ADMIN_EMAIL` (ADR 17), and everything else
 — invites, resets, deletions — is the Admin page. `mtglab users` exists for
 the same operations at a terminal.
+
+**Three of `app.db`'s tables clean themselves, and nobody has to remember
+to.** The door hires a sweeper beside the night runner and starts it as it
+stands: one pass immediately, then one a day, over expired sessions, spent
+invite and reset links, and rate-limit windows older than a day. Nothing is
+taken that anything could still read — a lapsed window is already no window
+at all to the limiter — and a purge that fails is logged and left for
+tomorrow rather than taken as a reason to refuse to serve. Each pass says
+what it removed, so the record is in the log:
+
+```bash
+fly logs | grep "the accounts database was swept"
+```
+
+Zeros are the ordinary answer on an instance swept yesterday. The one table
+that grows without anybody signing up is `login_attempts` — its rows are
+keyed per client address rather than per account — and it is the reason this
+runs at all.

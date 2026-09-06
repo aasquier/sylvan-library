@@ -383,7 +383,8 @@ func asStrings(v any) []string {
 // `ColorIdentity` covers every face (Ajani, Nacatl Pariah looked up by its
 // white front still reports {R}{W}). Missing names are simply absent from
 // the result; callers handle that, loudly. Exact full-name matches win; a
-// face-name match only fills a gap. Memoised per open on the exact name list.
+// face-name match only fills a gap. Memoised on the exact name list for as
+// long as the pool file stands unchanged.
 func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRecord, error) {
 	if len(names) == 0 {
 		return map[string]*CardRecord{}, nil
@@ -496,8 +497,10 @@ func ArtCropFrom(imageNormal *string) *string {
 	return &crop
 }
 
-// cache is the per-open memo, or nil when the pool has been closed under us
-// (a Use that outlived a Close, which only a shutdown does).
+// cache is the current open's memo, or nil when the pool has been closed
+// under us (a Use that outlived a Close, which only a shutdown does) -- a
+// Conn may only read and teach the memory while it is the open the memory
+// currently serves.
 func (c *Conn) cache() *cardCache {
 	c.pool.mu.Lock()
 	defer c.pool.mu.Unlock()
@@ -519,8 +522,9 @@ func copyOf(m map[string]*CardRecord) map[string]*CardRecord {
 // keyed on the exact name list, least-recently-used first out. The shelf asks
 // the same few hundred names on every page load until a deck is edited, and a
 // lookup was a full scan of 35,390 rows (`lower(name)` cannot use the index).
-// Per open, so the pool's stamp is the key's other half for free: a refresh
-// re-opens, and the memo starts empty.
+// The pool's stamp is the key's other half: the memo lives as long as the
+// pool file stands unchanged -- across the reaper's hand-backs -- and starts
+// empty when a refresh moves the stamp (`acquire` holds that line).
 type cardCache struct {
 	mu    sync.Mutex
 	max   int

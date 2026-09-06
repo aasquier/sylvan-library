@@ -155,11 +155,29 @@ kill_timeout = "30s"
 [[mounts]]
   source = "mtglab_data"
   destination = "/data"
-  # 3GB, sized in §4 step 3 to hold the ~63MB pool, the ~98MB of Scryfall
-  # downloads it is built from, `app.db`, the decks, and a backup. Both halves
-  # of that download actually land here: the Scryfall directory is derived from
-  # `MTGLAB_DATA_DIR` rather than from the working directory, which in this
-  # container would be the ephemeral layer rather than the volume this sizes.
+  # 3GB, sized in §4 step 3 to hold the pool file, the Scryfall downloads it
+  # is built from, `app.db`, the decks, and a backup. The two big halves grow
+  # by different rules, and the rules are what to read here -- the numbers
+  # this comment used to carry rotted, and are kept below only as a dated
+  # measurement rather than as a size to plan against:
+  #
+  #   - The downloads are held to the newest file of each kind by the
+  #     refresh's own sweep (`pool.SweepBulk`, run after every successful
+  #     load), so that directory tracks Scryfall's current bulk sizes rather
+  #     than accumulating a copy per refresh.
+  #   - The pool file is not written fresh: a refresh deletes the rows and
+  #     re-appends them into the same file under the one writer, and the
+  #     freed space stays inside it. So its size is a high-water mark rather
+  #     than a measure of what is in it, and it only ever goes up.
+  #
+  # Measured 2026-09-05: 98MB of downloads (two files), a 214MB pool file,
+  # 331MB of the volume used in total. The pool's ratchet is the half worth
+  # watching -- earlier comments in this tree recorded it at 63MB and then
+  # 96MB -- and a pool that has climbed too far is reset by rebuilding it,
+  # not by growing this. Both halves of the download actually land here: the
+  # Scryfall directory is derived from `MTGLAB_DATA_DIR` rather than from the
+  # working directory, which in this container would be the ephemeral layer
+  # rather than the volume this sizes.
   initial_size = "3gb"
 
 [http_service]
