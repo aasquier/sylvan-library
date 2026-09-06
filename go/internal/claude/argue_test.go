@@ -102,8 +102,12 @@ func TestResolveAlternativesAgreesWithTheCorpus(t *testing.T) {
 			for _, n := range row.InDeck {
 				inDeck[n] = true
 			}
+			// nil breakers: the corpus rows carry no commander card, and every
+			// recorded verdict in it predates ADR 51. A deck with no
+			// Rulebreaker commander must reach exactly these answers, which is
+			// what this row asserts.
 			kept, dropped, err := ResolveAlternatives(context.Background(), conn,
-				row.Names, row.Identity, inDeck)
+				row.Names, row.Identity, nil, inDeck)
 			if err != nil {
 				t.Errorf("%s: %v", row.Note, err)
 				continue

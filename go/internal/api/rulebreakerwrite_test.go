@@ -34,35 +34,18 @@ import (
 // records where it came from and how to re-derive it.
 func rulebreakerPool(t *testing.T) *pool.Pool {
 	t.Helper()
-	path := pooltest.Build(t)
-	db, err := pooltest.Writer(path)
-	if err != nil {
-		t.Fatalf("opening the fixture to doctor it: %v", err)
-	}
-	const insert = `INSERT INTO oracle_cards
-        (oracle_id, name, mana_cost, cmc, type_line, oracle_text, colors,
-         color_identity, keywords, produced_mana, legalities, layout,
-         reserved, game_changer)
-        VALUES (?, ?, ?, ?, ?, ?, []::VARCHAR[], ?::VARCHAR[], []::VARCHAR[],
-                []::VARCHAR[], '{"commander": "legal"}'::JSON, 'normal', false, false)`
-	rows := [][]any{
-		{"rb-seluma", "Seluma, Light of Aysen", "{4}{W}", 5.0, "Legendary Creature — Angel Warrior",
-			"Rulebreaker — A deck with this commander can have Angel cards of any color identity " +
-				"and any basic land cards.\nFlying", []string{"W"}},
-		{"rb-angel", "Fixture Red Angel", "{5}{R}{W}", 7.0, "Legendary Creature — Angel",
-			"Flying, first strike", []string{"R", "W"}},
-		{"rb-demon", "Fixture Black Demon", "{4}{B}", 5.0, "Creature — Demon",
-			"Flying", []string{"B"}},
-	}
-	for _, r := range rows {
-		if _, err := db.Exec(insert, r...); err != nil {
-			t.Fatalf("doctoring %s in: %v", r[1], err)
-		}
-	}
-	_ = db.Close()
-	p := pool.New(path, nil)
-	t.Cleanup(p.Close)
-	return p
+	return pooltest.OpenWith(t,
+		pooltest.Card{Name: "Seluma, Light of Aysen", ManaCost: "{4}{W}", CMC: 5,
+			TypeLine: "Legendary Creature — Angel Warrior", ColorIdentity: []string{"W"},
+			OracleText: "Rulebreaker — A deck with this commander can have Angel cards of " +
+				"any color identity and any basic land cards.\nFlying"},
+		pooltest.Card{Name: "Fixture Red Angel", ManaCost: "{5}{R}{W}", CMC: 7,
+			TypeLine: "Legendary Creature — Angel", OracleText: "Flying, first strike",
+			ColorIdentity: []string{"R", "W"}},
+		pooltest.Card{Name: "Fixture Black Demon", ManaCost: "{4}{B}", CMC: 5,
+			TypeLine: "Creature — Demon", OracleText: "Flying",
+			ColorIdentity: []string{"B"}},
+	)
 }
 
 // selumaRig is newWriteRig's wiring over the doctored pool and one extra deck.

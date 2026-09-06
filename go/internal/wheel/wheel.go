@@ -189,6 +189,22 @@ func Spin(ctx context.Context, d *deck.Deck, identity map[string]bool,
 		meaning, fateWhere = landed.meaning, landed.where
 	}
 
+	// **A Rulebreaker clause does not reach the wheel, and that is a decision
+	// rather than an oversight** (ADR 51). The other two advisory surfaces
+	// widen by loosening their query on the type words the clause mentions and
+	// then holding the rows to `gate.Rulebreakers.AnyIdentity`, which is the
+	// rule; the wheel cannot, because it never holds the rows. It counts the
+	// matches and draws one by seeded offset, so a query that is deliberately
+	// too generous does not cost a few wasted rows here -- it hands the player
+	// a card the commander never allowed, which is the one thing this function
+	// promises not to do.
+	//
+	// Making it exact means expressing the clause in SQL: the conjunctions and
+	// the mana-value floor, not just the words. That is a second copy of the
+	// predicate, and it is only worth writing beside a test that runs both
+	// renderings over the whole pool and holds them equal card for card.
+	// Worth doing; not worth doing halfway, and not worth doing for a
+	// novelty before the surfaces that suggest real cards.
 	inDeck := deckNames(d)
 	colors := identityColors(identity)
 	fits := "len(color_identity) = 0"

@@ -64,6 +64,73 @@ func Open(tb testing.TB) *pool.Pool {
 	return p
 }
 
+// Card is one extra oracle row, for a test whose subject the recorded fixture
+// cannot reach.
+//
+// **These are invented cards and must read as invented ones.** The 21 rows in
+// `testdata/` are real values from the real pool and that is what makes them
+// worth freezing; a row added here is a shape a checker reads -- a type line, a
+// mana value, a sentence in a template -- and naming one after a real card
+// would quietly turn a fixture into a claim about Magic that nobody looked up
+// (rule 1). Name them "Fixture ..." and let the golden corpora carry the real
+// cards.
+//
+// The exception, and it is narrow: oracle text that a checker *parses* has to
+// be the template Wizards actually printed, or the test proves the parser can
+// read a sentence nobody will ever send it. Copy such text out of the pool --
+// `mtglab cards show` -- and say in the test where it came from.
+type Card struct {
+	Name          string
+	ManaCost      string
+	CMC           float64
+	TypeLine      string
+	OracleText    string
+	ColorIdentity []string
+}
+
+// BuildWith is [Build] with extra cards doctored into the test's own copy. The
+// recorded corpus on disk is untouched; `deckread_test.go` and `stale_test.go`
+// established the practice and it is a fixture edit only in the sense that a
+// temp file is.
+func BuildWith(tb testing.TB, extra ...Card) string {
+	tb.Helper()
+	path := Build(tb)
+	if len(extra) == 0 {
+		return path
+	}
+	db, err := Writer(path)
+	if err != nil {
+		tb.Fatalf("opening the fixture to doctor it: %v", err)
+	}
+	defer db.Close()
+	const stmt = `INSERT INTO oracle_cards
+        (oracle_id, name, mana_cost, cmc, type_line, oracle_text, colors,
+         color_identity, keywords, produced_mana, legalities, layout,
+         reserved, game_changer)
+        VALUES (?, ?, ?, ?, ?, ?, []::VARCHAR[], ?::VARCHAR[], []::VARCHAR[],
+                []::VARCHAR[], '{"commander": "legal"}'::JSON, 'normal', false, false)`
+	for i, c := range extra {
+		identity := c.ColorIdentity
+		if identity == nil {
+			identity = []string{}
+		}
+		if _, err := db.ExecContext(context.Background(), stmt,
+			fmt.Sprintf("fixture-extra-%d", i), c.Name, c.ManaCost, c.CMC,
+			c.TypeLine, c.OracleText, identity); err != nil {
+			tb.Fatalf("doctoring %s in: %v", c.Name, err)
+		}
+	}
+	return path
+}
+
+// OpenWith is [BuildWith] plus a Pool over it, closed when the test ends.
+func OpenWith(tb testing.TB, extra ...Card) *pool.Pool {
+	tb.Helper()
+	p := pool.New(BuildWith(tb, extra...), nil)
+	tb.Cleanup(p.Close)
+	return p
+}
+
 // Writer opens a pool file read-write, for a test that wants to change one
 // under a Pool.
 func Writer(path string) (*sql.DB, error) {
