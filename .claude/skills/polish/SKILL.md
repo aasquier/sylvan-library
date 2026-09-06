@@ -513,7 +513,14 @@ It is what makes the pass cumulative rather than repetitive.
    a set. Then **verify by mutation, not by greenness**: break the thing,
    watch the test fail, restore it. Match the surrounding code's idiom and
    comment density; if a finding grows beyond surgical mid-fix, back it out to
-   a queued item and say so.
+   a queued item and say so. **One class of fix is refused outright, by
+   Aaron's ruling (2026-09-05): prose-only edits in the five fingerprinted
+   packages** — `internal/sim`, `internal/sim/tier1`, `internal/mana`,
+   `internal/floats`, `internal/mt19937` — whose embedded bytes are hashed
+   into the Tier 1 cache key (ADR 18), so a reflowed comment silently
+   discards everything the deployed instance has computed. A genuinely wrong
+   comment there is queued with its cost attached and fixed beside a real
+   change to the same package, so the cache is paid for once, for a reason.
 5. **Verify.** The full local gauntlet before any push, from `go/` with the
    Mac's three exports set: `gofmt -l .` printing nothing, `go vet ./...`,
    `go test -race ./...`, `golangci-lint run ./...`; then

@@ -275,9 +275,11 @@ into the Tier 1 cache's engine fingerprint — `internal/sim/cache`'s
 `engineSources` is the list, and its own doc comment now says this. **A
 reflowed comment in any of them changes the key and discards every stored row
 on the volume.** Nothing fails, no test speaks, and the instance silently
-recomputes what it had already paid for. Choose a slice outside them; if a
-comment in one is genuinely wrong, that is a finding to raise with the cost
-attached, not a tidy to fold into a sweep.
+recomputes what it had already paid for. Choose a slice outside them.
+**Aaron ruled it (2026-09-05): a prose-only edit in those five packages is
+never made.** A comment there that is genuinely wrong is queued with its
+cost attached and fixed beside a real change to the same package, so the
+cache is discarded once for a reason rather than twice for tidiness.
 
 ## What this run never does
 
