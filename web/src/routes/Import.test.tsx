@@ -1017,3 +1017,39 @@ describe('when the extra work leaves something behind', () => {
       .toHaveBeenCalledWith('/decks/aasquier/arahbo-cats'))
   })
 })
+
+/** The page on a narrow screen — as far as this room can see it.
+ *
+ * jsdom computes no layout, so the real measurement lives in a browser: on a
+ * 375px viewport the example decklist's `pre` (554px of `white-space: pre`
+ * monospace) once pushed the whole page to 612px — 237px of page-level
+ * horizontal scroll. The mechanism is a grid item's `auto` minimum: the
+ * widest unbreakable descendant becomes the column's minimum, and the pre's
+ * own `overflow-x-auto` never engages because the column already grew to fit
+ * it. `min-w-0` on the grid item is what lets the inner scrollbar exist.
+ *
+ * The assertion is derived from that mechanism rather than from the two
+ * class strings it currently lands on: *every* `overflow-x-auto` container
+ * this page puts inside the grid must sit in an item that may shrink, so the
+ * next wide example added to either column fails here instead of on a phone.
+ */
+describe('wide content scrolls inside its box instead of widening the page', () => {
+  it('puts every overflow-x-auto container in a grid item that can shrink', () => {
+    const { container } = renderImport()
+    const grid = container.querySelector('div.grid')
+    expect(grid).not.toBeNull()
+    const scrollers = [...grid!.querySelectorAll('[class~="overflow-x-auto"]')]
+    // Anti-vacuity: the example decklist pre is always on the page. A sweep
+    // that found nothing to check would pass while checking nothing.
+    expect(scrollers.length).toBeGreaterThan(0)
+    for (const el of scrollers) {
+      let item: Element = el
+      while (item.parentElement && item.parentElement !== grid) {
+        item = item.parentElement
+      }
+      expect(item.classList.contains('min-w-0'),
+        'a grid item holding an overflow-x-auto container must carry min-w-0, '
+        + 'or the container inherits the page instead of a scrollbar').toBe(true)
+    }
+  })
+})

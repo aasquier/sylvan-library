@@ -51,8 +51,12 @@ screen reader or a keyboard.
   phone story), 300ms-tap and double-tap-zoom on interactive elements,
   fixed-position elements over the keyboard.
 - Touch targets: interactive elements at ≥44px effective size on the deck
-  page's dense controls. Measure in a real mobile viewport
-  (`resize_window` mobile preset drives a true touch profile), not jsdom.
+  page's dense controls. Measure in a real mobile viewport, not jsdom — and
+  **read `innerWidth` back before trusting a single number**: on this rig a
+  `resize_window` *preset* can report success while the hidden pane stays
+  0×0, which makes every rect and overflow figure fiction (the 2026-08-24
+  run lost its whole phone sweep to this; the 2026-09-05 run got it back by
+  passing explicit `width`/`height` pixels, which do apply).
 - **Accessibility is compatibility with the player, not the device**, and it
   is swept with the same walk and the same tools as the pixels around it:
   - **Keyboard-only** through the changed surfaces: every interactive element
@@ -171,11 +175,17 @@ in front of it, and docs that called two standing copies normal. Aaron's
 ruling the same night: the volume is the library's one standing copy, and
 this facet exists so the same shape cannot regrow unnoticed.
 
-- **The one-copy rule.** `decks/` in a checkout holds `_template` and
-  nothing else; app data has no second standing copy anywhere. Check it
-  (`ls decks/`), and check the docs still say it (CLAUDE.md "Decks do not
-  live in git"). Local work that pulled real decks for a job — an overnight
-  round-robin, a migration rehearsal — must have cleaned up after itself.
+- **The one-copy rule.** `decks/` in a checkout is empty or holds only
+  scratch a session is actively using; app data has no second standing copy
+  anywhere. (`_template` was the old sentence's exception — the Go crossing
+  removed it, and nothing by that name exists in the tree now; corrected
+  2026-09-05 after a run went looking for it.) Check it (`ls decks/`), and
+  check the docs still say it (CLAUDE.md "Decks do not live in git"). Local
+  work that pulled real decks for a job — an overnight round-robin, a
+  migration rehearsal, a commandment-16 walk — must clean up after itself,
+  and a decks/ entry older than a few days is the divergence this facet was
+  created for: date it (`ls -la decks/`), find whether a live local server
+  is holding it, and queue the cleanup if one is.
 - **The capability audit, which is the real one.** For each thing the
   product does to its own data, ask: *can the deployed instance do this
   without the laptop?* An operation that exists only as a local CLI command
