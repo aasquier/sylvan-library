@@ -873,3 +873,97 @@ func TestAGamesCountThatIsNotANumberIsTheRecordedFiveHundred(t *testing.T) {
 		}
 	}
 }
+
+// Both paths seat four (Aaron, 2026-09-06). The night learned pods first, and
+// a room that could only ever seat two would have left a person unable to
+// start the thing their own arena runs every night.
+//
+// `c_slug` and `d_slug` are optional additions to the recorded `a`/`b` shape
+// rather than a new `seats` array, so every link the Coliseum has ever built
+// still means what it did.
+func TestTheRoomSeatsAPodAndFillsItInOrder(t *testing.T) {
+	t.Parallel()
+	shim := &stubShim{games: []tier3.WireGame{won(1, 5421, 3, 11)}}
+	a, reg, _ := forgeAPI(t, shim)
+	srv := forgeServer(t, a)
+
+	status, payload := postForge(t, srv,
+		`{"a_slug":"kaheera","b_slug":"mono-green","c_slug":"rich",`+
+			`"d_slug":"artifact-commander","games":1}`)
+	if status != 200 {
+		t.Fatalf("a four-seat ask was refused: %d %v", status, payload)
+	}
+	reg.Wait()
+	job := reg.Get(payload["id"].(string), alice.UserID)
+	if job == nil || job.Status() != "done" {
+		t.Fatalf("the pod did not finish: %v", job)
+	}
+	result, _ := job.Payload().Result.(forgeResult)
+	if len(result.Decks) != 4 {
+		t.Fatalf("the match seated %d decks, want 4", len(result.Decks))
+	}
+	// Seat order is the letters' order, because it is what `winner_seat`
+	// indexes into.
+	want := []string{"kaheera", "mono-green", "rich-fixture", "artifact-commander"}
+	for i, d := range result.Decks {
+		if d.Slug != want[i] {
+			t.Errorf("seat %d is %q, want %q", i+1, d.Slug, want[i])
+		}
+	}
+	// **A pod is asked for at the pod clock**, whoever asked. At a duel's 300
+	// about one four-seat game in six is cut and recorded as a draw with no
+	// winner, which is wrong for an interactive match as much as a nightly one.
+	if result.Clock != tier3.ClockPod {
+		t.Errorf("the pod ran at clock %d, want %d", result.Clock, tier3.ClockPod)
+	}
+}
+
+// A duel still runs at a duel's clock, so the rule above did not simply raise
+// the clock for everybody.
+func TestADuelKeepsTheDuelClock(t *testing.T) {
+	t.Parallel()
+	shim := &stubShim{games: []tier3.WireGame{won(1, 5421, 1, 11)}}
+	a, reg, _ := forgeAPI(t, shim)
+	srv := forgeServer(t, a)
+
+	status, payload := postForge(t, srv,
+		`{"a_slug":"kaheera","b_slug":"mono-green","games":1}`)
+	if status != 200 {
+		t.Fatalf("%d %v", status, payload)
+	}
+	reg.Wait()
+	job := reg.Get(payload["id"].(string), alice.UserID)
+	result, _ := job.Payload().Result.(forgeResult)
+	if result.Clock != tier3.ClockDefault {
+		t.Errorf("the duel ran at clock %d, want %d", result.Clock, tier3.ClockDefault)
+	}
+}
+
+// Seats fill in order, and a gap is refused rather than closed up. Seat order
+// is the order decks reach Forge and the order `winner_seat` points into, so a
+// table assembled around a caller's typo would be a match whose recorded
+// results name the wrong decks.
+func TestASeatGapIsRefusedRatherThanClosedUp(t *testing.T) {
+	t.Parallel()
+	a, _, _ := forgeAPI(t, &stubShim{games: []tier3.WireGame{won(1, 1, 1, 1)}})
+	srv := forgeServer(t, a)
+
+	for _, c := range []struct{ note, body, says string }{
+		{"d without c",
+			`{"a_slug":"kaheera","b_slug":"mono-green","d_slug":"rich"}`,
+			"d_slug was given without c_slug"},
+		{"b is still required",
+			`{"a_slug":"kaheera","c_slug":"rich"}`,
+			"b_slug is required"},
+	} {
+		t.Run(c.note, func(t *testing.T) {
+			status, payload := postForge(t, srv, c.body)
+			if status != 422 {
+				t.Fatalf("%d %v, want a 422", status, payload)
+			}
+			if detail, _ := payload["detail"].(string); !strings.Contains(detail, c.says) {
+				t.Errorf("the refusal reads %q, want it to name %q", detail, c.says)
+			}
+		})
+	}
+}

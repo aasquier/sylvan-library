@@ -141,8 +141,12 @@ func TestTheShapedMatchIsTheRecordedBytes(t *testing.T) {
 			run := tier3.RunFromWire(c.Run)
 			// No beats: every row in the frozen corpus is a silent match,
 			// and `omitempty` keeps the recorded bytes identical.
+			// The clock derived from the table, which for the corpus's two-seat
+			// matches is the recorded 300 -- so the golden stays valid and the
+			// rule is exercised rather than bypassed with a constant.
 			got, err := json.Marshal(shapeForge(pair, c.Addresses,
-				c.GamesAsked, big.NewInt(c.Seed), run, nil))
+				c.GamesAsked, tier3.ClockForSeats(len(pair)), big.NewInt(c.Seed),
+				run, nil))
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -72,7 +72,29 @@ const (
 	// the cap is what keeps one enthusiastic request from parking the Forge
 	// for an hour.
 	ForgeGamesMax = 20
+	// ForgeSeatsMax is the largest table this route will seat: a Commander
+	// pod. Four rather than "however many decks were named" because the pod
+	// is the format's own table and because a pod game already runs about ten
+	// times a duel's — measured 2026-09-06, ~135s median against ~16s — so
+	// a fifth chair would be a request that parks the one-wide lane for a
+	// very long time on a shape nobody plays.
+	ForgeSeatsMax = 4
+	// ForgeSeatsMin is a game: two decks. `tier3.RunGames` bounds this too,
+	// and refusing here means the refusal is a 422 with words rather than an
+	// error surfacing from three layers down.
+	ForgeSeatsMin = 2
 )
+
+// forgeSeatKeys are the request's seat letters, in seat order — the order the
+// decks reach Forge, and so the order `winner_seat` indexes.
+//
+// **Letters rather than an array, and `c`/`d` optional**, which keeps the
+// recorded request shape exactly as it was: `a_slug`/`b_slug` are what the
+// Coliseum's own link has always carried, and a pod is those two plus as many
+// more as were named. A `seats: []` array would have been the tidier design
+// for a route with no history; this one has a corpus and a room built on the
+// letters.
+var forgeSeatKeys = []string{"a", "b", "c", "d"}
 
 // forgeStatus answers: is the Forge reachable from this process?
 // A fact about the environment.
@@ -1173,7 +1195,7 @@ type forgePartial struct {
 // only by convention — nothing refuses the request — and pinned by
 // `TestADeckPlayedAgainstItselfShowsTheCombinedWins`, because the guard beats
 // the fix for a wart nobody has hit.
-func shapeForge(decks []*deck.Deck, addresses []string, games int,
+func shapeForge(decks []*deck.Deck, addresses []string, games, clock int,
 	seed *big.Int, run *tier3.SimRun, beats []forgeBeats) forgeResult {
 	wins := map[string]int{}
 	for _, d := range decks {
@@ -1210,11 +1232,15 @@ func shapeForge(decks []*deck.Deck, addresses []string, games int,
 		Played:         len(rows),
 		StartupSeconds: floats.Float(floats.RoundTo(run.StartupSeconds(), 1)),
 		WallSeconds:    floats.Float(floats.RoundTo(run.WallSeconds, 1)),
-		Clock:          ForgeClock,
-		Seed:           seed,
-		Rows:           rows,
-		Caveat:         ForgeCaveat,
-		Beats:          beats,
+		// The clock the match actually ran at, not the constant. A pod runs
+		// at [tier3.ClockPod], and a payload that said 300 while the games
+		// were played at 900 would be a room telling a viewer the wrong thing
+		// about the match in front of them.
+		Clock:  clock,
+		Seed:   seed,
+		Rows:   rows,
+		Caveat: ForgeCaveat,
+		Beats:  beats,
 	}
 	if len(out.Beats) > ForgeReplayGames {
 		out.Beats = out.Beats[:ForgeReplayGames]
@@ -1283,14 +1309,30 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 
 	type pair struct{ owner, slug string }
 	var pairs []pair
-	for _, side := range []string{"a", "b"} {
+	for i, side := range forgeSeatKeys {
 		raw := body[side+"_slug"]
 		// The raw value's truthiness, before the stringification. A `0`
 		// or an empty list is falsy and refused here; a non-empty list is
 		// truthy and becomes a slug that no deck has, which is a 404.
 		if !truthy(raw) {
-			wire.Detail(w, http.StatusUnprocessableEntity, side+"_slug is required")
-			return
+			if i < ForgeSeatsMin {
+				wire.Detail(w, http.StatusUnprocessableEntity, side+"_slug is required")
+				return
+			}
+			// **A gap ends the table rather than being skipped**, so
+			// `d_slug` sent without `c_slug` is refused instead of quietly
+			// seating three. Seat order is the order decks reach Forge and
+			// the order `winner_seat` indexes, so a table assembled out of a
+			// caller's typo would be a match whose results point at the
+			// wrong decks.
+			for _, rest := range forgeSeatKeys[i+1:] {
+				if truthy(body[rest+"_slug"]) {
+					wire.Detail(w, http.StatusUnprocessableEntity,
+						rest+"_slug was given without "+side+"_slug; seats are filled in order")
+					return
+				}
+			}
+			break
 		}
 		owner := str(body, side+"_owner")
 		if owner == "" {
@@ -1534,7 +1576,12 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 	// match is cut by a budget sized for a different clock.
 	clock := m.clock
 	if clock <= 0 {
-		clock = ForgeClock
+		// **Derived from the table, not defaulted to a duel's.** The night
+		// sets this per bout; an interactive match does not, and a pod handed
+		// `ForgeClock` would have about one game in six recorded as a draw
+		// with no winner — wrong whoever asked for it, which is why the rule
+		// lives in tier3 and both callers read the same function.
+		clock = tier3.ClockForSeats(len(decks))
 	}
 	worker := a.forgeWorker()
 	recorder := a.matchLedger()
@@ -1652,7 +1699,7 @@ func (a *API) playForgeMatch(rep jobs.Progress, m forgeMatch) (forgeResult, int6
 	matchID := recorder.Record(ctx, ledger.Match{Run: run, Decks: decks,
 		Seed: seed, Clock: clock, GamesRequested: games,
 		Hosted: hosted, OwnerIDs: ownerIDs})
-	out := shapeForge(decks, addresses, games, seed, run, played)
+	out := shapeForge(decks, addresses, games, clock, seed, run, played)
 	a.paintTheKillers(ctx, out.Rows)
 	return out, matchID, nil
 }

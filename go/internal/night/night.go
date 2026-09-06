@@ -52,6 +52,7 @@ import (
 	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // Default values for the settings that have one, applied by
@@ -77,20 +78,14 @@ const (
 	// game is a ~3 minute bout and ten is a ~26 minute one, so ten games a
 	// pod turns a night of twenty-eight bouts into a night of three.
 	PodGames = 1
-	// PodClock is Forge's per-game seconds for a pod (Aaron, 2026-09-06).
-	//
-	// **`tier3.ClockDefault` cannot hold a pod and the failure is silent.**
-	// Measured over six four-seat games: 45s, 47s, 86s, 185s, 218s and one
-	// that needed ~349s. At 300 that last one was written down as
-	// `timed_out` — which `parse.go` calls a draw with no winner — and then,
-	// because Forge honours no interrupt, played on invisibly to a real
-	// result nobody recorded. 900 clears the whole measured spread with room
-	// for the tail.
-	PodClock = 900
-	// DuelClock is Forge's per-game seconds for two seats: the engine's own
-	// default, restated here because the night now chooses between two
-	// clocks and a reader should find both in one place.
-	DuelClock = 300
+	// PodClock and DuelClock are Forge's per-game seconds at each size of
+	// table. **Aliases rather than numbers**: the rule lives in
+	// `tier3.ClockForSeats`, beside `ClockDefault` and `GameBudget`, because
+	// the interactive route needs the same answer and two copies of a clock
+	// is how one of them ends up stale. See there for the measurement that
+	// chose 900.
+	PodClock  = tier3.ClockPod
+	DuelClock = tier3.ClockDefault
 	// PodShare is how much of a scheduled night is pods rather than duels:
 	// two bouts in three (Aaron, 2026-09-06). Expressed as a fraction of the
 	// bout cap rather than a probability, so a night's shape is the same

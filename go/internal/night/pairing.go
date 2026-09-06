@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // The deal: who fights whom tonight, decided once at run open and written as
@@ -147,15 +149,11 @@ func GamesFor(seats int, set Settings) int {
 	return set.Games
 }
 
-// ClockFor is Forge's per-game seconds for a table of this size. A pod at a
-// duel's clock is cut about one game in six and recorded as a draw; see
-// [PodClock].
-func ClockFor(seats int) int {
-	if seats > 2 {
-		return PodClock
-	}
-	return DuelClock
-}
+// ClockFor is Forge's per-game seconds for a table of this size, delegated to
+// [tier3.ClockForSeats] so the night and the interactive room cannot disagree
+// about what a pod's clock is. A pod at a duel's clock is cut about one game
+// in six and recorded as a draw; the measurement is on that function.
+func ClockFor(seats int) int { return tier3.ClockForSeats(seats) }
 
 // PlanSample deals a measurement run: a full round-robin over the entire
 // roster — house and players together, every pair once, caps ignored — so
