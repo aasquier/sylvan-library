@@ -152,6 +152,23 @@ export function countRuns(beats: StagedBeat[]): StagedBeat[] {
   return out
 }
 
+/** Seats a game's tape has already dismissed, by staged name.
+ *
+ * Forge announces every elimination as its own `outcome` beat — "<player>
+ * has lost …" — and the stage keeps the sentence's tail as `text`, so this
+ * is a filter rather than a parse. Two edges hold it honest: the *winner's*
+ * outcome opens "won" and stays off the list, and beats carry their game
+ * number, so game two of a bout raises everyone the first game buried. The
+ * room hands the answer to the board, which lays the pall on those seats
+ * (Aaron, 2026-09-07: a dead player in a pod should read as dead).
+ */
+export function fallenBy(shown: StagedBeat[], game: number): string[] {
+  return shown
+    .filter((b) => b.game === game && b.kind === 'outcome'
+      && b.who !== null && b.text.startsWith('lost'))
+    .map((b) => b.who as string)
+}
+
 /** How fast the room is telling it, or whether it is telling it at all.
  *
  * **The Forge is never waited for and never slowed down.** It plays its games

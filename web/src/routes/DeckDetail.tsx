@@ -1248,17 +1248,23 @@ export default function DeckDetail() {
                   Only the {deck.needs_rationale} needing a rationale
                 </label>
               )}
-              {/* One verb, whichever direction has work to do: rolled mostly
-                  shut it opens everything, otherwise it folds everything. */}
+              {/* A proper toggle rather than a verb that flips (Aaron,
+                  2026-09-07): the chip asserts a state — pressed is the whole
+                  99 open on the table — and from any half-folded middle a
+                  press opens everything, the same "from some, on" rule the
+                  settings' master switches keep. `.chip-toggle`, never a
+                  link, so hover, focus and press all answer and
+                  `aria-pressed` says where it stands (commandments 17
+                  and 20). */}
               <button type="button"
+                      aria-pressed={folded.size === 0 && groups.length > 0}
                       onClick={() => setFolded(
-                        folded.size >= groups.length && groups.length > 0
-                          ? new Set()
-                          : new Set(groups.map(([key]) => key)))}
-                      className="btn btn-ghost btn-xs pb-2">
-                {folded.size >= groups.length && groups.length > 0
-                  ? 'Unfold all'
-                  : 'Fold all'}
+                        folded.size === 0 && groups.length > 0
+                          ? new Set(groups.map(([key]) => key))
+                          : new Set())}
+                      className={`chip-toggle mb-2 rounded-full px-3 py-1 text-xs font-medium${
+                        folded.size === 0 && groups.length > 0 ? ' is-on' : ''}`}>
+                All unfolded
               </button>
             </div>
             {!deck.pool_available && (

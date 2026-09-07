@@ -3018,8 +3018,14 @@ function FieldTransport({ speed, setSpeed, at, of, seek, turns = [],
  * two to keep in step.
  */
 export function MatchBoard({ board, shown, game, name, running, beat,
-  speed, setSpeed, of, seek, turns, games, playing, chooseGame, zones = [] }: {
+  speed, setSpeed, of, seek, turns, games, playing, chooseGame, zones = [],
+  fallen = [] }: {
   board: ForgeBoard | null
+  /** Seats the tape has already dismissed, by **staged name** — the room
+   *  scans its told beats for `outcome` sentences that open "lost" and
+   *  hands the names down, so the pall lands the moment the sentence is
+   *  spoken and never before. Empty for a duel or an unstarted game. */
+  fallen?: string[]
   /** The paintings the board's own zones wear, from `/api/coliseum`. Checked-in
    *  prose, so it arrives before any match does; empty is a legible state and
    *  draws the brass tiles the rail has always had. */
@@ -3309,11 +3315,18 @@ export function MatchBoard({ board, shown, game, name, running, beat,
             const facing = i < 2 ? 'far' : 'near'
             const seatName = name(s.slug, s.name)
             const open = s.seat === focus
+            /* The tape has already dismissed this seat: an `outcome` beat
+               said "<player> has lost …" at some earlier moment of the
+               replay. Compared by staged name, the same shelf `casting`
+               reads, so a pod of three Goreclaws still points at the right
+               chair. A fallen seat cannot also read as lit. */
+            const out = fallen.includes(seatName)
             return (
               <div key={s.seat}
                    className={`field-quad field-quad-${i + 1}`
                      + `${open ? ' is-open' : ''}`
-                     + `${s.seat === state.active ? ' is-on-turn' : ''}`}>
+                     + `${s.seat === state.active && !out ? ' is-on-turn' : ''}`
+                     + `${out ? ' is-fallen' : ''}`}>
                 {/* **A button, because it changes this page rather than
                     leaving it** (commandment 20). It is the seat's own plate
                     on a wide screen and the whole rail on a narrow one, and
@@ -3324,12 +3337,21 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                         onClick={() => setPinned(
                           pinned === s.seat ? null : s.seat)}>
                   <FieldPlate side={s} facing={facing} name={seatName} />
+                  {out && <span className="sr-only">, has fallen — out of
+                    this game</span>}
                   <span className="sr-only">
                     {pinned === s.seat
                       ? `, held open — press to follow the action again`
                       : `, press to hold this seat open`}
                   </span>
                 </button>
+                {/* The word over the pall — the eye's copy of the sr-only
+                    sentence above. */}
+                {out && (
+                  <span className="field-quad-fallen" aria-hidden="true">
+                    Fallen
+                  </span>
+                )}
                 <FieldSide side={s} facing={facing}
                            active={s.seat === state.active}
                            creatures={stackRow(s.creatures ?? [])} />

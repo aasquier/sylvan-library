@@ -22,8 +22,8 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  BETWEEN_BOUTS, beatDelay, countRuns, useReel, type Arriving, type Speed,
-  type StagedBeat,
+  BETWEEN_BOUTS, beatDelay, countRuns, fallenBy, useReel, type Arriving,
+  type Speed, type StagedBeat,
 } from './reel'
 
 describe('how fast a beat is told', () => {
@@ -355,5 +355,43 @@ describe('counting what arrives twice', () => {
     const { result } = renderHook(() => useReel('j9', [1], bout, 'paused'))
     act(() => { result.current[1](3) })
     expect(result.current[0].shown.map((b) => b.run)).toEqual([3, 0, 0])
+  })
+})
+
+describe('who the tape has dismissed', () => {
+  const beat = (over: Partial<StagedBeat>): StagedBeat => ({
+    key: 'k', game: 1, turn: 5, kind: 'cast', who: null, text: '', ...over,
+  })
+
+  it('names the players whose outcome opened "lost", and nobody else', () => {
+    const shown = [
+      beat({ kind: 'cast', who: 'Arahbo — Cats', text: 'casts Regal Caracal' }),
+      beat({ kind: 'outcome', who: 'Atla Palani — Eggs',
+        text: 'lost due to accumulation of 21 damage from generals' }),
+      beat({ kind: 'outcome', who: 'Gyome — Food',
+        text: 'lost the game due to being attacked' }),
+      beat({ kind: 'outcome', who: 'Arahbo — Cats', text: 'won the game' }),
+    ]
+    expect(fallenBy(shown, 1))
+      .toEqual(['Atla Palani — Eggs', 'Gyome — Food'])
+  })
+
+  it('lets a new game raise everyone the last one buried', () => {
+    const shown = [
+      beat({ kind: 'outcome', who: 'Gyome — Food', game: 1,
+        text: 'lost the game' }),
+      beat({ kind: 'outcome', who: 'Atla Palani — Eggs', game: 2,
+        text: 'lost the game' }),
+    ]
+    // Game two's board answers only for game two's dead.
+    expect(fallenBy(shown, 2)).toEqual(['Atla Palani — Eggs'])
+  })
+
+  it('skips an outcome that names nobody or says nothing', () => {
+    const shown = [
+      beat({ kind: 'outcome', who: null, text: 'lost the game' }),
+      beat({ kind: 'outcome', who: 'Gyome — Food', text: '' }),
+    ]
+    expect(fallenBy(shown, 1)).toEqual([])
   })
 })

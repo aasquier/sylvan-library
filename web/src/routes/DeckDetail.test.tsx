@@ -2362,8 +2362,10 @@ describe('the 99 rolls up', () => {
     const header = await screen.findByRole('button', { name: /Ramp/ })
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByText('Primeval Titan')).toBeNull()
-    // And with everything shut, the one verb offers the other direction.
-    expect(screen.getByRole('button', { name: 'Unfold all' })).toBeTruthy()
+    // And the master chip says where things stand: everything shut, so the
+    // toggle is off (Aaron, 2026-09-07 — a state, not a flipping verb).
+    const all = screen.getByRole('button', { name: 'All unfolded' })
+    expect(all.getAttribute('aria-pressed')).toBe('false')
   })
 
   it('folds a category away behind its header', async () => {
@@ -2443,15 +2445,24 @@ describe('the tabs on a phone', () => {
     }
   })
 
-  it('folds and unfolds everything from one control', async () => {
-    renderUnfolded()
-    await screen.findByText('Primeval Titan')
-    fireEvent.click(screen.getByRole('button', { name: 'Fold all' }))
-    expect(screen.queryByText('Primeval Titan')).toBeNull()
+  it('folds and unfolds everything from one toggle that says its state',
+    async () => {
+      renderUnfolded()
+      await screen.findByText('Primeval Titan')
+      // Everything is open, so the chip stands pressed — a proper toggle
+      // like the settings' switches (Aaron, 2026-09-07), which is also what
+      // commandment 20 asks of a control that changes this page.
+      const all = screen.getByRole('button', { name: 'All unfolded' })
+      expect(all.getAttribute('aria-pressed')).toBe('true')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Unfold all' }))
-    expect(screen.getByText('Primeval Titan')).toBeTruthy()
-  })
+      fireEvent.click(all)
+      expect(screen.queryByText('Primeval Titan')).toBeNull()
+      expect(all.getAttribute('aria-pressed')).toBe('false')
+
+      fireEvent.click(all)
+      expect(screen.getByText('Primeval Titan')).toBeTruthy()
+      expect(all.getAttribute('aria-pressed')).toBe('true')
+    })
 })
 
 /**

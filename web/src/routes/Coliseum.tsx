@@ -78,7 +78,7 @@ import { DeckCaution } from '../components/closedform'
 import { MatchBoard } from '../components/board'
 import { MatchVerdict } from '../components/verdict'
 import { MatchTheater } from '../components/theater'
-import { type Arriving, type Speed, type StagedBeat, useReel }
+import { type Arriving, fallenBy, type Speed, type StagedBeat, useReel }
   from '../lib/reel'
 import {
   beatLine, playerTurns, shortName, theaterBeats, theaterRows,
@@ -1272,6 +1272,14 @@ export default function ColiseumRoom() {
   // on from where the hand left off rather than snapping back.
   const [reel, seek, series] = useReel(job?.id ?? '', bouts, stage, speed)
 
+  /** Seats this game's tape has already dismissed, for the board's pall
+   *  (Aaron, 2026-09-07: a dead player in a pod should read as dead).
+   *  `fallenBy` argues the scan; the memo just keeps it off every render.
+   *  Scrubbing backwards re-runs it over a shorter `shown` and the pall
+   *  lifts again — the reel is the one clock (its own rule). */
+  const fallenSeats = useMemo(() => fallenBy(reel.shown, reel.game),
+    [reel.shown, reel.game])
+
   /** Where each of this bout's turns begins, for the transport's turn step.
    *
    *  **A player's turn, which is the unit somebody studying a game wants**
@@ -1615,6 +1623,7 @@ export default function ColiseumRoom() {
                       zones={data?.zones ?? []}
                       shown={reel.told} game={reel.game}
                       name={seatName} running={running}
+                      fallen={fallenSeats}
                       beat={reel.shown[reel.shown.length - 1] ?? null}
                       speed={speed} setSpeed={setSpeed}
                       of={reel.shown.length + reel.queue.length}
