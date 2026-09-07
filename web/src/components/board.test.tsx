@@ -2915,8 +2915,10 @@ it('draws an aura on the creature an ability was aimed at, and on no other',
  * The pall over a fallen seat (Aaron, 2026-09-07).
  *
  * A pod's quadrant reads as dead from the moment the tape says so: the room
- * scans its told beats for outcomes opening "lost" (`fallenBy`, tested with
- * the reel) and hands the staged names down; the board answers with
+ * scans its told beats for outcomes the scribe marked as losses (`fallenBy`,
+ * tested with the reel — and it read the verb out of the sentence until
+ * 2026-09-07, which is why it had never once fired on a real match) and hands
+ * the staged names down; the board answers with
  * `is-fallen`, the word for the eye and a sentence for the ear. The pall
  * itself is a layer above the seat and never a filter — that half is
  * commandment 19's own gate (`cardimagery_test.go`); this half holds the
@@ -2926,7 +2928,13 @@ it('draws an aura on the creature an ability was aimed at, and on no other',
 const POD: ForgeBoard = {
   seats: [
     { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
-    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 0 },
+    // **Alive on the board, and that is the point of this fixture.** It used
+    // to sit at nought life to stand for a dead player, back when the tape was
+    // the only thing that could say so. `seatIsOut` reads a life total now, so
+    // a nought here would bury this seat before any test asked it to — and
+    // these tests are about the tape's own path. `POD_DOWN` below is the other
+    // one.
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 12 },
     { seat: 3, slug: 'goreclaw', name: 'Goreclaw — Stompy', life: 38 },
     { seat: 4, slug: 'gyome', name: 'Gyome — Food', life: 21 },
   ],
@@ -2958,12 +2966,96 @@ it('lays the pall on a fallen seat and leaves the living unmarked', () => {
   expect(seat?.className,
     'the fallen seat cannot also read as the lit one')
     .not.toContain('is-on-turn')
+  // ...and it does not say so to a screen reader either. Seat 2 is the active
+  // one on this board's only step, and it is the seat that fell.
+  expect(seat?.textContent).not.toContain('is on turn')
+})
+
+it('says whose turn it is at a pod, in words as well as in gold', () => {
+  // The ring around the quadrant walks a light and says nothing at all to a
+  // screen reader; a duel says it in the trench, which a pod has not got. Seat
+  // 2 is the active one on this board's only step.
+  const { container } = showPod([])
+  const lit = container.querySelectorAll('.field-quad.is-on-turn')
+  expect(lit.length, 'one seat is on turn and only one').toBe(1)
+  expect(lit[0]?.textContent).toContain('Atla Palani — Eggs')
+  expect(lit[0]?.textContent).toContain('is on turn')
+  // And nobody else claims it.
+  const others = [...container.querySelectorAll('.field-quad')]
+    .filter((q) => !q.classList.contains('is-on-turn'))
+  expect(others).toHaveLength(3)
+  for (const seat of others) {
+    expect(seat.textContent).not.toContain('is on turn')
+  }
 })
 
 it('draws no pall while everyone still stands', () => {
   const { container } = showPod()
   expect(container.querySelector('.field-quad.is-fallen')).toBeNull()
   expect(container.textContent).not.toContain('Fallen')
+})
+
+/**
+ * **The board's own reading, which is the one that arrives on time.**
+ *
+ * Forge writes its outcome lines as an end-of-game post-mortem: measured on a
+ * real four-player game, Atla Palani's life reached nought at beat 495 and the
+ * line saying so landed at beat 702. For those two hundred and seven beats the
+ * room drew a seat at nought life with an empty everything and said nothing
+ * (Aaron, 2026-09-07). `seatIsOut` reads the loss off the state instead, and
+ * the room takes the union of the two so whichever knows first answers.
+ */
+const POD_DOWN: ForgeBoard = {
+  // **Life, commander damage and poison all arrive on the *step*, never on
+  // the seat.** A seat's `life` is the starting total and the other two are
+  // not on it at all — `foldBoard` reads `step.life`, `step.generals` and
+  // `step.counters`. Written on the seats, this fixture was ignored in
+  // silence and only the nought-life seat was buried, which is a fixture
+  // saying what a payload cannot.
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+    { seat: 3, slug: 'goreclaw', name: 'Goreclaw — Stompy', life: 40 },
+    { seat: 4, slug: 'gyome', name: 'Gyome — Food', life: 40 },
+  ],
+  cards: [],
+  steps: [{
+    turn: 1,
+    seat: 4,
+    changes: [],
+    // Three ways to be out that the tape has not mentioned, and one near miss
+    // on each. 903.10a counts commander damage *per commander*, which is why
+    // forty across two is not lethal and twenty-one from one is.
+    life: [{ seat: 1, life: 0 }, { seat: 2, life: 30 },
+      { seat: 3, life: 30 }, { seat: 4, life: 1 }],
+    generals: [
+      { seat: 2, from: [{ id: 1, damage: 21 }] },
+      { seat: 4, from: [{ id: 2, damage: 20 }, { id: 3, damage: 20 }] },
+    ],
+    counters: [
+      { seat: 3, counters: [{ kind: 'POISON', n: 10 }] },
+      { seat: 4, counters: [{ kind: 'poison', n: 9 }] },
+    ],
+  }],
+} as unknown as ForgeBoard
+
+it('buries a seat the board says is out, without waiting for the tape', () => {
+  const { container } = render(
+    <MatchBoard board={POD_DOWN} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback} fallen={[]}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  const buried = [...container.querySelectorAll('.field-quad.is-fallen')]
+  expect(buried.map((q) => q.querySelector('.field-plate-name')?.textContent))
+    .toEqual(['Arahbo — Cats', 'Atla Palani — Eggs', 'Goreclaw — Stompy'])
+  // `fallen` was empty: not one of these came from the narration.
+  expect(container.querySelectorAll('.field-quad-fallen')).toHaveLength(3)
+  // And the seat on one life, twenty from each of two commanders and nine
+  // poison is alive on all three counts — and is the one on turn.
+  const up = container.querySelector('.field-quad:not(.is-fallen)')
+  expect(up?.querySelector('.field-plate-name')?.textContent)
+    .toBe('Gyome — Food')
+  expect(up?.className).toContain('is-on-turn')
 })
 
 /**

@@ -29,10 +29,10 @@ import type { Clash } from '../lib/board'
 import type { Speed, StagedBeat } from '../lib/reel'
 import { halfNamed, pictureOf } from '../lib/board'
 import { halfGlassFor } from '../lib/halves'
-import { ARCANA, boutAt, type BoutFighter, faceFor, mannerOf, plateNote,
-  type Outcome, plateWord, sceneFor, type Staged, stagedBout, stagedMana,
-  stageLife, type StagedBout, type StagedMana, useStaged, useStagedBout,
-  useStagedMana } from '../lib/stage'
+import { ARCANA, boutAt, boutColumn, type BoutFighter, faceFor, mannerOf,
+  type Outcome, plateNote, plateWord, sceneFor, type Staged, stagedBout,
+  stagedMana, stageLife, type StagedBout, type StagedMana, useStaged,
+  useStagedBout, useStagedMana } from '../lib/stage'
 import { ManaPip } from './manasymbol'
 
 /** The card itself, or the card set in type when there is no picture of it.
@@ -588,7 +588,19 @@ function StageMana({ item }: { item: StagedMana }) {
  */
 function StageBout({ item }: { item: StagedBout }) {
   const n = item.blockers.length
-  const life = { '--stage-life': `${item.life}ms` } as CSSProperties
+  // **Each rank over its own seat's column** (Aaron, 2026-09-07). A duel
+  // answers the middle of the stage for both, which is every rule this drew by
+  // before there was a table wide enough to have columns; see `boutColumn` for
+  // the ruling and the game it was measured against.
+  const charge = boutColumn(item.from, item.seats)
+  const wall = boutColumn(item.at, item.seats)
+  const life = {
+    '--stage-life': `${item.life}ms`,
+    // The attacker is centred by a negative margin of half its width — see
+    // `.stage-bout-card.is-att`, which explains why it cannot be a transform —
+    // so this is the point it is centred *on* and the margin does the rest.
+    '--att-x': `${charge.centre * 100}%`,
+  } as CSSProperties
   return (
     <span style={life} aria-hidden="true"
           className={`stage-bout is-from-${item.facing}`
@@ -624,7 +636,8 @@ function StageBout({ item }: { item: StagedBout }) {
                 fallen={item.dying === item.attacker.id} />
       {item.blockers.map((b, i) => (
         <BoutCard key={b.id} fighter={b} role="blk"
-                  at={boutAt(i, n)} order={i} fallen={item.dying === b.id} />
+                  at={boutAt(i, n)} column={boutAt(i, n, wall.centre, wall.span)}
+                  order={i} fallen={item.dying === b.id} />
       ))}
       <span className="stage-plate-strip">
         <span className="stage-plate-word">{item.word}</span>
@@ -645,16 +658,29 @@ function StageBout({ item }: { item: StagedBout }) {
  *  it, which is the same fallback `StageFace` makes for the single-card
  *  stage. A gap in the rank would be a lie about how many creatures are in
  *  the fight. */
-function BoutCard({ fighter, role, at, order, fallen }: {
+function BoutCard({ fighter, role, at, column, order, fallen }: {
   fighter: BoutFighter
   role: 'att' | 'blk'
   at?: number
+  /** Where this card stands when the table is drawn in columns — the same
+   *  rank, centred on the defending seat's own column instead of on the whole
+   *  stage.
+   *
+   *  **Both are emitted and the stylesheet picks**, which is the only place
+   *  this decision can be made: a pod is a two-by-two on a laptop and a single
+   *  stack of seats on a phone, and *which* it is, is a media query. Reading
+   *  the width in here would write the breakpoint down a second time, in the
+   *  language that cannot see it change. So `lib/stage.ts` keeps the
+   *  arithmetic, the component hands down both answers, and one `@media` rule
+   *  in `index.css` says which is true of the table on the screen. */
+  column?: number
   order?: number
   /** Whether this is the fighter the beat just buried. */
   fallen?: boolean
 }) {
   const where = {
     ...(at != null ? { '--at': `${at * 100}%` } : {}),
+    ...(column != null ? { '--at-col': `${column * 100}%` } : {}),
     // Each blocker arrives a beat behind the one before it, so a wall that
     // lands in one beat still reads as several creatures stepping up rather
     // than as one shape appearing. Only ever used by the first render of a
@@ -742,7 +768,7 @@ function StageArva() {
  * `beatLine` correct against exactly that day.
  */
 export function CenterStage({ board, beat, speed, game, dies, seat, gained,
-  at, clash, outcome }: {
+  at, clash, outcome, table }: {
   board: ForgeBoard | null
   beat: StagedBeat | null
   speed: Speed
@@ -776,6 +802,17 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
    *  rather than the folded state. `alignLanes` is decided in the same place
    *  and for the same reason; see `clashOf`. */
   clash: Clash | null
+  /** **Everyone at the table, in the room's own words for them**, in seat
+   *  order — so `Clash.from` and `Clash.at` index straight into it.
+   *
+   *  Passed in rather than read off `board.seats`, because Forge's own title
+   *  for a deck is *"Goreclaw, Terror of Qal Sisma — Mono-Green Stompy"* and
+   *  the shelf that shortens it to *Goreclaw* is in the route: only the room
+   *  knows which decks these are and which general each is sleeved behind,
+   *  which is what decides whether a title shortens at all. Its length is also
+   *  how many seats there are, which is what tells a duel's drawing from a
+   *  pod's — one list, so the count and the names cannot disagree. */
+  table: readonly string[]
 }) {
   // Both arcana asked for once, before the first spell of the match wants
   // one — see `useArcana`.
@@ -871,8 +908,13 @@ export function CenterStage({ board, beat, speed, game, dies, seat, gained,
   // keyed on the beat because a gang arrives as several beats and each of them
   // has to reset the clock, or the third cat would land on a stage that was
   // already fading.
+  //
+  // **The table arrives named, and that is one list rather than two facts.**
+  // The seat indices on a `Clash` index into it, its length is how many people
+  // are playing, and the names on it are the room's own — the shelf that turns
+  // a slug into *Goreclaw* lives up in the route, and this is where it lands.
   const liveBout = stagedBout(clash, board, beat?.key ?? '', speed, outcome,
-    beat?.kind === 'dies' ? beat.id ?? null : null)
+    beat?.kind === 'dies' ? beat.id ?? null : null, table)
   const heldBout = useStagedBout(liveBout, beat?.key ?? '', game)
   // **Paused, the fight is the beat's own** — the marks' rule, and it is the
   // same argument. Stepping and scrubbing both pause first, and those are

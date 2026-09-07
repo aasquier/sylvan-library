@@ -1265,6 +1265,94 @@ export function alignLanes(far: BoardStack[], near: BoardStack[],
   }
 }
 
+/** Twenty-one from one commander kills — rule 903.10a, and the number this
+ *  format is named for. */
+const GENERAL_LETHAL = 21
+
+/** Ten poison counters kill, whatever the life total says. */
+const POISON_LETHAL = 10
+
+/**
+ * **Whether this seat is out, read off the board rather than off the tape.**
+ *
+ * The room already had an answer to this and it arrives far too late.
+ * `fallenBy` scans the narration for Forge's *"&lt;player&gt; has lost"*
+ * lines — which are correct, and which Forge writes as an **end-of-game
+ * post-mortem**: all of them together, at the last turn, however long ago
+ * anybody actually died. Measured on a real four-player game: Atla Palani's
+ * life reached zero at beat 495 and the line about it landed at beat 702, two
+ * hundred and seven beats later. For those two hundred and seven beats the
+ * room drew a player at nought life, with an empty battlefield, an empty
+ * graveyard and an empty exile, and said nothing at all about it (Aaron,
+ * 2026-09-07: *"I don't see any change when something died"* — with a
+ * screenshot of exactly that seat).
+ *
+ * So the board answers for itself, from the state it is already folding. Three
+ * conditions, and they are Magic's own rather than Forge's:
+ *
+ * - **Nought life or less**, which is the loss almost every game ends by.
+ * - **Twenty-one damage from one commander**, counted per commander because
+ *   903.10a counts per commander — a player who has taken twenty from each of
+ *   two is very much still in it, which is why `generals` is a list.
+ * - **Ten poison**, which kills at any life total.
+ *
+ * **This does not replace the tape, it outruns it.** A mill kill and the
+ * rarer conditions leave no mark on any of these, and the outcome line still
+ * catches them; the room takes the union, so whichever knows first is the one
+ * that answers. The reverse is what could not work: waiting for the line means
+ * a seat that is visibly, emptily dead reads as alive for a third of a game.
+ *
+ * Cheap enough to ask every render — three fields and at most a couple of list
+ * entries, per seat, on a board that is already being folded.
+ */
+export function seatIsOut(side: BoardSide | null | undefined): boolean {
+  if (!side) return false
+  if (side.life <= 0) return true
+  if (side.generals.some((g) => g.damage >= GENERAL_LETHAL)) return true
+  return side.counters.some((c) =>
+    c.kind.toLowerCase() === 'poison' && c.n >= POISON_LETHAL)
+}
+
+/**
+ * **Where a seat sits at the table** — the row it faces along and the column
+ * it stands in, as the room draws them.
+ *
+ * **The seats used to read in reading order and the game does not go that
+ * way.** Forge rotates strictly by seat number, 1 → 2 → 3 → 4 → 1, so a
+ * two-by-two filled left-to-right then left-to-right again sends the turn
+ * across the top, *back* to the left, and across the bottom — a Z, traced four
+ * times a round. Aaron, 2026-09-07, watching a real pod: *"games should play
+ * clockwise, it is confusing what order the players are going in"*. He is
+ * right, and it is not a preference: four people at a table pass the turn
+ * around the table, and a room that seats them in reading order has drawn a
+ * different table than the one being played.
+ *
+ * So the bottom row reads **right to left**. Seat 1 top-left, 2 top-right,
+ * 3 bottom-right, 4 bottom-left, and the turn walks the rim.
+ *
+ *     1 → 2          the turn goes across the top, down the right side,
+ *     ↑    ↓         back along the bottom and up the left — one circle,
+ *     4 ← 3          which is what a table of four actually looks like.
+ *
+ * **One function, because two places have to agree and they are in different
+ * languages.** `.field-quad` is placed by the class this decides, and
+ * `boutColumn` puts a fight's two ranks over the two seats that are in it —
+ * and those disagreeing would draw a bout over a bystander while looking
+ * perfectly correct in isolation. A duel has one column and this says so.
+ */
+export function seatSpot(seat: number, seats: number):
+  { row: 'far' | 'near'; col: number; cols: number } {
+  if (seats <= 2) return { row: seat === 0 ? 'far' : 'near', col: 0, cols: 1 }
+  const cols = Math.ceil(seats / 2)
+  const far = seat < cols
+  return {
+    row: far ? 'far' : 'near',
+    // The top row left to right, the bottom row right to left.
+    col: far ? seat : cols - 1 - (seat - cols),
+    cols,
+  }
+}
+
 /**
  * Every seat's creature lane at once, arranged against whichever one is
  * swinging. Two seats or four; the duel is the case with only one other seat
@@ -1367,15 +1455,30 @@ export interface Clash {
   attacker: BoardCard
   /** Everything blocking it, stacked — the count is on the stack. */
   blockers: BoardStack[]
-  /** Which half the attacker swung out of, so the stage can put it on that
-   *  seat's own edge and rank the wall across from it. */
-  swinging: 'far' | 'near'
+  /** **Which seat swung, as its place at the table** — an index into the
+   *  sides this was read from, which is `BoardState.sides` order, which is the
+   *  order the room draws the seats in. So 0 and 1 are a duel's far and near,
+   *  and 0..3 are a pod's four quadrants reading across and then down.
+   *
+   *  **It was `'far' | 'near'` and those are two of a duel's words, not two of
+   *  Magic's.** A seat index is the fact the board actually holds; which edge
+   *  of the arena that becomes is a drawing decision, and it lives in
+   *  `boutFacing` where a table of four can be given a different answer than a
+   *  table of two without this reading having to know there was a question. */
+  from: number
+  /** Where the wall stands, by the same reckoning.
+   *
+   *  **One seat, because that is a rule of Magic**: only the player being
+   *  attacked may block, so however many creatures are in the wall they are
+   *  all one person's. Read off the first of them rather than assumed, so a
+   *  payload that somehow disagreed draws the whole wall and names where its
+   *  first member stands instead of dropping anybody. */
+  at: number
 }
 
 export function clashOf(blockerId: number | undefined,
-  far: BoardSide | null | undefined,
-  near: BoardSide | null | undefined): Clash | null {
-  return fightOf(blockerId, far, near, 'blocker')
+  sides: (BoardSide | null | undefined)[]): Clash | null {
+  return fightOf(blockerId, sides, 'blocker')
 }
 
 /**
@@ -1393,20 +1496,36 @@ export function clashOf(blockerId: number | undefined,
  * stopped, `'either'` accepts both and works out which. The declaration keeps
  * the narrow door because a block beat can only ever name a blocker, and a
  * narrow door is one fewer way to be wrong.
+ *
+ * **`sides` is the whole table, and it used to be two halves.** A fight spans
+ * a seam and a duel has one, so `(far, near)` was the whole board — at a pod
+ * it is the top two quadrants and nothing else, and every fight a bottom seat
+ * was in resolved to null. That is a silent hole rather than a loud one: a
+ * fight this cannot read and a beat that is not a fight are the same answer,
+ * so the centre stage simply stayed shut and the room looked like a room where
+ * nobody had blocked.
+ *
+ * **What makes the general case no harder than the duel is a rule of Magic**,
+ * the same one `alignTable` rests on: only the active player attacks, and only
+ * the player being attacked may block. So however many seats are at the table,
+ * a fight is still exactly two of them — the two this answers with.
  */
 export function fightOf(id: number | undefined,
-  far: BoardSide | null | undefined,
-  near: BoardSide | null | undefined,
+  sides: (BoardSide | null | undefined)[],
   side: 'blocker' | 'either' = 'either'): Clash | null {
   if (!id) return null
-  const sides: [BoardSide | null | undefined, 'far' | 'near'][] =
-    [[far, 'far'], [near, 'near']]
-  // Where every creature stands, and on whose side. Both halves in one map,
-  // because a fight is the one thing on this board that spans the seam.
-  const at = new Map<number, { card: BoardCard; side: 'far' | 'near' }>()
-  for (const [side, which] of sides) {
-    for (const card of side?.creatures ?? []) at.set(card.id, { card, side: which })
-  }
+  // Where every creature stands, and in whose seat. Every seat in one map,
+  // because a fight is the one thing on this board that spans the seam —
+  // **and at a pod there are three seams, which is why this takes the table
+  // rather than two halves.** It was `(far, near)`, so a block declared by
+  // either of the bottom two quadrants resolved to null and the centre stage
+  // simply never opened: half a pod's fights were invisible, and nothing said
+  // so, because a fight this cannot read and a beat that is not a fight are
+  // the same answer.
+  const at = new Map<number, { card: BoardCard; seat: number }>()
+  sides.forEach((side, seat) => {
+    for (const card of side?.creatures ?? []) at.set(card.id, { card, seat })
+  })
   const here = at.get(id)
   if (!here) return null
   // Which end of the fight this id is standing at. A blocker names the card it
@@ -1416,15 +1535,22 @@ export function fightOf(id: number | undefined,
     : side === 'either' && here.card.combat === ATTACKING ? here : undefined
   if (!attacker) return null
   // Everything facing this attacker, in board order so the rank does not
-  // reshuffle itself as it grows.
+  // reshuffle itself as it grows — and where the wall stands, taken from the
+  // first of them. Only the defending player blocks, so the wall is one
+  // seat's; reading it rather than deriving it from the attacker's seat is
+  // what keeps a table of four honest, where "the other seat" is three seats.
   const wall: BoardCard[] = []
-  for (const { card } of at.values()) {
-    if (card.blocking === attacker.card.id) wall.push(card)
+  let walled = -1
+  for (const { card, seat } of at.values()) {
+    if (card.blocking !== attacker.card.id) continue
+    if (walled < 0) walled = seat
+    wall.push(card)
   }
   if (wall.length === 0) return null
   return {
     attacker: attacker.card,
     blockers: stackRow(wall),
-    swinging: attacker.side,
+    from: attacker.seat,
+    at: walled,
   }
 }

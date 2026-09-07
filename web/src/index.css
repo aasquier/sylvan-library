@@ -7994,6 +7994,13 @@ button:hover .tarot-fan-card {
 
 .field-quad {
   display: grid;
+  /* The containing block for the two layers a seat can wear — the turn's
+     walking rim and the pall over a fallen one — both of which are `inset: 0`
+     on this box. Safe to hold here: the two things inside a quadrant that
+     position themselves absolutely, the zone trays and the hand's tray, each
+     have a containing block of their own (`.field-zone-l` and `.field-hand`
+     are both `position: relative`, and each says why). */
+  position: relative;
   grid-template-columns: minmax(0, 1fr);
   /* Content, not `1fr`: a quadrant is as tall as the plate, the sand and the
      hand it actually holds. A fractional row would have sized the sand to
@@ -8051,7 +8058,48 @@ button:hover .tarot-fan-card {
  * have to keep their size, which is one `flex: 1 1` and one `flex: 0 0 auto` —
  * a two-column grid would have had to guess a width for a plate whose contents
  * are a life ring plus however many commanders have connected. */
+/* **A quadrant's plate is never mirrored, and the duel's is.**
+ *
+ * `.field-plate-near` reverses itself — the body runs right-to-left, the brass
+ * rule moves to the other edge — and in a duel that is load-bearing: the two
+ * plates share one horizontal trench, so each is anchored to its own half of
+ * it and *which one is mine* is answerable without reading (commandment 2).
+ *
+ * At four seats there is no shared trench. Every plate stands at the top of
+ * its own quadrant with that quadrant's whole width, and `facing` is being
+ * used for the thing it is *also* used for — which way the seat's creature row
+ * points — so the two bottom seats came out reversed against the two top ones:
+ * name, then ring, then a rule on the left for seats one and two; ring, then
+ * bead, then name, then a rule on the right for seats three and four (Aaron,
+ * 2026-09-07, looking at a real pod). Nothing was gained by it, because a
+ * mirror can only ever encode two states and there are four chairs.
+ *
+ * So the mirror is undone inside a pod and all four plates read alike. The
+ * duel's own rule is untouched, which is why this is here rather than a change
+ * to `.field-plate-near`. */
+.field.is-pod .field-plate-near {
+  justify-self: start;
+  justify-content: flex-start;
+  flex-direction: column;
+}
+.field.is-pod .field-plate-near .field-plate-body { flex-direction: row; }
+.field.is-pod .field-plate-near .field-plate-rule {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--field-brass) 72%, transparent) 0%,
+    color-mix(in srgb, var(--field-brass) 30%, transparent) 70%,
+    rgba(201, 162, 39, 0) 100%);
+}
+
 .field-quad-head {
+  /* **Above the seat's own light.** The lit and waiting washes are layers laid
+     over the whole quadrant (`.field.is-pod .field-quad::after`), and the
+     first cut put them over the plate too — so a waiting seat's life total
+     went dim, which is the one number a person compares across four chairs.
+     The sand dims; who this is and how much life they have does not. It is
+     also what finally makes the fallen pall's own claim true: a graveyard gets
+     a headstone, not a hole. */
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -8103,8 +8151,143 @@ button:hover .tarot-fan-card {
   box-shadow: inset 0 0 0 1px var(--field-brass);
 }
 
-/* The seat holding the camera reads as the lit one. */
-.field-quad.is-on-turn { box-shadow: inset 0 0 0 1px rgba(201, 162, 39, 0.35); }
+/* ---- The seat on turn ------------------------------------------------ */
+/* **Whose turn it is, said loudly enough to find across a table of four.**
+ *
+ * It was `inset 0 0 0 1px rgba(201, 162, 39, 0.35)` — a one-pixel hairline at
+ * a third strength, against sand that is already brass-coloured. On a duel the
+ * question barely needs asking; at four seats it is the first thing a watcher
+ * looks for and the answer was invisible (Aaron, 2026-09-07: *"we need to do
+ * better highlighting whose turn it is, maybe a golden border around their
+ * quadrant that shimmers"*).
+ *
+ * **The mechanism is the room's own, not a new one.** This is `.field-crown`
+ * at the scale of a seat: a short arc of light walking a conic gradient, with
+ * two masks subtracting the inside from the outside so what survives is the
+ * border alone. The crown does it around a commander's card and it is the
+ * right device here for the same reason — a *travelling* highlight reads as
+ * live, where a ring that pulses reads as an alert. Slower than the crown's
+ * 5.2s, because a quadrant's perimeter is some six times a card's and a light
+ * crossing it at the same angular rate would be running.
+ *
+ * A steady band under the walk, so the seat is bordered in gold even at the
+ * dark end of the lap: the turn is *information*, and information may not be
+ * absent for three quarters of a cycle. */
+@property --field-turn-sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 40deg;
+}
+/* **Gold needs something to sit against, and this sand is gold.** The rim was
+   drawn first as brass alone and measured on a real pod: at two pixels on a
+   490×347 quadrant it is a tenth of the proportion the crown's two pixels are
+   on a 58px card, and it was laid straight onto warm sand of nearly its own
+   hue — a line you find once you know it is there, which is the fault this
+   replaced rather than a smaller version of the fix. So the ring gets three
+   pixels, a dark hairline inside it to separate metal from ground, and a bloom
+   outside that says *lit* from the far side of the table. */
+.field-quad.is-on-turn {
+  box-shadow:
+    inset 0 0 0 3px rgba(24, 14, 4, 0.42),
+    0 0 0 1px color-mix(in srgb, var(--field-brass) 40%, transparent),
+    0 0 26px -4px color-mix(in srgb, var(--field-brass) 68%, transparent);
+}
+.field-quad.is-on-turn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Above the sand and the cards' own stacking, below the fallen pall's word:
+     this is a rim and it paints nothing but the rim, so nothing it crosses is
+     obscured — and a `filter` was never a candidate, because what is under
+     this is Wizards' paintings (commandment 19). */
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 8px;
+  /* The ring's thickness, and it is not the crown's two. A perimeter this size
+     needs the width to read at all; three is what carried across the sand when
+     it was looked at. */
+  padding: 3px;
+  /* **The dark end of the lap is still gold**, which is the one place this
+     departs from the crown. A commander's crown may go almost out between
+     passes because the card is still a commander when the light is elsewhere —
+     the crown glyph says so. Whose turn it is has nothing else saying it, so
+     the floor of this gradient is a band a person can find at any moment of
+     the cycle and the walk is a brightening over it, not an appearance. */
+  background: conic-gradient(from var(--field-turn-sweep) at 50% 50%,
+    color-mix(in srgb, var(--field-brass) 72%, transparent) 0deg,
+    color-mix(in srgb, var(--field-brass) 92%, #fff) 30deg,
+    #fff6dc 58deg,
+    color-mix(in srgb, var(--field-brass) 92%, #fff) 86deg,
+    color-mix(in srgb, var(--field-brass) 72%, transparent) 116deg 360deg);
+  -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  -webkit-mask-clip: content-box, border-box;
+  mask-clip: content-box, border-box;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: field-turn-walk 9s linear infinite;
+}
+@keyframes field-turn-walk {
+  from { --field-turn-sweep: 40deg; }
+  to { --field-turn-sweep: 400deg; }
+}
+
+/* **The light on the table, which is the half a rim cannot do.**
+ *
+ * A gold border says *this one* and it says it at the edge; what a person
+ * reads across a whole table is which seat the light is on (Aaron,
+ * 2026-09-07: *"brighten the players whos turn it is more, darken the others
+ * more"*). A duel has had this since the beginning — `.field-side-lit`, a warm
+ * wash lying on the sand of whichever half is active — and the pod, which
+ * needs it four times as much, had a one-pixel hairline.
+ *
+ * **Layers, and never a `filter`.** Everything inside a quadrant is Wizards'
+ * paintings, and a `brightness()` on the box is exactly the reach commandment
+ * 19 exists to catch — the fourteen that shipped under ADR 48 were all
+ * somebody wanting "this half is dim" and taking the obvious CSS. So: a warm
+ * sheet laid over the lit seat and a neutral shade over the others, both drawn
+ * *on* the quadrant as things of their own. `.field-quad.is-fallen::after` is
+ * the same device at full strength and was the model.
+ *
+ * One pseudo-element, three states that cannot overlap: a seat is fallen, or
+ * on turn, or neither. A fallen seat is never on turn — the board refuses it
+ * — so `::after` can carry all three without them ever meeting. */
+.field.is-pod .field-quad:not(.is-fallen)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 8px;
+  pointer-events: none;
+  /* The shade over a seat that is waiting. Enough to sit a full step below the
+     lit one and not so much that a person cannot read a board they are about
+     to have to think about — three of the four seats wear this at any moment,
+     and they are still the game. */
+  background: rgba(8, 7, 5, 0.30);
+  transition: background 320ms ease-out;
+}
+/* And the light on the seat whose turn it is: warm, centred, and lifting the
+   sand rather than the cards — a lamp over the part of the table being played
+   on. It replaces the shade rather than fighting it, so the step between lit
+   and waiting is the whole of both. */
+.field.is-pod .field-quad.is-on-turn:not(.is-fallen)::after {
+  background:
+    radial-gradient(ellipse 82% 74% at 50% 46%,
+      color-mix(in srgb, var(--field-sun) 15%, transparent) 0%,
+      color-mix(in srgb, var(--field-sun) 7%, transparent) 55%,
+      transparent 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The step stays; only the fade between them goes. Which seat is lit is
+     information, and information may not be animated away. */
+  .field.is-pod .field-quad::after { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The light stops walking and does not go out — the crown's own ruling, for
+     the crown's own reason: whose turn it is, is information, and stillness
+     may not answer it with less gold. */
+  .field-quad.is-on-turn::before { animation: none; }
+}
 
 /* ---- A fallen seat -------------------------------------------------- */
 /* **The pall, at the scale of a whole seat** (Aaron, 2026-09-07: a dead
@@ -8117,7 +8300,6 @@ button:hover .tarot-fan-card {
    it, a blood-dark rim says which kind of quiet this is, and the plate
    stays legible: a graveyard gets a headstone, not a hole. */
 .field-quad.is-fallen {
-  position: relative;
   box-shadow: inset 0 0 0 1px rgba(122, 31, 31, 0.45);
 }
 .field-quad.is-fallen::after {
@@ -8127,11 +8309,17 @@ button:hover .tarot-fan-card {
   z-index: 1;
   border-radius: 8px;
   pointer-events: none;
+  /* **Never lighter than a seat that is merely waiting.** The pall was drawn
+     when nothing else shaded a quadrant, so its centre sat at 0.16 — and the
+     moment the waiting seats took a flat 0.30 the dead one read as the
+     brightest of the three, which is the opposite of every intention here.
+     Measured against that number rather than picked: the centre clears it and
+     the vignette deepens from there. */
   background:
     radial-gradient(ellipse at 50% 42%,
-      rgba(64, 10, 10, 0.16) 0%,
-      rgba(6, 8, 6, 0.36) 62%,
-      rgba(6, 8, 6, 0.5) 100%);
+      rgba(48, 10, 10, 0.36) 0%,
+      rgba(6, 8, 6, 0.48) 62%,
+      rgba(6, 8, 6, 0.6) 100%);
   animation: quad-pall 1400ms ease-out both;
 }
 @keyframes quad-pall {
@@ -8142,24 +8330,57 @@ button:hover .tarot-fan-card {
    where a glyph would need a legend, and it wears the arena's own
    materials — bone ink on blood-dark ground under the brass hairline
    every plate here carries. Above the pall, so the sentence survives the
-   shade. */
+   shade.
+ *
+ * **Across the sand, not tagged into the corner.** It began as a small pill at
+ * the quadrant's top right, which is where the closed-zone tiles live in a pod
+ * — so it landed squarely on the word EXILE and covered it (measured on a real
+ * four-player game, 2026-09-07). Moving it is not just collision avoidance: a
+ * player who has lost takes their permanents with them, so from the instant
+ * this appears that seat's battlefield is **empty by rule** — the one place on
+ * this board guaranteed to have nothing to obscure, and the size a headstone
+ * wants. So it is centred on the seat's own sand and cut large enough to read
+ * from across the table, which is what Aaron asked the pall for in the first
+ * place. */
 .field-quad-fallen {
   position: absolute;
-  top: 6px;
-  right: 8px;
+  /* Centred on the seat, not on the quadrant: the head carries the plate and
+     the zones, which stay legible under the pall — a graveyard gets a
+     headstone, not a hole. Below it is only sand. */
+  left: 50%;
+  top: 58%;
+  transform: translate(-50%, -50%);
   z-index: 2;
   pointer-events: none;
-  padding: 2px 8px;
-  border-radius: 9999px;
+  padding: 5px 22px;
+  border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--field-brass) 45%, transparent);
   background: linear-gradient(180deg,
     rgba(64, 10, 10, 0.92), rgba(38, 7, 7, 0.92));
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
   color: #e8ddc8;
-  font-size: 0.66rem;
+  font-size: 1.05rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.22em;
+  /* The letter-spacing pushes a phantom gap past the last letter; the padding
+     above is even, so this takes it back and the word sits centred in its own
+     plate rather than a fifth of a letter left of it. */
+  text-indent: 0.22em;
   text-transform: uppercase;
+  white-space: nowrap;
   animation: quad-pall 1400ms ease-out both;
+}
+/* Narrow: a collapsed seat is a 57px rail and a plate this size would be
+   taller than the seat it is marking. The rail already dims and carries the
+   sentence for a screen reader; the word shrinks to fit the room it has. */
+@media (max-width: 61.999rem) {
+  .field-quad:not(.is-open) .field-quad-fallen {
+    top: 50%;
+    padding: 2px 10px;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
+  }
 }
 /* Reduced motion keeps the state and stills the settling. */
 @media (prefers-reduced-motion: reduce) {
@@ -8271,6 +8492,23 @@ button:hover .tarot-fan-card {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px 10px;
   }
+  /* **The table is seated clockwise, and the classes come from `seatSpot`.**
+     Forge rotates by seat number, so a grid filled in reading order sends the
+     turn across the top, back to the left and across the bottom — a Z traced
+     four times a round, which is what Aaron called confusing on a real pod
+     (2026-09-07). The bottom row reads right to left instead, so seat three
+     sits under seat two and seat four under seat one, and the turn walks the
+     rim of the table the way it does at one.
+
+     Placed explicitly on both axes rather than left to auto-flow: with only
+     the column named, three of the four land where they should and the fourth
+     is at the mercy of the placement algorithm, which is a thing to be told
+     rather than trusted. `lib/board.ts` owns which seat is where; this only
+     draws it. */
+  .field-quad.is-col-0 { grid-column: 1; }
+  .field-quad.is-col-1 { grid-column: 2; }
+  .field-quad.is-row-far { grid-row: 1; }
+  .field-quad.is-row-near { grid-row: 2; }
   /* Half the width means a smaller card, worked out from the same geometry
      the rest of the board uses rather than picked: the lean and the turning
      clearance come off `--field-card-full`, so naming only this keeps a
@@ -16925,7 +17163,11 @@ button:hover .tarot-fan-card {
      rule is not the obvious one: the arrival animates `transform`, and a
      `translateX(-50%)` in the base rule is simply replaced by the keyframe's
      own transform the moment it starts. A negative margin of half the width
-     centres it and nothing can overwrite it. */
+     centres it and nothing can overwrite it.
+
+     The middle of the stage, which is where every fight this room has ever
+     drawn stands. A pod moves it — see the `--att-x` override under the
+     two-by-two, a few rules down. */
   left: 50%;
   margin-left: -7.155%;
   animation: stage-bout-lunge 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -16948,7 +17190,10 @@ button:hover .tarot-fan-card {
 
    The attacker sits at 27% of the arena's height from its own edge and the
    wall at 75.5% — measured on the layout at 940x521 and kept as percentages
-   so the two ranks hold their relationship at any size. */
+   so the two ranks hold their relationship at any size.
+
+   **The vertical is all these classes decide**, and at a pod that is half the
+   answer — the horizontal is the column rule immediately below. */
 .stage-bout.is-from-far .stage-bout-card.is-att { top: 9.0%; }
 .stage-bout.is-from-far .stage-bout-card.is-blk { top: 60.4%; }
 .stage-bout.is-from-near .stage-bout-card.is-att { bottom: 9.0%; }
@@ -16957,6 +17202,34 @@ button:hover .tarot-fan-card {
    disagree about. */
 .stage-bout.is-from-far  { --bout-dir: 1; }
 .stage-bout.is-from-near { --bout-dir: -1; }
+
+/* **Each rank over its own seat's column, and only where there are columns.**
+ *
+ * Aaron ruled the geometry 2026-09-07: at four seats the attacker stands over
+ * its own quadrant's column and the wall over the defender's, so a fight
+ * between two seats in one column reads exactly as a duel does, a diagonal
+ * reads corner to corner, and a fight between two seats in one *row* keeps the
+ * conventional up-and-down while both ranks still stand over the two people
+ * who are actually in it. `boutColumn` in `lib/stage.ts` carries the argument,
+ * the alternatives and the game it was measured against — twelve blocks, not
+ * one of them on the axis the centred drawing gets right.
+ *
+ * **Here rather than in the component, because "is this table in columns" is a
+ * media query and nothing else.** The same DOM draws a pod two ways: a
+ * two-by-two above 62rem, and below it a single stack of seats with one open
+ * and the rest as rails. On the phone there is no left and no right to point
+ * at — a column offset there would slide both ranks into thirds of a stage
+ * that has one column, which is a lie told for the sake of consistency with a
+ * layout that is not on the screen. `StageBout` hands down both positions and
+ * this is the one place that knows which of them is true; see `BoutCard`.
+ *
+ * 62rem is `.field-table`'s own breakpoint, which is what makes this the
+ * right question to ask: the columns exist exactly where that grid has two of
+ * them. */
+@media (min-width: 62rem) {
+  .field.is-pod .stage-bout-card.is-att { left: var(--att-x, 50%); }
+  .field.is-pod .stage-bout-card.is-blk { left: var(--at-col, var(--at, 44%)); }
+}
 
 @keyframes stage-bout-lunge {
   0%   { opacity: 0;

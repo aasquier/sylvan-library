@@ -57,7 +57,8 @@
 import { useEffect, useState } from 'react'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
-import { type BoardCard, type Clash, halfNamed, pictureOf } from './board'
+import { type BoardCard, type Clash, halfNamed, pictureOf, seatSpot }
+  from './board'
 import { type HalfGlass } from './halves'
 import { type Pip, poolPips } from './mana'
 import { beatDelay, type Speed } from './reel'
@@ -1030,8 +1031,26 @@ export interface StagedBout {
   key: string
   attacker: BoutFighter
   blockers: BoutFighter[]
-  /** Which seat's edge the attacker swings out of. */
+  /** Which seat's edge the attacker swings out of.
+   *
+   *  **Derived from `from` rather than carried by the board** — see
+   *  [boutFacing], which is the one place a table of four is turned into an
+   *  edge of the arena. */
   facing: 'far' | 'near'
+  /** Where the two fighters sit, as places at the table: indices into
+   *  `BoardState.sides`, which is the order the room draws the seats in.
+   *
+   *  **Here even though only `facing` is drawn today**, because they are the
+   *  fight's own geometry and `facing` is a lossy reading of them: at four
+   *  seats two different pairs collapse onto the same edge. A drawing that
+   *  wants to point at the real quadrants — and a plate that wants to name the
+   *  two players, which a duel never needed — has the fact to hand rather than
+   *  a word that has already thrown it away. */
+  from: number
+  at: number
+  /** How many players are at this table, so the drawing can tell a duel from
+   *  a pod without counting seats it was not given. */
+  seats: number
   /** What the plate under the fight says. */
   word: string
   note: string | null
@@ -1101,16 +1120,70 @@ const BOUT_SPAN = 880 / 940
  * Stacking makes this rare on its own: the boards that field eight blockers
  * are token boards, and twelve identical Saprolings arrive here as one card.
  */
-export function boutPitch(n: number): number {
+export function boutPitch(n: number, span = BOUT_SPAN): number {
   const natural = BOUT_BLOCKER_W + BOUT_GAP
   if (n <= 1) return natural
-  return Math.min(natural, (BOUT_SPAN - BOUT_BLOCKER_W) / (n - 1))
+  return Math.min(natural, (span - BOUT_BLOCKER_W) / (n - 1))
 }
 
 /** Where the `i`th of `n` blockers stands: the **left edge** as a fraction of
- *  the stage, so the rank is centred however wide it turns out to be. */
-export function boutAt(i: number, n: number): number {
-  return 0.5 + (i - (n - 1) / 2) * boutPitch(n) - BOUT_BLOCKER_W / 2
+ *  the stage, so the rank is centred however wide it turns out to be.
+ *
+ *  `centre` and `span` are the column it is centred on — the whole stage for a
+ *  duel, one seat's column at a pod. See [boutColumn]. */
+export function boutAt(i: number, n: number, centre = 0.5,
+  span = BOUT_SPAN): number {
+  return centre + (i - (n - 1) / 2) * boutPitch(n, span) - BOUT_BLOCKER_W / 2
+}
+
+/**
+ * **Which column of the table a seat sits in**, as a centre and a width in
+ * fractions of the stage — the whole of what a pod changes about where a fight
+ * is drawn.
+ *
+ * Aaron ruled it 2026-09-07, against three alternatives and one measurement.
+ * The board's own axis is vertical — the attacker swings out of its row's edge
+ * and the wall ranks across — and at two seats that is the whole truth, because
+ * a duel's two seats *are* the two rows. At four it is a third of the truth:
+ * the six pairs of seats at a two-by-two are two column pairs, two row pairs
+ * and two diagonals, and only the column pairs lie on the axis the stage
+ * speaks. Drawn centred, a fight between the two bottom seats put its wall
+ * across the top of the table, over the two players who were not in it.
+ *
+ * **The measurement, because it is worse than the arithmetic suggests.** One
+ * real four-player game — cats, dinosaurs, stompy and food, 19 turns — produced
+ * twelve blocks: eight between the two bottom seats and four on a diagonal.
+ * *Not one* was the column pair the centred drawing gets right. A third of the
+ * pairings on paper, none of the fights in the game.
+ *
+ * So each rank slides to sit over its own seat's column. A column pair lands
+ * exactly as a duel does, one column wide; a diagonal lands with the attacker
+ * over its corner and the wall over the defender's; a row pair keeps the
+ * conventional vertical axis but gets *both* columns right, so the two ranks
+ * are at least over the two seats that are fighting. Four of six exactly true,
+ * two half true, and nothing drawn over a bystander.
+ *
+ * **The cost is the rank's room, and it is smaller than it looks.** A column is
+ * half the stage, so a wall overlaps from four cards rather than eight — and
+ * overlapping is what a big wall already does (`boutPitch` argues why it
+ * overlaps rather than shrinking). The measured game's largest wall was two.
+ *
+ * A duel answers the centre of the whole stage, which is what every rule here
+ * did before there was a table to have columns.
+ */
+export function boutColumn(seat: number, seats: number):
+  { centre: number; span: number } {
+  // **`seatSpot` and nothing else**, because the table is seated clockwise and
+  // a fight drawn against reading order would stand over the wrong quadrant
+  // while looking perfectly right on its own. One function decides where a
+  // seat is; this reads it.
+  const { col, cols } = seatSpot(seat, seats)
+  if (cols <= 1) return { centre: 0.5, span: BOUT_SPAN }
+  // **The clean fraction rather than the measured pixel.** A quadrant is 490 of
+  // a 992-wide table with a 10px gutter, so its true centre is 0.2475 against
+  // this 0.25 — two and a half pixels, and a constant measured against one
+  // screen is a fault this room has paid for twice.
+  return { centre: (col + 0.5) / cols, span: BOUT_SPAN / cols }
 }
 
 /** How many names the plate will read out before it stops. Three, because the
@@ -1172,6 +1245,87 @@ function walled(blockers: BoutFighter[]): string {
   return `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}`
 }
 
+/** A player's name in the possessive, which is a thing this room had never
+ *  needed to say until four of them were at a table.
+ *
+ *  The apostrophe alone after a name that already ends in *s* — *Thantis'*,
+ *  not *Thantis's* — because a commander's name is a name and that is how a
+ *  name ending in s is written. Cheap, and the alternative is visible: the
+ *  Coliseum seats whatever the library holds, and Magic prints plenty of them.
+ */
+function possessive(name: string): string {
+  return /s$/i.test(name) ? `${name}’` : `${name}’s`
+}
+
+/**
+ * The line under the fight, which says one more thing at a pod than it does at
+ * a duel.
+ *
+ * **"Whose creature is this?" is a question a duel never raised.** There were
+ * two players and the board seated them on the two edges, so a fight named the
+ * cards and the geometry named the people. At four seats the geometry can name
+ * at most a column — and on a phone, where one seat is open and there is no
+ * two-by-two at all, it cannot name even that. Aaron ruled the plate says it
+ * (2026-09-07): *Goreclaw's, by Gyome's Ygra and Greta*.
+ *
+ * The duel's own sentence is untouched, and that is deliberate rather than
+ * cautious: *"by Ygra and Greta"* is not missing anything when there is only
+ * one other player it could mean.
+ */
+function noted(attacker: string, blockers: BoutFighter[],
+  table: readonly string[], from: number, at: number): string | null {
+  if (!blockers.length) return null
+  const wall = walled(blockers)
+  // A table of two names nobody; a table with no names cannot.
+  const swung = table.length > 2 ? table[from] : undefined
+  const held = table.length > 2 ? table[at] : undefined
+  if (!swung || !held) return `by ${wall}`
+  // **A commander names its own seat, so it is not named twice.** The room
+  // calls a deck by its general when it is sleeved behind one — `shortName`
+  // decides that, up in the route — so the moment a commander is *in* the
+  // fight the sentence stutters: a real beat off the measured game read *"by
+  // Gyome's Gyome"*, and Arahbo swinging read *"Arahbo, Roar of the World /
+  // Arahbo's"*. Both are true and both look like a fault, which is the same
+  // test `walled` applies to a wall that says one name twice. So a possessive
+  // is dropped exactly when the name it would add is already being said —
+  // never when it is carrying information.
+  const said = new Set(blockers.map((b) => legendName(b.name)))
+  const swings = legendName(attacker) === swung ? '' : `${possessive(swung)}, `
+  const holds = said.has(held) ? '' : `${possessive(held)} `
+  return `${swings}by ${holds}${wall}`
+}
+
+/**
+ * **Which edge of the arena a fight is drawn out of** — the one place a seat
+ * at the table becomes a direction on the stage.
+ *
+ * A duel is the whole of what this used to be, and it was not a function: the
+ * board handed the stage `'far'` or `'near'` directly, because a duel's two
+ * seats *are* the two edges. Seat 0 is the far half and seat 1 is the near
+ * one, and that is still exactly what this answers for a table of two.
+ *
+ * **A pod is four seats and the arena still has two edges, so something has to
+ * give.** The room draws a pod as a two-by-two — seats 0 and 1 across the top,
+ * 2 and 3 across the bottom, each quadrant mirrored toward the middle — so a
+ * seat's row is which way it faces, and that is what this reads. Seats 0 and 1
+ * swing downward, 2 and 3 swing up.
+ *
+ * **What that throws away, said plainly**: two seats in the same row are two
+ * different players and this gives them one edge, so a fight between the top
+ * two is drawn on the same axis as a fight between the top-left and the
+ * bottom-left — the stage says *somebody up the table swung at somebody down
+ * it* and, for two of the six possible pairs, that is not where either of them
+ * is sitting. It is a fight drawn on a true axis for four pairings and a
+ * conventional one for two, which is the cheapest honest answer and not
+ * necessarily the right one. `StagedBout` carries `from` and `at` unreduced so
+ * a richer drawing — the true corner-to-corner axis, or a plate that names the
+ * two players — is a change here and in the stylesheet rather than a change to
+ * how the board is read.
+ */
+export function boutFacing(from: number, seats: number): 'far' | 'near' {
+  return seatSpot(from, seats).row
+}
+
 /**
  * The fight the board is showing, if it is showing one.
  *
@@ -1188,8 +1342,14 @@ function walled(blockers: BoutFighter[]): string {
  */
 export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
   key: string, speed: Speed, outcome: Outcome | null = null,
-  dying: number | null = null): StagedBout | null {
+  dying: number | null = null, table: readonly string[] = []): StagedBout | null {
   if (!clash) return null
+  // **The table is the names, and the count is read off them.** Two facts that
+  // cannot disagree, because they are one list: the room's shelf turns a slug
+  // into what a seat is called, and how many it hands over is how many people
+  // are playing. Empty is a duel with nothing to name, which is every caller
+  // that has no shelf — the tests, and any surface that only wants the picture.
+  const seats = table.length || 2
   // **A fighter fights in its own face's picture.** The dictionary paints a
   // card once, under the face it was filed by, and a permanent standing on the
   // other one — a modal double-faced card played as its land, a creature that
@@ -1212,13 +1372,16 @@ export function stagedBout(clash: Clash | null, board: ForgeBoard | null,
     key,
     attacker,
     blockers,
-    facing: clash.swinging,
+    facing: boutFacing(clash.from, seats),
+    from: clash.from,
+    at: clash.at,
+    seats,
     // **Three words for three moments**, and the tense is the whole of it: a
     // fight is *Blocked* while it is being declared, and once the damage has
     // landed it is something that already happened.
     word: outcome === 'fell' ? 'Cut down'
       : outcome === 'held' ? 'Broke through' : 'Blocked',
-    note: blockers.length ? `by ${walled(blockers)}` : null,
+    note: noted(clash.attacker.name, blockers, table, clash.from, clash.at),
     outcome,
     dying,
     life: boutLife(speed),

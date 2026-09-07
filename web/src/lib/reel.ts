@@ -50,6 +50,17 @@ export interface StagedBeat {
   kind: string
   who: string | null
   text: string
+  /** Whether an `'outcome'` beat is the one that **won**, and undefined on
+   *  every other kind.
+   *
+   *  **The verdict is a flag and not a word, and it has to be.** The scribe
+   *  strips *"&lt;player&gt; has won/lost"* off the front of Forge's sentence
+   *  before it crosses — a reason with the player's name in front of it is
+   *  unreadable — so what arrives is the tail alone and nothing in it says
+   *  which way the game went. `EventOutcome` has carried the answer since the
+   *  worker learned to narrate; this is the browser finally reading it. See
+   *  [fallenBy], which spent its whole life looking for the verb instead. */
+  won?: boolean
   /** The card this beat is about, in Forge's own spelling, carried past the
    *  sentence so the *board* can find it too.
    *
@@ -154,18 +165,35 @@ export function countRuns(beats: StagedBeat[]): StagedBeat[] {
 
 /** Seats a game's tape has already dismissed, by staged name.
  *
- * Forge announces every elimination as its own `outcome` beat — "<player>
- * has lost …" — and the stage keeps the sentence's tail as `text`, so this
- * is a filter rather than a parse. Two edges hold it honest: the *winner's*
- * outcome opens "won" and stays off the list, and beats carry their game
- * number, so game two of a bout raises everyone the first game buried. The
- * room hands the answer to the board, which lays the pall on those seats
- * (Aaron, 2026-09-07: a dead player in a pod should read as dead).
+ * Forge announces every elimination as its own `outcome` beat, and beats carry
+ * their game number, so game two of a bout raises everyone the first game
+ * buried. The room hands the answer to the board, which lays the pall on those
+ * seats (Aaron, 2026-09-07: a dead player in a pod should read as dead).
+ *
+ * **This read the verb out of the sentence, and the verb is not in the
+ * sentence.** It filtered on `text.startsWith('lost')`, which can never be
+ * true: Forge writes *"&lt;player&gt; has lost because life total reached 0"*,
+ * and the scribe **deliberately** trims the name and the verb off before the
+ * note crosses the wire — `scribe.go` says why, that a reason carrying the
+ * player's name in front of it is unreadable — and puts the win into the beat's
+ * own flag instead. So `text` is *"because life total reached 0"*, the filter
+ * matched nothing, and the pall built for this never once appeared on a real
+ * match. Measured on a four-player game whose four outcome beats read
+ * `because life total reached 0` three times and `because all opponents have
+ * lost` once.
+ *
+ * **The tests agreed with the bug**, which is the part worth keeping in mind:
+ * they built their own beats with `text: 'lost the game'` — a string Forge has
+ * never produced — so a green suite proved only that the filter matched the
+ * fixture. Driving the real staging is the fix and the lesson both.
+ *
+ * So it reads the flag. `won` is the scribe's own verdict, carried through
+ * staging untouched; the winner's outcome sets it and stays off this list.
  */
 export function fallenBy(shown: StagedBeat[], game: number): string[] {
   return shown
     .filter((b) => b.game === game && b.kind === 'outcome'
-      && b.who !== null && b.text.startsWith('lost'))
+      && b.who !== null && !b.won)
     .map((b) => b.who as string)
 }
 

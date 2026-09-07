@@ -82,7 +82,7 @@ import { MatchTheater } from '../components/theater'
 import { type Arriving, fallenBy, type Speed, type StagedBeat, useReel }
   from '../lib/reel'
 import {
-  beatLine, playerTurns, shortName, theaterBeats, theaterRows,
+  beatLine, beatWon, playerTurns, shortName, theaterBeats, theaterRows,
   turnMarks as turnMarksOf, turnsTaken,
 } from '../lib/theater'
 import { CrossedSwordsGlyph } from '../components/glyphs'
@@ -1259,6 +1259,16 @@ export default function ColiseumRoom() {
           // spelling. See `StagedBeat.id`.
           card: beat.card, id: beat.id, target: beat.target,
           entered: beat.entered,
+          // **And the verdict, which is a flag rather than a word.** The
+          // scribe trims *"<player> has won/lost"* off the front of Forge's
+          // outcome sentence — the reason is unreadable with a name in front
+          // of it — so the only thing left saying which way the game went is
+          // this. `amount` is 1 on a win and absent on a loss (`boolToWin`);
+          // narrowed to a boolean here so nothing downstream has to know that
+          // a verdict was ever a number. See `StagedBeat.won` and `beatWon`,
+          // which is a named reading precisely so a test can drive it with the
+          // real payloads instead of inventing a sentence to match.
+          won: beatWon(beat),
         }
       }),
     }

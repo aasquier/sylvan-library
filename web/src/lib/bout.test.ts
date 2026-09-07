@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BoardCard, BoardStack, Clash } from './board'
-import { BOUT_BLOCKER_W, boutAt, boutLife, boutPitch,
+import { BOUT_BLOCKER_W, boutAt, boutColumn, boutFacing, boutLife, boutPitch,
   stagedBout } from './stage'
+
+/** Four seats, named as the room names them — the measured game's own table.
+ *  Seats 0 and 1 across the top, 2 and 3 across the bottom. */
+const POD = ['Arahbo', 'Atla Palani', 'Goreclaw', 'Gyome']
 
 /** A creature, at the one detail the bout reads: a name and an id. */
 const beast = (id: number, name: string): BoardCard => ({
@@ -15,10 +19,11 @@ const beast = (id: number, name: string): BoardCard => ({
 })
 const stack = (card: BoardCard, count = 1): BoardStack =>
   ({ card, count, ids: [card.id] })
-const clash = (blockers: BoardStack[]): Clash => ({
+const clash = (blockers: BoardStack[], from = 0, at = 1): Clash => ({
   attacker: beast(1, 'Ghalta, Primal Hunger'),
   blockers,
-  swinging: 'far',
+  from,
+  at,
 })
 
 describe('how wide a rank of blockers stands', () => {
@@ -179,5 +184,161 @@ describe('a fight that has settled', () => {
     const out = stagedBout(clash([stack(beast(2, 'Sacred Cat')),
       stack(beast(3, 'Cat Token'), 3)]), null, 'k', 'play', 'held')
     expect(out?.note).toBe('by Sacred Cat and Cat Token ×3')
+  })
+})
+
+describe('which edge of the arena a seat becomes', () => {
+  it('is the duel it has always been at two seats', () => {
+    // Seat 0 is the far half and seat 1 the near one, which is what the board
+    // handed the stage directly before a table could hold four people.
+    expect(boutFacing(0, 2)).toBe('far')
+    expect(boutFacing(1, 2)).toBe('near')
+  })
+
+  it('reads a pod seat\'s row, because the two-by-two is how it is drawn', () => {
+    // Seats 0 and 1 across the top of the table, 2 and 3 across the bottom —
+    // `.field-quad-{n}` in DOM order — so a seat's row is which way it faces.
+    expect(boutFacing(0, 4)).toBe('far')
+    expect(boutFacing(1, 4)).toBe('far')
+    expect(boutFacing(2, 4)).toBe('near')
+    expect(boutFacing(3, 4)).toBe('near')
+  })
+
+  it('carries the seats through unreduced, which is the point of keeping them',
+    () => {
+      // `facing` is lossy on purpose and the fight's own geometry is not: two
+      // different pairs collapse onto one edge, so a drawing that wants to
+      // point at the real quadrants needs the pair rather than the word.
+      const out = stagedBout(clash([stack(beast(2, 'Sacred Cat'))], 2, 1),
+        null, 'k', 'play', null, null, POD)
+      expect(out?.from).toBe(2)
+      expect(out?.at).toBe(1)
+      expect(out?.seats).toBe(4)
+      expect(out?.facing).toBe('near')
+    })
+})
+
+describe('where at the table a fight is drawn', () => {
+  it('gives a duel the whole stage, which is what it always had', () => {
+    // Every rule this room drew a fight by before there was a table wide
+    // enough to have columns: one centre, one span, both ranks on it.
+    expect(boutColumn(0, 2)).toEqual(boutColumn(1, 2))
+    expect(boutColumn(0, 2).centre).toBe(0.5)
+    // And the rank arithmetic comes out identical to the two-argument call.
+    for (const n of [1, 3, 8]) {
+      const { centre, span } = boutColumn(1, 2)
+      expect(boutAt(0, n, centre, span)).toBeCloseTo(boutAt(0, n), 9)
+    }
+  })
+
+  it('puts each pod seat over its own column, seated clockwise', () => {
+    // **Not reading order.** The table is seated 1-2 across the top and 4-3
+    // across the bottom so the turn walks the rim rather than zig-zagging —
+    // `seatSpot` owns that and this reads it. A fight drawn against reading
+    // order would stand over the wrong quadrant while looking perfectly right
+    // on its own, which is why these two cannot be allowed to drift apart.
+    expect(boutColumn(0, 4).centre).toBeCloseTo(0.25, 9)  // seat 1, top left
+    expect(boutColumn(1, 4).centre).toBeCloseTo(0.75, 9)  // seat 2, top right
+    expect(boutColumn(2, 4).centre).toBeCloseTo(0.75, 9)  // seat 3, under it
+    expect(boutColumn(3, 4).centre).toBeCloseTo(0.25, 9)  // seat 4, bottom left
+  })
+
+  it('keeps a pod rank inside its own column, however big the gang', () => {
+    // The property the column exists for. A wall that ran past its column
+    // would be standing over the seat next door, which is the whole fault this
+    // was ruled to fix — and the left column must not run off the stage
+    // either. Twenty is far past anything Forge has produced and is the point.
+    for (const seat of [0, 1, 2, 3]) {
+      const { centre, span } = boutColumn(seat, 4)
+      const left = centre - span / 2
+      const right = centre + span / 2
+      for (let n = 1; n <= 20; n++) {
+        expect(boutAt(0, n, centre, span)).toBeGreaterThanOrEqual(left - 1e-9)
+        expect(boutAt(n - 1, n, centre, span) + BOUT_BLOCKER_W)
+          .toBeLessThanOrEqual(right + 1e-9)
+      }
+    }
+  })
+
+  it('overlaps a pod wall sooner, which is the cost that was chosen', () => {
+    // A column is half the stage, so the rank runs out of room at four cards
+    // rather than eight. Overlapping rather than shrinking is the standing
+    // rule — a card's size must not change for reasons that have nothing to do
+    // with the card — so what a column costs is pitch, never width.
+    const pod = boutColumn(0, 4).span
+    expect(boutPitch(3, pod)).toBeCloseTo(boutPitch(3), 9)
+    expect(boutPitch(4, pod)).toBeLessThan(boutPitch(4))
+  })
+
+  it('centres the rank on its own column, odd or even', () => {
+    for (const seat of [0, 3]) {
+      const { centre, span } = boutColumn(seat, 4)
+      for (const n of [1, 2, 3, 5]) {
+        const first = boutAt(0, n, centre, span)
+        const last = boutAt(n - 1, n, centre, span) + BOUT_BLOCKER_W
+        expect((first + last) / 2).toBeCloseTo(centre, 9)
+      }
+    }
+  })
+})
+
+describe('what the plate says when four people are at the table', () => {
+  const wall = [stack(beast(2, 'Ygra, Eater of All')),
+    stack(beast(3, 'Greta, Sweettooth Scourge'))]
+
+  it('leaves a duel\'s sentence exactly as it was', () => {
+    // Not caution — *"by Ygra and Greta"* is missing nothing when there is only
+    // one other player it could mean.
+    expect(stagedBout(clash(wall), null, 'k', 'play')?.note)
+      .toBe('by Ygra and Greta')
+    expect(stagedBout(clash(wall), null, 'k', 'play', null, null,
+      ['Arahbo', 'Atla Palani'])?.note).toBe('by Ygra and Greta')
+  })
+
+  it('names both players at a pod, which the geometry cannot', () => {
+    // Aaron ruled it 2026-09-07. At four seats the drawing can point at a
+    // column at best, and on a phone — one seat open, no two-by-two — it can
+    // point at nothing at all.
+    expect(stagedBout(clash(wall, 2, 3), null, 'k', 'play', null, null, POD)
+      ?.note).toBe('Goreclaw\u2019s, by Gyome\u2019s Ygra and Greta')
+  })
+
+  it('writes a name that already ends in s with the apostrophe alone', () => {
+    // *Thantis'*, not *Thantis's*, because a commander's name is a name. The
+    // Coliseum seats whatever the library holds and Magic prints plenty.
+    const seated = ['Thantis', 'Atla Palani', 'Goreclaw', 'Gyome']
+    expect(stagedBout(clash(wall, 0, 3), null, 'k', 'play', null, null, seated)
+      ?.note).toBe('Thantis\u2019, by Gyome\u2019s Ygra and Greta')
+  })
+
+  it('does not name a commander twice when it is in the fight itself', () => {
+    // The room calls a deck by its general, so the moment the general is *in*
+    // the fight the sentence stutters. Both of these came off the measured
+    // game and both look like a fault however true they are.
+    const gyome = [stack(beast(2, 'Gyome, Master Chef'))]
+    // The wall is Gyome, in Gyome's seat: *"by Gyome"*, not *"by Gyome's
+    // Gyome"*. The seat is still named — by the card standing in it.
+    expect(stagedBout(clash(gyome, 2, 3), null, 'k', 'play', null, null, POD)
+      ?.note).toBe('Goreclaw\u2019s, by Gyome')
+    // And the attacker's own seat, when the plate's title above it is already
+    // that seat's name. `clash`'s attacker is Ghalta; seat 1 is Atla Palani,
+    // so this one keeps its possessive and the next drops it.
+    expect(stagedBout(clash(gyome, 1, 3), null, 'k', 'play', null, null, POD)
+      ?.note).toBe('Atla Palani\u2019s, by Gyome')
+  })
+
+  it('drops only the name that is already said, never the other one', () => {
+    // The rule is about repetition and not about commanders: a possessive
+    // carrying information stays, in the same sentence as one that is not.
+    const wall = [stack(beast(2, 'Gyome, Master Chef')),
+      stack(beast(3, 'Greta, Sweettooth Scourge'))]
+    expect(stagedBout(clash(wall, 2, 3), null, 'k', 'play', null, null, POD)
+      ?.note).toBe('Goreclaw\u2019s, by Gyome and Greta')
+  })
+
+  it('falls back to the duel sentence when a seat has no name', () => {
+    // A hole in the shelf is not a reason to print an empty possessive.
+    expect(stagedBout(clash(wall, 2, 3), null, 'k', 'play', null, null,
+      ['A', 'B', '', 'D'])?.note).toBe('by Ygra and Greta')
   })
 })
