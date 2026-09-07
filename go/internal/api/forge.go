@@ -287,21 +287,41 @@ func newForgeRow(g tier3.GameResult, slug *string, seatSlug func(int) string) fo
 	return row
 }
 
-// ForgeBeatsMax is how many beats of one game reach the browser.
+// ForgeBeatsMax is how many beats of one game reach the browser, and it is
+// the parser's own bound on purpose — one number, owned in one place, so
+// the two layers cannot drift apart.
 //
-// The parser's own [tier3.EventCap] is 10,000, which bounds a runaway game in
-// *memory*; this is the tighter bound on what crosses to a person, and it
-// exists because the job's `partial` is re-fetched every poll. A measured
-// nine-turn game raises about a hundred beats (`events.go` did the counting),
-// so four hundred is roughly four times the real thing and lands the partial
-// near 30KB in the worst case and near 8KB in the ordinary one — which, at the
-// client's poll interval, is the ~20KB/s a watched match costs. Stated rather
-// than left to be discovered, because it is the one number here that anybody
-// paying for bandwidth would want to know.
+// **It was 400 until 2026-09-07, and the story of the raise is worth its
+// length.** Four hundred was "roughly four times the real thing" against a
+// measured nine-turn *duel* (~100 beats) — and then #448 seated four. A pod
+// runs several duels' worth of game at four players' worth of triggers,
+// sails past 400, and the cut below keeps the head — so the tail was
+// dropped, and the tail is the swing that ends the game and the killing
+// blow the tape draws as a whole card. Aaron watched match after match
+// whose ending never arrived and said so; the cap was the whole cause.
 //
-// The cut is announced, never silent: `truncated` says a game outran it, the
-// same way [tier3.EventLog] does one layer down.
-const ForgeBeatsMax = 400
+// Two fixes were weighed and refused before this one. *Keep the tail
+// instead*: the tape's battlefield is rebuilt by replaying
+// [tier3.BoardStep] deltas from the first step, so a tape missing its head
+// draws a corrupted board from the seam on. *Fold the middle*: same
+// arithmetic, same corruption, from wherever the fold sits. The beats and
+// the board are one reel — a step and a beat are the same moment seen
+// twice — and a reel of deltas is whole or it is wrong.
+//
+// So the browser's cap now equals the memory cap, and what that costs is
+// stated rather than left to be discovered: the live `partial` re-ships the
+// newest game's whole tape every poll, so the worst legal game — a clock
+// filler at the full 10,000 — is a few hundred KB gzipped per poll for
+// whoever is watching, and an ordinary pod is a small fraction of that.
+// For this instance — one table, a handful of friends — that is pennies a
+// month against endings that always arrive. The day this room has an
+// audience, the fix is a beat cursor on the poll (`?after=`, the tape is
+// append-only and the deltas compose forward), never a lower cap; this
+// comment is where that plan is written down.
+//
+// The cut is still announced, never silent: `truncated` says a game outran
+// even the parser, the same way [tier3.EventLog] does one layer down.
+const ForgeBeatsMax = tier3.EventCap
 
 // forgeBeat is one beat of a game as the client renders it.
 //
