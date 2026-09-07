@@ -1338,7 +1338,25 @@ func (a *API) simForge(w http.ResponseWriter, r *http.Request) {
 		if owner == "" {
 			owner = lib.MyOwner()
 		}
-		pairs = append(pairs, pair{owner: owner, slug: str(body, side+"_slug")})
+		seat := pair{owner: owner, slug: str(body, side+"_slug")}
+		// **No deck sits down twice** (Aaron, 2026-09-06). A table of one deck
+		// against itself is not a match anybody learns anything from, and the
+		// record would carry a meeting a deck had with itself.
+		//
+		// Refused here rather than only in the room, because the room is not
+		// the only way in: all four seats ride in the link, so a URL with the
+		// same deck twice would walk straight past a disabled button. The
+		// identity is owner *and* slug — two accounts may both keep a deck
+		// called `cats`, and those are two decks.
+		for i, seen := range pairs {
+			if seen == seat {
+				wire.Detail(w, http.StatusUnprocessableEntity,
+					fmt.Sprintf("%s is already in seat %d; a deck cannot sit down twice",
+						seat.slug, i+1))
+				return
+			}
+		}
+		pairs = append(pairs, seat)
 	}
 
 	// The gate before the decks -- the recorded order: an instance

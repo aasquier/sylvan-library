@@ -3050,6 +3050,34 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   const state = foldBoard(board, shown)
   const far = state.sides[0]
   const near = state.sides[1]
+
+  // **A table of four is a different room, and it needs a camera.**
+  //
+  // Four battlefields cannot stack. Measured on an iPhone viewport, one seat's
+  // half is 272px and four of them are 1,088px against 812px of screen — one
+  // and a third screens of sand before a hand, a seam or the transport, so a
+  // phone would never show the table at all. Aaron called it before the
+  // measurement did (2026-09-06).
+  //
+  // So the pod is drawn as one table with two behaviours, and the *same* DOM
+  // carries both — the seats are always all rendered, and the narrow screen
+  // collapses the ones it is not showing. Wide: a two-by-two, each quadrant
+  // mirrored toward the middle, which is the near/far reflection this board
+  // already lives by applied on both axes — four players around a table.
+  // Narrow: one seat open and the rest as rails.
+  //
+  // **Which seat is open follows the beat**, because this is a replay rather
+  // than a game somebody is playing: the attention is already wherever the
+  // action is, and a camera that follows it is doing what a spectator would
+  // do with their eyes. A tap pins a seat and holds it there; tapping the
+  // pinned seat lets go again.
+  const seats = state.sides
+  const pod = seats.length > 2
+  const [pinned, setPinned] = useState<number | null>(null)
+  // Nobody is on turn before the first one begins, and a table with no seat
+  // open would be a blank screen — so the first seat holds the camera until
+  // the game starts moving.
+  const focus = pinned ?? (state.active || seats[0]?.seat) ?? 0
   // One mark, belonging to one beat. No `useMemo`: the compiler does that,
   // and identity is not what governs replay here anyway — every mark is keyed
   // on `beat.key`, so a fresh object with the same key reconciles onto the
@@ -3249,7 +3277,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
         the ghost rising off the grave. One event, one clock, and the clock has
         to hang above all three of them. */}
     <div className="field-stage" style={lives}>
-    <section className={`field${lit ? ` is-${lit}-on` : ''}`}
+    <section className={`field${pod ? ' is-pod' : ''}${lit ? ` is-${lit}-on` : ''}`}
              aria-label="The battlefield">
       {/* The arena floor: sand, and the dust that never quite settles. */}
       <div className="field-floor" aria-hidden="true">
@@ -3268,6 +3296,51 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           his phone). Now each hand is its own grid area and travels with its
           seat at every width — above the far half, below the near one, which
           is where the two players' hands actually are. */}
+      {pod ? (
+        /* **The table.** One grid owning all four seats, so the two layouts
+           are a CSS decision rather than two React trees — a phone and a
+           laptop draw the same seats and disagree only about which ones are
+           open. `.field-quad` carries the facing, and the mirror is the same
+           one the duel uses: seats one and two face down the table, seats
+           three and four face up it, so every creature row is against the
+           middle and every land row is at a player's own back. */
+        <div className="field-table">
+          {seats.map((s, i) => {
+            const facing = i < 2 ? 'far' : 'near'
+            const seatName = name(s.slug, s.name)
+            const open = s.seat === focus
+            return (
+              <div key={s.seat}
+                   className={`field-quad field-quad-${i + 1}`
+                     + `${open ? ' is-open' : ''}`
+                     + `${s.seat === state.active ? ' is-on-turn' : ''}`}>
+                {/* **A button, because it changes this page rather than
+                    leaving it** (commandment 20). It is the seat's own plate
+                    on a wide screen and the whole rail on a narrow one, and
+                    `aria-pressed` says which seat is being held. */}
+                <button type="button"
+                        className={`field-quad-grip${pinned === s.seat ? ' is-pinned' : ''}`}
+                        aria-pressed={pinned === s.seat}
+                        onClick={() => setPinned(
+                          pinned === s.seat ? null : s.seat)}>
+                  <FieldPlate side={s} facing={facing} name={seatName} />
+                  <span className="sr-only">
+                    {pinned === s.seat
+                      ? `, held open — press to follow the action again`
+                      : `, press to hold this seat open`}
+                  </span>
+                </button>
+                <FieldSide side={s} facing={facing}
+                           active={s.seat === state.active}
+                           creatures={stackRow(s.creatures ?? [])} />
+                <FieldHand side={s} facing={facing} name={seatName}
+                           speed={speed} at={shown} />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+      <>
       <FieldHand side={far} facing="far" name={name(far.slug, far.name)}
                  speed={speed} at={shown} />
 
@@ -3311,6 +3384,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
 
       <FieldHand side={near} facing="near" name={nearName}
                  speed={speed} at={shown} />
+      </>
+      )}
 
       {/* **Everything that is cast, and everything that dies.** The board can
           only draw what stays, and half of Commander never stays — an instant

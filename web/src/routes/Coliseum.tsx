@@ -821,6 +821,35 @@ export default function ColiseumRoom() {
   // both fighters: `/coliseum?a=aaron/gyome&b=aaron/arahbo`.
   const [a, setA] = useState(params.get('a') ?? '')
   const [b, setB] = useState(params.get('b') ?? '')
+  // **Two more chairs, and a tab that says which table is laid** (Aaron,
+  // 2026-09-06). The pod is not a wider duel — it is a different game, with a
+  // different baseline and a different board — so it is a place you go rather
+  // than a dial you turn, which is what the strip above already uses tabs for.
+  //
+  // The chairs live in the link like the first two, so a four-player match is
+  // as sendable as a duel; and the table is read back from them on the way in,
+  // because a link carrying four decks means a link to a pod.
+  const [c, setC] = useState(params.get('c') ?? '')
+  const [d, setD] = useState(params.get('d') ?? '')
+  const [pod, setPod] = useState(Boolean(params.get('c') || params.get('d')))
+  /** The seat a deck is sitting in twice, or none.
+   *
+   *  **The door refuses this too**, and that is the guard that counts: all
+   *  four seats ride in the link, so a URL naming the same deck twice would
+   *  walk straight past a disabled button. This one exists so the answer
+   *  arrives before the press rather than as a 422 after it. */
+  const twiceSeated = ((): { deck: string; seat: number; first: number } | null => {
+    // Plain, not memoised: four strings and an `indexOf`, and the compiler
+    // could not prove the memo held anyway.
+    const seats: string[] = pod ? [a, b, c, d] : [a, b]
+    for (let i = 0; i < seats.length; i++) {
+      const here = seats[i]
+      if (!here) continue
+      const first = seats.indexOf(here)
+      if (first < i) return { deck: here, seat: i + 1, first: first + 1 }
+    }
+    return null
+  })()
   const [decks, setDecks] = useState<DeckTile[]>([])
   // The gate (ADR 35). Where Forge is not installed the gates simply do not
   // open — no greyed-out button, no excuse. The room is still worth walking
@@ -911,13 +940,27 @@ export default function ColiseumRoom() {
     api.decks().then((d) => {
       if (!alive) return
       setDecks(d)
-      // Both seats start occupied, because a form whose first state is
+      // Every seat starts occupied, because a form whose first state is
       // invalid scolds before anybody has touched it. A link that named the
-      // fighters wins over the shelf's first two.
-      const first = d[0]
-      const second = d[1] ?? first
-      if (first) setA((cur) => cur || `${first.owner}/${first.slug}`)
-      if (second) setB((cur) => cur || `${second.owner}/${second.slug}`)
+      // fighters wins over the shelf's first few.
+      //
+      // **Four different decks, not the first one four times.** A `<select>`
+      // with no value shows its first option, so seats three and four both
+      // came up reading the same deck as seat one — a table of three Arahbos
+      // that looked deliberate (Aaron, 2026-09-06, from the screenshot). The
+      // shelf is walked rather than indexed twice, and a shelf too short to
+      // seat four falls back to what it has rather than leaving a seat blank.
+      const at = (i: number) => d[i] ?? d[d.length - 1] ?? d[0]
+      const seat = (i: number) => {
+        const deck = at(i)
+        return deck ? `${deck.owner}/${deck.slug}` : ''
+      }
+      if (d.length) {
+        setA((cur) => cur || seat(0))
+        setB((cur) => cur || seat(1))
+        setC((cur) => cur || seat(2))
+        setD((cur) => cur || seat(3))
+      }
     }).catch((e) => { if (alive) setError(errorMessage(e)) })
     // Asked once, like `/api/claude`: a fact about the environment, and a
     // failed ask means the gates stay shut, which is the honest floor.
@@ -967,9 +1010,13 @@ export default function ColiseumRoom() {
       const next = new URLSearchParams(cur)
       if (a) next.set('a', a); else next.delete('a')
       if (b) next.set('b', b); else next.delete('b')
+      // The extra chairs leave the link when the duel table is laid, so a
+      // link sent from a duel cannot seat somebody else a pod.
+      if (pod && c) next.set('c', c); else next.delete('c')
+      if (pod && d) next.set('d', d); else next.delete('d')
       return next
     }, { replace: true })
-  }, [a, b, setParams])
+  }, [a, b, c, d, pod, setParams])
 
   /** The handle on the match being watched, for as long as it is worth
    *  holding: the job's own once it exists, and the one the link arrived with
@@ -1113,6 +1160,13 @@ export default function ColiseumRoom() {
       const submitted = await api.simForge({
         a_slug: slugOf(a), a_owner: a.slice(0, Math.max(0, a.indexOf('/'))),
         b_slug: slugOf(b), b_owner: b.slice(0, Math.max(0, b.indexOf('/'))),
+        // Sent only when the pod is laid: the door fills seats in order and
+        // refuses a gap, so an empty `c` beside a filled `d` is a 422 rather
+        // than a quietly three-handed game.
+        ...(pod ? {
+          c_slug: slugOf(c), c_owner: c.slice(0, Math.max(0, c.indexOf('/'))),
+          d_slug: slugOf(d), d_owner: d.slice(0, Math.max(0, d.indexOf('/'))),
+        } : {}),
         games, seed: dealt,
         // This room watches, so this room narrates. The measuring surfaces do
         // not ask, and Forge stays quiet for them.
@@ -1332,9 +1386,36 @@ export default function ColiseumRoom() {
           never greyed out with an excuse, which is the rule the Ask Claude
           surfaces set and this inherits. The room itself is worth walking
           through either way, so nothing else on the page depends on it. */}
+      {/* **Which table is laid.** A pod is not a wider duel: the baseline is
+          25% rather than 50%, the board is a two-by-two rather than two halves
+          facing off, and a game runs about ten times as long. So it is a place
+          you go, and it wears `.strip-tab` for the same reason the strip above
+          does (commandment 17) — these are places, not actions.
+
+          Inside the sand rather than beside "The record", because the record
+          holds both kinds and always did; the choice being made here is only
+          about the match you are about to send in. */}
+      {onSand && forgeReady && (
+        <div role="tablist" aria-label="The table"
+             className="mt-5 flex flex-wrap gap-2">
+          <button type="button" role="tab" aria-selected={!pod}
+                  onClick={() => setPod(false)}
+                  className={`strip-tab rounded-lg px-3 py-1.5 text-sm
+                              font-medium${!pod ? ' is-active' : ''}`}>
+            Duel
+          </button>
+          <button type="button" role="tab" aria-selected={pod}
+                  onClick={() => setPod(true)}
+                  className={`strip-tab rounded-lg px-3 py-1.5 text-sm
+                              font-medium${pod ? ' is-active' : ''}`}>
+            Four-player
+          </button>
+        </div>
+      )}
+
       {onSand && forgeReady && (
         <div data-open={running ? 'true' : 'false'}
-             className="card-surface gatehouse mt-5 flex flex-wrap items-end
+             className="card-surface gatehouse mt-3 flex flex-wrap items-end
                         gap-3 rounded-xl p-4">
           {/* **The selects carry a floor, and that is the whole fix.**
               Three rounds of this bug, and the first two treated a
@@ -1364,14 +1445,47 @@ export default function ColiseumRoom() {
               the basis alone, and the basis is what makes them take their own
               line on a real phone. The ellipsis on a long deck name survives:
               a `<select>` truncates its own option text at any width. */}
-          <Select label="Champion" value={a} onChange={setA}
+          {/* **A pod's four seats want a line of their own.**
+              Four selects fill the row, so the games dial and the gate wrapped
+              onto a second line and the gate — a whole portrait card, four
+              times a select's height — stood marooned in the middle with a
+              third of the panel empty beside it (Aaron, 2026-09-06: "Fight
+              button looks weird on four-player").
+
+              `display: contents` on the duel, so its row is exactly the row it
+              has always been: the wrapper is not in the layout at all, and the
+              two selects, the dial and the gate share one line as before. On
+              the pod the wrapper takes the full basis and the four seats get
+              their own row, which puts the dial and the gate back together on
+              the next one. */}
+          <div className={pod
+            ? 'flex w-full basis-full flex-wrap items-end gap-3'
+            : 'contents'}>
+          <Select label={pod ? 'First seat' : 'Champion'} value={a} onChange={setA}
                   className="min-w-[11rem] grow basis-full
                              sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map(seatOption)} />
-          <Select label="Challenger" value={b} onChange={setB}
+          <Select label={pod ? 'Second seat' : 'Challenger'} value={b} onChange={setB}
                   className="min-w-[11rem] grow basis-full
                              sm:basis-[13rem] sm:max-w-[15rem]"
                   options={decks.map(seatOption)} />
+          {/* **Champion and Challenger are a duel's words.** Four decks are
+              not a champion and three challengers — they are a table, and
+              seats at a table are numbered. The first two are renamed rather
+              than joined by two oddly-named strangers. */}
+          {pod && (
+            <>
+              <Select label="Third seat" value={c} onChange={setC}
+                      className="min-w-[11rem] grow basis-full
+                                 sm:basis-[13rem] sm:max-w-[15rem]"
+                      options={decks.map(seatOption)} />
+              <Select label="Fourth seat" value={d} onChange={setD}
+                      className="min-w-[11rem] grow basis-full
+                                 sm:basis-[13rem] sm:max-w-[15rem]"
+                      options={decks.map(seatOption)} />
+            </>
+          )}
+          </div>
           {/* **The ceiling is written where the number is typed.** A number
               input's `max` is validation, not a stop: 25 can be typed into
               this box and it looks accepted, and the arena will not fight 25
@@ -1397,8 +1511,23 @@ export default function ColiseumRoom() {
               than here, so there is one place to read them and one to change
               them. */}
           <SendThemIn running={running} lighting={lighting}
-                      disabled={running || !a || !b}
+                      disabled={running || !a || !b || (pod && (!c || !d))
+                                || Boolean(twiceSeated)}
                       onPress={() => void sendThemIn()} />
+
+          {/* **A shut gate says why it is shut.** A greyed control with no
+              sentence beside it is the room refusing without explaining,
+              which is exactly what commandment 2 rules out — a newcomer who
+              cannot tell a disabled button from a broken one has been told
+              nothing. The seat is named, so the fix is obvious. */}
+          {twiceSeated && (
+            <p className="basis-full text-sm" role="status"
+               style={{ color: 'var(--text-secondary)' }}>
+              {deckAt(twiceSeated.deck)?.name ?? slugOf(twiceSeated.deck)} is in
+              seat {twiceSeated.first} already — give seat {twiceSeated.seat} a
+              different deck. A deck cannot fight itself.
+            </p>
+          )}
         </div>
       )}
 
@@ -1442,8 +1571,11 @@ export default function ColiseumRoom() {
         <div className="mt-6">
           <MatchTheater
             key={job.id}
-            a={aDeck} b={bDeck}
-            aSlug={slugOf(a)} bSlug={slugOf(b)}
+            seats={pod
+              ? [{ deck: aDeck, slug: slugOf(a) }, { deck: bDeck, slug: slugOf(b) },
+                 { deck: deckAt(c) ?? null, slug: slugOf(c) },
+                 { deck: deckAt(d) ?? null, slug: slugOf(d) }]
+              : [{ deck: aDeck, slug: slugOf(a) }, { deck: bDeck, slug: slugOf(b) }]}
             games={forge ? forge.games : (job.total || games)}
             rows={rows}
             running={running}

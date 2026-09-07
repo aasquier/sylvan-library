@@ -7521,7 +7521,10 @@ button:hover .tarot-fan-card {
   --zone-col: calc(var(--zone-tile) * (var(--zone-seats, 1) + 1) + 5px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--zone-col);
-  grid-template-rows: repeat(3, var(--lane-h));
+  /* Per facing, because the creature lane is at a different end of each: the
+     far seat reads land, other, creatures down the page and the near seat
+     reads it back up, so that the creatures of both are against the seam. */
+  grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-h);
   align-items: stretch;
   gap: 8px 10px;
   padding: 8px var(--side-pad-x);
@@ -7673,6 +7676,27 @@ button:hover .tarot-fan-card {
   --lane-gap: 7px;
   --side-pad-x: 10px;
   --lane-h: calc(var(--field-card-full) * 81 / 58 + var(--lane-lean) * 2);
+  /* **The creature lane is taller, and it is the one lane that honestly is.**
+   *
+   * `--lane-h` above is the card and the clearance a turned card leans into,
+   * and that is the whole of what a land needs. A creature hangs furniture
+   * below itself — the power and toughness badge, the counter beads — and no
+   * allowance was ever made for it, so a busy creature lane clipped its own
+   * cards at every card size this board has ever used. Measured on a lane of
+   * eight: 17px over at a 38px card, 20 at 46, 26 at 58, 31 at 70 — a
+   * constant 0.44 of the card's width, which is what a proportional overhang
+   * looks like rather than a threshold somebody crossed.
+   *
+   * **Land and other keep `--lane-h`** (Aaron, 2026-09-06, choosing this over
+   * raising all three): the three lanes stop being one ruler, which this file
+   * otherwise holds to — but they stop because a creature genuinely is a
+   * taller thing than a land, and paying 26px on two lanes that do not need
+   * it would have cost the duel board 156px to fix a fault in one row.
+   *
+   * 0.45 rather than the measured 0.44, plus a pixel, for [--lane-lean]'s
+   * reason: the exact number leaves nothing for a fractional card width or a
+   * device pixel ratio to eat. */
+  --lane-tall: calc(var(--lane-h) + var(--field-card-full) * 0.45 + 1px);
   /* **What a half is worth**: three lanes, the two gaps between them, and its
    * own padding. Only the wide layout is told this, and the reason is worth
    * writing down because it is the whole of why the board finally stands
@@ -7689,7 +7713,7 @@ button:hover .tarot-fan-card {
    *
    * So at that width the half is told what it is and the hand fits itself into
    * what is left (`.field-hand`, `min-height: 0`). */
-  --half-h: calc(var(--lane-h) * 3 + 32px);
+  --half-h: calc(var(--lane-h) * 2 + var(--lane-tall) + 32px);
 }
 @media (max-width: 46rem) {
   /* A phone gives the arena about 340px and the corner cluster takes some of
@@ -7811,7 +7835,13 @@ button:hover .tarot-fan-card {
        whole width, so both halves share an origin without being told to. */
     --zone-tile: 58px;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(3, var(--lane-h)) auto;
+    grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-h) auto;
+  }
+  .field-side-far {
+    grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-tall) auto;
+  }
+  .field-side-near {
+    grid-template-rows: var(--lane-tall) var(--lane-h) var(--lane-h) auto;
   }
   .field-side .field-zone-l             { grid-area: 4 / 1; }
   .field-side-far .field-row-land       { grid-area: 1 / 1; }
@@ -7826,10 +7856,283 @@ button:hover .tarot-fan-card {
      specificity. See the block beside `.field-pile-label` for what this looks
      like when nobody notices. */
 }
+.field-side-far  { grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-tall); }
+.field-side-near { grid-template-rows: var(--lane-tall) var(--lane-h) var(--lane-h); }
+
+
 .field-side-far { grid-area: far; }
 .field-seam { grid-area: seam; }
 .field-side-near { grid-area: near; }
 .field-transport { grid-area: transport; }
+
+/* **Four seats sit around the anvil rather than across it.**
+ *
+ * The duel's stage is three columns — champion, anvil, challenger — and a pod
+ * given the same row showed as two tiles with two more shoved past the edge
+ * (Aaron, 2026-09-06: "Our preview is only two tiles on four player too").
+ * Four tiles are a table: two by two, with the anvil centred over the gap
+ * between them, because a column of anvil between two pairs is not a table,
+ * it is two duels standing next to each other. */
+.theater-stage.is-pod {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+}
+.theater-stage.is-pod .theater-anvil {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  /* Off the tiles it floats over, so the count stays readable against art. */
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--surface, rgba(20, 16, 10, 0.82));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 40rem) {
+  /* A phone has no room for two columns of card art; the table becomes a
+     stack and the anvil returns to the flow between the pairs. */
+  .theater-stage.is-pod { grid-template-columns: minmax(0, 1fr); }
+  .theater-stage.is-pod .theater-anvil {
+    position: static;
+    transform: none;
+    justify-self: center;
+  }
+}
+
+/* The count on a record tab: quieter than the label it follows, because it is
+   the evidence behind the word rather than the word. */
+.record-tab-n {
+  opacity: 0.65;
+  font-size: 0.85em;
+}
+
+/* ================= A table of four ==================================
+ *
+ * **Four battlefields cannot stack, and that is measured rather than felt.**
+ * One seat's half is 272px on an iPhone viewport and four of them are 1,088px
+ * against 812px of screen — one and a third screens of sand before a hand, a
+ * seam or the transport. Aaron called it before the tape measure did
+ * (2026-09-06).
+ *
+ * So the pod has two behaviours over **one** DOM, which is the whole trick
+ * here: every seat is always rendered, and the narrow screen collapses the
+ * ones it is not showing. Two React trees would have been two things to keep
+ * in step, and the board has been bitten by that before.
+ *
+ * The mirror is the duel's own, applied on both axes. Seats one and two face
+ * down the table and seats three and four face up it, so every creature row
+ * is against the middle and every land row is at its own player's back —
+ * which is what four people around a table actually looks like.
+ */
+.field.is-pod {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'table'
+    'transport';
+  /* **The rows have to be named too, and forgetting them is not a small
+     miss.** `.field` is given `grid-template-rows: var(--half-h) auto
+     var(--half-h) auto` in the wide block — four rows for the duel's four
+     areas — and a two-area template laid onto a four-row grid does not
+     rearrange itself: the table was clamped into a 231px row and overflowed
+     it, and the transport was placed 231px down, which put it straight
+     through the middle of the top two quadrants. Two areas, two rows, both
+     sized by what is in them. */
+  grid-template-rows: auto auto;
+}
+
+.field-table {
+  grid-area: table;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-quad {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* Content, not `1fr`: a quadrant is as tall as the plate, the sand and the
+     hand it actually holds. A fractional row would have sized the sand to
+     whatever was left and clipped it. */
+  grid-template-rows: auto auto auto;
+  min-width: 0;
+  border-radius: 8px;
+}
+
+/* **The duel's area names do not exist in here, and an unmatched grid area is
+   not an error — it is an overlap.**
+ *
+ * `.field-side-far` carries `grid-area: far` and `.field-hand-far` carries
+ * `grid-area: handsfar`, both named for the `.field` grid one level up. Inside
+ * a quadrant neither name resolves, so both fell back to the same implicit
+ * slot and drew on top of each other: the sand and the hand at identical
+ * coordinates, and the plate squeezed into a column beside them.
+ *
+ * **It is invisible to a bounding-box check of the quadrants**, which is how
+ * it shipped past a measurement that said the two-by-two was perfect — the
+ * quads *were* perfect, and everything inside one was piled up. Aaron saw it
+ * in a second. Reset the four placements the shorthand set and let the rows
+ * above do the placing, in DOM order: plate, sand, hand.
+ */
+.field-quad > .field-quad-grip,
+.field-quad > .field-side,
+.field-quad > .field-hand {
+  grid-area: auto;
+  grid-column: 1 / -1;
+}
+
+/* The seat's own plate, and the control that holds it open. A button because
+   it changes this page rather than leaving it (commandment 20), and it answers
+   the hand three ways because everything here does (commandment 17). */
+.field-quad-grip {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.field-quad-grip:hover { background: rgba(201, 162, 39, 0.10); }
+.field-quad-grip:focus-visible {
+  outline: 2px solid var(--field-brass);
+  outline-offset: 2px;
+}
+.field-quad-grip:active { transform: translateY(1px); }
+.field-quad-grip.is-pinned {
+  background: rgba(201, 162, 39, 0.16);
+  box-shadow: inset 0 0 0 1px var(--field-brass);
+}
+
+/* The seat holding the camera reads as the lit one. */
+.field-quad.is-on-turn { box-shadow: inset 0 0 0 1px rgba(201, 162, 39, 0.35); }
+
+/* ---- Narrow: one seat open, the rest as rails ---------------------- */
+@media (max-width: 61.999rem) {
+  /* A closed seat keeps its plate — life, commander, counters — and gives up
+     its sand and its hand. Nothing is unmounted: the seat is still in the
+     tree, so opening it is a class change rather than a remount, and no
+     animation restarts because a reader looked at somebody else. */
+  .field-quad:not(.is-open) > .field-side,
+  .field-quad:not(.is-open) > .field-hand {
+    display: none;
+  }
+  .field-quad:not(.is-open) {
+    border: 1px solid rgba(201, 162, 39, 0.18);
+  }
+  /* The open seat gets the whole width and the rails sit above it, so the
+     table reads top-to-bottom as "who is here" then "what is happening". */
+  .field-quad.is-open { order: 2; }
+  .field-quad:not(.is-open) { order: 1; }
+  .field-table { display: flex; flex-direction: column; }
+}
+
+/* **The zones stand in one column at a four-player table** (Aaron,
+ * 2026-09-06: "stack command zone and companion zone vertically on top of the
+ * other two to save space").
+ *
+ * The zones are an L on a duel board: the command zone runs along the bottom
+ * with its chairs side by side, and the graveyard and exile stack in a tile
+ * beside it. That L is bought with **width** — `--zone-col` is one tile per
+ * chair plus one — and a quadrant is half a board, so the width the L costs
+ * comes straight out of the lanes next to it, which is where the cards are.
+ *
+ * Standing them in a single tile-wide column gives every one of those tiles
+ * back to the sand: the chairs stack, the companion sits under them, and the
+ * graveyard and exile keep the bottom as they always did.
+ *
+ * **Scoped to the pod on purpose.** The duel board has the width to afford
+ * the L and Aaron has already walked it; extending this is one selector if
+ * he wants it everywhere. */
+.field.is-pod .field-side { --zone-col: calc(var(--zone-tile) + 5px); }
+.field.is-pod .field-zone-l { grid-template-columns: var(--zone-tile); }
+.field.is-pod .field-zone-cell.is-command   { grid-column: 1; grid-row: 1; }
+.field.is-pod .field-zone-cell.is-graveyard { grid-column: 1; grid-row: 2; }
+.field.is-pod .field-zone-cell.is-exile     { grid-column: 1; grid-row: 3; }
+/* The chairs stop being a row. `--seats` sized the group's *width* by how
+   many chairs it held; stacked, the count belongs to the height instead and
+   the width is simply the tile. */
+.field.is-pod .field-command {
+  flex-direction: column;
+  width: var(--zone-tile);
+}
+
+/* ---- Wide: the two-by-two ------------------------------------------ */
+@media (min-width: 62rem) {
+  .field-table {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+  /* Half the width means a smaller card, worked out from the same geometry
+     the rest of the board uses rather than picked: the lean and the turning
+     clearance come off `--field-card-full`, so naming only this keeps a
+     quadrant's cards able to turn.
+
+     **38 rather than 42** (Aaron, 2026-09-06, looking at it): at 42 the
+     two-by-two stood about 672px and a laptop with browser chrome had to
+     scroll for the bottom row. This is the one number to move if it ever
+     needs moving again — everything else in the quadrant follows it. */
+  .field.is-pod { --field-card-full: 38px; }
+  /* Nobody is collapsed on a wide screen; the grip is just the plate. */
+  .field-quad-grip { cursor: default; }
+  .field-quad-grip:hover { background: transparent; }
+
+  /* **A quadrant keeps the count of a hand and not the cards in it.**
+     Uncrushed, a quadrant came to 419px — plate 75, sand 231, hand 114 — and
+     four of those is 847px, which is a table nobody can see at once. The hand
+     is the part to give up: at four seats a reader is watching the table, not
+     counting somebody's grip, and the label already says whose hand it is and
+     how many cards are in it. The fan and the mana bar come back on the
+     narrow layout, where one seat is open and there is room for them. */
+  .field-quad .field-hand-fan,
+  .field-quad .field-pool { display: none; }
+  .field-quad .field-hand { padding-top: 2px; padding-bottom: 2px; }
+
+  /* **The hand's tray swings sideways on a wide screen, and a quadrant is the
+     wrong shape for that.**
+   *
+   * The rule above this one sends it `left: calc(100% + 6px)` — out of the
+   * hand and to the right — and the sentence that justifies it is "hands are
+   * the left column now, so their trays swing right into the arena". True of
+   * the duel, where the hand is a narrow column with the whole arena beside
+   * it. A quadrant's hand is a full-width row, so `100%` is the quadrant's
+   * whole width: the left-hand seats threw their tray into the neighbouring
+   * quadrant and the right-hand seats threw theirs clean off the screen
+   * (Aaron, 2026-09-06, looking at it — "can't see the ones on the right and
+   * left ones are way to the right").
+   *
+   * This is the same stale-sentence fault the block above already records
+   * having made twice. Here the tray opens **upward, over its own seat's
+   * sand**, which is space the seat already owns at either row of the table,
+   * and it is clamped to the quadrant so it cannot reach a neighbour. */
+  /* **Named through the facing, and that is not decoration.** The rule being
+     overridden is `.field-hand-far .field-hand-tray` — two classes, and it
+     sits *later* in this file than this block does, so a two-class selector
+     here loses the tie and the tray stays off the screen. Measured before
+     believing it: seat 1's tray opened 495px to the right of its own
+     quadrant and seats 2 and 4 ran to x=1438 on a 1280 screen. Three
+     classes wins on specificity at any order. */
+  .field-quad .field-hand-far .field-hand-tray,
+  .field-quad .field-hand-near .field-hand-tray {
+    top: auto;
+    bottom: calc(100% + 4px);
+    left: 0;
+    right: auto;
+    max-width: min(100%, 320px);
+    transform: translateY(7px) scale(0.97);
+    transform-origin: bottom left;
+  }
+  .field-quad .field-hand-far .field-hand-tray.is-open,
+  .field-quad .field-hand-near .field-hand-tray.is-open { transform: none; }
+}
 
 /* **A hand travels with its seat.** One shared rail is right on a wide screen
    and wrong on a narrow one: there the rail becomes a strip at the foot, and
@@ -9750,7 +10053,26 @@ button:hover .tarot-fan-card {
   grid-auto-flow: column;
   grid-auto-columns: var(--field-card-full);
   justify-content: start;
-  align-items: end;
+  /* **`start`, and the room the lane gained goes under the cards.**
+   *
+   * This was `end` — creatures standing on the lane's floor — and that is
+   * what made [--lane-tall] do nothing at all: every pixel the lane gained
+   * went *above* the cards while the power/toughness badge went on hanging
+   * out below. The lane grew 66 to 85 and the overflow moved 17 to 16, which
+   * is the measurement that gave it away. Starting them instead drops the new
+   * space exactly where the furniture is, and the overflow measures zero.
+   *
+   * **Changed here rather than overridden**, because an override lost: a
+   * second `.field-row-creatures` rule earlier in this file is the same
+   * specificity and this one is later, so it won in silence. That is the
+   * third time in one sitting a rule in this corner has been beaten by
+   * document order.
+   *
+   * The cost, stated: creatures sit about nineteen pixels higher in their
+   * lane than they did, so a far seat's front line is that much further from
+   * the seam. That is the price of the badge being inside the lane instead
+   * of cut in half by it. */
+  align-items: start;
 }
 
 .field-row-empty {

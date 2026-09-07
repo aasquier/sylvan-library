@@ -967,3 +967,53 @@ func TestASeatGapIsRefusedRatherThanClosedUp(t *testing.T) {
 		})
 	}
 }
+
+// A deck cannot sit down twice (Aaron, 2026-09-06).
+//
+// **Refused at the door, not only in the room**, and that is the point of
+// this test: all four seats ride in the Coliseum's link, so a URL naming the
+// same deck twice walks straight past a disabled button. A table of one deck
+// against itself teaches nobody anything, and the record would carry a
+// meeting a deck had with itself.
+func TestADeckCannotSitDownTwice(t *testing.T) {
+	t.Parallel()
+	a, _, _ := forgeAPI(t, &stubShim{games: []tier3.WireGame{won(1, 1, 1, 1)}})
+	srv := forgeServer(t, a)
+
+	for _, c := range []struct{ note, body, says string }{
+		{"the same deck in both seats of a duel",
+			`{"a_slug":"kaheera","b_slug":"kaheera"}`,
+			"kaheera is already in seat 1"},
+		{"a repeat in a pod's third seat",
+			`{"a_slug":"kaheera","b_slug":"mono-green","c_slug":"kaheera","d_slug":"rich"}`,
+			"kaheera is already in seat 1"},
+		{"a repeat in a pod's fourth seat",
+			`{"a_slug":"kaheera","b_slug":"mono-green","c_slug":"rich","d_slug":"rich"}`,
+			"is already in seat 3"},
+	} {
+		t.Run(c.note, func(t *testing.T) {
+			status, payload := postForge(t, srv, c.body)
+			if status != 422 {
+				t.Fatalf("%d %v, want a 422", status, payload)
+			}
+			detail, _ := payload["detail"].(string)
+			if !strings.Contains(detail, c.says) {
+				t.Errorf("the refusal reads %q, want it to name %q", detail, c.says)
+			}
+			// The seat is named so the fix is obvious, and the sentence says
+			// what the rule is rather than only that one was broken.
+			if !strings.Contains(detail, "cannot sit down twice") {
+				t.Errorf("the refusal does not say the rule: %q", detail)
+			}
+		})
+	}
+
+	// **Two accounts may both keep a deck called `cats`, and those are two
+	// decks.** The identity is owner and slug together, so a same-slug pair
+	// across owners is a real match and must not be refused.
+	status, _ := postForge(t, srv,
+		`{"a_slug":"kaheera","a_owner":"alice","b_slug":"kaheera","b_owner":"bob"}`)
+	if status == 422 {
+		t.Error("two owners' decks of the same slug were refused as one deck")
+	}
+}
