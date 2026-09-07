@@ -1245,6 +1245,47 @@ function walled(blockers: BoutFighter[]): string {
   return `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}`
 }
 
+/**
+ * **What the bout's plate calls each seat**: its general, and its deck's title
+ * only when the general cannot tell it apart.
+ *
+ * **A deck's title is what the quadrant is labelled with, and it is the wrong
+ * length for a sentence.** Measured against the real library, 2026-09-07: not
+ * one of the twenty-five decks is named after its commander, so `shortName`
+ * never shortens any of them and the plate was carrying two full prose titles
+ * — *"Life, Uh, Finds a Way's, by Kitchen Nightmares' Gyome"*. Trimming those
+ * by length was tried first and is a dead end in both directions: at a budget
+ * that leaves the titles intact that sentence does not change at all, and at
+ * one that shortens it, *Kitchen Nightmares* becomes *Kitchen* and *Fangs for
+ * Playing* becomes *Fangs*. The length was never in the names — it was in
+ * naming a seat by its deck at all.
+ *
+ * So a seat is its general, which is how somebody says it at a table: *Atla
+ * Palani's*, *by Gyome*. Aaron ruled it 2026-09-07 against three alternatives.
+ *
+ * **The fallback is the whole reason this is a function over the table rather
+ * than a lookup per seat.** A general is only a name if it is *this table's*
+ * only one, and the library holds three Atraxa decks — two of them in one pod
+ * would read *"Atraxa's, by Atraxa's ..."*, which is worse than the long
+ * version because it is ambiguous rather than merely wordy. A seat whose
+ * general is shared falls back to its deck's title; the seats that are not
+ * ambiguous keep the short name, because only the ambiguous ones need the
+ * longer one.
+ *
+ * A pairing is both generals, and a seat the board never showed a commander
+ * for is its deck — the board is the source, and a fact it has not got is not
+ * one to invent.
+ */
+export function seatNames(
+  table: readonly { general: string; deck: string }[]): string[] {
+  const seen = new Map<string, number>()
+  for (const { general } of table) {
+    if (general) seen.set(general, (seen.get(general) ?? 0) + 1)
+  }
+  return table.map(({ general, deck }) =>
+    general && seen.get(general) === 1 ? general : deck)
+}
+
 /** A player's name in the possessive, which is a thing this room had never
  *  needed to say until four of them were at a table.
  *

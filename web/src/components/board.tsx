@@ -74,10 +74,10 @@ import { counterSaid, counterSign } from '../lib/counters'
 import { drawableKeywords, keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
 import { tokenMaterial, tokenSigil } from '../lib/tokens'
-import { stepToTurn } from '../lib/theater'
+import { legendName, stepToTurn } from '../lib/theater'
 import { beatDelay, type Speed, type StagedBeat } from '../lib/reel'
 import { CenterStage } from './stage'
-import type { Outcome } from '../lib/stage'
+import { type Outcome, seatNames } from '../lib/stage'
 
 /** One card on the field.
  *
@@ -3102,7 +3102,17 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // to, and its plate names them, and both of those are this list read twice.
   // Here rather than in `CenterStage` because `name` is the route's shelf and
   // this is where it arrives.
-  const table = seats.map((s) => name(s.slug, s.name))
+  //
+  // **A seat is its general, and its deck's title only when that will not tell
+  // it apart** (Aaron, 2026-09-07). `seatNames` carries the argument and the
+  // measurement; what matters here is that both halves come off things this
+  // component already holds — the commander is on the folded side, so nothing
+  // new is threaded down from the route to say *Gyome* instead of *Kitchen
+  // Nightmares*.
+  const table = seatNames(seats.map((s) => ({
+    general: s.commanders.map((c) => legendName(c.name)).join(' & '),
+    deck: name(s.slug, s.name),
+  })))
   const [pinned, setPinned] = useState<number | null>(null)
   // Nobody is on turn before the first one begins, and a table with no seat
   // open would be a blank screen — so the first seat holds the camera until
