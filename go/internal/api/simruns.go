@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
+	"github.com/aasquier/sylvan-library/go/internal/convoke"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
@@ -669,27 +671,59 @@ func (a *API) sweep(ctx context.Context, slug string, d *deck.Deck, commander *s
 	}
 	total := steps * p.games
 
-	rows := make([]landRow, 0, len(p.counts))
-	simulated := 0
-	for _, count := range p.counts {
+	// The counts run convoked -- each one its own tier1.Run seeding its own
+	// generator, so they share nothing and the curve cannot depend on the
+	// order they finish. Rows land by index: the curve's order is the
+	// slice's, never the scheduler's, and the answer is byte-identical at
+	// every width. Cached counts decode up front; the misses are the work.
+	rows := make([]landRow, len(p.counts))
+	var toRun []int
+	for idx, count := range p.counts {
 		if hit := hits[count]; hit != nil {
 			var row landRow
 			if err := json.Unmarshal(hit.Result, &row); err == nil {
-				rows = append(rows, row)
+				rows[idx] = row
 				continue
 			}
 		}
-		base := simulated * p.games
+		toRun = append(toRun, idx)
+	}
+	// One monotonic bar over every running count: each worker feeds its
+	// per-run ticks into a shared total under the lock, so the bar only
+	// ever moves forward however the workers interleave.
+	var (
+		progMu sync.Mutex
+		played int
+	)
+	convoke.Indexed(len(toRun), 0, func(k int) {
+		idx := toRun[k]
+		count := p.counts[idx]
+		// Another request may have filled this count in while the job sat
+		// queued -- the re-read the serial loop always did (see the note on
+		// `sweep` above).
+		if hit := a.simCache.Get(ctx, keys[count]); hit != nil {
+			var row landRow
+			if err := json.Unmarshal(hit.Result, &row); err == nil {
+				rows[idx] = row
+				return
+			}
+		}
+		last := 0
 		keep := p.keep
 		summary := tier1.Run(resized[count], commander, tier1.Options{
 			Games: p.games, Turns: p.turns, KeepRule: &keep, Seed: int64Ptr(p.seed),
-			Progress: func(done, _ int) { rep.Report(base+done, total) },
+			Progress: func(done, _ int) {
+				progMu.Lock()
+				played += done - last
+				last = done
+				rep.Report(played, total)
+				progMu.Unlock()
+			},
 		})
 		row := landRowFrom(count, summary)
 		a.simCache.Put(ctx, keys[count], "sim.lands.count", row)
-		rows = append(rows, row)
-		simulated++
-	}
+		rows[idx] = row
+	})
 	rep.Report(total, total)
 
 	out := landSummaryFrom(slug, d, rows, p.games, p.seed)

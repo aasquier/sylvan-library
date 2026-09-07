@@ -368,3 +368,47 @@ func TestProgressIsCalledOncePerRulePlusOnce(t *testing.T) {
 		t.Fatal("watching the sweep changed its answer")
 	}
 }
+
+// The width is a wall-clock lever and nothing else: the whole Sweep -- rows,
+// ranking, baseline, gentlest, spread -- is identical at one worker and at
+// many, because every cell seeds its own generator and lands by index. This
+// is the contract `Options.Workers` names, held here; the corpus test above
+// holds the default width to the recorded answers at the same time.
+func TestSearchAnswersIdenticallyAtEveryWidth(t *testing.T) {
+	t.Parallel()
+	library := []*sim.Card{}
+	for i := 0; i < 24; i++ {
+		library = append(library, &sim.Card{Name: "Forest", IsLand: true,
+			Produces: []sim.Source{{Colors: []string{"G"}, Amount: 1}}})
+	}
+	for i := 0; i < 16; i++ {
+		library = append(library, &sim.Card{Name: "Bear",
+			Cost: sim.Cost{Generic: 1, Pips: [][]string{{"G"}}}})
+	}
+	serial, err := mulligan.Search(library, nil, mulligan.Options{
+		Games: 60, Turns: 8, Seed: 11, Workers: 1,
+	})
+	if err != nil {
+		t.Fatalf("serial search: %v", err)
+	}
+	convoked, err := mulligan.Search(library, nil, mulligan.Options{
+		Games: 60, Turns: 8, Seed: 11, Workers: 5,
+	})
+	if err != nil {
+		t.Fatalf("convoked search: %v", err)
+	}
+	a, err := json.Marshal(serial)
+	if err != nil {
+		t.Fatalf("marshal serial: %v", err)
+	}
+	b, err := json.Marshal(convoked)
+	if err != nil {
+		t.Fatalf("marshal convoked: %v", err)
+	}
+	if string(a) != string(b) {
+		t.Fatalf("five workers answered differently from one:\n%s\n%s", a, b)
+	}
+	if g, c := serial.Gentlest(), convoked.Gentlest(); g != c {
+		t.Fatalf("gentlest differs: %+v vs %+v", g, c)
+	}
+}

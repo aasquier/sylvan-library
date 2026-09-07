@@ -17,6 +17,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/convoke"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -253,7 +254,18 @@ func simLandsCommand(cfg config.Config) *cobra.Command {
 			}
 
 			fmt.Fprintln(out, " lands  P(cmdr T5)  spells thru T8  wasted thru T8  mull%")
+			// The counts run convoked -- every count seeds its own generator
+			// from the same recorded seed, so they share nothing -- and the
+			// table prints afterwards in count order: the same bytes the
+			// serial loop printed, arriving together instead of one row at a
+			// time.
+			var pts []int
 			for n := low; n <= high; n++ {
+				pts = append(pts, n)
+			}
+			summaries := make([]tier1.SimSummary, len(pts))
+			convoke.Indexed(len(pts), 0, func(idx int) {
+				n := pts[idx]
 				// Resize by cycling the existing land pool, preserving its
 				// colour mix.
 				resized := []*sim.Card{}
@@ -263,8 +275,11 @@ func simLandsCommand(cfg config.Config) *cobra.Command {
 				lib := append(append([]*sim.Card{}, resized...),
 					headOf(spells, len(library)-n)...)
 				s := seed
-				summary := tier1.Run(lib, commander,
+				summaries[idx] = tier1.Run(lib, commander,
 					tier1.Options{Games: games, Turns: 10, Seed: &s})
+			})
+			for idx, n := range pts {
+				summary := summaries[idx]
 				fmt.Fprintf(out, " %s     %s          %s           %s          %s\n",
 					padLeft(strconv.Itoa(n), 5),
 					padLeft(percent(summary.CommanderByTurn[5], 1), 6),
