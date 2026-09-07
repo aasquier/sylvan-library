@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor }
+  from '@testing-library/react'
 import type { ClaudeStatus, IntakeSheet, StanceView } from '../lib/api'
 
 vi.mock('../lib/api', async () => ({
@@ -38,6 +39,56 @@ function show(mayWrite: boolean, value: IntakeSheet = {}, over: Partial<ClaudeSt
   return onChange
 }
 
+/**
+ * Wait for the sheet to have finished **asking the dial**.
+ *
+ * **"Sort the cards" is not a gate, and every test here used it as one.** Four
+ * of the five chips are ungated and render on the very first paint, before the
+ * effect that asks `api.claudeStatus` has resolved anything; only "Draft the
+ * reasons" waits on the answer (ADR 41's second gate). So a
+ * `waitFor(() => getByRole('button', { name: 'Sort the cards' }))` succeeds on
+ * its first synchronous attempt and hands back a component that has not
+ * finished loading — which is a race dressed as a gate.
+ *
+ * It failed as one: `starts with everything off` waited that way and then
+ * asked for "Draft the reasons", and dropped 2 of 4 full-suite runs on a
+ * loaded machine while passing 8 of 8 when the file was run alone.
+ *
+ * **And the tests that assert only absences were resting on luck.** Several
+ * here check that something is *not* rendered after that non-gate, and an
+ * absence is trivially true of a component that has not finished loading. They
+ * have been catching what they catch by accident: re-introducing Aaron's
+ * 2026-08-29 bug — an unread dial rendering "Claude is turned off for this
+ * deck" — does still fail them, but only because that branch returns early and
+ * takes the ungated chips with it, so the `waitFor` times out rather than the
+ * assertion firing. A defect that left the chips standing and added the
+ * sentence a moment later would have gone straight through.
+ *
+ * So this settles the component instead of watching for an element. A
+ * macrotask boundary drains every microtask the effect's await chain queued —
+ * `fetchClaudeStatus` awaits `api.claudeStatus` and may await a second call
+ * after a dropped pin — and `act` flushes the state updates that land as a
+ * result. Deterministic: nothing is polled, so there is no load to lose to.
+ *
+ * Tests whose subject really is the gated control still wait for *it*: that is
+ * a gate on the thing being asserted, which is the shape this one is not.
+ */
+async function answered() {
+  const asked = vi.mocked(api.claudeStatus).mock.results
+  // The effect runs after the first paint, so the call may not have been made
+  // yet when this is reached.
+  await waitFor(() => expect(asked.length).toBeGreaterThan(0))
+  // **Await the component's own promises, not a tick.** A fixed flush is the
+  // trap one layer down: `setTimeout(r, 0)` drains the microtasks a resolved
+  // mock leaves behind and nothing else, so it would settle today's fixtures
+  // and quietly go back to being a race the day one of them answers on a
+  // timer. These are the promises the effect is suspended on, however long
+  // they take, and `act` flushes the state updates they land.
+  await act(async () => {
+    await Promise.allSettled(asked.map((r) => r.value))
+  })
+}
+
 describe('IntakeChoices', () => {
   afterEach(cleanup)
   beforeEach(() => vi.mocked(api.claudeStatus).mockReset())
@@ -46,8 +97,7 @@ describe('IntakeChoices', () => {
   // on it is on until somebody turns it on.
   it('starts with everything off', async () => {
     show(true)
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
+    await answered()
     for (const label of ['Sort the cards', 'Draft the reasons', 'Describe the deck',
       'Read up on your commander', 'Argue with every card']) {
       expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed'))
@@ -60,10 +110,12 @@ describe('IntakeChoices', () => {
   // the thing that actually helps.
   it('does not offer to draft reasons when the stance may not write', async () => {
     show(false)
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'Draft the reasons' })).toBeNull()
+    await answered()
+    // The sentence first: it is the thing that only exists once the dial has
+    // answered, so asserting it before the absence is what makes the absence
+    // mean anything.
     expect(screen.getByText(/may not change anything/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Draft the reasons' })).toBeNull()
     // And it says where the setting is, because a control somebody was told
     // about and cannot find is worse than one that was never mentioned.
     expect(screen.getByText(/stance dial/)).toBeTruthy()
@@ -80,8 +132,7 @@ describe('IntakeChoices', () => {
   // inline style no `:hover` can reach.
   it('gives every toggle the chip family and a pressed state', async () => {
     const onChange = show(true, { categories: true })
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
+    await answered()
 
     const sort = screen.getByRole('button', { name: 'Sort the cards' })
     expect(sort.className).toContain('chip-toggle')
@@ -170,10 +221,18 @@ describe('when the dial cannot be read', () => {
     vi.mocked(api.claudeStatus).mockResolvedValue(null as never)
     render(<IntakeChoices value={{}} onChange={vi.fn()} />)
 
+    // **Settled first, because every assertion below is an absence.** The
+    // symptom this was written for appears only once the read has failed and
+    // the component has re-rendered; waiting on an ungated chip asserted all
+    // of it against a component that had not asked yet. It was still failing
+    // against the real bug — that branch returns early and takes the chips
+    // with it, so the wait timed out — but by accident rather than by the
+    // assertions, and the accident does not cover a defect that leaves the
+    // chips up.
+    await answered()
     // The four that were never gated are still offered: the server decides
     // what it will do, and hiding them would be guessing the other way.
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy()
     expect(screen.queryByText(/Claude is turned off/)).toBeNull()
     expect(screen.queryByText(/exactly as you pasted it/)).toBeNull()
     // Drafting stays shut, because closed is the safe direction for a control
@@ -253,8 +312,7 @@ describe('the stance the sheet decided with', () => {
     const onStance = vi.fn<(stance: string | undefined) => void>()
     render(<IntakeChoices value={{}} onChange={vi.fn()} onStance={onStance} />)
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Sort the cards' })).toBeTruthy())
+    await answered()
     expect(onStance).toHaveBeenCalledWith('collaborator')
   })
 
