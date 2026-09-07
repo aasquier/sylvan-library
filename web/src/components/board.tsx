@@ -68,7 +68,8 @@ import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
   fightingStats, alignTable, type Clash, clashOf, fightOf,
-  foldBoard, markedHere, sameCard, stackRow } from '../lib/board'
+  foldBoard, markedHere, sameCard, seatIsOut, seatSpot,
+  stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
 import { drawableKeywords, keywordWords } from '../lib/keywords'
 import { poolDrain, poolFill, poolSaid, usePoolFlow } from '../lib/mana'
@@ -1489,7 +1490,7 @@ function FieldRow({ label, cards, empty, lane, slots }: {
 }
 
 /**
- * The board **one step before** the beat being drawn, as two sides.
+ * The board **one step before** the beat being drawn, every seat of it.
  *
  * **A dying creature has already left the fight by the time its death is
  * announced.** Forge reports the death and the zone change on one line — the
@@ -1499,15 +1500,15 @@ function FieldRow({ label, cards, empty, lane, slots }: {
  * game, *no* death resolved to a fight at its own step and every combat death
  * resolved at the one before.
  *
- * So this folds one step short. It is a second walk of the board and it is
- * paid only on death beats — 33 of them in a ten-game match, against some
+ * So this folds one step short. **The whole table, not two halves** — it fed
+ * `fightOf`, and handing that the first two seats of a pod is how a fight in
+ * the bottom half of the table becomes no fight at all. It is a second walk of
+ * the board and it is paid only on death beats — 33 of them in a ten-game match, against some
  * sixteen hundred beats — which is why it is a plain call rather than anything
  * cleverer.
  */
-function settled(board: ForgeBoard | null, shown: number):
-  [BoardSide | undefined, BoardSide | undefined] {
-  const before = foldBoard(board, Math.max(0, shown - 1))
-  return [before.sides[0], before.sides[1]]
+function settled(board: ForgeBoard | null, shown: number): BoardSide[] {
+  return foldBoard(board, Math.max(0, shown - 1)).sides
 }
 
 /** Commander's starting life, which is what the ring below is a fraction of.
@@ -3095,6 +3096,13 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // pinned seat lets go again.
   const seats = state.sides
   const pod = seats.length > 2
+  // **Everyone at the table, in the room's words, in seat order.** One list
+  // that the centre stage indexes with a `Clash`'s seat numbers and measures
+  // its own layout against — the fight is drawn over the two seats it belongs
+  // to, and its plate names them, and both of those are this list read twice.
+  // Here rather than in `CenterStage` because `name` is the route's shelf and
+  // this is where it arrives.
+  const table = seats.map((s) => name(s.slug, s.name))
   const [pinned, setPinned] = useState<number | null>(null)
   // Nobody is on turn before the first one begins, and a table with no seat
   // open would be a blank screen — so the first seat holds the camera until
@@ -3212,7 +3220,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   //
   // Null on every other beat, which is nearly all of them.
   const dying = beat?.kind === 'dies' ? beat.id : undefined
-  const settling = dying ? fightOf(dying, ...settled(board, shown)) : null
+  const settling = dying ? fightOf(dying, settled(board, shown)) : null
   // **How it ended, keyed on the attacker**, and the second half of this is
   // the part a real board had to teach (Aaron, 2026-08-28: *"sometimes that
   // will be mixed, like some blockers live, some die, so make sure the right
@@ -3233,7 +3241,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   const outcome: Outcome | null = !settling ? null
     : settling.attacker.id === dying ? 'fell' : stillUp ? 'held' : null
   const clash: Clash | null =
-    beat?.kind === 'block' ? clashOf(beat.id, far, near)
+    beat?.kind === 'block' ? clashOf(beat.id, seats)
       : outcome ? settling : null
 
   const lives = {
@@ -3333,7 +3341,14 @@ export function MatchBoard({ board, shown, game, name, running, beat,
            middle and every land row is at a player's own back. */
         <div className="field-table">
           {seats.map((s, i) => {
-            const facing = i < 2 ? 'far' : 'near'
+            // **Where this chair is, decided in one place.** `seatSpot` seats
+            // the table clockwise — the bottom row reads right to left, so the
+            // turn walks the rim instead of zig-zagging across it — and the
+            // same function tells the centre stage which column a fight's two
+            // ranks stand over. The class is how it reaches the grid; see
+            // `.field-quad.is-col-*` in the stylesheet.
+            const spot = seatSpot(i, seats.length)
+            const facing = spot.row
             const seatName = name(s.slug, s.name)
             const open = s.seat === focus
             /* The tape has already dismissed this seat: an `outcome` beat
@@ -3341,10 +3356,17 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                replay. Compared by staged name, the same shelf `casting`
                reads, so a pod of three Goreclaws still points at the right
                chair. A fallen seat cannot also read as lit. */
-            const out = fallen.includes(seatName)
+            // **Two ways to be dead, and the board's own is the fast one.**
+            // Forge writes its outcome lines as an end-of-game post-mortem, so
+            // the tape's word can be two hundred beats late; `seatIsOut` reads
+            // the loss off the state the fold is already carrying. The union,
+            // because neither is complete: a mill kill leaves no mark on a
+            // life total, and a life total does not wait for the tape.
+            const out = fallen.includes(seatName) || seatIsOut(s)
             return (
               <div key={s.seat}
                    className={`field-quad field-quad-${i + 1}`
+                     + ` is-col-${spot.col} is-row-${spot.row}`
                      + `${open ? ' is-open' : ''}`
                      + `${s.seat === state.active && !out ? ' is-on-turn' : ''}`
                      + `${out ? ' is-fallen' : ''}`}>
@@ -3378,6 +3400,14 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                           onClick={() => setPinned(
                             pinned === s.seat ? null : s.seat)}>
                     <FieldPlate side={s} facing={facing} name={seatName} />
+                    {/* **Whose turn it is, for the ear as well as the eye.**
+                        The ring around this quadrant walks a light and says
+                        nothing at all to a screen reader, and at four seats
+                        that is the first thing anybody wants to know. A duel
+                        says it in the trench (`FieldPlate`'s neighbour in
+                        `.field-seam`), which a pod does not have. */}
+                    {s.seat === state.active && !out
+                      && <span className="sr-only">, is on turn</span>}
                     {out && <span className="sr-only">, has fallen — out of
                       this game</span>}
                     <span className="sr-only">
@@ -3471,7 +3501,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           here and the skull on the card in its row stay one event. */}
       <CenterStage board={board} beat={beat ?? null} speed={speed} game={game}
                    dies={markLife('dies', speed)} seat={casting} at={shown}
-                   clash={clash} outcome={outcome}
+                   clash={clash} outcome={outcome} table={table}
                    gained={{ far: far.gained, near: near.gained }} />
 
       <FieldTransport speed={speed} setSpeed={setSpeed} at={shown} of={of}

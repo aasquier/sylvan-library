@@ -14,7 +14,8 @@ import { describe, expect, it } from 'vitest'
 import type { ForgeBoard, ForgeBoardCard } from './api'
 import type { BoardCard, BoardSide, BoardStack } from './board'
 import { alignLanes, alignTable, clashOf, faceInPlay, fightingStats, fightOf,
-  foldBoard, halfNamed, markedHere, pictureOf, stackRow } from './board'
+  foldBoard, halfNamed, markedHere, pictureOf, seatIsOut, seatSpot,
+  stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -1201,6 +1202,99 @@ describe('lining up a table of four', () => {
   })
 })
 
+describe('where a seat sits at the table', () => {
+  it('seats a duel the way it has always been seated', () => {
+    expect(seatSpot(0, 2)).toEqual({ row: 'far', col: 0, cols: 1 })
+    expect(seatSpot(1, 2)).toEqual({ row: 'near', col: 0, cols: 1 })
+  })
+
+  it('seats a pod clockwise, so the turn walks the rim', () => {
+    // Forge rotates by seat number, 1 -> 2 -> 3 -> 4 -> 1. Filled in reading
+    // order that traces a Z four times a round, which is what Aaron called
+    // confusing on a real pod (2026-09-07). The bottom row reads right to
+    // left instead.
+    //
+    //     1 -> 2
+    //     ^     v
+    //     4 <- 3
+    expect(seatSpot(0, 4)).toEqual({ row: 'far', col: 0, cols: 2 })
+    expect(seatSpot(1, 4)).toEqual({ row: 'far', col: 1, cols: 2 })
+    expect(seatSpot(2, 4)).toEqual({ row: 'near', col: 1, cols: 2 })
+    expect(seatSpot(3, 4)).toEqual({ row: 'near', col: 0, cols: 2 })
+  })
+
+  it('walks the rim: every step is to a neighbour, never a diagonal', () => {
+    // The property clockwise *is*, checked rather than drawn: consecutive
+    // seats share a row or a column, and the last one is beside the first.
+    // Reading order fails this on the second step and on the wrap.
+    const at = [0, 1, 2, 3].map((i) => seatSpot(i, 4))
+    for (let i = 0; i < 4; i++) {
+      const here = at[i]!
+      const next = at[(i + 1) % 4]!
+      const moved = (here.row === next.row ? 0 : 1) + (here.col === next.col ? 0 : 1)
+      expect(moved, `seat ${i + 1} to seat ${(i + 1) % 4 + 1}`).toBe(1)
+    }
+  })
+
+  it('gives every seat its own chair, whatever the table holds', () => {
+    for (const seats of [2, 3, 4]) {
+      const taken = new Set<string>()
+      for (let i = 0; i < seats; i++) {
+        const spot = seatSpot(i, seats)
+        expect(spot.col).toBeGreaterThanOrEqual(0)
+        expect(spot.col).toBeLessThan(spot.cols)
+        taken.add(`${spot.row}:${spot.col}`)
+      }
+      expect(taken.size, `${seats} seats, ${taken.size} chairs`).toBe(seats)
+    }
+  })
+})
+
+describe('whether a seat is out, without waiting for the tape', () => {
+  const seated = (over: Partial<BoardSide>): BoardSide => ({
+    seat: 1, slug: null, name: 'a seat', life: 40, counters: [], generals: [],
+    creatures: [], walkers: [], artifacts: [], enchantments: [], land: [],
+    hand: [], graveyard: [], exile: [], thrones: [], companion: null,
+    command: [], commanders: [], pool: '', gained: '', raised: '', ...over,
+  })
+
+  it('is nought life, which is how almost every game ends', () => {
+    expect(seatIsOut(seated({ life: 1 }))).toBe(false)
+    expect(seatIsOut(seated({ life: 0 }))).toBe(true)
+    // A drain past nought is still out, and a real board reaches it: the
+    // measured game ended with a seat on minus thirty-six.
+    expect(seatIsOut(seated({ life: -36 }))).toBe(true)
+  })
+
+  it('counts commander damage per commander, because 903.10a does', () => {
+    // Twenty from each of two is forty and is *not* lethal — the whole reason
+    // `generals` is a list rather than a total.
+    expect(seatIsOut(seated({ generals: [
+      { id: 1, name: 'Ghalta', damage: 20 },
+      { id: 2, name: 'Arahbo', damage: 20 }] }))).toBe(false)
+    expect(seatIsOut(seated({ generals: [
+      { id: 1, name: 'Ghalta', damage: 21 }] }))).toBe(true)
+  })
+
+  it('is ten poison at any life total', () => {
+    expect(seatIsOut(seated({ counters: [{ kind: 'poison', n: 9 }] })))
+      .toBe(false)
+    expect(seatIsOut(seated({ counters: [{ kind: 'poison', n: 10 }] })))
+      .toBe(true)
+    // Forge's own spelling is not guaranteed, and the counter that kills is
+    // not the only kind a player can carry.
+    expect(seatIsOut(seated({ counters: [{ kind: 'POISON', n: 10 }] })))
+      .toBe(true)
+    expect(seatIsOut(seated({ counters: [{ kind: 'energy', n: 40 }] })))
+      .toBe(false)
+  })
+
+  it('says nothing about a seat it has not been given', () => {
+    expect(seatIsOut(null)).toBe(false)
+    expect(seatIsOut(undefined)).toBe(false)
+  })
+})
+
 describe('reading one fight off the board', () => {
   // The same three fixtures the lane tests use, plus a side to stand them on.
   // `clashOf` reads `creatures` and nothing else, but the side is built whole
@@ -1233,10 +1327,11 @@ describe('reading one fight off the board', () => {
     // attacker, a beat could not say which of several fights it meant.
     const far = side(1, [attacker(1, 'Ghalta'), attacker(2, 'Bear')])
     const near = side(2, [blocker(3, 'Regal Caracal', 1)])
-    const out = clashOf(3, far, near)
+    const out = clashOf(3, [far, near])
     expect(out?.attacker.name).toBe('Ghalta')
     expect(out?.blockers.map((s) => s.card.name)).toEqual(['Regal Caracal'])
-    expect(out?.swinging).toBe('far')
+    expect(out?.from).toBe(0)
+    expect(out?.at).toBe(1)
   })
 
   it('hands back the whole gang, not just the blocker that was named', () => {
@@ -1248,7 +1343,7 @@ describe('reading one fight off the board', () => {
     const near = side(2, [blocker(2, 'Sacred Cat', 1),
       blocker(3, 'Fleecemane Lion', 1), blocker(4, 'Leonin Warleader', 1)])
     // Asked from the FIRST cat, and it still answers with all three.
-    const out = clashOf(2, far, near)
+    const out = clashOf(2, [far, near])
     expect(out?.blockers.map((s) => s.card.name))
       .toEqual(['Sacred Cat', 'Fleecemane Lion', 'Leonin Warleader'])
   })
@@ -1260,7 +1355,7 @@ describe('reading one fight off the board', () => {
     const far = side(1, [attacker(1, 'Ghalta')])
     const near = side(2, [2, 3, 4, 5, 6].map((id) =>
       blocker(id, 'Saproling', 1)))
-    const out = clashOf(2, far, near)
+    const out = clashOf(2, [far, near])
     expect(out?.blockers).toHaveLength(1)
     expect(out?.blockers[0]?.count).toBe(5)
   })
@@ -1273,17 +1368,73 @@ describe('reading one fight off the board', () => {
     const far = side(1, [attacker(1, 'Ghalta'), attacker(2, 'Bear')])
     const near = side(2, [blocker(3, 'Saproling', 1),
       blocker(4, 'Saproling', 1), blocker(5, 'Saproling', 2)])
-    expect(clashOf(3, far, near)?.blockers[0]?.count).toBe(2)
-    expect(clashOf(5, far, near)?.blockers[0]?.count).toBe(1)
+    expect(clashOf(3, [far, near])?.blockers[0]?.count).toBe(2)
+    expect(clashOf(5, [far, near])?.blockers[0]?.count).toBe(1)
   })
 
-  it('says which half swung, so the stage can use that seat\'s edge', () => {
+  it('says which two seats are in it, by their places at the table', () => {
     // The charge keeps the board's own axis, so this is the fact the whole
     // layout hangs off: a fight drawn on the wrong edge would seat the two
-    // players the opposite way round from the sand under it.
+    // players the opposite way round from the sand under it. Two indices
+    // rather than the two words `'far'` and `'near'`, because a table of four
+    // has neither — see `boutFacing`, which is where a seat becomes an edge.
     const far = side(1, [blocker(1, 'Regal Caracal', 2)])
     const near = side(2, [attacker(2, 'Ghalta')])
-    expect(clashOf(1, far, near)?.swinging).toBe('near')
+    expect(clashOf(1, [far, near])?.from).toBe(1)
+    expect(clashOf(1, [far, near])?.at).toBe(0)
+  })
+
+  it('reads a fight in the bottom half of a pod, which it could not', () => {
+    // **The hole this closed.** `clashOf` took a far and a near side, so at a
+    // table of four it was handed the top two quadrants and nothing else —
+    // every block declared by seat three or seat four resolved to null, and a
+    // null is exactly what a beat that is not a fight answers. So the centre
+    // stage never opened and nothing anywhere said why.
+    const table = [
+      side(1, []),
+      side(2, []),
+      side(3, [attacker(1, 'Ghalta'), attacker(2, 'Bear')]),
+      side(4, [blocker(3, 'Regal Caracal', 1)]),
+    ]
+    const out = clashOf(3, table)
+    expect(out?.attacker.name).toBe('Ghalta')
+    expect(out?.from).toBe(2)
+    expect(out?.at).toBe(3)
+  })
+
+  it('names the wall\'s own seat rather than assuming the seat opposite', () => {
+    // At two seats "the other one" is a fact; at four it is three seats, and
+    // the attacker's own position says nothing about which of them blocked.
+    // Only the defending player may block, so the wall is one seat's — read
+    // off the wall itself, which is the only thing that knows.
+    const table = [
+      side(1, [attacker(1, 'Ghalta')]),
+      side(2, []),
+      side(3, []),
+      side(4, [blocker(2, 'Sacred Cat', 1), blocker(3, 'Fleecemane Lion', 1)]),
+    ]
+    const out = clashOf(2, table)
+    expect(out?.from).toBe(0)
+    expect(out?.at).toBe(3)
+    expect(out?.blockers.map((b) => b.card.name))
+      .toEqual(['Sacred Cat', 'Fleecemane Lion'])
+  })
+
+  it('keeps one fight out of another one at the same table', () => {
+    // Only the active player attacks, so a pod's combat is one lane against up
+    // to three — and two of those defenders blocking two different attackers
+    // are two fights. A wall gathered by attacker id rather than by seat is
+    // what keeps them apart.
+    const table = [
+      side(1, [attacker(1, 'Ghalta'), attacker(2, 'Bear')]),
+      side(2, [blocker(3, 'Saproling', 1)]),
+      side(3, [blocker(4, 'Saproling', 2)]),
+      side(4, []),
+    ]
+    expect(clashOf(3, table)?.attacker.name).toBe('Ghalta')
+    expect(clashOf(3, table)?.at).toBe(1)
+    expect(clashOf(4, table)?.attacker.name).toBe('Bear')
+    expect(clashOf(4, table)?.at).toBe(2)
   })
 
   it('answers nothing rather than something wrong', () => {
@@ -1291,13 +1442,13 @@ describe('reading one fight off the board', () => {
     const near = side(2, [blocker(2, 'Regal Caracal', 1), beast(3, 'Bystander')])
     // A match played without the scribe carries no ids at all, and a missing
     // id means "not said" rather than "card zero".
-    expect(clashOf(undefined, far, near)).toBeNull()
+    expect(clashOf(undefined, [far, near])).toBeNull()
     // A creature that is not blocking is not in a fight, however much of the
     // board it is standing on.
-    expect(clashOf(3, far, near)).toBeNull()
+    expect(clashOf(3, [far, near])).toBeNull()
     // And an attacker that has left the board between the block and the beat
     // being read is a fight this has no business drawing.
-    expect(clashOf(2, side(1, []), near)).toBeNull()
+    expect(clashOf(2, [side(1, []), near])).toBeNull()
   })
 })
 
@@ -1369,25 +1520,25 @@ describe('asking about a fight from either end of it', () => {
     // is 0 — so asking `clashOf` about a dying attacker answers null every
     // time. A probe over a real match reported "attacker died 0 times", which
     // was a fact about the door rather than about the match.
-    expect(clashOf(1, far, near)).toBeNull()
-    expect(fightOf(1, far, near)?.attacker.name).toBe('Ghalta')
-    expect(fightOf(1, far, near)?.blockers.map((s) => s.card.name)).toEqual(['Cat'])
+    expect(clashOf(1, [far, near])).toBeNull()
+    expect(fightOf(1, [far, near])?.attacker.name).toBe('Ghalta')
+    expect(fightOf(1, [far, near])?.blockers.map((s) => s.card.name)).toEqual(['Cat'])
   })
 
   it('still answers when the blocker asks', () => {
-    expect(fightOf(2, far, near)?.attacker.name).toBe('Ghalta')
+    expect(fightOf(2, [far, near])?.attacker.name).toBe('Ghalta')
   })
 
   it('keeps the narrow door narrow', () => {
     // The declaration keeps `clashOf` because a block beat can only ever name
     // a blocker, and a narrow door is one fewer way to be wrong.
-    expect(fightOf(1, far, near, 'blocker')).toBeNull()
-    expect(fightOf(2, far, near, 'blocker')?.attacker.name).toBe('Ghalta')
+    expect(fightOf(1, [far, near], 'blocker')).toBeNull()
+    expect(fightOf(2, [far, near], 'blocker')?.attacker.name).toBe('Ghalta')
   })
 
   it('says nothing about a creature that is not in a fight at all', () => {
     const idle = side(2, [beast(9, 'Bystander')])
-    expect(fightOf(9, far, idle)).toBeNull()
+    expect(fightOf(9, [far, idle])).toBeNull()
   })
 })
 

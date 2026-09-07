@@ -300,6 +300,36 @@ export function beatLine(beat: ForgeBeat, name: (slug: string) => string):
 }
 
 /**
+ * Which way an outcome went, off the wire — `true` won, `false` lost, and
+ * `undefined` for every beat that is not an outcome at all.
+ *
+ * **The verdict is a flag, and the reason it has to be is worth knowing.**
+ * Forge writes *"&lt;player&gt; has lost because life total reached 0"*, and
+ * the scribe deliberately trims the name and the verb off the front before the
+ * note crosses: a reason wearing the player's name reads as
+ * *"Gyome — Food · Gyome — Food has won because…"*, which `scribe.go` says out
+ * loud. So the sentence that arrives is the tail alone — *"because life total
+ * reached 0"* — and the verb the verdict lives in is gone from it on purpose.
+ * `EventOutcome.Amount` is where it went, and it has been there since the
+ * worker learned to narrate.
+ *
+ * **A function rather than an expression inlined at the one call site**, and
+ * that is this fault's own lesson. `fallenBy` read the verdict by matching
+ * `text.startsWith('lost')` and could never once be true; its tests passed
+ * because they wrote their own beats saying `'lost the game'`, a string Forge
+ * has never produced. A named reading with the real payloads as its fixtures
+ * is a thing a test can drive, which is what that one could not.
+ *
+ * `1` and absent rather than `true` and `false` because the wire is Go and
+ * `omitempty` drops a zero — narrowed here so nothing downstream ever has to
+ * know a verdict was a number.
+ */
+export function beatWon(beat: ForgeBeat): boolean | undefined {
+  if (beat.kind !== 'outcome') return undefined
+  return beat.amount === 1
+}
+
+/**
  * Forge's turn number is not the turn number anybody says out loud.
  *
  * Measured rather than assumed (2026-08-25, `gyome-food` vs

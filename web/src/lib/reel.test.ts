@@ -25,6 +25,8 @@ import {
   BETWEEN_BOUTS, beatDelay, countRuns, fallenBy, useReel, type Arriving,
   type Speed, type StagedBeat,
 } from './reel'
+import type { ForgeBeat } from './api'
+import { beatWon } from './theater'
 
 describe('how fast a beat is told', () => {
   it('is an absolute pace, not a multiplier on something derived', () => {
@@ -363,35 +365,89 @@ describe('who the tape has dismissed', () => {
     key: 'k', game: 1, turn: 5, kind: 'cast', who: null, text: '', ...over,
   })
 
-  it('names the players whose outcome opened "lost", and nobody else', () => {
+  // **The sentences are the real ones, and that is the whole point of this
+  // block.** These tests used to write their own — `text: 'lost the game'` —
+  // and the filter under test matched on `text.startsWith('lost')`, so a green
+  // suite proved that an invented string matched an invented filter. Forge does
+  // not say that and never has: it says *"<player> has lost because life total
+  // reached 0"*, and the scribe trims the name and the verb off before the note
+  // crosses. The three notes below came off a real four-player game.
+  const LOST = 'because life total reached 0'
+  const GENERALS = 'because accumulated 21 damage from generals'
+  const WON = 'because all opponents have lost'
+
+  it('names the players the tape dismissed, and never the winner', () => {
     const shown = [
-      beat({ kind: 'cast', who: 'Arahbo — Cats', text: 'casts Regal Caracal' }),
-      beat({ kind: 'outcome', who: 'Atla Palani — Eggs',
-        text: 'lost due to accumulation of 21 damage from generals' }),
-      beat({ kind: 'outcome', who: 'Gyome — Food',
-        text: 'lost the game due to being attacked' }),
-      beat({ kind: 'outcome', who: 'Arahbo — Cats', text: 'won the game' }),
+      beat({ kind: 'cast', who: 'Arahbo', text: 'casts Regal Caracal' }),
+      beat({ kind: 'outcome', who: 'Atla Palani', text: GENERALS, won: false }),
+      beat({ kind: 'outcome', who: 'Goreclaw', text: LOST, won: false }),
+      beat({ kind: 'outcome', who: 'Gyome', text: WON, won: true }),
     ]
-    expect(fallenBy(shown, 1))
-      .toEqual(['Atla Palani — Eggs', 'Gyome — Food'])
+    expect(fallenBy(shown, 1)).toEqual(['Atla Palani', 'Goreclaw'])
+  })
+
+  it('reads the verdict off the flag and never out of the sentence', () => {
+    // The fault this closed, kept as a test: every one of these notes is a
+    // real loss and not one of them contains the word. A filter reading the
+    // prose answers "nobody died" on every match ever played.
+    for (const text of [LOST, GENERALS, 'because drew from an empty library']) {
+      expect(fallenBy([beat({ kind: 'outcome', who: 'Gyome', text })], 1))
+        .toEqual(['Gyome'])
+    }
+    // And the winner's note is the one that *does* carry the word, in the
+    // clause about everybody else — so prose would have buried the winner too.
+    expect(WON).toContain('lost')
+    expect(fallenBy([beat({ kind: 'outcome', who: 'Gyome', text: WON,
+      won: true })], 1)).toEqual([])
   })
 
   it('lets a new game raise everyone the last one buried', () => {
     const shown = [
-      beat({ kind: 'outcome', who: 'Gyome — Food', game: 1,
-        text: 'lost the game' }),
-      beat({ kind: 'outcome', who: 'Atla Palani — Eggs', game: 2,
-        text: 'lost the game' }),
+      beat({ kind: 'outcome', who: 'Gyome', game: 1, text: LOST, won: false }),
+      beat({ kind: 'outcome', who: 'Atla Palani', game: 2, text: LOST,
+        won: false }),
     ]
     // Game two's board answers only for game two's dead.
-    expect(fallenBy(shown, 2)).toEqual(['Atla Palani — Eggs'])
+    expect(fallenBy(shown, 2)).toEqual(['Atla Palani'])
   })
 
-  it('skips an outcome that names nobody or says nothing', () => {
-    const shown = [
-      beat({ kind: 'outcome', who: null, text: 'lost the game' }),
-      beat({ kind: 'outcome', who: 'Gyome — Food', text: '' }),
-    ]
-    expect(fallenBy(shown, 1)).toEqual([])
+  it('skips an outcome that names nobody', () => {
+    // A seat the scribe could not match to a name — see `scribe.go`, which
+    // answers seat 0 when two players' names are prefixes of each other.
+    expect(fallenBy([beat({ kind: 'outcome', who: null, text: LOST })], 1))
+      .toEqual([])
+  })
+})
+
+describe('which way an outcome went', () => {
+  // **Driven with the wire's own bytes.** These four beats are exactly what a
+  // real four-player match put on the wire — captured 2026-09-07, cats against
+  // dinosaurs against stompy against food — down to `amount` being absent on
+  // a loss, which is Go's `omitempty` dropping a zero and the precise detail a
+  // hand-written fixture forgets.
+  const outcome = (over: Partial<ForgeBeat>): ForgeBeat => ({
+    kind: 'outcome', turn: 38, who: 'arahbo-cats', against: null, ...over,
+  })
+
+  it('reads a loss off the absent flag, whatever the reason says', () => {
+    expect(beatWon(outcome({ who: 'arahbo-cats',
+      note: 'because life total reached 0' }))).toBe(false)
+    expect(beatWon(outcome({ who: 'goreclaw-stompy',
+      note: 'because life total reached 0' }))).toBe(false)
+  })
+
+  it('reads the win off the flag, not out of its sentence', () => {
+    // The winner's own reason contains the word "lost", about everybody else.
+    expect(beatWon(outcome({ who: 'gyome-food', amount: 1,
+      note: 'because all opponents have lost' }))).toBe(true)
+  })
+
+  it('says nothing about a beat that is not an outcome', () => {
+    // `amount` means something different on nearly every other kind — damage
+    // dealt, cards kept on a mulligan — so this may not answer for them.
+    expect(beatWon({ kind: 'damage', who: null, against: null, amount: 1 }))
+      .toBeUndefined()
+    expect(beatWon({ kind: 'mulligan', who: 'arahbo-cats', against: null,
+      amount: 1 })).toBeUndefined()
   })
 })
