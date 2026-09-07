@@ -258,6 +258,14 @@ function MeetingBoard({
           title={`${titleOf(m.a.commander, m.a.slug)} vs ${titleOf(m.b.commander, m.b.slug)}`}
           under={
             <>
+              {/* The slugs, always, and in the tally's own order — three
+                  different Goreclaw builds fight here, so a title of
+                  commander names alone rendered three identical rows with
+                  three different scores and no way to say whose 10–3 it
+                  was. The deck board above already subtitles every row with
+                  its slug; a meeting carries both of its own. */}
+              {m.a.slug} vs {m.b.slug}
+              {' · '}
               {m.a_wins}–{m.b_wins}
               {m.draws > 0 && <>–{m.draws}</>}
               {' · '}
@@ -285,9 +293,9 @@ function NothingYet() {
       <p className="record-empty-body">
         No bouts have been fought here — so there is nothing to weigh, and the
         house would rather tell you that than invent a champion. Send two decks
-        out onto the field above and the record begins keeping itself: how each
-        deck fares, how each way of playing fares, and who has the measure of
-        whom.
+        — or a table of four — out onto the field above and the record begins
+        keeping itself: how each deck fares, how each way of playing fares, and
+        who has the measure of whom.
       </p>
     </div>
   )

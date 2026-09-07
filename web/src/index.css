@@ -6357,12 +6357,30 @@ button:hover .tarot-fan-card {
 .whisper-sprout {
   color: var(--vine);
   cursor: pointer;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition: translate 200ms ease, scale 200ms ease, box-shadow 200ms ease;
   animation: sprout-bob 4.6s ease-in-out infinite;
 }
 
+/* **The reply rides `translate`/`scale`, never `transform`.** The bob above
+ * is an animation on `transform`, and a running animation replaces that
+ * property outright for as long as it plays — a `transform` written here
+ * rendered for nobody but the reduced-motion room, where the bob is off.
+ * The independent properties compose with an animated `transform`, so the
+ * sprout keeps bobbing AND lifts to meet the hand; the warmed shadow is the
+ * second reply, on a property no animation here touches. */
 .whisper-sprout:hover {
-  transform: translateY(-2px) scale(1.06);
+  translate: 0 -2px;
+  scale: 1.06;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--vine) 35%, transparent);
+}
+.whisper-sprout:active {
+  translate: 0 0;
+  scale: 0.97;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--vine) 25%, transparent);
+}
+.whisper-sprout:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
 }
 
 @keyframes sprout-bob {
@@ -6455,6 +6473,12 @@ button:hover .tarot-fan-card {
   }
   .deck-tile:hover img {
     transform: none;
+  }
+  /* The lift is motion and goes; the warmed shadow is light and stays. */
+  .whisper-sprout:hover,
+  .whisper-sprout:active {
+    translate: none;
+    scale: none;
   }
 }
 
@@ -18840,6 +18864,63 @@ button:hover .tarot-fan-card {
   .field-answer.is-ready {
     animation: none;
   }
+}
+
+/* --------------------------------------------------- the plain field, dressed
+ *
+ * `Select`, `NumberField` and the unchecked `TextField` in `components/ui.tsx`
+ * — the ordinary form controls every route reaches for — plus the one select
+ * Import built by hand in the same shape. Their paint lived inline on each
+ * element (`style={{ background, color, border }}`), which is the locked door
+ * again: an inline border outranks every rule a stylesheet can write, so none
+ * of them could answer a hand at all, and their focus was a stock Tailwind
+ * `focus:ring-2` — a white hospital ring in a house whose every dressed
+ * control answers in the vine. `.field-answer` above already argued the fix;
+ * this is the same coat for the fields with nothing to say about their
+ * contents. */
+.field-shell {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--hairline);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.field-shell::placeholder {
+  color: var(--text-muted);
+}
+.field-shell:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--vine) 55%, var(--hairline));
+}
+.field-shell:focus {
+  border-color: var(--vine);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vine) 22%, transparent);
+  outline: none;
+}
+.field-shell:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* A styled `<select>` gets no arrow lane from the platform: Chrome paints its
+ * glyph over the last characters of a long option (the Coliseum's third seat
+ * read "Mono-Green Stomp" with the "y" under the chevron). `appearance: none`
+ * takes the drawing over, the chevron is `.tier-select`'s, sized in em so it
+ * tracks the text, and the padding ends the text's lane before the glyph
+ * begins. */
+select.field-shell {
+  appearance: none;
+  padding-right: 1.9em;
+  text-overflow: ellipsis;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 0.9em top 55%, right 0.6em top 55%;
+  background-size: 0.3em 0.3em, 0.3em 0.3em;
+  background-repeat: no-repeat;
+}
+/* The dropdown list is painted by the platform; an option inheriting
+ * `transparent` is unreadable on any OS that renders the list on its own
+ * surface (`.tier-select option` learned this first). */
+select.field-shell option {
+  color: var(--text-primary);
+  background: var(--surface-1);
 }
 
 /* The names offered under a field that could not read one — "did you mean".
