@@ -67,7 +67,7 @@ import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
 import mementoArt from '../assets/coliseum/memento.webp'
 import { type BoardCard, type BoardMoment, type BoardSide, type BoardStack,
-  fightingStats, alignLanes, type Clash, clashOf, fightOf,
+  fightingStats, alignTable, type Clash, clashOf, fightOf,
   foldBoard, markedHere, sameCard, stackRow } from '../lib/board'
 import { counterSaid, counterSign } from '../lib/counters'
 import { drawableKeywords, keywordWords } from '../lib/keywords'
@@ -2774,7 +2774,7 @@ function FieldHand({ side, name, facing, speed, at }: {
  * other side of a real table. The hand is no longer among these rows — it is
  * held at the side (`FieldHand` above).
  */
-function FieldSide({ side, facing, active, creatures }: {
+function FieldSide({ side, facing, active, creatures, zones = true }: {
   side: BoardSide
   facing: 'far' | 'near'
   /** Whether it is this seat's turn. Neither half is lit before the first
@@ -2786,8 +2786,17 @@ function FieldSide({ side, facing, active, creatures }: {
    *  **Decided upstairs, because it cannot be decided here.** Lining a blocker
    *  up under its attacker is a fact about *both* seats, and a component that
    *  can only see one of them has no way to reach it — which is why this is a
-   *  prop rather than a call. `alignLanes` does the arranging. */
+   *  prop rather than a call. `alignTable` does the arranging. */
   creatures: (BoardStack | null)[]
+  /** Whether this half draws its own closed zones in its bottom corner.
+   *
+   *  **A duel does and a quadrant does not**, and the reason is width. The
+   *  corner cluster is bought out of the lane beside it — 83 pixels of a
+   *  duel's 800-odd, which is the notch Aaron called unused sand, and 83 of a
+   *  quadrant's 460, which is two cards off every row at a table where the
+   *  rows already scroll. At four seats the seat's nameplate carries them
+   *  instead; see `.field-quad-head`. */
+  zones?: boolean
 }) {
   // **Three lanes, always three, the same three every game** (Aaron,
   // 2026-08-27: *"keep the board the same size universally, enough for three
@@ -2852,8 +2861,15 @@ function FieldSide({ side, facing, active, creatures }: {
       {/* **The corner the game never stands in.** See `FieldZones`: a
           battlefield is wide and shallow, so the bottom corner of each half is
           sand nothing is ever played onto, and three closed zones fit in it
-          without taking a card's worth of room from the lanes beside them. */}
-      <FieldZones side={side} facing={facing} />
+          without taking a card's worth of room from the lanes beside them.
+
+          **A quadrant's zones are drawn by the quadrant instead** — the corner
+          argument is a duel's, and it stops being true when the half is 490
+          pixels wide. Measured on a real pod: the zone column costs a lane 83
+          of its 460 pixels, and a nine-land row wants 426 and gets 377, so it
+          scrolls. The seat's own nameplate had 337 pixels of nothing next to
+          it. */}
+      {zones && <FieldZones side={side} facing={facing} />}
       {/* **No wrapper around the lanes**, deliberately: they are placed in the
           half's own grid, beside and *over* the corner cluster. A box around
           the three of them would be a box the cluster is outside of, and then
@@ -3168,12 +3184,17 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // exactly where it was.
   //
   // **Here rather than in `FieldSide`**, because it is the one fact on this
-  // board that belongs to both seats at once: a component that can see one half
-  // cannot line it up against the other. Outside a combat it hands both lanes
+  // board that belongs to every seat at once: a component that can see one half
+  // cannot line it up against the other. Outside a combat it hands every lane
   // straight back, so this costs a `some` per beat and nothing else.
-  const lanes = alignLanes(
-    stackRow(far?.creatures ?? []), stackRow(near?.creatures ?? []),
-    [...far?.creatures ?? [], ...near?.creatures ?? []])
+  //
+  // **One call for both tables, which is also where a pod's lanes stopped being
+  // unarranged.** This used to be `alignLanes` over `sides[0]` and `sides[1]`
+  // and the pod branch stacked each quadrant on its own — so at four seats the
+  // arrangement was computed for two of the four seats and then not read at
+  // all. `alignTable` is the same rule over however many seats are at the
+  // table, and the duel is the case with one other seat in it.
+  const lanes = alignTable(seats)
 
   // **The fight the centre stage is showing**, on the beats where there is one.
   //
@@ -3327,24 +3348,51 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                      + `${open ? ' is-open' : ''}`
                      + `${s.seat === state.active && !out ? ' is-on-turn' : ''}`
                      + `${out ? ' is-fallen' : ''}`}>
-                {/* **A button, because it changes this page rather than
-                    leaving it** (commandment 20). It is the seat's own plate
-                    on a wide screen and the whole rail on a narrow one, and
-                    `aria-pressed` says which seat is being held. */}
-                <button type="button"
-                        className={`field-quad-grip${pinned === s.seat ? ' is-pinned' : ''}`}
-                        aria-pressed={pinned === s.seat}
-                        onClick={() => setPinned(
-                          pinned === s.seat ? null : s.seat)}>
-                  <FieldPlate side={s} facing={facing} name={seatName} />
-                  {out && <span className="sr-only">, has fallen — out of
-                    this game</span>}
-                  <span className="sr-only">
-                    {pinned === s.seat
-                      ? `, held open — press to follow the action again`
-                      : `, press to hold this seat open`}
-                  </span>
-                </button>
+                {/* **The seat's nameplate, and its zones beside it in the room
+                    the nameplate was not using.**
+
+                    A duel's zones live in the bottom corner of that seat's own
+                    sand, where a battlefield is wide and shallow and nothing is
+                    ever played. A quadrant is not wide: measured on a real pod
+                    at every desktop width — the page is capped, so a quadrant
+                    is 490 pixels whatever the window does — the zone column
+                    takes 83 of a lane's 460, and a nine-land row wanting 426
+                    got 377 and scrolled. The plate next to it was using 153 of
+                    its 490.
+
+                    So they come up here. The three tiles want 244 pixels; a
+                    plate with one commander dial on it leaves 337, and the
+                    worst plate anybody can build — three dials and a poison
+                    bead, measured by putting them there — leaves 154 and the
+                    row wraps rather than clipping.
+
+                    **The zones are a sibling of the button and never inside
+                    it.** Every pile here opens a tray on hover and focus, and
+                    interactive content nested inside a button is neither one
+                    thing nor the other: the browser gives the click to the
+                    button and a keyboard cannot reach the tray at all. */}
+                <div className="field-quad-head">
+                  <button type="button"
+                          className={`field-quad-grip${pinned === s.seat ? ' is-pinned' : ''}`}
+                          aria-pressed={pinned === s.seat}
+                          onClick={() => setPinned(
+                            pinned === s.seat ? null : s.seat)}>
+                    <FieldPlate side={s} facing={facing} name={seatName} />
+                    {out && <span className="sr-only">, has fallen — out of
+                      this game</span>}
+                    <span className="sr-only">
+                      {pinned === s.seat
+                        ? `, held open — press to follow the action again`
+                        : `, press to hold this seat open`}
+                    </span>
+                  </button>
+                  {/* The same provider the half puts round its own cards, for
+                      the same reason: a crown is only this seat's, and the
+                      chairs in a command zone are exactly what it marks. */}
+                  <Crowned.Provider value={crownedOn(s)}>
+                    <FieldZones side={s} facing={facing} />
+                  </Crowned.Provider>
+                </div>
                 {/* The word over the pall — the eye's copy of the sr-only
                     sentence above. */}
                 {out && (
@@ -3354,7 +3402,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                 )}
                 <FieldSide side={s} facing={facing}
                            active={s.seat === state.active}
-                           creatures={stackRow(s.creatures ?? [])} />
+                           creatures={lanes[i] ?? []} zones={false} />
                 <FieldHand side={s} facing={facing} name={seatName}
                            speed={speed} at={shown} />
               </div>
@@ -3367,7 +3415,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                  speed={speed} at={shown} />
 
       <FieldSide side={far} facing="far" active={lit === 'far'}
-                 creatures={lanes.far} />
+                 creatures={lanes[0] ?? []} />
 
       {/* **The seam: in the real building, the trench the lifts came up
           through — and now the board's scoreboard as well.**
@@ -3402,7 +3450,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
       </div>
 
       <FieldSide side={near} facing="near" active={lit === 'near'}
-                 creatures={lanes.near} />
+                 creatures={lanes[1] ?? []} />
 
       <FieldHand side={near} facing="near" name={nearName}
                  speed={speed} at={shown} />

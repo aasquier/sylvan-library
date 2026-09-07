@@ -1266,6 +1266,63 @@ export function alignLanes(far: BoardStack[], near: BoardStack[],
 }
 
 /**
+ * Every seat's creature lane at once, arranged against whichever one is
+ * swinging. Two seats or four; the duel is the case with only one other seat
+ * in it.
+ *
+ * **`alignLanes` had no idea a table could hold four people, and the way it
+ * did not know is worth naming.** Its guard is not a seat count — it asks
+ * whether exactly one of the two lanes it was handed contains an attacker, and
+ * that question has no answer at a pod: seat one can be swinging at seat four
+ * while seat three blocks, and three lanes are involved in one fight. So a pod
+ * never called it at all. Each quadrant stacked its own lane and a blocker
+ * stood wherever the fold happened to leave it.
+ *
+ * **What makes the general case tractable is a rule of Magic rather than a
+ * trick of layout: only the active player attacks.** However many people are
+ * at the table, at most one seat's creatures are ever `attacking` — so there is
+ * one attacker lane and every other lane is a defender's, which is exactly the
+ * shape `alignLanes` already knows how to arrange. It is called once per
+ * defending seat, and it does the rest: the attackers never move, each blocker
+ * slides under the attacker it stopped, a gang centres on it, and a lane with
+ * no resolvable block comes back untouched and gapless.
+ *
+ * **Two opposed seats read as "under"; the others read as "in the same
+ * order".** The two-by-two puts seat one directly above seat three and seat two
+ * above seat four, and those are the only pairs whose creature rows face each
+ * other — the two upper seats' lanes lie side by side on the same line, and a
+ * diagonal has no "under" at all. Every defender is still arranged, because the
+ * alternative is a fight that rearranges nothing at all two times in three, and
+ * an ordering that matches the attackers is worth having wherever it is drawn.
+ * A reader looking at the pair that *is* opposed gets the whole picture the
+ * duel gives.
+ */
+export function alignTable(
+  sides: (BoardSide | null | undefined)[]): (BoardStack | null)[][] {
+  const dense = sides.map((s) => stackRow(s?.creatures ?? []))
+  const out: (BoardStack | null)[][] = [...dense]
+
+  const swinging = dense.findIndex(
+    (lane) => lane.some((s) => s.card.combat === ATTACKING))
+  if (swinging < 0) return out
+
+  const attackers = dense[swinging] ?? []
+  const swung = sides[swinging]?.creatures ?? []
+  for (let seat = 0; seat < dense.length; seat++) {
+    if (seat === swinging) continue
+    const held = sides[seat]?.creatures ?? []
+    // **The attacker lane is passed as `far` every time, and it comes back
+    // unread.** `alignLanes` leaves the swinging lane exactly as it stands —
+    // Aaron's own rule, that only a clash moves anything and only the blocker
+    // moves — so calling it once per defender cannot produce two disagreeing
+    // versions of the one lane everybody is aligning against.
+    out[seat] = alignLanes(attackers, dense[seat] ?? [],
+      [...swung, ...held]).near
+  }
+  return out
+}
+
+/**
  * One fight on the sand: the attacker, and everything standing in its way.
  *
  * **This is what replaced the arrows** (Aaron, 2026-08-28: *"the

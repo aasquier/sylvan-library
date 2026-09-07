@@ -164,7 +164,12 @@ function Row({
   )
 }
 
-function Section({
+/** One board under its name and its one-sentence argument.
+ *
+ *  Exported because the feats hang under the same headings in the same room
+ *  (`components/coliseumfeats.tsx`), and two copies of a heading is how the two
+ *  halves of one page start looking like two pages. */
+export function Section({
   heading,
   blurb,
   children,
