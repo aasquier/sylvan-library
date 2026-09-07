@@ -7521,7 +7521,10 @@ button:hover .tarot-fan-card {
   --zone-col: calc(var(--zone-tile) * (var(--zone-seats, 1) + 1) + 5px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--zone-col);
-  grid-template-rows: repeat(3, var(--lane-h));
+  /* Per facing, because the creature lane is at a different end of each: the
+     far seat reads land, other, creatures down the page and the near seat
+     reads it back up, so that the creatures of both are against the seam. */
+  grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-h);
   align-items: stretch;
   gap: 8px 10px;
   padding: 8px var(--side-pad-x);
@@ -7673,6 +7676,27 @@ button:hover .tarot-fan-card {
   --lane-gap: 7px;
   --side-pad-x: 10px;
   --lane-h: calc(var(--field-card-full) * 81 / 58 + var(--lane-lean) * 2);
+  /* **The creature lane is taller, and it is the one lane that honestly is.**
+   *
+   * `--lane-h` above is the card and the clearance a turned card leans into,
+   * and that is the whole of what a land needs. A creature hangs furniture
+   * below itself — the power and toughness badge, the counter beads — and no
+   * allowance was ever made for it, so a busy creature lane clipped its own
+   * cards at every card size this board has ever used. Measured on a lane of
+   * eight: 17px over at a 38px card, 20 at 46, 26 at 58, 31 at 70 — a
+   * constant 0.44 of the card's width, which is what a proportional overhang
+   * looks like rather than a threshold somebody crossed.
+   *
+   * **Land and other keep `--lane-h`** (Aaron, 2026-09-06, choosing this over
+   * raising all three): the three lanes stop being one ruler, which this file
+   * otherwise holds to — but they stop because a creature genuinely is a
+   * taller thing than a land, and paying 26px on two lanes that do not need
+   * it would have cost the duel board 156px to fix a fault in one row.
+   *
+   * 0.45 rather than the measured 0.44, plus a pixel, for [--lane-lean]'s
+   * reason: the exact number leaves nothing for a fractional card width or a
+   * device pixel ratio to eat. */
+  --lane-tall: calc(var(--lane-h) + var(--field-card-full) * 0.45 + 1px);
   /* **What a half is worth**: three lanes, the two gaps between them, and its
    * own padding. Only the wide layout is told this, and the reason is worth
    * writing down because it is the whole of why the board finally stands
@@ -7689,7 +7713,7 @@ button:hover .tarot-fan-card {
    *
    * So at that width the half is told what it is and the hand fits itself into
    * what is left (`.field-hand`, `min-height: 0`). */
-  --half-h: calc(var(--lane-h) * 3 + 32px);
+  --half-h: calc(var(--lane-h) * 2 + var(--lane-tall) + 32px);
 }
 @media (max-width: 46rem) {
   /* A phone gives the arena about 340px and the corner cluster takes some of
@@ -7811,7 +7835,13 @@ button:hover .tarot-fan-card {
        whole width, so both halves share an origin without being told to. */
     --zone-tile: 58px;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(3, var(--lane-h)) auto;
+    grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-h) auto;
+  }
+  .field-side-far {
+    grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-tall) auto;
+  }
+  .field-side-near {
+    grid-template-rows: var(--lane-tall) var(--lane-h) var(--lane-h) auto;
   }
   .field-side .field-zone-l             { grid-area: 4 / 1; }
   .field-side-far .field-row-land       { grid-area: 1 / 1; }
@@ -7826,6 +7856,10 @@ button:hover .tarot-fan-card {
      specificity. See the block beside `.field-pile-label` for what this looks
      like when nobody notices. */
 }
+.field-side-far  { grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-tall); }
+.field-side-near { grid-template-rows: var(--lane-tall) var(--lane-h) var(--lane-h); }
+
+
 .field-side-far { grid-area: far; }
 .field-seam { grid-area: seam; }
 .field-side-near { grid-area: near; }
@@ -7999,6 +8033,36 @@ button:hover .tarot-fan-card {
   .field-quad.is-open { order: 2; }
   .field-quad:not(.is-open) { order: 1; }
   .field-table { display: flex; flex-direction: column; }
+}
+
+/* **The zones stand in one column at a four-player table** (Aaron,
+ * 2026-09-06: "stack command zone and companion zone vertically on top of the
+ * other two to save space").
+ *
+ * The zones are an L on a duel board: the command zone runs along the bottom
+ * with its chairs side by side, and the graveyard and exile stack in a tile
+ * beside it. That L is bought with **width** — `--zone-col` is one tile per
+ * chair plus one — and a quadrant is half a board, so the width the L costs
+ * comes straight out of the lanes next to it, which is where the cards are.
+ *
+ * Standing them in a single tile-wide column gives every one of those tiles
+ * back to the sand: the chairs stack, the companion sits under them, and the
+ * graveyard and exile keep the bottom as they always did.
+ *
+ * **Scoped to the pod on purpose.** The duel board has the width to afford
+ * the L and Aaron has already walked it; extending this is one selector if
+ * he wants it everywhere. */
+.field.is-pod .field-side { --zone-col: calc(var(--zone-tile) + 5px); }
+.field.is-pod .field-zone-l { grid-template-columns: var(--zone-tile); }
+.field.is-pod .field-zone-cell.is-command   { grid-column: 1; grid-row: 1; }
+.field.is-pod .field-zone-cell.is-graveyard { grid-column: 1; grid-row: 2; }
+.field.is-pod .field-zone-cell.is-exile     { grid-column: 1; grid-row: 3; }
+/* The chairs stop being a row. `--seats` sized the group's *width* by how
+   many chairs it held; stacked, the count belongs to the height instead and
+   the width is simply the tile. */
+.field.is-pod .field-command {
+  flex-direction: column;
+  width: var(--zone-tile);
 }
 
 /* ---- Wide: the two-by-two ------------------------------------------ */
@@ -9989,7 +10053,26 @@ button:hover .tarot-fan-card {
   grid-auto-flow: column;
   grid-auto-columns: var(--field-card-full);
   justify-content: start;
-  align-items: end;
+  /* **`start`, and the room the lane gained goes under the cards.**
+   *
+   * This was `end` — creatures standing on the lane's floor — and that is
+   * what made [--lane-tall] do nothing at all: every pixel the lane gained
+   * went *above* the cards while the power/toughness badge went on hanging
+   * out below. The lane grew 66 to 85 and the overflow moved 17 to 16, which
+   * is the measurement that gave it away. Starting them instead drops the new
+   * space exactly where the furniture is, and the overflow measures zero.
+   *
+   * **Changed here rather than overridden**, because an override lost: a
+   * second `.field-row-creatures` rule earlier in this file is the same
+   * specificity and this one is later, so it won in silence. That is the
+   * third time in one sitting a rule in this corner has been beaten by
+   * document order.
+   *
+   * The cost, stated: creatures sit about nineteen pixels higher in their
+   * lane than they did, so a far seat's front line is that much further from
+   * the seam. That is the price of the badge being inside the lane instead
+   * of cut in half by it. */
+  align-items: start;
 }
 
 .field-row-empty {
