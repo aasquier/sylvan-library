@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	"fmt"
 	"strings"
 )
 
@@ -19,11 +18,10 @@ import (
 // separate methods rather than one clever one because they read different
 // tables and mean different things.
 //
-// **The earliest printing, never the newest**, and that is the whole design of
-// this file. `GetCards` answers a name with its *newest* printing, which is
-// how Teenage Mutant Ninja Turtles art arrived on the Grand Coliseum and Marvel
-// art on Valor's Reach — crossover paintings on a room that is an homage to
-// Magic's own arenas. For a token the newest printing is a lottery among
+// **The earliest printing, never the newest**, and that used to be the whole
+// design of this file. It is [Conn.ArtFor]'s rule now — the same trap caught a
+// room drawing real cards, so the reading moved to `art.go` and this asks it
+// the token's question. For a token the newest printing is a lottery among
 // ninety-eight of them; the earliest is the *original*, which is the picture
 // anybody who has played with a Food knows: Throne of Eldraine's pie for Food,
 // Ixalan's for Treasure, Shadows over Innistrad's for Clue. Recognisable beats
@@ -78,56 +76,19 @@ func TokenName(forge string) string {
 // [Conn.GetCards] keeps and the same reason: a picture is decoration and a
 // missing one must never cost anybody a match they are watching.
 func (c *Conn) TokenArtFor(ctx context.Context, names []string) (map[string]TokenArt, error) {
-	out := map[string]TokenArt{}
-	if len(names) == 0 {
-		return out, nil
-	}
-	lowered := make([]string, 0, len(names))
-	seen := map[string]bool{}
-	for _, name := range names {
-		low := strings.ToLower(strings.TrimSpace(name))
-		if low == "" || seen[low] {
-			continue
-		}
-		seen[low] = true
-		lowered = append(lowered, low)
-	}
-	if len(lowered) == 0 {
-		return out, nil
-	}
-
-	// One row per name: the earliest printing that actually has a picture and
-	// a painter. `released_at` then `id` because a set can print several of a
-	// token on one day (Throne of Eldraine shipped three Foods) and a tie
-	// broken by nothing at all is a tie broken differently on every query.
-	rows, err := c.db.QueryContext(ctx,
-		`WITH wanted(w) AS (SELECT unnest(?::VARCHAR[])),
-		      ranked AS (
-		        SELECT name, image_normal, artist, set_code, set_name,
-		               row_number() OVER (
-		                 PARTITION BY lower(name)
-		                 ORDER BY released_at ASC, id ASC) AS rank
-		        FROM printings
-		        WHERE lower(name) IN (SELECT w FROM wanted)
-		          AND image_normal IS NOT NULL AND artist IS NOT NULL)
-		 SELECT name, image_normal, artist, set_code, set_name
-		 FROM ranked WHERE rank = 1`, lowered)
+	found, err := c.ArtFor(ctx, names)
 	if err != nil {
-		return nil, fmt.Errorf("token_art: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var name, image, artist, set, setName any
-		if err := rows.Scan(&name, &image, &artist, &set, &setName); err != nil {
-			return nil, fmt.Errorf("token_art: %w", err)
-		}
-		art := TokenArt{Name: AsString(name), Image: AsString(image),
-			Artist: AsString(artist), Set: strings.ToUpper(AsString(set)),
-			Printing: AsString(setName)}
-		out[strings.ToLower(art.Name)] = art
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("token_art: %w", err)
+	out := make(map[string]TokenArt, len(found))
+	for key, art := range found {
+		// **A struct conversion, and it is doing a job.** The two types hold
+		// the same fields today and this is the line that keeps saying so: if
+		// [Art] ever gains one, this stops compiling and somebody has to decide
+		// whether a token has it too, rather than the token quietly answering
+		// with a zero. `WireGame(g)` earns its keep in `internal/api` the same
+		// way, twice so far.
+		out[key] = TokenArt(art)
 	}
 	return out, nil
 }

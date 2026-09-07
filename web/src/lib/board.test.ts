@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { ForgeBoard, ForgeBoardCard } from './api'
 import type { BoardCard, BoardSide, BoardStack } from './board'
-import { alignLanes, clashOf, faceInPlay, fightingStats, fightOf, foldBoard,
-  halfNamed, markedHere, pictureOf, stackRow } from './board'
+import { alignLanes, alignTable, clashOf, faceInPlay, fightingStats, fightOf,
+  foldBoard, halfNamed, markedHere, pictureOf, stackRow } from './board'
 
 /** A two-seat board with whatever steps a test needs. */
 function board(steps: ForgeBoard['steps']): ForgeBoard {
@@ -1087,6 +1087,117 @@ describe('a gang block stands around the creature it stopped', () => {
       .toEqual(['B1', 'B2', 'B3'])
     // **One arrow, from the creature that was stopped.** Three would rise out
     // of the two slots either side of Ghalta, where nothing is attacking.
+  })
+})
+
+/**
+ * **The same arrangement at a table of four, which never happened before.**
+ *
+ * `alignLanes` asks whether exactly one of the two lanes it was handed is
+ * swinging, and a pod cannot answer that — seat one swings at seat four while
+ * seat three blocks, and three lanes are in one fight. So the pod branch never
+ * called it: every quadrant stacked its own lane and a blocker stood wherever
+ * the fold left it, which is the gap this closes.
+ *
+ * `alignTable` leans on a rule of Magic instead of a count of seats: only the
+ * active player attacks, so there is exactly one attacker lane however many
+ * people are at the table.
+ */
+describe('lining up a table of four', () => {
+  const beast = (id: number, seat: number, name: string,
+    over: Partial<BoardCard> = {}): BoardCard => ({
+    id, name, token: false, types: 'Creature - Beast',
+    image: '', art: '', artist: '', zone: 'battlefield', seat, tapped: false,
+    mana: false, makes: [], keywords: [], leaving: null, power: 2,
+    toughness: 2, counters: [], counterHistory: [], combat: '',
+    attacking: 0, blocking: 0, casts: 0, attachedTo: 0, attachments: [],
+    live: [], granted: [], fate: '', copiedBy: 0, ...over,
+  })
+  const side = (seat: number, creatures: BoardCard[]): BoardSide => ({
+    seat, slug: `deck${seat}`, name: `Deck ${seat}`, life: 40,
+    counters: [], generals: [], creatures, walkers: [], artifacts: [],
+    enchantments: [], land: [], hand: [], graveyard: [], exile: [],
+    thrones: [], companion: null, command: [], commanders: [],
+    pool: '', raised: '', gained: '',
+  })
+  const named = (lane: (BoardStack | null)[] | undefined) =>
+    (lane ?? []).map((s) => s?.card.name ?? null)
+
+  it('slides a blocker under its attacker across four seats', () => {
+    // Seat one swings; seat three blocks the second attacker. The blocker was
+    // first in its own lane and belongs under A2.
+    const swinging = [
+      beast(1, 1, 'A1', { combat: 'attacking', attacking: 3 }),
+      beast(2, 1, 'A2', { combat: 'attacking', attacking: 3 }),
+    ]
+    const blocking = [
+      beast(3, 3, 'B', { combat: 'blocking', blocking: 2 }),
+      beast(4, 3, 'C'),
+    ]
+    const out = alignTable([side(1, swinging), side(2, []), side(3, blocking),
+      side(4, [])])
+
+    expect(named(out[0])).toEqual(['A1', 'A2'])
+    expect(named(out[2])).toEqual([null, 'B', 'C'])
+  })
+
+  it('arranges every seat that blocked, not only one of them', () => {
+    // A Commander attack goes at several opponents at once, so two seats can be
+    // blocking the same lane in the same combat. Arranging whichever was found
+    // first would leave the other exactly as unaligned as before.
+    const swinging = [
+      beast(1, 1, 'A1', { combat: 'attacking', attacking: 2 }),
+      beast(2, 1, 'A2', { combat: 'attacking', attacking: 3 }),
+    ]
+    const out = alignTable([
+      side(1, swinging),
+      side(2, [beast(3, 2, 'B2', { combat: 'blocking', blocking: 2 })]),
+      side(3, [beast(4, 3, 'B3', { combat: 'blocking', blocking: 2 })]),
+      side(4, []),
+    ])
+
+    // Both blockers stopped A2, which stands second, so both slide to slot one.
+    expect(named(out[1])).toEqual([null, 'B2'])
+    expect(named(out[2])).toEqual([null, 'B3'])
+  })
+
+  it('leaves a table where nobody is swinging exactly as it stands', () => {
+    // The ordinary case, and the one that matters most: four lanes must not
+    // grow holes in them every beat. Same arrays back, so nothing re-stacked.
+    const sides = [side(1, [beast(1, 1, 'A')]), side(2, [beast(2, 2, 'B')]),
+      side(3, []), side(4, [beast(4, 4, 'D')])]
+    const out = alignTable(sides)
+    expect(named(out[0])).toEqual(['A'])
+    expect(named(out[3])).toEqual(['D'])
+    for (const lane of out) {
+      expect(lane.every((s) => s !== null)).toBe(true)
+    }
+  })
+
+  it('says nothing about a blocker stopping a creature at another table', () => {
+    // A blocker naming an attacker this table cannot see resolves to no slot,
+    // so it does not move. The alternative — putting it somewhere anyway —
+    // would be the board making a claim it has no evidence for.
+    const out = alignTable([
+      side(1, [beast(1, 1, 'A1', { combat: 'attacking', attacking: 3 })]),
+      side(2, []),
+      side(3, [beast(9, 3, 'B', { combat: 'blocking', blocking: 404 })]),
+      side(4, []),
+    ])
+    expect(named(out[2])).toEqual(['B'])
+  })
+
+  it('still arranges a duel, which is the table with one other seat', () => {
+    // The duel path goes through this now too, so the two-seat answer has to be
+    // the one `alignLanes` always gave.
+    const out = alignTable([
+      side(1, [beast(1, 1, 'A1', { combat: 'attacking', attacking: 2 }),
+        beast(2, 1, 'A2', { combat: 'attacking', attacking: 2 })]),
+      side(2, [beast(3, 2, 'B', { combat: 'blocking', blocking: 2 }),
+        beast(4, 2, 'C')]),
+    ])
+    expect(named(out[0])).toEqual(['A1', 'A2'])
+    expect(named(out[1])).toEqual([null, 'B', 'C'])
   })
 })
 

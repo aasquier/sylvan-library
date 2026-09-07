@@ -2965,3 +2965,85 @@ it('draws no pall while everyone still stands', () => {
   expect(container.querySelector('.field-quad.is-fallen')).toBeNull()
   expect(container.textContent).not.toContain('Fallen')
 })
+
+/**
+ * **A blocker stands under its attacker at a table of four.**
+ *
+ * The arrangement itself is arithmetic and is tested where arithmetic can be
+ * asked (`lib/board.test.ts`, `alignTable`). What this holds is the *wiring*,
+ * which is where it was actually broken: the pod branch stacked each quadrant
+ * on its own and the arranged lanes were computed for two of the four seats and
+ * then never read. Nothing in either suite noticed, because a lane that is
+ * merely unarranged renders perfectly.
+ *
+ * jsdom cannot see that a card is *above* another one — it has no layout at all
+ * ([[css-sizing-is-invisible-to-the-suite]]). It can see the empty slot, which
+ * is a real element for exactly this reason, and an empty slot in a pod's lane
+ * is the whole of the claim: something moved to line up with something else.
+ */
+const POD_COMBAT: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 40 },
+    { seat: 3, slug: 'goreclaw', name: 'Goreclaw — Stompy', life: 40 },
+    { seat: 4, slug: 'gyome', name: 'Gyome — Food', life: 40 },
+  ],
+  cards: [
+    { id: 11, name: 'Fleecemane Lion', types: 'Creature - Cat', seat: 1 },
+    { id: 12, name: 'Regal Caracal', types: 'Creature - Cat', seat: 1 },
+    { id: 31, name: 'Goreclaw', types: 'Creature - Bear', seat: 3 },
+    { id: 32, name: 'Grizzly Bears', types: 'Creature - Bear', seat: 3 },
+  ],
+  steps: [
+    { turn: 1, seat: 1, changes: [
+      { id: 11, zone: 'battlefield', seat: 1 },
+      { id: 12, zone: 'battlefield', seat: 1 },
+      { id: 31, zone: 'battlefield', seat: 3 },
+      { id: 32, zone: 'battlefield', seat: 3 },
+    ] },
+    // Seat one swings at seat three with both cats. Seat three's *first* bear
+    // blocks the *second* cat, which is the arrangement that has something to
+    // show: the bear has to leave slot nought and stand under the cat at slot
+    // one, and the sand it came from stays open. A blocker already standing
+    // where it belongs proves nothing, because nothing moves.
+    { turn: 3, seat: 1, changes: [
+      { id: 11, combat: 'attacking', attacking: 3 },
+      { id: 12, combat: 'attacking', attacking: 3 },
+      { id: 31, combat: 'blocking', blocking: 12 },
+    ] },
+  ],
+} as unknown as ForgeBoard
+
+it('lines a pod blocker up under the attacker it stopped', () => {
+  const { container } = render(
+    <MatchBoard board={POD_COMBAT} shown={2} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+
+  const quads = container.querySelectorAll('.field-quad')
+  expect(quads.length, 'four seats is a pod').toBe(4)
+
+  // Seat three is the third quadrant, and its lane now holds a gap: the
+  // blocking bear moved off slot nought to stand under the cat it stopped.
+  const defender = quads[2]
+  expect(defender?.querySelectorAll('.field-slot').length,
+    'the blocker slid to line up with its attacker and left sand behind it')
+    .toBe(1)
+
+  // The attacker's own lane never moves — Aaron's rule, that only a clash
+  // realigns and only the blocker slides — so it has no gaps at all.
+  expect(quads[0]?.querySelectorAll('.field-slot').length,
+    'an attacking lane is left exactly as it stands').toBe(0)
+})
+
+it('leaves a pod with no combat in it gapless', () => {
+  // The ordinary beat, and the one that matters most: four lanes must not grow
+  // holes in them every time anybody looks.
+  const { container } = render(
+    <MatchBoard board={POD_COMBAT} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={2} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  expect(container.querySelectorAll('.field-slot').length).toBe(0)
+})

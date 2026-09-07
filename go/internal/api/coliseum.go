@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -145,5 +147,100 @@ func (a *API) coliseumStandings(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, "coliseum standings", err)
 		return
 	}
-	wire.JSON(w, http.StatusOK, board)
+	// The board and the paintings its feats are owed, in one answer.
+	//
+	// Embedded rather than nested so the record's own shape is untouched: every
+	// field `ledger.Standings` carries arrives exactly where it always did, and
+	// `art` is one more key beside them.
+	wire.JSON(w, http.StatusOK, struct {
+		*ledger.Standings
+		Art map[string]cardArt `json:"art"`
+	}{board, a.featArt(r.Context(), board)})
+}
+
+// cardArt is one feat card's painting, and the credit that has to travel with
+// it (commandment 19, and [pool.Art] for why they are never separated).
+type cardArt struct {
+	// Image is the whole card face, and there is no crop beside it on purpose —
+	// see [pool.Art], where the reason is a printing's painter and a printing's
+	// picture having to come out of the same row.
+	//
+	// It is also the safer half of Scryfall's own clause: the terms ask that a
+	// crop be shown with its credit *elsewhere in the same interface*, and let a
+	// full card image stand on its own because the card carries the artist's
+	// name and the copyright line in the printing. This board prints the credit
+	// anyway.
+	Image    string `json:"image"`
+	Artist   string `json:"artist"`
+	Set      string `json:"set"`
+	Printing string `json:"printing"`
+}
+
+// featArt resolves the paintings the three feat boards need, keyed by the card
+// name exactly as the record spells it.
+//
+// **The ledger stays pool-free and this is why the lookup lives here.** A win
+// rate is a gate (ADR 14): `ledger.Board` is deterministic arithmetic over
+// recorded rows, tested without a pool and answering the same way twice. A
+// painting is presentation. Reaching into the pool from inside the ledger would
+// put a picture in the middle of a computation nobody wants pictures in, so the
+// record is computed first and decorated second.
+//
+// **Forge's spelling is the key, and a feat may name a token.** The deepest
+// stack always does, and the biggest creature often does — a 15/15 is as likely
+// to be a Beast token as a card somebody cast. Forge says "Beast Token" where
+// Scryfall says "Beast", so both spellings are asked for and the answer is filed
+// back under the one the record uses. Raw first: the strip is only consulted
+// when the pool has never heard the name as printed, so a real card is never
+// mistaken for a token on the strength of how it ends.
+//
+// **No pool is not an error.** The record is a record without paintings, and
+// refusing to show somebody their own bouts because the card pool has not been
+// refreshed would be the worse answer by a mile.
+func (a *API) featArt(ctx context.Context, board *ledger.Standings) map[string]cardArt {
+	out := map[string]cardArt{}
+	if board == nil {
+		return out
+	}
+	named := make([]string, 0,
+		len(board.Blows)+len(board.Giants)+len(board.Stacks))
+	for _, b := range board.Blows {
+		named = append(named, b.Card)
+	}
+	for _, g := range board.Giants {
+		named = append(named, g.Card)
+	}
+	for _, s := range board.Stacks {
+		named = append(named, s.Card)
+	}
+	if len(named) == 0 {
+		return out
+	}
+
+	wanted := make([]string, 0, len(named)*2)
+	for _, name := range named {
+		wanted = append(wanted, name)
+		if stripped := pool.TokenName(name); stripped != name {
+			wanted = append(wanted, stripped)
+		}
+	}
+	_ = a.usePool(ctx, func(c *pool.Conn) error {
+		found, err := c.ArtFor(ctx, wanted)
+		if err != nil {
+			return err
+		}
+		for _, name := range named {
+			art, ok := found[strings.ToLower(name)]
+			if !ok {
+				art, ok = found[strings.ToLower(pool.TokenName(name))]
+			}
+			if !ok {
+				continue
+			}
+			out[name] = cardArt{Image: art.Image, Artist: art.Artist,
+				Set: art.Set, Printing: art.Printing}
+		}
+		return nil
+	})
+	return out
 }

@@ -97,9 +97,17 @@ built or holding its place in line:
    built for it. **The board is built too** — the listener on Forge's event
    bus is ADR 42, and the arena draws two seats, three lanes a side, the
    closed zones, the trench's three death clocks and a centre stage that
-   opens a scene chosen by what kind of card arrived. What is left here is
-   craft rather than capability: the combat square-off (below) is the one
-   named piece of it.
+   opens a scene chosen by what kind of card arrived. The combat square-off
+   landed with it, and the room **seats four** now: a two-by-two table on a
+   wide screen, one open seat and three rails on a phone, a per-seat clock
+   and game count, and the record split into duels and pods. The three feat
+   boards the night records — the killing blow, the largest creature, the
+   deepest stack of one token — are read at *The laurels*, each card drawn
+   as its earliest printing and credited to its painter. What is left here
+   is craft rather than capability; the named piece is that a pod's centre
+   stage still cannot draw its bouts (`clashOf` and `fightOf` take two
+   seats), so the fight a blocker is in is arranged on the sand and never
+   staged.
 4. **Shopping and swaps** — built: prices from Scryfall, swap boards, no
    checkout ever (out of scope by rule).
 5. **Five artifacts per deck** — built, generated only (ADR 8).

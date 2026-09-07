@@ -7525,10 +7525,17 @@ button:hover .tarot-fan-card {
  * the same width and the same offset, which is what combat will need when two
  * creature rows have to line up across the seam. */
 .field-side {
-  /* **The tile the corner cluster is built out of, declared here rather than
-     on the cluster**, because the half's own grid now has to do arithmetic
-     with it. `.field-zone-l` inherits it and is otherwise unchanged. */
-  --zone-tile: 78px;
+  /* **The tile the corner cluster is built out of, and it is declared on
+     `.field` rather than here.**
+   *
+   * It began here, because the half's own grid does arithmetic with it and
+   * `.field-zone-l` inherited it from the same box. Then the pod moved its
+   * zones up beside the nameplate, out of `.field-side` altogether — and a
+   * custom property that is not inherited is not an error, it is *nothing*:
+   * `grid-template-columns: auto var(--zone-tile) var(--zone-tile)` resolved to
+   * two empty columns and the whole cluster measured sixteen pixels by six.
+   * Silent, and invisible to every test in this repo. Declared on the board,
+   * both layouts inherit it and the arithmetic below is unchanged. */
   /* **One width for both halves' corners, and the wider one sets it.**
    *
    * This column used to be `auto` — as wide as whatever was in it. A companion
@@ -7668,6 +7675,12 @@ button:hover .tarot-fan-card {
    * the number that makes the board one size: three of these, twice, and the
    * arena is as tall as it will ever be. */
   --field-card-full: 58px;
+  /* **The tile a closed zone is drawn on**, and it lives up here with the
+     other rulers because two different layouts read it now: the duel's corner
+     cluster inside a half, and the pod's strip beside a seat's nameplate,
+     which is outside `.field-side` and inherited nothing when this was
+     declared there. See `.field-side`, where it used to be. */
+  --zone-tile: 78px;
   /* **What a card leaning forty-five degrees sticks out by, plus a pixel.**
      Both of these used to be 0.15 and 0.35, which are not wrong -- they are
      the exact geometry, and that was the fault. A card of width `w` and the
@@ -7853,11 +7866,14 @@ button:hover .tarot-fan-card {
      half — the same end of the same sand the corner was tucked into, so a
      phone and a laptop put a player's graveyard in the same *place* even
      though they draw it in a different shape. */
+  /* The narrow tile. On `.field` for the reason it is declared there at all:
+     a pod's zones hang off the seat's nameplate, outside any `.field-side`,
+     and would keep the wide tile on a phone if this stayed on the half. */
+  .field { --zone-tile: 58px; }
   .field-side {
-    /* The narrow tile, and the column arithmetic above goes with the corner:
-       here the zones lie in a strip at the foot and every lane already has the
-       whole width, so both halves share an origin without being told to. */
-    --zone-tile: 58px;
+    /* The column arithmetic above goes with the corner: here the zones lie in
+       a strip at the foot and every lane already has the whole width, so both
+       halves share an origin without being told to. */
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: var(--lane-h) var(--lane-h) var(--lane-h) auto;
   }
@@ -8002,12 +8018,63 @@ button:hover .tarot-fan-card {
  * in a second. Reset the four placements the shorthand set and let the rows
  * above do the placing, in DOM order: plate, sand, hand.
  */
-.field-quad > .field-quad-grip,
+.field-quad > .field-quad-head,
 .field-quad > .field-side,
 .field-quad > .field-hand {
   grid-area: auto;
   grid-column: 1 / -1;
 }
+
+/* **The seat's nameplate and its three closed zones, on one line.**
+ *
+ * A duel keeps its zones in the bottom corner of its own sand, where a
+ * battlefield is wide and shallow and nothing is ever played — the notch Aaron
+ * pointed at as unused. A quadrant does not have that room and the plate has it
+ * to spare, both measured on a real four-player board:
+ *
+ *     quadrant             490px   (the page is capped, so this is the width
+ *                                   at 1280, at 1440 and at anything above)
+ *     lanes / zone column  377 + 83
+ *     a nine-land row      426px  -> 49px of it scrolled out of sight
+ *     plate, one dial      153px  -> 337 of nothing beside it
+ *     plate, three dials
+ *       and a poison bead  336px  -> 154 left, which is the worst case
+ *     the three zone tiles 244px
+ *
+ * So the tiles ride up here and every lane gets its 83 pixels back, which is
+ * two more cards on a row that was scrolling. `flex-wrap` is the answer to the
+ * worst case rather than a smaller tile: on the rare plate that cannot spare
+ * 244 the zones take their own line, which costs the quadrant one tile of
+ * height and is what the phone layout has always done anyway.
+ *
+ * **Nothing here is a grid.** The plate has to take the slack and the zones
+ * have to keep their size, which is one `flex: 1 1` and one `flex: 0 0 auto` —
+ * a two-column grid would have had to guess a width for a plate whose contents
+ * are a life ring plus however many commanders have connected. */
+.field-quad-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+/* **The plate is sized by what is on it, and that is what decides the wrap.**
+ *
+ * `width: 100%` is right for the grip when it is the only thing on the row and
+ * wrong here: a flex basis of the whole row means the zones never fit beside it
+ * and the head wraps every single time, which cost a quadrant 63 pixels of
+ * height for nothing. Measured exactly that way before it was believed.
+ *
+ * Sized by its content instead, the wrap becomes the honest question rather
+ * than a foregone one — 153 pixels of plate and 244 of zones share a 490-pixel
+ * row comfortably, a companion's extra chair still fits at 300, and only the
+ * crowded plate this whole layout was measured against (three commander dials
+ * and a poison bead, 336) pushes the zones onto their own line. No number is
+ * written down here to say so; the content says it. */
+.field-quad-head > .field-quad-grip { flex: 1 1 auto; width: auto; min-width: 0; }
+.field-quad-head > .field-zone-l { flex: 0 0 auto; }
 
 /* The seat's own plate, and the control that holds it open. A button because
    it changes this page rather than leaving it (commandment 20), and it answers
@@ -8104,6 +8171,18 @@ button:hover .tarot-fan-card {
 
 /* ---- Narrow: one seat open, the rest as rails ---------------------- */
 @media (max-width: 61.999rem) {
+  /* **An empty slot means nothing when there is nothing to line up against.**
+     `alignTable` slides a pod's blockers under the attackers they stopped, and
+     the sand they came from is what makes the two lanes agree. On a phone the
+     table is one open seat and three rails, so the lane those gaps are lined up
+     with is not on the screen at all — and what is left is a defender's row
+     with holes punched in it for no reason a reader can see, on the layout with
+     the least width to spare.
+
+     The arrangement itself stays: the order is still the order, and opening the
+     other seat still shows it. Only the spacing goes. */
+  .field.is-pod .field-slot { display: none; }
+
   /* A closed seat keeps its plate — life, commander, counters — and gives up
      its sand and its hand. Nothing is unmounted: the seat is still in the
      tree, so opening it is a class change rather than a remount, and no
@@ -8112,6 +8191,12 @@ button:hover .tarot-fan-card {
   .field-quad:not(.is-open) > .field-hand {
     display: none;
   }
+  /* **A rail keeps the plate and gives up the zones with the sand.** They used
+     to be inside `.field-side` and vanished with it for free; now they are in
+     the head beside the nameplate, and the head is what a rail *is*. Three
+     graveyard tiles on every closed seat would be the rail drawing more than
+     the open one. */
+  .field-quad:not(.is-open) .field-zone-l { display: none; }
   .field-quad:not(.is-open) {
     border: 1px solid rgba(201, 162, 39, 0.18);
   }
@@ -8122,9 +8207,7 @@ button:hover .tarot-fan-card {
   .field-table { display: flex; flex-direction: column; }
 }
 
-/* **The zones stand in one column at a four-player table** (Aaron,
- * 2026-09-06: "stack command zone and companion zone vertically on top of the
- * other two to save space").
+/* **The zones leave the sand entirely at a four-player table.**
  *
  * The zones are an L on a duel board: the command zone runs along the bottom
  * with its chairs side by side, and the graveyard and exile stack in a tile
@@ -8132,24 +8215,54 @@ button:hover .tarot-fan-card {
  * chair plus one — and a quadrant is half a board, so the width the L costs
  * comes straight out of the lanes next to it, which is where the cards are.
  *
- * Standing them in a single tile-wide column gives every one of those tiles
- * back to the sand: the chairs stack, the companion sits under them, and the
- * graveyard and exile keep the bottom as they always did.
+ * **This used to stand them in one tile-wide column instead** (Aaron,
+ * 2026-09-06: *"stack command zone and companion zone vertically on top of the
+ * other two to save space"*), which bought back two tiles of the three. It was
+ * not enough, and the measurement is in `.field-quad-head`: the one remaining
+ * column still cost a lane 83 of its 460 pixels, and a nine-land row wanting
+ * 426 got 377 and scrolled out of sight — while the seat's own nameplate sat
+ * next to it using 153 pixels of 490.
  *
- * **Scoped to the pod on purpose.** The duel board has the width to afford
- * the L and Aaron has already walked it; extending this is one selector if
- * he wants it everywhere. */
-.field.is-pod .field-side { --zone-col: calc(var(--zone-tile) + 5px); }
-.field.is-pod .field-zone-l { grid-template-columns: var(--zone-tile); }
+ * So the cluster goes up to the nameplate and the sand becomes one column.
+ * The three tiles lie in a row up there, which is the shape that fits a
+ * nameplate's slack rather than a battlefield's corner, and the chairs are a
+ * row again with them.
+ *
+ * **Scoped to the pod on purpose.** The duel board has the width to afford the
+ * L in its own corner and Aaron has walked it there; this is the layout that
+ * has no corner to spare. */
+.field.is-pod .field-side { grid-template-columns: minmax(0, 1fr); }
+.field.is-pod .field-row-land,
+.field.is-pod .field-row-other,
+.field.is-pod .field-row-creatures { grid-column: 1 / -1; }
+.field.is-pod .field-zone-l {
+  grid-template-columns: auto var(--zone-tile) var(--zone-tile);
+  align-content: end;
+}
 .field.is-pod .field-zone-cell.is-command   { grid-column: 1; grid-row: 1; }
-.field.is-pod .field-zone-cell.is-graveyard { grid-column: 1; grid-row: 2; }
-.field.is-pod .field-zone-cell.is-exile     { grid-column: 1; grid-row: 3; }
-/* The chairs stop being a row. `--seats` sized the group's *width* by how
-   many chairs it held; stacked, the count belongs to the height instead and
-   the width is simply the tile. */
+.field.is-pod .field-zone-cell.is-graveyard { grid-column: 2; grid-row: 1; }
+.field.is-pod .field-zone-cell.is-exile     { grid-column: 3; grid-row: 1; }
+/* The chairs are a row again: standing them up was a way of buying width back
+   from the sand, and up here the width is what there is spare and the height
+   is what there is not. */
 .field.is-pod .field-command {
-  flex-direction: column;
-  width: var(--zone-tile);
+  flex-direction: row;
+  width: calc(var(--zone-tile) * var(--seats, 1));
+}
+
+/* **The trays open downwards from a nameplate.**
+ *
+ * `.field-zone-l`'s tray opens *up* — `bottom: calc(100% + 6px)` — because on a
+ * duel board the cluster is in the bottom corner of the sand and there is
+ * nothing but arena above it. At the top of a quadrant that is a panel thrown
+ * clean out of `.field`, which clips, so the graveyard would open into nothing.
+ * This is the third time a tray in this room has been left anchored to a
+ * layout it no longer lives in; the other two are argued a few hundred lines
+ * down. */
+.field.is-pod .field-zone-l .field-tray {
+  top: calc(100% + 6px);
+  bottom: auto;
+  transform-origin: top right;
 }
 
 /* ---- Wide: the two-by-two ------------------------------------------ */
@@ -12860,6 +12973,271 @@ button:hover .tarot-fan-card {
 @media (prefers-reduced-motion: reduce) {
   .record-band-span,
   .record-band-mark { animation: none; }
+}
+
+/* ------------------------------------------------------------ the laurels
+ *
+ * The three feats the room crowns: the killing blow, the largest creature, the
+ * deepest stack of one token. `components/coliseumfeats.tsx` carries the
+ * argument for why these are drawn and the record next door is measured.
+ *
+ * **Thirty pieces of Wizards' art hang on this one page**, which makes it the
+ * sharpest place on the site for commandment 19. Everything below that touches
+ * a card is a *layer over* it — `.art-lift`'s warm screen, and one swept
+ * highlight on a pseudo-element. There is no `filter` in this block and there
+ * must never be one: `go/cmd/mtglab/cardimagery_test.go` reads the built bundle
+ * and fails the build over it, which is how fourteen of these reached the live
+ * site once already.
+ *
+ * **The box is 488x680**, the printed ratio, so the card is whole and its own
+ * artist line and copyright are inside the picture. Cropping is a violation
+ * exactly when it clips those off a full card, and this clips nothing — the
+ * credit is also written out in words beside every one of them.
+ */
+
+.laurel-sheet { margin-top: 1.25rem; }
+
+/* ---- the painting, and the two layers allowed over it */
+
+.laurel-art {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: var(--laurel-art-w, 44px);
+  aspect-ratio: 488 / 680;
+  border-radius: 0.3rem;
+  /* The sweep rides inside the card's own edge. Also what makes the corners
+     of the highlight follow the corners of the painting rather than cutting
+     across them. */
+  overflow: hidden;
+  background: color-mix(in oklab, var(--anvil-brass) 8%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+.laurel-art-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  /* `cover` on a box already at the printed ratio, so nothing is cropped and
+     nothing is stretched. Both would be commandment 19 faults; this is neither,
+     and it is here to stop a half-pixel of letterboxing on odd widths. */
+  object-fit: cover;
+}
+
+/* The card the room has no painting for. A plate the size of the picture, so a
+   list of ten stays lined up when one of them is a token nobody has printed. */
+.laurel-art.is-bare {
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in oklab, var(--anvil-brass) 30%, transparent);
+  background: color-mix(in oklab, var(--anvil-brass) 5%, transparent);
+}
+
+.laurel-art-bare-mark {
+  width: 42%;
+  height: 42%;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--anvil-brass) 34%, transparent);
+}
+
+/* The lift: a warm screen over the painting, off until something asks for it.
+   **Opacity is this element's property and only this element's.** The
+   champion's sweep is on a pseudo-element and moves a transform, because an
+   animation on the same property silently outranks a `:hover` that changes it
+   — which is a trap this stylesheet has already been caught by. */
+.laurel-art-glint {
+  --art-lift: 0.16;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.laurel-champion:hover .laurel-art-glint,
+.laurel-row:hover .laurel-art-glint { opacity: 1; }
+
+/* ---- the champion of each board */
+
+.laurel-champion {
+  --laurel-art-w: 150px;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 0.35rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in oklab, var(--anvil-brass) 26%, var(--hairline));
+  border-radius: 0.65rem;
+  background:
+    radial-gradient(120% 150% at 8% 0%,
+      color-mix(in oklab, var(--anvil-brass) 9%, transparent) 0%,
+      transparent 62%);
+}
+
+/* The light that moves across the crowned card, and the reason this page is
+   alive rather than a table with pictures in it (commandment 6). A transform
+   on a layer above the painting: compositor-clean, and it cannot reach the
+   art it passes over. */
+.laurel-champion .laurel-art::after {
+  content: '';
+  position: absolute;
+  inset: -30% -60%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(102deg,
+    transparent 38%,
+    rgb(255 244 214 / 0.5) 50%,
+    transparent 62%);
+  transform: translateX(-70%);
+  animation: laurel-sweep 7s ease-in-out infinite;
+}
+
+@keyframes laurel-sweep {
+  0%, 62%, 100% { transform: translateX(-70%); }
+  86%           { transform: translateX(70%); }
+}
+
+/* Takes the slack, so the figure is pinned to the right edge and lands in the
+   same column as the nine figures below it. */
+.laurel-champion-body { flex: 1 1 auto; min-width: 0; }
+
+/* The figure, stacked over its unit and right-aligned against the plate's own
+   edge. `flex: 0 0 auto` so a long unit never squeezes the name beside it. */
+.laurel-figure {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  text-align: right;
+}
+
+.laurel-figure-n {
+  font-size: 2.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--anvil-brass) 62%, var(--text-primary));
+}
+
+.laurel-figure-unit {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.laurel-champion-card {
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.laurel-champion-where {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ---- the nine behind it */
+
+.laurel-list { display: flex; flex-direction: column; }
+
+.laurel-row {
+  display: grid;
+  grid-template-columns: 1.6rem auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0.35rem;
+  transition: background-color 180ms ease;
+}
+
+.laurel-row:last-child { border-bottom: 0; }
+
+.laurel-row:hover {
+  background: color-mix(in oklab, var(--anvil-brass) 6%, transparent);
+}
+
+.laurel-rank {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: color-mix(in oklab, var(--anvil-brass) 52%, var(--text-muted));
+}
+
+.laurel-row-body { display: flex; flex-direction: column; min-width: 0; }
+
+.laurel-row-card {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.laurel-row-where {
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.laurel-row-figure {
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* The credit, on the champion and on every row behind it. Quiet, never absent:
+   this is the licence the whole project runs on, not a caption. */
+.laurel-credit {
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 46rem) {
+  /* **The figure comes off the end of the row and wraps under the name.** At
+     150px of art plus a 2.9rem numeral there is nothing left in the middle for
+     the card's name on a phone, and the name is the half a reader is here for.
+     Wrapping keeps every part at a size it can be read at instead of shrinking
+     all three until none of them can. */
+  .laurel-champion {
+    --laurel-art-w: 112px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .laurel-champion-body { flex: 1 1 12rem; }
+  .laurel-figure {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.45rem;
+  }
+  .laurel-figure-n { font-size: 2.1rem; }
+
+  /* The rank column goes: nine Roman numerals are the first thing to give up
+     when the width is the card's name. The order is still the order. */
+  .laurel-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+  }
+  .laurel-rank { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The sweep is decoration over a picture and says nothing, so it goes
+     entirely. The lift stays — it is the answer to a hover, which is a
+     question somebody asked. */
+  .laurel-champion .laurel-art::after { animation: none; opacity: 0; }
 }
 
 /* ----------------------------------------------------------- the verdict

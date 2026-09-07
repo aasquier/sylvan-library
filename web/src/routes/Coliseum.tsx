@@ -71,6 +71,7 @@ import {
   type ColiseumStandings, type DeckTile, type ForgeBeats, type ForgeDeckRow,
   type ForgeResult, type Job, type ValidationReport,
 } from '../lib/api'
+import { ColiseumFeats } from '../components/coliseumfeats'
 import { ColiseumRecord } from '../components/coliseumrecord'
 import { CardHover, Caveat, ErrorNote, NumberField, Select }
   from '../components/ui'
@@ -807,7 +808,11 @@ export default function ColiseumRoom() {
   // Nothing about a running match is torn down by switching: the job poll and
   // the reel are both hooks on this component, so a match keeps going while
   // the record is open and the field picks its replay back up where it was.
-  const [view, setView] = useState<'sand' | 'record'>('sand')
+  // **Three places, and the last two read the same book.** The record and the
+  // laurels are both built out of `/api/coliseum/standings` — one read, two
+  // ways of asking about it — so opening either fetches the board and moving
+  // between them costs nothing at all.
+  const [view, setView] = useState<'sand' | 'record' | 'laurels'>('sand')
   const onSand = view === 'sand'
   // Read once, when the record is first opened, and kept afterwards. The
   // board is a whole-history read and it does not change while somebody is
@@ -924,13 +929,16 @@ export default function ColiseumRoom() {
   // the bout that just ended is now part of what the board is counting and a
   // stale board would be the room contradicting itself.
   useEffect(() => {
-    if (view !== 'record') return
+    // Either book, not just the record's: the laurels are read off the same
+    // answer, and gating this on one of the two names is how the other one
+    // would sit at "opening the books…" forever.
+    if (onSand) return
     let alive = true
     api.coliseumStandings()
       .then((b) => { if (alive) { setBoard(b); setBoardFailed(false) } })
       .catch(() => { if (alive) setBoardFailed(true) })
     return () => { alive = false }
-  }, [view, forge])
+  }, [onSand, forge])
 
   useEffect(() => {
     let alive = true
@@ -1345,29 +1353,37 @@ export default function ColiseumRoom() {
         what those minutes are for.
       </p>
 
-      {/* **The room's two places.** Not the arena strip below — that one picks
-          which house a match is watched in, and it stays where it is. This one
-          picks between fighting and remembering.
+      {/* **The room's three places.** Not the arena strip below — that one
+          picks which house a match is watched in, and it stays where it is.
+          This one picks between fighting, remembering, and the three things
+          worth telling a story about.
 
           `.strip-tab` rather than `.btn` for the reason the arena strip uses
           it (commandment 17): these are places you go, not actions you take.
           Same class, same `is-active` ink, same shape `Library` and
-          `DeckDetail` wear. */}
+          `DeckDetail` wear.
+
+          **The laurels are their own place rather than a section of the
+          record**, because they answer a different kind of question. The
+          record is careful about averages and draws a band round every one of
+          them; a laurel is one thing that happened once, and a sample size of
+          one is the point rather than a weakness. Two ways of reading put one
+          under the other would make the second look like a footnote to the
+          first. */}
       <div role="tablist" aria-label="The coliseum"
            className="mt-6 flex flex-wrap border-b"
            style={{ borderColor: 'var(--hairline)' }}>
-        <button type="button" role="tab" aria-selected={onSand}
-                onClick={() => setView('sand')}
-                className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm
-                            font-medium${onSand ? ' is-active' : ''}`}>
-          The sand
-        </button>
-        <button type="button" role="tab" aria-selected={!onSand}
-                onClick={() => setView('record')}
-                className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm
-                            font-medium${!onSand ? ' is-active' : ''}`}>
-          The record
-        </button>
+        {([['sand', 'The sand'],
+           ['record', 'The record'],
+           ['laurels', 'The laurels']] as const).map(([key, label]) => (
+          <button key={key} type="button" role="tab"
+                  aria-selected={view === key}
+                  onClick={() => setView(key)}
+                  className={`strip-tab -mb-px border-b-2 px-3 py-2 text-sm
+                              font-medium${view === key ? ' is-active' : ''}`}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* The record. A whole-history read, so it says so while it is coming
@@ -1387,7 +1403,9 @@ export default function ColiseumRoom() {
               Opening the books…
             </p>
           )}
-          {!boardFailed && board && <ColiseumRecord board={board} />}
+          {!boardFailed && board && (view === 'record'
+            ? <ColiseumRecord board={board} />
+            : <ColiseumFeats board={board} />)}
         </>
       )}
 

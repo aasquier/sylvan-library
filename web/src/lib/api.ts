@@ -3008,6 +3008,31 @@ export interface ColiseumStandings {
   blows: ColiseumBlow[]
   giants: ColiseumGiant[]
   stacks: ColiseumStack[]
+  /** The painting for every card the three boards name, keyed by the name
+   *  exactly as the record spells it — Forge's spelling, so a token is under
+   *  `Food Token` and not under `Food`.
+   *
+   *  **A name absent from here has no painting, which is a state to draw
+   *  rather than a failure.** A deployment with no card pool answers with an
+   *  empty map and every board still reads. */
+  art: Record<string, ColiseumArt>
+}
+
+/** One card's painting, and the credit that must be shown with it.
+ *
+ *  **Never render `image` without `artist` and `printing` beside it.** That is
+ *  commandment 19 and Scryfall's own terms rather than a house preference, and
+ *  it is why the three fields arrive together in one object instead of the
+ *  picture being reachable on its own. */
+export interface ColiseumArt {
+  /** The whole card face, from the printing named below. There is no art crop
+   *  on purpose: a crop could only come from a different printing than the one
+   *  credited here, which is how a painter gets the wrong credit. */
+  image: string
+  artist: string
+  /** The set's code, and its name in words for the credit line. */
+  set: string
+  printing: string
 }
 
 /** One line of the biggest-killing-blows board.
