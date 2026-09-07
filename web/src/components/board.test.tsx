@@ -2910,3 +2910,58 @@ it('draws an aura on the creature an ability was aimed at, and on no other',
     rerender(at(1))
     expect(container.querySelectorAll('.field-aura')).toHaveLength(0)
   })
+
+/**
+ * The pall over a fallen seat (Aaron, 2026-09-07).
+ *
+ * A pod's quadrant reads as dead from the moment the tape says so: the room
+ * scans its told beats for outcomes opening "lost" (`fallenBy`, tested with
+ * the reel) and hands the staged names down; the board answers with
+ * `is-fallen`, the word for the eye and a sentence for the ear. The pall
+ * itself is a layer above the seat and never a filter — that half is
+ * commandment 19's own gate (`cardimagery_test.go`); this half holds the
+ * seat. A fallen seat also stops reading as lit, whatever the active step
+ * says: a chair nobody sits in cannot be on turn.
+ */
+const POD: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'arahbo', name: 'Arahbo — Cats', life: 40 },
+    { seat: 2, slug: 'atla', name: 'Atla Palani — Eggs', life: 0 },
+    { seat: 3, slug: 'goreclaw', name: 'Goreclaw — Stompy', life: 38 },
+    { seat: 4, slug: 'gyome', name: 'Gyome — Food', life: 21 },
+  ],
+  cards: [],
+  steps: [
+    { turn: 1, seat: 2, changes: [] },
+  ],
+} as unknown as ForgeBoard
+
+function showPod(fallen?: string[]) {
+  return render(
+    <MatchBoard board={POD} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback} fallen={fallen}
+                speed="play" setSpeed={vi.fn()} of={1} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('lays the pall on a fallen seat and leaves the living unmarked', () => {
+  const { container } = showPod(['Atla Palani — Eggs'])
+  expect(container.querySelectorAll('.field-quad').length,
+    'four seats is a pod and draws four quadrants').toBe(4)
+  const buried = container.querySelectorAll('.field-quad.is-fallen')
+  expect(buried.length, 'one player has fallen; three are still in it')
+    .toBe(1)
+  const seat = buried[0]
+  expect(seat?.textContent).toContain('Atla Palani — Eggs')
+  expect(seat?.textContent).toContain('Fallen')
+  expect(seat?.textContent).toContain('has fallen — out of this game')
+  expect(seat?.className,
+    'the fallen seat cannot also read as the lit one')
+    .not.toContain('is-on-turn')
+})
+
+it('draws no pall while everyone still stands', () => {
+  const { container } = showPod()
+  expect(container.querySelector('.field-quad.is-fallen')).toBeNull()
+  expect(container.textContent).not.toContain('Fallen')
+})

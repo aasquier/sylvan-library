@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -891,5 +892,118 @@ func TestPublicPathsHoldOnlyTheAuthDoorsAndHealth(t *testing.T) {
 			t.Errorf("PublicPaths names %s, which is neither the liveness probe "+
 				"nor an auth door — a public data route is a decision, not a listing", p)
 		}
+	}
+}
+
+// The static ETag is the content's, which is the whole point: a deploy
+// rewrites every mtime whether or not a byte changed, and the modtime
+// validator alone made the first visit after any deploy re-download the
+// entire shell — megabytes of ambient loops for a one-line release
+// (2026-09-07). Content survives a deploy; a clock does not. Held three
+// ways: the tag answers If-None-Match with a 304, a touched mtime over the
+// same bytes keeps the same tag, and changed bytes retire it.
+func TestAStaticETagIsTheContentsNotTheClocks(t *testing.T) {
+	t.Parallel()
+	web, tarot := site(t)
+	d, err := New(Config{RequireAuth: false, SecureCookies: false,
+		WebDist: web, TarotDir: tarot,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+
+	first := get(t, srv, "GET", "/assets/app.js", "")
+	tag := first.Header.Get("ETag")
+	if tag == "" {
+		t.Fatal("a served asset carries no ETag")
+	}
+
+	// Revalidation is a 304 — the cheap answer this exists for.
+	again := get(t, srv, "GET", "/assets/app.js", "", "If-None-Match", tag)
+	if again.StatusCode != http.StatusNotModified {
+		t.Fatalf("If-None-Match answered %d, want 304", again.StatusCode)
+	}
+
+	// A deploy's touch: same bytes, new clock. The tag must not move — the
+	// property the mtime validator could never offer.
+	path := filepath.Join(web, "assets", "app.js")
+	future := time.Now().Add(2 * time.Hour)
+	if err := os.Chtimes(path, future, future); err != nil {
+		t.Fatal(err)
+	}
+	touched := get(t, srv, "GET", "/assets/app.js", "", "If-None-Match", tag)
+	if touched.StatusCode != http.StatusNotModified {
+		t.Fatalf("same bytes under a touched mtime answered %d, want 304",
+			touched.StatusCode)
+	}
+
+	// A real release: new bytes retire the tag, and nothing serves stale
+	// content under a fresh name — ADR 18's discipline, one layer down.
+	if err := os.WriteFile(path,
+		[]byte("console.log('app v2')"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fresh := get(t, srv, "GET", "/assets/app.js", "", "If-None-Match", tag)
+	if fresh.StatusCode != http.StatusOK {
+		t.Fatalf("changed bytes under the old tag answered %d, want 200",
+			fresh.StatusCode)
+	}
+	if newTag := fresh.Header.Get("ETag"); newTag == "" || newTag == tag {
+		t.Fatalf("changed bytes kept tag %q", newTag)
+	}
+}
+
+// lockedLog is a log sink two goroutines can share: the server's request
+// goroutine writes, the test reads after the response — and without the
+// lock there is no happens-before edge between those two at all.
+type lockedLog struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (l *lockedLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedLog) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+// Serial: it lowers the package-level `slowRequest` floor to zero, which
+// every request in this package crosses Handler under — a parallel
+// neighbour would see the lowered floor and log warnings nobody asked for.
+func TestASlowRequestLeavesARouteShapedWarning(t *testing.T) {
+	saved := slowRequest
+	slowRequest = 0
+	t.Cleanup(func() { slowRequest = saved })
+
+	logged := &lockedLog{}
+	web, tarot := site(t)
+	d, err := New(Config{RequireAuth: false, SecureCookies: false,
+		WebDist: web, TarotDir: tarot,
+		Logger: slog.New(slog.NewTextHandler(logged, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+
+	resp := get(t, srv, "GET", "/api/decks/local/mono-green", "")
+	_ = resp.Body.Close()
+
+	line := logged.String()
+	if !strings.Contains(line, "slow request") {
+		t.Fatalf("no slow-request warning in: %q", line)
+	}
+	// The template, never the path: a path can carry a slug and a slug can
+	// carry a person — the ledger's own rule, held for the log too.
+	if strings.Contains(line, "mono-green") {
+		t.Fatalf("the warning leaked a concrete path: %q", line)
 	}
 }

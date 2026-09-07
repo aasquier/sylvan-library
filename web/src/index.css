@@ -8039,6 +8039,69 @@ button:hover .tarot-fan-card {
 /* The seat holding the camera reads as the lit one. */
 .field-quad.is-on-turn { box-shadow: inset 0 0 0 1px rgba(201, 162, 39, 0.35); }
 
+/* ---- A fallen seat -------------------------------------------------- */
+/* **The pall, at the scale of a whole seat** (Aaron, 2026-09-07: a dead
+   player in a pod should read as dead). The same shade the sand already
+   lays over a dying creature (`.field-mark-dies::before`), grown to the
+   quadrant — and laid *above* the seat as a layer of its own, never as a
+   filter through it: the cards underneath are Wizards' paintings and stay
+   untouched (commandment 19, ADR 48 — "a red filter on their quadrant" is
+   the exact reach that commandment exists to catch). The seat dims under
+   it, a blood-dark rim says which kind of quiet this is, and the plate
+   stays legible: a graveyard gets a headstone, not a hole. */
+.field-quad.is-fallen {
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(122, 31, 31, 0.45);
+}
+.field-quad.is-fallen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 8px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 42%,
+      rgba(64, 10, 10, 0.16) 0%,
+      rgba(6, 8, 6, 0.36) 62%,
+      rgba(6, 8, 6, 0.5) 100%);
+  animation: quad-pall 1400ms ease-out both;
+}
+@keyframes quad-pall {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* The word, not an icon: "Fallen" reads at first contact (commandment 2)
+   where a glyph would need a legend, and it wears the arena's own
+   materials — bone ink on blood-dark ground under the brass hairline
+   every plate here carries. Above the pall, so the sentence survives the
+   shade. */
+.field-quad-fallen {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  pointer-events: none;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--field-brass) 45%, transparent);
+  background: linear-gradient(180deg,
+    rgba(64, 10, 10, 0.92), rgba(38, 7, 7, 0.92));
+  color: #e8ddc8;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: quad-pall 1400ms ease-out both;
+}
+/* Reduced motion keeps the state and stills the settling. */
+@media (prefers-reduced-motion: reduce) {
+  .field-quad.is-fallen::after,
+  .field-quad-fallen {
+    animation: none;
+  }
+}
+
 /* ---- Narrow: one seat open, the rest as rails ---------------------- */
 @media (max-width: 61.999rem) {
   /* A closed seat keeps its plate — life, commander, counters — and gives up

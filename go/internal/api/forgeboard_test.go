@@ -90,8 +90,14 @@ func TestTheStepsAreCutWhereTheBeatsAre(t *testing.T) {
 	// The property this file exists for. A game that outran the beat ceiling
 	// must lose exactly as many steps, because the room advances the board by
 	// counting the beats it has told.
-	board := newForgeBoard(aReel(900), map[int]string{1: "gyome"}, nil, nil,
-		ForgeBeatsMax)
+	//
+	// The fixture is sized off the ceiling rather than as a literal: a
+	// literal 900 outran the original 400 and silently stopped outrunning
+	// anything the day the cap was raised to the parser's own bound
+	// (2026-09-07) — the coliseum ledger's recurring lesson about constants
+	// that stood in for a thing that later varied.
+	board := newForgeBoard(aReel(ForgeBeatsMax+500), map[int]string{1: "gyome"},
+		nil, nil, ForgeBeatsMax)
 	if len(board.Steps) != ForgeBeatsMax {
 		t.Errorf("%d steps crossed against a ceiling of %d beats; the picture "+
 			"and the account would drift apart by the difference",

@@ -1,7 +1,10 @@
 package door
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -9,6 +12,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
 // The content types the door answers, by extension, named outright rather
@@ -71,10 +76,24 @@ type staticSite struct {
 	index     string            // path of index.html, or ""
 	rootFiles map[string]string // name -> path, listed once from the trusted directory
 	mounts    map[string]string // "/assets/" -> directory, "/tarot/" -> directory
+
+	// etags memoises each served file's content hash, keyed on the path and
+	// re-verified against (size, mtime) on every hit -- a rebuilt bundle
+	// under the same name gets a fresh hash, not a stale one. See `etagFor`
+	// for why content and not mtime is the validator worth paying for.
+	etagMu sync.Mutex
+	etags  map[string]etagEntry
+}
+
+type etagEntry struct {
+	size int64
+	mod  time.Time
+	tag  string
 }
 
 func newStaticSite(webDist, tarotDir string, log *slog.Logger) (*staticSite, error) {
-	s := &staticSite{rootFiles: map[string]string{}, mounts: map[string]string{}}
+	s := &staticSite{rootFiles: map[string]string{}, mounts: map[string]string{},
+		etags: map[string]etagEntry{}}
 	if webDist != "" {
 		if info, err := os.Stat(webDist); err == nil && info.IsDir() {
 			s.webDist = webDist
@@ -148,7 +167,7 @@ func (s *staticSite) serveMounted(w http.ResponseWriter, r *http.Request, dir, r
 		notFound(w)
 		return
 	}
-	serveFile(w, r, full)
+	s.serveFile(w, r, full)
 }
 
 // serveShell is the catch-all: GET only (a HEAD of the shell is a 405 --
@@ -167,10 +186,10 @@ func (s *staticSite) serveShell(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimPrefix(r.URL.Path, "/")
 	if target, ok := s.rootFiles[name]; ok {
-		serveFile(w, r, target)
+		s.serveFile(w, r, target)
 		return
 	}
-	serveFile(w, r, s.index)
+	s.serveFile(w, r, s.index)
 }
 
 // serveFile answers one regular file with the door's content type and
@@ -178,7 +197,17 @@ func (s *staticSite) serveShell(w http.ResponseWriter, r *http.Request) {
 // what a committed bundle with stable filenames needs, and a lesson that
 // was paid for once already. `http.ServeContent` supplies Last-Modified,
 // the conditional 304 and Range handling.
-func serveFile(w http.ResponseWriter, r *http.Request, full string) {
+//
+// **The ETag is the content's, and that is what makes a deploy cheap.** The
+// modtime validator alone answered every revalidation until 2026-09-07, and
+// it has a blind spot with a real bill: a deploy rewrites every file's
+// mtime whether or not a byte changed, so the first visit after any deploy
+// re-downloaded the whole shell -- css, chunks, and every ambient video
+// loop the page carries, megabytes for a one-line release. A content hash
+// survives the deploy for every file the release did not touch, and
+// `If-None-Match` outranks `If-Modified-Since` in `ServeContent`, so the
+// stronger validator is the one that answers.
+func (s *staticSite) serveFile(w http.ResponseWriter, r *http.Request, full string) {
 	f, err := os.Open(full)
 	if err != nil {
 		notFound(w)
@@ -193,7 +222,38 @@ func serveFile(w http.ResponseWriter, r *http.Request, full string) {
 	h := w.Header()
 	h.Set("Content-Type", ContentType(full))
 	setDefault(h, "Cache-Control", "no-cache")
+	if tag := s.etagFor(full, info); tag != "" {
+		h.Set("ETag", tag)
+	}
 	http.ServeContent(w, r, "", info.ModTime(), f)
+}
+
+// etagFor is the file's strong ETag, hashed once and remembered until the
+// file's size or mtime moves. It hashes through its own handle so the
+// serving handle's position is never touched; a file that cannot be hashed
+// simply serves exactly as it did before ETags existed -- an optimisation
+// must not invent a failure mode (the sim cache's rule, held to here).
+func (s *staticSite) etagFor(full string, info os.FileInfo) string {
+	s.etagMu.Lock()
+	e, ok := s.etags[full]
+	s.etagMu.Unlock()
+	if ok && e.size == info.Size() && e.mod.Equal(info.ModTime()) {
+		return e.tag
+	}
+	f, err := os.Open(full)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		return ""
+	}
+	tag := `"` + hex.EncodeToString(hash.Sum(nil))[:32] + `"`
+	s.etagMu.Lock()
+	s.etags[full] = etagEntry{size: info.Size(), mod: info.ModTime(), tag: tag}
+	s.etagMu.Unlock()
+	return tag
 }
 
 // notFound is the static tiers' refusal: `{"detail": "Not Found"}`, the

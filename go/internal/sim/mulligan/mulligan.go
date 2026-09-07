@@ -45,7 +45,9 @@ package mulligan
 
 import (
 	"errors"
+	"sync"
 
+	"github.com/aasquier/sylvan-library/go/internal/convoke"
 	"github.com/aasquier/sylvan-library/go/internal/floats"
 	"github.com/aasquier/sylvan-library/go/internal/sim"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier1"
@@ -223,9 +225,21 @@ type Options struct {
 	Seed  int
 	// Rules overrides the grid. Nil means: use `Candidates`.
 	Rules []tier1.KeepRule
-	// Progress is called with (index, total) before each rule and once more
-	// at the end.
+	// Progress is called with (completed, total): once with 0 before the
+	// grid starts, then as each rule's run finishes, ending on
+	// (total, total). Completions are counted under one lock, so the count
+	// never moves backwards -- but *which* rule just finished is
+	// deliberately not part of the contract, because at any width above one
+	// that order is scheduling rather than arithmetic.
 	Progress func(done, total int)
+	// Workers caps how many rules run at once, under `convoke.Indexed`'s
+	// rule: zero means one fewer than GOMAXPROCS, floored at one, so a grid
+	// on the serving instance always leaves a core answering the door.
+	// Every rule seeds its own generator inside tier1.Run, so the width
+	// changes wall time and nothing else -- Search's answer is
+	// byte-identical at every setting, which
+	// `TestSearchAnswersIdenticallyAtEveryWidth` holds it to.
+	Workers int
 }
 
 // DefaultOptions is the standing defaults: 2,000 games, 10 turns,
@@ -264,16 +278,28 @@ func Search(library []*sim.Card, commander *sim.Card, opts Options) (*Sweep, err
 		return nil, ErrNoRules
 	}
 
-	rows := make([]Row, 0, len(grid))
-	for i, rule := range grid {
-		if opts.Progress != nil {
-			opts.Progress(i, len(grid))
-		}
-		rows = append(rows, row(rule, library, commander, opts.Games, opts.Turns, opts.Seed))
-	}
 	if opts.Progress != nil {
-		opts.Progress(len(grid), len(grid))
+		opts.Progress(0, len(grid))
 	}
+	// The rules run convoked -- each cell its own tier1.Run, each Run its
+	// own generator -- and land by index, so the grid order every stable
+	// tie-break downstream leans on is the slice's order, never the
+	// scheduler's.
+	rows := make([]Row, len(grid))
+	var (
+		mu        sync.Mutex
+		completed int
+	)
+	convoke.Indexed(len(grid), opts.Workers, func(i int) {
+		r := row(grid[i], library, commander, opts.Games, opts.Turns, opts.Seed)
+		mu.Lock()
+		rows[i] = r
+		completed++
+		if opts.Progress != nil {
+			opts.Progress(completed, len(grid))
+		}
+		mu.Unlock()
+	})
 
 	baselineRule := tier1.DefaultKeepRule()
 	baseline, found := Row{}, false

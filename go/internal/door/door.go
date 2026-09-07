@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/api"
 	"github.com/aasquier/sylvan-library/go/internal/auth"
@@ -356,21 +357,43 @@ func (d *Door) Close() error {
 // uncompressed — the same layering the app has always had.
 func (d *Door) Handler() http.Handler {
 	base := d.securityHeaders(d.authenticate(gzipped(http.HandlerFunc(d.dispatch))))
-	if d.traffic == nil {
-		return base
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t := &tally{template: traffic.Unrouted}
 		r = r.WithContext(context.WithValue(r.Context(), tallyKey{}, t))
 		sw := &statusWriter{ResponseWriter: w}
+		start := time.Now()
 		base.ServeHTTP(sw, r)
 		status := sw.status
 		if status == 0 {
 			status = http.StatusOK
 		}
-		d.traffic.Record(t.template, status)
+		if d.traffic != nil {
+			d.traffic.Record(t.template, status)
+		}
+		// The intermittent stall leaves a name behind it. Route template,
+		// never the concrete path — the ledger's own rule, because a path
+		// can carry a slug and a slug can carry a person. Everything this
+		// door answers quickly is quiet; a line here is a request that was
+		// genuinely slow for whoever was waiting on it, and the log is where
+		// "the site felt sluggish for a minute" stops being unfalsifiable.
+		if elapsed := time.Since(start); elapsed >= slowRequest {
+			d.log.Warn("slow request", "route", t.template,
+				"method", r.Method, "status", status,
+				"ms", elapsed.Milliseconds())
+		}
 	})
 }
+
+// slowRequest is where an answered request earns a log line. Reads on this
+// app measure in tens of milliseconds and anything long-running is a job,
+// so half a second is not a tuning judgment about handlers — it is the
+// signature of contention: a starved core, a drained CPU-burst balance, a
+// lock held too long. Those are exactly the stalls a person feels and a
+// later reading cannot reconstruct without a timestamped name.
+//
+// A var only so the one serial test that proves the warning fires can
+// lower the floor; nothing else assigns it.
+var slowRequest = 500 * time.Millisecond
 
 // tally carries the matched template from dispatch back out to the counting
 // layer — never the concrete path: a path can carry a slug and a slug can
