@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { BoardCard, BoardStack, Clash } from './board'
 import { BOUT_BLOCKER_W, boutAt, boutColumn, boutFacing, boutLife, boutPitch,
-  stagedBout } from './stage'
+  seatNames, stagedBout } from './stage'
 
 /** Four seats, named as the room names them — the measured game's own table.
  *  Seats 0 and 1 across the top, 2 and 3 across the bottom. */
@@ -279,6 +279,98 @@ describe('where at the table a fight is drawn', () => {
         expect((first + last) / 2).toBeCloseTo(centre, 9)
       }
     }
+  })
+})
+
+describe('what the plate calls a seat', () => {
+  // The real library, 2026-09-07: not one of the twenty-five decks is named
+  // after its commander, which is why the deck's title was never going to be
+  // the short form.
+  const seat = (general: string, deck: string) => ({ general, deck })
+
+  it('is the general, which is how somebody says it at a table', () => {
+    expect(seatNames([
+      seat('Atla Palani', 'Life, Uh, Finds a Way'),
+      seat('Gyome', 'Kitchen Nightmares'),
+      seat('Korvold', 'Eat the Rich'),
+      seat('Arahbo', 'Armed and Feline'),
+    ])).toEqual(['Atla Palani', 'Gyome', 'Korvold', 'Arahbo'])
+  })
+
+  it('falls back to the deck when a general is not this table\'s only one',
+    () => {
+      // Three of the library's decks run Atraxa. Two of them in one pod would
+      // read "Atraxa's, by Atraxa's ...", which is worse than the long version
+      // because it is ambiguous rather than merely wordy.
+      expect(seatNames([
+        seat('Atraxa', 'The Last Chapter Comes Early'),
+        seat('Atraxa', 'Counters Without Number'),
+        seat('Gyome', 'Kitchen Nightmares'),
+        seat('Arahbo', 'Armed and Feline'),
+      // The two Atraxa seats lengthen; the other two keep the short name they
+      // were entitled to, because a collision is a fact about two chairs.
+      ])).toEqual(['The Last Chapter Comes Early', 'Counters Without Number',
+        'Gyome', 'Arahbo'])
+    })
+
+  it('lengthens only the seats that are ambiguous, never the whole table', () => {
+    // The property, stated: a collision is a fact about two chairs and the
+    // other two keep the short name they were entitled to.
+    const out = seatNames([
+      seat('Atraxa', 'The Loyal Opposition'),
+      seat('Atraxa', 'Ten Counters, No Cure'),
+      seat('Tivit', 'Filibuster on the Floor'),
+      seat('Gyome', 'Kitchen Nightmares'),
+    ])
+    expect(out.slice(2)).toEqual(['Tivit', 'Gyome'])
+  })
+
+  it('is the deck when the board never showed a commander', () => {
+    // A match played without the scribe carries no command zone at all, and a
+    // fact the board has not got is not one to invent.
+    expect(seatNames([seat('', 'Eat the Rich'), seat('Gyome', 'Kitchen Nightmares')]))
+      .toEqual(['Eat the Rich', 'Gyome'])
+    // Two seats with nothing do not collide with each other into a fallback
+    // they were already taking.
+    expect(seatNames([seat('', 'Eat the Rich'), seat('', 'Armed and Feline')]))
+      .toEqual(['Eat the Rich', 'Armed and Feline'])
+  })
+
+  it('names both halves of a pairing', () => {
+    expect(seatNames([seat('Thrasios & Tymna', 'Squires of Zhalfir'),
+      seat('Gyome', 'Kitchen Nightmares')])[0]).toBe('Thrasios & Tymna')
+  })
+})
+
+describe('the sentence a real four-player match produces', () => {
+  // **The live library's own seats**, taken off match `2e86a6e129ed` on
+  // 2026-09-07 — the first four-seat game walked on the deployed instance.
+  // These two beats are why the plate stopped naming a seat by its deck.
+  const LIVE = seatNames([
+    { general: 'Arahbo', deck: 'Armed and Feline' },
+    { general: 'Atla Palani', deck: 'Life, Uh, Finds a Way' },
+    { general: 'Korvold', deck: 'Eat the Rich' },
+    { general: 'Gyome', deck: 'Kitchen Nightmares' },
+  ])
+  const fight = (attacker: string, wall: BoardStack[], from: number, at: number)
+  : Clash => ({ attacker: beast(1, attacker), blockers: wall, from, at })
+
+  it('names two seats without spending a line on two deck titles', () => {
+    // Was: "Life, Uh, Finds a Way’s, by Eat the Rich’s Pest Token ×3".
+    expect(stagedBout(fight('Zacama, Primal Calamity',
+      [stack(beast(2, 'Pest Token'), 3)], 1, 2), null, 'k', 'play', null, null,
+    LIVE)?.note).toBe('Atla Palani\u2019s, by Korvold\u2019s Pest Token \u00d73')
+  })
+
+  it('says almost nothing when the generals are the fight', () => {
+    // Was: "Life, Uh, Finds a Way’s, by Kitchen Nightmares’ Gyome" — and both
+    // halves of it were repeating a name already on the plate. The attacker is
+    // its own seat's general and the title line above says so; the wall is its
+    // seat's general and the card in the picture says so. What is left is the
+    // one fact neither of them carries.
+    expect(stagedBout(fight('Atla Palani, Nest Tender',
+      [stack(beast(3, 'Gyome, Master Chef'))], 1, 3), null, 'k', 'play', null,
+    null, LIVE)?.note).toBe('by Gyome')
   })
 })
 
