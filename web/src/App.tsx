@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import Claim from './routes/Claim'
 import Library from './routes/Library'
 import Login from './routes/Login'
@@ -529,8 +529,17 @@ export default function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={
             <div className="card-surface rounded-xl px-6 py-10 text-center">
+              {/* The wrong-turn room names its way out AND opens it — a
+                  sentence that points at the library without a link leaves
+                  the lost visitor to go find the door themselves. A real
+                  `<Link>` for a real destination (commandment 20, the other
+                  half). */}
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Nothing here. Try the library.
+                Nothing shelved at this address. Try{' '}
+                <Link to="/" className="underline"
+                      style={{ color: 'var(--series-1)' }}>
+                  the library
+                </Link>.
               </p>
             </div>
           } />

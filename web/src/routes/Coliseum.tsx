@@ -1330,9 +1330,10 @@ export default function ColiseumRoom() {
       <Hero />
 
       <p className="mt-6 max-w-2xl text-[0.95rem] leading-relaxed text-[var(--text-muted)]">
-        Six houses, and what Rome did in each of them. Send two decks in and
+        Six houses, and what Rome did in each of them. Send two decks in — or
+        seat a table of four — and
         {' '}<Term name="tier-3">the Forge</Term> plays real games — whole
-        ones, with an opponent, told blow by blow. It takes minutes; this is
+        ones, with opponents, told blow by blow. It takes minutes; this is
         what those minutes are for.
       </p>
 

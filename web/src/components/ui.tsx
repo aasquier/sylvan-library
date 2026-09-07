@@ -254,15 +254,14 @@ export function Select({
             style={{ color: 'var(--text-muted)' }}>
         {label}{help}
       </span>
+      {/* Painted by `.field-shell`, never inline — an inline border is a rule
+          no `:hover` can outrank (commandment 20's mechanism), and the class
+          also owns the chevron and the lane that keeps a long deck name from
+          running under it. */}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 max-w-full rounded-md px-2 text-sm outline-none focus:ring-2"
-        style={{
-          background: 'var(--surface-1)',
-          color: 'var(--text-primary)',
-          border: '1px solid var(--hairline)',
-        }}
+        className="field-shell h-9 max-w-full rounded-md px-2 text-sm"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -300,12 +299,7 @@ export function NumberField({
           max={max}
           step={step}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="tabular h-9 w-28 rounded-md px-2 text-sm outline-none focus:ring-2"
-          style={{
-            background: 'var(--surface-1)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--hairline)',
-          }}
+          className="field-shell tabular h-9 w-28 rounded-md px-2 text-sm"
         />
         {suffix && (
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{suffix}</span>
@@ -336,14 +330,14 @@ export function TextField({
   // breaks onto a new line instead of crushing it; flex-1 with the default
   // basis-0 collapsed it to ~14px next to the fixed-width selects.
   //
-  // **A checked field is styled by class and NOT inline, and the two cannot be
-  // mixed.** The inline `border` below outranks any rule a stylesheet can
-  // write, so leaving it in place while adding a class would have produced a
-  // field that answers in the DOM and nowhere a person can see — commandment
-  // 20's exact mechanism, which is why `answer` swaps the whole treatment over
-  // to `.field-answer` rather than adding to it. `focus:ring-2` goes with it:
-  // the class owns focus too, and two box-shadows for one state is one of them
-  // silently winning.
+  // **A field is styled by class and NEVER inline, and the two cannot be
+  // mixed.** An inline `border` outranks any rule a stylesheet can write, so
+  // pairing one with a class would produce a field that answers in the DOM
+  // and nowhere a person can see — commandment 20's exact mechanism. `answer`
+  // swaps the whole coat (`.field-answer`, which owns hover, focus and the
+  // verdict colours) rather than adding to the plain one (`.field-shell`,
+  // which owns hover and focus for a field with nothing to report); two
+  // box-shadows for one state is one of them silently winning.
   const checked = answer !== undefined
   return (
     <label className="flex min-w-48 flex-1 basis-64 flex-col gap-1">
@@ -358,12 +352,7 @@ export function TextField({
         aria-describedby={describedBy}
         className={checked
           ? `field-answer h-9 rounded-md px-2 text-sm is-${answer}`
-          : 'h-9 rounded-md px-2 text-sm outline-none focus:ring-2'}
-        style={checked ? undefined : {
-          background: 'var(--surface-1)',
-          color: 'var(--text-primary)',
-          border: '1px solid var(--hairline)',
-        }}
+          : 'field-shell h-9 rounded-md px-2 text-sm'}
       />
     </label>
   )

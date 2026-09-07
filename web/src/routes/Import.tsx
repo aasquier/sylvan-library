@@ -662,12 +662,7 @@ export default function Import() {
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 aria-label="Status"
-                className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2"
-                style={{
-                  background: 'var(--surface-1)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--hairline)',
-                }}
+                className="field-shell h-9 rounded-md px-2 text-sm"
               >
                 <option value="theoretical">Theory — a list I am considering</option>
                 <option value="built">Built — the cards are sleeved up</option>
