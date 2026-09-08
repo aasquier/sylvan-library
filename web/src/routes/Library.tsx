@@ -461,8 +461,7 @@ function FirstRun({ showcase = false }: { showcase?: boolean }) {
           yet.
         </p>
         <Link to="/import"
-              className="mt-6 inline-block rounded-lg px-4 py-2 text-sm font-medium"
-              style={{ background: 'var(--series-1)', color: '#fff' }}>
+              className="btn btn-primary btn-accent-vine mt-6">
           Import a decklist
         </Link>
         {showcase && (
@@ -1037,8 +1036,7 @@ export default function Library() {
                     { value: 'size', label: 'Card count' },
                   ]} />
           <Link to="/import"
-                className="h-9 rounded-lg px-4 text-sm font-medium leading-9"
-                style={{ background: 'var(--series-1)', color: '#fff' }}>
+                className="btn btn-primary btn-accent-vine h-9">
             Import a decklist
           </Link>
         </div>

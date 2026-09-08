@@ -1638,6 +1638,67 @@ describe('a card with two faces, and which one the room holds up', () => {
     expect(faceInPlay(adventure, 'Instant — Adventure')).toBe(-1)
   })
 
+  /** Hengegate Pathway: both halves are lands, so no type line can ever tell
+   *  them apart. This is the card the type-line reading is blind to — 48 of
+   *  them in the pool on 2026-09-07, and every Pathway among them — and the
+   *  one Aaron caught showing "funny depending on what side they are on"
+   *  (2026-09-07). */
+  const pathway: ForgeBoardCard = {
+    id: 32,
+    name: 'Hengegate Pathway',
+    types: 'Land',
+    seat: 1,
+    image: 'hengegate.jpg',
+    faces: ['Hengegate Pathway', 'Mistgate Pathway'],
+    face_types: ['Land', 'Land'],
+    face_images: ['hengegate.jpg', 'mistgate.jpg'],
+    layout: 'modal_dfc',
+  }
+
+  /** One Pathway, played on its second step, with or without Forge saying so.
+   *  `land` is the row a permanent typed `Land` sorts into. */
+  const played = (rename?: string) => {
+    const b: ForgeBoard = {
+      seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],
+      cards: [pathway],
+      steps: [
+        { changes: [{ id: 32, zone: 'hand', seat: 1 }] },
+        // `land` rather than `battlefield`: a land rides its own zone on this
+        // wire, which is why `rowFor` has no case for the type.
+        { changes: [{ id: 32, zone: 'land', seat: 1,
+          types: 'Land', ...(rename ? { name: rename } : {}) }] },
+      ],
+    }
+    return foldBoard(b, 2).sides[0]!.land[0]!
+  }
+
+  it('turns a card over on the rename, where its type line cannot', () => {
+    const card = played('Mistgate Pathway')
+    expect(card.image).toBe('mistgate.jpg')
+    // The name goes with the painting, or the table labels the land it is
+    // showing with the name of the half it is not.
+    expect(card.name).toBe('Mistgate Pathway')
+  })
+
+  it('leaves the front up when nothing renamed it', () => {
+    // The state this whole signal exists to fix: a type line of `Land` matches
+    // both halves, `faceInPlay` refuses to guess, and without a rename there
+    // is nothing else to go on. The front is what it was showing and the front
+    // is what it keeps.
+    const card = played()
+    expect(card.image).toBe('hengegate.jpg')
+    expect(card.name).toBe('Hengegate Pathway')
+  })
+
+  it('ignores a rename that is not one of the card faces', () => {
+    // A copy effect, a Forge spelling this board has never seen — whatever it
+    // is, it is not this card turning over, and inventing a face for it would
+    // be the guess `faceInPlay` already refuses to make.
+    const card = played('Some Other Card')
+    expect(card.image).toBe('hengegate.jpg')
+    expect(card.name).toBe('Hengegate Pathway')
+  })
+
   it('turns a permanent over on the beat the game announced it', () => {
     const b: ForgeBoard = {
       seats: [{ seat: 1, slug: 'x', name: 'x', life: 40 }],

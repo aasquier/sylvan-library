@@ -53,7 +53,34 @@ final class Json {
         first = false;
     }
 
-    /** RFC 8259 escaping, including the C1 range a naive writer forgets. */
+    /** RFC 8259 escaping, including the C1 range a naive writer forgets.
+     *
+     * **Everything outside printable ASCII leaves as `\\uXXXX`, and that is a
+     * bug fix rather than a preference.** This writer's output goes to
+     * `System.out`, and a `PrintStream` encodes with `stdout.encoding` --
+     * which is *not* `file.encoding` and does not follow JEP 400. Measured on
+     * the Forge worker (2026-09-07), where the image sets no locale at all:
+     *
+     *     file.encoding   = UTF-8
+     *     stdout.encoding = ANSI_X3.4-1968      <- US-ASCII
+     *
+     * So every character above 0x7e was being handed to a US-ASCII encoder,
+     * which does not fail -- it substitutes `?`. `Mjolnir, Storm Hammer` with
+     * its umlaut went over the wire as `Mj?lnir, Storm Hammer`, missed the
+     * card pool's exact-name lookup, and drew a blank plate on the Coliseum
+     * board. Ninety-seven cards in the pool have a non-ASCII name -- Lorien
+     * Revealed, Barad-dur, Anduril, Nazgul, Eowyn -- and every one of them was
+     * blank in every match.
+     *
+     * **The substitution is lossy, so nothing downstream could have fixed
+     * it**: `Mj?lnir` cannot be folded back into a name. It has to not happen,
+     * and an ASCII-only wire is the way it cannot: `\\uXXXX` is plain JSON that
+     * `encoding/json` decodes without being asked, and it stays correct on any
+     * host, under any locale, whatever a future `PrintStream` is built with.
+     *
+     * Java `char` is a UTF-16 code unit, so an astral character escapes as its
+     * two surrogates -- which is exactly what RFC 8259 asks for and what every
+     * decoder reassembles. */
     private void quote(String s) {
         out.append('"');
         for (int i = 0; i < s.length(); i++) {
@@ -67,8 +94,11 @@ final class Json {
                 case '\b': out.append("\\b");  break;
                 case '\f': out.append("\\f");  break;
                 default:
-                    if (c < 0x20) out.append(String.format("\\u%04x", (int) c));
-                    else out.append(c);
+                    if (c < 0x20 || c > 0x7e) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
             }
         }
         out.append('"');

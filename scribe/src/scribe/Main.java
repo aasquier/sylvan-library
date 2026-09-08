@@ -6,7 +6,10 @@
 package scribe;
 
 import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -103,7 +106,20 @@ public final class Main {
         rules.setSimTimeout(clock);
 
         Match match = new Match(rules, seats, "Scribe");
-        PrintStream out = System.out;
+        // **Never bare `System.out`.** A `PrintStream` encodes with
+        // `stdout.encoding`, which is not `file.encoding` and does not follow
+        // JEP 400 -- and the worker image sets no locale, so it measured
+        // `ANSI_X3.4-1968` (US-ASCII) against a `file.encoding` of UTF-8 on
+        // 2026-09-07. A US-ASCII encoder does not fail on a character it
+        // cannot carry; it silently writes `?`, which is how every card with
+        // an accent in its name drew a blank plate on the Coliseum board.
+        //
+        // `Json` escapes above 0x7e now, so the wire is ASCII either way and
+        // this line is the belt to that pair of braces: it keeps the stream
+        // honest for anything that is ever written through it without going
+        // past the escaper first.
+        PrintStream out = new PrintStream(
+            new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
         Scribe scribe = new Scribe(out);
 
         for (int number = 1; number <= games; number++) {

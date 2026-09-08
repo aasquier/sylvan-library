@@ -352,6 +352,111 @@ body {
   background: rgb(0 0 0 / var(--art-shade, 0.3));
 }
 
+/* **A card in a list, and the mark that turns it over.**
+ *
+ * The plate is only a positioning context: the painting inside it is drawn by
+ * `CardArt` exactly as it always was, and the mark is a layer laid *over* the
+ * card rather than anything reaching into it. Commandment 19 is the reason
+ * that distinction is worth writing down here -- a `filter` on this button is
+ * a filter on a thing we drew and is fine; a `filter` on the painting under it
+ * would be Wizards' art being altered, and this file has fourteen fixed
+ * violations behind it saying how easily that happens.
+ *
+ * **The mark's materials are the hint panel's**, deliberately: a dark plate
+ * with a brass hairline is what this app already uses for a caption that has
+ * to stay readable over an arbitrary painting, and a second vocabulary for
+ * the same problem would be two things to learn. The brass is a literal
+ * rather than `var(--field-brass)`, which is scoped to the board -- an
+ * undefined custom property does not fall back, it inherits, and this app has
+ * turned muted text white that way once already.
+ */
+.card-plate {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.card-flip {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, #c9a227 42%, transparent);
+  background: rgb(14 11 7 / 0.82);
+  color: #e8dfc8;
+  cursor: pointer;
+  line-height: 0;
+  /* The painting is 64px wide and a thumb is not. The drawing stays 13px and
+     the target grows underneath it -- `.field-hint` does this on the board for
+     the same reason and with the same asymmetry argument; here there is room
+     on every side, because the mark sits in a corner of its own plate. */
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+.card-flip::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.card-flip:hover,
+.card-flip:focus-visible {
+  background: rgb(20 16 10 / 0.94);
+  border-color: color-mix(in srgb, #c9a227 85%, transparent);
+  color: #f6edd6;
+}
+.card-flip:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+/* It turns, because the thing it does is turn something. */
+.card-flip:active {
+  transform: rotateY(50deg);
+}
+
+/* The label a 13px mark cannot carry, floated clear of a 64px painting rather
+   than truncated inside it: at rest it is not drawn at all, so nothing in the
+   row is covered, and it arrives for a pointer and a keyboard alike. */
+.card-flip-says {
+  position: absolute;
+  right: calc(100% + 5px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, #c9a227 42%, transparent);
+  background: rgb(14 11 7 / 0.95);
+  color: #f0e7d2;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  z-index: 5;
+}
+.card-flip:hover .card-flip-says,
+.card-flip:focus-visible .card-flip-says {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-flip,
+  .card-flip-says {
+    transition: none;
+  }
+  .card-flip:active {
+    transform: none;
+  }
+}
+
 /* Full-bleed art behind text, as on the empty library.
  *
  * The two themes need genuinely different treatment here, which is why this is
@@ -4507,6 +4612,19 @@ button:hover .tarot-fan-card {
  * dark ink where a deep one needs the page's. */
 .btn-accent-1 { --btn-accent: var(--series-1); --btn-ink: #fff; }
 .btn-accent-2 { --btn-accent: var(--series-2); --btn-ink: var(--page); }
+/* The Library's own, and the reason this row of accents exists at all: the
+   shelves are the sylvan room -- vines across the masthead, a forest in the
+   plate -- and the one action on the page was arriving in the charts' blue
+   (Aaron, 2026-09-07: "it is still a basic blue button").
+   
+   `--btn-ink: var(--page)` rather than a fixed white, because `--vine` is a
+   *dark* green on the light theme and a light one on the dark theme, so the
+   ink has to cross over with it. Measured in the browser rather than worked
+   out on paper: #f9f9f7 on #4a7c59 is 4.61:1, and #0d0d0d on #6fae7f is
+   7.44:1. A fixed `#fff` would have been 4.86:1 here and **2.61:1** there --
+   unreadable on the theme most of this site is looked at in, and the trap
+   this one line exists to have avoided. */
+.btn-accent-vine { --btn-accent: var(--vine); --btn-ink: var(--page); }
 
 .btn-quiet {
   background: var(--page);
@@ -6278,8 +6396,139 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* **The shelves: a page of a lore volume laid open, not a grey box.**
+ *
+ * This strip is the one part of the Library that is about *Magic* rather than
+ * about your decks, and it was drawn as `card-surface` and an entrance
+ * animation -- which is to say as a flat panel with a hairline, exactly like
+ * every deck tile beside it (Aaron, 2026-09-07: "the styling on that text box
+ * is also basic AF"). A fact that came off a shelf should look like it did.
+ *
+ * **The spine is the whole idea.** A bar down the bound edge, vine falling
+ * into brass -- the two metals this site already owns, rather than a third --
+ * stopping short of both corners so it reads as the spine of one volume among
+ * many and not as a coloured border. It is a pseudo-element rather than a
+ * `border-left` so hover can brighten it on its own, and it is *inset* rather
+ * than clipped because `overflow: hidden` here would eat the card previews
+ * these facts hang off -- the trap `components/hint.tsx` argues at length.
+ *
+ * **The brass stays under the words, never in them.** `#c9a227` measures
+ * 3.66:1 on the light page, and the token shelf's own note already calls that
+ * unreadable for a sentence; so the wash is a few per cent of it, the rule
+ * under the eyebrow is most of it, and every actual word here keeps the ink
+ * it had.
+ *
+ * The panel answers the pointer, but gently and never by moving: it holds
+ * controls, and a container that lifts under the hand on its way to a button
+ * is a container that shoves the button. */
 .shelf-fact {
+  position: relative;
   animation: tile-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards 120ms;
+  background:
+    linear-gradient(
+      100deg,
+      color-mix(in srgb, #c9a227 7%, transparent) 0%,
+      transparent 42%),
+    var(--surface-1);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+.shelf-fact::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0.85rem;
+  inset-block-end: 0.85rem;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, var(--vine), #c9a227);
+  opacity: 0.7;
+  transition:
+    opacity 220ms ease,
+    inset-block-start 220ms ease,
+    inset-block-end 220ms ease;
+}
+.shelf-fact:hover {
+  border-color: color-mix(in srgb, var(--vine) 32%, var(--hairline));
+  box-shadow: 0 2px 16px color-mix(in srgb, var(--vine) 13%, transparent);
+}
+.shelf-fact:hover::before {
+  opacity: 1;
+  inset-block-start: 0.5rem;
+  inset-block-end: 0.5rem;
+}
+
+/* The shelf label. Letter-spaced because it is a label rather than a
+   sentence, and standing *on* the metal rather than wearing it -- the rule
+   carries the brass so the words do not have to. */
+.shelf-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+.shelf-eyebrow::after {
+  content: '';
+  width: 1.5rem;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #c9a227 75%, transparent),
+    transparent);
+}
+
+/* **The volume's bookplate**, and the one thing in this strip with more to
+   say -- so it is a real control that answers a mouse, a keyboard and a
+   thumb (`FieldHint`) rather than a `title` only the first of those would
+   ever find. `components/hint.tsx` carries that whole argument.
+   
+   Compounded with `.field-hint` deliberately: that class is a reset living
+   ~2,800 lines further down this file, and at equal specificity document
+   order would hand it every one of these declarations back. */
+.field-hint.shelf-volume {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #c9a227 38%, var(--hairline));
+  background: color-mix(in srgb, #c9a227 8%, transparent);
+  color: var(--text-secondary);
+  padding: 0.1rem 0.5rem;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease;
+}
+.field-hint.shelf-volume:hover,
+.field-hint.shelf-volume:focus-visible {
+  border-color: color-mix(in srgb, #c9a227 72%, transparent);
+  background: color-mix(in srgb, #c9a227 17%, transparent);
+  color: var(--text-primary);
+}
+
+/* A real destination, so it stays an `<a>` and commandment 20 has no quarrel
+   with it -- but it still has to answer the hand, which an inline `color` and
+   a bare `underline` never did. The rule thickens and the arrow walks. */
+.shelf-learn {
+  color: var(--series-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-thickness 160ms ease;
+}
+.shelf-learn:hover {
+  text-decoration-thickness: 2px;
+}
+.shelf-learn-arrow {
+  display: inline-block;
+  transition: transform 200ms ease;
+}
+.shelf-learn:hover .shelf-learn-arrow {
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shelf-learn-arrow {
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

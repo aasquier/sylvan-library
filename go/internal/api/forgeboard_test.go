@@ -610,6 +610,66 @@ func TestAFaceListThatDoesNotLineUpIsNotSent(t *testing.T) {
 	}
 }
 
+// The board holds up the face Forge actually named.
+//
+// **The record's picture is always the front**, because `image_normal` falls
+// back to the first face -- so a modal double-faced card resolved out of the
+// pool arrives holding its front painting whichever half was played. Forge
+// names a permanent by the face it is showing, and that name is the one signal
+// that settles it.
+//
+// **The type line could not settle it, which is the whole reason this exists.**
+// `faceInPlay` in the browser turns a card over when its type line changes, and
+// that answers for a Delver of Secrets becoming an Insectile Aberration. It
+// cannot answer for two faces that share a type line: both halves of every
+// Pathway are `Land`, so the browser sees two matches, rightly refuses to
+// guess, and the front stayed up on a card standing on its back. Measured over
+// the pool on 2026-09-07, 48 cards have two faces with identical type lines --
+// 38 transforming, 10 modal -- and Aaron caught it on the deployed board the
+// same day.
+func TestTheBoardPaintsTheFaceForgeNamed(t *testing.T) {
+	t.Parallel()
+	pathway := boardArt{
+		Image:      "hengegate.jpg",
+		Faces:      []string{"Hengegate Pathway", "Mistgate Pathway"},
+		FaceImages: []string{"hengegate.jpg", "mistgate.jpg"},
+	}
+
+	// The back, named: the painting follows the name rather than the record.
+	if got := faceUp(pathway, "Mistgate Pathway"); got != "mistgate.jpg" {
+		t.Errorf("a card named by its back is painted %q, want the back", got)
+	}
+	// The front, named: unchanged, which is what it always was.
+	if got := faceUp(pathway, "Hengegate Pathway"); got != "hengegate.jpg" {
+		t.Errorf("a card named by its front is painted %q, want the front", got)
+	}
+	// The combined name singles out neither half, and the front is the right
+	// answer for a board that has not been told which side it is looking at.
+	if got := faceUp(pathway, "Hengegate Pathway // Mistgate Pathway"); got != "hengegate.jpg" {
+		t.Errorf("a card named by both halves is painted %q, want the front", got)
+	}
+
+	// A card whose halves share one painting has no faces to choose between,
+	// and one with no faces at all is nearly every card in Magic.
+	adventure := boardArt{Image: "giant.jpg",
+		Faces: []string{"Bonecrusher Giant", "Stomp"}}
+	if got := faceUp(adventure, "Stomp"); got != "giant.jpg" {
+		t.Errorf("an Adventure half is painted %q, want the card own picture", got)
+	}
+	if got := faceUp(boardArt{Image: "sol.jpg"}, "Sol Ring"); got != "sol.jpg" {
+		t.Errorf("a one-faced card is painted %q, want its own picture", got)
+	}
+
+	// A list that half-arrived is an index that answers confidently for the
+	// wrong painting, so it stands the whole thing down.
+	ragged := boardArt{Image: "hengegate.jpg",
+		Faces:      []string{"Hengegate Pathway", "Mistgate Pathway"},
+		FaceImages: []string{"hengegate.jpg"}}
+	if got := faceUp(ragged, "Mistgate Pathway"); got != "hengegate.jpg" {
+		t.Errorf("a ragged face list painted %q, want the card own picture", got)
+	}
+}
+
 // **Each half's own type line, or none at all.**
 //
 // The moment the room could find a card by its second name it started naming

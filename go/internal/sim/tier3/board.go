@@ -193,6 +193,24 @@ type BoardChange struct {
 	Power     *int   `json:"power,omitempty"`
 	Toughness *int   `json:"toughness,omitempty"`
 	Types     string `json:"types,omitempty"`
+	// Name is what Forge is calling this card *now*, sent only on the step it
+	// started calling it something else.
+	//
+	// **Forge renames a permanent when it turns over, and the dictionary
+	// deliberately does not.** A card is filed under the name it was first
+	// seen by, so that a board folded to step three shows what was true at
+	// step three; revising the dictionary would rewrite the past. The rename
+	// therefore travels the way every other changing fact does -- as a change
+	// on the step it happened -- and the browser turns the picture over from
+	// it.
+	//
+	// **This is the signal `Types` could not be.** A type line tells a Delver
+	// of Secrets from an Insectile Aberration, and `faceInPlay` in
+	// `lib/board.ts` reads it for exactly that. It cannot tell apart two faces
+	// that share one: both halves of every Pathway are `Land`, and measured
+	// over the pool on 2026-09-07, **48 cards have two faces with identical
+	// type lines** (38 transforming, 10 modal). A name can.
+	Name string `json:"name,omitempty"`
 	// Counters is the card's whole counter set, whenever any of it moved. The
 	// whole set rather than the part that changed, because a browser holding a
 	// partial one has no way to know a kind went to zero.
@@ -650,6 +668,15 @@ func (b *board) name(id int, card, types string, token bool, seat int) {
 	if at, seen := b.known[id]; seen {
 		if types != "" {
 			b.cards[at].Types = types
+		}
+		// The dictionary keeps the name it learned -- see [BoardChange.Name]
+		// for why the past is not rewritten -- and the change carries the new
+		// one. Only when it actually differs, so the ordinary case of a card
+		// being named again by every line that touches it raises nothing.
+		if card != b.cards[at].Name {
+			if ch := b.change(id); ch != nil {
+				ch.Name = card
+			}
 		}
 		return
 	}
