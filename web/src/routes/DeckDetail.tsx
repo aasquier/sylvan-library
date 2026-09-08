@@ -42,6 +42,7 @@ import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
 import { CrossedSwordsGlyph, GoldfishGlyph } from '../components/glyphs'
 import { DeckArtifactsPanel } from '../components/artifacts'
+import { CardFacePlate } from '../components/cardface'
 import { CommanderDossierPanel } from '../components/dossier'
 import { DeckReviewPanel } from '../components/review'
 import { ReplaceComposer, SwapComposer } from '../components/swap'
@@ -1136,8 +1137,7 @@ export default function DeckDetail() {
               </span>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Link to="/import"
-                      className="rounded-lg px-3 py-1.5 text-xs font-medium"
-                      style={{ background: 'var(--gridline)', color: 'var(--text-primary)' }}>
+                      className="btn btn-quiet btn-xs">
                   Paste a decklist
                 </Link>
               </div>
@@ -1494,12 +1494,13 @@ export default function DeckDetail() {
                     {/* The art crop, not the full card: at this size a whole
                         card scan is an unreadable smudge, while the art alone
                         is what the eye actually recognises a card by. Hover
-                        still gives the full card for the text. */}
-                    <CardHover card={card}>
-                      <CardArt src={card.art_crop} alt={card.name}
-                               ratio="aspect-[626/457]"
-                               className="w-16 shrink-0 cursor-help" />
-                    </CardHover>
+                        still gives the full card for the text.
+
+                        `CardFacePlate` rather than the two of them directly:
+                        a card that is painted twice gets a mark that turns it
+                        over, and every other card in the 99 -- which is nearly
+                        all of them -- is drawn exactly as it was. */}
+                    <CardFacePlate card={card} />
                     <div className="min-w-0 flex-1 basis-52">
                       <div className="flex flex-wrap items-baseline gap-2">
                         <CardHover card={card}>

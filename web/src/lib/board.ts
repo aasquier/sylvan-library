@@ -563,20 +563,32 @@ export function foldBoard(board: ForgeBoard | null, steps: number): BoardState {
       if (change.tapped != null) card.tapped = change.tapped
       if (change.power != null) card.power = change.power
       if (change.toughness != null) card.toughness = change.toughness
-      if (change.types) {
-        card.types = change.types
-        // **A card with a painting per face turns over here, and nowhere
-        // else.** The dictionary files a card under the name it was first seen
-        // by and never revises it, so a modal double-faced card played as its
-        // land is still filed as the sorcery on its front — and drawing that
-        // sorcery in the land row is the board showing a card that is not the
-        // card on the table (Aaron, 2026-08-29). A type line changing is the
-        // one thing on this pipe that says a permanent turned over, and it
-        // arrives on the step the game announced it. `faceInPlay` answers -1
-        // for everything it cannot tell apart, and -1 leaves the card exactly
-        // as it was.
-        const face = known ? faceInPlay(known, change.types) : -1
-        if (face >= 0 && known) {
+      if (change.types) card.types = change.types
+      // **A card with a painting per face turns over here, and nowhere
+      // else.** The dictionary files a card under the name it was first seen
+      // by and never revises it, so a modal double-faced card played as its
+      // land is still filed as the sorcery on its front — and drawing that
+      // sorcery in the land row is the board showing a card that is not the
+      // card on the table (Aaron, 2026-08-29).
+      //
+      // **Two signals, and the name is the better one.** A type line changing
+      // says a permanent turned over, and for a year it was the only thing on
+      // this pipe that did — but it can only ever say so about faces a type
+      // line tells apart, and 48 cards in the pool have two that it does not.
+      // Both halves of every Pathway are `Land`, so `faceInPlay` sees two
+      // matches, rightly refuses to guess, and the board kept showing the
+      // front of a card that was on its back (Aaron, 2026-09-07: they "show
+      // funny depending on what side they are on"). Forge names the face, and
+      // the server now sends the rename on the step it happened, so an exact
+      // answer is available where a comparison was not. The type line stays as
+      // the fallback: it still answers for a card that transformed without
+      // anything renaming it.
+      if (known && (change.name || change.types)) {
+        const named = change.name ? halfNamed(known, change.name) : -1
+        const face = named >= 0
+          ? named
+          : (change.types ? faceInPlay(known, change.types) : -1)
+        if (face >= 0) {
           card.image = pictureOf(known, face)
           // The name goes with the picture or the tile labels a land with a
           // sorcery's name. Only ever for the cards this turned over, so every

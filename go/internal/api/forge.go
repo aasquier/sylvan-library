@@ -738,6 +738,42 @@ func facePicturesOf(rec *pool.CardRecord, faces []string) []string {
 	return out
 }
 
+// faceUp is the painting for the face this card is actually on.
+//
+// **Forge names a permanent by the face it is showing, and the record's own
+// picture is always the front.** `image_normal` falls back to the first face
+// (`images` in `rows.go`), so a modal double-faced card resolved out of the
+// pool comes back holding its front painting no matter which half was played
+// -- and a Hengegate Pathway played as Mistgate Pathway arrived on the board
+// correctly *named* and wearing the wrong painting.
+//
+// **The type line could not rescue this one, which is why the fix is here.**
+// `faceInPlay` in `lib/board.ts` turns a card over when its type line changes,
+// and that answers for a Delver becoming an Insectile Aberration. It cannot
+// answer for a card whose faces share a type line: both halves of every
+// Pathway are `Land`, so the browser sees two matches, refuses to guess, and
+// leaves the front showing. Measured over this pool on 2026-09-07, **48 cards
+// have two faces with the same type line** -- 38 transforming, 10 modal --
+// and every Pathway is one of them.
+//
+// The name is the signal the type line is not: it is what Forge said this
+// object is called, and a face name is an exact answer where a type line is a
+// comparison. A card named by its combined `A // B` name matches no single
+// face and keeps the front, which is the right answer for a card whose halves
+// share one picture and for a board that has not been told which half it is
+// looking at.
+func faceUp(art boardArt, name string) string {
+	if len(art.Faces) == 0 || len(art.FaceImages) != len(art.Faces) {
+		return art.Image
+	}
+	for i, face := range art.Faces {
+		if strings.EqualFold(face, name) {
+			return art.FaceImages[i]
+		}
+	}
+	return art.Image
+}
+
 // paintTheKillers fills in each killing blow's card image, one pool read for
 // the whole match however many games it ran.
 //
@@ -1051,7 +1087,7 @@ func newForgeBoard(reel *tier3.BoardReel, seats map[int]string,
 		out.Cards = append(out.Cards, forgeBoardCard{
 			ID: card.ID, Name: card.Name, Token: card.Token,
 			Types: card.Types, Seat: card.Seat, CopiedBy: card.CopiedBy,
-			Image: painted.Image, Art: painted.Art, Artist: painted.Artist,
+			Image: faceUp(painted, card.Name), Art: painted.Art, Artist: painted.Artist,
 			Mana: painted.Mana, Makes: painted.Makes,
 			Keywords:   painted.Keywords,
 			Faces:      painted.Faces,

@@ -158,6 +158,21 @@ export interface Card {
   color_identity?: string[]
   image?: string | null
   art_crop?: string | null
+  /** Every face's name, painting and crop, index-aligned, for a card that is
+   *  **painted twice** — a transforming card or a modal double-faced one.
+   *
+   *  Absent for every other card, including the ones with two *names*: an
+   *  Adventure, a split card and a flip card put both halves on one piece of
+   *  cardboard, so there is no second painting and nothing to turn over. The
+   *  server decides that off Scryfall's own encoding rather than a list of
+   *  layouts (`paintedTwice` in `deckread.go` carries the argument).
+   *
+   *  **Undefined is "this card has one face", not "the faces failed to
+   *  load"** — and a payload from before these keys existed lands in a browser
+   *  that has them, which is the same reading either way. */
+  faces?: string[]
+  face_images?: string[]
+  face_art_crops?: string[]
   edhrec_rank?: number | null
   reserved?: boolean
   price_usd?: number | null
@@ -1071,6 +1086,19 @@ export interface ForgeBoardChange {
   power?: number
   toughness?: number
   types?: string
+  /** What Forge is calling this card *now*, sent only on the step it started
+   *  calling it something else.
+   *
+   *  **A card that turns over is renamed, and the board's dictionary keeps
+   *  the name it learned** so that folding to an earlier step still shows what
+   *  was true then. The rename arrives here instead, and `halfNamed` turns it
+   *  into a face index — which is the one signal `types` cannot give: both
+   *  halves of every Pathway are `Land`, so a type line singles out neither
+   *  and `faceInPlay` rightly refuses to guess.
+   *
+   *  **Undefined is "still called what it was called"**, which is true of
+   *  every card on nearly every step. */
+  name?: string
   /** The card's whole counter set, whenever any of it moved.
    *
    *  **An empty array is a real answer and `undefined` is not the same

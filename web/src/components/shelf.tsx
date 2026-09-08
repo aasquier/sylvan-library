@@ -22,6 +22,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLore } from '../lib/lore'
+import { FieldHint } from './hint'
 import { CardHover, ManaCost } from './ui'
 
 /** A stride coprime to any plausible shelf size (89 is prime, and the shelf
@@ -48,17 +49,17 @@ export function TheShelves() {
   return (
     <aside className="shelf-fact card-surface rounded-xl px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[10px] uppercase tracking-wide"
-              style={{ color: 'var(--text-muted)' }}>
+        <span className="shelf-eyebrow text-[10px] uppercase">
           From the shelves
         </span>
         {volume && (
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                title={volume.blurb}
-                style={{ background: 'var(--gridline)',
-                         color: 'var(--text-secondary)' }}>
+          /* The blurb used to hang on `title`, which is a sentence only a
+             mouse ever reads. It is a `FieldHint` now, so the volume says
+             what it is to a pointer, a keyboard and a thumb alike. */
+          <FieldHint name={volume.label} says={volume.blurb}
+                     className="shelf-volume text-[10px] font-medium">
             {volume.label}
-          </span>
+          </FieldHint>
         )}
       </div>
 
@@ -105,9 +106,9 @@ export function TheShelves() {
           <Link to={fact.learn.tab === 'colors'
                       ? `/learn?c=${fact.learn.key}`
                       : '/learn?tab=words'}
-                className="ml-auto whitespace-nowrap underline"
-                style={{ color: 'var(--series-1)' }}>
-            In the Learn room →
+                className="shelf-learn ml-auto whitespace-nowrap">
+            In the Learn room{' '}
+            <span aria-hidden className="shelf-learn-arrow">→</span>
           </Link>
         )}
       </div>

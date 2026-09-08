@@ -274,6 +274,23 @@ type CardJSON struct {
 	GameChanger   *bool    `json:"game_changer,omitempty"`
 	FlavorText    *string  `json:"flavor_text,omitempty"`
 	Artist        *string  `json:"artist,omitempty"`
+	// Faces is each face's name in printed order and FaceImages each face's
+	// own painting, index-aligned with it. **Both are sent only for a card
+	// that is painted twice**, which is a narrower thing than a card with two
+	// names.
+	//
+	// Six layouts carry an `A // B` name and only two of them -- `transform`
+	// and `modal_dfc`, 501 cards in this pool -- give each face an
+	// `image_uris` of its own. An Adventure, a split card and a flip card are
+	// two names on *one* piece of cardboard: there is no second painting to
+	// turn to, and offering to turn one over would be the interface lying
+	// about what the card is. So the test is [pool.CardFace.ImageNormal] being
+	// there rather than a list of layout names somebody has to keep in step --
+	// `records.go` argues that at length, and this is that argument being
+	// used.
+	Faces        []string `json:"faces,omitempty"`
+	FaceImages   []string `json:"face_images,omitempty"`
+	FaceArtCrops []string `json:"face_art_crops,omitempty"`
 	// full: the hero fields were asked for; extra: the trailing pairs
 	// `get_deck` appends to the commander's row (oracle_id, printing).
 	full  bool
@@ -302,6 +319,14 @@ func (c CardJSON) MarshalJSON() ([]byte, error) {
 			wire.KV{Key: "art_crop", Value: c.ArtCrop}, wire.KV{Key: "edhrec_rank", Value: c.EdhrecRank}, wire.KV{Key: "reserved", Value: c.Reserved},
 			wire.KV{Key: "power", Value: c.Power}, wire.KV{Key: "toughness", Value: c.Toughness}, wire.KV{Key: "loyalty", Value: c.Loyalty},
 			wire.KV{Key: "game_changer", Value: c.GameChanger})
+		// Absent for the great majority of cards, and absent is the honest
+		// shape: a card with one painting has no faces, which is not the same
+		// claim as a card whose faces we failed to read.
+		if len(c.FaceImages) > 0 {
+			out = append(out, wire.KV{Key: "faces", Value: c.Faces},
+				wire.KV{Key: "face_images", Value: c.FaceImages},
+				wire.KV{Key: "face_art_crops", Value: c.FaceArtCrops})
+		}
 		if c.full {
 			out = append(out, wire.KV{Key: "flavor_text", Value: c.FlavorText}, wire.KV{Key: "artist", Value: c.Artist})
 		}
@@ -328,11 +353,42 @@ func CardRow(entry deck.CardEntry, rec *pool.CardRecord, full bool) CardJSON {
 		row.ColorIdentity = append([]string{}, rec.ColorIdentity...)
 		row.Image, row.ArtCrop, row.EdhrecRank, row.Reserved = rec.ImageNormal, rec.ImageArtCrop, rec.EdhrecRank, &reserved
 		row.Power, row.Toughness, row.Loyalty, row.GameChanger = rec.Power, rec.Toughness, rec.Loyalty, &gc
+		row.Faces, row.FaceImages, row.FaceArtCrops = paintedTwice(rec)
 		if full {
 			row.FlavorText, row.Artist = rec.FlavorText, rec.Artist
 		}
 	}
 	return row
+}
+
+// paintedTwice is the names and paintings of a card that has one per face, and
+// nothing at all for every other card.
+//
+// **All the faces or none of them.** A short list is worse than no list here
+// for `cardFaces`' own reason one layer down: every caller indexes into it
+// beside the other, so a list missing its second half is an index that answers
+// confidently for the wrong painting.
+func paintedTwice(rec *pool.CardRecord) ([]string, []string, []string) {
+	if len(rec.Faces) < 2 {
+		return nil, nil, nil
+	}
+	names := make([]string, 0, len(rec.Faces))
+	images := make([]string, 0, len(rec.Faces))
+	crops := make([]string, 0, len(rec.Faces))
+	for _, face := range rec.Faces {
+		// **Both pictures or neither.** The row draws the crop and the hover
+		// draws the whole card, so a face with one and not the other is a
+		// turn that works in one place and blanks in the other. All 501 of
+		// these cards carry both, measured 2026-09-07; this is the guard for
+		// the day one does not.
+		if face.ImageNormal == nil || face.ImageArtCrop == nil {
+			return nil, nil, nil
+		}
+		names = append(names, face.Name)
+		images = append(images, *face.ImageNormal)
+		crops = append(crops, *face.ImageArtCrop)
+	}
+	return names, images, crops
 }
 
 // WithArt is `service._with_art`: one row, wearing its chosen printing --
@@ -346,6 +402,18 @@ func WithArt(row CardJSON, overrides map[string]ChosenArt) CardJSON {
 	if chosen.ArtCrop != nil {
 		row.ArtCrop = chosen.ArtCrop
 	}
+	// **A chosen printing cannot be turned over, and that is deliberate.**
+	// `printings` holds one `image_normal` per row and no faces at all, so the
+	// only back this deck could offer is the one on `oracle_cards` -- which
+	// belongs to Scryfall's *representative* printing and is a different piece
+	// of cardboard from the front now being shown. Turning the card would have
+	// swapped the painting on the way back as well as on the way there, and
+	// [pool.Art] already carries the longer version of why a picture and the
+	// row it came from do not get separated.
+	//
+	// Dropping the faces is the honest degrade: the card stops offering to
+	// turn, rather than offering to turn into somebody else's painting.
+	row.Faces, row.FaceImages, row.FaceArtCrops = nil, nil, nil
 	if row.full {
 		row.Artist, row.FlavorText = chosen.Artist, chosen.FlavorText
 	}

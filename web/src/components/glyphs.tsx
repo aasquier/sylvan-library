@@ -394,3 +394,39 @@ export function QuillGlyph({ size = 14 }: { size?: number }) {
     </svg>
   )
 }
+
+/**
+ * The turn sign: a card, and an arrow coming round its edge.
+ *
+ * **Drawn for the one verb this app had no sign for** — *look at the other
+ * side* — which a transforming card and a modal double-faced card both want
+ * and which nothing else here means. Deliberately not [ReplayGlyph]: that
+ * circle already means *run it again* on the Simulator and the tarot table,
+ * and a mark that means two things is a mark that means neither.
+ *
+ * The card is drawn first and drawn plainly, because whatever else this says
+ * it has to say "card" before it says "turn". The arrow wraps the right edge
+ * rather than crossing the face: at fourteen pixels a stroke over the
+ * rectangle reads as a scribble on it, and the whole point is a card coming
+ * round rather than a card being scratched out.
+ *
+ * The convention above says a glyph goes beside a label and never instead of
+ * one. This one sits on a 64px painting where no label fits, so its button
+ * carries the sentence in `aria-label` and shows the face it turns to on
+ * hover and on focus — see `.card-flip` in `index.css`.
+ */
+export function TurnCardGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden
+         focusable="false" style={{ display: 'block' }}>
+      <rect x="3.2" y="3.4" width="9.6" height="13.2" rx="1.5"
+            fill="none" stroke="currentColor" strokeWidth="1.7" />
+      {/* Up the right-hand side and over the top: the path a card takes when
+          a thumb turns it, rather than a ring drawn around it. */}
+      <path d="M12.8 14.6 a6.2 6.2 0 0 0 4.6 -8.4"
+            fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" />
+      <path d="M14.4 4.1 L18.6 5.2 L16.2 8.4 Z" fill="currentColor" />
+    </svg>
+  )
+}
