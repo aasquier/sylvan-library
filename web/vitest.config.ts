@@ -58,5 +58,10 @@ export default defineConfig({
     // `vi.fn()` inside a `vi.mock` factory -- that is module-level state which
     // survives between tests -- so those are reset explicitly in `beforeEach`.
     restoreMocks: true,
+    // `clearMocks` defaults to true from vitest 5, which clears a factory's
+    // `vi.fn()` call history between tests -- the same thing the `beforeEach`
+    // calls above do by hand. Kept explicit so the two are not read as
+    // disagreeing, and so a suite relying on either one can see both.
+    clearMocks: true,
   },
 })

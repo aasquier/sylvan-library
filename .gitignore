@@ -97,6 +97,7 @@ cookies.json
 node_modules/
 web/dist/
 .vite/
+.vitest/
 
 # NOTE: web_dist/ is deliberately NOT ignored. It is the built app,
 # and committing it is what lets someone clone this repo and run `mtglab ui`
