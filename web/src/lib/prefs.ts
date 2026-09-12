@@ -20,10 +20,9 @@
  */
 
 import { useCallback, useSyncExternalStore } from 'react'
-import { setSound, soundOn, wake } from './tablesounds'
+import { SOUND_KEY, setSound, soundOn, wake } from './tablesounds'
 
 const AMBIENCE_KEY = 'mtglab-ambience'
-const SOUND_KEY = 'mtglab-table-sound'
 
 const listeners = new Set<() => void>()
 

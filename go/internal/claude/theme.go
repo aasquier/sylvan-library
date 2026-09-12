@@ -693,7 +693,7 @@ func themeMode(base string, who Persona) (Mode, error) {
 // is not a 422. By the time this runs the seed is a number and `tarot.Deal`
 // takes any.
 func readingFor(who Persona, seed *big.Int) *tarot.Reading {
-	if !who.Deals || seed == nil {
+	if who.Prop != PropTarot || seed == nil {
 		return nil
 	}
 	reading := tarot.Deal(seed)
@@ -973,9 +973,10 @@ func CheckAsk(transcript, slots, requested, persona, seed, facts any,
 
 // seedFor resolves the reading seed at check time, so an unusable one is a
 // 422 now rather than a job in state `error` later. A seed handed to a voice
-// that does not deal is dropped, never refused.
+// that does not deal is dropped, never refused — which covers a room whose
+// prop is something other than cards as well as a room with no prop at all.
 func seedFor(who Persona, seed any) (*big.Int, error) {
-	if !who.Deals || seed == nil {
+	if who.Prop != PropTarot || seed == nil {
 		return nil, nil
 	}
 	n, err := intValue(seed)

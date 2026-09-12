@@ -45,10 +45,14 @@ function drawn(key: string, position: string, note: string | null): TarotDrawn {
 
 beforeEach(() => {
   localStorage.clear()
+  // Dressed with `prop`, the key the server sends now. Deliberately without
+  // the legacy `deals` beside it, so this table is dealt by the new spelling
+  // alone — `routes/NewDeck.test.tsx` holds the other half of that window and
+  // still sends only `deals`, which is what a tab open across the deploy sees.
   vi.mocked(api.personas).mockResolvedValue({
     default: 'plain',
     personas: [{ key: 'fortune-teller', label: 'Read my fortune',
-                 blurb: 'Three cards.', deals: true }],
+                 blurb: 'Three cards.', prop: 'tarot' }],
   })
   vi.mocked(api.tarotReading).mockResolvedValue({
     seed: 7,

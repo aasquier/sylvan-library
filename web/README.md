@@ -11,8 +11,12 @@ The app you see at `mtglab ui` is the **committed bundle** in
 `web_dist/` — a change under `web/src` is invisible until
 `npm --prefix web run build`, and CI fails if the committed bundle drifts from
 source. For live iteration use the `web-dev` entry in `.claude/launch.json`
-(Vite with HMR, proxying `/api` — and *only* `/api`, which is why package-data
-assets like the tarot art 404 in dev and only in dev).
+(Vite with HMR, proxying `/api` **and `/tarot`** to the `mtglab ui` on 8765 —
+this sentence said "only `/api`, which is why the tarot art 404s in dev" until
+2026-09-12, and `vite.config.ts` has proxied both for long enough that nobody
+remembers when; the rule the stale half was really stating still holds, which
+is that anything the Go binary serves by its own path needs a proxy line or it
+404s in dev and only in dev).
 
 `npm --prefix web run check` = typecheck + oxlint + Vitest in one. CI runs
 them as separate steps on purpose, so a type error reports as a type error.
@@ -103,6 +107,23 @@ following the same geometry — there is no build step to run and nothing in
   so a pool's *instantaneous* peak is one mana for every spell in the game.
   Anything drawn from that peak strobes. `poolRaised` sums the rises instead,
   which is why the row shows five pips and not one pip five times.
+- **A room's costume is a record, not a boolean.** The theme interview is one
+  component wearing whatever the chosen voice wears, and `lib/costumes.ts` is
+  the whole of that: the mood over its painting, the classes for its question
+  card, speech, fun fact and answer box, its placeholder, and what it says
+  while it is working. Two rules hold it together. Everything a costume
+  changes is a **class the stylesheet owns** — an inline style is a costume no
+  `:hover` can reach, which is commandment 17's mechanism one surface over —
+  and an **empty class means the plain chrome**, whose paint stays at the call
+  site so an undressed room never has to restate the default. The room's
+  painting and accent are `lib/personart.ts`, keyed by the same
+  `PersonaKey` union: a key in the union is checked at compile time, and a
+  voice the *server* adds tomorrow is not in it and must still render, so
+  every lookup takes a plain `string` and answers with a fallback
+  (`routes/NewDeck.test.tsx`'s third, unknown voice is that claim). Which room
+  deals tarot is `dealsTarot` in `lib/api.ts` and nowhere else — the wire key
+  is mid-rename from `deals` to `prop`, and a compatibility window read at
+  five call sites is a compatibility window that ends at four of them.
 - **Glossary keys are pinned to the served table.** A `Term` or `HelpTip` name
   must exist in `go/internal/reference/data/glossary.json`, which the app
   fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip

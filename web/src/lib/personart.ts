@@ -34,7 +34,37 @@
  * accent, the warm terracotta of that mark.
  */
 
-export const PERSONA_ART: Record<string, { art: string; credit: string }> = {
+/**
+ * The rooms this build knows something about, by key.
+ *
+ * A union rather than `string`, because every table below is keyed by hand and
+ * a mistyped key in one of them is not an error of any kind today — it is a
+ * painting that silently never renders, on a tile that looks merely plain.
+ *
+ * **The server is still the roster, and this is not a copy of it.** A voice
+ * added server-side (ADR 21's whole payoff) arrives with a key that is not in
+ * this union, and that has to keep working: it renders from the roster's own
+ * label and blurb with no painting and the default accent, exactly as
+ * `necromancer` does in `routes/NewDeck.test.tsx`. So every lookup takes a
+ * plain `string` and answers with a fallback, and the one cast that spans the
+ * two worlds lives inside these two functions rather than at each call site.
+ */
+export type PersonaKey =
+  | 'plain'
+  | 'fortune-teller'
+  | 'therapist'
+  | 'scientist'
+  | 'chef'
+  | 'storyteller'
+  | 'barkeep'
+  | 'witch'
+
+export interface PersonaArt {
+  art: string
+  credit: string
+}
+
+const PERSONA_ART: Partial<Record<PersonaKey, PersonaArt>> = {
   'fortune-teller': {
     art: 'https://cards.scryfall.io/art_crop/front/f/e/feddbdc6-0757-43cb-bb41-dc83c6cf42ea.jpg',
     credit: 'Volkan Baǵa',
@@ -65,7 +95,16 @@ export const PERSONA_ART: Record<string, { art: string; credit: string }> = {
   },
 }
 
-export const PERSONA_ACCENT: Record<string, string> = {
+/** The painting a room wears, or nothing — `plain` has no painting by design. */
+export function personaArt(persona: string): PersonaArt | undefined {
+  return PERSONA_ART[persona as PersonaKey]
+}
+
+/** What a room whose accent nobody has picked wears: the app's own first
+ *  series colour, which is the chrome every other surface uses. */
+const DEFAULT_ACCENT = 'var(--series-1)'
+
+const PERSONA_ACCENT: Partial<Record<PersonaKey, string>> = {
   plain: '#e8956d',
   'fortune-teller': '#8f79e8',
   therapist: '#7ab8d9',
@@ -77,4 +116,9 @@ export const PERSONA_ACCENT: Record<string, string> = {
   // third of the painting average #90af72, which is that colour under a dim
   // hut. Lifted to the saturation and value the rest of this table lives at.
   witch: '#7eb846',
+}
+
+/** A room's colour, on its chrome and its backdrop. */
+export function personaAccent(persona: string): string {
+  return PERSONA_ACCENT[persona as PersonaKey] ?? DEFAULT_ACCENT
 }

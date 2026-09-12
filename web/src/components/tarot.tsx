@@ -35,9 +35,10 @@
  * still in copyright and is not this.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   api,
+  dealsTarot,
   type Persona,
   type PersonaRoster,
   type TarotDrawn,
@@ -47,14 +48,15 @@ import {
 import { deal as dealSound, flip as flipSound, riffle, shimmer }
   from '../lib/tablesounds'
 import { useTableSound } from '../lib/prefs'
+import { useStashed } from '../lib/stash'
 import { HandFanGlyph } from './glyphs'
-import { PERSONA_ART } from '../lib/personart'
+import { PersonaGrid } from './personagrid'
 import backUrl from '../assets/seance/tarot-back.webp'
 import roomMp4Url from '../assets/seance/seance-room-loop.mp4'
 import roomStillUrl from '../assets/seance/seance-room-still.webp'
 import roomWebmUrl from '../assets/seance/seance-room-loop.webm'
 import { ThemeInterview } from './theme'
-import { CardArt, Spinner } from './ui'
+import { Spinner } from './ui'
 import { VideoBackdrop } from './videofx'
 
 /** The table survives a reload, for the reason the transcript does: a reading
@@ -542,143 +544,6 @@ function SoundToggle() {
   )
 }
 
-/* -------------------------------------------------------------- the reader */
-
-/*
- * The paintings themselves moved to `lib/personart.ts` (punch list item 8):
- * the interview's rooms need them too, and this file already imports
- * `theme.tsx`, so a table in either component would be an import cycle.
- *
- * `plain` is deliberately absent from that table: it is the tile with no
- * costume, and a borrowed painting would make it one of seven characters
- * rather than the exit from character. It is not artless any more, though
- * (punch list 2026-08-15 item 1) — it wears `ClaudeMark` below, drawn rather
- * than painted, for the same reason the card back and the library's tree are
- * drawn: the one voice that is nobody in particular still deserves a face,
- * and the honest face for it is a mark rather than somebody else's portrait.
- */
-
-/**
- * Claude's own tile art: a spark of warm light on the same night the card
- * backs are printed on.
- *
- * Chosen by Claude, since the tile is Claude (item 1 asked). Not a figure —
- * every costumed tile is a painting of somebody, and the point of this one
- * is that there is nobody between you and the conversation. A light source
- * works where a portrait would lie: warm against the indigo, radiating, with
- * the concentric rings a voice makes. The palette deliberately shares the
- * card back's night so the grid reads as one table, and the spark is the
- * warm terracotta none of the paintings use, so the one drawn tile still
- * reads as its own kind of thing.
- */
-function ClaudeMark() {
-  const id = useId().replace(/:/g, '')
-  return (
-    <svg viewBox="0 0 626 457" className="h-full w-full" aria-hidden="true"
-         preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <radialGradient id={`${id}-night`} cx="50%" cy="42%" r="75%">
-          <stop offset="0%" stopColor="#2c3f6b" />
-          <stop offset="60%" stopColor="#1b2647" />
-          <stop offset="100%" stopColor="#101830" />
-        </radialGradient>
-        <radialGradient id={`${id}-halo`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(255,236,210,0.95)" />
-          <stop offset="30%" stopColor="rgba(240,166,122,0.55)" />
-          <stop offset="70%" stopColor="rgba(218,119,86,0.18)" />
-          <stop offset="100%" stopColor="rgba(218,119,86,0)" />
-        </radialGradient>
-      </defs>
-      <rect width="626" height="457" fill={`url(#${id}-night)`} />
-      {/* A scatter of far stars, the card back's sky continued. */}
-      <g fill="#f0e4c2">
-        {[[62, 70, 1.6], [140, 330, 1.2], [210, 96, 1.1], [318, 40, 1.4],
-          [430, 88, 1.2], [538, 150, 1.6], [566, 330, 1.1], [468, 396, 1.3],
-          [96, 210, 1.0], [246, 402, 1.2], [388, 372, 1.0], [520, 244, 1.0],
-        ].map(([x, y, r]) => (
-          <circle key={`${x}-${y}`} cx={x} cy={y} r={r} opacity="0.55" />
-        ))}
-      </g>
-      {/* The rings a voice makes: concentric, fading as they travel. */}
-      {[74, 118, 166, 220].map((r, i) => (
-        <circle key={r} cx="313" cy="222" r={r} fill="none"
-                stroke="#f0a67a" strokeWidth={1.6 - i * 0.3}
-                opacity={0.34 - i * 0.07} />
-      ))}
-      <circle cx="313" cy="222" r="150" fill={`url(#${id}-halo)`} />
-      {/* The spark: rays alternating long and short, warm on the night. */}
-      <g transform="translate(313 222)">
-        {Array.from({ length: 12 }, (_, i) => {
-          const a = (i * Math.PI * 2) / 12 - Math.PI / 2
-          const inner = 26
-          const outer = i % 2 === 0 ? 74 : 50
-          return (
-            <line key={i}
-                  x1={Math.cos(a) * inner} y1={Math.sin(a) * inner}
-                  x2={Math.cos(a) * outer} y2={Math.sin(a) * outer}
-                  stroke={i % 2 === 0 ? '#f7d9b8' : '#e8956d'}
-                  strokeWidth={i % 2 === 0 ? 7 : 4.5}
-                  strokeLinecap="round" opacity="0.92" />
-          )
-        })}
-        <circle r="19" fill="#fbe8d0" />
-        <circle r="9" fill="#fff6ea" />
-      </g>
-    </svg>
-  )
-}
-
-function ReaderPanel({ persona, onPick }: {
-  persona: Persona
-  onPick: () => void
-}) {
-  const art = PERSONA_ART[persona.key]
-  return (
-    // No `art-fade` on the wrapper: that class belongs to the `<img>` inside
-    // `CardArt`, which is the element that gets `.loaded` back. On the wrapper
-    // it is an opacity-0 that nothing ever lifts, and every tile shipped as a
-    // black rectangle with a caption — the exact bug the punch list reported.
-    <button onClick={onPick}
-            className="reader-tile card-surface flex flex-col overflow-hidden rounded-xl text-center">
-      {art && (
-        <CardArt src={art.art} alt="" ratio="aspect-[626/457]" eager
-                 className="reader-tile-art w-full rounded-none" />
-      )}
-      {/* The tile with no costume wears Claude's own mark — drawn, so it
-          needs no credit line and owes nobody a licence (item 1). */}
-      {!art && persona.key === 'plain' && (
-        <span className="reader-tile-art block w-full aspect-[626/457]"
-              aria-hidden="true">
-          <ClaudeMark />
-        </span>
-      )}
-      <span className="flex flex-1 flex-col items-center gap-2 px-5 py-4">
-        <span className="text-base font-medium">{persona.label}</span>
-        <span className="text-xs leading-relaxed"
-              style={{ color: 'var(--text-secondary)' }}>
-          {persona.blurb}
-        </span>
-        {/* Only the reader who deals gets a footer. Six tiles all reciting
-            "No cards — just the questions" said nothing six times; the blurb
-            already says who each voice is, and the one fact worth a line of
-            its own is that the fortune-teller's table has cards on it. */}
-        {persona.deals && (
-          <span className="mt-auto text-[11px] uppercase tracking-wide"
-                style={{ color: 'var(--series-1)' }}>
-            ✦ Three cards, dealt for you
-          </span>
-        )}
-        {art && (
-          <span className={`text-[10px]${persona.deals ? '' : ' mt-auto'}`}
-                style={{ color: 'var(--text-muted)' }}>
-            Art by {art.credit}
-          </span>
-        )}
-      </span>
-    </button>
-  )
-}
-
 /* --------------------------------------------------------------- the table */
 
 export function TarotTable({ onPick, onLeave, onCeremony }: {
@@ -691,7 +556,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   onCeremony?: (active: boolean) => void
 }) {
   const [roster, setRoster] = useState<PersonaRoster | null>(null)
-  const [table, setTable] = useState<Table>(loadTable)
+  const [table, setTable] = useStashed(TABLE, loadTable)
   const [reading, setReading] = useState<TarotReading | null>(null)
   const [shuffling, setShuffling] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -706,10 +571,6 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   useEffect(() => {
     api.personas().then(setRoster).catch((e) => setError(String(e)))
   }, [])
-
-  useEffect(() => {
-    localStorage.setItem(TABLE, JSON.stringify(table))
-  }, [table])
 
   // Every stagger this component sets up, cancelled on the way out — a card
   // turning over into an unmounted tree is a warning in the console and a
@@ -769,8 +630,8 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   // route. Cleanup fires `false` so leaving the door restores the chrome.
   // `shuffling` stands alone because only the dealing reader ever shuffles,
   // and during her shuffle `table.persona` is not yet written.
-  const ceremonyActive = shuffling || (Boolean(
-    roster?.personas.find((p) => p.key === table.persona)?.deals)
+  const seated = roster?.personas.find((p) => p.key === table.persona) ?? null
+  const ceremonyActive = shuffling || (seated !== null && dealsTarot(seated)
     && !(allTurned && settled && table.read))
   useEffect(() => {
     onCeremony?.(ceremonyActive)
@@ -779,7 +640,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
 
   const chooseReader = useCallback(async (persona: Persona) => {
     setError(null)
-    if (!persona.deals) {
+    if (!dealsTarot(persona)) {
       setReading(null)
       setTable({ persona: persona.key, seed: null, turned: [], read: false })
       return
@@ -802,7 +663,10 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
       setShuffling(false)
       setError(String((e as Error).message ?? e))
     }
-  }, [])
+    // `setTable` is `useState`'s own setter arriving through `useStashed`: as
+    // stable as it ever was, and listed only because the rule cannot see that
+    // through a custom hook.
+  }, [setTable])
 
   const turn = (i: number) => {
     setTurnedHere(true)
@@ -882,7 +746,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     return <Spinner label="Gathering the readers…" />
   }
 
-  const chosen = roster.personas.find((p) => p.key === table.persona) ?? null
+  const chosen = seated
 
   /* -------------------------------------------------- nobody has sat down */
 
@@ -929,12 +793,8 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
             </div>
             )
           : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {roster.personas.map((p) => (
-                <ReaderPanel key={p.key} persona={p}
-                             onPick={() => void chooseReader(p)} />
-              ))}
-            </div>
+            <PersonaGrid personas={roster.personas}
+                         onPick={(p) => void chooseReader(p)} />
             )}
       </section>
       </>
@@ -946,15 +806,16 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   // The linger (Aaron's item 4): all three cards up is not the end of the
   // ceremony — it is the moment the querent gets to sit with the spread.
   // The table folds only once they knock on the glass (`table.read`).
-  const dealing = chosen.deals && !(allTurned && settled && table.read)
-  const lingering = chosen.deals && allTurned && settled && !table.read
+  const deals = dealsTarot(chosen)
+  const dealing = deals && !(allTurned && settled && table.read)
+  const lingering = deals && allTurned && settled && !table.read
   const takeReading = () => setTable((t) => ({ ...t, read: true }))
   // Every voice frames its own table. The dealing reader talks about the
   // cards; everyone else introduces themselves with the same words their
   // tile used — so the screen the conversation opens on belongs to the voice
   // that was picked, rather than to one shared paragraph that read like the
   // interview's script.
-  const intro = chosen.deals
+  const intro = deals
     ? {
         title: 'The cards are out',
         blurb: 'Three cards for three places. The questions are still about '
@@ -999,7 +860,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 one thing you do not want. This is that path, named for what
                 it does. Only for a reader who deals; the plain voices have
                 no cards to shuffle. */}
-            {chosen.deals && (
+            {deals && (
               <button onClick={() => { void chooseReader(chosen) }}
                       disabled={shuffling}
                       className="btn btn-felt btn-sm">

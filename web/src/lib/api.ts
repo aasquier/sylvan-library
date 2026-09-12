@@ -2808,9 +2808,36 @@ export interface Persona {
   key: string
   label: string
   blurb: string
-  /** Whether this reader is dealt a spread before the conversation starts.
-   *  Only the fortune teller is, today. */
-  deals: boolean
+  /** What is already on this room's table before a word is said: `tarot` for
+   *  the fortune teller's spread, `''` for a room with nothing on the table.
+   *
+   *  Optional because a new wire key arrives `undefined` — a tab open across a
+   *  deploy is reading the payload the *old* server sent, which has no `prop`
+   *  in it at all. Never read directly; [dealsTarot] is the one reader. */
+  prop?: string
+  /** @deprecated The pre-`prop` spelling, still served for one release so an
+   *  old tab does not lose the cards mid-conversation. Read only as a fallback
+   *  and only by [dealsTarot]; delete both halves together. */
+  deals?: boolean
+}
+
+/**
+ * Does this room deal a tarot spread?
+ *
+ * The one place that question is answered, which is the point: the deal
+ * reaches five decisions in `components/tarot.tsx` — whether to shuffle,
+ * whether the ceremony owns the screen, whether the tile promises cards,
+ * whether there is a spread to reshuffle, and which framing the interview
+ * opens with — and a wire key in the middle of a compatibility window must
+ * not be spelled out at five of them.
+ *
+ * `prop` wins whenever the server sends one, in both directions: a new client
+ * against an old server falls through to `deals`, and a new server's `prop: ''`
+ * beats a stale `deals: true` rather than losing to it.
+ */
+export function dealsTarot(persona: Persona): boolean {
+  if (persona.prop !== undefined) return persona.prop === 'tarot'
+  return persona.deals === true
 }
 
 export interface PersonaRoster {

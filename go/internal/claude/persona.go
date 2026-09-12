@@ -38,10 +38,21 @@ type Persona struct {
 	// carries a quote of their own words, never propose — are not a persona's
 	// to soften. A voice is appended; a contract is not.
 	Voice string
-	// Deals reports whether this persona is dealt a spread before it starts.
-	// Only the fortune teller is, and internal/tarot owns the deal.
-	Deals bool
+	// Prop is what is already on this room's table before a word is said.
+	//
+	// A boolean lived here first and it was called Deals, which answered one
+	// question — is there a spread? — and could never answer the next one,
+	// because the room after this one has a cauldron on the table rather than
+	// cards. A named prop answers both: [PropTarot] is the fortune teller's
+	// spread, "" is a room with nothing on the table, and a value nobody has
+	// written plumbing for is inert rather than an error. Only the deal knows
+	// what "tarot" means, and internal/tarot owns it.
+	Prop string
 }
+
+// PropTarot is the fortune teller's prop: three cards, dealt before the
+// conversation starts. The one prop the server does anything with.
+const PropTarot = "tarot"
 
 // RosterEntry is a persona as the door may serve it — which is a Persona with
 // Voice removed. Its own type rather than a Persona marshalled with a `json:"-"`
@@ -50,7 +61,27 @@ type RosterEntry struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
 	Blurb string `json:"blurb"`
-	Deals bool   `json:"deals"`
+	Prop  string `json:"prop"`
+}
+
+// MarshalJSON writes `prop`, and also the older `deals` boolean it replaced.
+//
+// **Both keys, for one release, because a browser is not redeployed with the
+// server.** A tab that has been open since before this change reads `deals`
+// and nothing else; dropping the key would take the cards off the table
+// mid-conversation for somebody who is already talking to the fortune teller.
+// The derivation is here rather than in the data so the two can never
+// disagree.
+//
+// TODO(rooms): delete the `deals` half — and this method with it — one release
+// after the `prop` key ships, when no tab that predates it is still open.
+func (e RosterEntry) MarshalJSON() ([]byte, error) {
+	// A local type with no method set of its own, or this recurses forever.
+	type entry RosterEntry
+	return json.Marshal(struct {
+		entry
+		Deals bool `json:"deals"`
+	}{entry(e), e.Prop == PropTarot})
 }
 
 var (

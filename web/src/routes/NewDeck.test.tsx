@@ -27,30 +27,39 @@ vi.mock('react-router-dom', async () => ({
   useNavigate: () => navigate,
 }))
 
-vi.mock('../lib/api', async () => ({
-  // Real: it is what turns the create response into the deck's address, and a
-  // stub would let this navigate to the pre-ADR-22 path with every test
-  // passing.
-  deckUrl: (await vi.importActual<typeof import('../lib/api')>(
-    '../lib/api')).deckUrl,
-  api: {
-    colors: vi.fn(), searchCards: vi.fn(), createDeck: vi.fn(),
-    claudeStatus: vi.fn(), themeAsk: vi.fn(), themePropose: vi.fn(),
-    job: vi.fn(), personas: vi.fn(), tarotReading: vi.fn(),
-  },
-  // The proposal is a background job now — it was measured at 226 seconds and
-  // no hosted proxy holds a POST open that long. Faked rather than imported
-  // for real, because the real poller closes over the `api` object this mock
-  // replaces and would go looking for a `fetch` nobody set up.
-  followJob: vi.fn(),
-  ApiError: class ApiError extends Error {
-    status: number
-    constructor(message: string, status: number) {
-      super(message)
-      this.status = status
-    }
-  },
-}))
+vi.mock('../lib/api', async () => {
+  const real = await vi.importActual<typeof import('../lib/api')>('../lib/api')
+  return {
+    // Real: it is what turns the create response into the deck's address, and
+    // a stub would let this navigate to the pre-ADR-22 path with every test
+    // passing.
+    deckUrl: real.deckUrl,
+    // Real, and load-bearing here: the wire key that says which room deals
+    // cards is mid-rename, ROSTER below is deliberately spelled the old way,
+    // and a stub would make that fixture prove nothing at all.
+    dealsTarot: real.dealsTarot,
+    // Real: it is how a server's own refusal keeps its wording on the way to
+    // the screen.
+    errorMessage: real.errorMessage,
+    api: {
+      colors: vi.fn(), searchCards: vi.fn(), createDeck: vi.fn(),
+      claudeStatus: vi.fn(), themeAsk: vi.fn(), themePropose: vi.fn(),
+      job: vi.fn(), personas: vi.fn(), tarotReading: vi.fn(),
+    },
+    // The proposal is a background job now — it was measured at 226 seconds
+    // and no hosted proxy holds a POST open that long. Faked rather than
+    // imported for real, because the real poller closes over the `api` object
+    // this mock replaces and would go looking for a `fetch` nobody set up.
+    followJob: vi.fn(),
+    ApiError: class ApiError extends Error {
+      status: number
+      constructor(message: string, status: number) {
+        super(message)
+        this.status = status
+      }
+    },
+  }
+})
 
 const { api, followJob } = await import('../lib/api')
 
@@ -177,6 +186,12 @@ const PROPOSAL = {
  * `Persona` and a prompt server-side and *nothing else moves*; the moment this
  * list is hard-coded in the client again, `storyteller` stops appearing and
  * the test that looks for it fails.
+ *
+ * **Spelled with `deals` on purpose, and left that way.** The server sends
+ * `prop` now and `deals` beside it for one release, because a tab opened
+ * before the deploy is reading the older payload — this roster *is* that tab,
+ * and the fortune-teller below still has to deal from it.
+ * `components/tarot.test.tsx` is the same roster in the new spelling.
  */
 const ROSTER = {
   personas: [
@@ -576,13 +591,19 @@ describe('the theme conversation', () => {
 
   it('reports readings that matched nothing they said', async () => {
     await enterTheme()
-    expect(screen.getByText(/1 reading did not match anything you said/i))
-      .toBeTruthy()
+    // Twice: printed in the sidebar, and said in the live region — the same
+    // sentence from one place, so the count somebody hears is the count they
+    // can then go and read.
+    expect(screen.getAllByText(/1 reading did not match anything you said/i))
+      .toHaveLength(2)
   })
 
   it('sends the whole conversation back, because the client holds it', async () => {
     await enterTheme()
-    fireEvent.change(screen.getByRole('textbox', { name: '' }),
+    // Named now. The box used to be a textbox with no accessible name at all —
+    // a placeholder is not a label, and a reader landing in it was told
+    // nothing about what it was for.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Your answer' }),
                      { target: { value: 'Dune, easily' } })
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }))
 
@@ -714,6 +735,7 @@ describe('the proposal', () => {
   it('says a lost run is lost rather than showing a bare 404', async () => {
     // Jobs live in the server's memory and die with it. A
     // restart mid-run is the one way this fails that is nobody's mistake.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { ApiError } = await import('../lib/api')
     vi.mocked(followJob).mockImplementation((_id, _onTick, _ms, initial) => (
       initial?.status === 'done' ? settled(initial) : {
@@ -725,7 +747,13 @@ describe('the proposal', () => {
     await screen.findByText(READY.question)
     fireEvent.click(screen.getByRole('button', { name: /suggest my colours/i }))
 
-    expect(await screen.findByText(/that run is gone/i)).toBeTruthy()
+    // In the room's own words: this used to say "the server restarted while it
+    // was working", which is true, is useful to exactly one person, and is not
+    // the person who just asked to have their cards read (commandment 10).
+    expect(await screen.findByText(/That reading was lost before it was finished/))
+      .toBeTruthy()
+    expect(screen.queryByText(/server/i)).toBeNull()
+    logged.mockRestore()
   })
 
   it('keeps the reading and the claim visibly apart', async () => {
@@ -784,15 +812,27 @@ describe('the proposal', () => {
 })
 
 describe('when the surface is not available', () => {
-  it('says which of the two things is missing', async () => {
+  it('says the door is shut without reciting how to open it', async () => {
     // The grid itself renders either way — it costs nothing — and the answer
     // arrives when a voice is picked, from the interview's own status check.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.mocked(api.claudeStatus).mockResolvedValue(
       { ...CLAUDE_STATUS, configured: false } as never)
     await sitWith('plain')
 
-    expect(await screen.findByText(/ANTHROPIC_API_KEY/)).toBeTruthy()
+    // This used to print `ANTHROPIC_API_KEY` and the name of the file to put
+    // it in, to whoever had just sat down to be asked about the films they
+    // like. Commandment 10: the environment is not a thing a player may see,
+    // and it is not a thing they can do anything about either.
+    expect(await screen.findByText(/Claude cannot be reached from here/))
+      .toBeTruthy()
+    expect(screen.queryByText(/ANTHROPIC_API_KEY/)).toBeNull()
+    expect(screen.queryByText(/env\.example/)).toBeNull()
     expect(api.themeAsk).not.toHaveBeenCalled()
+    // The half that is genuinely useful goes where its audience is reading.
+    expect(logged.mock.calls.flat().some(
+      (arg) => String(arg).includes('ANTHROPIC_API_KEY'))).toBe(true)
+    logged.mockRestore()
   })
 
   it('offers the door that always works', async () => {
