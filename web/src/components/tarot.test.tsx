@@ -241,3 +241,63 @@ describe('the pot, before anything is said', () => {
       .not.toBeNull()
   })
 })
+
+/**
+ * A stash the current code never writes.
+ *
+ * Every writer today stamps a room-reader's seed in the same set() that
+ * seats them — but a stash from an earlier build can arrive carrying
+ * `{persona: 'witch', seed: null}`, and both fetch effects bail on a null
+ * seed, so the room stands on its own loading state forever. Found live on
+ * 2026-09-12: the door hung on "Finding what she has set out…" until
+ * localStorage was cleared by hand. The table clears itself back to the
+ * choosing floor instead; these pin that recovery, for both rooms, and pin
+ * that the recovery also heals the stash so it runs once rather than on
+ * every visit forever.
+ */
+describe('a stash from another era', () => {
+  beforeEach(() => {
+    vi.mocked(api.personas).mockResolvedValue({
+      default: 'plain',
+      personas: [
+        { key: 'fortune-teller', label: 'Read my fortune',
+          blurb: 'Three cards.', prop: 'tarot' },
+        { key: 'witch', label: 'Brew me something',
+          blurb: 'A pot already boiling.', prop: 'cauldron' },
+      ],
+    })
+  })
+
+  it('clears a seated witch with no seed back to the choosing floor',
+     async () => {
+    localStorage.setItem('mtglab-tarot-table', JSON.stringify(
+      { persona: 'witch', seed: null, turned: [], read: false }))
+    render(<TarotTable onPick={() => {}} onLeave={() => {}} />)
+    // The stash heals — waited on, because the recovery is an effect and the
+    // roster is on screen before it flushes. Without the fix this never
+    // becomes true and the room stands on its spinner forever.
+    await waitFor(() => {
+      expect(JSON.parse(localStorage.getItem('mtglab-tarot-table')!).persona)
+        .toBeNull()
+    })
+    // The recovery lands on the roster, not on a wait that never ends.
+    expect(screen.getByRole('button', { name: /Brew me something/ }))
+      .toBeTruthy()
+    expect(screen.queryByText(/Finding what she has set out/)).toBeNull()
+    // And nothing asked the server to brew from a seed that does not exist.
+    expect(api.brewReading).not.toHaveBeenCalled()
+  })
+
+  it('clears a seated fortune-teller with no seed the same way', async () => {
+    localStorage.setItem('mtglab-tarot-table', JSON.stringify(
+      { persona: 'fortune-teller', seed: null, turned: [], read: false }))
+    render(<TarotTable onPick={() => {}} onLeave={() => {}} />)
+    await waitFor(() => {
+      expect(JSON.parse(localStorage.getItem('mtglab-tarot-table')!).persona)
+        .toBeNull()
+    })
+    expect(screen.getByRole('button', { name: /Read my fortune/ }))
+      .toBeTruthy()
+    expect(api.tarotReading).not.toHaveBeenCalled()
+  })
+})
