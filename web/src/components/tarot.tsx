@@ -646,6 +646,22 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     return () => { live = false }
   }, [seated, table.seed, pot])
 
+  // A stash is input, not memory. Every writer today stamps a room-reader's
+  // seed in the same set() that seats them — but a stash written by an
+  // earlier build can arrive carrying `{persona: witch, seed: null}`, and
+  // both fetch effects above bail on a null seed. That pair is a deadlock:
+  // a pot that will never fill (or a spread that will never land) behind a
+  // loading state that never resolves, on the newcomer's first door, until
+  // somebody clears their browser storage by hand. A seated reader whose
+  // room re-deals from a seed, with no seed to re-deal from, is a table
+  // nobody can sit at — clear it back to the choosing floor instead.
+  useEffect(() => {
+    if (!seated || table.seed !== null) return
+    if (dealsTarot(seated) || brewsACauldron(seated)) setTable(NO_TABLE)
+    // `setTable` through `useStashed`, stable as useState's own setter; the
+    // rule cannot see that through a custom hook (same note as chooseReader).
+  }, [seated, table.seed, setTable])
+
   const cards = reading?.cards ?? []
   const allTurned = cards.length > 0 && table.turned.length >= cards.length
   // What the ball is showing: the card most recently turned face up. Indexed

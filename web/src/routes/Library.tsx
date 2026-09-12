@@ -508,13 +508,19 @@ function DeckCard({ deck, onDelete, heading: Heading = 'h2', index = 0 }: {
     <div className="group/card tile-enter relative"
          style={{ '--tile-index': Math.min(index, 11) } as React.CSSProperties}>
       {/* Muted until the card is hovered or the button is focused: deleting a
-          deck should be reachable without being the thing your eye lands on. */}
+          deck should be reachable without being the thing your eye lands on.
+          And inert while invisible — `opacity-0` alone keeps hit-testing, so
+          on a phone (no hover, ever) every tile carried an invisible tappable
+          Entomb in its corner. A touch hand reaches Entomb through the deck
+          page's action rail; here the chip is a pointer shortcut, and a
+          shortcut nobody can see must not swallow a tap. Keyboard is
+          unaffected: focus reveals it and Enter needs no pointer. */}
       {deck.writable && (
         <button
           onClick={() => onDelete(deck)}
           title={`Entomb ${deck.name} — the whole deck goes to your crypt, and can be raised again`}
           aria-label={`Entomb ${deck.name}`}
-          className="btn btn-danger btn-xs absolute right-2 top-2 z-10 opacity-0 focus:opacity-100 group-hover/card:opacity-100"
+          className="btn btn-danger btn-xs absolute right-2 top-2 z-10 opacity-0 pointer-events-none focus:opacity-100 focus:pointer-events-auto group-hover/card:opacity-100 group-hover/card:pointer-events-auto"
           style={{ background: 'var(--surface-1)' }}
         >
           Entomb

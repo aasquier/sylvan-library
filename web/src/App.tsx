@@ -157,17 +157,31 @@ function AuthScreen({ theme, onToggleTheme, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
-      <div className="mb-5 flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <LibraryMark size={26} />
-          <span className="wordmark-title font-semibold tracking-tight">
-            Sylvan Libraries
+    // Dressed like a room, not like a form (the Queen's walk, 2026-09-12):
+    // this is the first surface an invited person ever sees on a deployed
+    // instance, and it was the one screen in the house with no ivy and no
+    // weather on it. Both layers are the shared ones — `ForestAmbience`
+    // honours the ambience switch and reduced motion by itself, and the
+    // canopy hangs from a full-width lintel the way it hangs over every
+    // signed-in page. Still no nav and no health line, for the reason above:
+    // those offer questions this session cannot get answered.
+    <div className="relative flex min-h-screen w-full flex-col">
+      <ForestAmbience />
+      <div className="relative w-full">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between px-6 pt-6">
+          <span className="flex items-center gap-2">
+            <LibraryMark size={26} />
+            <span className="wordmark-title font-semibold tracking-tight">
+              Sylvan Libraries
+            </span>
           </span>
-        </span>
-        <ThemeButton theme={theme} onToggle={onToggleTheme} />
+          <ThemeButton theme={theme} onToggle={onToggleTheme} />
+        </div>
+        <HeaderCanopy />
       </div>
-      {children}
+      <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-12">
+        {children}
+      </div>
     </div>
   )
 }
