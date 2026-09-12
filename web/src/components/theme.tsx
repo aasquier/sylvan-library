@@ -614,7 +614,7 @@ function CommanderTile({ card, onPick }: {
   return (
     <CardHover tapOpens={false} card={card} className="block">
       <button onClick={onPick}
-              className="card-surface block w-full overflow-hidden rounded-xl text-left transition hover:opacity-90">
+              className="pick-tile card-surface block w-full overflow-hidden rounded-xl text-left">
         {card.art_crop && (
           <img src={card.art_crop} alt="" loading="lazy"
                className="h-20 w-full object-cover" />

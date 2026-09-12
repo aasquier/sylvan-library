@@ -497,7 +497,7 @@ export default function NewDeck() {
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {taxonomy.combinations.map((c) => (
                 <button key={c.key} onClick={() => choose(c)}
-                        className="card-surface flex items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:opacity-90">
+                        className="pick-tile card-surface flex items-center gap-3 rounded-lg px-3 py-2 text-left">
                   <ColorRing colors={c.colors} size={20} />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{c.name}</span>
@@ -677,9 +677,10 @@ export default function NewDeck() {
                             setCommanders(null)
                             pickCommander(card)
                           }}
-                          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition hover:opacity-90"
-                          style={{ border: '1px solid var(--hairline)',
-                                   background: 'var(--page)' }}
+                          // The border rides a class, not the style prop: an
+                          // inline border is a door `.pick-tile:hover`'s vine
+                          // can never reach (commandment 20's mechanism).
+                          className="pick-tile flex items-center gap-2 rounded-lg border border-[var(--hairline)] bg-[var(--page)] px-2 py-1.5 text-left text-xs"
                         >
                           {card.art_crop && (
                             <img src={card.art_crop} alt="" loading="lazy"
@@ -763,7 +764,7 @@ export default function NewDeck() {
             {commanders?.map((card) => (
               <CardHover tapOpens={false} key={card.name} card={card} className="block">
                 <button onClick={() => pickCommander(card)}
-                        className="card-surface block w-full overflow-hidden rounded-xl text-left transition hover:opacity-90">
+                        className="pick-tile card-surface block w-full overflow-hidden rounded-xl text-left">
                   {card.art_crop && (
                     <img src={card.art_crop} alt="" loading="lazy"
                          className="h-24 w-full object-cover" />
