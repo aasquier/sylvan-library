@@ -13,6 +13,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 
+	"github.com/aasquier/sylvan-library/go/internal/brew"
 	"github.com/aasquier/sylvan-library/go/internal/claude/ledger"
 	"github.com/aasquier/sylvan-library/go/internal/claude/tools"
 	"github.com/aasquier/sylvan-library/go/internal/deckread"
@@ -85,6 +86,10 @@ const (
 	// TarotSource is how a reader cites `tarotlore`. Lowercase, because
 	// KeepFact folds case before matching and the id is folded with it.
 	TarotSource = "tarot:"
+	// CauldronSource is how the witch cites `cauldronlore`. Lowercase, for the
+	// reason TarotSource is: the prefix is matched case-insensitively and the
+	// corpus folds the id, so the two halves have to agree about the fold.
+	CauldronSource = "cauldron:"
 	// MinQuoteChars: below this a "quote" is a coincidence rather than
 	// evidence. Three keeps real short answers -- "cat", "red", "80s".
 	MinQuoteChars = 3
@@ -480,6 +485,12 @@ type Fact struct {
 // model's.** The id was the whole ask; `text` came back only because the
 // schema requires it, and a fun fact paraphrased at a fortune-teller's table
 // is the one thing at that table that would be a lie.
+//
+// A `cauldron:` id is the same rule one room over, and it is written as a
+// second arm rather than folded into the first for the reason
+// `reference/cauldronlore.go` gives at length: two corpora that happen to
+// have the same shape today are two contracts, and the day one of them grows
+// a field the generic version is the thing standing in the way.
 func KeepFact(raw any, searched []Page) *Fact {
 	item, ok := raw.(map[string]any)
 	if !ok {
@@ -493,6 +504,13 @@ func KeepFact(raw any, searched []Page) *Fact {
 	folded := casefold(source)
 	if strings.HasPrefix(folded, TarotSource) {
 		entry := reference.TarotFactByID(source[len(TarotSource):])
+		if entry == nil {
+			return nil
+		}
+		return &Fact{Text: entry.Text, Source: entry.Source, URL: ""}
+	}
+	if strings.HasPrefix(folded, CauldronSource) {
+		entry := reference.CauldronFactByID(source[len(CauldronSource):])
 		if entry == nil {
 			return nil
 		}
@@ -588,34 +606,95 @@ func CheckTranscript(raw any) ([]TranscriptTurn, error) {
 const themeFrame = "Somebody has opened the deckbuilder and does not know " +
 	"what to build. Interview them."
 
-// frameFor is the opening frame, the spread when there is one, and what is
-// known.
+// frameFor is the opening frame, whatever is on the table, and what is known.
 //
 // **Here rather than in the system prompt, and that is a caching decision.** A
-// mode's instructions are byte-stable so `Converse` can cache them; a spread is
-// different every reading, so putting it there would make every first turn a
-// cache miss for the whole block.
+// mode's instructions are byte-stable so `Converse` can cache them; a prop is
+// different every conversation, so putting it there would make every first
+// turn a cache miss for the whole block.
 //
 // `told == nil` means **no corpus at all**, and that is why it is not simply an
 // empty slice. Only the turn can tell a fact; the proposal's schema has no
 // `fact` field, so offering it a hundred entries would be seven kilobytes of
 // prompt with nowhere to go. An empty non-nil slice still means "offer
 // everything, nothing told yet", which is a real first turn.
-func frameFor(reading *tarot.Reading, told []string) string {
-	if reading == nil {
+//
+// At most one of `reading` and `pot` is ever non-nil — a persona has one prop
+// — and the switch is written so that a hypothetical both would take the
+// spread and not concatenate two tables into one room.
+func frameFor(reading *tarot.Reading, pot *brew.Pot, told []string) string {
+	switch {
+	case reading != nil:
+		frame := fmt.Sprintf("%s\n\nYou have already dealt three cards, face up, "+
+			"in this order. These are the cards on the table and there are no "+
+			"others:\n%s", themeFrame, reading.Describe())
+		if told == nil {
+			return frame
+		}
+		keys := make([]string, 0, len(reading.Cards))
+		for _, drawn := range reading.Cards {
+			keys = append(keys, drawn.Card.Key)
+		}
+		return frame + reference.TarotOffer(keys, told)
+
+	case pot != nil:
+		// Two sentences in here are load-bearing and should survive editing.
+		//
+		// **"Their words are the only thing that ever goes in."** ADR 20's
+		// grounded-quote rule restated in the room's own vocabulary. The
+		// spread's frame does not need it because a card is obviously not
+		// something the querent said; an ingredient sitting in a *pot about
+		// them* is a much easier thing to mistake for evidence, and the
+		// readiness instrument is unchanged and unguarded against a model that
+		// starts grounding slots on ingredients.
+		//
+		// **"never read them their own pot"** keeps her from narrating the
+		// mechanic. The witch's voice already refuses to say what the brew is
+		// for; this is that refusal extended to the board, so the interface
+		// gets to reveal ingredients as slots ground rather than the model
+		// announcing them.
+		//
+		// **The last sentence is the question**, and that one is not a matter
+		// of voice at all -- it is this room's own guard, stated to the model
+		// so it stops tripping it. `readAsk` deletes any answer that does not
+		// end in a question mark, because a declarative sentence here is the
+		// mode telling somebody what they think instead of asking. She is the
+		// persona most likely to write past the question -- her register wants
+		// a wry line after it -- and the first live opening ask did exactly
+		// that, so the guard (correctly) dropped a perfectly good question
+		// along with the tail it was wearing. The instruction is here, in the
+		// arm, rather than in the predicate: the predicate is the boundary and
+		// it does not move.
+		frame := fmt.Sprintf("%s\n\nThe pot has been on since before they "+
+			"knocked, and you have already set out three things to go into "+
+			"it, in this order. These are what the brew is waiting on and "+
+			"there is nothing else on the shelf:\n%s\n\n"+
+			"They go in ONE AT A TIME, and only when they have earned it: a "+
+			"thing goes in the moment this person has told you something true "+
+			"about themselves that it belongs to, in their own words. Until "+
+			"then it is sitting on the board beside you. So let each one "+
+			"colour the question you ask next — the shape of the thing, what "+
+			"it does in water, what it is for — and ask the question that "+
+			"would put it in. Never ask them about the ingredient, and never "+
+			"read them their own pot: they cannot see the board, the brew is "+
+			"not for you to explain, and the worst thing you ever do is "+
+			"refuse to say what it is for. Their words are the only thing "+
+			"that ever goes in. Nothing you set out is evidence of anything "+
+			"about them. End every turn on the question itself: the last "+
+			"sentence you write is the question, and nothing follows the "+
+			"question mark.", themeFrame, pot.Describe())
+		if told == nil {
+			return frame
+		}
+		keys := make([]string, 0, len(pot.Ingredients))
+		for _, chosen := range pot.Ingredients {
+			keys = append(keys, chosen.Ingredient.Key)
+		}
+		return frame + reference.CauldronOffer(keys, told)
+
+	default:
 		return themeFrame
 	}
-	frame := fmt.Sprintf("%s\n\nYou have already dealt three cards, face up, "+
-		"in this order. These are the cards on the table and there are no "+
-		"others:\n%s", themeFrame, reading.Describe())
-	if told == nil {
-		return frame
-	}
-	keys := make([]string, 0, len(reading.Cards))
-	for _, drawn := range reading.Cards {
-		keys = append(keys, drawn.Card.Key)
-	}
-	return frame + reference.TarotOffer(keys, told)
 }
 
 // themeMessages is the transcript as a request: a frame, the conversation, and
@@ -698,6 +777,28 @@ func readingFor(who Persona, seed *big.Int) *tarot.Reading {
 	}
 	reading := tarot.Deal(seed)
 	return &reading
+}
+
+// potFor is the pot this conversation is being brewed into, or nil.
+//
+// `readingFor`'s twin, and the same argument holds for every line of it:
+// re-picked from the seed on every turn rather than stored, because the pick
+// is deterministic and one integer in the client's hand is enough to keep the
+// three ingredients the same three ingredients for the whole conversation.
+//
+// **No error path**, for the same reason: `seedFor` has already read the seed
+// at check time, which is where a malformed one has to be refused anyway — a
+// job in state `error` four minutes later is not a 422.
+//
+// Written beside `readingFor` rather than folded into it. Two props, two
+// functions, for the reason `internal/brew` gives at length: they are two
+// contracts that happen to have the same shape today.
+func potFor(who Persona, seed *big.Int) *brew.Pot {
+	if who.Prop != PropCauldron || seed == nil {
+		return nil
+	}
+	pot := brew.Deal(seed)
+	return &pot
 }
 
 // ThemeStanceFor is the stance that applies when there is no deck to derive
@@ -971,12 +1072,18 @@ func CheckAsk(transcript, slots, requested, persona, seed, facts any,
 	return plan, nil
 }
 
-// seedFor resolves the reading seed at check time, so an unusable one is a
-// 422 now rather than a job in state `error` later. A seed handed to a voice
-// that does not deal is dropped, never refused — which covers a room whose
-// prop is something other than cards as well as a room with no prop at all.
+// seedFor resolves the prop's seed at check time, so an unusable one is a
+// 422 now rather than a job in state `error` later. A seed handed to a room
+// with nothing on the table is dropped, never refused.
+//
+// Written as "has a prop" rather than as a list of the two that do, so a third
+// prop is not a silent no-op the day somebody adds one: a room with something
+// on its table carries a seed, and which *object* that seed picks is
+// `readingFor` and `potFor`'s business rather than this one's. Before the
+// cauldron this read `who.Prop != PropTarot`, which would have dropped the
+// witch's seed on the floor and re-picked her pot on every turn.
 func seedFor(who Persona, seed any) (*big.Int, error) {
-	if who.Prop != PropTarot || seed == nil {
+	if who.Prop == "" || seed == nil {
 		return nil, nil
 	}
 	n, err := intValue(seed)
@@ -1041,7 +1148,7 @@ func RunAsk(ctx context.Context, conn *pool.Conn, plan *AskPlan, run ThemeRun) (
 		Endpoint: plan.Endpoint,
 		Messages: themeMessages(plan.History,
 			closingFor(plan.Carried, plan.History, plan.Told),
-			frameFor(readingFor(who, plan.Seed), plan.Told)),
+			frameFor(readingFor(who, plan.Seed), potFor(who, plan.Seed), plan.Told)),
 		Stance: plan.Effective,
 		// No deck source, and the nil is the point rather than a default
 		// nobody filled in.
@@ -1330,7 +1437,7 @@ func RunProposal(ctx context.Context, conn *pool.Conn, plan *ProposalPlan, run T
 			// `told` is nil, and the nil is load-bearing: the proposal's
 			// schema has no `fact` field, so offering it a hundred entries
 			// would be seven kilobytes of prompt with nowhere to go.
-			frameFor(readingFor(who, plan.Seed), nil)),
+			frameFor(readingFor(who, plan.Seed), potFor(who, plan.Seed), nil)),
 		Stance: plan.Effective,
 		Deps:   tools.Deps{Source: nil, Pool: conn},
 		Tier:   plan.Tier,

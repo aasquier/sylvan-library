@@ -38,13 +38,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   api,
+  brewsACauldron,
   dealsTarot,
+  type BrewReading,
   type Persona,
   type PersonaRoster,
   type TarotDrawn,
   type TarotReading,
   type ThemeCommander,
 } from '../lib/api'
+import { Cauldron } from './cauldron'
+import { POT_IS_ON } from '../lib/cauldroncopy'
 import { deal as dealSound, flip as flipSound, riffle, shimmer }
   from '../lib/tablesounds'
 import { useTableSound } from '../lib/prefs'
@@ -56,7 +60,7 @@ import roomMp4Url from '../assets/seance/seance-room-loop.mp4'
 import roomStillUrl from '../assets/seance/seance-room-still.webp'
 import roomWebmUrl from '../assets/seance/seance-room-loop.webm'
 import { ThemeInterview } from './theme'
-import { Spinner } from './ui'
+import { ErrorNote, Spinner } from './ui'
 import { VideoBackdrop } from './videofx'
 
 /** The table survives a reload, for the reason the transcript does: a reading
@@ -82,6 +86,11 @@ interface Table {
 }
 
 const NO_TABLE: Table = { persona: null, seed: null, turned: [], read: false }
+
+/** Nothing is in the pot before a word is said, and this is that nothing as
+ *  one stable array — a fresh `[]` every render is an effect one component
+ *  down that re-runs every render to conclude the same thing. */
+const NOTHING_IN_IT: string[] = []
 
 function loadTable(): Table {
   try {
@@ -544,6 +553,26 @@ function SoundToggle() {
   )
 }
 
+/**
+ * When the pot does not answer.
+ *
+ * Commandment 10, and `theme.tsx`'s `trouble` one file over carries the whole
+ * argument: whatever a browser threw is exactly what somebody fixing this
+ * wants and none of what somebody waiting on a question wants, so the
+ * diagnosis goes to the console — where the first audience reads — and the
+ * room is handed a sentence written for the second.
+ *
+ * It is deliberately a sentence about the evening rather than about a
+ * request. Nothing the querent did caused it, the other way in still works,
+ * and neither of those is a thing a stack trace says.
+ */
+function potTrouble(e: unknown): string {
+  console.error('the witch’s room: the pot did not answer', e)
+  return 'The fire is out under the pot for the moment, and nothing you did '
+    + 'put it out. Pick somebody else across the table, or go and choose '
+    + 'colours yourself — both still work.'
+}
+
 /* --------------------------------------------------------------- the table */
 
 export function TarotTable({ onPick, onLeave, onCeremony }: {
@@ -558,6 +587,11 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   const [roster, setRoster] = useState<PersonaRoster | null>(null)
   const [table, setTable] = useStashed(TABLE, loadTable)
   const [reading, setReading] = useState<TarotReading | null>(null)
+  /** What the witch's pot is waiting on. The spread's twin, and re-fetched
+   *  from the same stashed seed for the same reason: one integer is enough to
+   *  put the same three things back in the pot, so the room and the
+   *  conversation can never disagree about what is going in. */
+  const [pot, setPot] = useState<BrewReading | null>(null)
   const [shuffling, setShuffling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const timers = useRef<number[]>([])
@@ -580,17 +614,37 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     timers.current.push(window.setTimeout(fn, ms))
   }
 
+  // Who is at the table. Read here rather than below the effects because two
+  // of them need it: a seed means something different in each room, and the
+  // prop is the only thing that says which.
+  const seated = roster?.personas.find((p) => p.key === table.persona) ?? null
+
   // Re-deal from the seed after a reload. Deterministic server-side, so the
   // cards that come back are the cards that were on the table — which is the
   // whole reason a spread costs one integer to remember.
   useEffect(() => {
+    if (!seated || !dealsTarot(seated)) return
     if (table.seed === null || reading?.seed === table.seed) return
     let live = true
     api.tarotReading(table.seed)
       .then((r) => { if (live) setReading(r) })
       .catch((e) => { if (live) setError(String(e)) })
     return () => { live = false }
-  }, [table.seed, reading])
+  }, [seated, table.seed, reading])
+
+  // And the same again for the pot. Two props, two fetches, guarded on the
+  // prop rather than on the seed alone — both rooms remember one integer, and
+  // an unguarded pair of effects would have each of them asking for the
+  // other's object every time somebody sat down.
+  useEffect(() => {
+    if (!seated || !brewsACauldron(seated)) return
+    if (table.seed === null || pot?.seed === table.seed) return
+    let live = true
+    api.brewReading(table.seed)
+      .then((p) => { if (live) setPot(p) })
+      .catch((e) => { if (live) setError(potTrouble(e)) })
+    return () => { live = false }
+  }, [seated, table.seed, pot])
 
   const cards = reading?.cards ?? []
   const allTurned = cards.length > 0 && table.turned.length >= cards.length
@@ -624,15 +678,21 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   }, [allTurned, turnedHere])
   const settled = allTurned && (!turnedHere || waited)
 
-  // Tell the page when the deal is the event. Computed here rather than
+  // Tell the page when the prop is the event. Computed here rather than
   // reusing `dealing` below because hooks cannot follow the early returns,
-  // and the two must agree: this is `dealing || shuffling` by another
-  // route. Cleanup fires `false` so leaving the door restores the chrome.
-  // `shuffling` stands alone because only the dealing reader ever shuffles,
-  // and during her shuffle `table.persona` is not yet written.
-  const seated = roster?.personas.find((p) => p.key === table.persona) ?? null
-  const ceremonyActive = shuffling || (seated !== null && dealsTarot(seated)
-    && !(allTurned && settled && table.read))
+  // and the two must agree: this is `dealing || simmering || shuffling` by
+  // another route. Cleanup fires `false` so leaving the door restores the
+  // chrome. `shuffling` stands alone because only the dealing reader ever
+  // shuffles, and during her shuffle `table.persona` is not yet written.
+  //
+  // Both props end their ceremony the same way, through `table.read`: the
+  // spread lingers with all three cards up until the querent knocks, and the
+  // pot simmers full-size until they come to the table. Only what they are
+  // waiting for differs.
+  const ceremonyActive = shuffling
+    || (seated !== null && dealsTarot(seated)
+      && !(allTurned && settled && table.read))
+    || (seated !== null && brewsACauldron(seated) && !table.read)
   useEffect(() => {
     onCeremony?.(ceremonyActive)
   }, [ceremonyActive, onCeremony])
@@ -640,11 +700,31 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
 
   const chooseReader = useCallback(async (persona: Persona) => {
     setError(null)
+    // The pot: no shuffle and no beat, because it has been on since before
+    // anybody knocked. What it needs is the seed — the same integer that puts
+    // the same three things back in it after a reload — so this asks for it
+    // and goes straight to the room, where the querent gets to stand and look
+    // at it before saying anything.
+    if (brewsACauldron(persona)) {
+      setReading(null)
+      try {
+        const filled = await api.brewReading()
+        setPot(filled)
+        setTable({
+          persona: persona.key, seed: filled.seed, turned: [], read: false,
+        })
+      } catch (e) {
+        setError(potTrouble(e))
+      }
+      return
+    }
     if (!dealsTarot(persona)) {
       setReading(null)
+      setPot(null)
       setTable({ persona: persona.key, seed: null, turned: [], read: false })
       return
     }
+    setPot(null)
     // The shuffle is a beat rather than a spinner. `/api/tarot/reading` is a
     // dict lookup and answers instantly, and a reading that arrived the moment
     // you sat down would not feel like one — this is the door where that
@@ -686,6 +766,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
     timers.current.forEach(clearTimeout)
     timers.current = []
     setReading(null)
+    setPot(null)
     setTable(NO_TABLE)
     setError(null)
   }
@@ -722,20 +803,27 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
    * while shuffling for the same reason in reverse: the emptying is what makes
    * the next deal a change rather than a re-render of the same string.
    */
-  const said = shuffling || cards.length === 0
-    ? ''
-    : lastTurned === null
-      ? `The deal is done: ${cards.length} `
-        + `card${cards.length === 1 ? '' : 's'} face down on the table. `
-        + 'Turn them over when you are ready.'
-      : `${lastTurned.position}: ${lastTurned.face_name}`
-        + `${lastTurned.reversed ? ', reversed' : ''}.`
+  // The hut's own arrival, in the same region and by the same rule: the pot is
+  // on before anybody says anything, and a room that opened in silence would
+  // be the deal's old bug one prop over. The string is the caption's, verbatim
+  // — never a second wording of it.
+  const simmering = seated !== null && brewsACauldron(seated) && !table.read
+  const said = simmering && pot
+    ? POT_IS_ON
+    : shuffling || cards.length === 0
+      ? ''
+      : lastTurned === null
+        ? `The deal is done: ${cards.length} `
+          + `card${cards.length === 1 ? '' : 's'} face down on the table. `
+          + 'Turn them over when you are ready.'
+        : `${lastTurned.position}: ${lastTurned.face_name}`
+          + `${lastTurned.reversed ? ', reversed' : ''}.`
   const say = <span className="sr-only" role="status">{said}</span>
 
   if (error && !roster) {
     return (
       <div className="card-surface rounded-xl px-6 py-8">
-        <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
+        <ErrorNote>{error}</ErrorNote>
         <button onClick={onLeave} className="btn btn-quiet btn-sm mt-3">
           ← Pick colours myself
         </button>
@@ -779,7 +867,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
         </div>
 
         {error && (
-          <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
+          <ErrorNote>{error}</ErrorNote>
         )}
 
         {shuffling
@@ -809,6 +897,18 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   const deals = dealsTarot(chosen)
   const dealing = deals && !(allTurned && settled && table.read)
   const lingering = deals && allTurned && settled && !table.read
+  // The hut's linger, and it is the same beat with nothing to turn over: the
+  // pot is already on, so the querent gets to stand and look at it before
+  // anybody asks them anything.
+  //
+  // **`brewing` is the phase, not the picture**, and the difference is a real
+  // flicker: a reload arrives with the stash saying `witch` and `read: false`
+  // while the pot is still a request in flight, and keying this on `pot` would
+  // put the conversation on screen for that beat and then swap the room in
+  // over the top of it. It is the same fact `simmering` carries above, where
+  // the live region needed it before the early returns.
+  const brews = brewsACauldron(chosen)
+  const brewing = brews && !table.read
   const takeReading = () => setTable((t) => ({ ...t, read: true }))
   // Every voice frames its own table. The dealing reader talks about the
   // cards; everyone else introduces themselves with the same words their
@@ -822,10 +922,18 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
              + 'you — the pictures are only there to make them harder to '
              + 'answer politely.',
       }
-    : {
-        title: chosen.label,
-        blurb: `${chosen.blurb} None of the questions are about Magic.`,
-      }
+    : brews
+      ? {
+          title: 'The pot is on',
+          blurb: 'The questions are about you, never about Magic — what you '
+               + 'always take too much of, what you would climb back into the '
+               + 'bin for, what you do when it goes wrong. Say it plainly. '
+               + 'The pot only takes true things.',
+        }
+      : {
+          title: chosen.label,
+          blurb: `${chosen.blurb} None of the questions are about Magic.`,
+        }
 
   return (
     <>
@@ -840,7 +948,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
           chrome above the felt is a line the ceremony cannot fit in one
           screen (item 6). Once the conversation is the event the plain
           header row returns. */}
-      {!dealing && (
+      {!dealing && !brewing && (
         <div className="flex flex-wrap items-start gap-3">
           {cards.length > 0 && (
             <p className="text-[10px] uppercase tracking-wide"
@@ -877,7 +985,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
       )}
 
       {error && (
-        <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
+        <ErrorNote>{error}</ErrorNote>
       )}
 
       {/* The spread. Centred and large while it is the event — on the felt,
@@ -967,12 +1075,71 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
           the visible "Begin the reading" button beside it is the plain
           door, so the gesture is never the only way forward. */}
 
+      {/* Agatha's hut, full size, before a word is said. The séance's linger
+          with nothing to turn over: the pot has been on since before anybody
+          knocked, so the one thing to do here is stand and look at it — and
+          the room gets the whole viewport to be looked at in, the same way the
+          spread does (`onCeremony` clears the page's chrome around it). */}
+      {/* A reload lands here with the stash saying `witch` and the pot still a
+          request in flight. It is one round trip to a dict lookup, so this is
+          usually a frame — but a frame of nothing under a cleared masthead is
+          a page that looks broken, and the alternative (keying the phase on
+          the pot) puts the conversation on screen and then swaps a room in
+          over the top of it. */}
+      {brewing && !pot && !error && (
+        <Spinner label="Finding what she has set out…" />
+      )}
+
+      {brewing && pot && (
+        <div className="cauldron-hut relative">
+          <Cauldron view="room" ingredients={pot.ingredients}
+                    grounded={NOTHING_IN_IT} caption={POT_IS_ON}>
+            {/* The chrome rides the dark upper corners, which is the one part
+                of this composition with nothing in it — and comes off the
+                room on a phone, where "dark upper corners" is a fact about a
+                wide window rather than about the design. */}
+            <div className="cauldron-controls">
+              <span className="flex items-center gap-3">
+                <button onClick={takeReading} className="btn btn-copper-hot">
+                  Sit down at the pot
+                </button>
+                <span className="text-xs" style={{ color: 'var(--hut-ink)' }}>
+                  stand and look as long as you like
+                </span>
+              </span>
+              <span className="flex items-center gap-2">
+                <button onClick={leaveTable}
+                        className="btn btn-copper btn-sm">
+                  Different reader
+                </button>
+              </span>
+            </div>
+          </Cauldron>
+          <div className="px-5 pb-5 pt-4">
+            <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+              <strong>Something green is already turning over in it, and she
+              is not going to say what.</strong>{' '}
+              Three things go in tonight, and you bring all three.
+            </p>
+            {/* The picture is credited in the room it is in. A committed
+                public-domain oil rather than a hotlinked card crop, so the
+                Fan Content deal is not what is being kept here — the habit
+                is, and the habit is the point. */}
+            <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              The hut is John William Waterhouse&rsquo;s <em>The Magic
+              Circle</em>, 1886.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Keyed on the reader and the spread, so choosing differently remounts
           rather than reuses. A persona is fixed for a conversation (ADR 21)
           and this is where that is enforced rather than asked for. */}
-      {!dealing && (
+      {!dealing && !brewing && (
         <ThemeInterview key={`${chosen.key}:${table.seed ?? 'none'}`}
                         persona={chosen.key} seed={table.seed}
+                        pot={brews ? pot : null}
                         intro={intro} onPick={onPick} onLeave={onLeave} />
       )}
     </section>

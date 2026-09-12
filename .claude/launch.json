@@ -21,6 +21,27 @@
       ]
     },
     {
+      "// mtglab-ui-claude": [
+        "The API with the pipe open: sources .env into the process, because",
+        "the binary itself never reads that file (config.go argues why).",
+        "Use this one when walking a Claude surface locally -- the interview",
+        "rooms, research, the dossier; `mtglab-ui` serves everything else",
+        "and answers those surfaces with the shut-door copy."
+      ],
+      "name": "mtglab-ui-claude",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a; . ./.env; set +a; exec ./mtglab ui --port 8765"
+      ],
+      "port": 8765,
+      "autoPort": false,
+      "// autoPort": [
+        "Pinned for the reason argued on mtglab-ui above: the vite proxy",
+        "names 127.0.0.1:8765 and a reassigned port fails silently."
+      ]
+    },
+    {
       "name": "mtglab-ui-no-pool",
       "runtimeExecutable": "bash",
       "runtimeArgs": [

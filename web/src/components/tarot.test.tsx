@@ -28,7 +28,13 @@ import { api, type TarotDrawn } from '../lib/api'
 
 vi.mock('../lib/api', async (importOriginal) => {
   const real = await importOriginal<typeof import('../lib/api')>()
-  return { ...real, api: { ...real.api, personas: vi.fn(), tarotReading: vi.fn() } }
+  return {
+    ...real,
+    api: {
+      ...real.api,
+      personas: vi.fn(), tarotReading: vi.fn(), brewReading: vi.fn(),
+    },
+  }
 })
 
 afterEach(cleanup)
@@ -142,5 +148,96 @@ describe('the table, said out loud', () => {
     await waitFor(() => {
       expect(region()!.textContent).toBe('THE TURNING: four-of-cups.')
     })
+  })
+})
+
+/**
+ * The other room the door opens onto, and the half of it that lives here: the
+ * pot, full size, before a word is said.
+ *
+ * The séance's linger with nothing to turn over. It matters that this is a
+ * *phase* rather than a decoration — the interview must not be underneath it,
+ * because the page's chrome is cleared for the room and a conversation
+ * standing behind a full-bleed 16:9 plate is a conversation nobody can see.
+ * `components/cauldron.test.tsx` holds everything after this point.
+ */
+describe('the pot, before anything is said', () => {
+  function region(): HTMLElement | null {
+    return document.querySelector('[role="status"]')
+  }
+
+  beforeEach(() => {
+    vi.mocked(api.personas).mockResolvedValue({
+      default: 'plain',
+      personas: [{ key: 'witch', label: 'Brew me something',
+                   blurb: 'A pot already boiling.', prop: 'cauldron' }],
+    })
+    vi.mocked(api.brewReading).mockResolvedValue({
+      seed: 7,
+      ingredients: [
+        { key: 'rose-hips', name: 'Rose hips', slot: 'taste',
+          position: 'The Base', note: 'the colour of a bruise' },
+        { key: 'wolfsbane', name: 'Wolfsbane', slot: 'temperament',
+          position: 'The Heat', note: 'the hood comes off in the boil' },
+        { key: 'mugwort', name: 'Mugwort', slot: 'posture',
+          position: 'The Binding', note: 'holds whatever else is in there' },
+      ],
+    })
+  })
+
+  /** Pick the witch and wait for the hut. */
+  async function knock() {
+    render(<TarotTable onPick={() => {}} onLeave={() => {}} />)
+    const her = await screen.findByRole('button', { name: /Brew me something/ })
+    her.click()
+    await waitFor(() => {
+      expect(document.querySelector('.cauldron-room')).not.toBeNull()
+    })
+  }
+
+  it('opens on the room, with nothing in the pot and no interview under it',
+     async () => {
+    await knock()
+    // Nothing in it: the pot is on, and what goes in it is what the querent
+    // has not said yet.
+    expect(document.querySelector('.cauldron-room')!
+      .getAttribute('data-level')).toBe('0')
+    // And the conversation has not started. The room owns the screen.
+    expect(screen.queryByLabelText('Your answer')).toBeNull()
+  })
+
+  it('says the arrival in the same words it prints', async () => {
+    await knock()
+    const line = 'The pot is on. Nothing in it yet but the boil.'
+    await waitFor(() => {
+      expect(region()!.textContent).toBe(line)
+    })
+    expect(document.querySelector('.cauldron-beat')!.textContent).toBe(line)
+  })
+
+  it('credits the painting in the room the painting is in', async () => {
+    await knock()
+    // A committed public-domain oil rather than a hotlinked card crop, so the
+    // Fan Content deal is not what is being kept here — the habit is.
+    expect(screen.getByText(/John William Waterhouse/)).toBeTruthy()
+    expect(screen.getByText(/The Magic Circle/)).toBeTruthy()
+  })
+
+  it('hands the way in to a control that wears the room', async () => {
+    await knock()
+    // Commandment 17: the one action on this screen is the room's own, not
+    // the page's accent button standing in somebody else's house.
+    const sit = screen.getByRole('button', { name: 'Sit down at the pot' })
+    expect(sit.className).toContain('btn-copper-hot')
+    sit.click()
+    // ...and it folds. The full-size room goes and the interview takes the
+    // screen; the strip that rides above the conversation from here on is
+    // `cauldron.test.tsx`'s, because it belongs to the interview rather than
+    // to the door.
+    await waitFor(() => {
+      expect(document.querySelector('.cauldron-room')).toBeNull()
+    })
+    expect(document.querySelector('.persona-room, [role="status"]'))
+      .not.toBeNull()
   })
 })

@@ -39,6 +39,9 @@ var loreFile []byte
 //go:embed data/tarotlore.json
 var tarotloreFile []byte
 
+//go:embed data/cauldronlore.json
+var cauldronloreFile []byte
+
 //go:embed data/model.json
 var modelFile []byte
 
@@ -401,6 +404,29 @@ type TarotLore struct {
 	Facts []TarotFact `json:"facts"`
 }
 
+// CauldronFact is one true thing about brewing or about a thing that goes in
+// the pot, cited by id by the witch. `Ingredient` is empty for the pot tier
+// -- the facts that are true of every brew, whatever landed in it.
+//
+// The fifth corpus of checked-in prose, and shaped exactly like [TarotFact]
+// because it is used exactly the same way: a persona's prop offers facts, the
+// turn cites one by id, and the corpus's own sentence is what the querent
+// reads. The one field that differs is the one that names what a fact is
+// about, and it is named for this prop rather than for the other one --
+// `card` and `ingredient` are two vocabularies and a shared column would have
+// made the corpora look like one table with a spare field.
+type CauldronFact struct {
+	ID         string `json:"id"`
+	Text       string `json:"text"`
+	Source     string `json:"source"`
+	Ingredient string `json:"ingredient"`
+}
+
+// CauldronLore is every fact, pot tier first.
+type CauldronLore struct {
+	Facts []CauldronFact `json:"facts"`
+}
+
 // Model is the deck model's spoken vocabulary: the categories a card may
 // be filed under, the two statuses and two stages, the basics the singleton
 // rule exempts, the conventional category targets and the Game Changer
@@ -460,6 +486,7 @@ var (
 	vocabulary Vocabulary
 	shelves    Shelves
 	tarot      TarotLore
+	cauldron   CauldronLore
 	model      Model
 	shelf      RuntimeShelves
 	coliseum   Coliseum
@@ -473,6 +500,7 @@ func init() {
 	themesJSON = mustCompact("themes.json", themesFile, &vocabulary)
 	mustCompact("lore.json", loreFile, &shelves)
 	mustCompact("tarotlore.json", tarotloreFile, &tarot)
+	mustCompact("cauldronlore.json", cauldronloreFile, &cauldron)
 	mustCompact("model.json", modelFile, &model)
 	mustCompact("shelves.json", shelvesFile, &shelf)
 	mustCompact("coliseum.json", coliseumFile, &coliseum)
@@ -553,6 +581,9 @@ func Lore() *Shelves { return &shelves }
 
 // Tarot is the fortune-teller's corpus, typed. Read-only.
 func Tarot() *TarotLore { return &tarot }
+
+// Cauldron is the witch's corpus, typed. Read-only.
+func Cauldron() *CauldronLore { return &cauldron }
 
 // Deck is the deck model's vocabulary, typed. Read-only.
 func Deck() *Model { return &model }

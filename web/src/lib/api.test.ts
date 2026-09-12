@@ -17,8 +17,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, api, dealsTarot, errorMessage, followJob, onSessionLost,
-  type Job, type Persona,
+  ApiError, api, brewsACauldron, dealsTarot, errorMessage, followJob,
+  onSessionLost, type Job, type Persona,
 } from './api'
 
 function job(overrides: Partial<Job> = {}): Job {
@@ -681,6 +681,51 @@ describe('a room that deals tarot', () => {
     // case fold nor a stray space is "tarot".
     for (const prop of ['cauldron', 'Tarot', 'tarot ', 'tarot-cards']) {
       expect(dealsTarot(room({ prop }))).toBe(false)
+    }
+  })
+})
+
+/**
+ * ...and a room with a pot on, which is deliberately **not** the same reader
+ * over the same field.
+ *
+ * The asymmetry is the whole reason there are two of these rather than one
+ * `hasProp`. `deals` predates the cauldron entirely, so against a pre-`prop`
+ * server the right answer for a spread is whatever that boolean said and the
+ * right answer for a pot is `false` — that server's witch had nothing on the
+ * table. A single generalised reader would have to pick one of those, and
+ * either choice is wrong somewhere.
+ */
+describe('a room with a pot on', () => {
+  const room = (over: Partial<Persona>): Persona =>
+    ({ key: 'x', label: 'X', blurb: 'x', ...over })
+
+  it('reads the prop, exactly', () => {
+    expect(brewsACauldron(room({ prop: 'cauldron' }))).toBe(true)
+    expect(brewsACauldron(room({ prop: '' }))).toBe(false)
+    expect(brewsACauldron(room({ prop: 'tarot' }))).toBe(false)
+    for (const prop of ['Cauldron', 'cauldron ', 'cauldrons']) {
+      expect(brewsACauldron(room({ prop }))).toBe(false)
+    }
+  })
+
+  it('answers false against a server that never had one', () => {
+    // No `prop` in the payload at all is a tab open across the deploy. There
+    // is no legacy key to fall back to here and there must not be one: a
+    // `deals: true` from that server meant *cards*, and reading it as a pot
+    // would put a cauldron in the fortune teller's room.
+    expect(brewsACauldron(room({}))).toBe(false)
+    expect(brewsACauldron(room({ deals: true }))).toBe(false)
+    expect(brewsACauldron(room({ deals: false }))).toBe(false)
+  })
+
+  it('is never true at the same time as the spread', () => {
+    // A persona has one prop. Nothing enforces that on the wire, so the two
+    // readers being mutually exclusive over every spelling either of them
+    // answers to is worth holding here.
+    for (const prop of ['', 'tarot', 'cauldron', 'scrying-bowl']) {
+      const r = room({ prop })
+      expect(dealsTarot(r) && brewsACauldron(r)).toBe(false)
     }
   })
 })

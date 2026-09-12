@@ -27,9 +27,22 @@ import type { ClaudeStatus } from '../lib/api'
 import { levelLabel, presetLabel } from '../lib/claudecopy'
 import { isCapped, type StancePin } from '../lib/stance'
 
-export function StanceReadout({ status, pin }: {
+/**
+ * Where the readout is standing, for the one phrase that depends on it.
+ *
+ * `null` is the pin the header offers back as "follow the deck", and on a deck
+ * page that is exactly what it does. The theme interview **has no deck** — it
+ * is the surface somebody arrives at *before* there is one — so a line reading
+ * "following the deck" there named a thing that does not exist in the room,
+ * which is the kind of small lie a newcomer has no way to check. Same setting,
+ * same resolved answer, one honest phrase per surface.
+ */
+export type StanceSurface = 'deck' | 'table'
+
+export function StanceReadout({ status, pin, surface = 'deck' }: {
   status: ClaudeStatus
   pin: StancePin
+  surface?: StanceSurface
 }) {
   const [open, setOpen] = useState(false)
   const [pinned, setPinned] = useState(false)
@@ -60,7 +73,7 @@ export function StanceReadout({ status, pin }: {
   // because it is the one the menu can give back).
   const resolved = presetLabel(status.stance.preset)
   const line = pin === null
-    ? `${resolved} · following the deck`
+    ? `${resolved} · ${surface === 'table' ? 'at the table' : 'following the deck'}`
     : capped
       ? `${resolved} · limited from ${presetLabel(pin)}`
       : resolved

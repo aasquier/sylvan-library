@@ -3,15 +3,24 @@ package api
 import (
 	"net/http"
 
+	"github.com/aasquier/sylvan-library/go/internal/brew"
 	"github.com/aasquier/sylvan-library/go/internal/claude"
 	"github.com/aasquier/sylvan-library/go/internal/tarot"
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// The Claude surface's free corners: the roster of voices, and the tarot
-// table's deal. Both are deterministic, need no key, no pool and no network,
-// and answer on a base install with no account — which is exactly why they
-// cross first. The rest of the family waits on the pipe.
+// The Claude surface's free corners: the roster of voices, the tarot table's
+// deal, and the cauldron's pick. All of them are deterministic, need no key,
+// no pool and no network, and answer on a base install with no account —
+// which is exactly why they cross first. The rest of the family waits on the
+// pipe.
+//
+// The two props are deliberately the same shape, down to the query grammar
+// and the refusals, because they are the same promise made twice: a seed a
+// browser has held for months answers with what it answered with then. What
+// they do NOT share is an implementation — `internal/brew` argues that at
+// length, and the short version is that two props are two contracts and a
+// shared one would move them together.
 
 // personaRoster is `GET /api/claude/personas`: the voices the theme interview
 // can adopt, for the door to render.
@@ -66,6 +75,50 @@ func (a *API) tarotReading(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.JSON(w, http.StatusOK, tarot.Deal(seed))
+}
+
+// brewReading is `GET /api/brew/reading`: fill the pot. No model, no card
+// pool, no network, no cost.
+//
+// The witch's prop, and the tarot route's twin in every respect a client can
+// observe. **The deterministic code decides** (ADR 14): which three things
+// the cauldron asks for has a right answer and belongs in code, while what
+// any of it says about the person on the other side of the steam has none and
+// belongs to her. Seeded and returning its seed, so the client can carry one
+// integer and get the same three ingredients for the whole conversation —
+// the same stateless trick the transcript uses, and the reason a brew needs
+// no table either.
+//
+// A seed may be supplied to re-fill an existing pot, which is what a reload
+// does. That is the promise this route rests on, and it is `internal/mt19937`
+// that keeps it.
+//
+// Written beside the deal rather than in a file of its own because the
+// grouping this file argues is *the free corners* — no key, no pool, no
+// network — and that is precisely what this is. The duplication with
+// `tarotReading` is four lines of query handling and it is on purpose: these
+// are two routes' contracts, and the day one of them has to answer a
+// parameter the other does not, a shared helper is the thing in the way.
+func (a *API) brewReading(w http.ResponseWriter, r *http.Request) {
+	// Last value wins — the recorded reading of `?seed=7&seed=9` is nine.
+	// Go's Query().Get() returns the FIRST, which is the kind of difference
+	// that never shows up until somebody's client appends.
+	vals := r.URL.Query()["seed"]
+	if len(vals) == 0 {
+		wire.JSON(w, http.StatusOK, brew.Deal(nil))
+		return
+	}
+	raw := vals[len(vals)-1]
+	seed, ok := brew.ParseSeed(raw)
+	if !ok {
+		// An absent parameter is a fresh pick; a present but unreadable one is
+		// a 422. `?seed=` with no value takes this branch, which is the deck's
+		// recorded contract and is held to it by a test rather than by the
+		// hope that two hand-written scanners agree.
+		wire.Unprocessable(w, wire.IntParsing("query", "seed", raw))
+		return
+	}
+	wire.JSON(w, http.StatusOK, brew.Deal(seed))
 }
 
 // claudeStatus is `GET /api/claude` -- `service.claude_status`: is the Claude

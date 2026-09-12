@@ -247,6 +247,56 @@ describe('while the proposal runs', () => {
   })
 })
 
+describe('a proposal that ran and came back empty', () => {
+  /* The server's reason for an unparseable pour carries a wire token —
+     "(stop reason: max_tokens)" — and that sentence is frozen by the crossing
+     corpus, so the wire cannot change. The screen can: the room speaks its
+     own sentence and the recorded reason goes to the console. `asked: false`
+     reasons are the server explaining itself in a person's words and must
+     keep passing through (the stance-off test above holds that half). */
+  it('speaks in the room\'s words and sends the wire token to the console', async () => {
+    const ask = job(report({
+      question: 'And at the table?', may_propose: true, grounded: 3,
+      slots: [
+        { kind: 'taste', value: 'fog', quote: 'fog' },
+        { kind: 'temperament', value: 'planner', quote: 'planner' },
+        { kind: 'posture', value: 'organiser', quote: 'organiser' },
+      ],
+    }))
+    const pour = {
+      answered_by: 'claude', mode: 'theme-proposal', model: 'claude-sonnet-5',
+      asked: true, reason: 'The answer did not parse (stop reason: max_tokens).',
+      stance: STANCE, combinations: [], sources: [], slots: [], slots_dropped: 0,
+    }
+    const pourJob = {
+      id: 'job-pour', kind: 'claude.theme.proposal', status: 'done', done: 1,
+      total: 1, percent: 100, label: 'pour', result: pour, error: null,
+      created_at: '2026-08-15T10:00:00+00:00',
+    }
+    // The first follow is the ask; every follow after it is the pour.
+    vi.mocked(followJob)
+      .mockReturnValueOnce({
+        promise: Promise.resolve(ask) as never, cancel: () => {},
+      } as never)
+      .mockReturnValue({
+        promise: Promise.resolve(pourJob) as never, cancel: () => {},
+      } as never)
+    vi.mocked(api.themePropose).mockResolvedValue({ id: 'job-pour' } as never)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      renderRoom()
+      fireEvent.click(await screen.findByRole('button', { name: 'Get my colours' }))
+      // The room's own sentence, not the wire's.
+      await screen.findByText('Nothing usable came back.')
+      expect(screen.queryByText(/stop reason/)).toBeNull()
+      expect(spy).toHaveBeenCalledWith(
+        'the proposal came back empty:', pour.reason)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+})
+
 describe('a turn that finished on purpose', () => {
   it('offers no retry when the stance is off', async () => {
     answersWith(report({
@@ -387,16 +437,35 @@ describe('a costumed room', () => {
     expect(screen.queryByText(/Reading around…/)).toBeNull()
   })
 
+  it('says one thing in both places in the hut too', async () => {
+    // The second costumed room, and the same property: the banner in the
+    // column and the button in the sidebar read one field, so a room cannot
+    // answer in two voices however many rooms there are.
+    answersWith(report({
+      question: 'And at the table?', may_propose: true, grounded: 3,
+    }))
+    vi.mocked(api.themePropose).mockReturnValue(new Promise(() => {}) as never)
+    render(<ThemeInterview onPick={() => {}} onLeave={() => {}}
+                           persona="witch" seed={7} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pour it out' }))
+    expect(await screen.findAllByText(/Bringing it up to a boil…/))
+      .toHaveLength(2)
+    expect(screen.queryByText(/Reading around…/)).toBeNull()
+  })
+
   it('leaves the plain rooms exactly as they were', async () => {
     answersWith(report({ question: 'What have you rewatched most?' }))
     render(<ThemeInterview onPick={() => {}} onLeave={() => {}}
-                           persona="witch" />)
+                           persona="therapist" />)
 
     await screen.findAllByText('What have you rewatched most?')
     // No costume: the plain answer box, and the question printed rather than
-    // written. This PR dresses no second room — the witch's cauldron is next.
+    // written. Six of the eight voices are undressed and every one of them
+    // gets exactly this.
     expect(screen.getByPlaceholderText(/However much or little/)).toBeTruthy()
     expect(document.querySelector('.seance-scroll')).toBeNull()
+    expect(document.querySelector('.cauldron-slate')).toBeNull()
     expect(document.querySelector('.ink-text')).toBeNull()
   })
 })

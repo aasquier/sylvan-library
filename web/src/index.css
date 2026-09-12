@@ -2301,6 +2301,1549 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* ─────────────────────────────────────────────────────────── Agatha's hut
+ *
+ * The witch's interview room (`components/cauldron.tsx`), and the séance's
+ * sibling: three ingredients picked from a seed, going into a boiling pot one
+ * at a time as the querent's own words ground the slots they were picked for.
+ *
+ * Like the parchment and the felt, this **commits to one palette in both
+ * themes** and does not ask the theme toggle for permission. `.seance-scroll`
+ * says why in as many words — *"it is a physical object on the table"* — and
+ * `.tarot-table-felt:has(.seance-room)` does the same thing for a whole room.
+ * A witch's hut at night is a witch's hut at night. What makes that safe is
+ * the re-inked text tokens below: everything inside that reads
+ * `var(--text-muted)` stays legible on the hut without knowing where it is
+ * sitting, in either theme, with no `!important` anywhere.
+ *
+ * Measured rather than assumed, the way `.btn-accent-vine`'s comment insists:
+ * `--text-muted` here composites to rgb(162, 170, 155) over `--hut-ash`, which
+ * is **8.19:1** — AA with room to spare, and the same sum for `--text-primary`
+ * lands higher still.
+ */
+.cauldron-hut {
+  /* The brew's journey. FOUR stops, not three: a pot with nothing true in it
+     is still on the fire, and it has a colour. The first step is deliberately
+     small — one true thing does not transform a pot — which is why the
+     reaction to ingredient one is carried mostly by the splash. */
+  --brew-0: #4a3720; /* murky umber   — nothing in it but the boil */
+  --brew-1: #5c5527; /* umber turning — one true thing */
+  --brew-2: #6e8130; /* sickly olive  — two */
+  --brew-3: #7eb846; /* the room's accent (personaAccent('witch')) — three */
+
+  /* What the brew THROWS. The rim light, the caustics, the bead highlights,
+     the steam's tint and the room's own glow all read `--lit`, so the whole
+     hut reports the brew without a word of copy. */
+  --lit-0: #7a5a28;
+  --lit-1: #8d7d34;
+  --lit-2: #9db545;
+  --lit-3: #a8e86a;
+
+  /* The room's own materials. */
+  --copper: #b87333;
+  --copper-lit: #e3a45f;
+  --verdigris: #5f9e8f;
+  --hut-ink: rgba(246, 250, 240, 0.92);
+  --hut-ash: #0b0c08;
+
+  /* Re-inked, the felt's trick one surface over. */
+  --text-primary: rgba(248, 252, 244, 0.94);
+  --text-secondary: rgba(240, 248, 234, 0.86);
+  --text-muted: rgba(226, 238, 218, 0.7);
+
+  /* The dark ground is sampled from the plate's own lower edge rather than
+     chosen, `.tarot-table-felt:has(.seance-room)`'s argument: the panel's top
+     edge has to be the colour the picture's bottom edge already is, or the two
+     read as a picture on a table rather than as one room. */
+  background: linear-gradient(to bottom, #0d0e09 0%, #0a0b07 42%, #070804 100%);
+  border-radius: 1rem;
+  /* The plate clips to the panel's rounded corners. */
+  overflow: hidden;
+}
+
+/* The level, and the cascade trap it is written around.
+ *
+ * The default is declared against the SAME attribute at the SAME specificity
+ * as the steps, and on the one element per window that carries the level —
+ * not on the plate inside it. An element's own declaration always beats the
+ * one it would inherit, so a `--brew` sitting on the strip's inner stage
+ * silently outranks the level on the strip itself, and the folded pot simmers
+ * umber forever while the full-size one goes green. (This is
+ * `an-undefined-custom-property-inherits-silently` with the polarity flipped:
+ * here the property is defined, in the wrong place.) Source order is what
+ * separates these four; keep them adjacent and in this order. */
+.cauldron-window[data-level] {
+  /* The palette is repeated here, not only on `.cauldron-hut`, so the arrival
+     room is the same room whatever panel it is standing in. */
+  --brew-0: #4a3720;
+  --brew-1: #5c5527;
+  --brew-2: #6e8130;
+  --brew-3: #7eb846;
+  --lit-0: #7a5a28;
+  --lit-1: #8d7d34;
+  --lit-2: #9db545;
+  --lit-3: #a8e86a;
+  --copper: #b87333;
+  --copper-lit: #e3a45f;
+  --verdigris: #5f9e8f;
+  --brew: var(--brew-0);
+  --lit: var(--lit-0);
+}
+.cauldron-window[data-level='1'] {
+  --brew: var(--brew-1);
+  --lit: var(--lit-1);
+}
+.cauldron-window[data-level='2'] {
+  --brew: var(--brew-2);
+  --lit: var(--lit-2);
+}
+.cauldron-window[data-level='3'] {
+  --brew: var(--brew-3);
+  --lit: var(--lit-3);
+}
+
+/* ── the hotspot contract ──────────────────────────────────────────────────
+ *
+ * **Four percentages of the plate, and the only numbers in this whole family
+ * that mean anything.** Everything anchors here: the dim, the brew, the
+ * caustics, the vortex, the surface clip, every splash, the steam, and the
+ * strip's crop. `.seance-room`'s `--ball-*` is the precedent, including why
+ * there are two size numbers — an absolutely positioned box resolves a width
+ * percentage against its container's width and a height percentage against
+ * its height, so one shape needs one number per axis.
+ *
+ * `--pot-dy` does NOT mean what `--ball-dy` means, and the difference is real:
+ * the sphere is a circle read against two axes, and a cauldron seen from a
+ * standing person's height is an ellipse 0.16 as tall as it is wide. Both
+ * readings are recorded in `assets/agatha/PROVENANCE.md`, because they answer
+ * different questions — 40.9% is the circle that HANGS OVER the pot, and
+ * 6.54% is the mouth's own opening, which is what anything landing IN the brew
+ * wants.
+ *
+ * Re-measure all four against the first frame of any footage that replaces the
+ * plate, and nothing else. Nothing is cropped, so nothing drifts: `cover` on a
+ * box whose aspect IS the picture's is deliberately a no-op, and a crop that
+ * moved with the viewport would move the pot out from under the splash. */
+.cauldron-pot {
+  --pot-x: 66%; /* centre of the mouth, across the plate */
+  --pot-y: 36%; /* ...and down it */
+  --pot-d: 23%; /* the mouth's major axis, as % of plate WIDTH */
+  --pot-dy: 6.54%; /* ...and its minor axis, as % of plate HEIGHT */
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  /* Both a stacking context for the blended layers — so they blend against
+     the plate rather than against whatever the page has behind the panel —
+     and the clip that keeps everything inside the room. */
+  isolation: isolate;
+  background: #07080a;
+}
+
+/* LAYER 0 · the picture. */
+.cauldron-plate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* LAYER 0b · the dusk, and it is a treatment rather than a bake.
+ *
+ * The painting is daylit — mean luma 104 against the séance still's 52 — and
+ * `fabrica.recipe.yaml` states the rule for holding one back: *"a level baked
+ * into the byte stream is a decision `index.css` can no longer argue with"*.
+ * So the committed file is the crop and nothing else, and this is the shade.
+ * A black multiply at alpha `a` composites to exactly `v * (1 - a)`, which is
+ * why the stylesheet and a bake are the same arithmetic and the stylesheet is
+ * the right half of the line to put it on.
+ *
+ * The five stops are a smoothstep written out: CSS interpolates a gradient
+ * linearly, and two stops alone put a visible shoulder across the sorceress.
+ * Open over the cauldron, closing to dusk at the frame's edges — the measured
+ * result is mean 54.1 / p90 116.1, inside the house's dark cluster. */
+.cauldron-dusk {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: radial-gradient(25% 68% at 70% 44%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.106) 66.25%,
+    rgba(0, 0, 0, 0.34) 77.5%,
+    rgba(0, 0, 0, 0.574) 88.75%,
+    rgba(0, 0, 0, 0.68) 100%);
+}
+
+/* LAYER 0c · the fire, breathing. The room's idle heartbeat.
+ *
+ * The plate is a photograph of a painting and photographs do not move, so
+ * every other beat in this room is an *event* — a thing goes in, the colour
+ * steps, the pot is poured. Between them the hut sat perfectly still, which is
+ * commandment 6's exact complaint. A fire is the one thing in the picture that
+ * would never be still, so the fire is what gets the pulse.
+ *
+ * Centred on the embers themselves rather than on the pot: 67.8% across and
+ * 52.6% down, measured off the plate (`assets/agatha/PROVENANCE.md` records
+ * the reading), which is below and right of the mouth's own centre. A quarter
+ * of the plate wide, and the height is that same distance read against the
+ * short side — 16:9 means one circle needs two percentages, which is the
+ * hotspot contract's own note about `--pot-d` and `--pot-dy`.
+ *
+ * Screened, so it only ever ADDS to what Waterhouse already painted there. */
+.cauldron-embers {
+  position: absolute;
+  left: 67.8%;
+  top: 52.6%;
+  width: 25%;
+  height: 44.4%;
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  background: radial-gradient(ellipse closest-side,
+    rgba(255, 148, 52, 0.5) 0%,
+    rgba(214, 92, 22, 0.28) 42%,
+    rgba(140, 48, 10, 0.11) 68%,
+    transparent 88%);
+  filter: blur(10px);
+  opacity: 0.48;
+  animation: cauldron-embers 4.4s ease-in-out infinite;
+}
+
+@keyframes cauldron-embers {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* LAYER 1 · the dim, and it is the layer the whole effect turns on.
+ * `.seance-glass-dim`'s argument verbatim: near-white plus anything is
+ * near-white, and a lit cauldron's mouth is near-white. The interior is
+ * multiplied down to a dark before anything is put into it.
+ *
+ * **Not all the way down, and that is the correction.** At 0.99 it took the
+ * painted rim light with it and handed the layers above a black hole to draw
+ * on, which is how the brew ended up being asked to supply ALL the light and
+ * came out the colour of milk. At 0.84 the interior is a warm near-black and
+ * Waterhouse's gold still kisses the far edge of the mouth, which is the light
+ * the whole composition is lit by. */
+.cauldron-dim {
+  position: absolute;
+  left: var(--pot-x);
+  top: var(--pot-y);
+  width: calc(var(--pot-d) * 1.06);
+  height: calc(var(--pot-dy) * 1.06);
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: radial-gradient(ellipse closest-side,
+    rgba(10, 6, 3, 0.84) 0%, rgba(10, 6, 3, 0.8) 62%,
+    rgba(10, 6, 3, 0.42) 84%, transparent 97%);
+}
+
+/* LAYER 2 · the liquid, and it is DARK.
+ *
+ * **A pot of brew at night is a hole with a colour in it.** This was
+ * `mix-blend-mode: screen` over a stop mixed 74% toward white, which is a
+ * lamp rather than a liquid: screening near-white into the mouth erased the
+ * painting's dark interior and its gold rim in one pass, and level zero — a
+ * *murky umber* — rendered pale grey. Read on a screenshot it did not look
+ * like a colour choice, it looked like a rendering fault.
+ *
+ * So the level's colour arrives as a low tint over the dark rather than as
+ * light thrown out of it: every stop is `--brew` folded most of the way into
+ * a near-black, and the element's own opacity is what keeps the painting
+ * underneath. Level 0 composites to about rgb(42, 32, 21) — brown-black, the
+ * colour of a pot nobody has put anything in. Level 3's #7eb846 composites to
+ * about rgb(63, 84, 37), which is dark green *liquid*; the green a person
+ * actually sees at the ready beat is the caustic and the gloss below, lighting
+ * it from inside. A lid is flat. Light in water is not.
+ *
+ * It breathes: a boil is not a still disc. */
+.cauldron-brew {
+  position: absolute;
+  left: var(--pot-x);
+  top: var(--pot-y);
+  width: calc(var(--pot-d) * 0.96);
+  height: calc(var(--pot-dy) * 0.96);
+  translate: -50% -50%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse closest-side,
+    color-mix(in srgb, var(--brew) 56%, #050301) 0%,
+    color-mix(in srgb, var(--brew) 44%, #050301) 44%,
+    color-mix(in srgb, var(--brew) 26%, #050301) 76%,
+    color-mix(in srgb, var(--brew) 14%, #050301) 92%,
+    transparent 100%);
+  opacity: 0.72;
+  transition: background 1500ms cubic-bezier(0.32, 0, 0.2, 1);
+  animation: cauldron-breathe 5.4s ease-in-out infinite;
+}
+
+@keyframes cauldron-breathe {
+  0%,
+  100% {
+    opacity: 0.66;
+    scale: 1 1;
+  }
+  47% {
+    opacity: 0.78;
+    scale: 1.015 1.05;
+  }
+}
+
+/* LAYER 3 · two soft caustics crawling on the surface, on a period that
+   shares no useful multiple with the breathe above — so the light on the brew
+   is never twice the same. `background-position` rather than moving the
+   element: the lobes slide WITHIN the liquid.
+
+   **`--lit` straight, not mixed toward white.** These are the brew lighting
+   itself from under the surface, and a lobe pulled halfway to white is a
+   studio lamp shining down into the pot — the other half of what made the
+   mouth read as a bowl of milk. Screened over the dark liquid, `--lit-0` lands
+   a warm amber shimmer on brown-black and `--lit-3` a green one on dark green,
+   which is the reading the room is after at every level. */
+.cauldron-caustic {
+  position: absolute;
+  left: var(--pot-x);
+  top: var(--pot-y);
+  width: calc(var(--pot-d) * 0.94);
+  height: calc(var(--pot-dy) * 0.94);
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 56% 44% at 33% 38%,
+      var(--lit) 0%, transparent 70%),
+    radial-gradient(ellipse 44% 38% at 68% 64%,
+      color-mix(in srgb, var(--lit) 72%, black) 0%, transparent 72%);
+  opacity: 0.34;
+  transition: opacity 1200ms ease;
+  animation: cauldron-caustic 12.6s ease-in-out infinite;
+}
+
+@keyframes cauldron-caustic {
+  0%,
+  100% {
+    opacity: 0.26;
+    background-position: 0 0, 0 0;
+  }
+  50% {
+    opacity: 0.44;
+    background-position: 7% -6%, -8% 5%;
+  }
+}
+
+/* LAYER 3b · the gloss: one thin arc of light lying ON the surface, the way a
+   liquid seen at a shallow angle takes the room back at you.
+
+   It is a ring gradient (nothing in the middle, a band at 82%, gone by the
+   rim) cut by a linear mask so only its lower half survives — so the arc sits
+   on the ember side of the mouth, which is where the fire is (67.8% / 52.6%
+   of the plate, below and right of the mouth's centre). Screened and quiet:
+   the highlight is the thing that says *wet*, and a bright one says *plastic*.
+   A shade stronger once the pot is ready, because the brew is throwing more
+   light by then and the surface has more to give back.
+
+   No animation of its own. The caustics under it move, and a highlight that
+   also breathed would read as two lights rather than one surface. */
+.cauldron-gloss {
+  position: absolute;
+  left: calc(var(--pot-x) + 1.1%);
+  top: calc(var(--pot-y) + 1.2%);
+  width: calc(var(--pot-d) * 0.76);
+  height: calc(var(--pot-dy) * 0.66);
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  background: radial-gradient(ellipse closest-side,
+    transparent 56%,
+    color-mix(in srgb, var(--lit) 66%, white) 82%,
+    transparent 100%);
+  -webkit-mask-image: linear-gradient(to top,
+    #000 0%, rgba(0, 0, 0, 0.28) 46%, transparent 70%);
+  mask-image: linear-gradient(to top,
+    #000 0%, rgba(0, 0, 0, 0.28) 46%, transparent 70%);
+  opacity: 0.24;
+  transition: opacity 1800ms ease;
+}
+
+.cauldron-window.is-ready .cauldron-gloss {
+  opacity: 0.3;
+}
+
+/* LAYER 4 · the vortex. Ready only, and it is the one motion that says
+   *this is finished and moving on its own*: 22 seconds, which is a stir
+   nobody's hand is in. */
+.cauldron-vortex {
+  position: absolute;
+  left: var(--pot-x);
+  top: var(--pot-y);
+  width: calc(var(--pot-d) * 0.9);
+  height: calc(var(--pot-dy) * 0.9);
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 2400ms ease;
+  background: conic-gradient(from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--lit) 46%, transparent) 40deg,
+    transparent 96deg,
+    color-mix(in srgb, var(--lit) 30%, transparent) 190deg,
+    transparent 250deg,
+    color-mix(in srgb, var(--lit) 40%, transparent) 320deg,
+    transparent 360deg);
+  -webkit-mask-image: radial-gradient(ellipse closest-side,
+    transparent 8%, #000 34%, #000 76%, transparent 98%);
+  mask-image: radial-gradient(ellipse closest-side,
+    transparent 8%, #000 34%, #000 76%, transparent 98%);
+  animation: cauldron-vortex 22s linear infinite;
+}
+
+.cauldron-window.is-ready .cauldron-vortex {
+  opacity: 0.72;
+}
+
+@keyframes cauldron-vortex {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* THE SURFACE CLIP. Everything that happens IN the liquid — the collar, the
+   crown, the rings, the bloom, the boil — lives inside this one masked layer,
+   so a ring dies against the pot wall instead of sailing out across the hut.
+   The mask is the mouth ellipse built from the same four percentages; there is
+   no fifth number here. The fix is the mask rather than a smaller `scale`,
+   because a ring that dies against the wall is the correct physics and a ring
+   that stops short is a UI pulse. */
+.cauldron-surface {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse calc(var(--pot-d) * 0.5)
+    calc(var(--pot-dy) * 0.5) at var(--pot-x) var(--pot-y),
+    #000 76%, rgba(0, 0, 0, 0.5) 92%, transparent 100%);
+  mask-image: radial-gradient(ellipse calc(var(--pot-d) * 0.5)
+    calc(var(--pot-dy) * 0.5) at var(--pot-x) var(--pot-y),
+    #000 76%, rgba(0, 0, 0, 0.5) 92%, transparent 100%);
+}
+
+/* What must NOT be clipped: the thing falling through the air, and the wash
+   the bloom throws off the pot and onto the room. */
+.cauldron-air {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The colour arriving, radiating FROM the splash point rather than from the
+   mouth's centre. Elliptical, because a ring on a surface seen at this angle
+   is an ellipse with the rim's own aspect. */
+.cauldron-bloom {
+  position: absolute;
+  left: var(--hit-x);
+  top: var(--hit-y);
+  width: calc(var(--pot-d) * 0.3);
+  height: calc(var(--pot-dy) * 0.3);
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  background: radial-gradient(ellipse closest-side,
+    color-mix(in srgb, var(--bloom-to) 88%, white) 0%,
+    var(--bloom-to) 44%, transparent 78%);
+  filter: blur(2px);
+  animation: cauldron-bloom 2200ms cubic-bezier(0.16, 0.8, 0.28, 1) forwards;
+}
+
+@keyframes cauldron-bloom {
+  0% {
+    scale: 0.2 0.2;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    scale: 7.4 7.4;
+    opacity: 0;
+  }
+}
+
+/* The bloom's other half: a wash that reaches OFF the pot and lights the hut
+   for a beat. This is what makes a colour step read as an event in a room
+   rather than as a value changing in a box. */
+.cauldron-wash {
+  position: absolute;
+  top: var(--pot-y);
+  width: 120%;
+  height: 130%;
+  translate: -50% -50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse 40% 48% at 50% 50%,
+    color-mix(in srgb, var(--bloom-to) 46%, transparent) 0%, transparent 68%);
+  opacity: 0;
+  animation: cauldron-wash 2600ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes cauldron-wash {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  22% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.25;
+  }
+}
+
+/* Three rings, each slower and wider than the last, border thinning as it
+   goes: the surface answering a weight rather than a UI pulse. */
+.cauldron-ripple {
+  position: absolute;
+  left: var(--hit-x);
+  top: var(--hit-y);
+  width: calc(var(--pot-d) * 0.22);
+  height: calc(var(--pot-dy) * 0.22);
+  translate: -50% -50%;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--lit) 70%, white);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: cauldron-ripple var(--ripple-dur, 1500ms)
+    cubic-bezier(0.12, 0.72, 0.3, 1) var(--ripple-delay, 0ms) forwards;
+}
+
+@keyframes cauldron-ripple {
+  0% {
+    scale: 0.35 0.35;
+    opacity: 0;
+    border-width: 2.5px;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  100% {
+    scale: 5.4 5.4;
+    opacity: 0;
+    border-width: 0.5px;
+  }
+}
+
+/* The collar: a short-lived wall of liquid standing up where the thing went
+   in, before it falls back. This is the beat that sells the weight. */
+.cauldron-collar {
+  position: absolute;
+  left: var(--hit-x);
+  top: var(--hit-y);
+  width: calc(var(--pot-d) * 0.2);
+  height: calc(var(--pot-dy) * 0.6);
+  translate: -50% -70%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse 50% 100% at 50% 100%,
+    color-mix(in srgb, var(--lit) 80%, white) 0%,
+    color-mix(in srgb, var(--lit) 30%, transparent) 55%, transparent 76%);
+  animation: cauldron-collar 620ms cubic-bezier(0.18, 0.86, 0.3, 1) forwards;
+}
+
+@keyframes cauldron-collar {
+  0% {
+    scale: 0.3 0.2;
+    opacity: 0;
+  }
+  26% {
+    scale: 1 1.25;
+    opacity: 0.95;
+  }
+  100% {
+    scale: 1.3 0.1;
+    opacity: 0;
+  }
+}
+
+/* The crown: eight beads out of the collar, on TWO eases in one keyframe —
+   out is fast and decelerating, back is slow and accelerating, which is
+   gravity in two curves. Their Y throw is squashed to about a third of their
+   X throw, because the surface is seen at a shallow angle. */
+.cauldron-crown {
+  position: absolute;
+  left: var(--hit-x);
+  top: var(--hit-y);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.cauldron-bead {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lit) 76%, white);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--lit) 60%, transparent);
+  mix-blend-mode: screen;
+  animation: cauldron-bead 820ms cubic-bezier(0.22, 0.9, 0.36, 1) forwards;
+}
+
+@keyframes cauldron-bead {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  46% {
+    transform: translate(var(--bead-x), calc(var(--bead-y) - 14px)) scale(1);
+  }
+  100% {
+    transform: translate(calc(var(--bead-x) * 1.34), 6px) scale(0.35);
+    opacity: 0;
+  }
+}
+
+/* The boil. A bubble **breaks**; it does not fade — the last fifth of the
+   keyframe goes wide and flat, fast. A bubble that fades out is a dot with an
+   opacity animation. */
+.cauldron-bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%,
+    color-mix(in srgb, var(--lit) 92%, white) 0%,
+    color-mix(in srgb, var(--brew) 90%, white) 40%,
+    color-mix(in srgb, var(--brew) 70%, black) 78%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--lit) 40%, transparent);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: cauldron-bubble var(--bubble-dur, 2600ms)
+    cubic-bezier(0.3, 0.1, 0.5, 1) forwards;
+}
+
+@keyframes cauldron-bubble {
+  0% {
+    transform: translate(-50%, 6px) scale(0.2);
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.9;
+  }
+  62% {
+    transform: translate(calc(-50% + var(--bubble-wobble, 3px)), -3px) scale(1);
+    opacity: 1;
+  }
+  84% {
+    transform: translate(-50%, -5px) scale(1.5, 0.55);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -7px) scale(2.3, 0.12);
+    opacity: 0;
+  }
+}
+
+/* The steam. Its own layer, so the blur is a blur on something WE drew —
+   commandment 19's exact carve-out, and there is no card art in this room at
+   all. Drifts up, sideways and apart: steam does not travel in a line. */
+.cauldron-steam {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* **Thinner and slower than it was, because the picture already has smoke in
+   it.** At their first weight the wisps read as white smudges laid over
+   Waterhouse's own vapour rather than as steam rising through it — the peak
+   opacities came down by about two fifths in `cauldron.tsx`, the drift got
+   longer, and the white in the gradient here went with them. Steam is a thing
+   you notice moving; a mark is a thing you notice sitting. */
+.cauldron-wisp {
+  position: absolute;
+  top: calc(var(--pot-y, 36%) - 2%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse 60% 50% at 50% 60%,
+    color-mix(in srgb, var(--lit) 52%, white) 0%,
+    rgba(214, 230, 204, 0.1) 44%, transparent 74%);
+  filter: blur(12px);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: cauldron-wisp var(--wisp-dur, 7200ms)
+    cubic-bezier(0.3, 0.05, 0.5, 1) forwards;
+}
+
+@keyframes cauldron-wisp {
+  0% {
+    transform: translate(-50%, 0) scale(0.5, 0.4) rotate(0deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: var(--wisp-peak, 0.5);
+  }
+  58% {
+    transform: translate(calc(-50% + var(--wisp-drift, 30px)), -46%)
+      scale(1.15, 1.35) rotate(6deg);
+  }
+  100% {
+    transform: translate(calc(-50% + var(--wisp-drift, 30px) * 1.9), -100%)
+      scale(2.1, 2.3) rotate(-4deg);
+    opacity: 0;
+  }
+}
+
+/* The light the pot throws UP out of its mouth and onto whatever leans over
+   it. Off-centre and above on purpose: centred on the belly it reads as a
+   bowl lit from a studio. Reads `--lit`, so the room reports the brew. */
+.cauldron-glow {
+  position: absolute;
+  left: var(--pot-x);
+  top: var(--pot-y);
+  width: 56%;
+  height: 84%;
+  translate: -50% -80%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse 46% 34% at 50% 86%,
+    color-mix(in srgb, var(--lit) 44%, transparent) 0%,
+    color-mix(in srgb, var(--lit) 13%, transparent) 40%, transparent 70%);
+  opacity: 0.34;
+  filter: blur(12px);
+  transition: opacity 1800ms ease;
+  animation: cauldron-glow 8.3s ease-in-out infinite;
+}
+
+.cauldron-window.is-ready .cauldron-glow {
+  opacity: 0.8;
+}
+
+@keyframes cauldron-glow {
+  0%,
+  100% {
+    scale: 1;
+  }
+  44% {
+    scale: 1.045;
+  }
+}
+
+/* ── the thing falling in ──────────────────────────────────────────────────
+ *
+ * Two nested boxes, and the nesting IS the physics: the outer translates X at
+ * a constant rate and the inner falls on an ease-in. One element cannot be
+ * both, and a single eased diagonal is a slide rather than an arc.
+ *
+ * Both are plate-sized (`inset: 0`), because a percentage in `translate`
+ * resolves against the element's OWN box — a token-sized box travelling 17%
+ * would travel seventeen per cent of a glyph. */
+.cauldron-toss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cauldron-toss-x {
+  position: absolute;
+  inset: 0;
+  animation: cauldron-toss-x 900ms linear forwards;
+}
+
+.cauldron-toss-y {
+  position: absolute;
+  inset: 0;
+  animation: cauldron-toss-y 900ms cubic-bezier(0.42, 0, 1, 1) forwards;
+}
+
+@keyframes cauldron-toss-x {
+  to {
+    transform: translateX(var(--toss-x));
+  }
+}
+
+@keyframes cauldron-toss-y {
+  to {
+    transform: translateY(var(--toss-y));
+  }
+}
+
+.cauldron-token {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  translate: -50% -50%;
+  animation: cauldron-tumble 900ms linear forwards;
+}
+
+@keyframes cauldron-tumble {
+  to {
+    rotate: var(--toss-spin, 220deg);
+  }
+}
+
+.cauldron-token-glyph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: rgba(224, 236, 210, 0.92);
+  filter: drop-shadow(0 0 7px rgba(0, 0, 0, 0.8));
+}
+
+/* The stroke must not thin out as the glyph tumbles and scales. */
+.cauldron-token-glyph path,
+.cauldron-token-glyph circle {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Its name rides beside it and is gone before the landing — the socket is
+   where the name stays. */
+.cauldron-token-name {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  color: color-mix(in srgb, var(--lit) 70%, white);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
+  animation: cauldron-token-name 900ms ease-out forwards;
+}
+
+@keyframes cauldron-token-name {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── the pour ──────────────────────────────────────────────────────────────
+ *
+ * A ladle of light drawn up out of the surface, the brew dipping as it is
+ * drawn from, and a vial taking the light as it rises clear. Sized as a
+ * percentage of the plate so it is the same object at every width. */
+.cauldron-serve {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.cauldron-window.is-serving .cauldron-serve {
+  opacity: 1;
+}
+
+.cauldron-ladle {
+  position: absolute;
+  left: var(--pot-x);
+  top: var(--pot-y);
+  width: calc(var(--pot-d) * 0.34);
+  height: calc(var(--pot-dy) * 1.5);
+  translate: -50% -50%;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  background: radial-gradient(ellipse closest-side,
+    color-mix(in srgb, var(--lit) 96%, white) 0%,
+    color-mix(in srgb, var(--lit) 60%, transparent) 52%, transparent 80%);
+  filter: blur(1px);
+}
+
+.cauldron-window.is-serving .cauldron-ladle {
+  animation: cauldron-ladle 2600ms cubic-bezier(0.3, 0.02, 0.2, 1) forwards;
+}
+
+@keyframes cauldron-ladle {
+  0% {
+    translate: -50% -50%;
+    scale: 0.35 0.35;
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+    scale: 1 1;
+  }
+  100% {
+    translate: -50% -600%;
+    scale: 0.8 3.4;
+    opacity: 0;
+  }
+}
+
+.cauldron-vial {
+  position: absolute;
+  left: var(--pot-x);
+  top: calc(var(--pot-y) - 22%);
+  width: 5.4%;
+  aspect-ratio: 1 / 2;
+  translate: -50% -50%;
+  opacity: 0;
+}
+
+.cauldron-window.is-serving .cauldron-vial {
+  animation: cauldron-vial 3400ms cubic-bezier(0.2, 0.7, 0.25, 1) 900ms forwards;
+}
+
+@keyframes cauldron-vial {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.7);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px) scale(1.04);
+  }
+}
+
+.cauldron-vial svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.cauldron-vial-fill {
+  fill: var(--lit);
+}
+
+.cauldron-vial-glass {
+  stroke: color-mix(in srgb, var(--lit) 50%, white);
+  fill: none;
+  stroke-width: 2.4;
+}
+
+.cauldron-vial-halo {
+  fill: var(--lit);
+  filter: blur(9px);
+  opacity: 0.55;
+}
+
+/* The pot answers being drawn from: the brew's own light dips and recovers.
+   On OUR layer, never on the picture. */
+.cauldron-window.is-serving .cauldron-brew {
+  animation:
+    cauldron-breathe 5.4s ease-in-out infinite,
+    cauldron-dip 2600ms ease-in-out;
+}
+
+@keyframes cauldron-dip {
+  0% {
+    filter: brightness(1);
+  }
+  30% {
+    filter: brightness(0.62);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* ── the room, full size ───────────────────────────────────────────────────
+ *
+ * The arrival: the pot owning the viewport, simmering umber, nothing in it.
+ * The chrome rides the dark upper corners, `.tarot-ceremony-controls`'s own
+ * arrangement, and comes off the room on a phone for its reason. */
+.cauldron-room {
+  position: relative;
+  /* **The threshold has to fit through the door.** Left to the panel's width
+     the room is 16:9 of whatever the page is wide — 766px tall on a laptop —
+     and with the masthead and the intake's own chrome above it, and the
+     picture credit below it, a 720-tall window never showed the whole thing
+     at once. The one moment this room exists for is *standing and looking at
+     it*, and it was the one thing the window would not let you do.
+
+     So the plate is capped by height and the width follows, which is safe
+     precisely because the hotspot contract is four PERCENTAGES of the plate:
+     scale the picture and the mouth stays under the splash. `max-width` rather
+     than `max-height` is what does it — the pot inside is `aspect-ratio: 16/9`
+     at `width: 100%`, so capping the width is how you cap the height without
+     letting the two disagree. The chrome and the caption ride this element, so
+     they narrow with the picture instead of overhanging it.
+
+     Two terms, and `min` takes whichever is crueller. 74vh is the ceiling the
+     walk asked for. The `calc` is the arithmetic underneath it: about 11rem of
+     page above the room and 8rem of prose and credit below it, so on a short
+     window the picture gives up the difference rather than pushing the credit
+     line off the bottom. On a tall one the vh term wins and the cap is the
+     one that was asked for. */
+  max-width: min(calc(74vh * 16 / 9), calc((100vh - 19rem) * 16 / 9));
+  margin-inline: auto;
+  /* No radius of its own: the room is the top of the hut panel, and
+     `.cauldron-hut`'s `overflow: hidden` is what rounds it. A second radius
+     inside the first is the notch that read as a picture hung on a panel
+     rather than as the top of one. */
+}
+
+.cauldron-controls {
+  position: absolute;
+  inset: 0.6rem 0.9rem auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  z-index: 10;
+}
+
+/* The caption the eye reads — the same string the live region says, never a
+   second wording of it. */
+.cauldron-beat {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.6rem 1.1rem 0.75rem;
+  background: linear-gradient(to top, rgba(6, 7, 5, 0.86), transparent);
+  font-size: 0.85rem;
+  color: rgba(236, 244, 228, 0.92);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.cauldron-beat span {
+  opacity: 0;
+  animation: cauldron-beat-in 600ms ease forwards;
+}
+
+@keyframes cauldron-beat-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── the folded strip ──────────────────────────────────────────────────────
+ *
+ * **One geometry, two windows.** The strip is not a second composition — it is
+ * the same 16:9 room, magnified and clipped to a band around the hotspot, so
+ * every layer above is written once and both windows obey it. There is no
+ * second measurement anywhere in this file. */
+.cauldron-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--copper) 30%, transparent);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #07080a;
+  isolation: isolate;
+}
+
+.cauldron-strip-window {
+  position: relative;
+  height: clamp(84px, 11vw, 126px);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The same room, closer. `--cauldron-zoom` is the magnification and both
+   numbers below derive from it: the stage is that much wider than the window,
+   and it is pushed left by exactly as much as that magnification moves the
+   mouth. Vertically, `translateY(-36%)` of the stage's OWN height puts the
+   point at 36% of that height on the window's midline. Derived from the
+   contract, never re-measured. */
+.cauldron-strip-stage {
+  --cauldron-zoom: 1.7;
+  position: absolute;
+  width: calc(100% * var(--cauldron-zoom));
+  left: calc(50% - var(--cauldron-zoom) * var(--pot-x));
+  top: 50%;
+  transform: translateY(calc(-1 * var(--pot-y)));
+}
+
+/* ── the sockets ───────────────────────────────────────────────────────────
+ *
+ * Three places, one per slot, and **not a control**: commandment 20's test
+ * both ways — it does not take you anywhere and it does not change what is in
+ * front of you. It is a state readout, so it is a list and not a row of
+ * buttons. */
+.cauldron-sockets {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0 1rem;
+  margin: 0;
+  list-style: none;
+}
+
+.cauldron-socket {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  /* Wide enough that ELDERFLOWER and MEADOWSWEET — the shelf's longest
+     unbreakable strikes — stay inside their own coin's column. */
+  width: 4.75rem;
+  text-align: center;
+}
+
+/* **An iron coin, not a wireframe.** A dashed circle with microtype under it
+   is what a form draws to say "nothing here yet", and it put three dotted
+   outlines on a Waterhouse oil. A witch's shelf holds cast things: a dark coin
+   with a hairline rim, a lit top edge, a hollow under it, and the herb struck
+   into its face in pale ash. Same size, same place, same behaviour — only the
+   material changed. */
+.cauldron-socket-ring {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1px solid rgba(226, 238, 218, 0.16);
+  background: radial-gradient(circle at 38% 28%,
+    #262a20 0%, #171a11 54%, #0a0c07 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(236, 244, 228, 0.09),
+    inset 0 -5px 9px rgba(0, 0, 0, 0.62),
+    0 1px 3px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  transition: border-color 700ms ease, box-shadow 700ms ease;
+}
+
+.cauldron-socket.is-in .cauldron-socket-ring {
+  border-color: color-mix(in srgb, var(--copper) 78%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(236, 244, 228, 0.12),
+    inset 0 0 14px color-mix(in srgb, var(--lit) 26%, transparent),
+    inset 0 -5px 9px rgba(0, 0, 0, 0.5),
+    0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.cauldron-socket-glyph {
+  width: 1.75rem;
+  height: 1.75rem;
+  opacity: 0.42;
+  color: rgba(214, 224, 206, 0.88);
+  transition: opacity 700ms ease, filter 700ms ease;
+}
+
+.cauldron-socket.is-in .cauldron-socket-glyph {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lit) 60%, transparent));
+}
+
+/* The place's name wears the séance's own small caps — one letterform across
+   both costumed rooms, so the table's labels and the shelf's are kin rather
+   than two different rooms' furniture. `.tarot-caption` is the same stack at
+   the same size. */
+.cauldron-socket-place {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(226, 238, 218, 0.72);
+  transition: color 700ms ease;
+}
+
+.cauldron-socket.is-in .cauldron-socket-place {
+  color: color-mix(in srgb, var(--lit) 74%, white);
+}
+
+/* The place is always named; what is in it arrives in words the moment it is
+   in — so the state is legible without colour, and without a pointer to rest
+   on it (`components/hint.tsx`: hover-only is half the room).
+
+   Empty, it is a note in the margin and it is set like one: italic, quiet ash,
+   the app's own face. Filled, the herb is struck into the coin, so it takes
+   the place's small caps. The two states are different KINDS of text, which is
+   most of why the filled one now reads as an arrival. */
+.cauldron-socket-herb {
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-style: italic;
+  color: rgba(226, 238, 218, 0.5);
+  transition: color 700ms ease;
+}
+
+.cauldron-socket.is-in .cauldron-socket-herb {
+  font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  font-style: normal;
+  /* A step smaller and tighter than the place label: an eleven-letter herb
+     must not reach into the next coin's column. */
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  color: rgba(242, 249, 236, 0.9);
+}
+
+/* The line under the folded pot: the beat, printed, because the conversation
+   phase has no room for the plate's own caption and a reveal that only
+   happens in colour is a reveal half the room misses. */
+.cauldron-beat-line {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(226, 238, 218, 0.75);
+  padding: 0 0.25rem;
+}
+
+/* ── the ready pulse ───────────────────────────────────────────────────────
+ *
+ * The folded pot deliberately does not grow back for the ready beat: a panel
+ * that reflows mid-conversation moves the text somebody is reading, and the
+ * moment is already carried by four changes at once. So the payoff goes wide
+ * rather than tall — one slow pulse of the brew's green across the room behind
+ * the conversation. Motion, no reflow. */
+.cauldron-ready-pulse {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 60% at 50% 46%,
+    rgba(126, 184, 70, 0.5) 0%, rgba(126, 184, 70, 0.16) 42%, transparent 72%);
+  opacity: 0;
+  animation: cauldron-ready-pulse 2600ms cubic-bezier(0.24, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes cauldron-ready-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+
+/* ── the slate, and what is written on it ──────────────────────────────────
+ *
+ * The costume (`lib/costumes.ts`). The question sits on a slate propped
+ * against the pot, and her words arrive in chalk rather than ink: a witch
+ * writes on what is to hand, and the quill belongs to the reader across the
+ * village. Padding lives here rather than at the call site, `.seance-scroll`'s
+ * reason — the material sets the silhouette, so the costume owns the whole
+ * class list rather than adding to one. */
+/* **Furniture, not a form.** Next to the fortune-teller's deckled parchment
+   this was a rounded olive box with system sans in it — which is a web form
+   standing where a piece of the room should be. The material is a riven slate:
+   a near-black green-black ground, two grains of dust caught in it at
+   opposite corners, the pot's own light falling across it from the right
+   (where the pot actually is), a copper hairline all the way round and the
+   heavier copper frame still holding it on two sides. All of it gradients: no
+   image, nothing to fetch, nothing to credit.
+
+   Padding lives here rather than at the call site, `.seance-scroll`'s reason —
+   the material sets the silhouette, so the costume owns the whole class list
+   rather than adding to one. */
+.cauldron-slate {
+  position: relative;
+  padding: 1.6rem 1.85rem;
+  border-radius: 0.4rem;
+  background:
+    /* the pot's light, falling on it from the right, where the pot is */
+    radial-gradient(ellipse 62% 92% at 108% 42%,
+      rgba(126, 184, 70, 0.11), transparent 72%),
+    /* the fire, much further off and much warmer, from below right */
+    radial-gradient(ellipse 70% 60% at 92% 118%,
+      rgba(214, 116, 42, 0.07), transparent 68%),
+    /* chalk dust, worked into the grain, at opposite corners */
+    radial-gradient(ellipse 40% 30% at 22% 14%,
+      rgba(226, 238, 214, 0.045), transparent),
+    radial-gradient(ellipse 46% 34% at 74% 88%,
+      rgba(226, 238, 214, 0.035), transparent),
+    linear-gradient(168deg, #14180f 0%, #0d1108 56%, #070a04 100%);
+  border: 1px solid color-mix(in srgb, var(--copper, #b87333) 30%, transparent);
+  /* A copper frame on two sides: a slate is held in something. */
+  border-left: 3px solid color-mix(in srgb, var(--copper, #b87333) 62%, black);
+  border-bottom: 3px solid color-mix(in srgb, var(--copper, #b87333) 44%, black);
+  box-shadow:
+    inset 0 1px 0 rgba(226, 238, 214, 0.05),
+    inset 0 0 34px rgba(0, 0, 0, 0.6),
+    0 12px 28px rgba(0, 0, 0, 0.42);
+  color: rgba(248, 252, 244, 0.94);
+  /* Re-inked, so nothing on the slate needs an `!important` war with an
+     inline style that was written for the page's own palette. */
+  --text-primary: rgba(248, 252, 244, 0.94);
+  --text-secondary: rgba(240, 248, 234, 0.86);
+  --text-muted: rgba(226, 238, 218, 0.7);
+}
+
+/* The hand it is written in: chalk, cut in the Fell.
+ *
+ * **The question takes the room's letterform, the answers keep the app's.**
+ * The Fell types are already the fortune-teller's (`assets/fonts/PROVENANCE.md`
+ * argues the licence and the cut), and the shelf's small caps below borrow them
+ * too, so the two costumed rooms are kin rather than strangers — but the face
+ * belongs to whoever is *speaking*. She asks in it; everything the querent and
+ * the app say around her stays in the app's own sans, which is also what keeps
+ * a long answer readable.
+ *
+ * A step larger than the app's base with the leading opened to 1.6, because
+ * the Fell's x-height is small and a 1rem setting of it is a question somebody
+ * has to lean in for. The ink is warm ash rather than the cool near-white it
+ * was: on a green-black slate lit by a fire, white reads as a sticker. */
+.cauldron-question {
+  font-family: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  letter-spacing: 0.012em;
+  color: rgba(243, 236, 220, 0.95);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* While she is working it out, the line stops breathing and the *steam* does
+   it instead: three dots arriving one at a time under the sentence's own
+   ellipsis. A whole sentence pulsing to 45% is a sentence somebody has to wait
+   to be allowed to read; dots are the part that is allowed to be impatient.
+   `clip-path` rather than animating `content`, which Firefox does not do. */
+.cauldron-question.thinking-pulse {
+  opacity: 1;
+  animation: none;
+}
+
+.cauldron-question.thinking-pulse::after {
+  content: '···';
+  display: inline-block;
+  vertical-align: baseline;
+  white-space: nowrap;
+  letter-spacing: 0.16em;
+  margin-left: 0.12em;
+  animation: cauldron-steam-dots 1.8s steps(1, end) infinite;
+}
+
+@keyframes cauldron-steam-dots {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  25% {
+    clip-path: inset(0 66% 0 0);
+  }
+  50% {
+    clip-path: inset(0 33% 0 0);
+  }
+  75%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* What she already said, and the fun fact beside it: quieter slate, so the
+   live question stays the brightest thing in the room.
+
+   Named `-said` rather than `-bubble` on purpose, and it is worth a line:
+   `.cauldron-bubble` is already taken by the thing that rises through the
+   brew and breaks, forty rules up. Two different objects under one class is a
+   chat bubble that gets `position: absolute`, a `border-radius: 50%` and a
+   boil animation — which is exactly what the first cut of this did. */
+.cauldron-said {
+  background: linear-gradient(170deg, #20241b, #171a12);
+  border: 1px solid rgba(232, 239, 224, 0.12);
+  color: rgba(238, 246, 232, 0.88);
+}
+
+.cauldron-note {
+  background: linear-gradient(168deg, #1a1d15, #13160e);
+  border: 1px solid color-mix(in srgb, var(--copper, #b87333) 26%, transparent);
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.4);
+  --text-muted: rgba(226, 238, 218, 0.7);
+  --text-secondary: rgba(240, 248, 234, 0.86);
+  color: rgba(248, 252, 244, 0.94);
+}
+
+.cauldron-note a {
+  color: color-mix(in srgb, var(--copper-lit, #e3a45f) 80%, white);
+}
+
+/* The answer box: chalk on slate, and a shade DEEPER than the slate around it
+   so it reads as cut into the stone rather than laid on top of it. Pale ink, a
+   copper hairline, a caret the colour of the chalk — and a focus ring that
+   warms from the copper toward `--lit`, so putting the cursor in the box is
+   the pot noticing. */
+.cauldron-scratch {
+  background: rgba(5, 7, 4, 0.72);
+  border: 1px solid color-mix(in srgb, var(--copper, #b87333) 42%, transparent);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(226, 238, 214, 0.05);
+  color: rgba(248, 252, 244, 0.94);
+  caret-color: #eef6e6;
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.cauldron-scratch::placeholder {
+  color: rgba(226, 238, 218, 0.52);
+  font-style: italic;
+}
+
+.cauldron-scratch:hover:not(:focus) {
+  border-color: color-mix(in srgb, var(--copper-lit, #e3a45f) 56%, transparent);
+}
+
+.cauldron-scratch:focus {
+  border-color: color-mix(in srgb, var(--lit, #a8e86a) 52%, var(--copper-lit, #e3a45f));
+  outline: 2px solid color-mix(in srgb, var(--copper-lit, #e3a45f) 58%, transparent);
+  outline-offset: 1px;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.6),
+    0 0 14px color-mix(in srgb, var(--lit, #a8e86a) 22%, transparent);
+}
+
+/* Hover is gated, because a touch screen has no "here" to leave: `:hover`
+   latches on the last thing tapped, and three sockets in a row would leave one
+   lit until something else was touched. `:focus-visible` keeps its own rule
+   outside the query, where it belongs. */
+@media (hover: hover) {
+  .cauldron-socket:hover .cauldron-socket-ring {
+    border-color: color-mix(in srgb, var(--copper-lit) 60%, transparent);
+  }
+}
+
+/* On a phone the room is 211px tall at 375px wide, so the dark upper corners
+   with nothing in them stop being a fact about the design and start being a
+   fact about a wide window. `.tarot-ceremony-controls`'s rule, one room over. */
+@media (max-width: 899px) {
+  .cauldron-controls {
+    position: static;
+    inset: auto;
+    padding: 0.6rem 0 0.75rem;
+  }
+}
+
+/* The 490px-class narrow viewport. The strip stacks, the window drops to a
+   band, and what survives the 1.7x crop at that height is the lit mouth and
+   the rim — effectively a drawn brew bar, which is exactly the right thing at
+   that size and costs no second implementation. */
+@media (max-width: 619px) {
+  .cauldron-strip {
+    grid-template-columns: 1fr;
+  }
+  .cauldron-strip-window {
+    height: 54px;
+  }
+  .cauldron-sockets {
+    padding: 0.5rem 0.75rem 0.75rem;
+    justify-content: space-around;
+  }
+  .cauldron-socket {
+    width: auto;
+  }
+  .cauldron-socket-glyph {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+}
+
+/* ── reduced motion ────────────────────────────────────────────────────────
+ *
+ * **The room stays; the weather stills.** The plate is a `VideoBackdrop` in
+ * `art` mode, so it swaps itself for the still in JS and needs no rule here —
+ * removing it would leave the ingredients falling into nothing.
+ *
+ * The rest divides three ways, and the division is the whole point. Something
+ * whose 0% frame already reads only needs its animation dropped. Something
+ * whose 0% frame is invisible needs its **resting state spelled out**, because
+ * "stilled" and "held at its first keyframe" are not the same thing
+ * (`.seance-vision`'s lesson). And something that is an *event* is removed
+ * outright, because an event held at one frame is a smear (`.wheel-strike`'s).
+ *
+ * What is never withheld is what happened: the socket fills, the colour
+ * settles over 900ms, and the caption and the live region say the line. */
+@media (prefers-reduced-motion: reduce) {
+  .cauldron-brew,
+  .cauldron-caustic,
+  .cauldron-glow,
+  .cauldron-window.is-serving .cauldron-brew {
+    /* Their 0% frame reads, so these only need arresting. */
+    animation: none;
+  }
+  /* The fire holds at the middle of its own breath rather than at either end
+     of it: a hearth stopped at its dimmest is a hearth going out, and one
+     stopped at its brightest is a flare. */
+  .cauldron-embers {
+    opacity: 0.48;
+    animation: none;
+  }
+  /* All three dots, standing still. The sentence is still the sentence and
+     the wait is still a wait; only the counting stops. */
+  .cauldron-question.thinking-pulse::after {
+    clip-path: none;
+    animation: none;
+  }
+  /* The colour still MOVES — it is the state, not the weather — but it
+     arrives as a settle rather than as a bloom. */
+  .cauldron-brew {
+    transition: background 900ms ease;
+  }
+  /* Ceremony. The honest reduced version is that it does not happen. */
+  .cauldron-vortex,
+  .cauldron-window.is-ready .cauldron-vortex,
+  .cauldron-ladle,
+  .cauldron-window.is-serving .cauldron-ladle,
+  .cauldron-vial,
+  .cauldron-window.is-serving .cauldron-vial,
+  .cauldron-ready-pulse {
+    animation: none;
+    opacity: 0;
+  }
+  /* Held at a frame that reads, rather than at an invisible one: a surface
+     with nothing on it stops reading as liquid. */
+  .cauldron-bubble {
+    animation: none;
+    opacity: 0.85;
+    transform: translate(-50%, -2px) scale(1);
+  }
+  .cauldron-wisp {
+    animation: none;
+    opacity: 0.18;
+    transform: translate(-50%, -30%) scale(1.3, 1.5);
+  }
+  /* Events, removed. */
+  .cauldron-ripple,
+  .cauldron-bloom,
+  .cauldron-wash,
+  .cauldron-crown,
+  .cauldron-bead,
+  .cauldron-collar,
+  .cauldron-toss,
+  .cauldron-toss-x,
+  .cauldron-toss-y,
+  .cauldron-token,
+  .cauldron-token-name {
+    animation: none;
+    display: none;
+  }
+  .cauldron-beat span {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* ------------------------------------------------------------ the lab bench
  *
  * `LabBench` in routes/Research.tsx (punch list item 7). One custom
@@ -4374,6 +5917,54 @@ button:hover .tarot-fan-card {
   --lab-speed: 0.35;
 }
 
+/* The hut's sign, and the one place in this family where the drawing has to
+ * step back.
+ *
+ * A door sign is an emblem: 48px of the room's accent, flat, read at a
+ * glance. Over a Waterhouse oil that same emblem is a cartoon — a spring-green
+ * pot sitting on top of a painting, which is commandment 5's complaint in one
+ * image. So at THIS placement, and only here, the sign is struck small and
+ * re-inked: cast iron in ash-grey, a dark belly with a lit rim instead of a
+ * poured slab of colour, and the brew reduced to a line. The room's green
+ * survives as that line and as the three motes over it — an accent the eye
+ * finds, not a fill it lands on.
+ *
+ * Nothing about the drawing changes; every class below is inert without this
+ * one on the wrapper, so a sign rendered anywhere else is the sign it was. */
+.room-sign-hut svg {
+  width: 2.5rem;
+  height: 1.875rem;
+}
+
+.room-sign-hut {
+  /* Iron, not the room's accent: `.room-sign`'s own `color` is what the
+     feet, the belly and the rim all read. */
+  color: #9aa296;
+}
+
+/* The belly is cast, so it is dark with a lit edge rather than filled. */
+.room-sign-hut .hut-sign-body {
+  fill: #14170f;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+/* What is working in it: a line of the room's own green, lit from under. */
+.room-sign-hut .hut-sign-brew {
+  fill: none;
+  stroke: var(--room-accent, #7eb846);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 2px color-mix(in srgb,
+    var(--room-accent, #7eb846) 60%, transparent));
+}
+
+/* Three motes off it, the same green, at the weights the drawing gave them. */
+.room-sign-hut .lab-bubble,
+.room-sign-hut .lab-steam {
+  fill: var(--room-accent, #7eb846);
+}
+
 /* The readiness banner picks up the room's accent too, so "the proposal
    button lit up" happens in the voice's own colour. */
 .persona-room .ready-banner {
@@ -4738,6 +6329,148 @@ button:hover .tarot-fan-card {
 .btn-felt:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: none;
+}
+
+/* ---------------------------------------------------------- the hut's voice
+ *
+ * `.btn-copper` — Agatha's room, and `.btn-felt`'s argument one room over: a
+ * `.btn-quiet` dropped into a witch's hut is the page's furniture standing in
+ * somebody else's house (commandment 17). Hammered copper warmed by a fire,
+ * going green where a hand has been.
+ *
+ * **It is hardware now, and it was a pill.** The first cut was a 10% wash of
+ * copper inside a copper hairline whose whole reply to the pointer was a
+ * slightly wider wash — which on the plate read as a flat orange lozenge that
+ * did not answer the hand at all. The house already knows how to make a
+ * control that is an OBJECT: `.wheel-spin-btn` is the loud version and
+ * `.btn-arena` the quiet one, and both are the same three declarations — a lit
+ * top edge, a shaded lower one, and a drop underneath. A face that is lit at
+ * the top and hollow at the bottom is *above* the surface; a fill is printed
+ * on it.
+ *
+ * The two voices share that body and differ only in their face and their
+ * hover: `.btn-copper` is the room's quiet control and `.btn-copper-hot` is
+ * the one action the room is for, which takes the brew's own light.
+ *
+ * Outside `.cauldron-hut` the token fallbacks keep them ordinary buttons, so
+ * the arrival room can wear one before any panel has been built around it.
+ *
+ * **Focus is deliberately not re-styled.** `.btn:focus-visible`'s vine ring
+ * covers it and covers it on purpose: a keyboard should find every button in
+ * this app the same way, which is exactly what `.btn-brass` says in its own
+ * comment — and both call sites write `btn btn-copper…`, so the ring is on
+ * them. Sizes come from `.btn-sm` / `.btn-xs` as everywhere else. */
+.btn-copper,
+.btn-copper-hot {
+  /* The hardware: a bevel along the top edge, the concave shade under it, and
+     the drop that lifts the whole thing off the plate. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 186, 0.32),
+    inset 0 -6px 11px rgba(48, 22, 6, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.btn-copper {
+  /* Beaten copper under a fire. The deep end is compressed into the last
+     sixth, so the band the label actually crosses stays light enough to carry
+     dark ink: measured rather than assumed, #241507 on the darkest colour a
+     glyph reaches (about #b97a40) is 4.99:1, and 5.9:1 at the top. Dark roast
+     rather than black — a pure black label on copper reads as a sticker, and
+     this room commits to one palette in both themes so there is no second
+     column for it to be wrong in. */
+  background-color: #c88a4e;
+  background-image: linear-gradient(
+    180deg,
+    #d9a068 0%,
+    #c88a4e 46%,
+    #b5763c 84%,
+    #a2652f 100%
+  );
+  border-color: color-mix(in srgb, var(--copper, #b87333) 64%, #2a1608);
+  color: #241507;
+}
+.btn-copper:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--copper-lit, #e3a45f);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 204, 0.44),
+    inset 0 -6px 11px rgba(48, 22, 6, 0.34),
+    0 5px 16px rgba(0, 0, 0, 0.46),
+    0 0 14px color-mix(in srgb, var(--copper-lit, #e3a45f) 28%, transparent);
+}
+/* The press leaves verdigris: copper that has been handled goes green, and in
+ * this one room the green is also the brew's. It settles flat and the light
+ * goes round the other way — the bevel becomes a hollow — with the patina laid
+ * INSIDE it rather than swapped for the face, which is the difference between
+ * a metal that has been touched and a button that has changed colour. Three
+ * replies at once, so no single inline override can silence the control:
+ * commandment 20's mechanism, answered before it happens. */
+.btn-copper:active:not(:disabled),
+.btn-copper-hot:active:not(:disabled) {
+  transform: translateY(0);
+  border-color: var(--verdigris, #5f9e8f);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.5),
+    inset 0 0 16px color-mix(in srgb, var(--verdigris, #5f9e8f) 46%, transparent),
+    inset 0 -1px 0 rgba(255, 236, 204, 0.12);
+}
+/* The glint, in copper rather than white — a lantern crossing metal, not a
+ * highlight crossing plastic. `.btn`'s own `overflow: hidden` keeps it inside
+ * the radius, and `.btn-primary::after` is the same idiom, one sweep on hover
+ * and nothing at rest. */
+.btn-copper::after,
+.btn-copper-hot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    color-mix(in srgb, var(--copper-lit, #e3a45f) 58%, transparent) 47%,
+    rgba(255, 244, 222, 0.26) 52%,
+    color-mix(in srgb, var(--copper-lit, #e3a45f) 18%, transparent) 58%,
+    transparent 68%
+  );
+  transform: translateX(-130%);
+}
+.btn-copper:hover:not(:disabled)::after,
+.btn-copper-hot:hover:not(:disabled)::after {
+  transform: translateX(130%);
+  transition: transform 650ms ease;
+}
+
+/* The one action the room is for: the pour. The same body, a brighter face,
+ * and the brew's own light behind it — and the light comes off `--lit`, which
+ * is umber at level zero and the accent at three, so the button becomes the
+ * brightest thing in the room at the moment it becomes worth pressing. */
+.btn-copper-hot {
+  background-color: color-mix(in srgb, var(--copper-lit, #e3a45f) 82%, black);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--copper-lit, #e3a45f) 82%, transparent),
+    color-mix(in srgb, var(--copper, #b87333) 92%, black)
+  );
+  border-color: color-mix(in srgb, var(--copper, #b87333) 60%, black);
+  /* Fixed dark ink, measured rather than assumed: #1a1206 on the gradient's
+   * pale end (#e3a45f at 82%) is 8.4:1 and on its dark end
+   * (#b87333 into black) is 4.7:1, so the label clears AA on every band it
+   * crosses. The room commits to one palette in both themes, so unlike
+   * `.btn-accent-vine` there is no second column for this to be wrong in. */
+  color: #1a1206;
+  font-weight: 600;
+}
+/* The fallback is the brew's FINAL stop rather than the copper, and that is a
+ * decision rather than a default: the one place this button stands outside a
+ * `.cauldron-window` is the ready banner in the conversation column, and the
+ * ready banner exists only when the pot has come up green. */
+.btn-copper-hot:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 204, 0.44),
+    inset 0 -6px 11px rgba(48, 22, 6, 0.32),
+    0 4px 14px rgba(0, 0, 0, 0.42),
+    0 0 18px color-mix(in srgb, var(--lit, #a8e86a) 46%, transparent);
 }
 
 /* ---------------------------------------------------------- the arena gate
@@ -5676,10 +7409,14 @@ button:hover .tarot-fan-card {
   .btn-primary:hover:not(:disabled),
   .btn-quiet:hover:not(:disabled),
   .btn-arena:hover:not(:disabled),
+  .btn-copper:hover:not(:disabled),
+  .btn-copper-hot:hover:not(:disabled),
   .btn-danger-solid:hover:not(:disabled) {
     transform: none;
   }
   .btn-primary:hover:not(:disabled)::after,
+  .btn-copper:hover:not(:disabled)::after,
+  .btn-copper-hot:hover:not(:disabled)::after,
   .btn-arena:hover:not(:disabled)::after {
     transform: translateX(-130%);
   }

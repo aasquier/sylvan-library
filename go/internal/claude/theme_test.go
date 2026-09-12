@@ -546,7 +546,7 @@ func TestThePromptsAreBytes(t *testing.T) {
 		if row.Seed != nil {
 			seed = big.NewInt(*row.Seed)
 		}
-		if got := frameFor(readingFor(who, seed), row.Told); got != row.Frame {
+		if got := frameFor(readingFor(who, seed), potFor(who, seed), row.Told); got != row.Frame {
 			t.Errorf("frame %q:\n got    %q\n corpus %q", row.Note, got, row.Frame)
 		}
 	}
@@ -565,6 +565,44 @@ func TestThePromptsAreBytes(t *testing.T) {
 		if got := proposalAsk(corpus.Prompts.Grounded, row.Budget, row.Avoid); got != row.Ask {
 			t.Errorf("ask %q:\n got    %q\n corpus %q", row.Note, got, row.Ask)
 		}
+	}
+}
+
+// TestTheWitchsFrameTellsHerWhereToStop: the one sentence in her frame that is
+// about this room's machinery rather than about her voice.
+//
+// `readAsk` deletes any answer that does not end in a question mark -- a
+// declarative sentence there is the mode telling somebody what they think
+// instead of asking -- and the witch is the persona most likely to write past
+// the question, because her register wants a wry line after it. The first live
+// opening ask did exactly that: a good question, a sentence after the question
+// mark, and the guard (correctly) dropped the whole turn. The fix is the frame
+// asking her to stop on the question, never the predicate loosening.
+//
+// The plain frame is checked too, and that is the anti-vacuity half: it proves
+// the sentence is coming out of the cauldron arm rather than out of
+// `themeFrame`, where it would reach every room and mean nothing about this
+// one.
+func TestTheWitchsFrameTellsHerWhereToStop(t *testing.T) {
+	t.Parallel()
+	const pin = "the last sentence you write is the question, and nothing " +
+		"follows the question mark"
+
+	who, err := GetPersona("witch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pot := potFor(who, big.NewInt(1909))
+	if pot == nil {
+		t.Fatal("the witch set nothing out, so there is no cauldron frame to read")
+	}
+	if frame := frameFor(nil, pot, nil); !strings.Contains(frame, pin) {
+		t.Errorf("her frame no longer says where the turn ends:\n  want a sentence "+
+			"containing %q\n  got:\n%s", pin, frame)
+	}
+	if frame := frameFor(nil, nil, nil); strings.Contains(frame, pin) {
+		t.Errorf("the frame every room gets now carries the cauldron arm's "+
+			"instruction, so this check is no longer about the witch:\n%s", frame)
 	}
 }
 

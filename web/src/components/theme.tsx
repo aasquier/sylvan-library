@@ -27,13 +27,14 @@
  * same truth: the deck is made by the person whose deck it is.
  */
 
-import { useCallback, useEffect, useId, useRef, useState,
+import { useCallback, useEffect, useId, useMemo, useRef, useState,
          type CSSProperties, type ReactNode } from 'react'
 import {
   ApiError,
   api,
   errorMessage,
   followJob,
+  type BrewReading,
   type ClaudeStatus,
   type ThemeCombination,
   type ThemeCommander,
@@ -43,7 +44,10 @@ import {
   type ThemeSlot,
   type ThemeTurn,
 } from '../lib/api'
+import { Cauldron, ReadyPulse } from './cauldron'
+import { POURED, POURING, SERVE_MS, potLabel } from '../lib/cauldroncopy'
 import { costumeFor } from '../lib/costumes'
+import { reducedMotion } from '../lib/motion'
 import { COLOR_VAR } from '../lib/mtg'
 import { personaAccent, personaArt } from '../lib/personart'
 import { useStashed } from '../lib/stash'
@@ -287,11 +291,17 @@ function RoomSign({ persona }: { persona: string }) {
             <path d="M21 36 L 17 45 M32 39 L 32 44 M43 36 L 47 45"
                   stroke="currentColor" strokeWidth="3" strokeLinecap="round"
                   opacity="0.85" />
-            <path d="M15 21 C 15 33 22 39 32 39 C 42 39 49 33 49 21 Z"
+            {/* The three named parts carry a class each so that ONE placement
+                — the header over the hut, below — can re-ink them without the
+                drawing changing. Inert everywhere else: nothing styles them
+                unless `.room-sign-hut` is on the wrapper. */}
+            <path className="hut-sign-body"
+                  d="M15 21 C 15 33 22 39 32 39 C 42 39 49 33 49 21 Z"
                   fill="currentColor" opacity="0.85" />
-            <path d="M11 21 H 53" stroke="currentColor" strokeWidth="3.4"
-                  strokeLinecap="round" />
-            <ellipse cx="32" cy="19.4" rx="15" ry="3.2" fill="#c8ef86" />
+            <path className="hut-sign-rim" d="M11 21 H 53" stroke="currentColor"
+                  strokeWidth="3.4" strokeLinecap="round" />
+            <ellipse className="hut-sign-brew" cx="32" cy="19.4" rx="15"
+                     ry="3.2" fill="#c8ef86" />
             <circle className="lab-bubble" cx="26" cy="15" r="2.4"
                     fill="#c8ef86" opacity="0.85" />
             <circle className="lab-bubble lab-bubble-2" cx="37" cy="12" r="1.9"
@@ -335,7 +345,18 @@ function RoomSign({ persona }: { persona: string }) {
         )
     }
   })()
-  return <span className="room-sign shrink-0" aria-hidden="true">{sign}</span>
+  // **The hut's sign is struck smaller and in iron, and only here.** A door
+  // sign is an emblem — flat, in the room's accent, read at a glance — and
+  // that is the right thing on a tile in a grid. Standing on top of a
+  // Waterhouse oil at forty-eight pixels of spring green it is a cartoon
+  // pasted onto a painting, which is commandment 5 exactly. `.room-sign-hut`
+  // in index.css is the whole change: half the size, cast iron in ash, and the
+  // green kept as a line rather than a fill. The drawing is untouched, so the
+  // sign is the sign it was anywhere it is rendered without this class.
+  const hut = persona === 'witch' ? ' room-sign-hut' : ''
+  return (
+    <span className={`room-sign shrink-0${hut}`} aria-hidden="true">{sign}</span>
+  )
 }
 
 /** The hand's pace (the brief's front two, third pass). A fixed,
@@ -694,7 +715,8 @@ function CombinationPanel({ combo, rank, sources, onPick }: {
 /* --------------------------------------------------------------- the page */
 
 export function ThemeInterview({
-  onPick, onLeave, persona = 'plain', seed = null, intro, leaveLabel,
+  onPick, onLeave, persona = 'plain', seed = null, pot = null, intro,
+  leaveLabel,
 }: {
   onPick: (key: string, card: ThemeCommander) => void
   onLeave: () => void
@@ -706,6 +728,15 @@ export function ThemeInterview({
    *  three cards server-side, so the conversation and the table can never
    *  disagree about what is face up. */
   seed?: number | null
+  /** What is in the witch's pot, when this room has one on. The same seed
+   *  picks the same three things server-side, so the strip and the questions
+   *  can never disagree about what is going in.
+   *
+   *  **The pot reports the grounding; it never performs it.** Everything it
+   *  reads is `slots`, which is the readiness instrument's own answer, and
+   *  there is no field anywhere on this page that lets a pot count something
+   *  the transcript does not carry. */
+  pot?: BrewReading | null
   /** The reader's own framing, when somebody else is setting the scene. */
   intro?: { title: string; blurb: string }
   leaveLabel?: string
@@ -719,6 +750,16 @@ export function ThemeInterview({
   const [busy, setBusy] = useState<'' | 'asking' | 'proposing'>('')
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  /* What the pot last said, in the pot's own words. One string, printed under
+     the strip and said by the live region — never two wordings of it. Cleared
+     when the next question starts being written, so the beat that follows is a
+     change rather than a repeat of the same joined sentence. */
+  const [stirred, setStirred] = useState('')
+  /* The pour, which runs on the plate while the reading is worked out. */
+  const [serving, setServing] = useState(false)
+  /* One slow pulse of the brew's green across the room behind the
+     conversation, on the beat the pot comes up ready. Motion, no reflow. */
+  const [pulsing, setPulsing] = useState(false)
   const box = useRef<HTMLTextAreaElement>(null)
   // The answer box's label is invisible but it is a real `<label>`, and a label
   // needs an id to point at. One per mounted interview.
@@ -931,10 +972,37 @@ export function ThemeInterview({
     asker.current?.cancel()
   }, [])
 
+  // The pot's beat has passed once the next question is being written. The
+  // live region is empty for that whole stretch anyway (see `said` below), so
+  // clearing here is what makes the question that follows a *change* rather
+  // than a re-render of the same joined string with the stir still on the
+  // front of it.
+  useEffect(() => {
+    if (busy === 'asking') setStirred('')
+  }, [busy])
+
+  /* The pour, and it is the only thing on this screen that is theatre rather
+     than report: the ladle, the dip and the vial take about four and a half
+     seconds and the reading takes minutes, so this is a beat at the start of a
+     wait rather than a progress bar for it. Cleared on a timer rather than
+     when the job lands, for exactly that reason. */
+  const serve = useRef<number | null>(null)
+  useEffect(() => () => { if (serve.current) clearTimeout(serve.current) }, [])
+
   async function proposeIt() {
     setBusy('proposing')
     setError(null)
     setElapsed(0)
+    if (pot && !reducedMotion()) {
+      setServing(true)
+      setStirred(POURING)
+      if (serve.current) clearTimeout(serve.current)
+      serve.current = window.setTimeout(() => setServing(false), SERVE_MS)
+    } else if (pot) {
+      // Reduced motion gets the sentence and no ladle: the pour is reported in
+      // words and by the brew settling, which is what §10's rule asks for.
+      setStirred(POURING)
+    }
     try {
       const job = await api.themePropose({
         transcript, slots,
@@ -970,7 +1038,27 @@ export function ThemeInterview({
     setReport(null)
     setError(null)
     setBusy('')
+    // The pot is doused with everything else. Starting over keeps the reader
+    // and the same three ingredients — those were picked on the way in and are
+    // the door's to change — but nothing is in it any more.
+    setStirred('')
+    setServing(false)
+    setPulsing(false)
   }
+
+  // The potion, handed over. Said once, when the panels arrive.
+  useEffect(() => {
+    if (pot && proposal) setStirred(POURED)
+  }, [pot, proposal])
+
+  // The proposal's twin of `noQuestion` below: a run that produced nothing
+  // usable speaks in the room's own words on screen, and the server's
+  // recorded reason — which may carry a wire token, and the crossing corpus
+  // freezes that sentence — goes to the console instead of the room.
+  useEffect(() => {
+    if (proposal?.asked && !proposal.combinations.length && proposal.reason)
+      console.error('the proposal came back empty:', proposal.reason)
+  }, [proposal])
 
   // Everything the screen is made of, derived once — and above the early
   // returns rather than below them, because the live region at the foot of
@@ -985,6 +1073,16 @@ export function ThemeInterview({
   // for two spellings, and the kind is the one the floor is counted in.
   const kinds = new Set(slots.map((s) => s.kind)).size
   const grounded = report?.grounded ?? kinds
+  /* The same set again, as the pot reads it: which kinds, in the order they
+     landed. **A slot kind appearing that was not there on the previous render
+     IS the grounding** — no server change, no new field, and the pot can never
+     count something the transcript does not carry. Memoised on the joined
+     spelling because the array is an argument to an effect one component down,
+     and a fresh array every render is an effect that runs every render. */
+  const kindList = slots.map((s) => s.kind)
+  const kindKey = kindList.join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const inPot = useMemo(() => kindList, [kindKey])
   const floor = report?.floor ?? 3
   // A conversation restored from a previous tab has no report yet, and every
   // one of these has to come off the transcript instead — otherwise coming
@@ -1036,6 +1134,27 @@ export function ThemeInterview({
   const costume = costumeFor(persona)
 
   /**
+   * What is printed where the question goes when there is no question.
+   *
+   * **A turn that RAN and produced nothing gets the room's words; a turn that
+   * never ran keeps the server's.** The first is a shrug — the answer did not
+   * end in a question mark, or did not parse — and "Nothing usable came back."
+   * is the app talking about itself in a room that has a voice of its own
+   * (commandment 10, and `lib/costumes.ts` is where the voices live). The
+   * second is `asked: false`: the stance is off, or this is as long as the
+   * conversation goes, and those sentences are real explanations that no
+   * costume may paint over — a witch saying "the steam took that one" when
+   * what actually happened is a setting would be a room lying about itself.
+   *
+   * The plain room's entry is the sentence that was already here, so nothing
+   * uncostumed moves. Read by both the card and the live region below, because
+   * the eye and the ear are told the same thing in the same words.
+   */
+  const noQuestion = !question && report?.asked && report.reason
+    ? costume.emptyReply
+    : report?.reason ?? ''
+
+  /**
    * The interview, said out loud: the question arriving, the moment there is
    * enough to read from, and any reading that was thrown away.
    *
@@ -1060,8 +1179,21 @@ export function ThemeInterview({
    * count of dropped readings.
    */
   const said = busy === 'asking' ? '' : [
-    question || report?.reason || '',
-    ready ? costume.ready : '',
+    // The newest thing in the pot, led by its PLACE — "The Base takes the rose
+    // hips. One of three…" — because the shelf holds "Quince" beside "Rose
+    // hips" and "the X goes in" is ungrammatical for half of it. It comes
+    // first because it is what just happened.
+    stirred,
+    // Once the panels are up, the question and the banner are no longer on
+    // the screen — and a sentence an eye cannot find is exactly what this
+    // region's second rule forbids. What is left is the one line about the
+    // thing that just arrived.
+    // `noQuestion` rather than `report.reason` straight, so the ear is told
+    // what the eye is shown: the card above prints the same value, and a room
+    // that said one thing on the slate and another in the live region would
+    // be two rooms. Uncostumed, it IS `report.reason`.
+    proposal ? '' : question || noQuestion || '',
+    proposal || !ready ? '' : costume.ready,
     report?.slots_dropped ? droppedNote(report.slots_dropped) : '',
   ].filter(Boolean).join(' ')
   const say = <span className="sr-only" role="status">{said}</span>
@@ -1121,6 +1253,14 @@ export function ThemeInterview({
                 <p className="mt-1 text-[10px]"
                    style={{ color: 'var(--text-muted)' }}>
                   The room wears {roomArt.credit}&rsquo;s painting.
+                  {/* And the hut is a whole painting rather than a card crop,
+                      so it is named the way a painting is named. Credited
+                      where it renders, which is the rule whether the licence
+                      makes it one or not. */}
+                  {pot && (
+                    <> The pot is John William Waterhouse&rsquo;s{' '}
+                    <em>The Magic Circle</em>, 1886.</>
+                  )}
                 </p>
               )}
             </div>
@@ -1160,6 +1300,38 @@ export function ThemeInterview({
       {!proposal && (
         <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
           <div className="space-y-4">
+            {/* The pot, folded (`components/cauldron.tsx`). A rail **above the
+                conversation column** rather than floating in the middle of the
+                page — where the séance's small spread sits, and for its
+                reason: the person is reading this column, so this is where the
+                room has to be. The plate commits to it too, since the cauldron
+                sits at 66% across the picture.
+
+                It reports `slots` and nothing else. A kind appearing that was
+                not there on the last render is the grounding, which drops that
+                slot's ingredient; three in and the brew is ready. Nothing here
+                can count something the transcript does not carry. */}
+            {pot && pot.ingredients.length > 0 && (
+              <div className="space-y-2">
+                <div role="img"
+                     aria-label={`The pot. ${potLabel(pot.ingredients, inPot)}`}>
+                  <Cauldron view="strip" ingredients={pot.ingredients}
+                            grounded={inPot} serving={serving}
+                            onBeat={setStirred}
+                            onReady={() => setPulsing(true)} />
+                </div>
+                {/* The beat, printed. The folded phase has no room for the
+                    plate's own caption, and a reveal that happens only in
+                    colour is a reveal half the room misses. Same string the
+                    live region says. */}
+                {stirred && (
+                  <p className="cauldron-beat-line">{stirred}</p>
+                )}
+              </div>
+            )}
+            {pulsing && !reducedMotion() && (
+              <ReadyPulse onDone={() => setPulsing(false)} />
+            )}
             {/* What has been said, so the conversation reads as one. Only a
                 *trailing assistant turn* is held back — that is the pending
                 question, and the card below renders it. A trailing *user*
@@ -1215,7 +1387,7 @@ export function ThemeInterview({
                     // The reader's words arrive as ink soaking into the
                     // page; everyone else's questions simply print.
                     ? <InkText text={question} />
-                    : question || report?.reason
+                    : question || noQuestion
                     // A thrown turn sets no report, so there is no `reason` to
                     // show — and "Starting…" under a red error line describes
                     // the one thing that is definitely not happening.
@@ -1335,10 +1507,18 @@ export function ThemeInterview({
                 </p>
                 {/* Worded apart from the sidebar's "Suggest my colours" —
                     two controls, one act, and a reader (or a test) should be
-                    able to tell which one they pressed. */}
+                    able to tell which one they pressed.
+
+                    The room's own tailoring when it has any (`costume.action`),
+                    and the app's accent button when it does not — a blank
+                    costume field means the plain chrome, whose paint stays
+                    here so an undressed room never has to restate the
+                    default. */}
                 <button onClick={proposeIt} disabled={!!busy}
-                        className="btn btn-primary btn-accent-2"
-                        style={{ '--btn-ink': '#fff' } as CSSProperties}>
+                        className={`btn ${costume.action || 'btn-primary btn-accent-2'}`}
+                        style={costume.action
+                          ? undefined
+                          : { '--btn-ink': '#fff' } as CSSProperties}>
                   {costume.readyAction}
                 </button>
               </div>
@@ -1403,8 +1583,12 @@ export function ThemeInterview({
                                 border: '1px solid var(--hairline)' }} />
               </label>
               <button onClick={proposeIt} disabled={!ready || !!busy}
-                      className={`btn mt-3 w-full ${ready ? 'btn-primary btn-accent-2' : 'btn-quiet'}`}
-                      style={ready ? { '--btn-ink': '#fff' } as CSSProperties : undefined}>
+                      className={`btn mt-3 w-full ${ready
+                        ? costume.action || 'btn-primary btn-accent-2'
+                        : 'btn-quiet'}`}
+                      style={ready && !costume.action
+                        ? { '--btn-ink': '#fff' } as CSSProperties
+                        : undefined}>
                 {/* The room's own words for the wait, not the app's. This
                     button and the banner in the column say the same thing at
                     the same moment; they used to say "Reading around…" and
@@ -1433,7 +1617,11 @@ export function ThemeInterview({
                 The control itself is the header's Claude menu now; this line
                 reports what that setting resolves to for this conversation. */}
             <div className="border-t pt-2" style={{ borderColor: 'var(--hairline)' }}>
-              <StanceReadout status={status} pin={pin} />
+              {/* `table`, because there is no deck here yet — this is the
+                  surface somebody arrives at before there is one, and the
+                  readout's default phrase named a thing the room does not
+                  have. */}
+              <StanceReadout status={status} pin={pin} surface="table" />
             </div>
           </aside>
         </div>
@@ -1441,6 +1629,17 @@ export function ThemeInterview({
 
       {proposal && (
         <div className="space-y-4">
+          {/* The room's own line for the moment the potion is handed over,
+              above the app's promise rather than instead of it: the sentence
+              below carries "nothing is created until you say so", which is
+              commandment 2's and is not a costume's to soften. Said by the
+              live region in these same words. */}
+          {pot && (
+            <p className="text-sm font-medium"
+               style={{ color: 'var(--text-primary)' }}>
+              {POURED}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               Pick a commander to carry on — you will name the deck next, and
@@ -1454,7 +1653,13 @@ export function ThemeInterview({
 
           {proposal.combinations.length === 0 && (
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              {proposal.reason || 'Nothing usable came back.'}
+              {/* A run that produced nothing gets the costume's sentence —
+                  `noQuestion`'s rule, applied to the pour. `asked: false` is
+                  the server explaining itself in a person's words, and those
+                  pass through untouched. */}
+              {proposal.asked && proposal.reason
+                ? costume.emptyReply
+                : proposal.reason || costume.emptyReply}
             </p>
           )}
 

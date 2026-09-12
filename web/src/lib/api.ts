@@ -2889,6 +2889,53 @@ export interface TarotReading {
   cards: TarotDrawn[]
 }
 
+/**
+ * One thing going into the witch's pot.
+ *
+ * `slot` is `taste` | `temperament` | `posture` — ADR 20's first three slot
+ * kinds, the same three the spread uses — so an ingredient is picked *for* a
+ * slot and the readiness instrument is untouched. `position` is what she
+ * calls that place out loud ("The Base", "The Heat", "The Binding").
+ *
+ * `note` is what she sees it do in the water. It is flavour, not fact: the
+ * true things live in the cauldron lore and reach the page only as a fact she
+ * chose to tell. There is no `meaning` here or on the server — the pot is
+ * filled deterministically; what any of it says about the person is hers.
+ *
+ * Note what is NOT on the wire: `category`. On the table it is `slot`, and one
+ * question with two answers is how a client ends up rendering the
+ * disagreement.
+ */
+export interface BrewIngredient {
+  key: string
+  name: string
+  note: string
+  slot: string
+  position: string
+}
+
+export interface BrewReading {
+  /** Carried by the client and re-sent every turn, so a reload wants the same
+   *  three things. The same stateless trick the transcript uses. */
+  seed: number
+  ingredients: BrewIngredient[]
+}
+
+/**
+ * Does this room have a pot on?
+ *
+ * A second two-line reader over the same field rather than a generalised
+ * `hasProp`, and the asymmetry with [dealsTarot] is the point of writing it
+ * separately: `prop` wins whenever the server sends one, and there is no
+ * legacy key to fall back to, because `deals` predates the cauldron entirely
+ * and a pre-`prop` server never had a witch with a prop. Against an old server
+ * the right answer here is **false** — that server's witch had nothing on the
+ * table — where for the spread it is `deals`.
+ */
+export function brewsACauldron(persona: Persona): boolean {
+  return persona.prop === 'cauldron'
+}
+
 /** One slide of an arena's rotation.
  *
  *  Five kinds, and the two text fields are filled to match: `roman`,
@@ -3541,6 +3588,12 @@ export const api = {
   tarotReading: (seed?: number) =>
     get<TarotReading>(
       seed === undefined ? '/api/tarot/reading' : `/api/tarot/reading?seed=${seed}`),
+  // Fill the pot: one ingredient per place. The deal's twin, and free for the
+  // same reasons — no model, no card pool, no network. Pass the seed back to
+  // pick the same three things, which is what a reload does.
+  brewReading: (seed?: number) =>
+    get<BrewReading>(
+      seed === undefined ? '/api/brew/reading' : `/api/brew/reading?seed=${seed}`),
   // Public, so it is the one call that works before anything else does. The
   // shell reads it to decide whether to ask for a login at all, and the nav to
   // decide whether to offer the admin page.
