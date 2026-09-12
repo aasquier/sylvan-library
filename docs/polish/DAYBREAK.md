@@ -20,22 +20,50 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ---
 
+## Open — 2026-09-12
+
+**White: the live invalid example is gone — all 25 decks now pass the gate,
+and CLAUDE.md's standing fact ("at least one curated deck fails the gate on
+purpose, a banned card left as the gate's one honest live demonstration") has
+quietly stopped being true.** Read off the deployed instance's own deck wire
+this run: 25 curated, `errors: 0` on every one (two carry warnings only). The
+library grew 17 → 25 since the last check confirmed one failing deck, and
+somewhere in the growth the demonstration left. Decks are your data — no run
+touches them, and no CI gate can see the volume. · *Cost of leaving it:*
+nothing breaks; the gate just has no live proof it refuses anything, and the
+prose promises one. · **Recommendation:** drop a banned card back into one
+deck you like for the job (a minute in the deck editor), or rule the fact
+retired and CLAUDE.md gets the sentence removed on the next working branch.
+Ledger: White, 2026-09-12.
+
+**White: the nine open torch Dependabot alerts are triaged in prose and
+never dismissed on GitHub, so the security tab re-asks a settled question
+forever.** The triage lives in `tools/pyproject.toml` (containment: dev-Mac
+only, never ships, safetensors-only snapshot — and this run made the
+snapshot pin real code, so the premise now holds by test rather than by
+habit). The alerts (1 critical, 8 lesser, all `pip/torch`, all `development`
+scope) stay open because dismissing needs repo-admin, which the pass does
+not have and should not. · *Cost of leaving it:* every future security read
+spends the hour re-deriving this paragraph. · **Recommendation:** dismiss
+all nine as "tolerable risk — see tools/pyproject.toml's depth-extra triage"
+(two minutes in the Security tab). Ledger: White, 2026-09-12.
+
 ## Open — 2026-09-05
 
-**White/Blue: the once-per-cycle determinism replay is still owed, and one
-sign-in unlocks it and two more besides.** The tarot deal, the Wheel's spin
-and every Tier 1 result are seeded promises, and the way we prove a deploy
-kept them is to replay them against the deployed instance — which answers 401
-before a login, and Claude never signs in to anything. The same 401 is why
-Blue's two owed walks (the fortune-teller's table, the `/claude` keeper duty)
-have now been skipped three runs running. · *Cost of leaving it:* the one
-contract the project calls a promise is checked only on this laptop, and
-commandment 14 says a green suite has not seen the page. · **What would have
-to be true:** the `claude` seat signed in through Claude-in-Chrome once, in an
-evening you are at the keyboard; the next White run rides the session and the
-walks come with it. · **Recommendation:** unchanged — sign it in when it is
-convenient; nothing else here is waiting on anything. Ledger: White,
-2026-09-05.
+**Blue: two owed walks remain — the fortune-teller's table and the `/claude`
+keeper duty — and the door they were waiting behind is open.** White's
+2026-09-12 run found the browser seat signed in (your own `gyome` session)
+and rode it: the determinism replay is done and green on all four surfaces
+(tarot byte-identical to the 2026-08-24 baseline, wheel self-consistent and
+matching the recorded fate, the new brew route live-matching a local build,
+Tier 1 answering `cached: true` on the re-ask), so that half of this item is
+out of the queue and in White's ledger entry. What is left is Blue's half:
+walking the tarot room as a room and keeping the `/claude` page
+(commandment 18). · *Cost of leaving it:* the two rooms most personal to the
+project go another cycle unseen. · **Recommendation:** the Blue leg behind
+this run rides the same session and takes both walks; if the session has
+lapsed by then, the item reverts to waiting on a sign-in. Ledger: White,
+2026-09-12; Blue, 2026-09-05.
 
 **Blue: the Settings room says "the torches are not lit yet", and the only
 thing keeping that true is that you have not flipped the switch.** The line is

@@ -101,3 +101,24 @@ func TestTheCheckersReadTheStartingDeck(t *testing.T) {
 		t.Fatal("yorion")
 	}
 }
+
+func TestKerugaReadsExactlyThreeAsLegal(t *testing.T) {
+	t.Parallel()
+	// The rule's own words are "mana value 3 OR GREATER", so 3 is the legal
+	// side of the line — and the shared deck above holds no card at exactly
+	// 3, which is how a `<` vs `<=` mutant at the comparison lived through
+	// the whole table (gremlins, 2026-09-12: CONDITIONALS_BOUNDARY at
+	// companion.go:144). A boundary is the rule; it gets its own pin.
+	keruga := rec("keruga, the macrosage", "Legendary Creature — Dinosaur Hippo", "",
+		"Companion — keruga, the macrosage", 5)
+	three := rec("Centaur Courser", "Creature — Centaur Warrior", "{2}{G}", "", 3)
+	two := rec("Grizzly Bears", "Creature — Bear", "{1}{G}", "", 2)
+	deck := []Entry{{three.Name, three}, {two.Name, two}}
+	got := CheckCompanion("keruga, the macrosage", deck, map[string]*pool.CardRecord{"keruga, the macrosage": keruga})
+	if got.Unsupported != "" {
+		t.Fatalf("unsupported: %q", got.Unsupported)
+	}
+	if strings.Join(got.Violations, ",") != "Grizzly Bears" {
+		t.Fatalf("violations %v, want exactly the two-drop: three is legal", got.Violations)
+	}
+}

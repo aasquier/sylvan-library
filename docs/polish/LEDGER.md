@@ -19,8 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24, 2026-08-19,
-  2026-08-16.
+- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
+  2026-08-24, 2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -28,6 +28,225 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-12 (rainbow)
+
+- **Fixed this run:**
+  1. **The depth model's "pinned" claim was enforced by nothing, and a
+     critical-RCE dismissal rested on it.** `tools/cardmotion/depth.py` said
+     *"Pinned, not floating"* above `MODEL_ID` — a bare Hugging Face repo id,
+     which resolves whatever upstream's main branch points at on any fresh
+     download. Two standing claims rode on the pin being real: the
+     fingerprint story (same weights in, same depth out), and the
+     torch==2.2.2 security triage in `tools/pyproject.toml`, which dismisses
+     the **critical** torch.load pickle RCE (Dependabot #12) on the premise
+     that "the one model it loads is a pinned Hugging Face snapshot shipping
+     safetensors" — a premise a compromised or merely updated upstream repo
+     could void by shipping a `pytorch_model.bin`, which transformers would
+     hand to torch.load's unpickler on exactly the torch this machine is
+     ceilinged at. Verified before fixing: the local HF cache's one snapshot
+     is `5426e4f0f36572d16453bbda7a8389317b1bef99` (safetensors + two JSON
+     configs, no pickle), and upstream main **currently equals it** (HF API,
+     2026-09-12) — so pinning changes nothing observable today and closes
+     the window. `MODEL_REVISION` is that sha, passed as `revision=` in the
+     one `pipeline()` call;
+     `test_the_depth_model_is_pinned_to_a_commit_and_the_loader_uses_it`
+     holds it to the immutable form (40-hex — a branch or tag fails) and
+     holds the call site wired, without importing torch (ADR 32).
+     **Mutation-verified both legs**: revision set to `"main"`, watched to
+     fail; `revision=` removed from the call, watched to fail; both
+     restored. The pyproject triage paragraph now names where its premise
+     lives. Toolbox gates green (ruff, mypy 23 files, pytest 238).
+  2. **The coverage ratchet was owed a click and got it: 90.5 → 90.8.** The
+     step's own comment instructs "raise MINIMUM when the tree passes a
+     higher number"; CI's own print on today's main run is **91.2% on both
+     legs** (run 34722211776), and the raise keeps the 0.3–0.4 headroom
+     every prior click kept (89.5@90.1, 90.0@90.4, 90.5@90.8, now
+     90.8@91.2). The history comment carries the new pair. Proof is this
+     PR's own required checks — the gate runs on both legs of every PR.
+  3. **A named gate survivor is pinned: Keruga's boundary.**
+     `TestKerugaReadsExactlyThreeAsLegal` (`internal/gate/companion_test.go`)
+     — the rule's words are "mana value 3 **or greater**", and the shared
+     test deck holds no card at exactly 3, so a `<`→`<=` mutant at
+     `companion.go:144` lived through the whole table. The pin's CMC-3 card
+     is Centaur Courser, **looked up, not remembered** (`cards show`:
+     {2}{G}, Centaur Warrior) — the first draft typed a real card with a
+     wrong cost, which is non-negotiable 1 caught in the act.
+     **Mutation-verified against the exact lived mutant**: `< 3` made
+     `<= 3`, watched to fail, restored, re-green.
+  4. **CLAUDE.md's ADR 28 sentence caught up with the ADR chain.** "Recorded
+     from one call site" had become four argued call sites: the edit engine
+     (`edits.go:81`) plus three in `intake.go` that arrived with #447, each
+     carrying its own ADR 28 comment — and **ADR 41 took the decision in
+     words** ("ADR 28 gains an edit kind for the intake write"), so this was
+     doc-rot, not drift. The bullet now says "through the one recorder" and
+     names both argued paths. The recording invariant itself (every edit
+     recorded, never rationale text) was read against all four sites and
+     holds.
+- **Verified this run — licensing (triple-check):**
+  - **`animist verify`: 34 recipes, all held** (was 33; +1 is
+    `agatha-hut-plate.recipe.yaml`, #460). Committed media **207 tracked
+    files** (was 205). The one new source-side asset since 2026-09-05 read
+    in full: `web/src/assets/agatha/` — Waterhouse's *The Magic Circle*
+    (1886, Tate), **public domain confirmed through the Commons API at
+    fetch time**, crop/resize/WEBP recorded in the recipe, the
+    committed-vs-hotlinked argument made (PD oil vs Fan Content hotlink),
+    the dusk laid as a stylesheet layer rather than a bake (commandment 19's
+    shape, argued at length in the PROVENANCE), and the credit **renders in
+    the room** (`theme.tsx:1262` names painter, painting, year). The
+    accounting gate (`TestEveryCommittedPictureIsAccountedForWhereItStands`)
+    and both licence-record guards passed in this run's suite.
+  - **The licence gate still has no override**, read in the code:
+    `tools/animist/sources.py` raises `LicenceRefused` against the three
+    allowlists (lines 175/212/272/305); `cli.py` grep for
+    force/bypass/skip-licence: nothing. No Wizards image under
+    `git ls-files`; `PageMasthead.credit` still required by the type
+    (`ui.tsx:514`); all six `PERSONA_ART` entries carry credits;
+    monetization sweep clean (one note: tesseract.js's postinstall is
+    `opencollective-postinstall` — a donation prompt in **dev tooling**,
+    blocked by npm allow-scripts and never shipped; not a surface).
+  - **ADR 6 holds**: ci.yml line 116 still scans
+    `.duckdb`/`.jsonl.gz`/`.json.gz` anywhere; no bulk data tracked.
+  - **Dependency licences, swept 2026-09-12 from the packages themselves.**
+    Go: 32 third-party — 19 MIT, 10 BSD-3-Clause, 2 Apache-2.0,
+    `modernc.org/mathutil` still the known classifier miss (BSD-3 by its
+    LICENSE, ruled 2026-08-24). npm: **173 packages — 133 MIT, 15 ISC, 10
+    Apache-2.0, 4 MPL-2.0, 3+3 BSD, 2 MIT-0, 1 each
+    BlueOak/CC0/"MIT AND ISC". Zero AGPL/GPL/SSPL/UNLICENSED on either
+    side.** Swept after `npm ci`, because **local `node_modules` was behind
+    the lockfile again** — the #458 frontend bump (oxlint 1.80, vitest
+    4.1.11) had never been installed here; same trap as 2026-09-05, synced
+    the same way.
+- **Verified this run — security & isolation:**
+  - **Exactly one route new since 2026-09-05** (`a82fbdf..e9d2c52`, every
+    `Pattern:` site lives in `api.go`): `GET /api/brew/reading` (#460).
+    Read end to end: seed-only input through `brew.ParseSeed`, no owner, no
+    pool, no model, deterministic `brew.Deal` — and auth-protected by
+    construction (not in `PublicPaths`, whose rule-not-roster test stands).
+    It is also a **new seeded promise**, so the replay below baselines it.
+  - **The ADR 5 isolation sweep is live, re-proven by mutation**: a served
+    `GET /api/decks/{owner}/{slug}/polish-probe` injected into the route
+    table fails `TestEverySweptRouteIsServedAndEveryServedRouteIsSwept` by
+    name ("1 owner-scoped route(s) are served and never swept"); removed,
+    tree clean.
+  - **Email**: `AsDict(true)` still has exactly one non-test caller
+    (`admin.go:124`). **Tokens**: no query-string token under `web/src`
+    (the one `token=` hit is a card-token React prop). **Argon2id**:
+    m=19456 KiB, t=2, p=1 unchanged at the OWASP minimum. `.env` ignore
+    order intact; `fly.toml` opens with its no-secrets rule.
+  - **SQL over the delta**: the two added shapes are clean —
+    `claude/ledger.go`'s roll-up builds its WHERE from bound `?` literals
+    behind the existing Axes guard, and `pool/records.go`'s price filter
+    binds its one value. No new `os.Getenv` outside config.
+  - **CodeQL: 0 open, 11 dismissed** (the five stale Python alerts are
+    gone since 2026-09-05); today's main analysis green. **Dependabot: 9
+    open, all `pip/torch`, all development-scope** — created 2026-08-24,
+    triaged in `pyproject.toml` prose since 08-16. The triage's containment
+    premise was made real by fix 1; the alerts themselves stay open because
+    dismissal needs repo-admin (daybreak line, with the recommendation to
+    dismiss all nine against the pyproject paragraph).
+- **Found on the live walk, queued:** **the deliberately-invalid deck is
+  gone.** All **25** decks (was 17) are `stage: curated` with `errors: 0`
+  on the deck wire (two carry warnings only:
+  one-blade-many-blessings:1, school-of-hard-knocks:2). CLAUDE.md's
+  standing fact — at least one curated deck fails the gate on purpose —
+  stopped being true somewhere in the library's growth. No run touches
+  decks; daybreak carries the ask (drop a banned card back in, or retire
+  the fact).
+- **Measurements (2026-09-12, rainbow):** raw output, not a summary.
+  - **Coverage** (floor was 90.5, raised to 90.8 by fix 2):
+
+    ```
+    go test -count=1 -coverpkg=./... ./... ; go tool cover -func  →  total: 91.2%   (flat vs 09-05)
+    go test -count=1 -coverprofile=own.out ./... ; -func          →  total: 88.9%   (was 89.1)
+    ```
+
+    CI's own print on today's main: 91.2% on both legs. Own-tests lows:
+    `wire` 67.7 (flat), `deckread` 68.1, `deckyaml` 70.8 (flat), `shelves`
+    81.5, `sim` 81.6. The 0.2pp own-tests fall is spread thin — no package
+    cratered; watched, not alarming.
+  - **Suite wall clock: 4m22.1s — contaminated, record but do not trend.**
+    `go test -count=1 ./...`, 50 packages, 0 failures, user 11m54s — but
+    the machine carried load averages 63/103/55 (the rainbow's own
+    orchestrator and the desktop app), and every package roughly doubled
+    uniformly (`api` 150.1s was 63.7, `claude` 134.1 was 64.5, `cards` 80.7
+    was 35.9) while the tree grew only 7% (1,817 → 1,948 top-level tests) —
+    the signature of contention, not growth. The next quiet run re-baselines.
+  - **`t.Parallel` census: 1,921 of 1,948 parallel, 27 serial, and all 27
+    say why where they stand** (script re-check; one serial test new since
+    09-05). 53 `t.Setenv` sites (flat). **Skip census: 37 `t.Skip` sites,
+    every one conditional on a real absence** — including two that read
+    unconditional and are not (the rate-table straddle helpers in
+    `claude/ledger` and `cmd/mtglab` skip only when no priced rate carries
+    an `Until`; data-conditional, the curve_test shape).
+  - **Mutation, `internal/gate` second spin — full capture on the first
+    run, and the 2026-09-05 deferred item closes**: Killed 160, Lived 19,
+    Not covered 6, **Timed out 3** (not the collapse; the 09-05 re-run
+    pathology was 139/139), Not viable 0 — **efficacy 89.39%**, 12m06s in a
+    throwaway worktree at `origin/main` under residual load (quiet-machine
+    baseline remains 5m34s). The population grew 142 → 188 sites (#444's
+    rulebreaker.go). **All 19 survivors named** (the 09-05 four are stale
+    line numbers — validate.go moved):
+    `companion.go` 91:7, 95:8(NEG+BOUND), 95:19(BOUND), 144:38(BOUND —
+    **killed this run by fix 3**), 216:16(INC), 273:21(ARITH);
+    `rulebreaker.go` 94:13, 120:21, 276:17, 375:44 (all BOUND — **the new
+    #444 code carries four boundary survivors**, the next gate question);
+    `validate.go` 124:50, 213:30, 285:29(NEG+BOUND), 471:23, 485:28,
+    489:17, 508:16. NOT COVERED: companion.go 324/326/328 (the
+    hybrid-symbol table), rulebreaker.go 59:107, 404:21, validate.go
+    511:87. The three TIMED OUT (companion.go 77:10, 80:61, 95:19) are
+    load-bounded and say nothing reliable.
+  - **The determinism replay — FULL PASS, live, all four surfaces, and the
+    2026-09-05 daybreak item clears.** The browser seat was found signed in
+    (Aaron's own `gyome` session — the `claude` seat itself was not; ridden
+    under the standing you-are-me ruling, reads and repeat-safe calls only):
+    - **Tarot live**: `GET /api/tarot/reading?seed=1909` on
+      sylvan-libraries.com is **byte-identical to the 2026-08-24 baseline**
+      — 741 bytes, sha256 `e406f504…`, Three of Wands reversed / Ten of
+      Swords / The Devil — across ~19 days and ~30 deploys. Local build of
+      this tree: same bytes (scratch data dir, bind held by my own PID,
+      proven by `lsof`).
+    - **Wheel live**: two spins of
+      `POST /api/decks/gyome/arahbo-cats/wheel {"seed":1909}` —
+      self-identical, 973 bytes, `symbol: sword`, `sword_face: edge`,
+      `answered_by: "dice"` — **all equal to the 2026-08-24 recorded
+      fate**.
+    - **Brew (new surface), first baseline**: local build seed 1909 → 503
+      bytes, sha256
+      `54c5036e0afd2b17a2943e1d9062df39bff5858885bc47a0fc3843d91bebead8`
+      (Quince/taste/The Base, Storm-rain/temperament/The Heat,
+      Hawthorn/posture/The Binding), self-consistent — and **the deployed
+      instance answers the same bytes**, a live-vs-local cross-check.
+    - **Tier 1 live, in the fingerprint-proof form**: the same ask
+      (`/api/sim/mana`, gyome/arahbo-cats, seed 1909) submitted twice —
+      first `cached: false`, second **`cached: true`**, results identical
+      minus the cache fields (7,420 bytes), seed carried on both. This
+      two-ask shape needs no stored baseline and survives engine-fingerprint
+      churn; recommend it as the standing Tier 1 replay form. (The five
+      fingerprinted packages did not move in the delta; `sim/mulligan` did,
+      but its absence from `engineSources` is argued where it stands and
+      #451's convoke change is held byte-identical by
+      `TestSearchAnswersIdenticallyAtEveryWidth`.)
+  - **Live posture**: `/api/health` 200 — pool fresh, 35,393 oracle cards,
+    **108,263 printings** (was 107,355; the pool refreshed since), **25
+    decks** (was 17). Reference shelves (`/api/colors`, `/api/glossary`)
+    200. Page renders (ivy door, credited masthead).
+  - **`data/app.db` untouched by any of it**: pre-run mtime 08:42
+    2026-09-12 (another session's, hours before this rainbow), re-checked
+    after the suites and the scratch server — unchanged. The replay server
+    ran on a scratch `MTGLAB_DATA_DIR` on port 8799, bind verified.
+- **Queued for Aaron (2026-09-12):** the live invalid-example deck
+  (daybreak), and the nine torch alerts' GitHub-side dismissal (daybreak).
+  Nothing else new needs a ruling.
+- **Deferred:**
+  - ~~10 of `internal/gate`'s surviving mutants unnamed~~ — **closed this
+    run** (full roster above; one killed).
+  - **The rulebreaker.go boundary cluster** (94:13, 120:21, 276:17,
+    375:44): four boundary survivors in code that arrived with #444.
+    *Trigger:* the next gate change, or the next White run reads the four
+    sites against the clause's own wording the way fix 3 read Keruga's.
+  - **`repr.go`'s corpus ruling** and **`--version`/build stamp**:
+    standing, triggers unchanged (2026-08-24).
 
 ### 2026-09-05 (cleanup)
 

@@ -114,6 +114,31 @@ def test_depth_drift_without_a_map_is_refused() -> None:
         derive(art_image(), None, EFFECTS["depth-drift"])
 
 
+def test_the_depth_model_is_pinned_to_a_commit_and_the_loader_uses_it() -> None:
+    # Two claims rest on this pin and neither can be tested by running the
+    # loader (ADR 32: no test imports torch): the fingerprint story assumes
+    # same weights in, same depth out, and the torch==2.2.2 triage in
+    # `pyproject.toml` dismisses a critical torch.load RCE on the premise
+    # that the loaded snapshot ships safetensors. A Hugging Face `revision`
+    # may be a branch, a tag, or a commit — only the commit form is
+    # immutable, so only the commit form makes either claim true. Importing
+    # `cardmotion.depth` is torch-free by design (torch lives inside
+    # `load_model`), which is what lets this run in the plain suite.
+    import inspect
+    import re
+
+    from cardmotion import depth
+
+    assert re.fullmatch(r"[0-9a-f]{40}", depth.MODEL_REVISION), (
+        "MODEL_REVISION must be a full commit sha — a branch or tag floats, "
+        "and both standing claims assume it cannot")
+    # And the pin must be wired, not decorative: the one pipeline() call in
+    # the loader resolves the model at that revision.
+    assert "revision=MODEL_REVISION" in inspect.getsource(depth.load_model), (
+        "load_model no longer passes revision=MODEL_REVISION, so the model "
+        "resolves whatever the repo's main branch points at today")
+
+
 # ------------------------------------------------------------- the cache
 
 def test_the_key_moves_with_every_input(tmp_path) -> None:
