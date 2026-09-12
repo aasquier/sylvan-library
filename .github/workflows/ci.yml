@@ -242,11 +242,12 @@ jobs:
       # `system_linux.go` is compiled here where `system_darwin.go` was
       # compiled there, and the two folding orders above disagree by a tenth.
       # A floor set at the measurement would go red on the first of those.
-      # 89.5 was set at a measured 90.1 and 90.0 at a measured 90.4; this is
-      # 90.5 at a measured 90.8.
+      # 89.5 was set at a measured 90.1, 90.0 at a measured 90.4, 90.5 at a
+      # measured 90.8; this is 90.8 at a measured 91.2 (CI's own print on
+      # both legs, 2026-09-12).
       - name: Coverage floor
         env:
-          MINIMUM: "90.5"
+          MINIMUM: "90.8"
         run: |
           go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > /dev/null
           TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}' | tr -d '%')

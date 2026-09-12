@@ -364,9 +364,10 @@ promise; `fly secrets` deployed).
 - **An invalid deck is simulated, not refused**, and every result carries
   `deck_check` — refusing removes the diagnosis exactly when it is wanted
   (commandment 2). One state refuses: a deck that compiles to no cards.
-- **Every deck edit is recorded from one call site** (ADR 28) — never
-  rationale text, never an undo. Creation/import/delete are deliberately
-  outside it.
+- **Every deck edit is recorded through the one recorder** (ADR 28; ADR 41
+  added the intake write's own edit kinds, so the edit engine and the intake
+  are both argued call sites now) — never rationale text, never an undo.
+  Creation/import/delete are deliberately outside it.
 - **Reference prose is checked-in, not generated** — colors, glossary, lore,
   tarot lore (`internal/reference`'s embedded JSON): finite, editable, free.
   Card facts inside it still resolve through the pool; an unresolvable name

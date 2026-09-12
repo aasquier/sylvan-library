@@ -33,6 +33,19 @@ if TYPE_CHECKING:
 #: that without a version moving anywhere.
 MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
+#: The pin itself. A repo id alone floats with the repo's main branch, so
+#: `MODEL_REVISION` names the exact upstream commit the loader resolves —
+#: the immutable form, which is what two standing claims rest on: the
+#: fingerprint story above (same weights, same depth), and the torch==2.2.2
+#: security triage in `pyproject.toml`, whose dismissal of the torch.load
+#: pickle RCE assumes the snapshot it names keeps shipping safetensors.
+#: This commit does: `model.safetensors` and two JSON configs, nothing
+#: unpickled. Moving the pin is a decision, not an update — re-read that
+#: triage paragraph first, confirm the new snapshot is still
+#: safetensors-only, and expect every depth-derived asset to want
+#: regenerating (the committed art was built from this snapshot).
+MODEL_REVISION = "5426e4f0f36572d16453bbda7a8389317b1bef99"
+
 
 class DepthError(RuntimeError):
     """The model is unavailable or refused the image."""
@@ -70,7 +83,8 @@ def load_model() -> DepthModel:  # pragma: no cover -- needs the depth extra
             "tooling and never part of the app") from exc
 
     torch.set_num_threads(max(1, (os.cpu_count() or 2) - 1))
-    estimator = pipeline("depth-estimation", model=MODEL_ID, device="cpu")
+    estimator = pipeline("depth-estimation", model=MODEL_ID,
+                         revision=MODEL_REVISION, device="cpu")
 
     class _Loaded:
         def infer(self, image: Image) -> Image:
