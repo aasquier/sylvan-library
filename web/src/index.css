@@ -8419,6 +8419,17 @@ button:hover .tarot-fan-card {
   box-shadow: 0 18px 34px rgb(0 0 0 / 0.28);
 }
 
+/* The keyboard's hover. Without this the front page's primary object fell
+ * back to the browser's own focus outline — a UA blue that belongs to no
+ * palette in this house — while every button wears the vine. Same ring as
+ * `.btn:focus-visible`, offset a little further because the tile is large
+ * and the ring reads better with air. The lift is deliberately not copied:
+ * focus is a position, not a hover. */
+.deck-tile:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 3px;
+}
+
 .deck-tile img {
   transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
 }

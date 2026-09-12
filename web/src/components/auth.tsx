@@ -55,7 +55,7 @@ export function AuthField({
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2"
+        className="h-9 rounded-md px-2 text-sm outline-none focus:ring-2 focus:ring-[var(--vine)]"
         style={{ background: 'var(--surface-1)', color: 'var(--text-primary)',
                  border: '1px solid var(--hairline)' }}
       />
@@ -74,8 +74,12 @@ export function AuthSubmit({ label, busyLabel, busy, disabled }: {
   disabled?: boolean
 }) {
   return (
+    // `btn-accent-vine`, not the accentless fallback: without an accent,
+    // `.btn-primary` dresses in `--text-primary` and the one action on the
+    // whole screen reads as a neutral grey pill. The door wears the house's
+    // own green.
     <button type="submit" disabled={busy || disabled}
-            className="btn btn-primary">
+            className="btn btn-primary btn-accent-vine">
       {busy ? busyLabel : label}
     </button>
   )
