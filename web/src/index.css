@@ -8438,6 +8438,45 @@ button:hover .tarot-fan-card {
   transform: scale(1.045);
 }
 
+/* The choosing hand's tile — a commander, a guild face, a colour
+ * combination on the Start-a-deck doors and the interview's proposal. The
+ * one control on the newcomer's first real decision used to greet the
+ * mouse by dimming (`hover:opacity-90`) — and in this game's own grammar a
+ * dimmed, still card is what a TAPPED permanent looks like. Hover adds
+ * light instead: the hairline warms to the vine, the tile lifts a pixel,
+ * a soft shadow puts it above the page, and the painting leans a step
+ * closer (a transform, never a filter — commandment 19: nothing re-renders
+ * Wizards' art on its way to the screen). Press settles it flat; the
+ * keyboard gets the same vine ring every button wears. */
+.pick-tile {
+  transition: transform 160ms ease, box-shadow 160ms ease,
+              border-color 160ms ease;
+}
+
+.pick-tile:hover {
+  transform: translateY(-1px);
+  border-color: var(--vine);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
+}
+
+.pick-tile:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.pick-tile:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
+.pick-tile img {
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pick-tile:hover img {
+  transform: scale(1.03);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .forest-ambience {
     display: none;
@@ -8473,13 +8512,17 @@ button:hover .tarot-fan-card {
   .nav-link::after,
   .deck-tile,
   .deck-tile img,
+  .pick-tile,
+  .pick-tile img,
   .whisper-sprout {
     transition: none;
   }
-  .deck-tile:hover {
+  .deck-tile:hover,
+  .pick-tile:hover {
     transform: none;
   }
-  .deck-tile:hover img {
+  .deck-tile:hover img,
+  .pick-tile:hover img {
     transform: none;
   }
   /* The lift is motion and goes; the warmed shadow is light and stays. */
