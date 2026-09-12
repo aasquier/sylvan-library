@@ -50,6 +50,25 @@ describe('StanceReadout', () => {
     expect(screen.getByText(/Consultant · following the deck/)).toBeTruthy()
   })
 
+  it('does not name a deck on a surface that has none', () => {
+    // The theme interview is where somebody arrives *before* there is a deck,
+    // and the unpinned line read "following the deck" there — a phrase about a
+    // thing that is not in the room, on the one screen built for people who
+    // have never had one. Same setting, same resolved answer, honest phrase.
+    render(<StanceReadout status={status()} pin={null} surface="table" />)
+    expect(screen.getByText(/Consultant · at the table/)).toBeTruthy()
+    expect(screen.queryByText(/following the deck/)).toBeNull()
+  })
+
+  it('keeps the capped line surface-blind, because it is about the instance', () => {
+    // Only the *unpinned* phrase names where you are standing. "Limited from"
+    // is a sentence about the deployment's ceiling, which is the same sentence
+    // in every room — surface-awareness that spread further than the one
+    // phrase that needed it would be two wordings of one fact.
+    render(<StanceReadout status={status()} pin="collaborator" surface="table" />)
+    expect(screen.getByText(/Consultant · limited from Collaborator/)).toBeTruthy()
+  })
+
   it('shows just the resolved name when a pin is honoured', () => {
     render(<StanceReadout status={status()} pin="consultant" />)
     expect(screen.getByText('Consultant')).toBeTruthy()

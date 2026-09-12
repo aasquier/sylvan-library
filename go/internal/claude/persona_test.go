@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
 // TestTheVoicesAreTheRecordedOnes reads the embedded roster back and checks
@@ -147,37 +149,184 @@ func TestTheWireCarriesBothSpellingsOfTheProp(t *testing.T) {
 	}
 }
 
-// TestAnUnknownPropIsInert is what the named prop buys over the boolean: the
-// room after this one has a cauldron on the table, and adding it must not
-// reach the deal.
+// TestAnUnknownPropIsInert is what the named prop buys over the boolean: two
+// rooms now have something on the table, and neither one's plumbing may reach
+// the other's.
 //
-// Every spelling here is a room the tarot plumbing has to ignore — the empty
-// prop, a prop nobody has written code for, and the two near-misses that would
-// fire if the comparison were ever loosened into a fold or a prefix.
+// Every spelling here is a room both deals have to ignore — a prop nobody has
+// written code for, and the four near-misses that would fire if either
+// comparison were ever loosened into a fold or a prefix.
+//
+// **What it deliberately no longer asserts is that an unknown prop loses its
+// seed.** `seedFor` asks "is there anything on the table", not "is it cards",
+// because the alternative — a list of the props that carry one — is a silent
+// no-op the day a third prop lands, and it was exactly that on the day the
+// cauldron did: the witch's seed went on the floor and her pot was re-picked
+// every turn. A seed is about the *room*; what it picks is the deal's
+// business, and that is what the two nil assertions below hold.
 func TestAnUnknownPropIsInert(t *testing.T) {
 	t.Parallel()
-	for _, prop := range []string{"", "cauldron", "Tarot", "tarot "} {
+	for _, prop := range []string{"scrying-bowl", "Tarot", "tarot ", "Cauldron", "cauldron "} {
 		who := Persona{Key: "somebody", Prop: prop}
-		seed, err := seedFor(who, "1234")
-		if err != nil {
-			t.Errorf("prop %q: a seed it should be dropping was refused: %v", prop, err)
-		}
-		if seed != nil {
-			t.Errorf("prop %q: kept the seed %v", prop, seed)
-		}
 		if reading := readingFor(who, big.NewInt(1234)); reading != nil {
 			t.Errorf("prop %q: was dealt a spread", prop)
 		}
+		if pot := potFor(who, big.NewInt(1234)); pot != nil {
+			t.Errorf("prop %q: was filled a pot", prop)
+		}
 	}
-	// The positive control, or the loop above passes for reasons that have
-	// nothing to do with the prop.
-	reader := Persona{Key: "reader", Prop: PropTarot}
-	seed, err := seedFor(reader, "1234")
-	if err != nil || seed == nil {
-		t.Fatalf("the dealing prop lost its seed: %v / %v", seed, err)
+	// A room with nothing on the table at all is the one that still drops the
+	// seed: there is nothing for it to reproduce.
+	bare := Persona{Key: "nobody", Prop: ""}
+	seed, err := seedFor(bare, "1234")
+	if err != nil {
+		t.Errorf("a propless room's seed was refused rather than dropped: %v", err)
 	}
-	if readingFor(reader, seed) == nil {
-		t.Error("the dealing prop was dealt no spread")
+	if seed != nil {
+		t.Errorf("a propless room kept the seed %v", seed)
+	}
+	// The positive controls, or the loop above passes for reasons that have
+	// nothing to do with the prop. Each prop gets its own object and neither
+	// gets the other's.
+	for _, tc := range []struct {
+		prop  string
+		deals bool
+		fills bool
+	}{
+		{PropTarot, true, false},
+		{PropCauldron, false, true},
+	} {
+		who := Persona{Key: "somebody", Prop: tc.prop}
+		got, err := seedFor(who, "1234")
+		if err != nil || got == nil {
+			t.Fatalf("prop %q lost its seed: %v / %v", tc.prop, got, err)
+		}
+		if dealt := readingFor(who, got) != nil; dealt != tc.deals {
+			t.Errorf("prop %q: dealt a spread = %v, want %v", tc.prop, dealt, tc.deals)
+		}
+		if filled := potFor(who, got) != nil; filled != tc.fills {
+			t.Errorf("prop %q: filled a pot = %v, want %v", tc.prop, filled, tc.fills)
+		}
+	}
+}
+
+// TestTheTwoPropsAnswerOnlyTheirOwnRoom walks the real roster rather than
+// hand-built personas, because the hand-built ones cannot catch the failure
+// that actually happened: `data/personas.json` carries the prop **twice** —
+// once on the persona the prompt is built from and once on the roster entry
+// the wire serves — and the witch's first landed with only the roster half
+// changed. Every frame she was ever handed would have been the plain one.
+//
+// So this asks the shipped roster: exactly one voice is dealt a spread,
+// exactly one is filled a pot, and they are not the same voice.
+func TestTheTwoPropsAnswerOnlyTheirOwnRoom(t *testing.T) {
+	t.Parallel()
+	seed := big.NewInt(1909)
+	var dealt, filled []string
+	for _, key := range PersonaKeys {
+		who, err := GetPersona(key)
+		if err != nil {
+			t.Fatalf("%s is in PersonaKeys and GetPersona refuses it: %v", key, err)
+		}
+		if readingFor(who, seed) != nil {
+			dealt = append(dealt, key)
+		}
+		if potFor(who, seed) != nil {
+			filled = append(filled, key)
+		}
+	}
+	if len(dealt) != 1 || dealt[0] != "fortune-teller" {
+		t.Errorf("dealt a spread: %v, want exactly the fortune teller", dealt)
+	}
+	if len(filled) != 1 || filled[0] != "witch" {
+		t.Errorf("filled a pot: %v, want exactly the witch — and the likeliest "+
+			"cause of an empty list is a `prop` changed on the roster entry in "+
+			"data/personas.json and not on the persona beside it", filled)
+	}
+}
+
+// TestTheWitchsFrameNamesHerPotAndRefusesToExplainIt holds the two sentences
+// the cauldron arm of `frameFor` exists for, because neither is visible in any
+// report and both are the difference between a pot and a progress bar.
+//
+// `theme_test.go`'s recorded corpus already pins the frame byte for byte; this
+// says *why* those bytes, so that a later edit that rewords the block has to
+// decide about these two on purpose rather than by accident.
+func TestTheWitchsFrameNamesHerPotAndRefusesToExplainIt(t *testing.T) {
+	t.Parallel()
+	who, err := GetPersona("witch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed := big.NewInt(1909)
+	pot := potFor(who, seed)
+	if pot == nil {
+		t.Fatal("the witch was filled no pot")
+	}
+	frame := frameFor(readingFor(who, seed), pot, nil)
+	for _, want := range []string{
+		// ADR 20's grounded-quote rule, in the room's own vocabulary.
+		"Their words are the only thing that ever goes in.",
+		// The mechanic stays the interface's to reveal.
+		"never read them their own pot",
+		// An ingredient is not evidence about anybody.
+		"Nothing you set out is evidence of anything about them.",
+		// One at a time, or the pot fills before the questions land.
+		"ONE AT A TIME",
+	} {
+		if !strings.Contains(frame, want) {
+			t.Errorf("the witch's frame no longer says %q", want)
+		}
+	}
+	// And the pot itself is in it, by name and by place.
+	for _, chosen := range pot.Ingredients {
+		if !strings.Contains(frame, chosen.Ingredient.Name) {
+			t.Errorf("the frame does not name %q, which is in the pot",
+				chosen.Ingredient.Name)
+		}
+		if !strings.Contains(frame, chosen.Position.Name) {
+			t.Errorf("the frame does not name the place %q", chosen.Position.Name)
+		}
+	}
+	// The spread's own sentence must not have followed her into the hut.
+	if strings.Contains(frame, "dealt three cards") {
+		t.Error("the witch's frame carries the fortune teller's spread")
+	}
+}
+
+// TestTheWitchCitesHerOwnCorpus is `KeepFact`'s second arm: a `cauldron:` id
+// resolves to the corpus's own sentence and the model's paraphrase is thrown
+// away, exactly as a `tarot:` id already did. An id nobody has is a dropped
+// fact rather than a dropped turn.
+func TestTheWitchCitesHerOwnCorpus(t *testing.T) {
+	t.Parallel()
+	lore := reference.Cauldron()
+	if len(lore.Facts) == 0 {
+		t.Fatal("the cauldron corpus is empty and this test is measuring nothing")
+	}
+	first := lore.Facts[0]
+	for _, spelling := range []string{
+		CauldronSource + first.ID,
+		strings.ToUpper(CauldronSource + first.ID),
+	} {
+		fact := KeepFact(map[string]any{
+			"text": "the model's own words", "source": spelling,
+		}, nil)
+		if fact == nil {
+			t.Fatalf("%q was dropped", spelling)
+		}
+		if fact.Text != first.Text {
+			t.Errorf("%q: the querent was handed %q, not the corpus's own words",
+				spelling, fact.Text)
+		}
+		if fact.Source != first.Source || fact.URL != "" {
+			t.Errorf("%q: credited %q / %q", spelling, fact.Source, fact.URL)
+		}
+	}
+	if fact := KeepFact(map[string]any{
+		"text": "x", "source": CauldronSource + "not-a-fact",
+	}, nil); fact != nil {
+		t.Errorf("an invented cauldron id was kept: %+v", fact)
 	}
 }
 

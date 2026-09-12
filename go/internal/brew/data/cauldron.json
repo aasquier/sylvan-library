@@ -1,0 +1,36 @@
+{
+ "_comment": "The witch's cauldron: three categories of eight, bound to the theme interview's first three slot kinds, and the order things go into the pot. This file is the source of truth -- edit it here, but never reorder it: a deal picks uniformly by INDEX within a category, so a moved entry changes what a seed brews, and `TestASeedBrewsTheRecordedPot` is the tripwire. Adding an ingredient to a category changes every seed in that category too, which is the price of the simple contract and is said out loud in brew.go.",
+ "order": [
+  {"slot":"taste","name":"The Base","asks":"what they already love, from long before any of this -- the thing the whole pot is built on"},
+  {"slot":"temperament","name":"The Heat","asks":"how they are when the fire gets under it and the plan comes apart in their hands"},
+  {"slot":"posture","name":"The Binding","asks":"what they become when there are other people in the room, and what holds them there"}
+ ],
+ "ingredients": [
+  {"key":"rose-hips","name":"Rose hips","category":"taste","note":"go in whole and turn the water the colour of a bruise"},
+  {"key":"wild-honeycomb","name":"Wild honeycomb","category":"taste","note":"goes in wax and all, and the wax comes straight back up"},
+  {"key":"elderflower","name":"Elderflower","category":"taste","note":"a handful of cream-coloured stars that smell like a hot afternoon"},
+  {"key":"meadowsweet","name":"Meadowsweet","category":"taste","note":"almond and cut hay; the whole room knows the moment it hits the water"},
+  {"key":"quince","name":"Quince","category":"taste","note":"hard as a fist while it is cold, and gone rose-red by the time it softens"},
+  {"key":"damson-skins","name":"Damson skins","category":"taste","note":"peeled off in ribbons; the colour comes out long before the taste does"},
+  {"key":"sloe-berries","name":"Sloe berries","category":"taste","note":"pricked one at a time with a thorn, which is the only way they give anything up"},
+  {"key":"angelica","name":"Angelica stems","category":"taste","note":"candied green and bitter underneath, like being fond of somebody difficult"},
+
+  {"key":"wolfsbane","name":"Wolfsbane","category":"temperament","note":"handled with the pot between you and it, and it goes in hooded like its own flower"},
+  {"key":"valerian-root","name":"Valerian root","category":"temperament","note":"smells frankly terrible and settles the whole pot anyway"},
+  {"key":"storm-rain","name":"Storm-rain","category":"temperament","note":"caught in a bowl on the step while it was still thundering"},
+  {"key":"nettle","name":"Nettle","category":"temperament","note":"picked bare-handed on purpose; loses its sting the second it meets heat"},
+  {"key":"vervain","name":"Vervain","category":"temperament","note":"a thin, unpromising stalk that half the charms in Europe ask for by name"},
+  {"key":"st-johns-wort","name":"St John's wort","category":"temperament","note":"the yellow flowers bleed red into the water, which is most of why it is in here"},
+  {"key":"rowan-berries","name":"Rowan berries","category":"temperament","note":"scarlet, and each one carries a five-pointed star on its underside"},
+  {"key":"henbane","name":"Henbane","category":"temperament","note":"goes in last and in the smallest amount the pot will bear"},
+
+  {"key":"mugwort","name":"Mugwort","category":"posture","note":"shaken out of a shoe that has walked a very long way"},
+  {"key":"red-thread","name":"Red thread","category":"posture","note":"wound round the spoon three times before anything else goes in"},
+  {"key":"mandrake-root","name":"Mandrake root","category":"posture","note":"shaped like a person, and lowered in feet first out of politeness"},
+  {"key":"hawthorn","name":"Hawthorn","category":"posture","note":"cut from a hedge and never from a lone tree, which is a distinction that matters"},
+  {"key":"rue","name":"Rue","category":"posture","note":"bitter enough to close your throat; the pot takes it as an apology"},
+  {"key":"yarrow","name":"Yarrow","category":"posture","note":"a fistful of grey lace, and everyone who put it under a pillow wanted the same answer"},
+  {"key":"iron-nail","name":"Iron nail","category":"posture","note":"dropped in and left there; it will not dissolve and it is not meant to"},
+  {"key":"hearth-salt","name":"Hearth salt","category":"posture","note":"a pinch over the left shoulder first, and the rest of it into the water"}
+ ]
+}

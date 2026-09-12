@@ -1,0 +1,187 @@
+{
+  "facts": [
+    {
+      "id": "pot-alewife",
+      "text": "Brewing in medieval England was overwhelmingly women's work, and the alewife's trade dress is familiar: a tall hat to be seen over a market crowd, a broom hung above the door, a cat for the grain store, and a cauldron in the yard. It is an old argument that the witch of the picture books was assembled, piece by piece, out of somebody's shop front.",
+      "source": "Judith M. Bennett, Ale, Beer, and Brewsters in England (Oxford, 1996)",
+      "ingredient": ""
+    },
+    {
+      "id": "pot-ale-stake",
+      "text": "A brewer with a fresh batch to sell put out an ale-stake — a pole with a bush or a broom tied to the end of it — and in some English towns the law required it, so the official ale-taster could find the house. The vintner's version of the same sign is why we still say that good wine needs no bush.",
+      "source": "Judith M. Bennett, Ale, Beer, and Brewsters in England (Oxford, 1996)",
+      "ingredient": ""
+    },
+    {
+      "id": "pot-gundestrup",
+      "text": "The most famous cauldron in Europe was pulled out of a Danish peat bog in 1891: silver, worked all over with gods and beasts, and laid down in pieces on purpose. Cauldrons were given to bogs and lakes across Iron Age Europe, and nobody was ever meant to get them back.",
+      "source": "National Museum of Denmark, on the Gundestrup cauldron (found at Rævemose, 1891)",
+      "ingredient": ""
+    },
+    {
+      "id": "pot-dagda",
+      "text": "The Dagda's cauldron is one of the four treasures the Tuatha Dé Danann brought to Ireland, and almost the whole of what is said about it is that no company ever went away from it unsatisfied. Three of the treasures are weapons. The fourth is a pot that feeds everybody.",
+      "source": "Cath Maige Tuired (the Second Battle of Mag Tuired)",
+      "ingredient": ""
+    },
+    {
+      "id": "pot-ceridwen",
+      "text": "Ceridwen set a boy to stir her cauldron for a year and a day, and at the end of it three drops flew out and caught him on the thumb. He put the thumb in his mouth, took everything that was in the pot, and became Taliesin. The story is very clear that the drops were an accident and that they counted anyway.",
+      "source": "Hanes Taliesin (the Tale of Taliesin)",
+      "ingredient": ""
+    },
+    {
+      "id": "pot-sunwise",
+      "text": "Stir with the sun and never against it. Sunwise — deosil — was the lucky way round for a pot, a churn, a boat leaving harbour and a person walking round a church, and going widdershins was what you did when you meant to undo something.",
+      "source": "Iona Opie & Moira Tatem, A Dictionary of Superstitions (Oxford, 1989)",
+      "ingredient": ""
+    },
+
+    {
+      "id": "rose-hips-harvest",
+      "text": "Britain stripped its own hedgerows for these. During the Second World War schoolchildren and village groups were sent out every autumn to gather rose hips by the ton for a national syrup scheme, and county herb committees weighed and paid for what came in.",
+      "source": "Roy Vickery, A Dictionary of Plant-Lore (Oxford, 1995)",
+      "ingredient": "rose-hips"
+    },
+    {
+      "id": "honeycomb-telling",
+      "text": "The bees were told. A death, a birth or a marriage in the house meant somebody walked out to the hives and said so out loud, often knocking first and draping the hives in black — and a household that forgot to tell them was expected to lose the bees, or the honey, before the year was out.",
+      "source": "Iona Opie & Moira Tatem, A Dictionary of Superstitions (Oxford, 1989)",
+      "ingredient": "wild-honeycomb"
+    },
+    {
+      "id": "elderflower-asking",
+      "text": "You asked the elder before you cut it. An old woman was held to live in the tree — the Elder Mother, Hyldemoer in Denmark, the Old Gal in England — and the formula was to ask her leave and wait a moment for an answer. Burning elder on the hearth was refused outright.",
+      "source": "Geoffrey Grigson, The Englishman's Flora (1955)",
+      "ingredient": "elderflower"
+    },
+    {
+      "id": "meadowsweet-strewing",
+      "text": "Meadowsweet was the strewing herb of choice: Gerard writes in 1597 that Queen Elizabeth wanted it in her chambers above every other herb, because the smell makes the heart merry and does not overwhelm the head. It went down on floors at weddings too, which is where the old name bridewort comes from.",
+      "source": "John Gerard, The Herball, or Generall Historie of Plantes (1597)",
+      "ingredient": "meadowsweet"
+    },
+    {
+      "id": "quince-wedding",
+      "text": "The quince is the marriage fruit. Plutarch reports a law of Solon's that an Athenian bride should eat one before going in to her husband, and quinces keep turning up in Greek wedding custom for centuries afterwards — a hard, sour thing handed over at the softest moment anybody has.",
+      "source": "Plutarch, Life of Solon",
+      "ingredient": "quince"
+    },
+    {
+      "id": "damson-dye",
+      "text": "The damson carries Damascus in its name and came west along the trade roads, but the orchards planted for it in Shropshire and Worcestershire were not planted for the table: the skins went to the Midlands cloth trade as a dye, and the fruit was a by-product of the colour.",
+      "source": "Roy Vickery, A Dictionary of Plant-Lore (Oxford, 1995)",
+      "ingredient": "damson-skins"
+    },
+    {
+      "id": "sloe-frost",
+      "text": "Nobody eats a sloe twice. The country rule is to leave them on the blackthorn until the first hard frost has been through them, and every hedgerow gin recipe in Britain now quietly admits that a night in the freezer does the same job.",
+      "source": "Roy Vickery, A Dictionary of Plant-Lore (Oxford, 1995)",
+      "ingredient": "sloe-berries"
+    },
+    {
+      "id": "angelica-angel",
+      "text": "Angelica's name is its own story: the herbals say an angel appeared in a dream during an epidemic and named the plant, which is why it is archangelica and why it was chewed and burned in the streets through every outbreak that reached northern Europe.",
+      "source": "Maud Grieve, A Modern Herbal (1931)",
+      "ingredient": "angelica"
+    },
+
+    {
+      "id": "wolfsbane-lykoktonon",
+      "text": "The Greek name is lykoktonon — wolf-killer — and it is a description of the job, not a metaphor: aconite went on bait and on arrows meant for wolves. Every gardening book that lists it still tells you to wear gloves, and means that too.",
+      "source": "Richard Folkard, Plant Lore, Legends, and Lyrics (1884)",
+      "ingredient": "wolfsbane"
+    },
+    {
+      "id": "valerian-rats",
+      "text": "Rats are said to come to valerian, which is why one telling of the Pied Piper gives him the root in his pocket rather than only a pipe in his hand — and rat-catchers really did carry it. Cats behave around valerian much as they behave around catmint, and nobody has ever found it dignified.",
+      "source": "Maud Grieve, A Modern Herbal (1931)",
+      "ingredient": "valerian-root"
+    },
+    {
+      "id": "storm-rain-souring",
+      "text": "Thunder soured the beer. Brewers across England swore a storm would turn a whole vat, and the counter-charm was iron: a bar, a knife or a horseshoe laid across the vessel to keep the thunder out of it until the weather had gone over.",
+      "source": "Iona Opie & Moira Tatem, A Dictionary of Superstitions (Oxford, 1989)",
+      "ingredient": "storm-rain"
+    },
+    {
+      "id": "nettle-lightning",
+      "text": "Nettles went on the fire when a thunderstorm came over, to turn the lightning away from the house. The same plant is a textile: when the cotton blockade bit in 1915, German uniforms were being woven partly from nettle fibre.",
+      "source": "Roy Vickery, A Dictionary of Plant-Lore (Oxford, 1995)",
+      "ingredient": "nettle"
+    },
+    {
+      "id": "vervain-gathering",
+      "text": "Vervain is in more charms than almost anything else growing. The Romans swept Jupiter's altars with it and called it the holy plant, and Pliny records the lengths the Magi went to for it: a circle drawn round the plant first, and it lifted with the left hand.",
+      "source": "Pliny the Elder, Natural History, Book XXV",
+      "ingredient": "vervain"
+    },
+    {
+      "id": "st-johns-wort-midsummer",
+      "text": "Crush a flower of it and the oil runs red, which got the plant both its name and its day. It was gathered on Midsummer Eve — St John's Eve — and hung over doors and windows against whatever was abroad that night, and the red was called the blood of the Baptist.",
+      "source": "Geoffrey Grigson, The Englishman's Flora (1955)",
+      "ingredient": "st-johns-wort"
+    },
+    {
+      "id": "rowan-red-thread",
+      "text": "Turn a rowan berry over and there is a tiny five-pointed star where the flower was, which is exactly why it was the anti-witch tree. 'Rowan tree and red thread gar the witches tyne their speed' is the Scots rhyme, and rowan crosses bound with red thread went up over byre doors every May.",
+      "source": "Geoffrey Grigson, The Englishman's Flora (1955)",
+      "ingredient": "rowan-berries"
+    },
+    {
+      "id": "henbane-gruit",
+      "text": "Before hops took over, ale was bittered with gruit — a changing mix of herbs that varied by town and by brewer — and henbane is among the plants named in that argument. Bavaria's purity law of 1516 ended it by naming barley, hops and water, and nothing else at all.",
+      "source": "Maud Grieve, A Modern Herbal (1931); the Bavarian Reinheitsgebot (1516)",
+      "ingredient": "henbane"
+    },
+
+    {
+      "id": "mugwort-traveller",
+      "text": "Mugwort is the traveller's herb: a sprig in the shoe and you would not tire on the road. It is also the first plant named in the Old English Nine Herbs Charm, which addresses it directly — 'una thu hattest, yldost wyrta', you are called the one, the eldest of herbs.",
+      "source": "The Nine Herbs Charm, in the Lacnunga (10th century)",
+      "ingredient": "mugwort"
+    },
+    {
+      "id": "red-thread-binding",
+      "text": "Red is the binding colour, and it binds by being tied rather than sewn. It went round rowan twigs over Scottish byre doors, round a newborn's wrist against the evil eye from Greece to Mongolia, and round the churn when the butter would not come.",
+      "source": "Iona Opie & Moira Tatem, A Dictionary of Superstitions (Oxford, 1989)",
+      "ingredient": "red-thread"
+    },
+    {
+      "id": "mandrake-dog",
+      "text": "Nobody was supposed to pull a mandrake themselves. The instruction, repeated from Josephus through the medieval herbals, is to loosen the earth around it, tie a dog to the root, stop your ears and stand well off — because the root screams when it comes out, and the dog takes what the scream does.",
+      "source": "Josephus, The Jewish War, Book VII; the medieval herbal tradition",
+      "ingredient": "mandrake-root"
+    },
+    {
+      "id": "hawthorn-lone-tree",
+      "text": "The blossom stays outside. Bringing may into the house was held across England to bring a death in with it, and a hawthorn standing alone in a field was left exactly where it was — an Irish bypass was famously re-routed around one at Latoon in 1999, and the tree is still there.",
+      "source": "Roy Vickery, A Dictionary of Plant-Lore (Oxford, 1995)",
+      "ingredient": "hawthorn"
+    },
+    {
+      "id": "rue-courtroom",
+      "text": "Rue is the herb of grace, and it was thrown rather than handed over: it was strewn across courtroom floors and carried in the judges' nosegays at the assizes, a practice that survived at the Old Bailey long after anyone believed in it. The plant rue and the feeling rue are two unrelated words that everybody has enjoyed confusing.",
+      "source": "Maud Grieve, A Modern Herbal (1931)",
+      "ingredient": "rue"
+    },
+    {
+      "id": "yarrow-pillow",
+      "text": "Yarrow answered one question, and it was always the same question. It went under the pillow on the right night with a rhyme — 'Good morrow, good morrow, fair yarrow' is how one recorded version opens — to show the sleeper who they would marry. Two of its old names are nosebleed and staunchweed, which is one plant credited with both starting the thing and stopping it.",
+      "source": "Geoffrey Grigson, The Englishman's Flora (1955)",
+      "ingredient": "yarrow"
+    },
+    {
+      "id": "iron-nail-refusal",
+      "text": "Iron was the refusal. A nail in the doorpost, a horseshoe over the lintel, an open pair of scissors under the mattress — the rule recorded across Europe is that the good folk cannot cross cold iron, and a nail driven into a threshold is a house saying no without anybody having to be rude about it.",
+      "source": "Iona Opie & Moira Tatem, A Dictionary of Superstitions (Oxford, 1989)",
+      "ingredient": "iron-nail"
+    },
+    {
+      "id": "hearth-salt-both-ways",
+      "text": "Salt is the awkward one, because it is the gift and the insult at once. It is what you carry into a new house first, with bread and a coin; it is also what you never pass hand to hand at table — 'help to salt, help to sorrow' — and what you throw over your left shoulder when it goes over, into the eye of whoever is standing behind you.",
+      "source": "Iona Opie & Moira Tatem, A Dictionary of Superstitions (Oxford, 1989)",
+      "ingredient": "hearth-salt"
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+# The plate Agatha's room is built on (ADR 29, ADR 31).
+#
+# **John William Waterhouse, `The Magic Circle`, 1886, Tate.** A sorceress
+# scribing a circle with a wand, a brass cauldron on three legs over a bed of
+# burning embers, smoke going straight up out of it, ravens standing around
+# the ring and flowers at its edge. It is the one public-domain painting that
+# has the whole room in it at once -- the pot, the fire, the witch and her
+# familiars -- and it was chosen off a proof sheet: Wright of Derby's
+# `Alchemist` has the mood and the wrong vessel, and Rosa's two witch scenes
+# have the right darkness and no cauldron worth the name.
+#
+# It is the room's **still**, which in `VideoBackdrop`'s vocabulary means the
+# poster and the reduced-motion fallback of an `art`-mode backdrop. A loop is
+# expected to land beside it later and nothing about this file changes when it
+# does; the four hotspot percentages in `index.css` are the one thing that is
+# re-measured against new footage.
+#
+# ## The crop is forced almost everywhere it is not chosen
+#
+# The plate is 2000x2942 -- a portrait painting, and this room is 16:9. A
+# 16:9 band out of it is **at most 1125 source pixels tall**, and only if it
+# takes the full width. So the band's height is not a choice, and the width
+# is a choice with exactly one good answer:
+#
+# **Full width also puts the cauldron at the house's own centrepiece scale.**
+# The pot's mouth measures 460 source pixels across the brass, which is
+# **23.0% of a 2000-wide frame** against the seance room's `--ball-d: 22.9%`
+# for its crystal ball (`web/src/index.css`). Any narrower crop makes the
+# cauldron *larger* than the sphere the house already settled, and sees less
+# of the painting doing it.
+#
+# So the only real decision is where the band sits, and it is the one below.
+#
+# ## No dusk is baked here, and that is `fabrica`'s rule rather than a gap
+#
+# The painting is bright -- mean luma 104 over this crop, against the seance
+# still's 52 and the forge's 48. It wants holding back, and it is **not held
+# back here**. `fabrica.recipe.yaml` states the reason for a tenebrist oil
+# and it is the same reason for a daylit one: *"a level baked into the byte
+# stream is a decision `index.css` can no longer argue with"*. `velatio` is
+# the closer precedent still -- the brightest picture in that directory, mean
+# 152, and it answers with a tighter mask in the stylesheet rather than a
+# level in the file.
+#
+# The dusk that lands this plate in the house range is therefore written down
+# as **CSS**: `.cauldron-dusk` in `web/src/index.css`, one multiply layer of
+# exactly the shape `.seance-glass-dim` already is. PROVENANCE.md beside this
+# file carries the arithmetic and the measured result.
+#
+# (It could not have been baked through this pipeline anyway: `animist`'s
+# still vocabulary has no darkening op. `levels` takes an `out_black` and can
+# only *lift* a floor, and `duotone` throws the painting's colour away to
+# darken it -- which is the exact failure its own docstring records against
+# the first parchment, and this room needs the painting's own colour intact
+# underneath a green layer at runtime.)
+animist: 1
+
+why_committed: >
+  The room is staged on this painting: ingredients fall into its cauldron and
+  the brew is drawn over its mouth, so it is the floor the whole composition
+  stands on rather than decoration beside one. Scryfall art is hotlinked
+  because the Fan Content Policy covers display and the credit line is part
+  of the deal; this is a public-domain oil photographed by a museum, so
+  committing the derived crop is clean -- and a room that goes blank when a
+  third-party host moves a file is a room the app does not own.
+
+sources:
+  # `LicenseShortName` is "Public domain" on Commons, re-confirmed through
+  # the API at fetch time. Two independent grounds: Waterhouse died in 1917,
+  # so the work is out of copyright everywhere the term is life plus 100 or
+  # fewer, and the photograph of it is a faithful reproduction of a
+  # two-dimensional public domain work.
+  waterhouse:
+    provider: wikimedia
+    title: "The Magic Circle - John William Waterhouse.jpg"
+    landing: https://commons.wikimedia.org/wiki/File:The_Magic_Circle_-_John_William_Waterhouse.jpg
+    found_via: >
+      Commons, searching the painter and the painting by name -- which is
+      the search that works for pictures and the one `campus.recipe.yaml`
+      recorded. Three other subjects were fetched and proof-sheeted first.
+    licence: Public domain
+
+outputs:
+  # 1280x720, which is the seance room's own plate size and the size its
+  # `--room-aspect: 16 / 9` box is drawn at.
+  #
+  # Quality 82, at the top of this project's range (the coliseum runs 74-82)
+  # and for the mosaic's reason: the scan carries the canvas weave and the
+  # craquelure of a 140-year-old oil, and those are fine high-frequency
+  # detail that a codec smears into mud before it gives up anything else.
+  - file: agatha-hut-plate.webp
+    from: waterhouse
+    ops:
+      # **The band's height is arithmetic; only its top edge is a decision.**
+      #
+      # 2000 wide at 16:9 is 1125 tall, which is 0.38239 of a 2942-pixel
+      # plate. Sliding that window is the whole composition, and three things
+      # pull against each other as it slides:
+      #
+      #   - The **pot mouth** wants to sit high, where a room puts its
+      #     centrepiece: the seance's sphere is at `--ball-y: 26.2%`.
+      #   - The **lower third has to tolerate UI**, and it is quietest (bare
+      #     ground, her feet, the signature) when the window sits low.
+      #   - Her **hand and the wand** are at source y 0.545, and a window
+      #     whose top edge falls below that reduces the sorceress to a skirt.
+      #     The painting is called `The Magic Circle` because she is drawing
+      #     one; the gesture is the subject.
+      #
+      # The mouth's centre measures at source y 0.695. Putting it at the
+      # seance's 26.2% needs a top edge of 0.595 and loses the hand outright.
+      # Putting it at 47.7% (the widest cut of the proof sheet) keeps the
+      # hand and buries the pot in the middle of the frame with the fire
+      # spilling into the lower third.
+      #
+      # **0.5574 puts the mouth at 36.0% of the frame** and keeps the
+      # forearm, the cuff and the wand along the top edge. The fire lands at
+      # 45-80%, the ground and her feet take the bottom quarter, and there
+      # are 33 points of frame above the rim for steam to rise through.
+      #
+      # What it costs is stated plainly because no crop of this painting
+      # avoids it: **she is headless at every viable window.** Her face is at
+      # source y 0.33-0.42 and the pot is at 0.695 -- 0.365 apart, where the
+      # whole band is 0.382 tall. A window holding both has no room left for
+      # the fire, which is half of what makes this a cauldron room.
+      - crop: {frac_box: [0.0, 0.5574, 1.0, 0.9398]}
+      - resize: {width: 1280}
+    encode: {format: webp, quality: 82}
+    expect: {width: 1280, height: 720, budget_kb: 200, metadata: none}

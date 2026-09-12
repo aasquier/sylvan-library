@@ -36,9 +36,9 @@ import type { PersonaKey } from './personart'
 
 export interface Costume {
   /** The weather over the room's painting. A subset of `RoomMood` in
-   *  `components/forest.tsx` — the two the rooms use; widen it here if a room
-   *  ever wants the embers. */
-  mood: 'mist' | 'wisps'
+   *  `components/forest.tsx`. The witch's hut wanted the embers, which is the
+   *  case the previous wording of this docstring left the door open for. */
+  mood: 'mist' | 'wisps' | 'embers'
   /** The whole class list for the card the question sits on. The one field
    *  that is never empty: something has to carry the box. */
   scroll: string
@@ -58,12 +58,34 @@ export interface Costume {
   ink: boolean
   /** While the next question is being written. */
   thinking: string
+  /** When a turn ran and came back with nothing to ask.
+   *
+   *  It is a costume field rather than the server's sentence for the reason
+   *  every other field here is one: "Nothing usable came back." is the app
+   *  talking about itself, and a witch does not have a *came back*. The plain
+   *  entry is that sentence unchanged, so an undressed room says what it has
+   *  always said — and a turn that never ran at all (`asked: false`: the
+   *  stance is off, the ceiling is reached) keeps the server's own words,
+   *  because those are a real explanation rather than a shrug. */
+  emptyReply: string
   /** While the reading itself is being worked out. The clock is appended by
    *  the caller, so this ends where the seconds begin. */
   reading: string
   /** The line over the ready banner, and the button under it. */
   ready: string
   readyAction: string
+  /** The class list for the room's own primary action — the button that
+   *  *does the thing this room is for*. Empty means the app's own accent
+   *  button, whose paint stays at the call site like every other blank field
+   *  here.
+   *
+   *  It exists because a room with its own palette gets its own tailoring
+   *  rather than a hand-me-down (`.btn-felt`'s argument, and commandment 17's):
+   *  a `.btn-accent-2` standing on a witch's hut is the page's furniture in
+   *  somebody else's house. It is one field rather than two because the banner
+   *  in the column and the button in the sidebar are one act — the same reason
+   *  `reading` is one field. */
+  action: string
 }
 
 /**
@@ -82,9 +104,11 @@ export const PLAIN: Costume = {
   placeholder: 'However much or little you like…',
   ink: false,
   thinking: 'Thinking…',
+  emptyReply: 'Nothing usable came back.',
   reading: 'Reading around…',
   ready: 'That’s enough to go on.',
   readyAction: 'Get my colours',
+  action: '',
 }
 
 const COSTUMES: Partial<Record<PersonaKey, Costume>> = {
@@ -102,9 +126,43 @@ const COSTUMES: Partial<Record<PersonaKey, Costume>> = {
     placeholder: 'Write your answer on the parchment…',
     ink: true,
     thinking: 'The quill hovers…',
+    emptyReply: 'The cards went quiet. Ask the table again.',
     reading: 'Reading the cards…',
     ready: 'Three cards, three answers — the reading is ready.',
     readyAction: 'Read my cards',
+    action: '',
+  },
+
+  /* The cauldron (commandment 3, and the room this file was refactored for —
+     see the docstring above). The question sits on a slate propped against the
+     pot; her words arrive in chalk rather than ink, because a witch writes on
+     what is to hand and the quill belongs to the reader across the village.
+     Every class here is defined in `index.css` under "Agatha's hut". */
+  witch: {
+    mood: 'embers',
+    scroll: 'cauldron-slate',
+    question: 'cauldron-question',
+    // `-said`, not `-bubble`: the pot already has a `.cauldron-bubble` and it
+    // is the thing that rises through the brew and breaks.
+    bubble: 'cauldron-said',
+    note: 'cauldron-note',
+    quill: 'cauldron-scratch',
+    placeholder: 'Go on. The pot only takes true things…',
+    // Deliberately. `InkText` is the *reader's* wet-ink reveal on parchment
+    // and it belongs to her: the witch does not write anything down, she
+    // listens and puts things in a pot. Her questions print.
+    ink: false,
+    // No ellipsis on this one, and that is the stylesheet's business rather
+    // than an oversight: `.cauldron-question.thinking-pulse::after` draws three
+    // dots and brings them in one at a time, so the wait is something the room
+    // *does* instead of the whole sentence dimming to 45% while somebody is
+    // trying to read it. Under reduced motion all three stand still.
+    thinking: 'She leans over the steam',
+    emptyReply: 'The steam took that one — say it again, plainer.',
+    reading: 'Bringing it up to a boil…',
+    ready: 'Three things in the pot, and it has stopped arguing with itself.',
+    readyAction: 'Pour it out',
+    action: 'btn-copper-hot',
   },
 }
 

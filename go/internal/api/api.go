@@ -307,11 +307,15 @@ func (a *API) Routes() []Route {
 		{Method: http.MethodGet, Pattern: "/api/coliseum/standings",
 			Handler: a.coliseumStandings},
 		{Method: http.MethodGet, Pattern: "/api/themes", Handler: a.themes},
-		// The Claude surface's two free corners:
-		// a checked-in roster of voices, and a seeded deal. Neither needs a
-		// key, a pool or a network, so both answer on a base install --
+		// The Claude surface's free corners:
+		// a checked-in roster of voices, and the two personas' props -- a
+		// seeded deal and a seeded pick. None of them needs a
+		// key, a pool or a network, so all of them answer on a base install --
 		// and the deal is internal/mt19937's first served caller, where a
 		// seed a browser has held for months must still deal its own spread.
+		// The pick makes the same promise from the same generator, and both
+		// sit off `PublicPaths`, which is to say deny-by-default like
+		// everything else the door was not told to open.
 		{Method: http.MethodGet, Pattern: "/api/claude/personas", Handler: a.personaRoster},
 		// The dial itself: it reports which modes are built and what each
 		// surface defaults to. Free, reaching no network and no
@@ -321,6 +325,7 @@ func (a *API) Routes() []Route {
 		// alone is therefore a 404.
 		{Method: http.MethodGet, Pattern: "/api/claude", Handler: a.claudeStatus},
 		{Method: http.MethodGet, Pattern: "/api/tarot/reading", Handler: a.tarotReading},
+		{Method: http.MethodGet, Pattern: "/api/brew/reading", Handler: a.brewReading},
 		// The pool behind the prose, and the pool's own four doors (the
 		// second family): a combination's champions and signature cards,
 		// the shelves' named cards, the search box, the typeahead behind

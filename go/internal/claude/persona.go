@@ -51,8 +51,14 @@ type Persona struct {
 }
 
 // PropTarot is the fortune teller's prop: three cards, dealt before the
-// conversation starts. The one prop the server does anything with.
+// conversation starts. The first prop the server does anything with.
 const PropTarot = "tarot"
+
+// PropCauldron is the witch's prop: three ingredients, picked before the
+// conversation starts and going in one at a time as her questions land. The
+// second prop the server does anything with, and `internal/brew` owns what
+// the word means.
+const PropCauldron = "cauldron"
 
 // RosterEntry is a persona as the door may serve it — which is a Persona with
 // Voice removed. Its own type rather than a Persona marshalled with a `json:"-"`

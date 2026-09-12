@@ -110,8 +110,9 @@ following the same geometry — there is no build step to run and nothing in
 - **A room's costume is a record, not a boolean.** The theme interview is one
   component wearing whatever the chosen voice wears, and `lib/costumes.ts` is
   the whole of that: the mood over its painting, the classes for its question
-  card, speech, fun fact and answer box, its placeholder, and what it says
-  while it is working. Two rules hold it together. Everything a costume
+  card, speech, fun fact and answer box, its placeholder, the class its one
+  real action wears, and what it says while it is working. Two rules hold it
+  together. Everything a costume
   changes is a **class the stylesheet owns** — an inline style is a costume no
   `:hover` can reach, which is commandment 17's mechanism one surface over —
   and an **empty class means the plain chrome**, whose paint stays at the call
@@ -124,6 +125,19 @@ following the same geometry — there is no build step to run and nothing in
   deals tarot is `dealsTarot` in `lib/api.ts` and nowhere else — the wire key
   is mid-rename from `deals` to `prop`, and a compatibility window read at
   five call sites is a compatibility window that ends at four of them.
+- **A prop gets its own reader, never a generalised one.** `brewsACauldron`
+  sits beside `dealsTarot` over the same `prop` field and is deliberately
+  **not** a `hasProp(persona, kind)`, because the two answer differently
+  against an old server: `deals` predates the cauldron entirely, so a payload
+  with no `prop` in it means *whatever that boolean said* for a spread and
+  **false** for a pot — that server's witch had nothing on the table. One
+  reader would have to pick one of those and be wrong somewhere. What is
+  behind each of them is a room: `components/tarot.tsx` deals the spread and
+  `components/cauldron.tsx` is Agatha's hut, whose whole grammar hangs off
+  four percentages of one plate (`--pot-x/-y/-d/-dy` in `index.css`, measured
+  in `src/assets/agatha/PROVENANCE.md`) — re-measure those and nothing else if
+  the picture is ever recut, and the folded strip follows because it is the
+  same composition cropped rather than a second one.
 - **Glossary keys are pinned to the served table.** A `Term` or `HelpTip` name
   must exist in `go/internal/reference/data/glossary.json`, which the app
   fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip

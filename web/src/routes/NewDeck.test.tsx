@@ -38,6 +38,13 @@ vi.mock('../lib/api', async () => {
     // cards is mid-rename, ROSTER below is deliberately spelled the old way,
     // and a stub would make that fixture prove nothing at all.
     dealsTarot: real.dealsTarot,
+    // Its sibling, and real for a sharper version of the same reason: the
+    // roster below is spelled the OLD way, with `deals` and no `prop` at all,
+    // which is exactly what a tab open across the deploy sees — and the right
+    // answer for a pot against that server is `false`, because that server's
+    // witch had nothing on the table. A stub could not tell the two readers
+    // apart, and this fixture is the only place the asymmetry is exercised.
+    brewsACauldron: real.brewsACauldron,
     // Real: it is how a server's own refusal keeps its wording on the way to
     // the screen.
     errorMessage: real.errorMessage,
