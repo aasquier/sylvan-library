@@ -2,6 +2,7 @@ package claude
 
 import (
 	"encoding/json"
+	"math/big"
 	"strings"
 	"testing"
 )
@@ -32,7 +33,7 @@ func TestTheVoicesAreTheRecordedOnes(t *testing.T) {
 	}
 	var deals []string
 	for _, k := range PersonaKeys {
-		if personas[k].Deals {
+		if personas[k].Prop == PropTarot {
 			deals = append(deals, k)
 		}
 	}
@@ -87,6 +88,15 @@ func TestTheRosterCannotCarryAVoice(t *testing.T) {
 		if entry.Label == "" || entry.Blurb == "" {
 			t.Errorf("%s has no label or blurb; the tile would render empty", entry.Key)
 		}
+		// The roster carries the prop, and carries the same one the persona
+		// does. The two lists are hand-kept in one file, so this is the join
+		// that catches a room dressed on one side of it and bare on the other
+		// — a fortune teller whose roster entry forgot the cards would render
+		// a tile promising a spread that never arrives, or the reverse.
+		if entry.Prop != personas[entry.Key].Prop {
+			t.Errorf("%s is served with prop %q and read with prop %q",
+				entry.Key, entry.Prop, personas[entry.Key].Prop)
+		}
 	}
 	// A caller that sorts what it is handed must not reorder the tile grid for
 	// the next request.
@@ -94,6 +104,80 @@ func TestTheRosterCannotCarryAVoice(t *testing.T) {
 	first[0], first[1] = first[1], first[0]
 	if Roster()[0].Key != PersonaKeys[0] {
 		t.Error("Roster() handed out its own backing array")
+	}
+}
+
+// TestTheWireCarriesBothSpellingsOfTheProp is the one-release overlap, read
+// off the marshalled bytes rather than off the struct.
+//
+// `prop` is what the client reads now; `deals` is the boolean it replaced, and
+// it stays on the wire for exactly as long as a browser tab opened before this
+// change might still be talking to this server. The derivation is a method on
+// RosterEntry so the two cannot drift, and this is where that is held: a
+// hand-written `deals` in the data, or a `prop` renamed without the boolean
+// following it, both land here.
+func TestTheWireCarriesBothSpellingsOfTheProp(t *testing.T) {
+	t.Parallel()
+	body, err := json.Marshal(Roster())
+	if err != nil {
+		t.Fatalf("marshalling the roster: %v", err)
+	}
+	var got []struct {
+		Key   string `json:"key"`
+		Prop  string `json:"prop"`
+		Deals bool   `json:"deals"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("re-reading the roster: %v", err)
+	}
+	dealt := 0
+	for _, entry := range got {
+		if entry.Deals != (entry.Prop == PropTarot) {
+			t.Errorf("%s is served prop %q with deals %v; the two spellings "+
+				"disagree and an old tab would lose the cards",
+				entry.Key, entry.Prop, entry.Deals)
+		}
+		if entry.Deals {
+			dealt++
+		}
+	}
+	// Or every assertion above passes on a roster where nobody deals at all.
+	if dealt != 1 {
+		t.Errorf("%d entries deal on the wire, want exactly the fortune teller", dealt)
+	}
+}
+
+// TestAnUnknownPropIsInert is what the named prop buys over the boolean: the
+// room after this one has a cauldron on the table, and adding it must not
+// reach the deal.
+//
+// Every spelling here is a room the tarot plumbing has to ignore — the empty
+// prop, a prop nobody has written code for, and the two near-misses that would
+// fire if the comparison were ever loosened into a fold or a prefix.
+func TestAnUnknownPropIsInert(t *testing.T) {
+	t.Parallel()
+	for _, prop := range []string{"", "cauldron", "Tarot", "tarot "} {
+		who := Persona{Key: "somebody", Prop: prop}
+		seed, err := seedFor(who, "1234")
+		if err != nil {
+			t.Errorf("prop %q: a seed it should be dropping was refused: %v", prop, err)
+		}
+		if seed != nil {
+			t.Errorf("prop %q: kept the seed %v", prop, seed)
+		}
+		if reading := readingFor(who, big.NewInt(1234)); reading != nil {
+			t.Errorf("prop %q: was dealt a spread", prop)
+		}
+	}
+	// The positive control, or the loop above passes for reasons that have
+	// nothing to do with the prop.
+	reader := Persona{Key: "reader", Prop: PropTarot}
+	seed, err := seedFor(reader, "1234")
+	if err != nil || seed == nil {
+		t.Fatalf("the dealing prop lost its seed: %v / %v", seed, err)
+	}
+	if readingFor(reader, seed) == nil {
+		t.Error("the dealing prop was dealt no spread")
 	}
 }
 

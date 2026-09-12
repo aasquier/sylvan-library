@@ -30,14 +30,14 @@ import { COMMANDERS, GALLERY, HEART } from '../lib/claudefavorites'
 import libraryMp4 from '../assets/claude/claude-library-loop.mp4'
 import libraryStill from '../assets/claude/claude-library-still.webp'
 import libraryWebm from '../assets/claude/claude-library-loop.webm'
-import { PERSONA_ACCENT } from '../lib/personart'
+import { personaAccent } from '../lib/personart'
 import { CardHover, ManaCost, ManaText, PageMasthead } from '../components/ui'
 import { CommanderMotion } from '../components/cardmotion'
 import { TierGlyph } from '../components/pentagram'
 
 /** The spark's own terracotta — the accent the plain tile already answers
  *  to, so this page and that tile read as the same person. */
-const ACCENT = PERSONA_ACCENT.plain
+const ACCENT = personaAccent('plain')
 
 /** Checked-in prose, Keeper-style: the story is mine, the card facts beside
  *  it are the pool's. */

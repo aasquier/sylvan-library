@@ -1614,7 +1614,18 @@ button:hover .tarot-fan-card {
   }
 }
 
-.seance-scroll > * {
+/* Everything on the sheet stands above the grain and the candlelight, both of
+   which are pseudo-elements at `inset: 0`.
+   `:not(.sr-only)` is not decoration and the exemption is load-bearing: this
+   file is unlayered and Tailwind's utilities are in `@layer utilities`, so an
+   unlayered `> *` beats `.sr-only` at any specificity and would hand a
+   screen-reader-only label `position: relative`. A `clip-path`-ed inline box
+   is invisible and still occupies a line, so the answer box's label — which
+   exists for a reader and for nobody's eye — would have pushed the parchment
+   open by a line that nothing on screen accounts for. Nothing that has ever
+   been a child of this element carries the class, so the narrowing moves no
+   pixel that exists today. */
+.seance-scroll > *:not(.sr-only) {
   position: relative;
 }
 

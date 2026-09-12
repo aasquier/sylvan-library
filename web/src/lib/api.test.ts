@@ -16,7 +16,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api, errorMessage, followJob, onSessionLost, type Job } from './api'
+import {
+  ApiError, api, dealsTarot, errorMessage, followJob, onSessionLost,
+  type Job, type Persona,
+} from './api'
 
 function job(overrides: Partial<Job> = {}): Job {
   return {
@@ -631,5 +634,53 @@ describe('a failure a person reads', () => {
 
   it('still answers for what a third party might throw', () => {
     expect(errorMessage('a string')).toBe('a string')
+  })
+})
+
+/**
+ * Which room deals cards, across a wire key that is changing spelling.
+ *
+ * `deals` was a boolean and is becoming `prop`, a named thing on the table,
+ * because the room after the fortune-teller's has a cauldron on it rather than
+ * cards. Both keys ride for one release — the server is redeployed and the
+ * browser is not, so a tab that has been open since before the change is
+ * reading the old payload and has to keep dealing.
+ *
+ * Every case below is a pairing that really happens during that window, which
+ * is why this is a table rather than one assertion.
+ */
+describe('a room that deals tarot', () => {
+  const room = (over: Partial<Persona>): Persona =>
+    ({ key: 'x', label: 'X', blurb: 'x', ...over })
+
+  it('reads the prop the server sends now', () => {
+    expect(dealsTarot(room({ prop: 'tarot' }))).toBe(true)
+    expect(dealsTarot(room({ prop: '' }))).toBe(false)
+  })
+
+  it('falls back to the older spelling when that is all there is', () => {
+    // An old server, a new client: the key simply is not in the payload, which
+    // arrives as `undefined` rather than as anything to compare.
+    expect(dealsTarot(room({ deals: true }))).toBe(true)
+    expect(dealsTarot(room({ deals: false }))).toBe(false)
+    expect(dealsTarot(room({}))).toBe(false)
+  })
+
+  it('lets the prop win wherever both are sent', () => {
+    // The overlap's own shape, and the one direction that could go wrong on
+    // its own: a server sending both must not be second-guessed by the older
+    // key, in either direction.
+    expect(dealsTarot(room({ prop: 'tarot', deals: true }))).toBe(true)
+    expect(dealsTarot(room({ prop: '', deals: true }))).toBe(false)
+  })
+
+  it('deals nothing for a prop nobody has written plumbing for', () => {
+    // The cauldron, arriving before the client knows what one is. A room with
+    // a prop this build has never heard of is a room with no cards, never an
+    // error and never a guess — and the comparison is exact, so neither a
+    // case fold nor a stray space is "tarot".
+    for (const prop of ['cauldron', 'Tarot', 'tarot ', 'tarot-cards']) {
+      expect(dealsTarot(room({ prop }))).toBe(false)
+    }
   })
 })

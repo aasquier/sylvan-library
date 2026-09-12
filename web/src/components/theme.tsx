@@ -27,11 +27,12 @@
  * same truth: the deck is made by the person whose deck it is.
  */
 
-import { useCallback, useEffect, useRef, useState,
+import { useCallback, useEffect, useId, useRef, useState,
          type CSSProperties, type ReactNode } from 'react'
 import {
   ApiError,
   api,
+  errorMessage,
   followJob,
   type ClaudeStatus,
   type ThemeCombination,
@@ -42,11 +43,13 @@ import {
   type ThemeSlot,
   type ThemeTurn,
 } from '../lib/api'
+import { costumeFor } from '../lib/costumes'
 import { COLOR_VAR } from '../lib/mtg'
-import { PERSONA_ACCENT, PERSONA_ART } from '../lib/personart'
+import { personaAccent, personaArt } from '../lib/personart'
+import { useStashed } from '../lib/stash'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { SceneBackdrop } from './forest'
-import { ArmedButton, CardHover, ColorRing, Spinner } from './ui'
+import { ArmedButton, CardHover, ColorRing, ErrorNote, Spinner } from './ui'
 import { ReplayGlyph } from './glyphs'
 import { StanceReadout } from './stance'
 
@@ -60,6 +63,56 @@ const SLOT_LABELS: Record<string, string> = {
   temperament: 'How you are',
   posture: 'At the table',
   anchor: 'Already a favourite',
+}
+
+/* ------------------------------------------- when something does not arrive
+ *
+ * **Commandment 10, which this screen was breaking three ways.** A job the
+ * server no longer held said *"the server restarted while it was working"*; a
+ * browser that could not reach it printed whatever it had thrown, so the room
+ * answered `Load failed`; and the door with no key recited an environment
+ * variable and the file to put it in. None of that is a sentence about Magic,
+ * or about anything the person reading it can do.
+ *
+ * **The detail is not deleted, it is redirected** — `forgeTrouble`'s argument
+ * in the Go tree, one surface over. Everything above is exactly what somebody
+ * fixing this wants and none of it is what somebody waiting on a question
+ * wants, so it goes to the console, where the first audience reads, and the
+ * room is handed a sentence written for the second.
+ *
+ * What is deliberately *not* rewritten is a refusal the server wrote itself:
+ * "that is as long as this conversation goes", "the stance is off, so no call
+ * was made", a transcript it will not take. Those are sentences about the
+ * interview, they are already in its voice, and anything this file put in
+ * their place would say less.
+ */
+
+/** No key, or a Claude nobody here can reach. The same sentence whether it is
+ *  found by the dial before a word is said or by a 503 mid-conversation. */
+const CLOSED = 'This door needs Claude, and Claude cannot be reached from '
+  + 'here at the moment. Nothing is wrong with anything you said — the other '
+  + 'way in still works.'
+const GONE_QUESTION = 'That question was lost on its way to you. Nothing you '
+  + 'have said has gone anywhere — say something and it will be asked again.'
+const LOST_QUESTION = 'The question did not make it through. Nothing you have '
+  + 'said has gone anywhere — try that again.'
+const GONE_READING = 'That reading was lost before it was finished. Nothing '
+  + 'you have said has gone anywhere — ask for it again when you are ready.'
+const LOST_READING = 'The reading did not make it through. Nothing you have '
+  + 'said has gone anywhere — ask for it again.'
+
+/** The room's words for a call that did not come back: `gone` when the server
+ *  no longer has the run, `lost` when nothing reached it at all. */
+function trouble(e: unknown, gone: string, lost: string): string {
+  // Anything that is not a refusal is a browser's own account of a connection,
+  // and a browser writes for developers.
+  if (!(e instanceof ApiError)) return lost
+  // Two statuses are facts about the machinery rather than about the
+  // conversation, and both arrive worded for whoever runs the place: a run
+  // that is no longer in memory, and an endpoint with no key behind it.
+  if (e.status === 404) return gone
+  if (e.status === 503) return CLOSED
+  return errorMessage(e)
 }
 
 interface Saved {
@@ -403,9 +456,27 @@ function InkText({ text }: { text: string }) {
 
   let word = 0
   return (
+    // Reachable by the keyboard, and deliberately NOT a button (green's pass,
+    // 2026-09-12). A button's accessible name is its own contents, so wrapping
+    // the question in one would have a screen reader announce the whole
+    // sentence as the label of a control — where what this is is the question,
+    // which happens to be able to hurry itself up. So: focusable, Enter or
+    // Space finishes the line, no role, and nothing an eye can see changes
+    // until the focus ring arrives. Nothing is withheld from a reader by
+    // leaving the role off, either — the text is in the DOM from the first
+    // frame and the wipe is CSS, so a skip is a courtesy to a waiting eye and
+    // means nothing at all to a reader.
     <span ref={host} className={`ink-text${skipped ? ' is-dry' : ''}`}
+          tabIndex={0}
           onClick={() => setSkipped(true)}
-          title={skipped ? undefined : 'Click to let the ink dry at once'}>
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setSkipped(true)
+            }
+          }}
+          title={skipped ? undefined
+            : 'Click, or press Enter, to let the ink dry at once'}>
       {text.split(/(\s+)/).map((part, i) => {
         if (/^\s*$/.test(part)) return part
         const n = word++
@@ -437,6 +508,15 @@ function InkText({ text }: { text: string }) {
       </svg>
     </span>
   )
+}
+
+/** Readings the server threw away because it could not find them in the
+ *  transcript. One sentence in one place: the sidebar prints it and the live
+ *  region says it, and a count somebody hears must be the count they can then
+ *  go and read. */
+function droppedNote(n: number): string {
+  return `${n} reading${n === 1 ? '' : 's'} did not match anything you said, `
+    + `and ${n === 1 ? 'was' : 'were'} dropped.`
 }
 
 function Chip({ slot }: { slot: ThemeSlot }) {
@@ -484,13 +564,15 @@ function factCredit(fact: NonNullable<ThemeReport['fact']>): ReactNode {
 }
 
 
-function FactNote({ fact, seance }: {
+function FactNote({ fact, dressed }: {
   fact: NonNullable<ThemeReport['fact']>
-  seance?: boolean
+  /** The room's class for this aside, or '' for the plain chrome — whose paint
+   *  stays here, since a room with no costume should not have to name one. */
+  dressed: string
 }) {
   return (
-    <aside className={`rounded-lg px-4 py-3${seance ? ' seance-note' : ''}`}
-           style={seance ? undefined : { background: 'var(--gridline)' }}>
+    <aside className={`rounded-lg px-4 py-3${dressed ? ` ${dressed}` : ''}`}
+           style={dressed ? undefined : { background: 'var(--gridline)' }}>
       <p className="text-[10px] uppercase tracking-wide"
          style={{ color: 'var(--text-muted)' }}>
         While you are here
@@ -629,7 +711,7 @@ export function ThemeInterview({
   leaveLabel?: string
 }) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
-  const [saved, setSaved] = useState<Saved>(() => load(persona, seed))
+  const [saved, setSaved] = useStashed(SAVED, () => load(persona, seed))
   const { transcript, slots, proposal, facts } = saved
   const [report, setReport] = useState<ThemeReport | null>(null)
   const [answer, setAnswer] = useState('')
@@ -638,6 +720,9 @@ export function ThemeInterview({
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
+  // The answer box's label is invisible but it is a real `<label>`, and a label
+  // needs an id to point at. One per mounted interview.
+  const answerId = useId()
   const [pin, setPin] = useStance()
 
   // No slug, because there is no deck yet — which is the whole point of this
@@ -649,9 +734,17 @@ export function ThemeInterview({
       .then(setStatus).catch(() => setStatus(null))
   }, [pin, setPin])
 
+  // The half of a shut door that a player must never read, said where the
+  // person who can open it is reading instead (commandment 10 — `trouble`
+  // above carries the argument). Not in the branch that renders it: that
+  // branch runs on every keystroke this screen sees.
   useEffect(() => {
-    localStorage.setItem(SAVED, JSON.stringify(saved))
-  }, [saved])
+    if (status && (!status.installed || !status.configured)) {
+      console.error('the theme interview is shut: no ANTHROPIC_API_KEY in this '
+        + 'server’s environment — put one in .env (see .env.example), or '
+        + '`fly secrets set` it when deployed')
+    }
+  }, [status])
 
   // The turn is a background job too now, for the reason `api.themeAsk` gives:
   // measured at 4.3–37.7s with one at 133.8s, against a transport ceiling
@@ -703,16 +796,18 @@ export function ThemeInterview({
           : s.facts,
       }))
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 404
-        // Same sentence the proposal shows, and the same cause: jobs live in
-        // the server's memory and die with it.
-        ? 'That question is gone — the server restarted while it was working. Say something and it will ask again.'
-        : String((e as Error).message ?? e))
+      // The diagnosis to the console, the sentence to the room — see `trouble`.
+      console.error('the theme interview: a turn did not come back', e)
+      setError(trouble(e, GONE_QUESTION, LOST_QUESTION))
     } finally {
       setBusy('')
       box.current?.focus()
     }
-  }, [persona, seed, pin, status])
+    // `setSaved` is `useState`'s own setter arriving through `useStashed`, so
+    // it is exactly as stable as it was when it was destructured here — it is
+    // listed because the rule cannot see that through a custom hook, not
+    // because anything about it moves.
+  }, [persona, seed, pin, status, setSaved])
 
   // Fetch a question whenever there isn't one pending. That covers the opening
   // turn, and it also covers the case a plain `length > 0` guard got wrong: a
@@ -810,16 +905,13 @@ export function ThemeInterview({
       .then((job) => setSaved((s) => (
         { ...s, proposal: job.result as ThemeProposal, job: null })))
       .catch((e) => {
-        setError(e instanceof ApiError && e.status === 404
-          // Jobs live in the server's memory and die with it. Say so rather
-          // than showing a bare 404 for something the person never asked to
-          // look up.
-          ? 'That run is gone — the server restarted while it was working. Ask again when you are ready.'
-          : String((e as Error).message ?? e))
+        console.error('the theme interview: a reading did not come back', e)
+        setError(trouble(e, GONE_READING, LOST_READING))
         setSaved((s) => ({ ...s, job: null }))
       })
       .finally(() => { clearInterval(clock); setBusy('') })
-  }, [])
+    // Stable, and listed for the reason `send` above gives.
+  }, [setSaved])
 
   // One place decides to follow a job, and it is this — the same argument as
   // the auto-ask effect above. `proposeIt` records the id and stops; a
@@ -851,10 +943,13 @@ export function ThemeInterview({
       })
       setSaved((s) => ({ ...s, job: job.id }))
     } catch (e) {
-      // 409 below the floor, 503 with no key, 422 for a transcript the server
-      // will not take — all still answered by the POST itself, which is why
-      // they read as sentences here rather than as a job that failed.
-      setError(String((e as Error).message ?? e))
+      // 409 below the floor and 422 for a transcript the server will not take
+      // are still answered by the POST itself, which is why they read as
+      // sentences here rather than as a job that failed — `trouble` passes
+      // those through and keeps its own words for the two that are about the
+      // machinery instead of about the conversation.
+      console.error('the theme interview: the reading was not accepted', e)
+      setError(trouble(e, GONE_READING, LOST_READING))
       setBusy('')
     }
   }
@@ -877,34 +972,24 @@ export function ThemeInterview({
     setBusy('')
   }
 
-  if (!status) {
-    return <Spinner label="Opening the interview…" />
-  }
-  // One way this door stays shut: no key. The second arm this branch used to
-  // carry — Claude absent from the server — cannot happen, because the client
-  // is linked into the binary and the dial's `installed` is a constant.
-  if (!status.installed || !status.configured) {
-    return (
-      <div className="card-surface rounded-xl px-6 py-8">
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          This door needs Claude, and this server has no key for it yet.
-          <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-            Set <code>ANTHROPIC_API_KEY</code> — see <code>.env.example</code>.
-          </span>
-        </p>
-        <button onClick={onLeave} className="btn btn-quiet btn-sm mt-3">
-          {leaveLabel ?? '← Pick colours myself'}
-        </button>
-      </div>
-    )
-  }
-
-  const grounded = report?.grounded ?? slots.length
+  // Everything the screen is made of, derived once — and above the early
+  // returns rather than below them, because the live region at the foot of
+  // this block has to be declared before the first `return` can render it.
+  // `components/tarot.tsx` has the same shape for the same reason.
+  //
+  // **One count, read one way.** `grounded` and `ready` used to disagree about
+  // a restored tab: the number came off `slots.length` and the readiness off
+  // the distinct kinds among them, which is two answers to "how much does it
+  // know". They cannot differ today — the server keys its readings by kind, so
+  // there is at most one of each — but "they happen to agree" is not a reason
+  // for two spellings, and the kind is the one the floor is counted in.
+  const kinds = new Set(slots.map((s) => s.kind)).size
+  const grounded = report?.grounded ?? kinds
   const floor = report?.floor ?? 3
   // A conversation restored from a previous tab has no report yet, and every
   // one of these has to come off the transcript instead — otherwise coming
   // back to it shows a stranger's blank screen with your own answers above it.
-  const ready = report?.may_propose ?? (new Set(slots.map((s) => s.kind)).size >= floor)
+  const ready = report?.may_propose ?? (kinds >= floor)
   const last = transcript[transcript.length - 1]
   const question = report?.question
     || (last?.role === 'assistant' ? last.text : '')
@@ -941,22 +1026,79 @@ export function ThemeInterview({
   // The room (punch list item 8): each voice's own painting washed across
   // the viewport, its accent on the chrome, its sign by the door. `plain`
   // keeps a bare room on purpose — no costume includes the walls.
-  const roomArt = PERSONA_ART[persona]
-  const accent = PERSONA_ACCENT[persona] ?? 'var(--series-1)'
-  // The fortune-teller's table writes in ink on parchment (overhaul item 5,
-  // commandment 15): the question card becomes a scroll, the words arrive
-  // wet, the answer box takes a quill. Every other room keeps the plain
-  // chrome — the costume is the reader's, not the interview's.
-  const seance = persona === 'fortune-teller'
+  const roomArt = personaArt(persona)
+  const accent = personaAccent(persona)
+  // And what this room is wearing (`lib/costumes.ts`): the fortune-teller's
+  // question card is a scroll, her words arrive wet, her answer box takes a
+  // quill. This was a boolean and six ternaries until there was a second
+  // costumed room to build — the costume is the reader's, not the
+  // interview's, and now it is a record rather than an `if`.
+  const costume = costumeFor(persona)
+
+  /**
+   * The interview, said out loud: the question arriving, the moment there is
+   * enough to read from, and any reading that was thrown away.
+   *
+   * **The tarot table's mechanism, copied deliberately** — that file argues it
+   * at length and `tarot.test.tsx` pins it. A live region has to be in the
+   * document *before* its text changes; one that mounts with its sentence
+   * already in it is initial content, which readers do not announce. This
+   * screen's entire business is one sentence arriving after a wait of seconds,
+   * and it had no live region at all: a question that took thirty seconds to
+   * write landed in silence.
+   *
+   * Empty while the question is being written, for the same reason in reverse:
+   * the emptying is what makes the next one a change rather than a re-render
+   * of the same string.
+   *
+   * Failures are deliberately not here. They go through `ErrorNote`, whose
+   * `role="alert"` is assertive, because somebody waiting on an answer that is
+   * never coming should not hear about it in turn.
+   *
+   * Every sentence is one an eye can also read, never a second wording of it —
+   * the question as the card prints it, the banner's own line, the sidebar's
+   * count of dropped readings.
+   */
+  const said = busy === 'asking' ? '' : [
+    question || report?.reason || '',
+    ready ? costume.ready : '',
+    report?.slots_dropped ? droppedNote(report.slots_dropped) : '',
+  ].filter(Boolean).join(' ')
+  const say = <span className="sr-only" role="status">{said}</span>
+
+  if (!status) {
+    return <>{say}<Spinner label="Opening the interview…" /></>
+  }
+  // One way this door stays shut: no key. The second arm this branch used to
+  // carry — Claude absent from the server — cannot happen, because the client
+  // is linked into the binary and the dial's `installed` is a constant.
+  //
+  // What it may not do is say *which* key, or where to put it: that sentence
+  // is for whoever runs this, and it is in the console (see the effect above).
+  if (!status.installed || !status.configured) {
+    return (
+      <>
+      {say}
+      <div className="card-surface rounded-xl px-6 py-8">
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          {CLOSED}
+        </p>
+        <button onClick={onLeave} className="btn btn-quiet btn-sm mt-3">
+          {leaveLabel ?? '← Pick colours myself'}
+        </button>
+      </div>
+      </>
+    )
+  }
 
   return (
+    <>
+    {say}
     <section className="persona-room space-y-5"
              style={{ '--room-accent': accent } as CSSProperties}>
       {/* The fortune-teller's room drifts with mana rather than mist — the
           crystal ball's violet light, given the whole floor. */}
-      {roomArt && <SceneBackdrop art={roomArt.art}
-                                 mood={persona === 'fortune-teller'
-                                   ? 'wisps' : 'mist'} />}
+      {roomArt && <SceneBackdrop art={roomArt.art} mood={costume.mood} />}
       <div className="flex flex-wrap items-center gap-3">
         <RoomSign persona={persona} />
         {/* The framing paragraph only frames an *empty* table. Once the
@@ -1009,9 +1151,11 @@ export function ThemeInterview({
         </div>
       </div>
 
-      {error && (
-        <p className="text-sm" style={{ color: 'var(--status-critical)' }}>{error}</p>
-      )}
+      {/* Through the one component every refusal in the app comes through, for
+          its `role="alert"` — a failure is the one message that must not wait
+          its turn behind whatever is being read. It was a coloured line of
+          text, which is a failure only an eye can find. */}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       {!proposal && (
         <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
@@ -1033,15 +1177,15 @@ export function ThemeInterview({
                     <li key={`${i}-${t.text.slice(0, 12)}`}
                         className={t.role === 'user' ? 'text-right' : ''}>
                       <span className={`chat-bubble inline-block max-w-[85%] rounded-xl px-3 py-2 text-sm${
-                              seance && t.role === 'assistant'
-                                ? ' seance-bubble' : ''}`}
+                              costume.bubble && t.role === 'assistant'
+                                ? ` ${costume.bubble}` : ''}`}
                             style={t.role === 'user'
                               // The room's accent, not the app's: your own
                               // words wear the colour of whoever you are
                               // talking to (item 8).
                               ? { background: 'var(--room-accent, var(--series-1))',
                                   color: '#fff' }
-                              : seance
+                              : costume.bubble
                                 ? undefined
                                 : { border: '1px solid var(--hairline)',
                                     color: 'var(--text-secondary)' }}>
@@ -1053,23 +1197,21 @@ export function ThemeInterview({
               )
             })()}
 
-            {report?.fact && <FactNote fact={report.fact} seance={seance} />}
+            {report?.fact && <FactNote fact={report.fact} dressed={costume.note} />}
 
             {/* The scroll carries its own geometry: the deckle mask sets its
                 silhouette and its padding (letters that reach the torn edge
-                get torn with it), so the utility classes stay on the plain
-                card only. */}
-            <div className={seance
-              ? 'seance-scroll'
-              : 'rounded-xl px-5 py-4 card-surface'}>
+                get torn with it), which is why the costume owns this whole
+                class list rather than adding to one. */}
+            <div className={costume.scroll}>
               <p className={`text-base leading-relaxed${
                    busy === 'asking' ? ' thinking-pulse' : ''}${
-                   seance ? ' seance-question' : ''}`}
+                   costume.question ? ` ${costume.question}` : ''}`}
                  style={{ color: busy === 'asking'
                    ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                 {busy === 'asking'
-                  ? (seance ? 'The quill hovers…' : 'Thinking…')
-                  : seance && question
+                  ? costume.thinking
+                  : costume.ink && question
                     // The reader's words arrive as ink soaking into the
                     // page; everyone else's questions simply print.
                     ? <InkText text={question} />
@@ -1085,7 +1227,16 @@ export function ThemeInterview({
                   magic word. */}
               {!finished && (
               <>
+              {/* A real label rather than a placeholder doing a label's work.
+                  Invisible, because the question above it is the label as far
+                  as the eye is concerned and a second one would be clutter —
+                  but a placeholder is not a name, and a reader landing in this
+                  box was being told nothing at all about what it is for. */}
+              <label htmlFor={answerId} className="sr-only">
+                Your answer
+              </label>
               <textarea
+                id={answerId}
                 ref={box}
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
@@ -1099,12 +1250,10 @@ export function ThemeInterview({
                   }
                 }}
                 rows={2}
-                placeholder={seance
-                  ? 'Write your answer on the parchment…'
-                  : 'However much or little you like…'}
+                placeholder={costume.placeholder}
                 className={`mt-3 w-full rounded-md px-3 py-2 text-sm${
-                  seance ? ' seance-quill' : ''}`}
-                style={seance
+                  costume.quill ? ` ${costume.quill}` : ''}`}
+                style={costume.quill
                   ? undefined
                   : { background: 'var(--page)', color: 'var(--text-primary)',
                       border: '1px solid var(--hairline)' }}
@@ -1179,9 +1328,7 @@ export function ThemeInterview({
               <div className="ready-banner rounded-xl px-5 py-4">
                 <p className="text-sm font-medium"
                    style={{ color: 'var(--text-primary)' }}>
-                  {seed !== null
-                    ? 'Three cards, three answers — the reading is ready.'
-                    : 'That’s enough to go on.'}
+                  {costume.ready}
                 </p>
                 <p className="mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                   Keep talking if you’re enjoying it, or get your colours now.
@@ -1192,7 +1339,7 @@ export function ThemeInterview({
                 <button onClick={proposeIt} disabled={!!busy}
                         className="btn btn-primary btn-accent-2"
                         style={{ '--btn-ink': '#fff' } as CSSProperties}>
-                  {seed !== null ? 'Read my cards' : 'Get my colours'}
+                  {costume.readyAction}
                 </button>
               </div>
             )}
@@ -1210,9 +1357,7 @@ export function ThemeInterview({
               <div className="ready-banner rounded-xl px-5 py-4">
                 <p className="text-sm font-medium thinking-pulse"
                    style={{ color: 'var(--text-primary)' }}>
-                  {seed !== null
-                    ? `Reading the cards… ${elapsed}s`
-                    : `Reading around… ${elapsed}s`}
+                  {`${costume.reading} ${elapsed}s`}
                 </p>
                 <p className="mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                   A few minutes — it reads around and checks every card against
@@ -1240,9 +1385,7 @@ export function ThemeInterview({
                 how many of its answers were not questions. */}
             {!!report?.slots_dropped && (
               <p className="text-xs" style={{ color: 'var(--status-warning)' }}>
-                {report.slots_dropped} reading
-                {report.slots_dropped === 1 ? '' : 's'} did not match anything
-                you said, and {report.slots_dropped === 1 ? 'was' : 'were'} dropped.
+                {droppedNote(report.slots_dropped)}
               </p>
             )}
 
@@ -1262,8 +1405,14 @@ export function ThemeInterview({
               <button onClick={proposeIt} disabled={!ready || !!busy}
                       className={`btn mt-3 w-full ${ready ? 'btn-primary btn-accent-2' : 'btn-quiet'}`}
                       style={ready ? { '--btn-ink': '#fff' } as CSSProperties : undefined}>
+                {/* The room's own words for the wait, not the app's. This
+                    button and the banner in the column say the same thing at
+                    the same moment; they used to say "Reading around…" and
+                    "Reading the cards…" simultaneously, because one keyed on
+                    the persona and the other on whether a spread had been
+                    dealt. A room speaks in one voice. */}
                 {busy === 'proposing'
-                  ? `Reading around… ${elapsed}s`
+                  ? `${costume.reading} ${elapsed}s`
                   : 'Suggest my colours'}
               </button>
               <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -1338,5 +1487,6 @@ export function ThemeInterview({
         </div>
       )}
     </section>
+    </>
   )
 }

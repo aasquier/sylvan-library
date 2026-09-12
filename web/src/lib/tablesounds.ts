@@ -30,14 +30,18 @@
  *   rather than a label you take on faith.
  */
 
-const KEY = 'mtglab-table-sound'
+/** Where the preference lives. Exported because `lib/prefs.ts` watches this
+ *  exact key for `storage` events from other tabs, and it had a second copy of
+ *  the literal to do it — two spellings of one key, and the day one of them
+ *  changed would be the day a second tab stopped hearing the toggle. */
+export const SOUND_KEY = 'mtglab-table-sound'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 
 export function soundOn(): boolean {
   try {
-    return localStorage.getItem(KEY) === '1'
+    return localStorage.getItem(SOUND_KEY) === '1'
   } catch {
     return false
   }
@@ -45,8 +49,8 @@ export function soundOn(): boolean {
 
 export function setSound(on: boolean): void {
   try {
-    if (on) localStorage.setItem(KEY, '1')
-    else localStorage.removeItem(KEY)
+    if (on) localStorage.setItem(SOUND_KEY, '1')
+    else localStorage.removeItem(SOUND_KEY)
   } catch { /* private browsing: the toggle just does not persist */ }
 }
 
