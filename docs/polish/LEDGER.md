@@ -4324,7 +4324,14 @@ runs against a cache nobody emptied.
     `go (arm64)`, `go-lint`. `tools` still absent (queued 9 stands).
   - **Actions hygiene: 27 `uses:` refs, 27 SHA-pinned, five workflow
     files** (`ci`, `codeql`, `dependency-review`, `forge-release`,
-    `mutants`) — unchanged from 09-05.
+    `mutants`) — unchanged from 09-05. Go module/build caches hit on the
+    primary key tonight (read from run 34733373497's log: "Cache restored
+    successfully", post step "not saving" on a primary hit, as designed).
+  - **Free-tier audit (GitHub changelog, Aug + early Sep 2026): nothing to
+    adopt.** Hosted-runner usage stays free for public repos; the September
+    drop is a runner-version-deprecation REST API and workflow-visibility
+    tweaks, none of which changes this pipeline or sharpens a queued
+    proposal.
   - **Scanner backlog: CodeQL 0 open · Dependabot 9 open** (the torch
     cluster; White's 09-12 daybreak line asks the dismissal) · secret
     scanning 0 on an enabled scanner.
