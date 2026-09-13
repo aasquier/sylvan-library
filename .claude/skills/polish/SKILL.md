@@ -105,6 +105,15 @@ is the one place night work touches the live instance:
   authenticated walk is owed. Four minutes either way, and it is the
   difference between a bad merge caught at 3am and one found by a friend at
   breakfast.
+- **Watching the deploy honestly.** Poll the `tests` run on `main` by name
+  with a sleep-30 loop — codeql's early green is not a deploy, and
+  `gh run watch` can outlive a Bash timeout in silence — and prove the
+  deploy by the machine image tag naming the sha, because post steps can
+  outrun `timeout-minutes`: a run whose conclusion reads `cancelled` can sit
+  on a deploy that fully landed (Red's 2026-09-12 entry records one, 22m49s
+  against a 20-minute ceiling). And a rapid re-push can wedge GitHub's
+  scheduler for half an hour with nothing red anywhere; cancel and re-kick
+  with an empty commit rather than waiting it out.
 - **If that walk fails, roll back — do not debug.** HOSTING has the runbook.
   An unattended rollback restores a known-good instance in minutes; an
   unattended debugging session is how a small breakage becomes a night of
@@ -188,9 +197,11 @@ one you are running, and only that one; the others are for their own runs.
 
 The shelf is thinner than it looks: there is no `bench` command, and the
 cache register is half-built — `mtglab sim cache` lists what the Tier 1 cache
-holds and can clear it, but **nothing anywhere counts hits**, so a cache can
-still be correct, tested, and never once used with no number saying so.
-**Building the bench suite and the counter half is an open ledger item.**
+holds and can clear it, but **the Tier 1 register still counts no hits** (the
+door's ETag memo now counts its own — `etagCounts` in
+`go/internal/door/static.go` is the pattern to copy), so that cache can still
+be correct, tested, and never once used with no number saying so. **Building
+the bench suite and the Tier 1 counter half is an open ledger item.**
 Mutation sampling is the exception — `gremlins` is the tool, installed on
 demand, and White's testing facet carries the protocol. Otherwise the stock
 Go toolchain is the instrument set — richer than a purpose-built shelf would
@@ -213,7 +224,7 @@ go test -race -count=1 -cover ./...                      # what CI runs
 cd tools && .venv/bin/animist verify                     # assets vs recipes
 ```
 
-Four rules, each bought by a real wrong answer:
+The shelf's rules, each bought by a real wrong answer:
 
 - **`-benchmem` or it is not a benchmark.** In Go the usual cause of slow is
   allocation, and `ns/op` alone cannot see it. A change that moves `ns/op`
@@ -237,6 +248,13 @@ Four rules, each bought by a real wrong answer:
 - **Mutation runs go on a throwaway copy** of the package, never the working
   tree — and a harness that cannot prove it ran is reporting `SURVIVED` for
   a mutant that never compiled.
+- **A number from another night is a number from another machine.** This
+  Mac's load moves with the sessions running on it, so cross-night absolutes
+  are not comparable: one run nearly reported a +35–56% search regression
+  that an interleaved A/B race — rebuild the old binary, alternate A/B/A/B
+  requests the same night, about four minutes — dissolved to noise while the
+  ambient load visibly rose. Race the two builds or do not compare them;
+  Black's 2026-09-12 ledger entry is the working example.
 
 ## Choosing the color
 
@@ -420,6 +438,13 @@ Orchestration:
   before it can run the gauntlet.
 - Give each agent exactly one color, its reference file, the ledger, and the
   protocol and non-negotiables below.
+- **A leg closes its own loop inside its one turn.** No wake ever reaches a
+  subagent — a leg that ends its turn expecting a monitor, a timer or a CI
+  notification to rouse it simply stops, and the orchestrator inherits a
+  half-closed leg (it happened; closing it by hand cost the night an hour).
+  So a leg polls its own CI inside the turn — a sleep-30 loop, never
+  `gh run watch`, which can silently outlive a Bash timeout — and ends only
+  when its PR is merged, walked, or honestly parked with the reason stated.
 - **Each lands its own branch and PR.** Never seven runs' diffs on one branch,
   which is a mass restructure by the back door. Each agent updates **only its
   own ledger section**; colorless may correct another's, which is its job.

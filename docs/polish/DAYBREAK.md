@@ -36,21 +36,19 @@ deck you like for the job (a minute in the deck editor), or rule the fact
 retired and CLAUDE.md gets the sentence removed on the next working branch.
 Ledger: White, 2026-09-12.
 
-**Green: PR #468 is green and open — six fields get their names back and the
-front door stops dropping the keyboard — and it waits on your eye
-(commandment 16).** Two fixes, both AT-visible and nothing else: explicit
-`htmlFor` in `NumberField`/`Select` (the help bubble's button was stealing
-the label — five fields on `/simulate`, Games on `/coliseum` answered to
-nothing), and `autoFocus` on the reset panel's Email field (the unfold
-unmounted the button under your focus and dumped it to `<body>`). The walk:
-`npm --prefix web run dev`, then on `/simulate` click the GAMES caption —
-it should focus the field, not open the help bubble (the bubble's ? still
-opens it); tab to "Forgotten your password?" on the signed-out door, press
-Enter, and your next keystroke should land in the Email field. Nothing
-animates; two minutes. · *Cost of leaving it:* six controls stay nameless
-to readers and the door keeps dropping keyboards. · **Recommendation:**
-walk it, then merge — CI is green and the diff is four files. Ledger:
-Green, 2026-09-12.
+**Green: #468 merged at ~04:00 on your direct instruction — six fields
+answer to their names and the door keeps hold of the keyboard — and one
+beat of commandment 14 is still owed: an authenticated look at the
+relabeled fields on the live site.** What stands verified: the six
+`htmlFor` fixes in a real browser pre-merge, and the `/signin` focus catch
+on the deployed door post-merge. The relabeled fields live on `/simulate`
+and `/coliseum`, behind the login, so the live half waits on a signed-in
+seat. · *Cost of leaving it:* nothing likely — the diff was four files and
+the pattern uniform — but the live page has not been heard by a reader
+since the labels moved. · **Recommendation:** next signed-in session, click
+the GAMES caption on `/simulate` live — focus lands in the field, the
+bubble's ? still opens the help. Thirty seconds. Ledger: Green, 2026-09-12
+(the correction note under its heading carries the merge record).
 
 **Green: the pool refresh is due — 13 days old tonight, across the two-week
 line on Monday, and a released product is already invisible to it.** Scryfall
@@ -93,6 +91,40 @@ spends the hour re-deriving this paragraph. · **Recommendation:** dismiss
 all nine as "tolerable risk — see tools/pyproject.toml's depth-extra triage"
 (two minutes in the Security tab). Ledger: White, 2026-09-12.
 
+**Colorless: `fly` on this shell has refused its stored login since Saturday
+morning, and the cause is a clock, not corruption.** `LOG_LEVEL=debug fly
+auth whoami` says it plainly: `token expired (740h38m since login, timeout
+is 720h0m0s)` — flyctl's 30-day interactive-session ceiling, clocked from
+deploy day's login (Aug 13), lapsed 09-12 ~08:00. The stored token itself
+still works; every leg's `FLY_API_TOKEN` export bypasses the interactive
+check, which is why the workaround holds. · *Cost of leaving it:* every
+session pays the grep-export tax, and the first one that forgets reads a
+healthy instance as unreachable. · **Recommendation:** run `fly auth login`
+once at the keyboard — two minutes, resets the 30-day clock. Ledger:
+Colorless, 2026-09-12.
+
+**Colorless: the comment sweep is losing to the tree by arithmetic — one
+slice retires ~20 dated lines a cycle and this week added ~50 (go 183 → 235,
+web/src 368 → 426) — and the only fix that scales is a ceiling, which would
+bind every future session and is therefore yours.** A ratchet test over
+dated comments outside tests (the count may not rise; a session adding a
+date-is-the-fact comment bumps the ceiling consciously, the test saying how
+to decide) is the coverage-floor pattern applied to prose residue. · *Cost
+of leaving it:* the residue grows without bound and the sweep becomes
+ritual. · **Recommendation:** yes to the ratchet — Colorless builds it next
+run; or rule the totals advisory and the sweep keeps its judgment-only
+shape. Ledger: Colorless, 2026-09-12.
+
+**Colorless: one clean, week-stale harness worktree survives at
+`.claude/worktrees/frosty-roentgen-e3fccf`** (detached at c57f4e7, Sep 6,
+`git status` empty — the auto-clean that should have removed it did not),
+and its 33 duplicate recipes are why a `find`-shaped count reads 67 recipe
+files where the tree tracks 34. A relic is a decision, never a silent
+deletion. · *Cost of leaving it:* phantom rows in every future count, and a
+seed for the known worktree Spotlight storm. · **Recommendation:**
+`git worktree remove .claude/worktrees/frosty-roentgen-e3fccf` — it is clean
+and unreferenced, so nothing is lost. Ledger: Colorless, 2026-09-12.
+
 ## Open — 2026-09-05
 
 **Blue: the Settings room says "the torches are not lit yet", and the only
@@ -120,9 +152,10 @@ walk; **#436 merged 2026-09-05**, so that reason has expired. · *Cost of
 leaving it:* any edit made through a local surface diverges silently from the
 volume's truth — and the growth proves local surfaces are still being used. ·
 **What would have to be true:** the local server on 8765 — another session's,
-up since Aug 28, still alive tonight (PID 19163) and writing `data/`'s WAL at
-20:19 on 09-12 — is stopped or known to be finished with them. No night run
-deletes files out from under a running process it did not start. ·
+PID 19163, started fresh at 08:42 on 09-12 (`ps lstart`; the Aug-28 server is
+gone, so local servers keep being *started*, which is the point) and writing
+`data/`'s WAL that evening — is stopped or known to be finished with them. No
+night run deletes files out from under a running process it did not start. ·
 **Recommendation:** `rm -rf decks/` in the main checkout once 8765 is down;
 future local walks pull fresh from the instance or point `MTGLAB_DECKS_DIR`
 at a scratch directory. Ledger: Green, 2026-09-05; re-read and sharpened
@@ -165,7 +198,8 @@ Ledger: Red, 2026-08-24, queued 9.
 **Red 4. The volume restore drill has still never been walked, and the ladder
 it would cross grew again.** A drill older than the newest schema migration is
 due by Red's own rule, because the ladder is forward-only and a restore
-crosses it; the ladder is at rung 14 and no drill has crossed any of it.
+crosses it; the ladder is at rung 17 (0015–0017 landed 09-06 with the
+Coliseum's records) and no drill has crossed any of it.
 Snapshots are healthy — five, 5-day retention. · *Cost of leaving it:* the
 library's one standing copy (ADR 30) is behind a procedure nobody has ever
 run, and five days is all the retention there is. · **What would have to be

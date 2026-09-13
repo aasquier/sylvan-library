@@ -82,10 +82,11 @@ run reports green, and the bugs are somewhere the file never looks.
 
 The developer shelf is artifacts in the plainest sense — and much of it is
 currently an absence: there is no bench suite, and the cache register is
-half-built (`mtglab sim cache`, since #270, lists the Tier 1 cache's contents
-and can clear them — no hit counter anywhere), and **building the bench suite
-and the counter half over the Go packages is this part's standing item** until
-it lands. Mutation sampling has left that list — `gremlins` is the tool now, and
+half-built (`mtglab sim cache` lists the Tier 1 cache's contents and can
+clear them — that register still counts no hits, though the door's ETag memo
+now counts its own, `etagCounts` in `go/internal/door/static.go`), and
+**building the bench suite and the Tier 1 counter half over the Go packages
+is this part's standing item** until it lands. Mutation sampling has left that list — `gremlins` is the tool now, and
 White's testing facet owns it. What else survives is `animist verify` in
 `tools/`, plus the stock Go toolchain the other colors measure with (the
 shelf section in `SKILL.md` lists it). Nothing else in the cycle owns the
@@ -267,6 +268,14 @@ point is buried in narration — the point survives, the diary does not. Sweep
 a bounded slice each run (a package, or one route family) and record in the
 ledger which slices are done, so the sweep finishes over cycles instead of
 restarting every one.
+
+**The slice budget loses to the tree, measured 2026-09-12**: one slice
+retires ~20 dated lines a cycle while the week added ~50 (go 183 → 235,
+web/src 368 → 426). The sweep keeps its judgment-only shape — it is how the
+keep/cut line gets applied — but the ceiling question (a ratchet test over
+dated comments outside tests, bumped consciously when a date is the fact) is
+queued for Aaron; until he rules, choose the densest untouched family and do
+not present the totals as shrinking.
 
 **Five packages are not sweepable, and the reason is ADR 18.**
 `internal/sim`, `internal/sim/tier1`, `internal/mana`, `internal/floats` and
