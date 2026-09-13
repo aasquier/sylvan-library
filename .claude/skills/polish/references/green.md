@@ -47,12 +47,17 @@ screen reader or a keyboard.
 - **After any bundle rebuild, run the guards with `-count=1`** —
   `go test -race -count=1 ./cmd/mtglab/` — because Go's test cache does not
   track reads outside the module and `web_dist` is outside `go/`: proven
-  2026-09-12 with a minimal module whose test read `../outside/data.txt` —
-  the file was changed so the assertion would fail, and `go test` kept
-  answering `ok (cached)` until `-count=1` forced the run and got the FAIL.
-  A plain `./...` after a bundle change is not evidence about the bundle.
-  CI is immune (its gate already carries `-count=1`, ci.yml:218); the
-  laptop ritual is the exposed half.
+  2026-09-12 with a minimal scratch module whose test read a data file from
+  a sibling directory outside it — the file was changed so the assertion
+  would fail, and `go test` kept answering `ok (cached)` until `-count=1`
+  forced the run and got the FAIL. A plain `./...` after a bundle change is
+  not evidence about the bundle. CI is immune (its gate already carries
+  `-count=1`, ci.yml:218); the laptop ritual is the exposed half — and it
+  bit this very bullet: the first wording named the scratch file by its
+  relative path, the skill-record guard (which reads this directory from
+  outside the module too) rightly failed on a path that resolves nowhere,
+  and the local suite could not see that failure for exactly the reason
+  the bullet states.
 - Mobile Safari's quirks are the usual suspects; audit the surfaces changed
   since last run for them: viewport height (`100vh` vs dynamic toolbars —
   prefer `dvh`/`svh` with fallback), `env(safe-area-inset-*)` on notched
