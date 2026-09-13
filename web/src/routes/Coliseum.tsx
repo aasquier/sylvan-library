@@ -26,7 +26,7 @@
  * prose still answers whole — only the paintings go missing, which the stage
  * renders as the arena's palette alone.
  *
- * **And the gates open from here** (Aaron's call, 2026-08-25). Tier 3 used to
+ * **And the gates open from here** (Aaron's call). Tier 3 used to
  * be a fifth option on the Simulator, which made one screen answer two unlike
  * questions — "what do ten thousand shuffles say about my mana" is a number
  * you read, and "who wins" is a match you *watch*, for minutes. The Simulator
@@ -44,7 +44,7 @@
  * seconds and nobody can watch seconds of Commander, so the room holds a queue
  * and drains it at a rate a person can follow.
  *
- * **And a series is told in order** (Aaron, 2026-08-26). A match raises its
+ * **And a series is told in order** (Aaron). A match raises its
  * second fight while the first is still being told, and the arriving one used
  * to take the room mid-sentence. It does not now: a bout is told to its end,
  * the room takes a breath, and the next begins — with every bout the match has
@@ -110,7 +110,7 @@ const ARENA_GAMES_MAX = 20
 /**
  * A fresh shuffle, drawn for every bout sent in.
  *
- * **The shuffle is not the watcher's problem** (Aaron, 2026-08-26: "I am not a
+ * **The shuffle is not the watcher's problem** (Aaron: "I am not a
  * big fan of our shuffle field we let players put in ... I think we should hide
  * the seed from them altogether"). It used to be a numbered field standing in
  * the gate beside the two decks, defaulted to a small round number, and it
@@ -130,7 +130,7 @@ const drawShuffle = () => Math.floor(Math.random() * SHUFFLE_CEILING) + 1
 /**
  * What a deck is called in the gate's two pickers.
  *
- * **Lean, because the control has to hold it** (Aaron, 2026-08-26: "we are
+ * **Lean, because the control has to hold it** (Aaron: "we are
  * cramming a lot of text into the dropdown options, those should be leaner to
  * pick and look at so the whole phrase fits on the button or dropdown
  * easily"). Three things used to be concatenated into one option — the deck's
@@ -403,7 +403,7 @@ function CopyTheLink() {
 /**
  * The card the gate *is*, and "is" is doing all the work in that sentence.
  *
- * Aaron, 2026-08-27: *"what if our button to 'Send them in' was a button made
+ * Aaron: *"what if our button to 'Send them in' was a button made
  * from the card 'Arena' with a little footnote fun fact, that is one of the
  * prime cards to represent a duel in Magic"*. He is right about the card and
  * he is right for a reason worth writing down: the two selects beside this
@@ -601,7 +601,7 @@ function spell(seconds: number): string {
 /**
  * The tale of the tape: what the house printed once the last game landed.
  *
- * **A score, not four measurements** (Aaron, 2026-08-27: "make the numbers
+ * **A score, not four measurements** (Aaron: "make the numbers
  * prettier that it outputs too, it is pretty basic"). What stood here was a
  * grid of identical `StatTile`s — this deck's wins, that deck's wins, draws,
  * clock-outs, game length — five boxes of equal weight, so the only fact
@@ -826,8 +826,8 @@ export default function ColiseumRoom() {
   // both fighters: `/coliseum?a=aaron/gyome&b=aaron/arahbo`.
   const [a, setA] = useState(params.get('a') ?? '')
   const [b, setB] = useState(params.get('b') ?? '')
-  // **Two more chairs, and a tab that says which table is laid** (Aaron,
-  // 2026-09-06). The pod is not a wider duel — it is a different game, with a
+  // **Two more chairs, and a tab that says which table is laid** (Aaron).
+  // The pod is not a wider duel — it is a different game, with a
   // different baseline and a different board — so it is a place you go rather
   // than a dial you turn, which is what the strip above already uses tabs for.
   //
@@ -955,7 +955,7 @@ export default function ColiseumRoom() {
       // **Four different decks, not the first one four times.** A `<select>`
       // with no value shows its first option, so seats three and four both
       // came up reading the same deck as seat one — a table of three Arahbos
-      // that looked deliberate (Aaron, 2026-09-06, from the screenshot). The
+      // that looked deliberate (Aaron, from the screenshot). The
       // shelf is walked rather than indexed twice, and a shelf too short to
       // seat four falls back to what it has rather than leaving a seat blank.
       const at = (i: number) => d[i] ?? d[d.length - 1] ?? d[0]
@@ -975,7 +975,7 @@ export default function ColiseumRoom() {
     api.forgeStatus()
       .then((st) => { if (alive) setForgeReady(st.available) })
       .catch(() => { if (alive) setForgeReady(false) })
-    // **A reload does not cost you the fight** (Aaron, 2026-08-26: "When I
+    // **A reload does not cost you the fight** (Aaron: "When I
     // reload a page I lose the fight, anyway to avoid that and reload the
     // in-flight match?"). The match never went anywhere — it is being fought
     // on another machine and the arena has been holding it all along. What was
@@ -1291,7 +1291,7 @@ export default function ColiseumRoom() {
   const [reel, seek, series] = useReel(job?.id ?? '', bouts, stage, speed)
 
   /** Seats this game's tape has already dismissed, for the board's pall
-   *  (Aaron, 2026-09-07: a dead player in a pod should read as dead).
+   *  (Aaron: a dead player in a pod should read as dead).
    *  `fallenBy` argues the scan; the memo just keeps it off every render.
    *  Scrubbing backwards re-runs it over a shorter `shown` and the pall
    *  lifts again — the reel is the one clock (its own rule). */
@@ -1301,7 +1301,7 @@ export default function ColiseumRoom() {
   /** Where each of this bout's turns begins, for the transport's turn step.
    *
    *  **A player's turn, which is the unit somebody studying a game wants**
-   *  (Aaron, 2026-08-26: "a player's turn at a time, not a full two player
+   *  (Aaron: "a player's turn at a time, not a full two player
    *  turn"). Forge prints a turn line per seat and alternates them, so
    *  consecutive `turn` beats are one player's turn apart and nothing has to
    *  be halved — the halving is exactly the trap `lib/theater.ts` records this
@@ -1661,7 +1661,7 @@ export default function ColiseumRoom() {
         </div>
       )}
 
-      {/* **The result, directly under the sand** (Aaron, 2026-08-27: "our
+      {/* **The result, directly under the sand** (Aaron: "our
           results block is wrong, it currently sits below the coliseum facts
           panel, it should sit right below the sandbox"). It used to render
           inside the arena's own block, after the painting, after the house's

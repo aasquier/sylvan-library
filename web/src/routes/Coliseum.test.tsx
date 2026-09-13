@@ -350,8 +350,8 @@ describe('the Coliseum', () => {
  * The gates: this room is the only one that starts a real match, and these are
  * the properties a green backend suite cannot see from its side of the wire.
  *
- * They moved here from the Simulator with the Forge itself (Aaron's call,
- * 2026-08-25), and one is new and load-bearing: **this room asks to be
+ * They moved here from the Simulator with the Forge itself (Aaron's call),
+ * and one is new and load-bearing: **this room asks to be
  * narrated.** Narration is free in time and about a hundred beats a game in
  * volume, so it is asked for per run — and if this room ever stopped asking,
  * the play-by-play would simply be empty with nothing on screen to explain it.
@@ -565,7 +565,7 @@ describe('the shuffle', () => {
  *
  * The match is fought on another machine and the arena holds it either way;
  * all a reload ever lost was this room's handle on it, which lived in memory
- * (Aaron, 2026-08-26: "When I reload a page I lose the fight"). The handle
+ * (Aaron: "When I reload a page I lose the fight"). The handle
  * rides in the link now. Three endings, and none of them may be a raw refusal.
  */
 describe('walking back into a match', () => {
@@ -608,7 +608,7 @@ describe('walking back into a match', () => {
  * The account is gone, and the room does not miss it.
  *
  * It was a column of sentences retelling the game the board above it was
- * already showing, and Aaron asked for it to go (2026-08-26). The thing worth
+ * already showing, and Aaron asked for it to go. The thing worth
  * guarding is the distinction its name got wrong: **it was never a log of the
  * machinery** — it was the narration, the same typed beats the board is folded
  * from. So deleting the panel must not have cost the room the beats.
@@ -809,7 +809,7 @@ describe('the tale of the tape', () => {
      async () => {
     // Three things used to be concatenated into one option — the deck's name,
     // its owner and its pilot — inside a control that is eleven rem wide on a
-    // phone, so every option ended in an ellipsis (Aaron, 2026-08-26: "those
+    // phone, so every option ended in an ellipsis (Aaron: "those
     // should be leaner to pick and look at so the whole phrase fits").
     //
     // jsdom cannot measure a width, but the crammed phrase is not a width
@@ -887,7 +887,7 @@ describe('the tale of the tape', () => {
     // It also retires the collision this test used to guard: the title and
     // the credit were two absolutes anchored to the same edge, twelve pixels
     // apart on a laptop and straight through each other on a phone (Aaron
-    // photographed it, 2026-08-25). One of them no longer occupies the frame
+    // photographed it). One of them no longer occupies the frame
     // at all, so there is nothing left to collide with.
     const { container } = show()
     await screen.findByText(/harena/)
@@ -945,7 +945,7 @@ describe('the tale of the tape', () => {
  * A bout that dies mid-match, and the one state this room could never survive:
  * an arena that says "running" while nothing runs.
  *
- * On 2026-08-30 a twenty-game match on the deployed instance was cancelled by
+ * A twenty-game match on the deployed instance was once cancelled by
  * the app that asked for it, the worker went on playing to nobody, and every
  * bout after it queued behind the one with no audience. The room's part of
  * that was the last mile: a progress bar turning over a fight that had already

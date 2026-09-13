@@ -5350,6 +5350,15 @@ user adaptability · hosted-first alignment*
 
 ### 2026-09-12 (rainbow) — PR #468, green and open for Aaron's eye
 
+*Correction beside the heading, Colorless 2026-09-12 (the cross-section
+mandate): the heading's state rotted within its own night. #468 merged at
+~04:00 on 2026-09-13 on Aaron's direct instruction, given while he was
+briefly awake. What stands verified: the six label fixes in a real browser
+pre-merge (this leg's own walk below), and the `/signin` focus catch on the
+deployed door post-merge. An authenticated live re-check of the relabeled
+`/simulate` and `/coliseum` fields was not done and is owed — the daybreak
+item is narrowed to exactly that.*
+
 Leg five of seven; White #463, Blue #464, Black #465 and Red #466/#467 merged,
 deployed and walked ahead of it. Load 3.95 at start (15-min average 18.53 —
 the earlier legs), so wall clocks tonight carry the usual caveat; nothing
@@ -6455,10 +6464,11 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
-  2026-08-21 (scoped — the relic sweep only), 2026-08-19 (rainbow, the first
-  colorless run with five colors to audit), 2026-08-19 (the run that created
-  this section).
+- **Last run:** 2026-09-12 (rainbow, night — ran past 04:00 into 09-13).
+  Previous: 2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-21
+  (scoped — the relic sweep only), 2026-08-19 (rainbow, the first colorless
+  run with five colors to audit), 2026-08-19 (the run that created this
+  section).
 - **Read everything below the 2026-08-24 block as history, not as state.** It
   is all about the Python app, and its instruments are gone: `mtglab bench`,
   `mtglab bench caches`, `mtglab bench profile`, `mtglab mutate` and
@@ -6467,6 +6477,260 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-09-12 (rainbow)
+
+The sixth leg of the 2026-09-12 rainbow, run past 04:00 into 09-13. Five
+color legs merged, deployed and walked ahead of it (#463 White, #464 Blue,
+#465 Black, #466+#467 Red, #468 Green — Green's merged at ~04:00 on Aaron's
+direct instruction while he was briefly awake; its correction note sits
+under Green's own heading). All five parts run; the relic sweep ran all six
+passes. Cleanup follows tonight, so the hand-offs below are hours old, not
+a week.
+
+- **Fixed this run:**
+  1. **The shared documents-versus-tree kit moved out of
+     `licenserecord_test.go` — the deferred item's third carry, and the
+     first that was silent.** Deferred 2026-08-24 with a trigger; the
+     trigger fired and the 09-05 entry handed it to that night's cleanup
+     *by name*; the cleanup's own "still in hand — nine" list does not
+     contain it and states no reason — the exact silent carry-forward its
+     phase rules forbid, found by reading the two lists against each other.
+     Landed here as `go/cmd/mtglab/recordkit_test.go`: `repoRoot` (17 test
+     files call it), `sortedKeys` (4), `repoPaths` (2), `backticked`,
+     `repoExtensions` and `mtglabVerb`, with the conservatisms' argument
+     travelling with the code and the licensing test keeping only its own
+     subject. Same package, so zero call sites moved; the licence file
+     points at the kit by name.
+  2. **The comment sweep, slice `web/src/routes/Coliseum{,.test}.tsx` — the
+     first web/src slice ever taken** (the 09-05 deferral's own trigger).
+     **Dated lines 19 → 1**; the keep is the Arena card's *"re-checked
+     against Scryfall rather than recalled, 2026-08-28"* — a validation
+     date, the fourth kind: strip it and the sentence claims the Scryfall
+     check is current forever while new printings arrive. Sixteen of the
+     cuts were dates on Aaron's rulings ("Aaron, 2026-08-26:" → "Aaron:",
+     the standing precedent); the other two were when-it-happened clauses
+     ("On 2026-08-30 a twenty-game match…" → "A twenty-game match … was
+     once cancelled…"), every argument kept. The family's remaining
+     `#NNN` hits are card collector numbers (`ONS #319`, `TSB #117`) —
+     the residue grep read, not obeyed. **Slices done:**
+     `internal/sim/{cache,compile,curve,tier3}` (08-24), `internal/api`
+     non-test (09-05), the Coliseum route family (09-12). **Not
+     sweepable:** the five fingerprinted packages, unchanged.
+  3. **"No hit counter anywhere" broke the week it was written, and the
+     pass's own surface said it twice.** Black's #465 landed `etagCounts`
+     (`go/internal/door/static.go`) — a runtime hit/miss register on the
+     door's ETag memo, mutation-verified from its own test — so the shelf's
+     sentence in `SKILL.md` and part three's here were both false by the
+     time this run read them. Both now say which cache counts and which
+     still does not: **the Tier 1 register remains counterless**, and the
+     rebuild's standing scope narrows to exactly that plus the benchmark
+     ledger, with `etagCounts` named as the pattern to copy. (This is the
+     standing question answering on the pass itself: a description of the
+     world in a skill rots like any count, and no gate can hold it — the
+     compare-not-rederive habit is the whole defence.)
+  4. **Three process lessons from tonight's legs, folded into the skill
+     where every future run reads them** — each bought with real lost time
+     tonight, none re-derivable from the checklist that existed yesterday:
+     (a) the measuring shelf gains **the interleaved A/B race rule**
+     (Black's graduation of its 09-05 warning: a +35–56% phantom search
+     regression dissolved by a four-minute A/B/A/B race; cross-night
+     absolutes on this Mac are not comparable); the "Four rules" header is
+     now countless prose, so the next rule does not rot a number. (b) the
+     rainbow orchestration gains **"a leg closes its own loop inside its
+     one turn"** — Blue's subagent parked mid-CI-wait expecting a wake that
+     never reaches a subagent, and the orchestrator closed the leg by hand.
+     (c) the Nightbound merge rules gain **"watching the deploy honestly"**
+     — poll the `tests` run by name (never `gh run watch`, which outlived a
+     10-minute Bash timeout in silence tonight), prove the deploy by the
+     machine image tag because post steps outrun `timeout-minutes` (Red's
+     22m49s-against-20 run read `cancelled` over a fully-landed deploy),
+     and cancel-and-rekick a wedged scheduler with an empty commit (Green's
+     40-minute all-workflows stall, status page green throughout).
+  5. **Cross-section corrections under the mandate, all argued in place:**
+     Green's #468 daybreak line was stale within the night (merged on
+     Aaron's instruction; rewritten to the one owed beat — an authenticated
+     live listen to the relabeled fields — with the merge record in a note
+     under Green's heading); Red's restore-drill line said **rung 14**
+     where the ladder stands at **17** (`ls go/internal/auth/migrations/`:
+     0001–0017; 0015–0017 landed 09-06 with #448) — the drill is *more*
+     due than the queue claimed; and the nine-decks line's "up since Aug
+     28" clause had quietly become false — PID 19163 was **started 08:42
+     on 09-12** (`ps lstart`), meaning the Aug-28 server is gone and local
+     servers keep being *started*, which strengthens that line's own point.
+- **Part one — is the ledger telling the truth?**
+  - **The 09-05 cleanup's landing claims: sampled seven, seven hold.**
+    `daybreakrecord_test.go` and `skillrecord_test.go` on main (#440), ADR
+    0050 exists, `auth.Sweeper` at `sweep.go:73` (#441), `mtglab claude
+    usage` with `claudeusage_test.go` (#442), `hostedcopy.test.ts` and
+    `asynccontrols.test.ts` (#443). Verdict on "sixteen of twenty-five over
+    five branches": **honest**, with the one exception recorded as fix 1 —
+    the helpers hand-off was dropped without a stated reason, the first
+    breach of the no-silent-carry rule since it was written.
+  - **The two-places audit, tonight's five legs: 5 of 5 clean, the second
+    clean cycle running** — and the guard now re-proves it on every
+    gauntlet, so this line graduates from an audit finding to a regression
+    check. Zero daybreak-only items opened tonight.
+  - **Spot-checks of tonight's claimed fixes, five taken, five hold:**
+    `TestEveryGoFileCompilesOnBothCILegs` exists and ci.yml's floor step
+    carries `if: matrix.arch == 'arm64'` at MINIMUM 90.8 (#466);
+    `devProfiler` mounts `/debug/pprof/` in `cmd/mtglab/ui.go` (#464);
+    `etagCounts` in the door (#465); the torch snapshot pin argued in
+    `tools/pyproject.toml:55` with the recipe tests beside it (#463);
+    `htmlFor` through `components/ui.tsx:251` with the lodger-label
+    argument, `autoFocus` in `components/auth.tsx` (#468).
+  - **Deferred-trigger walk (this section's own):** both 09-05 deferrals
+    consumed tonight — the helpers move (fix 1) and the web/src slice
+    (fix 2). The Answered block in `DAYBREAK.md` holds six entries whose
+    ledger records exist; moving them out is Cleanup's beat, tonight.
+- **Part two — the checklists, against what tonight's runs actually found.**
+  Every color earned it tonight: White found the standing CLAUDE.md fact
+  broken on the live wire (the invalid example gone — a discovery no
+  checklist line named) and closed the determinism replay through the
+  signed-in seat; Blue took the two owed walks and landed the pprof mount's
+  dev half; Black landed the ETag memo *with its own counter* and graduated
+  the A/B race method; Red landed the floor gating watched end-to-end and
+  brought back two deploy-watch discoveries; Green found the lodger-label
+  mechanism and proved the local test-cache lie. **Reciting-risk verdict:**
+  the relic sweep's passes 1–4 are now clean three runs running — the
+  honest reading is *genuinely healthy* (Aaron ruled on six relics
+  2026-08-21 and the tree has not re-accumulated), and the sweep stays
+  because it is minutes of insurance and its count-habit is what caught
+  tonight's stray worktree. The skill absolute that has visibly drifted
+  with nobody enforcing it: **"one line per item" in the daybreak rules** —
+  every current item is a paragraph, and Aaron answers the file happily in
+  that shape (25 in one morning, 09-05). Deliberately *not* reworded and
+  *not* machine-checked by this run: a line-count gate would fail the file
+  he blessed, and rewording a rule to match drift is the move the pass
+  forbids. Recorded here for Cleanup/Aaron: either the rule means "one
+  item per question, headline-first" (reword once, his call) or the file
+  is drifting toward the three-thousand-line fate the queue exists to
+  avoid.
+- **Part three — the tooling.**
+  - `animist verify` — **34 recipes tracked, 34 held, exit 0** (09-05:
+    33/33; the +1 is the Agatha hut plate, #460). Count-before-reading
+    caught the stray again: `find` sees **67** recipe files where the tree
+    tracks 34 — the extras are one clean, week-stale harness worktree
+    (part four's find, queued below).
+  - **The fly drift diagnosed, and it is not drift** (tonight's item 4 in
+    the orchestrator's audit material). Raw, from `LOG_LEVEL=debug fly
+    auth whoami`:
+
+        DEBUG token expired (740h38m45.731247s since login, timeout is 720h0m0s)
+        Error: no access token available. Please login with 'flyctl auth login'
+
+    flyctl v0.4.85 (unchanged since Aug 18) enforces a **720-hour
+    interactive-session ceiling** on the config-file token, clocked from
+    `last_login` — deploy day, Aug 13 — which lapsed Saturday ~08:00,
+    exactly when every leg started needing the workaround. The config
+    parses clean (PyYAML: six top-level keys, token a 665-char string; no
+    tabs, perms 600), and the env-var path skips the interactive check,
+    which is why `FLY_API_TOKEN=$(…)` works and will keep working. Queued:
+    `fly auth login` is Aaron's two minutes.
+  - **The hooks guard (`.claude/hooks/guard-git.py`), reasons re-verified
+    live:** the blanket-add refusal's reason is standing in the working
+    tree tonight (nine real decks in `decks/` — the exact sweep-in risk),
+    and the stash refusal's WIP-commit alternative is CLAUDE.md law. The
+    guard fails loud on an unreadable payload (its jq predecessor's
+    inertness is its own doc comment). It has no test that would catch it
+    going inert — deferred below with a trigger rather than built tonight,
+    because the guard is one file, self-arguing, and a test harness for
+    hook payloads is new plumbing.
+  - **The shelf's live question, asked again:** the answer moved twice
+    this week — `sim cache` holds the contents half, `etagCounts` now
+    holds a counter *pattern* — so what the stock toolchain still cannot
+    do is down to **Tier 1 hit counting and a benchmark ledger**, and the
+    rebuild should be scoped to exactly that. The old shelf's colorless
+    questions (did the catalogue move; are the recorded survivors alive)
+    remain unanswerable until it lands — the standing gap line, so it
+    cannot silently become permanent.
+- **Part four — the relic sweep, all six passes run.**
+  - **Pass 1 (every tracked directory) — clean.** 147 tracked directories
+    read against the architecture; **51 `go/internal` packages, 51 package
+    docs, 0 without** (09-05: 49/49; the two new are `brew` and `convoke`,
+    both current-era). The 42 doc-less rows are all `testdata/`, `data/`,
+    fuzz corpora and the migrations dir — no Go in any of them.
+  - **Pass 2 (odd file types) — clean.** Fuzz seeds, tier3's recorded
+    fixtures, `scribe/`'s GPL boundary (LICENSE, build.sh, Java), the
+    docker trio, `.env.example`, go.mod/sum.
+  - **Pass 3 (arrived since 09-05) — clean.** ADRs 50–51, the rulebreaker
+    family, the night engine's tests, `brew`, `convoke`, `auth.Sweeper`,
+    migrations 0014–0017 — all reachable from the shape that shipped them.
+  - **Pass 4 (every doc by its own title) — clean.** 52 ADRs; 14 core
+    docs; **eleven** PROVENANCE files (agatha the eleventh); one new doc
+    since the last enumeration, `docs/polish/COVERAGE.md`, live (the
+    floor's own story, #463/#466 era).
+  - **Pass 5 (every command) — clean, top level unchanged**: cards,
+    claude, data, decks, forge-shim, sim, ui, users + cobra's two + the
+    hidden `probe`. Nothing runs on a dead purpose.
+  - **Pass 6 (non-source files nothing names) — 15 rows, all the migration
+    ladder** (0001–0017 minus 0007 and 0014, both named in ledger text —
+    the naming mechanic, working as documented).
+  - **One relic, and the count-habit found it: a clean, detached harness
+    worktree at `.claude/worktrees/frosty-roentgen-e3fccf`** (c57f4e7,
+    Sep 6, `git status` empty) — the isolation auto-clean that should have
+    removed it did not. Queued for Aaron with the removal recommendation;
+    nothing references it and nothing would be lost.
+- **Part four's leftovers.** (a) The 08-24 "file the pprof item into Red's
+  section" hand-off resolved *differently and honestly*: the mount landed
+  tonight as Blue's work, so the record lives in Blue's section where the
+  landing is — the hand-off's purpose (the item not being lost) is served;
+  no further action. (b) The 09-05 prediction that Red/Green's open-branch
+  daybreak edits "will conflict at rebase — resolved by whoever merges
+  second" resolved cleanly this week; no residue found. (c) No
+  contradictions between tonight's five sections — the one overlap (White
+  doing the replay that was queued as White/Blue, Blue taking the walks)
+  was divided explicitly in the queue item itself, which is the two-owners
+  shape handled right.
+- **Measurements (2026-09-12, rainbow, night):** raw output, not a summary.
+
+      $ cd tools && .venv/bin/animist verify
+      34 recipes printed, 34 held, exit 0   (09-05: 33/33; find sees 67 —
+      the extras are the stray worktree's 33)
+
+      dated comments, go/**.go                      235   (09-05: 205 → 183)
+      dated comments, go/**.go outside _test.go     114   (09-05: 111 → 89)
+      dated comments, web/src (ts/tsx/css)          426   (09-05: 368)
+      slice routes/Coliseum{,.test}.tsx             19 → 1   (the keep is a
+                                                    validation date)
+      #NNN / vNNN residue, go non-test              14
+
+      The tree added ~50 dated lines in the week against one slice's ~20
+      removed — the budget arithmetic behind the ratchet question queued
+      tonight (part five's re-scope in the reference records it).
+
+      migrations ladder: 0001–0017 (daybreak said 14 — corrected)
+      two-places audit: 5 of 5 tonight's legs clean (second clean cycle)
+      09-05 cleanup landing claims: 7 sampled, 7 hold
+      tonight's leg claims: 5 sampled, 5 hold
+      relic pass 1: 147 tracked dirs; 51 packages, 51 package docs
+      relic pass 6: 15 rows, 0 findings
+      PID 19163 (port 8765): started Sat Sep 12 08:42:52 (ps lstart)
+
+- **Queued for Aaron (2026-09-12):** three, each in `DAYBREAK.md` under
+  Colorless with its recommendation — the fly re-login (a 720h session
+  ceiling, not corruption; `fly auth login` resets it), the dated-comment
+  ratchet (the arithmetic above; binds every session, so his), and the
+  stray worktree (a relic is a decision).
+- **Deferred (2026-09-12), with triggers:**
+  - **A test that fails when `guard-git.py` goes inert** (the corollary in
+    part two applied to the pass's own guard). *Trigger:* a second hook
+    joining `.claude/hooks/`, or the guard observed allowing a spelling it
+    documents refusing.
+  - **The next `web/src` comment-sweep slice** — densest remaining family:
+    `web/src/components` (49 dated lines across the directory). *Trigger:*
+    the next colorless run, unless the ratchet ruling reshapes the sweep
+    first.
+- **Staleness, honestly stated** for the next bare `/polish`: every color
+  carries a 2026-09-12 tag as of tonight and Cleanup runs in hours, so
+  date-staleness is nil; substance orders the next cycle exactly as the
+  09-05 entry wrote it — **White first** (the isolation completeness guard
+  and the invalid-example ruling both sit in its lap), then **Black** (the
+  Tier 1 counter, now with an in-tree pattern to copy), then by date. The
+  queue Cleanup inherits tonight is verified current as of this run:
+  **thirteen open items by the guard's own marker count** — five from
+  09-12's legs, three from this run, two from 09-05, three from 08-24 —
+  and six Answered entries ready to move out.
 
 ### 2026-09-05 (cleanup)
 
