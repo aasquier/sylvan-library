@@ -188,13 +188,34 @@ func Refresh(ctx context.Context, opt RefreshOptions, watch RefreshWatcher) (Ref
 
 	var counts RefreshCounts
 
+	// A run that loads both tables builds a new file and renames it into
+	// place; a `--oracle-only` run writes in place, because it deliberately
+	// keeps the printings it never downloaded and copying a hundred thousand
+	// of them across would make the small refresh the slow one. [rebuild]
+	// argues the rest, including what a rebuild must carry over by hand.
+	var into *rebuild
+	catalog := ""
+	if !opt.OracleOnly {
+		into, err = startRebuild(ctx, db, opt.DBPath)
+		if err != nil {
+			return counts, &RefreshError{Phase: PhaseShelves, Err: err}
+		}
+		catalog = rebuildCatalog
+		defer func() {
+			if into != nil {
+				into.abandon(ctx)
+			}
+		}()
+	}
+
 	watch.gathering(OracleBulk)
 	oracle, err := DownloadBulkFrom(ctx, index, OracleBulk, opt.ScryfallDir)
 	if err != nil {
 		return counts, &RefreshError{Phase: PhaseGather, Err: err}
 	}
 	watch.gathered(OracleBulk, oracle)
-	counts.Oracle, err = LoadOracle(ctx, db, oracle)
+	counts.Oracle, err = loadInto(ctx, db, catalog, oracle, "oracle_cards",
+		OracleColumns, SkipOracleLayout, OracleRow)
 	if err != nil {
 		return counts, &RefreshError{Phase: PhaseShelve, Err: err}
 	}
@@ -215,11 +236,28 @@ func Refresh(ctx context.Context, opt RefreshOptions, watch RefreshWatcher) (Ref
 		return counts, &RefreshError{Phase: PhaseGather, Err: err}
 	}
 	watch.gathered(PrintingsBulk, printings)
-	counts.Printings, err = LoadPrintings(ctx, db, printings)
+	counts.Printings, err = loadInto(ctx, db, catalog, printings, "printings",
+		PrintingColumns, SkipPrinting, PrintingRow)
 	if err != nil {
 		return counts, &RefreshError{Phase: PhaseShelve, Err: err}
 	}
 	watch.shelved(PrintingsBulk, counts.Printings)
+
+	// Everything is in the new file; this is the step that makes it the pool.
+	// It is classified as a shelving failure because that is what it is from
+	// where a caller stands -- the rows were gathered and did not get shelved.
+	//
+	// Asking whether there *is* a rebuild rather than trusting that there
+	// must be: reaching here means `!opt.OracleOnly`, so one was started --
+	// but that is an invariant held forty lines apart by two separate
+	// conditions, and the first edit that breaks it would earn a nil
+	// dereference here rather than a sentence. This shape cannot.
+	if into != nil {
+		if err := into.finish(ctx); err != nil {
+			return counts, &RefreshError{Phase: PhaseShelve, Err: err}
+		}
+		into = nil // finished; the deferred abandon must not undo it
+	}
 
 	counts.Swept = sweepLeavings(opt.ScryfallDir, map[string]string{
 		OracleBulk: oracle, PrintingsBulk: printings})

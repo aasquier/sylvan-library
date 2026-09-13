@@ -68,7 +68,14 @@ var ceilings = map[string]int{
 }
 
 const (
-	goDatedCommentCeiling  = 114
+	// 114 → 115 on the branch that landed the pool rebuild. The one added
+	// comment dates the measurement that argues for the whole change ("On
+	// 2026-09-13 the served pool was 261,894,144 bytes"), and a reader who
+	// cannot see when that was measured cannot tell a live number from a
+	// rotted one -- which is the doc comment's own test for keeping a date.
+	// This is what raising the ceiling is supposed to look like: one line, in
+	// the diff, with the reason beside it.
+	goDatedCommentCeiling  = 115
 	webDatedCommentCeiling = 292
 )
 

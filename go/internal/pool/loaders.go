@@ -27,18 +27,35 @@ import (
 // the refusal safe.
 
 func LoadOracle(ctx context.Context, db *sql.DB, path string) (int64, error) {
-	return load(ctx, db, path, "oracle_cards", OracleColumns,
+	return loadInto(ctx, db, "", path, "oracle_cards", OracleColumns,
 		SkipOracleLayout, OracleRow)
 }
 
 func LoadPrintings(ctx context.Context, db *sql.DB, path string) (int64, error) {
-	return load(ctx, db, path, "printings", PrintingColumns,
+	return loadInto(ctx, db, "", path, "printings", PrintingColumns,
 		SkipPrinting, PrintingRow)
 }
 
-func load(ctx context.Context, db *sql.DB, path, table string,
+// loadInto is [LoadOracle]'s body with one extra dial: which *catalog* the
+// rows land in. Empty is the default database -- the file the connection was
+// opened on, which is every call the two exported loaders make and the whole
+// behaviour that existed before the rebuild path. A name is an ATTACHed
+// catalog, which is how [Refresh] fills a brand-new file from a connection
+// that is holding the old one open ([rebuild] argues why it works that way).
+//
+// The catalog reaches the rows by two different roads and both have to agree:
+// SQL gets a qualified table name, and the Appender takes it as its own
+// first argument. Neither is optional -- an appender pointed at the default
+// catalog would cheerfully fill the *old* pool while the DELETE emptied the
+// new one.
+func loadInto(ctx context.Context, db *sql.DB, catalog, path, table string,
 	columns []string, skip func(map[string]any) bool,
 	row func(map[string]any) []any) (int64, error) {
+
+	qualified := table
+	if catalog != "" {
+		qualified = catalog + "." + table
+	}
 
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -55,7 +72,7 @@ func load(ctx context.Context, db *sql.DB, path, table string,
 			_, _ = conn.ExecContext(ctx, "ROLLBACK")
 		}
 	}()
-	if _, err := conn.ExecContext(ctx, "DELETE FROM "+table); err != nil {
+	if _, err := conn.ExecContext(ctx, "DELETE FROM "+qualified); err != nil {
 		return 0, fmt.Errorf("load %s: %w", table, err)
 	}
 
@@ -65,7 +82,7 @@ func load(ctx context.Context, db *sql.DB, path, table string,
 		if !ok {
 			return fmt.Errorf("load %s: not a duckdb connection", table)
 		}
-		appender, err := duckdb.NewAppenderWithColumns(dc, "", "", table, columns)
+		appender, err := duckdb.NewAppenderWithColumns(dc, catalog, "", table, columns)
 		if err != nil {
 			return err
 		}

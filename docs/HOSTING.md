@@ -157,25 +157,33 @@ Facts about that command worth knowing at the terminal:
   on the app machine's shared core, measured 2026-09-13** including the SSH
   connect. "Budget minutes" stood here until somebody ran one and looked;
   budget a minute.
-- **It grows the file about 37 MB a run, and none of that is data.** The
-  reload deletes and re-inserts inside one transaction, so DuckDB keeps the
-  old pages and never reclaims them. Measured 2026-09-13: the source data
-  grew 0.3% over the fortnight while `mtg.duckdb` went 224,145,408 →
-  261,894,144 bytes (+16.8%), and a from-scratch build of *the very same
-  rows* — same loader, same bulk files, 35,517 oracle cards and 108,583
-  printings either way — came to **54,538,240 bytes**. Four fifths of the
-  served pool is dead pages. Nothing is at risk while the volume has room,
-  but if `/data` ever gets tight, the fastest gigabyte back is to move the
-  pool aside and rebuild rather than to buy disk:
+- **It builds a new file and renames it into place**, rather than emptying
+  and refilling the served one. You will see a `mtg.duckdb.rebuilding` beside
+  the pool while a refresh runs; it is gone by the end, and a stray one is a
+  run that died — harmless, and the next refresh clears it.
 
-  ```bash
-  fly ssh console -C "sh -c 'mv /data/mtg.duckdb /data/mtg.duckdb.old && mtglab data refresh'"
-  ```
+  This is why: the old in-place reload deleted and re-inserted inside one
+  transaction, and DuckDB keeps the emptied pages forever. Measured
+  2026-09-13, the source data grew 0.3% over a fortnight while `mtg.duckdb`
+  grew 16.8% to 261,894,144 bytes — and a from-scratch build of *the very
+  same rows*, same loader and same bulk files, came to **54,538,240**. Four
+  fifths of the served pool was dead pages, and roughly 37 MB of nothing was
+  accruing per refresh. **The first refresh after this landed reclaims all of
+  it in one go**, so expect `mtg.duckdb` to drop by about 200 MB and then
+  hold steady at each refresh rather than climbing.
 
-  Keep the `.old` file until `/api/health` reports the pool present with the
-  row counts you expect, then delete it. (The standing fix is to make the
-  refresh itself build into a temporary file and rename — deferred, and this
-  measurement is the argument for it.)
+  Two consequences worth knowing at the terminal. **A refresh now needs room
+  for both copies** — the old pool plus the new one — which at present is
+  about 320 MB against `/data`'s 3 GB, but is the number to check first if a
+  refresh ever fails for space. And **a failed refresh no longer touches the
+  served pool at all**: the rows go into the build file and the rename is the
+  last act, so a run that dies at any point, including one whose machine
+  disappears, leaves the library exactly as it was.
+
+  `price_history` is carried across by hand, because it is append-only and no
+  bulk file could put it back. If you add a table to the pool that a refresh
+  cannot fill from Scryfall, add it to `carried` in
+  `go/internal/pool/rebuild.go` or the next refresh will destroy it.
 - **It needs the writer's lock.** The app holds a shared DuckDB lease that
   expires within ~10 s of nobody using the pool; health checks do not renew
   it. If the refresh reports the pool busy repeatedly, something is really
