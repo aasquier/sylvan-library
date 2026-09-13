@@ -8083,6 +8083,107 @@ for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
 
+### 2026-09-12 (cleanup) — the second run
+
+The seventh and final leg of the 2026-09-12 rainbow, run ~05:00–06:00 on the
+morning of 09-13 — the first cleanup to run *inside* a rainbow rather than a
+week after one, so its untap re-checked a queue Colorless had itself verified
+hours earlier (the map in its 2026-09-12 entry). The two runs' counts agree:
+**thirteen open items and six Answered entries** going in.
+
+**Queue depth: 13 open before, 12 after**, both counted mechanically with
+`daybreakrecord_test.go`'s own extractor logic (a paragraph under an
+`## Open` heading carrying `**Recommendation:**`) — and the six Answered
+entries moved out entirely, each record verified in its named section before
+the move: gremlins (the skill's White facet + `docs/ENGINEERING.md:25`), the
+09-05 yes-to-all (the first-run entry below), the coverage floor and the key
+rotation (Red, 2026-09-12), the two owed walks and the pprof mount's dev
+half (Blue, 2026-09-12).
+
+**Untap — thirteen items, four-way, every classification re-made this
+morning rather than inherited:**
+
+- *Still true, needs Aaron — ten*, in the five shapes the queue now wears:
+  the fly re-login (refusal reproduced at 05:00: `no access token
+  available`; the env-token workaround still carries every session); the
+  nine torch alerts (API re-read: 9 open) and the `tools` required-check
+  flip (protection API re-read: seven contexts, `tools` absent) — both
+  repo-admin clicks; three rulings — the invalid-example deck (the one
+  classification resting on another leg's eyes: Colorless's hours-old
+  authenticated wire read, said plainly rather than re-derived), the
+  dated-comment ratchet, and the stale worktree (still in
+  `git worktree list`, still clean, still queued — a relic is a decision);
+  four watched tasks — the pool refresh (the 08-30 bulk turns 14 days old
+  this morning), the restore drill (ladder re-read: 0001–0017; HOSTING §5
+  still says "never been exercised here"), the `decks/` removal (PID 19163
+  still LISTENING on 8765 at 05:00 with nine decks in the directory — the
+  gate holds), and #468's authenticated listen (needs the seat).
+- *Still true, deliberately waiting — two*: the Settings torches copy
+  (`Settings.tsx:353` still hand-writes the unlit torches, still true —
+  waits on the night shelf by design) and the docs-rot guard (both
+  extractors plus #469's record kit confirmed on main; the standing
+  recommendation is to let the next Colorless measure `docs/` first).
+- *Still true, landable — one*: the cached-green gate line, landed below.
+- *Gone stale or already done — zero.* Colorless's map survived its own
+  re-check whole.
+
+**Discard to hand size — one landed, this branch's one non-record line:**
+CLAUDE.md's Setup section now says, beside the bundle-rebuild instruction it
+protects, that a bundle rebuild is followed by
+`go test -race -count=1 ./cmd/mtglab/` — Go's test cache tracks nothing
+outside `go/`, so a plain `./...` can answer a stale cached green for
+exactly the guards that read `web_dist/`. The narrow form per the daybreak
+line, never a blanket `-count=1` (CI already runs one; a laptop should not
+pay minutes to recompute what its cache holds honestly). Green's 2026-09-12
+entry holds the proof; `references/green.md` carries the full story. This
+cleanup's own gauntlet then obeyed the sentence in its record form: the
+record tests read `docs/` from outside the module too, so they ran
+`-count=1` after these very edits.
+
+**Upkeep — the queue regrouped for one morning read.** The by-date `## Open`
+sections are replaced by five groups ordered by what an answer costs: one
+command at the keyboard (1 item), clicks in the repository settings (2),
+rulings (3), watched tasks (4), deliberately waiting (2). Every item keeps
+its ledger pointer and its substance — the one-line-per-item tension is
+Aaron's to resolve, so nothing was compressed — with this morning's
+re-verified facts folded in, and the stale 09-05 blockquote ("the nine
+below") replaced by tonight's. The first two groups clear seven items in
+about five minutes.
+
+**Still in hand — twelve, and what would have to be true for each**, now
+carried by the group each stands in: Aaron at a keyboard for two minutes
+(fly); Aaron in the repository settings (alerts, `tools`); a sentence from
+Aaron (invalid example, ratchet, worktree); Aaron watching — a morning for
+the refresh, an hour and a scratch volume for the drill, the 8765 server
+stopped for `decks/`, the signed-in seat for the listen; and other work
+landing first (the night shelf for the torches copy, the next Colorless
+measurement for the docs-rot guard). No silent carries: the two oldest
+(Red's pair, opened 08-24, now on their third cleanup) name the same
+blocker each time — repo admin and a watched hour, neither of which a night
+run has or should have.
+
+**The extra cleanup step — nothing new.** Landing one sentence and
+regrouping one file surfaced no finding the six legs had not already
+recorded, so the beats did not run a second time. The standing tension —
+the daybreak rules' "one line per item" against every item being a
+paragraph — is Colorless's part-two record; deliberately not made a queue
+line by the run that was reshaping the queue, it rides the morning summary
+instead.
+
+**Measurements (2026-09-13, ~05:00):**
+
+    open daybreak items (extractor logic)   13 → 12
+    Answered entries moved out              6 (all records verified)
+    classification                          needs-Aaron 10 · waiting 2 ·
+                                            landable 1 · stale/done 0
+    required checks (API read-back)         7, `tools` absent
+    dependabot alerts open                  9
+    migrations ladder                       0001–0017
+    port 8765                               PID 19163 LISTENING (mtglab)
+    decks/ in the checkout                  9
+    worktrees                               main + frosty-roentgen-e3fccf
+    fly auth whoami                         refused (no access token)
+
 ### 2026-09-05 (cleanup) — the first run
 
 **Queue depth: 25 open items before, 9 after.** Both counted mechanically off
