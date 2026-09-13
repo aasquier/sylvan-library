@@ -837,8 +837,18 @@ describe('when the surface is not available', () => {
     expect(screen.queryByText(/env\.example/)).toBeNull()
     expect(api.themeAsk).not.toHaveBeenCalled()
     // The half that is genuinely useful goes where its audience is reading.
-    expect(logged.mock.calls.flat().some(
-      (arg) => String(arg).includes('ANTHROPIC_API_KEY'))).toBe(true)
+    //
+    // Awaited rather than asserted outright, because the two halves of this
+    // are not commanded in the order they read: the sentence above is in the
+    // render and this line is in a passive effect, and `findByText` settles
+    // on the DOM mutation — which lands *before* React flushes the effect.
+    // On a quiet laptop the flush wins the race every time (8 runs out of 8);
+    // on a loaded CI runner it does not, which is how this arrived as a
+    // one-in-a-few-hundred red on a branch that had not touched the frontend
+    // at all. Nothing about the component changed; the test was reading a
+    // clock it did not own.
+    await waitFor(() => expect(logged.mock.calls.flat().some(
+      (arg) => String(arg).includes('ANTHROPIC_API_KEY'))).toBe(true))
     logged.mockRestore()
   })
 
