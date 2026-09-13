@@ -25,6 +25,11 @@ against its own test binary, which answers a different question — how well a
 package tests *itself* — and reads 0% for a package whose behaviour is
 exercised entirely through its callers.
 
+**The gate runs on the arm64 matrix leg only** (since #466): the number is
+architecture-independent while every Go file compiles on both legs, and
+`TestEveryGoFileCompilesOnBothCILegs` (`go/cmd/mtglab`) holds that premise.
+Raise the floor against the arm64 leg's own print.
+
 The consequence nobody had noticed: with `-coverpkg`, every test binary emits
 every block, so the profile holds forty-six copies of each. `go tool cover
 -func` and a hand merge fold those duplicates differently and land **a tenth or
@@ -58,7 +63,7 @@ lever and a grind is visible before the work starts.
 | PR #290 | 90.1% | 89.81% |
 | #290's follow-up | 90.4% | 90.40% |
 | this pass | **90.8%** | 90.82% |
-| floor in `ci.yml` | **90.5** | |
+| floor in `ci.yml` | **90.8** (set at a measured 91.2, 2026-09-12) | |
 
 To reach 95%, **752 more statements** out of 17,977. Of what is left, about
 184 needs a JVM or a live network (below), so the reachable remainder is
