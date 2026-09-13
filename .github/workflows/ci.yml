@@ -245,7 +245,22 @@ jobs:
       # 89.5 was set at a measured 90.1, 90.0 at a measured 90.4, 90.5 at a
       # measured 90.8; this is 90.8 at a measured 91.2 (CI's own print on
       # both legs, 2026-09-12).
+      #
+      # **The arm64 leg computes it alone.** The merged number cannot differ
+      # by architecture while every Go file compiles on both legs — and it
+      # does: zero arch-suffixed filenames, zero `//go:build` lines anywhere
+      # in the module, and both runners are Linux, so even the `system_*.go`
+      # pair resolves the same way. On the last runs where both legs computed
+      # it they printed the same number to the tenth. Running it twice bought
+      # nothing, and the amd64 copy cost ~84s on the job that is the
+      # pipeline's critical path (~140s longer than this leg to begin with);
+      # the ~47s copy on the leg with slack is the one worth keeping. Raise
+      # MINIMUM against the arm64 leg's print. If an arch-constrained Go
+      # file ever lands, the floor stops measuring the whole tree's view and
+      # this step must go back to both legs — that premise is a checkable
+      # property of the tree, not a promise.
       - name: Coverage floor
+        if: matrix.arch == 'arm64'
         env:
           MINIMUM: "90.8"
         run: |
