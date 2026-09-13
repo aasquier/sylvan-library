@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { COLOR_NAMES, COLOR_VAR, manaSymbols, splitManaText, symbolName } from '../lib/mtg'
 import { ManaGlyph, OfficialSymbol } from './manasymbol'
@@ -248,8 +248,17 @@ interface SelectProps {
 export function Select({
   label, value, onChange, options, className = '', help,
 }: SelectProps) {
+  // `htmlFor`, not the wrapping alone: a bare `<label>` labels its FIRST
+  // labelable descendant, and the `help` bubble's trigger is a real `<button>`
+  // (hint.tsx buys keyboard and touch with it) that renders before the
+  // control. So on every helped field the label quietly labelled the bubble —
+  // the control answered to no name, and clicking the caption opened the help
+  // instead of focusing the field. An explicit `for` outranks the descendant
+  // walk, help or no help. NumberField below is the same shape for the same
+  // reason; `ui.test.tsx` holds both through the help slot.
+  const id = useId()
   return (
-    <label className={`flex max-w-full flex-col gap-1 ${className}`}>
+    <label htmlFor={id} className={`flex max-w-full flex-col gap-1 ${className}`}>
       <span className="flex items-center text-[11px] font-medium uppercase tracking-wide"
             style={{ color: 'var(--text-muted)' }}>
         {label}{help}
@@ -259,6 +268,7 @@ export function Select({
           also owns the chevron and the lane that keeps a long deck name from
           running under it. */}
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="field-shell h-9 max-w-full rounded-md px-2 text-sm"
@@ -285,14 +295,19 @@ export function NumberField({
   suffix?: string
   help?: React.ReactNode
 }) {
+  // Same explicit association as Select above, same trap: with a help bubble
+  // in the caption, the wrapping label's implicit control was the bubble's
+  // button, and the number answered to nothing but its own value.
+  const id = useId()
   return (
-    <label className="flex flex-col gap-1">
+    <label htmlFor={id} className="flex flex-col gap-1">
       <span className="flex items-center text-[11px] font-medium uppercase tracking-wide"
             style={{ color: 'var(--text-muted)' }}>
         {label}{help}
       </span>
       <div className="flex items-center gap-1">
         <input
+          id={id}
           type="number"
           value={value}
           min={min}

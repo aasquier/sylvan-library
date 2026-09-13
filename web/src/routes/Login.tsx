@@ -60,7 +60,13 @@ function ResetPanel() {
         never be used to find out who has one.
       </p>
 
-      <AuthField label="Email" type="email" autoComplete="email"
+      {/* autoFocus is the unfold's focus handling, not a nicety: this panel
+          mounts by replacing the "Forgotten your password?" button — the
+          element holding focus — so without it focus fell to <body>, a
+          keyboard user restarted from the top of the page, and a screen
+          reader heard nothing happen at all. React fires autoFocus on mount,
+          which is exactly the unfold. */}
+      <AuthField label="Email" type="email" autoComplete="email" autoFocus
                  value={email} onChange={setEmail} />
 
       <div className="flex items-center gap-3">

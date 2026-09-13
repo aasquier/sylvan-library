@@ -5345,8 +5345,189 @@ other five. No content below them was changed.)*
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
-  2026-08-19 (rainbow), 2026-08-16 (rainbow).
+- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
+  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-16 (rainbow).
+
+### 2026-09-12 (rainbow) — PR #468, green and open for Aaron's eye
+
+Leg five of seven; White #463, Blue #464, Black #465 and Red #466/#467 merged,
+deployed and walked ahead of it. Load 3.95 at start (15-min average 18.53 —
+the earlier legs), so wall clocks tonight carry the usual caveat; nothing
+below is quoted as a trend against a quiet-box baseline.
+
+- **Fixed (in the open PR) — six live controls answered to no name, and the
+  mechanism is a lodger in the label.** A bare `<label>` labels its **first
+  labelable descendant**, and the help bubble's trigger is a real `<button>`
+  (hint.tsx buys keyboard and touch with exactly that) rendered in the
+  caption, before the control — so on every field that carried `help`, the
+  wrapping label quietly labelled the bubble. Measured on the deployed
+  instance through the signed-in seat: **five unlabeled number inputs on
+  `/simulate`** (values 20000, 2, 5, 3, 7 — precisely the `NumberField`s
+  with help bubbles) and **one on `/coliseum`** (Games: `labels: null`, no
+  `aria-label`, no id — read off the DOM, not inferred), while every
+  *un*-helped sibling was fine. A reader hears "10" with no idea what it
+  counts, and a sighted mouse user clicking the visible caption opens the
+  help popover instead of focusing the field. Fix: explicit `htmlFor`/`useId`
+  association in `Select` and `NumberField` (`web/src/components/ui.tsx`) —
+  explicit `for` outranks the descendant walk, help or no help. Tests derive
+  from the association a reader walks (`getByRole('spinbutton', { name })`
+  through the help slot, both components), **three mutations, all killed**
+  (each stripped `htmlFor` fails exactly its own test; `autoFocus` below
+  fails the third). Why the last run's census missed it: the 09-05 sweep
+  counted anonymous *buttons* and images without alt — an unlabeled *field*
+  is neither. The checklist now carries the association census.
+- **Fixed (same PR) — the front door drops the keyboard when the reset form
+  unfolds.** "Forgotten your password?" is a real button (commandment 20
+  holds), but activating it replaces it with `ResetPanel`, and the element
+  holding focus unmounts: measured on the deployed door, `document.activeElement`
+  === `<body>` after the click. A keyboard user restarts tabbing from the
+  page top; a screen-reader user hears the click do nothing. Fix: `autoFocus`
+  on the panel's Email field (`web/src/routes/Login.tsx`) — React fires it on
+  mount, which *is* the unfold; landing in the field is both the announcement
+  and the next thing the person came to do. Test asserts focus lands there;
+  mutation-verified.
+- **Retracted mid-run — `/search` has no h1.** A 1.5s census raced the
+  route's lazy chunk and read a void as a finding (`h1: 0` and, worse, clean
+  `[]`s that looked like passes). Re-measured at 5s: `h1: "Card search"`,
+  zero unlabeled inputs, zero anonymous buttons. Both directions of that
+  instrument error are in the checklist now.
+- **Found and proven — a local `go test ./...` can green the bundle guards
+  against a bundle they never re-read.** After tonight's rebuild,
+  `./cmd/mtglab` reported `ok (cached)`; Go's test cache does not track
+  file reads **outside the module**, and `web_dist` is outside `go/`.
+  Settled by experiment, not presumption: a scratch module whose test reads
+  `../outside/data.txt` kept answering `ok (cached)` after the file was
+  changed to one that fails the assertion — `-count=1` got the FAIL. So
+  all ten bundle guards (floor, motion, imagery) can serve a stale local
+  green after any bundle rebuild, which is the exact wrongness their
+  anti-vacuity fatals guard one layer out — the binary simply never runs.
+  **CI is immune** (`go test -race -count=1` at ci.yml:218 — read, not
+  recalled), so this is a laptop-ritual hole: CLAUDE.md's documented gate
+  line (`go test -race ./...`) is weaker than CI's on exactly the tests
+  that pin user-facing promises. Tonight's own verification was done
+  honestly: `-count=1 ./cmd/mtglab/` fresh against the rebuilt bundle,
+  42.4s, ok. The checklist now carries the ritual; whether CLAUDE.md's
+  gate line should match CI (blanket `-count=1`, minutes per gauntlet) or
+  narrow to the one package is daybreak's question.
+- **The newcomer's walk (commandment 2), desktop 1280×800 and phone 375×812,
+  both themes, real `innerWidth` read back each time.** An uninvited visitor
+  meets the front door on every route — a deep link to `/learn` renders the
+  door with the path kept for after sign-in — and the door is honest about
+  the invite model ("Accounts here are invited, never signed up for"), rich
+  (the #461 ivy, drifting leaves, fireflies), and clean: labeled fields, one
+  h1, `lang="en"`, **overflow 0 at 375px**, no console errors, light theme's
+  `--text-muted` resolving `#73716c` (the 08-24 contrast fix, confirmed
+  live). The Sign in button reads pale in light theme because it is
+  properly **disabled** until both fields fill (`opacity: 0.4`); enabled,
+  its own pair is **4.61:1** — passes AA, no finding. Stumbles: the focus
+  drop above (fixed in the PR), and the standing touch-target reading
+  (theme toggle 38×32, Sign in 79×38, Forgotten 173×28 — the queued
+  under-44px item, recorded, not re-filed).
+- **Authenticated census through the signed-in seat (Aaron's standing
+  ruling, strictly read-only), ten routes at 1440×813:** `/`, deck page,
+  `/new`, `/import`, `/research`, `/settings`, `/learn`, `/search` (on
+  retry) all clean — one h1 each, zero anonymous buttons, zero imgs missing
+  alt (104/104 on the library), zero unlabeled fields. The exceptions were
+  the six fields above. `/new`'s 32 combination tiles are named buttons;
+  the nav's long hints are `title` descriptions over visible-text names
+  (spec-correct — content wins the name, so no Label-in-Name miss); the
+  Coliseum's six arenas are a real tablist; the send-off button is named by
+  its content. The Coliseum page credits its painting ("Motion inspired by
+  Grand Coliseum, Onslaught — art by Carl Critchlow") and the deck pickers
+  name all 25 decks. Console: zero errors on every route driven.
+- **Answered since last run (recorded, no re-litigation):**
+  - **Light-theme muted contrast (08-24 queued 1) is deployed** —
+    `--text-muted: #73716c` (4.62/4.75 per the sheet's own comment) in the
+    light palette, dark keeps `#898781`; verified rendering on the live door.
+  - **The safe-area pair (08-24 queued 4) landed together in #380** —
+    `viewport-fit=cover` in the meta *and* ten `env(safe-area-inset-*)`
+    usages with 0px fallbacks in the bundle, `.library-whisper` included —
+    the coupled shape that item demanded. The physical-notch look stays
+    Aaron's, on his phone.
+  - **The ADR 36 match ledger is no longer write-only on the instance
+    (08-24 queued 6c)** — `matchLedgerOf.Recent` feeds
+    `go/internal/api/upkeep.go:437`, and #448/#452 built the records read
+    into the Coliseum UI (three feat leaderboards seen rendering).
+  - `cardmotion sync` (08-24 6b) is **unchanged** — HOSTING §card-art still
+    documents build-on-the-dev-Mac-then-sftp; still the queue's, not
+    re-argued.
+- **Queued for Aaron (2026-09-12): the pool refresh is due, and this is the
+  first one the deferred DuckDB-size item is waiting on.** Bulk files
+  2026-08-30 — **13 days tonight, across the two-week line Monday** — and
+  Scryfall shows a released product inside the window the pool cannot know:
+  `slz`, set-type box, **363 paper cards, released 2026-09-02** (still
+  wearing Scryfall's codename "The Zeta Set"), with **Reality Fracture
+  (`fra`, 249 cards + `frc` commander decks) releasing 2026-10-02** and its
+  preview season about to fill the bulk files. `pool_stale: false` all the
+  while — that flag reads schema, not age (the 08-24 reading, still true).
+  *Cost of leaving it:* names from a released product fail to resolve on
+  import and search, and legality answers age silently. **Recommendation:**
+  run the refresh from HOSTING this week, watched, and **read
+  `mtg.duckdb`'s size after** — 224,145,408 bytes tonight, byte-stable
+  since 08-30 because no refresh has run; the in-place-reload deferral's
+  trigger is exactly this next refresh (materially past 214MB → the
+  rebuild-to-temp-and-rename earns its diff; a plateau → the entry closes
+  as measured behaviour).
+- **Measurements (2026-09-12, rainbow):**
+  - **Pool staleness: 13 days** (bulk 2026-08-30; oracle 35,393, printings
+    108,263, 25 decks; `pool_stale: false`; `/api/health` 200 in 206ms
+    public-cold-path). Flagged — see the queued item.
+  - **Held-awake trigger: not arrived.** Five merges landed tonight before
+    and during this leg; `auto_stop_machines = "off"` stands, the
+    commented scale-to-zero steady state sits beneath it unchanged.
+  - **Volume: 331M of 2.9G (12%), 2.4G free** — flat since 09-05 despite
+    the library growing 17 → 25 decks. Mix: scryfall **98M** (prune
+    holding), `mtg.duckdb` **224,145,408 B** (unmoved — no refresh),
+    cache 18M, decks **812K/25** (was 968K/17 — smaller *and* eight decks
+    larger; artifacts regenerate leaner), `app.db` **917,504 B** — up from
+    632K on 09-05, +36KB/day-ish with the purges live; the visitor ledger
+    and the new match records grow with use. A shape, watched, not a
+    crisis.
+  - **Machine: shared 2 vCPU / 1GB, iad, v387** (tonight's #467 deploy,
+    started 20:17 PDT); 1/1 checks passing; event log holds only that
+    start — **no OOM, no restarts**. Process RSS **78,782,464 B**; Fly's
+    own memory reading 262,549,504 / 1,008,623,616 (**26%**); load
+    [0, 0, 0] on the instance.
+  - **Schema: applied 17 = expected 17**, read off the admin tile's own
+    endpoint through the seat. Migrations 0015–0017 landed 09-06 (#448) —
+    note Red's standing restore-drill daybreak line still says "rung 14";
+    the drill is now three rungs staler than its wording.
+  - **Snapshots: five, 5-day retention, newest 13h, 1.0 GiB stored**
+    (802MiB full + ~60MiB dailies) — newest snapshot (09-12) newer than
+    newest migration (09-06): the checklist's question answers healthy.
+  - **Edge, 24h: 1021 2xx · 71 4xx · 3 5xx.** First non-zero 5xx a Green
+    run has recorded — four deploy bounces rode this same window (ADR 23's
+    seconds of downtime, ×4), so recorded as consistent-with-deploys, with
+    next quarter's quiet-day reading the one that matters.
+  - **Design point verified unchanged** (100 accounts / 10 concurrent):
+    rate limits one `var` block (10/15m, 30/15m, 3/hr, 10/hr, 20/15m),
+    `MaxJobs = 200`, `netWorkers = 2`, `forgeWorkers = 1`, CPU lane
+    GOMAXPROCS-derived, SQLite WAL + `busy_timeout(5000)` +
+    `foreign_keys(1)` on the write path, `soft_limit=20`/`hard_limit=40`.
+    No new capacity literal in #448–#467's diffs. The concurrency probe
+    was not re-run: the 08-24 curve stands as baseline, and tonight's box
+    spent the evening at load 4–19 under four other legs — a probe now
+    would poison the next comparison, which is the same call the 09-05
+    run made and for the same reason.
+  - **Guards, run before anything else was trusted:** the ten bundle
+    guards all pass — browser floor (16.4 held; the floor-setting features
+    still what holds it; the camera door independent), reduced motion
+    (every animation arrestable; covers honest both directions), card
+    imagery (no filter reaches a painting; no inline-style filter ships).
+  - **Hosted-first:** the one-copy rule still violated in the checkout and
+    the count moved — **nine** decks now (hylda-s-endless-winter appeared
+    Sep 7, joining the eight from 08-24/25), the 8765 server (PID 19163,
+    up since Aug 28) still alive and its WAL written at 20:19 tonight; the
+    daybreak line is sharpened, the gate unchanged. Language sweep: the
+    hostedcopy guard holds (runs green in this PR's gauntlet); the gate's
+    "local pool" stays by design (frozen goldens). Capability audit: the
+    Coliseum records read back through the UI (#452), costumes are
+    server records (#459) — the one standing laptop-only capability
+    remains `cardmotion sync`.
+- **Checklist corrections (1, applied to `references/green.md`):** the
+  association census and the lazy-chunk race, one bullet, both directions
+  argued — counting anonymous buttons misses unlabeled fields, and a
+  census that beats the route's chunk to the DOM reads voids as passes.
 
 ### 2026-09-05 (cleanup)
 

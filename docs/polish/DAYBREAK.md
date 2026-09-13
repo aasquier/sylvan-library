@@ -36,6 +36,51 @@ deck you like for the job (a minute in the deck editor), or rule the fact
 retired and CLAUDE.md gets the sentence removed on the next working branch.
 Ledger: White, 2026-09-12.
 
+**Green: PR #468 is green and open — six fields get their names back and the
+front door stops dropping the keyboard — and it waits on your eye
+(commandment 16).** Two fixes, both AT-visible and nothing else: explicit
+`htmlFor` in `NumberField`/`Select` (the help bubble's button was stealing
+the label — five fields on `/simulate`, Games on `/coliseum` answered to
+nothing), and `autoFocus` on the reset panel's Email field (the unfold
+unmounted the button under your focus and dumped it to `<body>`). The walk:
+`npm --prefix web run dev`, then on `/simulate` click the GAMES caption —
+it should focus the field, not open the help bubble (the bubble's ? still
+opens it); tab to "Forgotten your password?" on the signed-out door, press
+Enter, and your next keystroke should land in the Email field. Nothing
+animates; two minutes. · *Cost of leaving it:* six controls stay nameless
+to readers and the door keeps dropping keyboards. · **Recommendation:**
+walk it, then merge — CI is green and the diff is four files. Ledger:
+Green, 2026-09-12.
+
+**Green: the pool refresh is due — 13 days old tonight, across the two-week
+line on Monday, and a released product is already invisible to it.** Scryfall
+shows 363 paper cards released 2026-09-02 (`slz`) that the 08-30 bulk files
+cannot know, with Reality Fracture's preview season about to start
+(2026-10-02 release); `pool_stale: false` the whole time, because that flag
+reads schema, not age. · *Cost of leaving it:* imports and search quietly
+fail to resolve released cards, and legality ages. · **Recommendation:** run
+the refresh from HOSTING this week, watched — and read `mtg.duckdb`'s size
+after: it is 224,145,408 bytes tonight, and the deferred in-place-reload
+item's trigger is exactly this refresh (materially past 214MB → the
+rebuild-to-temp-and-rename earns its diff; a plateau → that entry closes).
+Ledger: Green, 2026-09-12.
+
+**Green: the local gauntlet's `go test -race ./...` can report a *cached*
+green for the ten bundle guards after a bundle rebuild — proven, not
+presumed.** Go's test cache does not track reads outside the module, and
+`web_dist` sits outside `go/`; an experiment tonight showed `ok (cached)`
+standing after the read file was changed to one that fails the assertion.
+CI is immune (its gate already runs `-count=1`, ci.yml:218) — only the
+laptop ritual is exposed, on exactly the tests that pin the Safari floor,
+reduced motion and card-imagery compliance. · *Cost of leaving it:* a
+session edits CSS, rebuilds, sees green locally, and CI is a surprise —
+the thing commandment 11 forbids. · **Recommendation:** teach CLAUDE.md's
+gate line the narrow form — add `go test -race -count=1 ./cmd/mtglab/`
+after any bundle rebuild (the polish checklist already carries it) rather
+than blanket `-count=1`, which would cost minutes of recompute on every
+gauntlet CI happily pays but a laptop should not. Ledger: Green,
+2026-09-12.
+
 **White: the nine open torch Dependabot alerts are triaged in prose and
 never dismissed on GitHub, so the security tab re-asks a settled question
 forever.** The triage lives in `tools/pyproject.toml` (containment: dev-Mac
@@ -65,20 +110,23 @@ cleanup — the copy becomes a fact the server owns when the shelf gives it
 something to read, and doing it before that would be a second hand-written
 promise. This line is the reminder. Ledger: Blue, 2026-09-05.
 
-**Green: eight real decks still stand in the checkout's `decks/`, and the
-thing that was holding them is gone.** arahbo-cats through trostani-tokens,
-`deck.yaml` mtimes 08-24/25 — the laptop-standing-copy shape that lost two
-rounds of labels and created the hosted-first facet. The reason to keep them
-was Red's held walk; **#436 merged 2026-09-05**, so that reason has expired. ·
-*Cost of leaving it:* any edit made through a local surface diverges silently
-from the volume's truth, and nothing fails when it does. · **What would have
-to be true:** the local server on 8765 — another session's, up since Aug 28
-and answering 200 as of tonight — is stopped or known to be finished with
-them. Cleanup did not delete files out from under a running process it did not
-start, which is the same rule that keeps this phase off the main checkout
-during a merge train. · **Recommendation:** `rm -rf decks/` in the main
-checkout once 8765 is down; future local walks pull fresh from the instance or
-point `MTGLAB_DECKS_DIR` at a scratch directory. Ledger: Green, 2026-09-05.
+**Green: NINE real decks now stand in the checkout's `decks/` — the pile is
+growing, not draining — and the thing that was holding them is gone.** The
+eight from 08-24/25 (arahbo-cats through trostani-tokens) plus
+**hylda-s-endless-winter, added Sep 7** — the laptop-standing-copy shape that
+lost two rounds of labels and created the hosted-first facet, and it gained a
+deck since this line was written. The reason to keep them was Red's held
+walk; **#436 merged 2026-09-05**, so that reason has expired. · *Cost of
+leaving it:* any edit made through a local surface diverges silently from the
+volume's truth — and the growth proves local surfaces are still being used. ·
+**What would have to be true:** the local server on 8765 — another session's,
+up since Aug 28, still alive tonight (PID 19163) and writing `data/`'s WAL at
+20:19 on 09-12 — is stopped or known to be finished with them. No night run
+deletes files out from under a running process it did not start. ·
+**Recommendation:** `rm -rf decks/` in the main checkout once 8765 is down;
+future local walks pull fresh from the instance or point `MTGLAB_DECKS_DIR`
+at a scratch directory. Ledger: Green, 2026-09-05; re-read and sharpened
+2026-09-12.
 
 ## Open — 2026-08-24
 
