@@ -17,7 +17,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
-import { CardHover, CardSheet, ErrorNote, Select, Spinner } from './ui'
+import { CardHover, CardSheet, ErrorNote, NumberField, Select, Spinner } from './ui'
 
 afterEach(cleanup)
 
@@ -304,4 +304,33 @@ it('caps a dropdown at its column, whatever the longest option says', () => {
 
   expect(container.querySelector('label')?.className).toContain('max-w-full')
   expect(container.querySelector('select')?.className).toContain('max-w-full')
+})
+
+it('still names a helped field after the label takes in a lodger', () => {
+  // A bare `<label>` labels its FIRST labelable descendant, and a help
+  // bubble's trigger is a real `<button>` (that is what buys it keyboard and
+  // touch) rendered in the caption — before the control. So on every field
+  // that carried help, the label quietly labelled the bubble: six live
+  // controls answered to nothing but their own values, and clicking the
+  // caption opened the help instead of focusing the field. The explicit
+  // `for`/`id` pair is the fix; these queries resolve through the same
+  // association a screen reader walks, so stripping either attribute fails
+  // here rather than on somebody's reader.
+  render(
+    <NumberField label="Games" value={10} onChange={() => {}}
+                 help={<button type="button" aria-label="What is Games?" />} />)
+
+  expect(screen.getByRole('spinbutton', { name: 'Games' })).toBeTruthy()
+  // The lodger keeps its own name — the caption must not swallow it either.
+  expect(screen.getByRole('button', { name: 'What is Games?' })).toBeTruthy()
+})
+
+it('names a helped dropdown the same way', () => {
+  render(
+    <Select label="Arena" value="a" onChange={() => {}}
+            options={[{ value: 'a', label: 'The Grand Coliseum' }]}
+            help={<button type="button" aria-label="What is the arena?" />} />)
+
+  expect(screen.getByRole('combobox', { name: 'Arena' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'What is the arena?' })).toBeTruthy()
 })

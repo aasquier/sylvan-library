@@ -44,6 +44,20 @@ screen reader or a keyboard.
   dropped, so shadows, transforms, filters and rings vanish while the layout
   stays correct), and `grep '(?<'` has a built-in false positive, since a
   named capture group `(?<name>…)` is not a lookbehind.
+- **After any bundle rebuild, run the guards with `-count=1`** —
+  `go test -race -count=1 ./cmd/mtglab/` — because Go's test cache does not
+  track reads outside the module and `web_dist` is outside `go/`: proven
+  2026-09-12 with a minimal scratch module whose test read a data file from
+  a sibling directory outside it — the file was changed so the assertion
+  would fail, and `go test` kept answering `ok (cached)` until `-count=1`
+  forced the run and got the FAIL. A plain `./...` after a bundle change is
+  not evidence about the bundle. CI is immune (its gate already carries
+  `-count=1`, ci.yml:218); the laptop ritual is the exposed half — and it
+  bit this very bullet: the first wording named the scratch file by its
+  relative path, the skill-record guard (which reads this directory from
+  outside the module too) rightly failed on a path that resolves nowhere,
+  and the local suite could not see that failure for exactly the reason
+  the bullet states.
 - Mobile Safari's quirks are the usual suspects; audit the surfaces changed
   since last run for them: viewport height (`100vh` vs dynamic toolbars —
   prefer `dvh`/`svh` with fallback), `env(safe-area-inset-*)` on notched
@@ -67,6 +81,24 @@ screen reader or a keyboard.
     images carry the card's name as alt text — the pool already knows it, so
     a bare `<img>` of a card is a one-line fix — and decorative art is marked
     decorative rather than read aloud as a filename.
+  - **Census *association*, not just anonymity — and wait for the route to
+    mount before counting.** Two instrument lessons from 2026-09-12, each of
+    which had already produced a wrong "clean". A sweep that counts anonymous
+    *buttons* walks straight past an unlabeled *field*: check
+    `el.labels`/`aria-label`/`aria-labelledby` on every input, select and
+    textarea, because a caption rendered above a control is not an
+    association — six live controls (five on `/simulate`, one on
+    `/coliseum`) sat unnamed for at least one run behind a green
+    "zero anonymous elements" reading. The mechanism to know: a bare
+    `<label>` labels its **first labelable descendant**, and a help bubble's
+    trigger is a real `<button>` in the caption, so a helped field's label
+    labelled the bubble — `ui.tsx` now associates by `htmlFor`/`useId` and
+    `ui.test.tsx` holds it through the help slot; any new field component
+    repeats that shape. And a census script that runs before the route's
+    lazy chunk mounts returns a void that reads as a pass (`[]` everywhere,
+    `h1: 0`) — wait for the route's own `h1`/main content, not a fixed
+    1.5s, or the reading is fiction in both directions (the `/search`
+    misread, same shape as the screenshot-taken-too-early trap).
   - **Contrast in both themes**, measured with a real checker rather than by
     eye: the felt and brass run dark, and the muted text tokens are where AA
     quietly fails. Check text and control states, not just body copy.

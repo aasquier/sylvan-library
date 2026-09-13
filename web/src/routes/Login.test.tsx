@@ -244,4 +244,16 @@ describe('the forgotten-password door', () => {
     expect(await screen.findByText(/too many requests/)).toBeTruthy()
     expect(screen.queryByText(RESET_ANSWER)).toBeNull()
   })
+
+  it('hands focus to the email field when the panel unfolds', async () => {
+    // The unfold replaces the "Forgotten your password?" button — the element
+    // holding focus — so without an explicit handoff focus fell to <body>: a
+    // keyboard user restarted tabbing from the top of the page, and a screen
+    // reader heard the click do nothing at all. Landing in the field is both
+    // the announcement and the next thing the person came to do.
+    render(<Login onSignedIn={vi.fn()} />)
+    await openResetPanel()
+
+    expect(document.activeElement).toBe(screen.getByLabelText('Email'))
+  })
 })
