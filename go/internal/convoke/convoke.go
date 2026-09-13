@@ -71,10 +71,8 @@ func Indexed(n, workers int, fn func(int)) {
 		fn(i)
 		return true
 	}
-	wg.Add(workers)
-	for w := 0; w < workers; w++ {
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for !stop.Load() {
 				i := int(next.Add(1)) - 1
 				if i >= n {
@@ -84,7 +82,7 @@ func Indexed(n, workers int, fn func(int)) {
 					return
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if caught != nil {

@@ -1502,8 +1502,8 @@ kill rate is bad enough to want every mutant rather than a sample.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
-  2026-08-19 (rainbow), 2026-08-18.
+- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
+  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -1513,6 +1513,196 @@ the spirit of Magic*
   column finds why) — but no path, number or test name down there is current.
   The section's own subtitle said "Python craft" until tonight, which is the
   drift this facet exists to catch, sitting on its own heading.
+
+### 2026-09-12 (rainbow)
+
+Leg two of the rainbow behind White's #463. The two walks Blue had owed for
+three runs were the night's first act — the `gyome` browser seat was signed
+in and rode read-only under Aaron's standing "you are me" ruling — and the
+approved half of the pprof item was the night's build.
+
+- **The two owed walks, both taken, both green:**
+  1. **The fortune-teller's table (commandment 15) is still the belle of the
+     ball, and it has grown since the last keeper saw it.** Walked end to end
+     on the deployed instance: the persona picker (every painted tile credits
+     its painter — Volkan Baǵa on the fortune-teller, Caroline Gariba on the
+     therapist; the uncostumed tile is correctly the only one uncredited),
+     then the candlelit table itself — photo-real, smoke moving, three
+     face-down cards on the felt with the 1909 backs, and **the crystal ball
+     optically inverts the card behind it**, which is the kind of touch the
+     commandment means by "the most care on the site". "Turn them over" dealt
+     Page of Pentacles reversed / Eight of Wands reversed / Seven of Wands
+     reversed; hover answers with a lift and a placard naming the spread
+     position ("THE TURNING — Eight of Wands, *reversed*"), and the displayed
+     card really is upside down — the orientation is honest, not a label.
+     "Begin the reading" streamed the reader's opening in handwritten script
+     on parchment ("…tell me something a bit different: if you had a whole
+     evening free tonight… what would you actually do with it?") — questions
+     about the person, never about Magic, exactly as promised. The evidence
+     panel ("Nothing yet — it only counts things you have actually said"),
+     the budget field, "Pick colours myself" and "Start over" all present.
+     **Zero console errors through deal, flip and reading.** The 08-24 blemish
+     (a bare flat `Loading…` on the way in) is gone — see the TS sweep below.
+     One reading turn was spent as the walk's evidence; no answer was
+     submitted, no deck created.
+  2. **The `/claude` keeper duty (commandment 18): the room is in good order
+     and to its keeper's liking.** Both exhibit commanders resolve live from
+     the pool with their own rules text (Kwain's tap glyph renders; Tatyova's
+     landfall line); the Syr Gwyn heart plate renders her pips and type line;
+     all four gallery paintings are credited beside the frame and **all four
+     credits were re-verified against the pool this run** (rule 1, nothing
+     recalled): Library of Alexandria — Mark Poole, Arabian Nights 1993 (the
+     08-24 correction holds); Island — John Avon, Unhinged **2004-11-19**;
+     Bitterblossom — Rebecca Guay, Morningtide **2008-02-01**; Farewell — Seb
+     McKinnon, Kamigawa: Neon Dynasty **2022-02-18**. Zero console errors.
+     **One question raised and ruled, so the next keeper does not re-open it:**
+     the three card exhibits (Kwain, Tatyova, Syr Gwyn) render `art_crop`s
+     with no painter named in words beside them — their credit is the
+     full-card scan behind the name's CardHover, frame and printed credit
+     included, which is `cardimagery_test.go`'s own settled accounting for
+     that surface and the same mechanism every deck page uses. The page's
+     sentence ("every other picture on this page names its painter") holds on
+     that reading, the same reading the 08-24 keeper walked away with.
+     Ruled compliant and left as is; a future keeper who wants the painters
+     named in words beside the crops is changing taste, not fixing a
+     violation.
+- **Fixed this run:**
+  1. **The dev-local pprof mount landed — the 2026-08-23 daybreak item's
+     approved half (a), built where the item said it belonged.**
+     `devProfiler` in `cmd/mtglab/ui.go` mounts `net/http/pprof`'s handlers
+     on a mux **in front of the door** and falls through to it, installed by
+     one boot-time condition: `if !requireAuth`. In front rather than through
+     because the door's auth sweeps derive from its served route table — a
+     profiler must be *structurally absent* when auth is on (a heap profile
+     is a walk of process memory, and that memory holds session tokens),
+     never a route the middleware has to refuse; the wrap that was never
+     installed cannot leak. Handlers are mounted by hand rather than by the
+     package's blank-import side effect (which registers on a DefaultServeMux
+     nothing serves — gosec G108's trap, avoided rather than excluded).
+     `devprofiler_test.go` pins both halves against the real boot via
+     `bootServer`: auth off serves the index, a real profile through Index's
+     lookup path, and still serves the app through the wrap; auth on gets the
+     door's page treatment and never the profiler's own answer (asserted on
+     the pprof index marker *and* on `Content-Disposition`, because every
+     pprof profile ships as an attachment and nothing in the door ever sets
+     one). **Mutation-verified both ways**: unconditional mount fails the
+     auth-on case on both assertions; never-mount fails the auth-off case;
+     restored, green. One boot-behaviour discovery recorded: with auth on,
+     `/debug/pprof/` gets the door's *page* treatment (the SPA catch-all —
+     404 JSON in a bare harness, the shell on the instance), not a 401 — the
+     401-before-routing sweep is `/api/`'s, and the test's first draft
+     assumed otherwise. Half (b) (live, admin-gated) stays deferred below.
+  2. **Modern-Go sweep: the one live find was again in the newest package.**
+     `internal/convoke` (landed #451) arrived with the old WaitGroup spelling
+     — `wg.Add(workers)` against a C-style counting loop of `go func(){defer
+     wg.Done()…}` — converted to `for range workers { wg.Go(…) }`: the
+     Add/Done mismatch class stops existing and the dead loop index goes with
+     it. convoke is **not** in `engineSources` (checked before editing — the
+     fingerprint list is still exactly the five), so the edit touches no
+     cache key. `go test -race -count=2 ./internal/convoke/` green.
+     Everything else already clean — see Measured.
+  3. **ROADMAP.md's "seven modes" is gone** (filed by Colorless 2026-09-05):
+     the "Where things stand" sentence now says the modes are
+     `data/modes.json`'s set, never a count written in prose — the number was
+     dropped, not corrected, per CLAUDE.md's own rule (`data/modes.json`
+     holds ten today and the sentence said seven).
+  4. **Memory audit: the coverage-floor index line had re-frozen a number.**
+     `MEMORY.md`'s index said "floor 90.5" while `ci.yml` gates **90.8**
+     (White raised it tonight; read back from the workflow, not from the
+     briefing). The 09-05 fix de-numbered the file body but left the index
+     and the file's own `description:` leading with a figure; both now say
+     "read it off ci.yml" with no number to rot. Also confirmed the API-key
+     index line already carries today's rotation.
+- **The spirit of Magic, both halves:**
+  - **Shelf fact-check, eleven claims, all held, zero wrong facts.** The four
+    `/claude` gallery credits (above, via a throwaway `poolq` SQL window,
+    deleted after — `git status` clean); two lore facts new to the sample:
+    "1994's Legends set" ✓ (`leg` 1994-06-01, Nicol Bolas in it) and
+    Skullclamp "printed costing one mana… banned within months" ✓ ({1},
+    Darksteel 2004-02-06, banned June 2004); and **the cauldron shelf's
+    first-ever fact-check** (`cauldronlore.json`, 30 facts, landed #460 with
+    the witch's pot): its prose is hedged folk-history ("was held", "is
+    said") and its concrete anchors verified — the 1516 Bavarian purity law,
+    the 1915 nettle-fibre uniforms, the WWII rose-hip syrup scheme, the
+    re-routed Irish bypass for a lone hawthorn (Latoon, Co. Clare). The
+    newest shelf keeps rule 1's register.
+  - **The sweep found nothing new to flavour**: rendered generic strings are
+    down to five `Cancel`s in `deckedit.tsx` (commandment 2 protects a
+    control verb) — and the five bare `>Loading…<` nodes from 08-24 are not
+    just fixed but **guarded**: `web/src/loadingstates.test.ts` now trips on
+    the bare-`<p>` shape, which is the completeness lesson landed as a
+    machine check. The 08-24 flavour candidates ("Shuffling up…" on the two
+    App.tsx spinner labels) still stand deferred — a taste change wants its
+    own small PR with Aaron's eye, and this leg's budget went to the walks
+    and the mount.
+- **The Anthropic best-practices currency check (owed from 09-05): done, and
+  the answer is quiet.** No deprecations touch this repo — PreToolUse Bash
+  hooks, SKILL.md's format, checked-in `.claude/settings.json` and
+  `launch.json` are all stable through the current release line. Two new
+  tools noted as *deferred*: `claude plugin eval` (scored skill test suites)
+  and `/skill-doctor` (unused-skill and context-cost diagnosis), both
+  2.1.269 (Sept 11). Trigger: a Colorless run wanting to measure whether the
+  polish/mtg-lab skills still earn their tokens — `/skill-doctor` is exactly
+  that instrument, and adopting it is a session's experiment, not a repo
+  change.
+- **Boot and config, re-measured (all numbers raw, quiet machine, load
+  2.7–6.4):** `os.Getenv`/`os.LookupEnv` outside tests **12 reads in 7
+  files** — unchanged from 09-05, doctrine holding (tier3/settings.go 3,
+  claude/endpoint.go 3, flymetrics 2, config 1, claude/stance 1,
+  claude/client 1, ui.go 1). `.env.example` vs code: **both `comm`
+  directions empty** for shipping names; the eight names outside the file
+  (`MTGLAB_TEST_*`, `MTGLAB_LIVE_*`, `MTGLAB_OLD_SHIM_URL`, `MTGLAB_X`,
+  the two `MTGLAB_TEST_ENVOR*`) are **all read only by `_test.go` files** —
+  verified zero non-test readers each — which is `configrecord_test.go`'s
+  boundary holding as the tree grows. The newest long-lived worker ends on
+  the same signal as everything else: #441's app.db janitor
+  (`auth.Sweeper`) is stopped from `Door.Close` (cancel + `wg.Wait`), which
+  `serveOn` defers — the shutdown invariant reached the newest goroutine.
+- **Go craft, the new packages read:** `internal/brew`'s package comment is
+  the standard the checklist asks for (the tarot coupling, the deliberately
+  simpler contract, why no floats — argument, not contents); `internal/
+  convoke`'s doc carries what must NOT come to it (shared-stream work) —
+  both exemplary. `door/static.go`'s new ETag mutex is a check-then-rewrite
+  on every hit (size/mtime re-verified), so it is not the read-mostly map
+  `RWMutex` is for — same shape as `api.setsMu`, recorded so the count
+  moving 18 → 22 non-test `sync.Mutex` lines does not read as drift; still
+  **0 `RWMutex`, 0 `errgroup`, and the one `wg.Add(1)` is a test's loop**.
+- **Toolchain audit: audited to go1.27.1 / go1.26.8, and nothing has shipped
+  since** (go.dev release history read tonight: both 2026-09-01, nothing
+  after). Local sdk stays go1.26.7; the go1.26.8 refresh remains an operator
+  `go install`, not a repo change. Tree pinned `go 1.26` by the macOS 12
+  ceiling; the reopening trigger is unchanged (Go 1.28, ~Feb 2027).
+- **Measured (2026-09-12, this Mac, quiet — load avg 2.7/2.8/6.4 at the
+  gauntlet, honest numbers unlike White's load-poisoned ones tonight):**
+  - Go gauntlet: `gofmt -l .` prints nothing; `go vet ./...` clean;
+    `go test -race ./...` **50 ok / 0 FAIL** (2m11s wall, 10m24s user, warm
+    cache except the touched packages); `golangci-lint run ./...`
+    **0 issues** (17.8s).
+  - Frontend: `npm --prefix web run check` green — **1,593 tests across 90
+    files in 77.6s** (1,429/81 on 09-05; real growth, the interview-rooms
+    and Coliseum work). `web/src` untouched by this leg, so no bundle
+    rebuild owed.
+  - Modern-Go inventory: `interface{}` 0 · `ioutil` 0 · `rand.Seed` 0 ·
+    `strings.Title` 0 · `sort.Slice` 2 (both `internal/jobs`, ruled
+    2026-08-24, ruling carried) · `sort.SliceStable` 21 · `sync.RWMutex` 0 ·
+    `errgroup` 0 · `wg.Add(1)` 1 (test loop) · `wg.Add(workers)` 0 (was 1,
+    converted).
+  - Layering, grepped not trusted: no `duckdb` import outside
+    `internal/pool`; `internal/api` imports `internal/door` nowhere.
+  - TS floor: zero regex lookbehind under `web/src`; zero
+    `forwardRef`/`React.memo`/`defaultProps`; zero non-null assertions
+    outside tests (oxlint holds it).
+  - `data/app.db` untouched by this leg (mtime Sep 12 08:42 before and
+    after; the `-wal` at 15:19 is the standing 8765 server's, another
+    session's process, left alone).
+- **Deferred (re-checked, with triggers):** the three local env readers
+  (unchanged at three; trigger: a fourth, or a whitespace bug); the
+  dropped-name counter (still nothing to surface); the pprof **live half
+  (b)** — admin-gated, CPU-only if ever — trigger unchanged: a hot spot the
+  local mount cannot explain; the "Shuffling up…" flavour pair (next spirit
+  run with UI budget); `claude plugin eval` / `/skill-doctor` (trigger
+  above, Colorless's question). **Left standing by ruling:** `internal/
+  jobs`' two `sort.Slice` (golden-bearing, total comparators).
 
 ### 2026-09-05 (rainbow, night)
 

@@ -50,21 +50,6 @@ all nine as "tolerable risk — see tools/pyproject.toml's depth-extra triage"
 
 ## Open — 2026-09-05
 
-**Blue: two owed walks remain — the fortune-teller's table and the `/claude`
-keeper duty — and the door they were waiting behind is open.** White's
-2026-09-12 run found the browser seat signed in (your own `gyome` session)
-and rode it: the determinism replay is done and green on all four surfaces
-(tarot byte-identical to the 2026-08-24 baseline, wheel self-consistent and
-matching the recorded fate, the new brew route live-matching a local build,
-Tier 1 answering `cached: true` on the re-ask), so that half of this item is
-out of the queue and in White's ledger entry. What is left is Blue's half:
-walking the tarot room as a room and keeping the `/claude` page
-(commandment 18). · *Cost of leaving it:* the two rooms most personal to the
-project go another cycle unseen. · **Recommendation:** the Blue leg behind
-this run rides the same session and takes both walks; if the session has
-lapsed by then, the item reverts to waiting on a sign-in. Ledger: White,
-2026-09-12; Blue, 2026-09-05.
-
 **Blue: the Settings room says "the torches are not lit yet", and the only
 thing keeping that true is that you have not flipped the switch.** The line is
 hand-written into the bundle (`web/src/routes/Settings.tsx`) and true today —
@@ -171,26 +156,6 @@ volume unwatched, and no test can stand in for the walk. · **Recommendation:**
 walk it once and date it in `docs/HOSTING.md` §5. Cents of volume for an hour.
 Ledger: Red, 2026-08-24, queued 11.
 
-## Open — 2026-08-23
-
-**6. A pprof mount, so the hot-spot patrol can profile the serving process
-itself.** Two halves, separable, and you said yes to (a): **dev-local**,
-mounting `net/http/pprof` only when auth is off — a laptop-only surface that
-lets a patrol profile `mtglab ui` under real request-shaped load. Not built by
-cleanup: it is a change to how the door assembles itself, which is a Blue or
-Colorless run's work rather than a queue-emptying one, and the tree still
-contains no pprof (checked 2026-09-05). (b) **live** — the same mount
-admin-gated behind ADR 17 — remains yours: **heap profiles carry process
-memory**, and this process's memory holds session tokens and Argon2id
-parameters, so live would mean CPU-profile-only, and commandment 10 keeps it
-invisible to users either way. · *Cost of leaving it:* the patrol reads
-test-shaped load and outside clocks, which is honest but blind to
-request-shaped hot spots. · **What would have to be true:** for (a), a colored
-run picking it up — it is perhaps forty lines and one boot-time condition. For
-(b), a hot spot the local mount cannot explain. · **Recommendation:** (a) yes,
-still; (b) can keep waiting. Ledger: Colorless, 2026-08-24 (recovered
-records).
-
 ---
 
 ## Answered
@@ -205,6 +170,15 @@ records).
   They are out of this file entirely because the ledger carries them: see the
   Cleanup section's 2026-09-05 entry for the full accounting, and each color's
   own 2026-09-05 (cleanup) block for the outcome.
+- **Blue's two owed walks** — done 2026-09-12 by the Blue rainbow leg, riding
+  the signed-in seat: the fortune-teller's table is still the belle of the
+  ball and the `/claude` page is in good order, its gallery credits
+  re-verified against the pool. Ledger: Blue, 2026-09-12.
+- **The pprof mount, half (a)** — landed 2026-09-12 (Blue): `/debug/pprof/`
+  mounts in front of the door only when auth is off, mutation-verified both
+  ways. Half (b) (live, admin-gated) is a *deferred* ledger item now, its
+  trigger a hot spot the local mount cannot explain. Ledger: Blue,
+  2026-09-12.
 
 *(Answered items move here in one line with the ruling and the date, then out
 entirely once the ledger carries them.)*
