@@ -21,6 +21,11 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > section's block, so the next Cleanup should carry the Answered list at the
 > foot of this file into White, Green, Red and Colorless.
 
+> **Later the same day: the pool rebuild landed.** Aaron read the morning's
+> measurement and asked for the rebuild-and-rename, so the Green item queued
+> out of it lasted about an hour. **Queue 6 → 5**, and the Answered list
+> below gains item 7.
+
 ---
 
 ## Open — one command at the keyboard, and still not run
@@ -66,25 +71,6 @@ still `"all"` and non-provider secret patterns are still off — both free.
 Ledger: Red, 2026-08-24, queued 9.
 
 ## Open — newly measured, and now worth doing
-
-**Green: four fifths of the served card pool is dead pages, and the number
-is no longer an estimate.** The deferred in-place-reload item named this
-morning's refresh as its trigger, and the trigger fired hard. The refresh
-grew `mtg.duckdb` 224,145,408 → 261,894,144 bytes (+16.8%) while the source
-data grew 0.3%; then the restore drill rebuilt *the same rows* from scratch
-on a throwaway volume — same loader, same bulk files, 35,517 oracle cards
-and 108,583 printings either way — and got **54,538,240 bytes**. The served
-pool is 4.8× the size it needs to be, and each refresh adds roughly 37 MB
-that is not data. · *Cost of leaving it:* nothing breaks — `/data` is at
-14% of 2.9 GB — but the bloat compounds every refresh, and it is paid for on
-every snapshot, every restore and every boot that opens the file. · **What
-would have to be true:** `pool.Refresh` builds into a temporary file and
-renames over the old one, which also makes a failed refresh atomically
-harmless rather than merely transactional. The manual form is already in
-`docs/HOSTING.md` and was walked today. · **Recommendation:** land the
-rebuild-and-rename; it is a contained change to one package with a
-measurement behind it and 207 MB on the table today. Ledger: Green,
-2026-09-13 — entry owed, the measurement is in the Answered list below.
 
 **Red: the "drill older than the newest migration" rule cannot be satisfied,
 and the drill that proved it is now walked.** Snapshot retention is five
@@ -223,3 +209,17 @@ and deletes them from here.)*
    25 seconds. Procedure, commands and the "set no secrets on the drill app"
    warning are now `docs/HOSTING.md` §Backups. The retention-versus-ladder
    finding is promoted to its own open item above.
+
+7. **Green — the pool rebuilds instead of reloading in place.** *Asked for and
+   landed the same day.* `pool.Refresh` now fills a new file beside the pool
+   and renames it into place; `price_history` is carried across by hand
+   because no bulk file could reconstruct it, and `--oracle-only` still writes
+   in place because it deliberately keeps printings it never downloaded. The
+   leak is reproduced in a unit test rather than asserted: against the old
+   path, three identical refreshes of the 22-card fixture took the file
+   1,847,296 → 3,682,304 → 3,944,448 bytes, and the rebuild holds it flat.
+   Two properties came free and are now tested — a failed refresh leaves the
+   served pool byte-identical (the old path left 22 half-loaded oracle rows
+   in it), and a crashed run's `.rebuilding` file cannot block the next
+   refresh. Expect the instance's `mtg.duckdb` to drop ~200 MB on the first
+   refresh after the deploy.

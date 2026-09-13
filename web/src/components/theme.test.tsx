@@ -26,7 +26,7 @@
  * two different things ("the interview, said out loud" below).
  */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeStatus, ThemeReport } from '../lib/api'
 import { ThemeInterview } from './theme'
@@ -289,8 +289,15 @@ describe('a proposal that ran and came back empty', () => {
       // The room's own sentence, not the wire's.
       await screen.findByText('Nothing usable came back.')
       expect(screen.queryByText(/stop reason/)).toBeNull()
-      expect(spy).toHaveBeenCalledWith(
-        'the proposal came back empty:', pour.reason)
+      // Awaited for the same reason as the `ANTHROPIC_API_KEY` line in
+      // `NewDeck.test.tsx`: this console write lives in a passive effect
+      // (`theme.tsx`'s `proposal` effect) while the sentence above it is in
+      // the render, so `findByText` can settle a flush too early. The three
+      // other console writes in that file are inside `catch` blocks, which
+      // run *before* the state update that renders — those are ordered and
+      // are deliberately left asserting outright.
+      await waitFor(() => expect(spy).toHaveBeenCalledWith(
+        'the proposal came back empty:', pour.reason))
     } finally {
       spy.mockRestore()
     }
