@@ -2884,9 +2884,9 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24, 2026-08-19,
-  2026-08-16, plus two un-run entries from that week — the targeted
-  performance pass and the measuring shelf — both kept below.
+- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
+  2026-08-24, 2026-08-19, 2026-08-16, plus two un-run entries from that week
+  — the targeted performance pass and the measuring shelf — both kept below.
 - **Everything below the 2026-08-24 block is about the Python app.** `bench
   run`, `bench caches`, `cards/db.py`, `modes.py`, the pandas import storm,
   the cache register: none of those files or commands exist. The *lessons*
@@ -2894,9 +2894,181 @@ applies to each. Ordered by cost:
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
 
-### 2026-09-05 (cleanup)
+### 2026-09-12 (rainbow)
 
-Four queued items closed, all on #442 and #441.
+Leg three behind White's #463 and Blue's #464. Two firsts: the instance's
+spend ledger was read from a shell for the first time (cleanup's `mtglab
+claude usage` over `fly ssh console`, with the token workaround), and Blue's
+day-old pprof mount took its first profile under request-shaped load. The
+night's near-miss is the entry's real lesson: the warm table showed three
+search shapes up 33–62% on a *quieter* machine than last run, and only an
+interleaved A/B race against a rebuilt #440 binary proved the code innocent.
+
+- **Fixed this run:**
+  1. **The entry chunk has a budget now, and the number lives in the gate**
+     (Blue's handoff; the standing question answered for this facet —
+     `web/README.md`'s "285 kB raw / 91 kB gzipped" was enforced by nothing
+     and had rotted twice). `go/cmd/mtglab/bundlebudget_test.go` gzips the
+     committed `web_dist/assets/app.js` in-process at BestCompression and
+     holds it under **128 KiB** — tonight's chunk is 98,255 B by that exact
+     measure, which matches the live wire transfer byte-for-byte (see
+     below), so the gate bounds what a browser actually downloads. The
+     budget's failure case is the one this facet already paid for once (a
+     recharts-shaped eager import is +111 KB gzipped and fails by a margin
+     no honest feature ever will); ordinary growth has ~30 KB of headroom,
+     months at the recent +1–2 KB/week. The README now points at the gate
+     instead of quoting a figure. Mutation-verified: budget lowered under
+     the real size fails with the real byte count in the message.
+  2. **The door's ETag memo carries a hit count** — the cache rule applied
+     to the one cache added since last run (the 2026-09-07 Swiftfoot pass's
+     `etags` memo: content hash per file, re-verified on (size, mtime)). It
+     was correct and tested and nothing counted its use, which is exactly
+     the "correct, tested, and never once consulted" shape the register
+     retired with Python. Now `etagHits`/`etagMisses` under the existing
+     mutex, read by `etagCounts()`, rendered nowhere (commandment 10).
+     `TestTheETagMemoAnswersTheSecondServe` drives the full door handler and
+     asserts exact counts derived from the mechanism: first serve 0/1,
+     second 1/1, a 304 revalidation 2/1 (the 304 is cheap *because* the
+     memo answered), a touched mtime 2/2, and the touch remembered 3/2.
+     Mutation-verified both ways: read disabled ("0 hits / 2 misses, want
+     1 / 1") and remember-write dropped (same failure) — each caught on the
+     second serve.
+- **No search regression — and the method that proved it is the finding.**
+  The warm table (below) put `q=goblin` at 76.7ms, no-text at 94.5, creature
+  at 86.3 against 09-05's 47.2/67.7/64.7, on a night with *lower* load —
+  while `identity=WU` sat flat. Environment-adjusting against WU as control
+  still left +35–56%. The answer was not to read more diffs but to rebuild
+  the pre-cleanup binary (#440, the exact state the 09-05 numbers were taken
+  on) and race it against main **interleaved on the same night** (12 samples
+  a side, A/B/A/B so the environment lands on both):
+
+  | route | old (#440) | new (main) |
+  |---|---:|---:|
+  | `search?q=goblin` | 95.3ms | 94.3ms |
+  | `search` (no text) | 128.7ms | 129.5ms |
+  | `search?type_line=creature` | 125.3ms | 120.7ms |
+  | `search?identity=WU` | 82.3ms | 80.8ms |
+  | `/api/health` (under traffic) | 3.8ms | 4.0ms |
+
+  Identical — and the absolutes *rose* during the race itself (load 2.77 →
+  4.77 while it ran; 35-day uptime, other sessions live). So: the code is
+  clean through #442's price semi-join, #446, #456 and the go-group bump
+  (DuckDB did **not** move — v2.10505.0 both sides; only anthropic-sdk
+  1.68→1.71, x/crypto, x/sys, modernc). **Method, for every future run on
+  this Mac: a cross-night search comparison is meaningless here without an
+  interleaved race, and the race costs four minutes.** This is 09-05's
+  "re-measure on a quiet Mac" warning graduated into an instrument.
+- **The pprof mount works, and it answered like the shelf said it would.**
+  Under ~15s of mixed search load: CPU profile **64.5% `runtime.cgocall`**,
+  featureless — the cgo blind spot, exactly as written. The alloc profile
+  (the instrument the shelf says to switch to): `deckread.SearchCards`
+  22.02MB cum over ~180 searches ≈ **122 KB per request**, `bytes.growSlice`
+  9.36MB (JSON buffer growth for ~150 KB payloads), duckdb `getBytes` 7.5MB,
+  argon2 19MB (boot-time seeding, not request-path). Proportionate to a
+  60-wide-row payload; no leak shape, no pathological churn. The lever on
+  search remains the scan itself — ingest-shaped, already deferred.
+- **Measurements (2026-09-12, this Mac — load 2.77 at the warm table, 3.8–5.5
+  through the race and live probes; ⚠️ absolute search numbers below are
+  environment-bound, see the race):**
+  - Local warm p50×15, port 8791, scratch decks dir, full pool:
+    `/api/health` 34.2ms (the designed fresh-open probe path — #374's
+    refusal-to-hold; it reads 3.8–4.0ms under concurrent traffic when it
+    rides others' leases, both states recorded, neither a regression) ·
+    `/api/lore` 0.8 · `/api/colors` 0.6 · `/api/glossary` 0.6 ·
+    `/api/tarot/reading` 1.0 · **`/api/brew/reading` 0.6 — new route, first
+    baseline; the witch's pot deal is a free corner (no model, no pool, no
+    network) and measures like one** · `/api/themes` 0.6 ·
+    `/api/claude/personas` 0.6 · `/` 0.7 · search 76.7 / 94.5 / 86.3 / 44.3
+    (environment-bound).
+  - Live TTFB p50×7 to `sjc`: `/api/health` **240.3ms** · `/` 158.7 ·
+    `/assets/app.js` 176.6 · `/assets/index.css` 155.0 · `/api/lore` 163.4.
+    Health body sane: pool true, 35,393 / 108,263, bulk 2026-08-30, **25
+    decks**, not stale.
+  - **The serving contract grew a validator and the 08-24 note is
+    superseded: the ETag is back, and it is the content's.** Live GET:
+    HTTP/2, `content-encoding: gzip`, `cache-control: no-cache`,
+    `vary: Accept-Encoding`, `last-modified`, **`etag`** (32-hex strong,
+    the Swiftfoot content hash — survives a deploy's mtime rewrite).
+    `If-None-Match` → **304, 0 bytes, 160ms**; unconditional gzip GET of
+    `app.js` → **98,255 bytes**, matching the budget gate's in-process
+    measure exactly.
+  - **Bundle** (committed `web_dist`, gzip -9): `charts.js` 399,398 /
+    111,241 — **byte-identical, fourth run running**; `app.js` 316,739 /
+    97,877 (was 313,099 / 96,751; +1.1 KB gz); **`index.css` 346,708 /
+    62,051 — was 297,522 / 53,749, +16.5% raw in seven days, 3.3× since
+    08-24.** Still the fastest-growing thing in the bundle; the 09-05
+    trigger ("if it doubles again") has not fired, and the instrument when
+    it does is a real browser's coverage tab, daylight work.
+    `web_dist/assets` total 9,612 KB (was 9,336).
+  - **Static assets over hotlinks: the host set is byte-identical to
+    09-05** — `cards.scryfall.io` the one fetch (28 appearances), tcgplayer
+    a click, jsdelivr inert behind the OCR overrides, and the three
+    `hotlinkrecord_test.go` guards all standing. Nothing new to classify.
+  - **Claude spend, both ledgers.** Laptop: **$2.1150, 107 conv / 123 req,
+    21,906 in / 152,443 out / 2,054,694 cached** (was $1.71 / 89 conv on
+    09-05 — the delta is the witch room's development spend:
+    `theme-conversation:witch` 12 conv, 738 / 11,379 / 108,984;
+    `theme-proposal:witch` 1 conv; `deck-description` 3 conv). Instance,
+    **read from a shell for the first time**: **$9.0034, 213 conv / 332
+    req, 78,590 in / 567,368 out / 9,748,735 cached — cache ratio 124:1,
+    ≈$0.042 a conversation.** Where the money goes: `commander-dossier` 20
+    conv / 54 req (231,013 out — dossiers are the long documents),
+    `theme-conversation:fortune-teller` 84 conv, `intake-filing` 16/33,
+    `deck-description` 24/60, `rationale-draft` 10/27, `research` 4/16.
+    `slot-argument` 3 conv / 3 req / **0 cached** — every argue pays its
+    full 3.3k-token prefix, which is the carried deferral's exposure made
+    visible at last: at three conversations it stays deferred. Both totals
+    priced at the rates in force when spent (`prices.Segments`, #442).
+    **These are Green's quota numbers: ≈$11.12 all-time across both boxes,
+    the instance running ≈$9/month at current usage.**
+  - **The mode table is ten, counted from `data/modes.json` — which is
+    byte-untouched since #392**, so the knob table stands as recorded 09-05
+    (16,384/high on the searching modes, 8,192 elsewhere, scan 2,048/low;
+    `may_write: []` on all ten; web_search `max_uses` 4/4/3/1, on the
+    current `web_search_20260209` variant). The craft reading therefore
+    covered what *did* change: `converse.go` untouched (both breakpoints
+    stand); the witch's pot frame rides in the **message** with the caching
+    argument preserved verbatim in `frameFor`'s comment; `potFor` re-picks
+    deterministically from the seed each turn (no state, no cache impact);
+    the personas diff is the `Deals`→`Prop` rename only; the witch's voice
+    carries no dated-model cruft. The intake's theme vocabulary (#447) is
+    enforced **response-side deliberately** — the mode is asked for words,
+    not handed 43 options, and unfilable answers are dropped and counted
+    (`ThemesDropped` on the wire) — the argument written at `keptThemes`;
+    request-side stance refusal unmoved on every path. `prices` untouched
+    since Segments; the `claude-api` skill's current table still matches
+    rate-for-rate, same nine models, no roster movement; `Checked =
+    2026-08-18` again deliberately not bumped (its contract is a human
+    reading the pricing page).
+  - **The deployed Tier 1 cache is intact through a busy week.** Every sim
+    change since 09-05 sits in `tier3/` and `sim/mulligan` — both
+    deliberately outside `engineSources`, and the *why* is already argued
+    at `cache.go:86-118` (mulligan's grid rides in the per-kind key). The
+    mulligan change itself is the Swiftfoot convocation — wall-time only,
+    byte-identical answers held by `TestSearchAnswersIdenticallyAtEveryWidth`.
+    Nothing to re-key, nothing orphaned.
+- **Carried items, re-checked:** cache-write tokens still invisible
+  (`cache_creation_input_tokens` still nowhere in the tree; still a schema
+  migration, still Aaron's window — both usage totals above are floors and
+  say so in their own output). Theme's second breakpoint unchanged
+  (converse untouched; still bounded at ~0.8% of that mode's input).
+  Interview/argue cache-or-key: trigger unfired, and the instance ledger
+  now quantifies the exposure (three argue conversations all-time). Long
+  max-age for media: unchanged, still blocked on content-hashing the media
+  names — note the Swiftfoot content ETag now makes every revalidation
+  deploy-proof, which softens the cost this item was queued about.
+- **Rig hygiene, recorded because the next run will ask:** `app.db` unmoved
+  (same 458,752 bytes, same 08:42 mtime); `app.db-wal` grew ~111 KB — the
+  **visitor ledger** recording the rig's ~500 curl requests, which is the
+  door doing its job against a dev-local database, not a dirtied one. The
+  8765 server (another session's) was left untouched; rigs ran on 8791/8792
+  and are down; the #440 worktree is removed.
+- **Not touched, deliberately:** the five fingerprinted packages (no code
+  need, and prose there is priced in cache keys); every spend figure read
+  from a ledger, never bought — no Claude call was made by this run, and
+  the rig ran with no credential in its environment so none could be; the
+  mode prompts (the reading found nothing that needs rewording, and prompt
+  text is user-audible — Nightbound holds it regardless).
 
 - **The bill is read at the rates it was paid at** (09-05 Black). `adminstats`
   priced every window with `prices.Today()`, so the morning Sonnet 5's
