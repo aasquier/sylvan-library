@@ -81,8 +81,15 @@ type staticSite struct {
 	// re-verified against (size, mtime) on every hit -- a rebuilt bundle
 	// under the same name gets a fresh hash, not a stale one. See `etagFor`
 	// for why content and not mtime is the validator worth paying for.
-	etagMu sync.Mutex
-	etags  map[string]etagEntry
+	//
+	// The two counters are the memo's proof of use, on the card pool's rule
+	// (`pool.Memo`): a cache can be correct, tested, and never once hit, and
+	// no correctness test can tell -- only a count read after driving the real
+	// serving path can. Read by `etagCounts`, rendered nowhere.
+	etagMu     sync.Mutex
+	etags      map[string]etagEntry
+	etagHits   int
+	etagMisses int
 }
 
 type etagEntry struct {
@@ -236,10 +243,16 @@ func (s *staticSite) serveFile(w http.ResponseWriter, r *http.Request, full stri
 func (s *staticSite) etagFor(full string, info os.FileInfo) string {
 	s.etagMu.Lock()
 	e, ok := s.etags[full]
-	s.etagMu.Unlock()
 	if ok && e.size == info.Size() && e.mod.Equal(info.ModTime()) {
+		s.etagHits++
+		s.etagMu.Unlock()
 		return e.tag
 	}
+	// Everything else is one miss, counted here so the unhashable degrade
+	// below cannot slip out uncounted: a miss is "the memo did not answer",
+	// not "a hash was then computed".
+	s.etagMisses++
+	s.etagMu.Unlock()
 	f, err := os.Open(full)
 	if err != nil {
 		return ""
@@ -254,6 +267,15 @@ func (s *staticSite) etagFor(full string, info os.FileInfo) string {
 	s.etags[full] = etagEntry{size: info.Size(), mod: info.ModTime(), tag: tag}
 	s.etagMu.Unlock()
 	return tag
+}
+
+// etagCounts is the memo's hit/miss count since construction, for tests to
+// hold the *serving path* to actually reaching the memo -- the counter half
+// of the cache rule, never a rendered number (commandment 10).
+func (s *staticSite) etagCounts() (hits, misses int) {
+	s.etagMu.Lock()
+	defer s.etagMu.Unlock()
+	return s.etagHits, s.etagMisses
 }
 
 // notFound is the static tiers' refusal: `{"detail": "Not Found"}`, the

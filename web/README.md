@@ -55,10 +55,11 @@ following the same geometry — there is no build step to run and nothing in
 - **Routes are lazy.** Every non-landing screen is a `React.lazy` line in
   `App.tsx`; a new screen wants one, not a top-level import. Three are
   deliberately eager — `Library`, `Login`, `Claim`, the screens you arrive on.
-  The entry chunk (`web_dist/assets/app.js`) is **285 kB raw / 91 kB
-  gzipped**, measured 2026-08-24; it was written here as ~266 kB and nothing
-  re-measures it, so treat the figure as a claim to check rather than a
-  budget that is enforced.
+  The entry chunk (`web_dist/assets/app.js`) is held under a gzipped budget
+  by `go/cmd/mtglab/bundlebudget_test.go` — the number lives in that gate,
+  deliberately not here: this line carried a measured figure twice and it
+  rotted both times, because prose re-measures nothing. The run-by-run
+  measurements live in the polish ledger's Black section.
 - **A deck is addressed by `DeckRef`** — `{owner, slug}` as an object, never
   two positional strings (transposed strings are a runtime 404 against
   somebody else's library; named fields are a compile error). `deckUrl` in

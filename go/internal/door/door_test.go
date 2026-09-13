@@ -955,6 +955,70 @@ func TestAStaticETagIsTheContentsNotTheClocks(t *testing.T) {
 	}
 }
 
+// The ETag memo is *used* by the serving path, which its correctness test
+// above cannot see: a memo can be right, green, and never once consulted --
+// keyed on something that never repeats, or bypassed by the caller -- and the
+// only thing that notices is a count read after driving the real surface (the
+// card pool's `Memo` rule, applied to the door's one cache). The counts are
+// exact and derived from the mechanism: every serve consults the memo once,
+// the first serve of a path can only miss, a revalidating 304 still consults,
+// and a touched mtime is one honest miss that re-verifies the bytes.
+func TestTheETagMemoAnswersTheSecondServe(t *testing.T) {
+	t.Parallel()
+	web, tarot := site(t)
+	d, err := New(Config{RequireAuth: false, SecureCookies: false,
+		WebDist: web, TarotDir: tarot,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+
+	assertCounts := func(when string, wantHits, wantMisses int) {
+		t.Helper()
+		hits, misses := d.static.etagCounts()
+		if hits != wantHits || misses != wantMisses {
+			t.Fatalf("%s: memo counts %d hits / %d misses, want %d / %d",
+				when, hits, misses, wantHits, wantMisses)
+		}
+	}
+
+	// First serve: the memo has never seen the path, so it can only miss.
+	first := get(t, srv, "GET", "/assets/app.js", "")
+	tag := first.Header.Get("ETag")
+	if tag == "" {
+		t.Fatal("a served asset carries no ETag")
+	}
+	assertCounts("after the first serve", 0, 1)
+
+	// Second serve, unconditional: same path, same bytes, same clock -- the
+	// hash must come from memory, not be recomputed.
+	get(t, srv, "GET", "/assets/app.js", "")
+	assertCounts("after the second serve", 1, 1)
+
+	// A revalidation consults the memo too: the 304 is cheap *because* the
+	// tag it compares against was remembered.
+	if resp := get(t, srv, "GET", "/assets/app.js", "",
+		"If-None-Match", tag); resp.StatusCode != http.StatusNotModified {
+		t.Fatalf("revalidation answered %d, want 304", resp.StatusCode)
+	}
+	assertCounts("after a 304 revalidation", 2, 1)
+
+	// A deploy's touch moves the mtime under the same bytes: the memo must
+	// refuse its remembered entry (one miss), re-verify the content, and
+	// remember the new clock -- so the serve after that hits again.
+	path := filepath.Join(web, "assets", "app.js")
+	future := time.Now().Add(2 * time.Hour)
+	if err := os.Chtimes(path, future, future); err != nil {
+		t.Fatal(err)
+	}
+	get(t, srv, "GET", "/assets/app.js", "")
+	assertCounts("after a touched mtime", 2, 2)
+	get(t, srv, "GET", "/assets/app.js", "")
+	assertCounts("after the touch was remembered", 3, 2)
+}
+
 // lockedLog is a log sink two goroutines can share: the server's request
 // goroutine writes, the test reads after the response — and without the
 // lock there is no happens-before edge between those two at all.
