@@ -153,9 +153,29 @@ Facts about that command worth knowing at the terminal:
   download was skipped still sweeps**, which is how a shelf that grew before
   this existed is reclaimed: run the refresh once, and the pile goes whether
   or not Scryfall published today.
-- **It is fast now**: ~27 seconds end to end on a dev Mac. On the app
-  machine's shared core, budget minutes — and update this sentence with a
-  measured number the first time you run one there.
+- **It is fast now**: ~27 seconds end to end on a dev Mac, and **41 seconds
+  on the app machine's shared core, measured 2026-09-13** including the SSH
+  connect. "Budget minutes" stood here until somebody ran one and looked;
+  budget a minute.
+- **It grows the file about 37 MB a run, and none of that is data.** The
+  reload deletes and re-inserts inside one transaction, so DuckDB keeps the
+  old pages and never reclaims them. Measured 2026-09-13: the source data
+  grew 0.3% over the fortnight while `mtg.duckdb` went 224,145,408 →
+  261,894,144 bytes (+16.8%), and a from-scratch build of *the very same
+  rows* — same loader, same bulk files, 35,517 oracle cards and 108,583
+  printings either way — came to **54,538,240 bytes**. Four fifths of the
+  served pool is dead pages. Nothing is at risk while the volume has room,
+  but if `/data` ever gets tight, the fastest gigabyte back is to move the
+  pool aside and rebuild rather than to buy disk:
+
+  ```bash
+  fly ssh console -C "sh -c 'mv /data/mtg.duckdb /data/mtg.duckdb.old && mtglab data refresh'"
+  ```
+
+  Keep the `.old` file until `/api/health` reports the pool present with the
+  row counts you expect, then delete it. (The standing fix is to make the
+  refresh itself build into a temporary file and rename — deferred, and this
+  measurement is the argument for it.)
 - **It needs the writer's lock.** The app holds a shared DuckDB lease that
   expires within ~10 s of nobody using the pool; health checks do not renew
   it. If the refresh reports the pool busy repeatedly, something is really
@@ -168,10 +188,14 @@ Facts about that command worth knowing at the terminal:
   fly ssh console -C "sh -c 'date -u +%T; ls -l /data/mtg.duckdb /data/mtg.duckdb.wal'"
   ```
 
-- **A dead SSH session is not a dead job.** `auto_stop_machines` is
-  `suspend`: a machine can suspend mid-command, break the transport, then
-  resume the job from memory on the next request. Check `/api/health`
-  before concluding anything.
+- **A dead SSH session is not a dead job.** Check `/api/health` before
+  concluding anything. This bullet used to say `auto_stop_machines` is
+  `suspend` and that a machine could suspend mid-command; `fly.toml` has
+  said `"off"` with `min_machines_running = 1` since the button landed, and
+  the bullet fifty lines above it said so correctly the whole time. Two
+  bullets in one section disagreeing is what doc rot looks like from the
+  inside — corrected 2026-09-13. If autostop ever goes back, the
+  suspend-and-resume caveat comes back with it.
 - **Whatever ran over `fly ssh` ran as root.** The entrypoint re-chowns
   `/data` at boot; `fly machine restart <machine-id>` hands the volume
   back immediately.
@@ -218,15 +242,57 @@ email addresses (ADR 16).
 **Fly separately snapshots the volume daily** — five-day retention, on a
 clock that knows nothing about deploys, so the boot most at risk (a schema
 migration after a merge) is the one guaranteed not to have a fresh
-snapshot. The restore path (fork a volume from a snapshot, reattach the
-machine) has never been exercised here; treat snapshots as a safety net of
-unmeasured strength and keep taking the manual backups, which are the ones
-with a proven restore.
+snapshot.
 
 ```bash
 fly volumes list --app sylvan-library
 fly volumes snapshots list <volume-id>
 ```
+
+### The restore drill — walked 2026-09-13
+
+**Measured recovery time: 96 seconds**, from picking a snapshot to the app
+serving the whole library. The drill ran into a throwaway app rather than
+the live one, which is the only shape worth repeating: nothing it does can
+reach `mtglab_data`, and destroying the app at the end takes the machine and
+the forked volume with it.
+
+```bash
+fly apps create sylvan-library-drill --org personal
+fly volumes create mtglab_data --app sylvan-library-drill --region iad --size 3 \
+  --snapshot-id <newest-snapshot-id> --yes
+fly machine run registry.fly.io/sylvan-library:<current-deployment-tag> \
+  --app sylvan-library-drill --region iad --name drill-restore \
+  --volume mtglab_data:/data --vm-cpu-kind shared --vm-cpus 2 --vm-memory 1024 \
+  --restart no -e MTGLAB_DATA_DIR=/data -e MTGLAB_DECKS_DIR=/data/decks
+fly logs --app sylvan-library-drill --no-tail   # read the configuration line
+fly apps destroy sylvan-library-drill --yes     # takes machine + volume with it
+```
+
+Set **no secrets** on the drill app. It needs the volume and the binary and
+nothing else, and a throwaway app holding a copy of the Anthropic key is a
+worse outcome than never having drilled. The image pulls across apps inside
+the org, so the tag is the one production is serving.
+
+What the walk proved: the boot line reported `schema=17 pool=present`, the
+25 deck directories came back and the four sampled decks validated
+`0 error(s)`, all three accounts restored with their state, addresses and
+the admin marker intact, and ext4 replayed the snapshot's journal on mount
+without intervention (`recovering journal` → `clean`). A from-nothing pool
+rebuild on the restored volume took 25 seconds, which is the evidence for
+"the pool needs no backup" above.
+
+**What a drill here can never prove, and the rule that needs to know it.**
+The standing rule is that a drill older than the newest schema migration is
+due, because the ladder is forward-only and a restore crosses it. Retention
+is five days. Rungs 0015–0017 landed 2026-09-06, so by the time this drill
+ran *every surviving snapshot already sat at rung 17* and no migration
+actually ran — the restore read the ladder rather than climbing it. That is
+not a gap in the drill, it is arithmetic: **a snapshot can only ever exercise
+a migration landed in the last five days.** So the rule to keep is the narrow
+one — after landing a schema migration, drill within five days or accept that
+that rung will never be rehearsed — and the manual `app.db` backup above,
+which has no retention clock, is what covers the rest.
 
 ## Decks, the laptop, and derived media
 

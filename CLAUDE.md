@@ -454,10 +454,17 @@ written down goes wrong without anything failing. Ask the library instead —
 for one deck's real status, stage and labels. Every count, name and status in
 any document, this one included, is a claim to re-check.
 
-One standing fact, because it is a rule rather than a roster: **at least one
-curated deck fails the gate on purpose** — a banned card left in place as a
-live invalid example, never a test fixture. A session that "fixes" it has
-removed the only honest demonstration the gate has.
+There used to be a standing fact here claiming at least one curated deck
+fails the gate on purpose, as a live demonstration that it refuses things.
+**Aaron retired it on 2026-09-13**, after a read of the deployed library
+found 25 curated decks and `0 error(s)` on every one: the library grew from
+17 decks to 25 and the deliberately-invalid example left somewhere in the
+growth, without anything failing — which is exactly the rot this section
+warns about, caught in this file's own prose. The gate's refusals are
+covered by tests; a deck kept broken on purpose is furniture the library
+never asked for. Noted rather than deleted because a future session finding
+an invalid curated deck should know it is a real problem, not the fixture
+that used to be promised here.
 
 ## Out of scope
 
