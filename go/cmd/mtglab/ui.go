@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -148,6 +149,38 @@ func configComplaints(cfg config.Config, forge tier3.Settings) []string {
 			"repair itself with a restart (ADR 17)")
 	}
 	return out
+}
+
+// devProfiler hangs the runtime profiler off the laptop server: `/debug/pprof/`
+// answers with [pprof.Index] and its family, and everything else falls through
+// to the app untouched.
+//
+// **In front of the door, never through it.** The door's auth sweeps derive
+// from its served route table -- a route added there is deny-by-default and
+// has to be classified -- and a profiler is not an app route: it must be
+// **structurally absent** when auth is on, not gated. A heap profile is a
+// walk of process memory, and with auth on that memory holds session tokens;
+// the only wrap that cannot leak them is the one that was never installed
+// (the call site below is the single condition). Sitting in front also keeps
+// profile downloads out of the door's gzip and visitor ledger, neither of
+// which should see them.
+//
+// The handlers are mounted on this mux by hand rather than by the package's
+// own blank-import side effect, because that registers on
+// [http.DefaultServeMux], which nothing here serves -- an import that
+// "mounts" the profiler somewhere unreachable is the trap gosec's G108 names.
+// [pprof.Index] itself serves every named runtime profile (heap, goroutine,
+// allocs, block, mutex) under the prefix, so only the four non-lookup
+// handlers need their own routes.
+func devProfiler(app http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.Handle("/", app)
+	return mux
 }
 
 // shutdownGrace is how long a stop waits for the requests already in flight
@@ -316,9 +349,18 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	// The address the kernel actually gave, not the one that was asked for —
 	// with port 0 those differ, and the one worth printing is the real one.
 	addr := listener.Addr().String()
+	handler := d.Handler()
+	if !requireAuth {
+		// Auth off is a laptop, one person (configComplaints' own reading),
+		// and the laptop is the one place the hot-spot patrol may profile the
+		// serving process (daybreak ruling, 2026-08-23: dev-local yes, live
+		// no). With auth on this line never runs, so the profiler is not a
+		// route the door has to refuse -- it does not exist.
+		handler = devProfiler(handler)
+	}
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           d.Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}

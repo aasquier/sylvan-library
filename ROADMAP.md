@@ -9,8 +9,9 @@ do, and the longer arc in one line each. What changed and why lives in git,
 
 The deployed instance is **one Go binary** serving everything: the deck
 library and its five artifacts, the gate, all three simulation tiers
-(goldfish, the Karsten/curve shelf, Forge), the Claude surfaces (seven
-modes behind the stance dial), the tarot table, auth and the Admin page,
+(goldfish, the Karsten/curve shelf, Forge), the Claude surfaces (the
+modes behind the stance dial — `data/modes.json` is the set, never a
+count written here), the tarot table, auth and the Admin page,
 and both ledgers. The frontend is the committed `web_dist/` bundle. Decks
 live on the instance's volume, nowhere else (ADR 30). The library's contents
 are data rather than documentation — ask it (`mtglab decks list`, then
