@@ -184,7 +184,11 @@ go vet ./... && go test -race ./... && ~/go/bin/golangci-lint run ./...
 
 `gofmt -l .` should print nothing. Frontend: `npm --prefix web run check`,
 then `npm --prefix web run build` if anything under `web/src` changed (the
-bundle is committed at `web_dist/`). Toolbox: from `tools/`, its own venv's
+bundle is committed at `web_dist/`) — and after any bundle rebuild,
+`go test -race -count=1 ./cmd/mtglab/`: Go's test cache tracks nothing
+outside `go/`, so without `-count=1` the guards that read `web_dist/` can
+answer a stale cached green (proven 2026-09-12; CI is immune, its gate
+already runs `-count=1`). Toolbox: from `tools/`, its own venv's
 binaries — `.venv/bin/ruff check .`, `.venv/bin/mypy`, `.venv/bin/python -m
 pytest tests/ -q` — when `tools/` moved; nothing puts `ruff` or a 3.12
 `pytest` on `PATH` here. `gh`, `npm`, `node` and `fly` resolve in a plain
