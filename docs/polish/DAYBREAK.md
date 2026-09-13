@@ -65,35 +65,6 @@ cleanup — the copy becomes a fact the server owns when the shelf gives it
 something to read, and doing it before that would be a second hand-written
 promise. This line is the reminder. Ledger: Blue, 2026-09-05.
 
-**Red: the Anthropic key expires in about five days (~2026-09-10), and from
-then a 401 on every Claude surface will read as a broken integration while
-actually being this date.** Renewal is two steps and minutes: a fresh key from
-the Anthropic console, then `fly secrets set ANTHROPIC_API_KEY=…` — the set
-restarts the machine (seconds of downtime, same as any deploy). · *Cost of
-leaving it:* every Claude room on the site goes dark mid-week with a
-misleading error, and the next session debugs an integration that is merely
-lapsed. · **What would have to be true:** nothing but the rotation. It stays
-in the queue because **nothing here can see whether it happened** — checked
-2026-09-05, `fly secrets list` prints names and digests and no dates, so the
-key's age is not a fact this file can read. · **Recommendation:** rotate it
-before the 10th and say so; everything else on the calendar is comfortable
-(TLS 2026-11-11 Fly-renews, domain and `FLY_API_TOKEN` August 2027). Ledger:
-Red, 2026-09-05.
-
-**Red: the coverage floor is computed twice per run and you ruled it should be
-computed once — the ruling is recorded, the change is not made.** The
-`Coverage floor` step runs the whole suite a second time on **both** matrix
-legs (84s amd64, 47s arm64) for a number that cannot differ between them: the
-tree holds zero arch-tagged non-test Go files. · *Cost of leaving it:* ~84
-seconds on every push and pull request, forever, growing with the suite. ·
-**What would have to be true:** a quiet pipeline. A `ci.yml` semantics change
-is only provable by CI itself — one branch, one watched run — and the cleanup
-phase ran against a merge train that had five branches queued behind it, so a
-change to what a required gate measures could not be watched honestly. ·
-**Recommendation:** yes, unchanged — gate the step on the arm64 leg (`if:
-matrix.arch == 'arm64'` or the file's equivalent), on its own branch, on a
-morning when the queue is empty. Ledger: Red, 2026-09-05.
-
 **Green: eight real decks still stand in the checkout's `decks/`, and the
 thing that was holding them is gone.** arahbo-cats through trostani-tokens,
 `deck.yaml` mtimes 08-24/25 — the laptop-standing-copy shape that lost two
@@ -170,6 +141,15 @@ Ledger: Red, 2026-08-24, queued 11.
   They are out of this file entirely because the ledger carries them: see the
   Cleanup section's 2026-09-05 entry for the full accounting, and each color's
   own 2026-09-05 (cleanup) block for the outcome.
+- **Red's coverage-floor double-computation** — landed 2026-09-12 (Red) as
+  #466 and proven on the watched main run: the floor computes once, on the
+  arm64 leg (51s, printing 91.3% against 90.8), the amd64 leg — the critical
+  path — skips it (~84s back per run), and the premise is a test now
+  (`TestEveryGoFileCompilesOnBothCILegs`). Ledger: Red, 2026-09-12.
+- **The Anthropic key** — rotated by Aaron 2026-09-12, lasts through
+  year-end; `fly secrets` still prints no dates, but the digest is on the
+  ledger now, so the *next* rotation is visible as a delta. Ledger: Red,
+  2026-09-12.
 - **Blue's two owed walks** — done 2026-09-12 by the Blue rainbow leg, riding
   the signed-in seat: the fortune-teller's table is still the belle of the
   ball and the `/claude` page is in good order, its gallery credits

@@ -4236,10 +4236,156 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-09-05 (rainbow, night). Previous: 2026-08-24 (rainbow),
-  2026-08-19 (rainbow), 2026-08-18 (punch-list item 5, with Blue), and
-  2026-08-16 (rainbow), the first Red run and the baseline the numbers below
-  are a trend against.
+- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
+  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18 (punch-list item 5,
+  with Blue), and 2026-08-16 (rainbow), the first Red run and the baseline
+  the numbers below are a trend against.
+
+### 2026-09-12 (rainbow)
+
+- **Landed and watched end to end: the coverage floor is computed once (PR
+  #466, its own branch before the leg's, per the ruling).** The 09-05 queued
+  item — ruled yes, waiting on a quiet pipeline — and tonight's serial
+  rainbow was one. `Coverage floor` now runs under `if: matrix.arch ==
+  'arm64'`. The premise re-measured before the edit rather than inherited:
+  zero arch-suffixed filenames, zero `//go:build` lines in any `.go` file
+  (tests included), zero `runtime.GOARCH` reads outside tests; the one OS
+  pair (`internal/api/system_{linux,darwin}.go`) resolves identically on two
+  Linux runners. Proof on the PR run (34733373497): amd64 `Coverage floor
+  skipped 0s`, job 298s; arm64 `success 53s`, printing `statement coverage:
+  91.3% (floor 90.8%)`. **Proof on the watched main run (34733612980, the
+  deploy run for 0944e1d): amd64 271s with the floor `skipped 0s` — against
+  a 369s pre-change median — and arm64 211s with the floor `success 51s`,
+  printing 91.3% against the 90.8 floor.** Deploy green (169s, post step
+  2s), release v386, forge-worker image tag names 0944e1dd; public walk
+  after: `/`, `/signin`, `/colors`, `/glossary` all 200 at 189–294ms
+  serving the 5,756b shell, health body pool true / 25 decks. **~84s off
+  the pipeline's critical path on every push and pull request.**
+- **And the premise is a test now (this branch):**
+  `TestEveryGoFileCompilesOnBothCILegs`
+  (`go/cmd/mtglab/coveragefloor_test.go`) walks every `.go` file under
+  `go/` and holds `build.Context.MatchFile` equal between linux/amd64 and
+  linux/arm64 — the toolchain's own constraint semantics, filename suffixes
+  and `//go:build` lines both, test files deliberately in scope (an
+  arch-tagged test covers statements on one leg only). This answers the
+  standing question for the night: "the number cannot differ by
+  architecture" was an absolute claim enforced by nothing.
+  **Mutation-verified both ways**: a `zz_mutation_amd64.go` fails it naming
+  the file and direction; a `//go:build arm64` file fails it the other way
+  round; restored, green, 359+ files swept with a <100 anti-vacuity floor.
+  `docs/polish/COVERAGE.md` updated beside it (the one-leg fact in the
+  formula section; its floor row was a raise stale at 90.5).
+- **The deploy post-step hang (inherited lead from Black's merge run
+  34731793427): investigated, closed as a one-off.** The pattern read
+  first: the ten prior successful deploys' `Post Push the Forge worker
+  image` steps took **1–2s each** (raw, newest first: 1,1,2,1,1,1,2,1,1,2s
+  across 09-07→09-12). Tonight's hung from 02:08:08Z until the job was
+  killed at 02:26:19Z — **~18m of post-step hang, the job dying at 22m49s
+  against `timeout-minutes: 20`**. Two discoveries worth keeping: **post
+  steps run past `timeout-minutes`** (the ceiling killed it ~3 minutes
+  late, and the conclusion reads `cancelled`), and the failure presents as
+  a cancelled `tests` run on main **whose deploy had fully landed** —
+  machines updated 02:08, forge-worker tag naming cb75cf2 — the
+  read-the-image-tag lesson confirmed in the wild. No lever to pull: the
+  deploy-side build has no `cache-to` (nothing to export; the 1–2s norm is
+  a teardown doing nothing), so this was a runner fault, n=1 in 11.
+  Tonight's own deploy post step: 2s.
+- **The expiry calendar, updated for the rotation: the Anthropic key was
+  rotated today (2026-09-12) and lasts through year-end** — the 09-05
+  daybreak line leaves the queue. What this run could and could not verify:
+  `fly secrets list` (table and `--json` both) still prints no dates, so
+  the rotation itself is Aaron's word plus the memory record; **the digest
+  is now on the record for the first time — `ANTHROPIC_API_KEY` =
+  `7970b591828c62f6` — so the next rotation is visible from here as a
+  digest delta**, which is as far as "nothing here can see whether it
+  happened" closes without spending a call. Deliberately not exercised
+  against a live Claude mode (that spends; the next organic use proves
+  it). Then, comfortable: **TLS 2026-11-11** (verified from the live cert
+  tonight — notAfter Nov 11 14:11:46 GMT, same cert issued 08-13; Fly
+  renews ~30 days out, so expect turnover around mid-October and check it
+  turned on the next run) · **domain 2027-08-13** · **`FLY_API_TOKEN`
+  2027-08-14**. Nothing inside sixty days.
+- **Measurements (2026-09-12, rainbow; laptop load 3.4–5.5 through the
+  night — noted per the standing rule):**
+  - **CI per-job medians, n=26** (every successful `ci.yml` run 2026-09-06
+    → 2026-09-12, all pre-floor-gating, computed from per-job
+    `started_at`/`completed_at`): `go (amd64)` **369s** (285–427, was
+    347.5) · `go (arm64)` **216s** (195–297, was 208.5) · `deploy` **149s**
+    (134–203, n=12, was 171) · `image` **141.5s** (35–329, was 181) ·
+    `frontend` **85s** (65–92, was 78) · `go-lint` **40s** · `tools`
+    **32s** · `no-secrets-or-card-data` **6s**. The amd64 growth (+21.5s)
+    is the suite growing through the week; it was the critical path by
+    ~153s. **First post-gating points: amd64 298s (PR) and 271s (main)
+    with the floor skipped; arm64 219s/211s with the floor at 53s/51s.**
+    Expect the amd64 median to settle near ~285s; read it off n≥10 next
+    run, never off tonight's two.
+  - **Required contexts, read back: SEVEN, unchanged** — `frontend`,
+    `image`, `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`,
+    `go (arm64)`, `go-lint`. `tools` still absent (queued 9 stands).
+  - **Actions hygiene: 27 `uses:` refs, 27 SHA-pinned, five workflow
+    files** (`ci`, `codeql`, `dependency-review`, `forge-release`,
+    `mutants`) — unchanged from 09-05. Go module/build caches hit on the
+    primary key tonight (read from run 34733373497's log: "Cache restored
+    successfully", post step "not saving" on a primary hit, as designed).
+  - **Free-tier audit (GitHub changelog, Aug + early Sep 2026): nothing to
+    adopt.** Hosted-runner usage stays free for public repos; the September
+    drop is a runner-version-deprecation REST API and workflow-visibility
+    tweaks, none of which changes this pipeline or sharpens a queued
+    proposal.
+  - **Scanner backlog: CodeQL 0 open · Dependabot 9 open** (the torch
+    cluster; White's 09-12 daybreak line asks the dismissal) · secret
+    scanning 0 on an enabled scanner.
+  - **Live probe (2026-09-13 ~02:45–03:05Z, v385→v386):** `GET /` 200
+    178–289ms, 5,756b · `/signin` `/colors` `/glossary` 200 189–294ms
+    (the shell; auth walls the content, as designed) · `/api/health` 200
+    201–282ms, body pool true, **35,393 oracle / 108,263 printings, 25
+    decks** (was 17 on 09-05 — real growth, see White's 09-12 note), bulk
+    2026-08-30, `pool_stale` false · `/api/decks` **401** 174ms · `HEAD /`
+    still **405** (queued 2's monitor-config caveat, unchanged). Still no
+    `app_db`/`disk_free_mb`/`schema_version` in the health body (queued 3
+    unchanged).
+  - **Alerting posture — unchanged in every line that matters:** fly.toml
+    HTTP check GET `/api/health` 30s/5s/10s grace (stops routing on
+    failure, restarts nothing) · machine restart policy fires on process
+    exit only · deploy-job failure email · **external uptime monitoring:
+    none · phone alerting: none** (queued 1, still the biggest gap).
+    Held-awake block still on.
+  - **Instance:** app machine started, release **v386** after tonight's
+    two Red deploys (v384 was Black's) · `forge-worker` stopped, holding
+    `forge-worker-0944e1dd…` · volume 3GB encrypted, **5 snapshots, newest
+    12h, 5-day retention, 1.0 GiB stored** (the 4-day-old one 802MiB, the
+    dailies 58–79MiB). **Restore drill still never walked** (queued 11 /
+    daybreak 08-24 item 4 stands).
+  - **Hot-spot patrol — read, not re-measured, per the standing method:**
+    Black's 09-12 leg took the request-shaped profiles the same night (its
+    section carries them): CPU 64.5% featureless `runtime.cgocall` (the
+    documented blind spot), alloc proportionate (`SearchCards` ≈122
+    KB/request, no leak shape, `growSlice` 9.36MB of JSON buffers), and
+    the one mover — search wall clocks +35–56% cross-night — proven
+    environmental by Black's interleaved A/B race against a rebuilt #440
+    (identical medians both sides, DuckDB unmoved at v2.10505.0). **No
+    alarm shapes: nothing climbed the ranking, nothing new is smoke.** The
+    race is the patrol's standing instrument now: a cross-night wall-clock
+    comparison on this Mac is not a finding without one.
+  - **Controls, re-censused:** 227 `<button>` tags outside tests (was
+    212) · **0 with no `className`** — measured tag-aware: a line-based
+    grep reports 130 false positives off multi-line JSX (the `=>` inside
+    an `onClick` ends a naive regex's tag early), and a brace-aware scan
+    still counts one `<button` living inside `hint.tsx`'s *doc comment*;
+    both worth knowing before trusting any future count · 912 `style={{`
+    props (was 890) · the async-controls census is **held by
+    `web/src/asynccontrols.test.ts`** and ran green tonight ·
+    `signOut()` confirmed fixed in-tree (`disabled={signingOut}`,
+    App.tsx:459) — queued 12's last read, closed by the 09-05 cleanup,
+    verified rather than inherited.
+- **Queue movement tonight:** the coverage-floor item **CLOSED** (landed
+  and proven above); the Anthropic-key line **CLOSED** (rotated today; the
+  calendar above carries the outcome and the digest baseline). Standing,
+  unchanged, Aaron aware tonight and deliberately not re-asked: **`tools`
+  as a required context** (a repository setting; his flip) and **the
+  restore drill** (a watched hour and a scratch volume — never forked
+  unwatched at night). No new questions from Red tonight: the honest queue
+  contribution is zero lines.
 
 *(Two headings added by the 2026-09-05 cleanup so this section reads like the
 other five. No content below them was changed.)*
