@@ -1695,6 +1695,26 @@ approved half of the pprof item was the night's build.
   - `data/app.db` untouched by this leg (mtime Sep 12 08:42 before and
     after; the `-wal` at 15:19 is the standing 8765 server's, another
     session's process, left alone).
+- **The standing question's answer this run: commandment 10's render rule is
+  enforced by nothing.** The Python era had
+  `tests/test_technology_never_renders.py` — a sweep of rendered strings for
+  the seed/database/framework shapes, mutation-verified against the five
+  original offences (PR #191's relabel left it as the tripwire) — and **it
+  has no successor**: the crossing kept `lib/claudecopy.ts` (the seam) and
+  `claudecopy.test.ts` (which tests the label functions, not the rule), and
+  no test anywhere sweeps `web/src` rendered strings for a re-grown
+  `seed {n}`, a database name, or a model id. The Wheel and the Simulator
+  both re-grew a rendered seed once already, which is why the commandment's
+  own parenthesis names seeds. **Deferred to the next Blue run rather than
+  built at 5pm-before-a-merge, deliberately**: the 2026-08-18 lesson is that
+  this exact class of tripwire passes as decoration on its first draft
+  (wrapped lines, shape-blind patterns), and the rebuild must carry the
+  Python version's own hard-won shape — flatten files before matching,
+  anchor on rendered shapes (`>seed <`, `label="Seed"`) never bare words
+  (card names like Seedborn Muse must not trip it), carve the two standing
+  exceptions (Claude by name, Forge by Aaron's 2026-08-28 ruling), and
+  mutation-verify against the five original shapes re-injected. Trigger: the
+  next Blue run, as its first fix.
 - **Deferred (re-checked, with triggers):** the three local env readers
   (unchanged at three; trigger: a fourth, or a whitespace bug); the
   dropped-name counter (still nothing to surface); the pprof **live half
@@ -1703,6 +1723,12 @@ approved half of the pprof item was the night's build.
   run with UI budget); `claude plugin eval` / `/skill-doctor` (trigger
   above, Colorless's question). **Left standing by ruling:** `internal/
   jobs`' two `sort.Slice` (golden-bearing, total comparators).
+- **Handed to Black (leg three, tonight):** the committed bundle's entry
+  chunk measured tonight at **316,739 B raw / 98,095 B gzipped** —
+  `web/README.md` still says 285/91 kB (its own text admits nothing
+  re-measures it; third rot of this number). Do not patch the prose a third
+  time: build the bundle-size budget the 08-24 cross-color note asked for,
+  and let the number live in the gate.
 
 ### 2026-09-05 (rainbow, night)
 
