@@ -30,28 +30,22 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > from the API as eight contexts, closing the Red item queued since 2026-08-24.
 > The Answered list gains items 7, 8 and 9.
 >
-> **Seven items are open as this file is written, counted rather than
-> remembered** — and two of those seven (Blue's settings copy, White's wider
-> prose guard) are the deliberately-waiting kind that need nothing today. An
-> earlier draft of this header said four, which was a number nobody had
-> counted; `grep -c '^\*\*[A-Z][a-z]*:'` is how to check it, and this file's
-> own standing rule says to.
+> **Six items are open as this file is written**, two of them (Blue's settings
+> copy, White's wider prose guard) the deliberately-waiting kind that need
+> nothing today. The count is worth a note of its own, because it went wrong
+> twice in one evening: a draft of this header said four, which nobody had
+> counted, and the grep written to settle it counted seven because
+> `^\*\*[A-Z][a-z]*:` also matches every `**Recommendation:` line. An item
+> opens with its colour, so ask for the colour:
+>
+> ```
+> grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):' docs/polish/DAYBREAK.md
+> ```
+>
+> Which is this file's own standing rule biting the file itself. A count is a
+> claim to re-check, and so is the recipe for checking it.
 
 ---
-
-## Open — one command at the keyboard, and still not run
-
-**Colorless: `fly` on this shell has refused its stored login since Saturday
-morning, and the cause is a clock, not corruption.** Re-read 2026-09-13
-17:00: `token expired (742h7m41s since login, timeout is 720h0m0s)` —
-flyctl's 30-day interactive-session ceiling, clocked from deploy day's login
-(Aug 13). The stored token itself still works; every leg's `FLY_API_TOKEN`
-export bypasses the interactive check, which is how this morning's refresh
-and the whole restore drill were driven. · *Cost of leaving it:* every
-session pays the grep-export tax, and the first one that forgets reads a
-healthy instance as unreachable. · **Recommendation:** run `fly auth login`
-once at the keyboard — two minutes, resets the 30-day clock. Queued three
-mornings running now. Ledger: Colorless, 2026-09-12.
 
 ## Open — a few clicks in the repository settings
 
@@ -82,20 +76,27 @@ the retention-free `app.db` backup covering the rest. Nothing further owed
 unless you want a post-migration drill added to the merge checklist.
 Ledger: Red, 2026-09-13 — entry owed, the walk is in the Answered list below.
 
-**Green: two curated decks warn that an MDFC's *land back* is filed under a
-spell category, which may be the gate reading the wrong face.**
-`one-blade-many-blessings` (Strength of the Harvest // Haven of the Harvest,
-filed 'engine') and `school-of-hard-knocks` (Legion Leadership // Legion
-Stronghold, 'utility'; Stump Stomp // Burnwillow Clearing, 'interaction') —
-all three are modal double-faced cards whose *front* is a spell and whose
-back is a land, and all three are filed by their front face, which is how a
-player would file them. · *Cost of leaving it:* three standing warnings that
-may be correct advice or may be a category check reading a combined type
-line; nobody has looked. · **Recommendation:** worth one session's read of
-the category check against a known MDFC, because if it is reading the wrong
-face it is wrong everywhere, not only here. Not urgent — warnings only, zero
-errors. Ledger: Green, 2026-09-13 — entry owed; noticed while re-checking the
-gate claim in ruling 1 below.
+## Open — a ruling, when you want to make it
+
+**Green: `Deck.LandCount()` counts by category alone, so a modal DFC filed as
+a spell is missing from the land count *and* from the opening-hand
+arithmetic.** Found while answering the MDFC warning below-the-line: the deck
+wire's `land_count`, and `analyze.OpeningHand` which reads it, both ask only
+"is the category 'land'". `analyze.CurveOf` and `PipRequirements` ask
+`IsLand()` instead. So a card like Stump Stomp // Burnwillow Clearing filed
+under 'interaction' falls between them — too land-like for the curve, not
+land-like enough for the land count — and the opening-hand land probabilities
+are computed one land short. · *Cost of leaving it:* three cards across two
+decks today; the numbers are quietly a little pessimistic, and nothing says
+so. · **What would have to be true:** this is the determinism contract's
+neighbourhood — `land_count` is on the wire and the opening-hand table is
+recorded in `gate/testdata/*.stats.json`, so changing the rule moves frozen
+goldens and is deliberately not a thing a session does on its own. ·
+**Recommendation:** rule on whether an MDFC counts toward `land_count`. It
+genuinely is a land drop, so "yes" is the honest answer and the one that makes
+the two arithmetics agree — but it is your call, and it wants its own branch
+with the goldens re-recorded deliberately. Ledger: Green, 2026-09-14 — entry
+owed.
 
 ## Open — watched tasks, for an hour or a seat
 
@@ -238,3 +239,24 @@ and deletes them from here.)*
    half. `allowed_actions` is deliberately still `"all"`: narrowing it means
    enumerating every action the workflows use, and getting that wrong breaks CI
    rather than tightening it — it wants its own session, not a drive-by.
+
+10. **Colorless — `fly auth login` was run.** `fly auth whoami` answers
+    `squieraaron@gmail.com` without the `FLY_API_TOKEN` export, so the 30-day
+    clock is reset and the grep-export tax is gone until roughly 2026-10-14.
+    Expect this back on the queue then; it is a ceiling, not a fault.
+
+11. **Green — the MDFC warning is correct, and chasing it found a real bug.**
+    The suspicion was that the gate reads the wrong face. It does not:
+    `CardRecord.IsLand` deliberately counts a modal DFC's land back and
+    deliberately refuses a `transform` card's, and says so where it stands —
+    you cast the front, and the back arrives only by flipping. The three
+    warnings are honest. **But `internal/analyze` had its own third
+    definition** — `strings.Contains(rec.TypeLine, "Land")` over the combined
+    line — which answers wrongly for **32 `transform` cards** (Treasure Map,
+    Ojer Pakpatiq, Thousand Moons Smithy…). Both its callers skip lands in
+    order to count spells, so those 32 vanished from the mana curve and their
+    coloured pips went unasked for: a deck running Treasure Map had a two-drop
+    no curve ever showed. Fixed by delegating to `IsLand`; no frozen golden
+    moved, checked before changing. The remaining half — `LandCount()` being
+    category-only — is promoted to its own open item above, because it moves
+    recorded numbers and is a ruling rather than a fix.

@@ -75,11 +75,20 @@ const (
 	// rotted one -- which is the doc comment's own test for keeping a date.
 	// This is what raising the ceiling is supposed to look like: one line, in
 	// the diff, with the reason beside it.
-	// 115 → 116 on the branch that made a refresh record its own prices. The
-	// added comment dates the two-days-seventeen-days-apart measurement that
-	// is the whole argument for the change; without the date a reader cannot
-	// tell whether the gap was ever closed.
-	goDatedCommentCeiling  = 116
+	// 114 → 117 over 2026-09-13/14, one at a time across three branches: the
+	// pool-bloat measurement, the two-days-seventeen-days-apart measurement,
+	// and the count of `transform` cards the analyzer was mis-reading. All
+	// three are counts taken against a pool that keeps growing, so a reader
+	// who cannot see when they were taken cannot tell a live number from a
+	// rotted one — which is this file's own test for keeping a date.
+	//
+	// **Worth saying plainly, though: that day added three and retired none.**
+	// The ratchet is doing its job — every one of those was a visible, argued
+	// line rather than drift — but a ceiling that only ever rises is the
+	// sweep's arithmetic problem in a new costume. The next Colorless run
+	// should spend its slice retiring dated comments rather than counting
+	// them, and lower this by more than it raises.
+	goDatedCommentCeiling  = 117
 	webDatedCommentCeiling = 292
 )
 

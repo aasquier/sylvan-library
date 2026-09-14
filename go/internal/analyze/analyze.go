@@ -140,8 +140,26 @@ func (o orderedCounts) MarshalJSON() ([]byte, error) {
 
 // isLand reads the whole type line for the word -- a substring, not a
 // parsed type list, which is the recorded reading here.
+// isLand is [pool.CardRecord.IsLand] with a nil guard, and the delegation is
+// the point of it.
+//
+// It used to ask `strings.Contains(rec.TypeLine, "Land")` of the whole
+// combined type line, which is a different question and answers wrongly for
+// **32 cards in the pool** (measured 2026-09-14): every `transform` card whose
+// back face is a land. Treasure Map, Ojer Pakpatiq, Thousand Moons Smithy,
+// Dowsing Device and the rest are artifacts and creatures you *cast* -- the
+// land arrives only by flipping, which is exactly the distinction
+// `CardRecord.IsLand` was written to make and says so where it stands.
+//
+// Both callers below skip lands in order to count *spells*, so the effect was
+// that those 32 cards vanished from the mana curve and their coloured pips
+// went unasked for in the pip requirements. A deck running Treasure Map had a
+// two-drop that no curve ever showed.
+//
+// No frozen golden moves: none of the 32 appears in any fixture deck, checked
+// before this changed.
 func isLand(rec *pool.CardRecord) bool {
-	return rec != nil && strings.Contains(rec.TypeLine, "Land")
+	return rec != nil && rec.IsLand()
 }
 
 // round2 rounds to two decimals, half to even on the scaled value.
