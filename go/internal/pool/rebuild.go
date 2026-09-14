@@ -132,6 +132,26 @@ func (r *rebuild) finish(ctx context.Context) error {
 		}
 	}
 
+	// Record what the prices were, now that the new printings are in and the
+	// history they extend has been carried over.
+	//
+	// **A refresh is the only moment the numbers move**, which is the whole
+	// argument for doing it here. `printings.price_usd` is written by the
+	// loader and by nothing else in the app, so between one refresh and the
+	// next every price in the pool is a constant -- and a snapshot taken on
+	// any other day records the same figures again under a new date, which
+	// is not history, it is a repeated reading of a stopped clock. Left to a
+	// separate command, the table gained a row whenever somebody happened to
+	// remember: the instance had exactly two days in it by 2026-09-14, and
+	// they were seventeen days apart.
+	//
+	// Inside the rebuild rather than after the rename, so it lands or does
+	// not land with everything else -- a refresh cannot half-succeed into a
+	// pool whose prices are recorded but whose rows are not.
+	if _, err := r.conn.ExecContext(ctx, snapshotInto(rebuildCatalog)); err != nil {
+		return fmt.Errorf("pool rebuild: recording the prices it loaded: %w", err)
+	}
+
 	if _, err := r.conn.ExecContext(ctx, "DETACH "+rebuildCatalog); err != nil {
 		return fmt.Errorf("pool rebuild: detaching: %w", err)
 	}

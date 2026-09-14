@@ -208,8 +208,21 @@ Facts about that command worth knowing at the terminal:
   `/data` at boot; `fly machine restart <machine-id>` hands the volume
   back immediately.
 
-`mtglab data snapshot` appends today's prices to the price history; the
-refresh does not do it for you.
+**A full refresh records the prices it loaded**, into `price_history`, as part
+of the rebuild — so the history gains a point every time the numbers actually
+move and you need do nothing. `mtglab data snapshot` still exists for
+recording a day by hand, and both are safe to repeat: the key is
+(snapshot_date, printing_id) and the write replaces, so refreshing twice on a
+Tuesday leaves one Tuesday holding the later prices.
+
+This used to be yours to remember, and the reason it no longer is, is worth
+stating: **nothing but the loader ever writes `printings.price_usd`.** Between
+one refresh and the next every price in the pool is a constant, so a snapshot
+taken on any other day records the same figures again under a new date — a
+repeated reading of a stopped clock rather than history. Left to memory the
+instance had accumulated exactly two days by 2026-09-14, and they were
+seventeen days apart. An `--oracle-only` run records nothing, correctly: it
+never touched a price.
 
 ## Backups
 

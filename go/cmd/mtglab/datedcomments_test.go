@@ -75,7 +75,11 @@ const (
 	// rotted one -- which is the doc comment's own test for keeping a date.
 	// This is what raising the ceiling is supposed to look like: one line, in
 	// the diff, with the reason beside it.
-	goDatedCommentCeiling  = 115
+	// 115 → 116 on the branch that made a refresh record its own prices. The
+	// added comment dates the two-days-seventeen-days-apart measurement that
+	// is the whole argument for the change; without the date a reader cannot
+	// tell whether the gap was ever closed.
+	goDatedCommentCeiling  = 116
 	webDatedCommentCeiling = 292
 )
 
