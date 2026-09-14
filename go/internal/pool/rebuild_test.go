@@ -92,9 +92,16 @@ func TestARebuiltPoolKeepsThePriceHistoryNoBulkFileCouldReplace(t *testing.T) {
 		t.Fatalf("refresh: %v", err)
 	}
 
-	if got := countRows(t, dbPath, "price_history"); got != 3 {
-		t.Errorf("the rebuild kept %d of 3 price snapshots -- a refresh has "+
-			"destroyed history nothing can reconstruct", got)
+	// Asked of the seeded rows by name rather than of the total, because the
+	// total is no longer only theirs: a refresh records the prices it loaded
+	// as well (see [TestARefreshRecordsThePricesItLoaded]). Counting
+	// everything made this read "kept 13 of 3" the moment that landed -- a
+	// green-to-red on a test whose subject had not changed at all. The
+	// question here was always "did the old days survive", so it asks that.
+	if got := countRows(t, dbPath,
+		"price_history WHERE printing_id IN ('p1','p2','p3')"); got != 3 {
+		t.Errorf("the rebuild kept %d of 3 seeded price snapshots -- a refresh "+
+			"has destroyed history nothing can reconstruct", got)
 	}
 	// And the rows it was supposed to replace really were replaced, so this
 	// is not passing because the refresh quietly did nothing.
@@ -214,5 +221,69 @@ func assertNoLeavings(t *testing.T, dbPath string) {
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("checking for leavings beside %s: %v", dbPath, err)
+	}
+}
+
+// **A refresh records the prices it loaded.** Left to a separate command the
+// table gained a row whenever somebody remembered, which on the instance came
+// to two days seventeen days apart. A refresh is also the only moment the
+// numbers change at all -- nothing but the loader writes `printings.price_usd`
+// -- so this is both the useful moment and the only useful moment.
+func TestARefreshRecordsThePricesItLoaded(t *testing.T) {
+	t.Parallel()
+	oracle, printings := sweepFixtureCards(t)
+	scryfall := newBothKinds(t, oracle, printings)
+
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "pool.duckdb")
+
+	if _, err := pool.Refresh(context.Background(), pool.RefreshOptions{
+		DBPath:      dbPath,
+		ScryfallDir: filepath.Join(dir, "scryfall"),
+		IndexURL:    scryfall.URL + "/bulk-data",
+	}, pool.RefreshWatcher{}); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+
+	priced := countRows(t, dbPath, "printings WHERE price_usd IS NOT NULL OR price_usd_foil IS NOT NULL")
+	if priced == 0 {
+		t.Skip("the frozen fixture carries no priced printings; nothing to record")
+	}
+	if got := countRows(t, dbPath, "price_history"); got != priced {
+		t.Errorf("the refresh recorded %d prices, want %d -- a refresh is the "+
+			"only moment these numbers move, so a refresh that does not record "+
+			"them loses that day permanently", got, priced)
+	}
+}
+
+// Refreshing twice in a day replaces that day rather than doubling it. The
+// key is (snapshot_date, printing_id) and the statement is INSERT OR REPLACE;
+// this is the test that says so out loud, because the alternative failure --
+// a history that grows a duplicate set per run -- would look like data.
+func TestTwoRefreshesInADayLeaveOneDayOfPrices(t *testing.T) {
+	t.Parallel()
+	oracle, printings := sweepFixtureCards(t)
+	scryfall := newBothKinds(t, oracle, printings)
+
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "pool.duckdb")
+	shelf := filepath.Join(dir, "scryfall")
+
+	for range 2 {
+		if _, err := pool.Refresh(context.Background(), pool.RefreshOptions{
+			DBPath: dbPath, ScryfallDir: shelf,
+			IndexURL: scryfall.URL + "/bulk-data",
+		}, pool.RefreshWatcher{}); err != nil {
+			t.Fatalf("refresh: %v", err)
+		}
+	}
+
+	priced := countRows(t, dbPath, "printings WHERE price_usd IS NOT NULL OR price_usd_foil IS NOT NULL")
+	if priced == 0 {
+		t.Skip("the frozen fixture carries no priced printings; nothing to record")
+	}
+	if got := countRows(t, dbPath, "price_history"); got != priced {
+		t.Errorf("two refreshes on one day left %d price rows, want %d -- the "+
+			"second run must replace the day, not add a second copy of it", got, priced)
 	}
 }

@@ -21,10 +21,21 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > section's block, so the next Cleanup should carry the Answered list at the
 > foot of this file into White, Green, Red and Colorless.
 
-> **Later the same day: the pool rebuild landed.** Aaron read the morning's
-> measurement and asked for the rebuild-and-rename, so the Green item queued
-> out of it lasted about an hour. **Queue 6 → 5**, and the Answered list
-> below gains item 7.
+> **Later the same day: the pool rebuild landed, and then the evening's work.**
+> Aaron read the morning's measurement and asked for the rebuild-and-rename, so
+> the Green item queued out of it lasted about an hour (#472). He then asked for
+> a second day of prices, which turned into #473 once it became clear a *daily*
+> snapshot would have recorded a stopped clock. He also told the session to stop
+> handing work back, so **`tools` is now a required status check** — read back
+> from the API as eight contexts, closing the Red item queued since 2026-08-24.
+> The Answered list gains items 7, 8 and 9.
+>
+> **Seven items are open as this file is written, counted rather than
+> remembered** — and two of those seven (Blue's settings copy, White's wider
+> prose guard) are the deliberately-waiting kind that need nothing today. An
+> earlier draft of this header said four, which was a number nobody had
+> counted; `grep -c '^\*\*[A-Z][a-z]*:'` is how to check it, and this file's
+> own standing rule says to.
 
 ---
 
@@ -42,7 +53,7 @@ healthy instance as unreachable. · **Recommendation:** run `fly auth login`
 once at the keyboard — two minutes, resets the 30-day clock. Queued three
 mornings running now. Ledger: Colorless, 2026-09-12.
 
-## Open — a few clicks in the repository settings, and still not clicked
+## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and
 never dismissed on GitHub, so the security tab re-asks a settled question
@@ -55,20 +66,6 @@ not. · *Cost of leaving it:* every future security read spends the hour
 re-deriving this paragraph. · **Recommendation:** dismiss all nine as
 "tolerable risk — see tools/pyproject.toml's depth-extra triage" (two
 minutes in the Security tab). Ledger: White, 2026-09-12.
-
-**Red: `tools` gates the deploy now, and is still not a required check —
-that half is a repository setting only you can flip.** Red's #285 fixed
-`deploy`'s `needs`; the protection API answered seven contexts again on
-2026-09-13 (`frontend`, `image`, `no-secrets-or-card-data`,
-`dependency-review`, `go (amd64)`, `go (arm64)`, `go-lint`) and `tools` is
-not among them. So a red toolbox blocks the deploy and not the merge — and
-that gate holds every committed asset to its recipe, which is commandment
-9's provenance half. · *Cost of leaving it:* a red `tools` still merges,
-silently. · **Recommendation:**
-`gh api -X POST …/protection/required_status_checks/contexts
--f 'contexts[]=tools'`, and while you are in settings, `allowed_actions` is
-still `"all"` and non-provider secret patterns are still off — both free.
-Ledger: Red, 2026-08-24, queued 9.
 
 ## Open — newly measured, and now worth doing
 
@@ -223,3 +220,21 @@ and deletes them from here.)*
    in it), and a crashed run's `.rebuilding` file cannot block the next
    refresh. Expect the instance's `mtg.duckdb` to drop ~200 MB on the first
    refresh after the deploy.
+
+8. **Green — a refresh records the prices it loaded** (#473). The price history
+   was kept by memory and memory had managed two days seventeen days apart
+   (2026-08-28 and 2026-09-14). The obvious repair — a nightly snapshot — would
+   have been wrong: nothing but the loader ever writes `printings.price_usd`, so
+   between refreshes every price is a constant and a cron would file the same
+   figures under thirty dates. The refresh now records them inside the rebuild,
+   so it lands atomically with everything else; `--oracle-only` records nothing,
+   correctly. `mtglab data snapshot` still exists for a day by hand. **Still
+   true and worth remembering: nothing in the app reads `price_history` yet** —
+   it is accumulating for deal-watching that has not been built.
+
+9. **Red — `tools` is a required status check.** Done directly rather than
+   queued a fourth morning. The protection API now answers eight contexts. A red
+   toolbox can no longer merge silently, which is commandment 9's provenance
+   half. `allowed_actions` is deliberately still `"all"`: narrowing it means
+   enumerating every action the workflows use, and getting that wrong breaks CI
+   rather than tightening it — it wants its own session, not a drive-by.

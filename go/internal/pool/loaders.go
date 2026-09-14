@@ -117,15 +117,37 @@ func loadInto(ctx context.Context, db *sql.DB, catalog, path, table string,
 	return total, nil
 }
 
-// SnapshotPrices appends today's prices to
-// price_history. One statement, long unchanged.
-func SnapshotPrices(ctx context.Context, db *sql.DB) (int64, error) {
-	if _, err := db.ExecContext(ctx, `
-        INSERT OR REPLACE INTO price_history
+// snapshotInto is the price-history statement, aimed at a catalog. Empty is
+// the connection's own database, which is `mtglab data snapshot`; a name is
+// the half-built pool a refresh is about to rename into place.
+//
+// `INSERT OR REPLACE` rather than `INSERT`, and that is what makes the whole
+// thing safe to run more than once: the key is (snapshot_date, printing_id),
+// so a second run on the same day overwrites that day rather than doubling
+// it. Refresh twice on a Tuesday and Tuesday holds the second prices, which
+// is the right answer -- they are the ones the library is actually serving.
+func snapshotInto(catalog string) string {
+	prefix := ""
+	if catalog != "" {
+		prefix = catalog + "."
+	}
+	return `
+        INSERT OR REPLACE INTO ` + prefix + `price_history
         SELECT CURRENT_DATE, id, oracle_id, name, price_usd, price_usd_foil
-        FROM printings
+        FROM ` + prefix + `printings
         WHERE price_usd IS NOT NULL OR price_usd_foil IS NOT NULL
-    `); err != nil {
+    `
+}
+
+// SnapshotPrices appends today's prices to price_history.
+//
+// Still exported and still the body of `mtglab data snapshot`, because a
+// person may want to record a day by hand. It is no longer the *only* way
+// the table gains rows: a full refresh records the prices it just loaded,
+// for the reason [rebuild] gives -- those are the only moment the numbers
+// change at all.
+func SnapshotPrices(ctx context.Context, db *sql.DB) (int64, error) {
+	if _, err := db.ExecContext(ctx, snapshotInto("")); err != nil {
 		return 0, fmt.Errorf("snapshot: %w", err)
 	}
 	var written int64
