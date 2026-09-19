@@ -1722,8 +1722,9 @@ kill rate is bad enough to want every mutant rather than a sample.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
-  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
+- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
+  2026-08-18.
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -1733,6 +1734,204 @@ the spirit of Magic*
   column finds why) — but no path, number or test name down there is current.
   The section's own subtitle said "Python craft" until tonight, which is the
   drift this facet exists to catch, sitting on its own heading.
+
+### 2026-09-19 (rainbow)
+
+Leg two of the rainbow behind White's #478, run in daylight (08:50 PDT start)
+with Aaron away from the keyboard, so the Nightbound rules governed. The
+09-12 entry's own instruction was the first act — "the next Blue run, as its
+first fix" — and the two owed walks both had a seat this time: the `gyome`
+session in Aaron's Chrome was signed in, and it rode read-only under the
+standing "you are me" ruling.
+
+- **Fixed this run — the commandment-10 render tripwire is back, in both
+  halves, and it is a guard rather than a measurement again.**
+  1. **`web/src/technologycopy.test.ts`** sweeps every non-test `.tsx` for
+     the two places a person reads — JSX text nodes and the five attributes
+     whose value is a sentence (`label`, `title`, `placeholder`, `aria-label`,
+     `alt`) — against a four-row table: `seed(s)`, database names
+     (DuckDB/SQLite/Postgres), model ids and families (`claude-…-n`,
+     Opus/Sonnet/Haiku/Fable), and language names. It carries the Python
+     version's hard-won shape and improves on it where the tree offered a
+     better tool: tag ends come from `tagscan.tagEnd` (so `onClick={() =>
+     …}` cannot end a tag early — the bug `controlstate`'s first draft
+     shipped with), balanced `{…}` groups collapse to `{}` so an interpolated
+     value is invisible while the badge's `seed {}` shape survives, comments
+     are blanked to spaces before matching so `tarot.tsx`'s long seed
+     explanations stay writeable, and a fragment holding `=;()` is skipped as
+     code (the honest floor: a rendered sentence with a bracket in it goes
+     unread). The two allowed names — Claude by name, Forge by Aaron's
+     2026-08-28 ruling — are held as controls that must pass. **The wire
+     field, the `sim.seed` key, `?seed=` on the two reading URLs and the
+     `feTurbulence seed=` filter parameter are all out of scope by
+     construction**, and so is `lib/claudefavorites.ts`'s dandelion — the one
+     legitimate rendered "seeds" in the tree lives in `.ts` data, which the
+     sweep does not read. Anti-vacuity in three parts: a component-count
+     floor, seven re-injected shapes each caught by name, ten legitimate
+     shapes each let through (the cure, a JSX comment, a line comment inside
+     a tag, a generic that is not a tag, Seedborn Muse).
+  2. **`TestNoGlossaryEntryTeachesATechnologyWord`** in
+     `internal/reference/reference_test.go` is the same table over
+     `Words().Terms`' `term`/`short`/`long`, derived over every entry — the
+     tooltip is the one place a beginner goes to be *told* the word, which
+     is why the glossary mattered more than the badge in #191. The key is not
+     swept (`sim.seed` is API; the Simulator pins it).
+  - **Mutation-verified against the original offences, re-injected into the
+    real tree rather than into fixtures:** `shuffle {seed}` → `seed {seed}`
+    and `label="Shuffle"` → `label="Seed"` in `routes/Simulator.tsx`, and
+    `"mulligan, ramp, shuffle…"` → `"…seed…"` in `routes/Learn.tsx` — the
+    guard failed naming all three (`Learn.tsx:289`, `Simulator.tsx:98`,
+    `Simulator.tsx:453`), and passed again on `git checkout`. Glossary half:
+    `sim.seed.short` "Which shuffle" → "Which seed" failed the Go test at
+    `sim.seed.short: "seed" renders`; restored, green. Both new tests run
+    parallel; the TS one alone takes 1.68s.
+- **The two owed walks, both taken on the deployed instance, both green:**
+  1. **The fortune-teller's table (commandment 15) is still the belle of the
+     ball.** `/new` → "Help me decide" put the stashed table back on the felt
+     — **the same three cards the 09-12 keeper saw** (Page of Pentacles /
+     Eight of Wands / Seven of Wands, all reversed), which is the stash and
+     the seed keeping their promise a week apart — with the reader's opening
+     writing itself across the parchment in script, motes and leaves
+     drifting, "Sound on", "Shuffle again" and "Different reader" all
+     present, the evidence panel honest ("Nothing yet — it only counts
+     things you have actually said"), the budget field and "Pick colours
+     myself" in place. **Zero console errors.** No answer was submitted, no
+     deck created. One accident recorded so the next keeper is not misled by
+     it: a 0.6-scale screenshot's frame is still the full 1456×822, and a
+     click aimed off the scaled image landed on the Mono-Red tile instead —
+     harmless (a read-only page, and Etali's CardHover answered the hand,
+     which is commandment 17 doing its job), but aim in the full frame.
+  2. **The `/claude` keeper duty (commandment 18): the room is in good order
+     and to its keeper's liking.** Kwain and Tatyova render live with the
+     pool's own rules text, the Syr Gwyn plate carries her pips and type
+     line, and all four gallery credits were re-verified against the pool
+     through a throwaway `poolq` SQL window (deleted after — `git status`
+     clean): Library of Alexandria — Mark Poole, Arabian Nights
+     **1993-12-17**; Island — John Avon, Unhinged **2004-11-19**;
+     Bitterblossom — Rebecca Guay, Morningtide **2008-02-01**; Farewell —
+     Seb McKinnon, Kamigawa: Neon Dynasty **2022-02-18** (NEO holds two
+     Farewell painters, McKinnon and Fuzichoco; the page names the right
+     one). Zero console errors. Nothing changed; the 09-12 ruling on the
+     three uncredited-in-words `art_crop`s stands.
+- **The spirit of Magic — shelf fact-check, nine cards and four dates, all
+  held, zero wrong facts.** Sample drawn by seeded `random.sample` over
+  `lore.json` and `colors.json`, every card through `./mtglab cards show`
+  (rule 1, nothing recalled): "1999's Sixth Edition rules until the 2009
+  overhaul" ✓ (`6ed` 1999-04-21, `m10` 2009-07-17); Skullclamp "printed
+  costing one mana" ✓ `{1}`, Darksteel 2004-02-06; Sol Ring `{T}: Add
+  {C}{C}` ✓ "one mana in, two out"; Command Tower ✓ "a land with no
+  downside in exactly this format"; Izzet's three champions ✓ (Niv-Mizzet,
+  Parun is a Dragon Wizard; Ral Zarek a planeswalker; Melek, Izzet Paragon
+  is literally a *Weird* Wizard, which the shelf's "a weird — a creature of
+  raw elemental magic" gets exactly right); Orzhov's three ✓ (Obzedat, Ghost
+  Council a Spirit Advisor at {1}{W}{W}{B}{B}; Teysa Karlov; Kaya, Orzhov
+  Usurper a planeswalker). The sweep half found nothing new to flavour; the
+  rendered-string inventory is unchanged from 09-12 and now guarded on the
+  commandment-10 axis as well as the loading-state one.
+- **Go craft — the six files new since 09-12 read, and the idiom is clean.**
+  `internal/pool/rebuild.go` (#472) is the standard the checklist asks for:
+  its package-level comment carries a *measured* argument (261,894,144 B
+  served vs 54,538,240 B rebuilt from the same rows) and the safety order is
+  argued at `finish` where it lives; the `owner_unix.go`/`owner_other.go`
+  split says why it is split. `internal/brew/seed.go`'s hand scanner argues
+  its deliberate copy of `tarot.ParseSeed` and pins it with a cross-parser
+  test. `internal/reference/cauldronlore.go` argues its duplication of
+  `tarotlore.go` rather than hiding it. **No goroutine was added since 09-12**
+  (the `go func`/`go name(` grep over the non-test diff is empty), so the
+  shutdown invariant has nothing new to reach. **One checklist correction
+  filed for Colorless** (not a code finding — the code is argued where it
+  stands): blue.md's Cobra-hygiene bullet says `os.Exit` is "confined to
+  `main.go` and an injectable `osExit`"; `osExit` no longer exists
+  (`cmd/mtglab/decks.go` says it "used to be"), and `cmd/mtglab/shim.go`'s
+  idle watchdog calls `os.Exit(0)` deliberately ("abrupt on purpose … a
+  clean exit is what turns `restart: no` into `stopped`"). The bullet should
+  name both sites and their arguments rather than a variable that is gone.
+- **Boot and config, re-measured (all raw):** `os.Getenv`/`os.LookupEnv`
+  outside tests **12 reads in 7 files — unchanged since 09-05**
+  (tier3/settings.go 3, claude/endpoint.go 3, flymetrics 2, config 1,
+  claude/stance 1, claude/client 1, ui.go 1). `.env.example` vs code: **both
+  `comm` directions empty** for shipping names; the eight names outside the
+  file (`MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`, `MTGLAB_OLD_SHIM_URL`,
+  `MTGLAB_TEST_ENVOR`, `MTGLAB_TEST_ENVOR_UNSET_ENTIRELY`,
+  `MTGLAB_TEST_HOLD_POOL`, `MTGLAB_TEST_POOL`, `MTGLAB_X`) each have **0
+  non-test readers** — `configrecord_test.go`'s boundary holding. Local env
+  readers still exactly three (`ui.go` `envOr`, `flymetrics` `envOr`, tier3
+  `envInt`); the deferred trigger has not arrived. `serve()` still carries
+  `signal.Notify(SIGINT, SIGTERM)` → `Shutdown`, `ReadHeaderTimeout` 30s,
+  `IdleTimeout` 120s. Required checks read back from the API today: eight
+  (`frontend`, `image`, `no-secrets-or-card-data`, `dependency-review`,
+  `go (amd64)`, `go (arm64)`, `go-lint`, `tools`).
+- **Toolchain audit: go.dev's release history read today — nothing has
+  shipped since go1.27.1 / go1.26.8 (both 2026-09-01).** Local sdk stays
+  go1.26.7; the go1.26.8 refresh remains an operator `go install`. Tree
+  pinned `go 1.26` by the macOS 12 ceiling; reopening trigger unchanged
+  (Go 1.28, ~Feb 2027).
+- **Memory audit: whole and quiet.** 177 files; every file the index names
+  exists and every file is indexed (both directions scripted, both empty);
+  no relative-dated claim to convert (the five "today"s are inside
+  narratives whose dates are stated); the coverage-floor and API-key index
+  lines already carry the 09-12 corrections. Nothing changed.
+- **Docs consistency, sampled:** CLAUDE.md's Testing count was refreshed by
+  White on 09-19 and is now held by `serialregister_test.go` rather than by
+  prose; `ROADMAP.md`'s mode sentence still reads "`data/modes.json` is the
+  set, never a count"; `web/README.md`'s bundle figure now lives in
+  `bundlebudget_test.go` (Black built the budget the 09-12 hand-off asked
+  for, so that number has stopped rotting).
+- **Measured (2026-09-19, this Mac, 08:51–08:55; load 3.1/3.5/15.6 at the
+  Go gauntlet's start, rising to 23 while Vitest's 91 workers ran):**
+  - Go gauntlet: `gofmt -l .` prints nothing; `go vet ./...` clean;
+    `go test -race ./...` **exit 0, 2m13.6s wall / 5m11s user** (warm cache
+    except `internal/reference`); `golangci-lint run ./...` **0 issues**
+    (9.7s).
+  - Frontend: `npm --prefix web run check` green — **1,615 tests across 91
+    files in 142.3s** (1,593/90 on 09-12; +22 are this run's guard plus
+    White's). Vitest's own note: 91 isolated workers at ~4.8s startup each,
+    "~58s faster with `isolate: false`" — recorded for Red/Black, not acted
+    on (a shared-worker mode changes what a module-level side effect can
+    leak between files, which is a testing-discipline call, not a speed
+    knob).
+  - `web/src` changed only by a `.test.ts`, which Vite bundles from
+    `main.tsx` outward and never reaches — **no bundle rebuild owed**, and
+    `git status` confirms `web_dist/` untouched.
+  - Modern-Go inventory (non-test): `interface{}` 0 · `ioutil` 0 ·
+    `rand.Seed` 0 · `strings.Title` 0 · `sort.Slice` 2 (both
+    `internal/jobs`, ruled 2026-08-24, ruling carried) · `sort.SliceStable`
+    21 · `sync.RWMutex` 0 · `sync.Mutex` 22 · `errgroup` 0 · `wg.Add(` 0
+    non-test (6 in tests) · **two rows added to the inventory this run:
+    `sort.Strings` 63 and `sort.Ints` 4** — `slices.Sort` is the spelling
+    the 09-05 conversion used in `night/pairing.go`, but sixty-three sites
+    is a mass edit and every one is a scalar sort with no tie to move, so
+    this is a number to watch rather than a conversion to start; convert
+    them as the files they sit in are touched for a real reason.
+  - Layering, grepped not trusted: no `duckdb` import outside
+    `internal/pool` (the other hits are the filename in `config`, test
+    fixtures, and `cmd/mtglab/data.go`'s prose); `internal/api` imports
+    `internal/door` nowhere (four comment mentions only);
+    `internal/night` imports `internal/api` only from a test.
+  - TS floor: zero regex lookbehind under `web/src`; zero
+    `forwardRef`/`React.memo`/`defaultProps`; rendered-attribute spellings
+    are 391 double-quoted and 0 `{'…'}` (the guard reads both anyway).
+  - `data/app.db` untouched (mtime Sep 12 08:42 before and after; the
+    `-wal` at Sep 14 07:05 is the standing 8765 server's).
+- **Deferred (re-checked, with triggers):** the "Shuffling up…" flavour
+  pair on the two `App.tsx` spinner labels — **deferred for a new reason
+  this time, worth writing down**: it needs a bundle rebuild, and a
+  bundle-carrying PR parked for Aaron's eye *during a rainbow* collides with
+  every later leg that rebuilds `web_dist/` (the committed bundle serialises
+  the merge train), so the right moment is a spirit run outside a rainbow or
+  a day Aaron can walk it within the hour; the three local env readers
+  (trigger: a fourth, or a whitespace bug); the dropped-name counter (still
+  nothing to surface); the pprof live half (b); `claude plugin eval` /
+  `/skill-doctor` (Colorless's question). **Skipped honestly:** the
+  Anthropic best-practices currency check — done 09-12, seven days ago, and
+  a week is inside its useful interval. **Left standing by ruling:**
+  `internal/jobs`' two `sort.Slice`.
+- **Queued for Aaron: nothing.** The run found no design decision, no
+  spend, no dependency and no security question; `DAYBREAK.md` is untouched
+  and the honest queue from this leg is empty.
+- **Handed forward:** to **Colorless**, the blue.md Cobra-hygiene
+  correction above; to **Red/Black**, Vitest's isolate note as a measured
+  candidate, not a recommendation.
 
 ### 2026-09-12 (rainbow)
 
