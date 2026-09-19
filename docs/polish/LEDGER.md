@@ -5931,8 +5931,248 @@ other five. No content below them was changed.)*
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
-  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-16 (rainbow).
+- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
+  2026-08-16 (rainbow).
+
+### 2026-09-19 (rainbow) — no PR of its own; ledger carried by the next leg
+
+Leg five of seven, run in daylight (10:28 PDT start, load `2.70 5.46 19.26` —
+the 15-minute figure is the earlier legs' `-race` suites, so no wall clock
+below is a trend). White #478, Blue #479 and Black #480 merged and deployed
+ahead of it (the instance is v397, Black's); Red's #481 sits green and parked.
+**Nothing under `web/src` that renders has changed since the last Green run**
+— `git diff --stat 0d33117..origin/main -- web/src` is three test files — so
+the browser facet this run is a re-measure of a surface already swept, and the
+run's landable work turned out to be one closure, one document fix and the
+measurements. That is the "only queued findings and no safe fix" case the
+rainbow protocol names, so this leg opened no PR: the text sits on
+`polish/green-2026-09-19` as a local commit and in the scratchpad carry file,
+for Colorless to carry onto its branch.
+
+- **Closed — the nine scratch decks are gone from the checkout, and every one
+  was checked against the instance first.** The daybreak item's blocker was a
+  running 8765 server; `lsof -nP -iTCP:8765 -sTCP:LISTEN` answered nothing
+  (Red's server had stopped before this leg began). Then, per the item's own
+  "what would have to be true": each slug against `fly ssh console -C "mtglab
+  decks list"` (25 decks) and each local `deck.yaml` against the instance's
+  copy, fetched by `cat` over ssh and diffed —
+
+  ```
+  arahbo-cats:             502 lines instance, 502 local   differs: name only (instance "Armed and Feline")
+  atla-palani-dinos:       493 lines instance, 475 local   instance newer: renamed "Life, Uh, Finds a Way"; +Phyrexian Altar, +Etali, Primal Conqueror, +Bonehoard Dracosaur; −Maskwood Nexus, −Kozilek, Butcher of Truth; two rationales rewritten
+  gyome-food:              490 lines instance, 490 local   differs: name only (instance "Kitchen Nightmares")
+  hylda-s-endless-winter:  344 lines instance, 344 local   identical
+  trostani-tokens:         403 lines instance, 406 local   instance newer: renamed "Token Effort"; Gleaming Splendor → Ainok Strike Leader
+  goreclaw-stompy:         MISSING-ON-INSTANCE             423 local; status: theoretical; 85 card entries
+  kaheera:                 MISSING-ON-INSTANCE             26 local; "A fixture, not a deck. See tests/tiny_pool.py."
+  mono-green:              MISSING-ON-INSTANCE             25 local; "A fixture, not a deck. See tests/tiny_pool.py."
+  partners-walk:           MISSING-ON-INSTANCE             41 local; "A scratch fixture … Delete after the walk."
+  ```
+
+  So: five were older snapshots of decks the instance has since renamed and
+  edited (the instance is newer on every diff — nothing on the laptop was
+  ahead of the truth); three declared themselves fixtures in their own
+  `strategy` line and pointed at a Python test the Go crossing deleted; and
+  one, **goreclaw-stompy**, is a real theoretical deck with no copy on the
+  instance. Before deleting that one: `git log --all -- decks/goreclaw-stompy`
+  finds it in history up to #136 (ADR 30, the day the library left the
+  repository), and `git show 5515f5f^:decks/goreclaw-stompy/deck.yaml` diffed
+  against the laptop copy differs by exactly one added `themes:` list —
+  `stompy`, `big-mana`, `ramp`, `midrange` — and one word ("corpus" →
+  "pool"). Recorded here so the only bytes that existed nowhere else survive.
+  Then `rm -rf` of the nine directories; `ls -A decks/` answers `[]`. **The
+  deletion is a filesystem act outside git, so it lands now regardless of
+  which branch carries this text.** Whether goreclaw-stompy belongs in the
+  library is Aaron's — queued below — because putting a deck onto the volume
+  is a write to the library, and no leg does that unasked.
+- **Closed — the deferred in-place-reload item (09-05), by measurement, and
+  the answer was the other branch of its own trigger.** The item said: if the
+  next refresh moved `mtg.duckdb` materially past 214MB, rebuild-to-temp
+  earns its diff; if it plateaued, close as steady state. What happened was a
+  third thing — Aaron read the morning's measurement and asked for the
+  rebuild (#472, 09-13), and the first refresh after it ran on the evening of
+  09-13 PDT. Read back this run: `/data/mtg.duckdb` **84,684,800 B**, mtime
+  `2026-09-14 04:34:59 UTC` — **down 139,460,608 B (−62%) from 224,145,408 B
+  on 09-12**, on a pool that grew (35,393 → 35,517 oracle, 108,263 → 108,583
+  printings). The "expected ~200MB drop" in the Answered list overshot; the
+  pool's real size is ~81MB and the old file was carrying ~140MB of air, not
+  200. The item closes. Two clocks, so nobody re-chases the mismatch: the
+  Admin Upkeep tile's "last gathered 2026-09-14" is the rebuild's own UTC
+  time; the bulk filenames' `2026-09-13` is Scryfall's `updated_at` stamp on
+  the files that rebuild downloaded. Both honest; the pool is six days old by
+  either.
+- **Fixed (document) — `docs/FORGE.md`'s worked examples named two decks the
+  instance does not hold.** `tivit-cedh` and `goreclaw-stompy` appear in no
+  `mtglab decks list` on the volume (Tivit's deck is `filibuster-on-the-floor`
+  there; Goreclaw's is the deck above). A runbook example that fails on the
+  only instance there is, is the hosted-first facet's language sweep in its
+  smallest form. Swapped for `filibuster-on-the-floor` and
+  `hylda-s-endless-winter`, both read off the instance today — and yes, this
+  is a roster claim that will rot the same way; it is two words in an example
+  and the alternative was a placeholder nobody can paste.
+- **The newcomer's walk (commandment 2), cold, phone width, on the real
+  door.** The Browser pane opened the live host this time (it had refused it
+  for Black), signed out, and `resize_window` with explicit `375×812` read
+  back `w: 375, h: 812` — the preset trap avoided. The door at that width:
+  `overflowX: 0`; two fields each with `labels: 1` and `autocomplete`
+  `username` / `current-password`; input text 14px; the viewport meta carries
+  `viewport-fit=cover`; the theme toggle is a `button` named "Switch to light
+  mode" (38×32); Sign in properly `disabled` until both fields fill (79×38);
+  "Forgotten your password?" a real button (173×28). Keyboard path, real Tab
+  presses: Password → Forgotten (`outline: solid 2px`) → theme toggle (`solid
+  2px`) → Username → Password — no trap, nothing skipped, and the inputs'
+  `outline: none` is `.field-shell:focus` drawing its ring as `border-color`
+  plus a 3px `box-shadow` instead (index.css, by design — Red's focus facet
+  owns that style and #481 holds it). Nothing on the door has changed since
+  the 09-12 walk found it honest, and it still is; no new stumble. The
+  authenticated phone sweep was **not** driven this run: Claude-in-Chrome's
+  `resize_window` reported success three times while `innerWidth` stayed
+  `1440` (`outerWidth: 728`) — the 08-24 trap in its Chrome form, and the
+  seat lives in Chrome. The desktop census stands in for it below.
+- **Authenticated census through the seat, read-only, `/` at 1440×813:**
+  `anonButtons: 0`, `unlabeledFields: []`, `imgsNoAlt: 0` of 104, one `h1`
+  ("Deck library"), `overflowX: -10` (the scrollbar), console clean on
+  `/admin`. **50 controls under 44px** on the shelf — nav links 32px tall,
+  every "Entomb" 66×28, "Tell me more" 96×28, the six filter `select`s 36px
+  — which is the 08-24 queued item 3 unchanged, recorded and not re-filed
+  (see the note for Colorless below).
+- **Owed entries from the 09-13 Answered list, written here because they are
+  this colour's** (items 4, 7, 8 and 11 of `DAYBREAK.md`'s foot; Cleanup may
+  strike them from that list on the strength of this entry):
+  - *Item 4, the watched refresh (2026-09-13, Aaron with Claude):* 41s, exit
+    0; 35,517 / 108,583; `swept 2 older bulk files (102,573,381 bytes freed)`;
+    the Zeta Set (`slz`) arrived as 363 reprints, so the queued claim that
+    imports would fail to resolve was wrong — what the refresh bought was
+    printings, prices and a fortnight of oracle drift. `pool.ArtFor` untouched.
+  - *Item 7, the rebuild (#472):* `pool.Refresh` fills a new file beside the
+    pool and renames it in; `price_history` carried by hand; `--oracle-only`
+    still in place. The leak reproduced in a unit test (1,847,296 → 3,682,304
+    → 3,944,448 B across three identical refreshes of the 22-card fixture)
+    and held flat by the rebuild; a failed refresh now leaves the served pool
+    byte-identical. Measured on the instance this run: the −62% above.
+  - *Item 8, prices recorded on refresh (#473):* the loader is the only writer
+    of `printings.price_usd`, so a nightly snapshot would have filed a stopped
+    clock under thirty dates; the refresh records inside the rebuild instead.
+    **Still nothing in the app reads `price_history`** — `mtglab data
+    snapshot` remains the by-hand day.
+  - *Item 11, the MDFC warning is correct and `internal/analyze` had a third
+    "is this a land" (#474):* `strings.Contains(TypeLine, "Land")` answered
+    wrongly for 32 `transform` cards, which fell off the curve and out of the
+    pip count; delegated to `IsLand`, no golden moved. The `LandCount()` half
+    is the ruling still queued above this leg — not re-litigated.
+- **Queued for Aaron (2026-09-19), two lines, both on `DAYBREAK.md`:**
+  1. **goreclaw-stompy.** A real 85-entry theoretical deck that now exists
+     only in git history (`git show 5515f5f^:decks/goreclaw-stompy/deck.yaml`)
+     plus the four theme words recorded above. *Cost of leaving:* none —
+     nothing serves it and nothing did. **Recommendation:** if it is a deck
+     you still want, paste that file through the site's import page (which
+     drafts nothing — every `why` is already there) and the library owns it;
+     if not, this line is its obituary and the ADR 30 rule held. Either way,
+     the mtg-lab skill's trigger list still names "mono-green/Goreclaw" as one
+     of your decks, which the instance contradicts — Blue's docs sweep.
+  2. **The next refresh has a date.** Pool is fresh today (six days), but
+     *Reality Fracture* (`fra`, 249 cards; `frc` commander decks) releases
+     **2026-10-02**, and until a refresh runs after that day the shelves
+     cannot resolve a released product. Deliberately waiting, nothing to do
+     today. **Recommendation:** "Gather the library again" on the Admin
+     Upkeep tab in the week of 10-05 — it is a deployed button now (ADR 6),
+     no ssh — and read the pool file's size back once more; it should hold
+     near 85MB.
+- **Measurements (2026-09-19, rainbow):**
+  - **`/api/health`** (public, from outside, no cache named): HTTP 200 in
+    0.321s —
+    `{"pool":true,"oracle_cards":35517,"printings":108583,"bulk_files":["default_cards-2026-09-13.jsonl.gz","oracle_cards-2026-09-13.jsonl.gz"],"decks":25,"pool_stale":false}`.
+    **Pool staleness: 6 days**; no ban-list announcement in the window that
+    this leg could verify; `pool_stale` still reads schema, not age.
+  - **Volume** — `df -h /data`: `/dev/vdc 2.9G 199M 2.6G 8% /data`. **Down
+    from 331M (12%) on 09-12 and 09-05** — the first fall a Green run has
+    recorded, all of it the pool. Breakdown (`du -sh`, `ls -la`):
+    `mtg.duckdb` **81M (84,684,800 B)**; `/data/scryfall` **99M** — exactly two
+    files, `default_cards-2026-09-13.jsonl.gz` 78,242,941 B and
+    `oracle_cards-2026-09-13.jsonl.gz` 24,610,703 B (the #420 prune holding);
+    `/data/cache` 18M (Admin: motion 11 MB · reader 5.8 MB · symbols 70 kB);
+    `/data/decks` 812K / **25** decks (Admin's byte sum: 600 kB); `app.db`
+    **925,696 B** (+8 KB since 09-12's 917,504 — the +36KB/day slope from
+    09-12 did not hold; ~1KB/day this week), `app.db-wal` 337,872 B.
+  - **Machine: `84e19ef25041e8`, shared 2 vCPU / 1024MB, iad, v397**, image
+    `deployment-01M2X8N7RTJ6C41A32SYB2X1YH`, started 09:42:14 PDT today
+    (Black's #480 deploy); 1/1 checks passing; event log holds only that
+    launch — **no OOM, no restarts**. Admin Machine tab: process **72 MB**
+    resident; machine 962 MB with **730 MB available**; instance memory as
+    the platform counts it **232 MB of 962 MB**; load `0.00 · 0.00 · 0.00`
+    on 2 CPUs; schema **v17 matches the code running here**. The Forge worker
+    `080e90dec3d918` (performance-4x, 8192MB) is `stopped` on image
+    `forge-worker-9fa99f9…`, last event `exit 130, requested_stop: true` at
+    16:43:03Z — the deploy's own image refresh, costing nothing stopped.
+  - **Edge, 24h (Admin, off Fly's Prometheus): 3,523 2xx · 357 4xx · 6 5xx.**
+    The 4xx figure is five times 09-12's 71 — a public host's scanners
+    meeting the door's 401; the 5xx are three deploys' bounces (#478, #479,
+    #480 all landed inside the window). Next quiet day's reading is the one
+    that matters, as 09-12 said.
+  - **Snapshots: five, 5-day retention, newest 2h, 1.1 GiB stored** — one
+    905 MiB full (4 days) + 59/63/62/62 MiB dailies. Newest snapshot (today)
+    newer than newest migration (0017, 09-06): healthy. Note the full is
+    905 MiB against 802 MiB on 09-12 — a snapshot is taken of the block
+    device, so the pool's 140MB of freed pages shrink `df` but not the
+    snapshot until the blocks are reused; not a fault, a shape to expect.
+  - **TLS: `notBefore Aug 13 14:11:47 2026 GMT`, `notAfter Nov 11 14:11:46
+    2026 GMT`, Let's Encrypt (YE2)** — 53 days, inside the sixty-day line
+    for the first time. `fly certs show`: `Status = Issued`, `rsa,ecdsa`,
+    "Expires 1 month from now" (Fly's rounding). Fly renews at ~30 days out,
+    so the watch date is **~2026-10-12**: a `notAfter` still reading Nov 11
+    after that is Red's alerting finding, not this facet's. `fly auth whoami`
+    answers the account without an env token; that login expires ~10-14.
+  - **Held-awake trigger: not arrived** — three merges deployed today before
+    this leg started; `auto_stop_machines = "off"` stands, the commented
+    scale-to-zero block unchanged beneath it.
+  - **Design point verified unchanged** (100 accounts / 10 concurrent): `git
+    diff 0d33117..origin/main` over `jobs/registry.go`, `auth/ratelimit.go`,
+    `convoke/convoke.go` and `fly.toml` is empty — `netWorkers = 2`,
+    `forgeWorkers = 1`, CPU lane `GOMAXPROCS`-derived, rate limits the one
+    `var` block (10/15m, 30/15m, 3/hr, 10/hr, 20/15m), SQLite WAL +
+    `busy_timeout(5000)`, `soft_limit = 20` / `hard_limit = 40`. **The
+    concurrency probe was skipped a fourth run running** — the checkout now
+    holds no decks to probe against, a local server rewrites `data/app.db`
+    (Red's did, 10:05 today), and the box carried other legs — so the 08-24
+    curve is now four runs old as a baseline. That is itself the finding:
+    the next Green run on a quiet box should re-run it with
+    `MTGLAB_DECKS_DIR` pointed at a scratch pull, before the baseline is
+    older than the code it measured.
+  - **Guards, run first with `-count=1` (1.6s, all PASS):**
+    `TestTheBundleStaysWithinTheDeclaredFloor`,
+    `TestTheFloorSettingFeaturesAreStillWhatHoldsIt`,
+    `TestTheCameraDoorStillHoldsTheFloorIndependently`,
+    `TestEveryAnimationInTheBundleCanBeArrested`,
+    `TestNoInlineStyleFilterShipsInTheBundle`,
+    `TestEveryArtBearingClassIsStillInTheBundle`,
+    `TestEveryOverlayClassIsStillInTheBundle`,
+    `TestTheBundleReachesForNobodyElsesCodeOrFonts`.
+  - **Hosted-first:** the one-copy rule **holds in the checkout for the first
+    time since 08-24** (`decks/` empty). Capability audit: the pool refresh is
+    a deployed admin button ("Gather the library again", Upkeep tab), the
+    Coliseum's records and costumes are server-side, `mtglab data backup` and
+    `snapshot` run placelessly under `fly ssh console`; the one standing
+    laptop-only capability remains `cardmotion sync` (HOSTING §card-art).
+    Language sweep of `docs/HOSTING.md` and `CLAUDE.md`: every "laptop" hit
+    describes tooling or states the rule; none describes data. The
+    `hostedcopy.test.ts` guard is in the tree.
+  - **`data/app.db` on the laptop: rewritten 10:05 today by Red's `mtglab
+    ui` start** (483,328 B, gitignored, unstaged) — recorded because the
+    protocol asks; not this leg's doing and not in any diff.
+- **For Colorless (cross-section, not re-filed here):** the 08-24 Green
+  queued item 3 (touch targets under 44px, app-wide — 50 of them on `/` at
+  1440 this run) lives in this section with **no line on `DAYBREAK.md`**;
+  09-12 chose "recorded, not re-filed" and this leg followed it, but the
+  skill's own rule says nothing waits in the ledger alone, so the queue audit
+  should either write its line or close it as a design ruling Aaron has
+  effectively made by leaving it. Also: two rig facts for the checklist —
+  the Browser pane *will* open the live host (it did today; Black's refusal
+  was not permanent), and Claude-in-Chrome's `resize_window` is the preset
+  trap's second form (reports success, `innerWidth` unmoved).
+- **Checklist corrections: none applied** — the reference's instructions were
+  each followed and each found what it said it would; the two rig facts above
+  are Colorless's to fold in if it agrees they are stable.
 
 ### 2026-09-12 (rainbow) — PR #468, green and open for Aaron's eye
 
