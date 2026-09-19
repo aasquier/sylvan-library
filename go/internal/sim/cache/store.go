@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	// Registers the "sqlite" driver. Same choice as `internal/auth` and
@@ -32,6 +33,14 @@ import (
 type Store struct {
 	db  *sql.DB
 	log *slog.Logger
+	// hits and misses are what `Get` answered over this process's life. A
+	// cache can be correct, tested, and never once consulted -- keyed on
+	// something that differs per request, say -- and no test finds that;
+	// only a counter does. A miss is "the table was asked and did not
+	// answer", which includes a read that failed; a nil store and an empty
+	// key ask nothing and count nothing, because "caching is off" is not a
+	// miss rate. Read through `Counts`; rendered nowhere.
+	hits, misses atomic.Int64
 }
 
 // Open attaches to `app.db` for the simulation cache.
@@ -110,12 +119,15 @@ func (s *Store) Get(ctx context.Context, key string) *Hit {
 		"SELECT result_json, created_at FROM sim_cache WHERE key = ?",
 		key).Scan(&blob, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
+		s.misses.Add(1)
 		return nil
 	}
 	if err != nil {
+		s.misses.Add(1)
 		s.log.Warn("simulation cache read failed", "err", err)
 		return nil
 	}
+	s.hits.Add(1)
 	// Touched on read so eviction is least-recently-*used* rather than
 	// oldest-computed. The numbers everybody looks at are exactly the ones
 	// worth keeping. A failure here is not a failure of the read: the answer
@@ -126,6 +138,16 @@ func (s *Store) Get(ctx context.Context, key string) *Hit {
 		s.log.Warn("simulation cache touch failed", "err", err)
 	}
 	return &Hit{Result: json.RawMessage(blob), CreatedAt: createdAt}
+}
+
+// Counts is how many times `Get` answered from the table and how many times
+// it was asked and could not, over this process's life. A nil store has
+// never been asked.
+func (s *Store) Counts() (hits, misses int64) {
+	if s == nil {
+		return 0, 0
+	}
+	return s.hits.Load(), s.misses.Load()
 }
 
 // Put stores `result`, evicting the least recently used rows if

@@ -673,3 +673,50 @@ func TestEveryKeepRuleFieldChangesTheKey(t *testing.T) {
 		})
 	}
 }
+
+// The counter is the one instrument that can tell a cache that works from a
+// cache that is never asked. Every expectation below is read off the
+// mechanism rather than restated: a miss is the table consulted and empty,
+// a hit is a row handed back, a write is neither, and an empty key -- the
+// spelling of "caching is off" -- consults nothing and so counts nothing.
+func TestTheStoreCountsWhatItAnswered(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := scratch(t)
+	expect := func(step string, hits, misses int64) {
+		t.Helper()
+		if h, m := store.Counts(); h != hits || m != misses {
+			t.Fatalf("%s: %d hits / %d misses, want %d / %d", step, h, m, hits, misses)
+		}
+	}
+	expect("before any ask", 0, 0)
+	if store.Get(ctx, "k1") != nil {
+		t.Fatal("a miss returned a hit")
+	}
+	expect("after a miss", 0, 1)
+	store.Put(ctx, "k1", "sim.mana", result{Games: 20000, Rate: 0.25})
+	expect("a write is not an ask", 0, 1)
+	if store.Get(ctx, "k1") == nil {
+		t.Fatal("the row did not come back")
+	}
+	expect("after a hit", 1, 1)
+	if store.Get(ctx, "") != nil {
+		t.Fatal("an empty key returned a hit")
+	}
+	expect("an empty key asks nothing", 1, 1)
+
+	// A read that fails is a miss too: the caller recomputed, and a counter
+	// that hid that would report a healthier cache than the one that ran.
+	broken := closed(t)
+	if broken.Get(ctx, "k1") != nil {
+		t.Fatal("a closed store returned a hit")
+	}
+	if h, m := broken.Counts(); h != 0 || m != 1 {
+		t.Fatalf("closed store: %d hits / %d misses, want 0 / 1", h, m)
+	}
+
+	var none *cache.Store
+	if h, m := none.Counts(); h != 0 || m != 0 {
+		t.Fatalf("nil store: %d hits / %d misses, want 0 / 0", h, m)
+	}
+}
