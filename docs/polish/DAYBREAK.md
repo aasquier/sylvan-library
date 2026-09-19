@@ -98,21 +98,17 @@ the two arithmetics agree — but it is your call, and it wants its own branch
 with the goldens re-recorded deliberately. Ledger: Green, 2026-09-14 — entry
 owed.
 
-## Open — watched tasks, for an hour or a seat
-
-**Green: NINE real decks still stand in the checkout's `decks/`, and the
-thing that was holding them is still running.** The eight from 08-24/25
-(arahbo-cats through trostani-tokens) plus hylda-s-endless-winter, added
-Sep 7. The reason to keep them expired when #436 merged 2026-09-05. ·
-*Cost of leaving it:* any edit made through a local surface diverges
-silently from the volume's truth. · **What would have to be true:** the
-local server on 8765 — another session's, PID 19163, started 08:42 on 09-12
-and **still listening at 17:00 on 09-13**, now 32 hours old — is stopped or
-known to be finished with them. No session deletes files out from under a
-running process it did not start. · **Recommendation:** `rm -rf decks/` in
-the main checkout once 8765 is down; future local walks pull fresh from the
-instance or point `MTGLAB_DECKS_DIR` at a scratch directory. Ledger: Green,
-2026-09-05; re-verified through 2026-09-13.
+**Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
+existed nowhere else, and it is deleted now — the other eight were older
+copies of decks the instance has since renamed and edited, or self-declared
+fixtures.** It survives in git history (`git show
+5515f5f^:decks/goreclaw-stompy/deck.yaml`, the last commit before ADR 30 moved
+the library out) plus four theme words recorded in the ledger. · *Cost of
+leaving it:* nothing — nothing served it. · **Recommendation:** if you still
+want it, paste that file through the site's import page and the library owns
+it; if not, this line is its obituary. Either way the mtg-lab skill's trigger
+list still names "mono-green/Goreclaw" as one of your decks, which the
+instance contradicts. Ledger: Green, 2026-09-19.
 
 ## Open — deliberately waiting, nothing to do yet
 
@@ -128,6 +124,16 @@ lands (ADR 46 names it as its own PR) and the settings room reads whether a
 night is scheduled off the wire. · **Recommendation:** unchanged — the copy
 becomes a fact the server owns when the shelf gives it something to read.
 This line is the reminder. Ledger: Blue, 2026-09-05.
+
+**Green: the pool is six days old and fine; the next refresh has a date
+rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the `frc`
+commander decks) releases 2026-10-02, and until a refresh runs after that day
+the shelves cannot resolve a released product. · *Cost of leaving it:* nothing
+until 10-02, then names from a new set fail on import and search. ·
+**Recommendation:** "Gather the library again" on the Admin Upkeep tab in the
+week of 10-05 — a deployed button now, no ssh — then read the pool file's
+size back once; the #472 rebuild took it 224 MB → 81 MB on 09-13 and it should
+hold near there. Ledger: Green, 2026-09-19.
 
 **White: `NOTICE.md` is held and the skills are held; the rest of the tree's
 prose is still unguarded.** The narrowed remains of the docs-rot question.
