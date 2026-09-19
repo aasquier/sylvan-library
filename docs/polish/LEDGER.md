@@ -29,6 +29,27 @@ state, never checklists.
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
 
+### 2026-09-19 (cleanup)
+
+- **Queued item closed, and the record the 09-13 morning owed: the live
+  invalid-example deck** (queued 2026-09-12; daybreak Answered 1). *Aaron
+  ruled: the fact is retired.* Read off the deployed volume that morning: 25
+  curated decks, `0 error(s)` on every one, two carrying warnings only. The
+  library had grown from 17 decks to 25 and the deliberately-invalid fixture
+  left somewhere in the growth without anything failing — the exact rot
+  CLAUDE.md's "claim to re-check" sentence warns about, caught in that file's
+  own prose. `CLAUDE.md`'s standing fact was removed on #471 and replaced by
+  a note saying it was retired and why, so a future session finding an
+  invalid curated deck knows it is a real problem rather than the promised
+  fixture. The gate's refusals stay covered by tests, which is where a
+  demonstration belongs. Nothing further owed.
+- **Still open, unchanged:** the nine torch alerts (API re-read 2026-09-19:
+  9, all `pip/torch`, `development`; a repo-admin click, carried with that
+  reason on both cleanups) and the wider prose guard (deliberately waiting,
+  re-worded once more on the queue with the 09-13 morning's two rot
+  instances as its first measured evidence).
+- Full accounting in the **Cleanup** section's 2026-09-19 entry.
+
 ### 2026-09-19 (rainbow)
 
 - **Fixed this run:**
@@ -3314,6 +3335,26 @@ applies to each. Ordered by cost:
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
 
+### 2026-09-19 (cleanup)
+
+- **Queued item 3 (08-24, the carried list) is closed — done elsewhere, by
+  #472.** The item's robustness half was that the loader ran `DELETE FROM
+  printings` before the load, so an interrupted refresh left the pool with
+  no printings, and it asked to be re-checked against `pool/refresh.go`
+  before closing. Re-checked: `pool.Refresh` now fills a new file beside the
+  pool and renames it into place (Green's 09-19 record carries the test — a
+  failed refresh leaves the served pool byte-identical, where the old path
+  left 22 half-loaded oracle rows in it). The hole is gone by construction;
+  the throughput half was already answered by the Appender. No re-litigation.
+- **Queued item 2 (08-24, the carried list) is reclassified, not closed.**
+  The theme conversation's second cache breakpoint — bounded at ~0.8% of that
+  mode's input on 08-19 and "still needing item 1 as its instrument" — never
+  had a daybreak line and does not need one: it is a deferred item whose
+  trigger is the cache-write tokens column landing (item 1, now on the queue
+  under "a migration window"), and the queue line for that column names it
+  as the thing waiting behind it. When the column lands, re-measure with it.
+- Full accounting in the **Cleanup** section's 2026-09-19 entry.
+
 ### 2026-09-19 (rainbow)
 
 Leg three behind White's #478 and Blue's #479. The quietest week this facet
@@ -5925,6 +5966,13 @@ other five. No content below them was changed.)*
     deploys**, which is the finding rather than the number. Five days is Fly's
     default and is the number that matters: a corruption nobody notices inside
     five days has no snapshot behind it.
+
+*Cleanup, 2026-09-19: three records this section was owed by the 09-13
+morning — the volume restore drill (Answered 6), `tools` as a required check
+(Answered 9), and the drill-versus-retention finding — are written in the
+**Cleanup** section's 2026-09-19 entry rather than here, because #481 was
+inserting this section's 2026-09-19 (rainbow) entry at its head at the same
+hour. Read that entry beside #481's.*
 
 ## Green — Growth & Resilience
 
@@ -9200,6 +9248,267 @@ the **queue depth before and after**, what Aaron ruled, what was landed, and —
 for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
+
+### 2026-09-19 (cleanup) — the third run
+
+The seventh and last leg of the 2026-09-19 rainbow, run in daylight
+(~11:20 PDT start) with Aaron away from the keyboard, so the Upkeep beat is
+the queue file rather than a conversation. Six legs ahead of it: #478 White,
+#479 Blue, #480 Black and #482 Colorless (carrying Green's `4c9df96`) merged
+and deployed — the instance was v398, `GH_SHA=a7ef805…`, when this leg began
+— and Red's #481 green and parked for the commandment-16 walk. Colorless had
+re-filed five ledger-only items onto the queue hours earlier, so this untap
+inherited a queue that had *grown* since the last cleanup by the file's own
+grep: **12 open going in.**
+
+**Queue depth: 12 open before, 14 after**, both by the daybreak header's own
+recipe (`grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):'`), and the
+growth is the untap working rather than failing: nothing was silently
+carried, two items that had been waiting *outside* the file were put in it
+(Red's #481 walk line, which lived only on its parked branch; Red's
+merge-queue item, whose ledger trigger fired this afternoon with four PRs
+open at once), and two ledger-only Black items were closed or reclassified
+without ever needing a line. The eleven-entry Answered list at the file's
+foot moved out entirely: seven records were already written by Green and
+Colorless on 09-19 (verified in place before striking), and the four this
+leg owed are below.
+
+**Untap — sixteen items read (twelve on the queue, four found in the ledger
+alone), four-way, every classification re-made this afternoon:**
+
+- *Still true, still needs Aaron — eleven*, in the six shapes the queue now
+  wears. **A walk:** #481 (green; its branch is behind `main` by five merges
+  and brought up to date at the end of this leg — see below). **Clicks:** the
+  nine torch alerts (API re-read: 9 open, all `pip/torch`, all
+  `development`; repo-admin, second cleanup carry with the reason stated).
+  **A word:** the `LandCount()` MDFC ruling (code re-read — `deck.go:487`
+  still counts by category; the goldens are the reason it waits);
+  goreclaw-stompy's import-or-obituary (`decks/` still empty; the skill's
+  trigger list still names it); the 44px touch floor (Green re-measured 50
+  controls on 09-19; four runs running); the `/api/health` body facts
+  (re-read: the live body still names pool, counts, bulk files, decks and
+  staleness and nothing about `app.db` or the disk — reclassified from "a
+  design idea" to "say yes and it is the next Red run's first fix", because
+  the recommendation *is* the design and only the platform-shaped free-space
+  read keeps it off a cleanup's branch); the drill-versus-retention residual
+  (HOSTING §Backups re-read, the five-day rule is landed; the one question
+  left is whether a merge-checklist line is wanted, recommended no); and the
+  merge queue (see the trigger note below). **A dollar:** the external
+  monitor and the phone (`fly secrets list` and the instance's check config
+  unchanged; on the queue since 09-19 only, in the ledger since 08-16).
+  **A watched deploy:** the deploy-time snapshot (`deploy.yml` re-read: no
+  snapshot step). **A migration window:** the cache-write tokens column
+  (`cache_creation_input_tokens` still appears only in two test fixtures).
+- *Still true, deliberately waiting — three*: the Settings torches copy
+  (`Settings.tsx:353` unchanged; `fly secrets list` shows no
+  `MTGLAB_NIGHT_WINDOW`, so the line is still true); the pool refresh after
+  *Reality Fracture* (a date, 2026-10-02, not a deadline; the pool is
+  `pool_stale: false` with both bulk files stamped 09-13); and the wider
+  prose guard (the kit is on `main`; the recommendation to let one more cycle
+  measure the rot stands).
+- *Still true, no longer needs him — zero landable by a cleanup.* The
+  nearest was the health body, and it is not a cleanup's to land (above).
+- *Gone stale — one, reworded rather than closed.* Red's 09-05 queued
+  item 5, the merge queue, carried the trigger "the next time more than two
+  PRs are open at once" and every run since read it as unfired (one PR on
+  08-19, zero on 09-05). This afternoon four were open at once — #475, #476,
+  #477 and #481 — so the trigger has fired and the item is put in front of
+  Aaron for the first time, with a "close" recommendation: the cost the
+  trigger predicted turned out to be one branch update and one full re-run
+  per Dependabot PR on the one morning a month they batch, and that is not
+  worth changing the contributor workflow for.
+- *Already done elsewhere — one.* Black's 08-24 queued item 3, the pool
+  refresh's robustness half ("`DELETE FROM printings` before the load, so an
+  interrupted refresh leaves the pool with no printings"), which that entry
+  said "should be re-checked against `pool/refresh.go` before this item is
+  closed". Re-checked: #472 (09-13) rebuilt the refresh to fill a new file
+  beside the pool and rename it in, and Green's 09-19 record carries the
+  test — a failed refresh leaves the served pool byte-identical. The
+  interrupted-refresh hole is gone by construction; closed in the Black
+  section's cleanup entry, not re-litigated.
+- *Reclassified, not queued — one.* Black's 08-24 queued item 2, the theme
+  mode's second cache breakpoint (bounded at ~0.8% of that mode's input on
+  08-19, "still needs item 1 as its instrument"). It never had a daybreak
+  line and does not need one: it is a deferred item whose trigger is the
+  cache-write tokens column landing, and it is now written as that beside
+  the column's own queue line rather than as a question of its own.
+- *The deferred-trigger walk, all six sections, after Colorless's own:* one
+  hook in `.claude/hooks/` (guard-git's inertness test stays deferred); #481
+  unmerged, so the `index.css` comment slice stays deferred; `internal/claude`
+  is not the slowest package; no single-card endpoint became a job. Nothing
+  fired that Colorless had not already caught — and the merge-queue trigger
+  above is the one that fired *after* Colorless read it, an hour later.
+
+**The four owed records, written here.** White's is in the White section's
+own 2026-09-19 (cleanup) entry (the retired invalid-deck fact). **The three
+Red ones are carried here by Cleanup rather than written at the head of the
+Red section**, because #481 inserts Red's 09-19 entry at exactly that spot and
+a second hand there would have made the parked PR unmergeable; the foot of
+the Red section points here, and #481's own entry should be read beside
+these.
+
+- *Red, Answered 6 — the volume restore drill (2026-09-13, Aaron with
+  Claude).* Walked in **4m49s wall clock, recovery time 96 seconds**, into a
+  throwaway app (`sylvan-library-drill`), never near `mtglab_data`, destroyed
+  at the end with production verified healthy after. Proved: `schema=17
+  pool=present` on the restored volume; 25 deck directories back, four
+  sampled decks validating `0 error(s)`; all three accounts with state and
+  admin marker intact; ext4 replaying the snapshot's journal cleanly on
+  mount; a from-nothing pool rebuild in 25 seconds. Procedure, commands and
+  the "set no secrets on the drill app" warning are `docs/HOSTING.md`
+  §Backups. This closes the 09-05 queued item 11 and the deferred "never
+  performed" item under it; `references/red.md`'s "a drill older than the
+  newest migration is due" rule is the one the drill itself broke — next
+  record.
+- *Red, the drill-versus-retention finding (2026-09-13, promoted from the
+  drill).* Snapshot retention is five days; rungs 0015–0017 landed
+  2026-09-06, so by 09-13 every surviving snapshot already sat at rung 17 and
+  the restore *read* the ladder rather than climbing it. A snapshot can only
+  ever exercise a migration landed in the last five days, so "drill older
+  than the newest migration" is unsatisfiable by construction and reads as
+  permanently overdue. Reworded in HOSTING §Backups on #471: drill within
+  five days of landing a migration, or accept that rung is never rehearsed,
+  with the retention-free `app.db` backup covering the rest. The residual —
+  whether the five-day drill is also named on the merge checklist — is the
+  one line still on the queue, recommended closed.
+- *Red, Answered 9 — `tools` is a required status check (2026-09-13, Aaron
+  directly).* Done rather than queued a fourth morning; the protection API
+  answers eight contexts (`frontend`, `image`, `no-secrets-or-card-data`,
+  `dependency-review`, `go (amd64)`, `go (arm64)`, `go-lint`, `tools` —
+  re-read 2026-09-19). A red toolbox can no longer merge silently, which is
+  commandment 9's provenance half. `allowed_actions` is deliberately still
+  `"all"`: narrowing it means enumerating every action the workflows use,
+  and getting that wrong breaks CI rather than tightening it — its own
+  session, not a drive-by. This closes the 09-05 queued item 9, opened
+  08-24 and carried by both earlier cleanups under the same stated blocker.
+
+**Discard to hand size — what landed, all of it needing no ruling:**
+
+- **The Dependabot trio, merged one at a time and each deploy watched.**
+  Every bump read off the PR bodies as patch or minor before merging —
+  `#475` go: anthropic-sdk-go 1.71→1.72, x/crypto 0.56→0.57, x/term
+  0.45→0.46, x/tools 0.49→0.50; `#477` actions: codeql-action
+  4.37.9→4.38.0 (init and analyze); `#476` frontend: react and react-dom
+  19.2.8→19.3.0, @types/react 19.2.18→19.3.0, @types/react-dom 19.2.7→19.3.0,
+  @types/node 26.4.1→26.5.1, oxlint 1.81→1.82, vite 8.2.2→8.3.0. `#476` had
+  been red on `frontend` since 09-16 for the known reason (`web_dist/` is
+  stale against a bumped React), so its bundle was rebuilt here
+  (`npm --prefix web ci && npm --prefix web run build`: four assets moved —
+  `Coliseum.js`, `DeckDetail.js`, `app.js`, `mtg.js`) and pushed to *its*
+  branch as `be84eb2`, never a recreated PR. Merge order, deploys and health:
+  the order was `#475` → `#477` → `#476`,
+  each merged only when the previous one's `tests` run on `main` had
+  finished, each needing `gh pr update-branch` first (the protection is
+  `strict`), and each polled by name with a sleep-30 loop, never `gh run
+  watch`. Proof per deploy by the app machine's image label:
+  `#475` → **v399, `GH_SHA=ed69b27`**, `tests` run 35461365928 success,
+  `/api/health` 200 (35,517 / 108,583, 25 decks, `pool_stale` false), door
+  200 and rendering in the Browser pane; `#477` → **v400,
+  `GH_SHA=ddce150`**, health 200, door 200, **but the `tests` run
+  (35461824055) concluded `failure`** — every test job green and the app
+  deployed, and the deploy job's last step, "Point the forge-worker machine
+  at it, and put it to sleep", died on the machine-update `POST` with **HTTP
+  409** one second after the worker image push completed; flyd's event log
+  shows `replacing/update` at 11:44:27.872 and `stopped/revert` at
+  11:44:27.991. The worker stayed on `forge-worker-ed69b27…` (one sha
+  behind, and the two images differ by no Go or Java byte — #477 changed
+  only workflow files), so no rollback was warranted and none was made:
+  rolling the app back would have landed it on the sha the worker already
+  held. Not debugged live, per the rule; `#476` → **v401,
+  `GH_SHA=e6148af`**, `tests` run 35462273298 success with the deploy job
+  green end to end, and the worker re-pointed to `forge-worker-e6148af…` —
+  the 409 healed by the next deploy, which is the transient shape. Health
+  200; door 200; the served `assets/app.js` md5 equals `main`'s committed
+  copy (`139cd84e…`, from `c08ad522…` before the React bump); the door
+  reloaded in the Browser pane on v401 with the console clean. **For Red's
+  next run, not queued:** the worker step has no retry and no tolerance for
+  a 409, so a transient on the Machines API fails a `main` run whose deploy
+  fully landed — the second time (after 09-12's `cancelled`-on-a-landed-deploy)
+  that a red `tests` conclusion on `main` has described the workflow and not
+  the instance.
+- **The queue rewritten in its final grouped shape** (the Upkeep beat's
+  night form): seven groups ordered by what an answer costs — a walk, a few
+  clicks, a word each, a dollar, a watched deploy, a migration window,
+  deliberately waiting — every line re-verified and pointing at its ledger
+  record, the Answered list gone, the header blockquote replaced.
+  `daybreakrecord_test.go` proved every pointer with `-count=1` before the
+  push. The one-line-per-item tension is unchanged and still Aaron's: two
+  questions about how the pass writes ride the report rather than the queue
+  (below).
+- **Three other sections touched, each within Cleanup's licence:** White
+  gains a cleanup entry (the owed record); Black gains one (item 3 closed,
+  item 2 reclassified); Red gains one pointer at its foot. No test, no code,
+  no `web/src` — the diff is four documents, which is the surgical cap
+  honoured from the other side: a cleanup whose landable work was records
+  and merges should not manufacture a fix to look busy.
+
+**Still in hand — fourteen, each with what would have to be true**, carried
+by the group each stands in on the queue: Aaron at a browser for ten minutes
+(#481's walk — the Tab route is written on the line); Aaron in the Security
+tab for two (the alerts); a word from Aaron on six (MDFC, goreclaw, 44px,
+health body, drill checklist, merge queue); a $5 account and a free one (the
+monitor); a morning he can watch a deploy (the snapshot step — and the
+deploy token's scope read first); a boot he can watch (the tokens column);
+and other work landing first (the night shelf for the torches copy, 10-02
+for the pool, one more measured rot cycle for the prose guard). **Carried
+three cleanups without a stated reason: none.** The torch alerts are on
+their second carry with the reason (repo-admin) written both times; Red's
+monitor, health and snapshot items are on their *first* cleanup as queue
+lines, though they have sat in the ledger since 08-16 — which is Colorless's
+09-19 finding, not a new one.
+
+**#481, kept mergeable.** The branch is behind `main` by #482 and
+the three merges above, plus this one, and its `DAYBREAK.md` hunk collides with the
+regroup by construction — it inserts a "walk before a merge" section at the
+exact spot this file now carries one — while its `LEDGER.md` hunk (the head
+of the Red section) is untouched here on purpose. So after this entry merges,
+`main` is merged into `polish/red-2026-09-19` and the daybreak side resolved
+to the regrouped file (which already carries #481's line, verbatim); whether
+anything else conflicted, and the branch's check state after, ride the
+report rather than this entry, because they happen after it lands.
+
+**The extra cleanup step — one finding, from touching queued work.** Landing
+the Dependabot trio is what fired the merge-queue trigger: three green PRs
+against a `strict` protection each needed `gh pr update-branch` and a full
+re-run after the previous merge, which is precisely the cost that item
+predicted and had never been measured. Recorded as its queue line with a
+"close" recommendation rather than adopted; the beats did not run a second
+time, because the finding was already a queued item with its trigger.
+
+**Two questions for Aaron that ride the report, not the queue** (Colorless,
+2026-09-19, part two — one ruling about how the pass writes): whether "one
+line per item" means one item per *question*, headline first, with the
+context after; and whether `Queued for Aaron` blocks in the ledger should
+carry a machine-readable marker so `daybreakrecord_test.go` can read both
+directions — today it proves every queue line has a record and cannot prove
+every record has a line, which is exactly how five items hid for 26 days.
+
+**Measurements (2026-09-19, ~11:20–12:15 PDT):**
+
+    open daybreak items (the header's grep)   12 → 14
+    items read in the untap                   16 (12 queue + 4 ledger-only)
+    classification                            needs-Aaron 11 · waiting 3 ·
+                                              landable 0 · stale 1 (reworded) ·
+                                              done elsewhere 1 · reclassified 1
+    Answered entries moved out                11 (7 already recorded; 4 written here)
+    required checks (API read-back)           8, `tools` present
+    dependabot alerts open                    9 (all pip/torch, development)
+    code-scanning alerts open                 0
+    open PRs at the start                     4 (#475, #476, #477, #481)
+    fly auth whoami                           answers (plain login; ~10-14 ceiling)
+    fly secrets                               7 names, no MTGLAB_NIGHT_WINDOW
+    /api/health at the start                  200 · 35,517 / 108,583 · 25 decks · pool_stale false
+    instance at the start                     v398 · GH_SHA=a7ef805
+    dependabot PRs merged                     3 (#475 → v399, #477 → v400, #476 → v401)
+    main `tests` runs watched                 3 (success · failure at the worker step, app landed · success)
+    forge-worker after the last deploy        forge-worker-e6148af…, stopped
+    /api/health after the last deploy         200 · same body · 0.26s
+    served app.js md5 == main's               yes (139cd84e…)
+    branch updates paid (strict protection)   3
+    data/app.db                               Sep 19 10:05 before and after
+    decks/                                    empty
+    worktrees                                 main only
+    .claude/hooks                             1 hook (trigger unfired)
 
 ### 2026-09-12 (cleanup) — the second run
 
