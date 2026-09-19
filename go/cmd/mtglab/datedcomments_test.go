@@ -88,8 +88,13 @@ const (
 	// sweep's arithmetic problem in a new costume. The next Colorless run
 	// should spend its slice retiring dated comments rather than counting
 	// them, and lower this by more than it raises.
-	goDatedCommentCeiling  = 117
-	webDatedCommentCeiling = 292
+	goDatedCommentCeiling = 117
+	// 292 → 259 on the branch that swept the Coliseum board family
+	// (`web/src/components/board.tsx`): every date there sat on one of
+	// Aaron's rulings, whose argument is the sentence and not the day, so all
+	// of them went and no ceiling was raised beside them. This is what the
+	// fall side is for -- the test failed on the sweep before this line moved.
+	webDatedCommentCeiling = 259
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a

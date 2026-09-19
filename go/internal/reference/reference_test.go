@@ -3,6 +3,9 @@ package reference
 import (
 	"bytes"
 	"encoding/json"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -304,5 +307,53 @@ func TestArchetypeIndexFollowsThePilotedOrder(t *testing.T) {
 	t.Parallel()
 	if ArchetypeIndex("aggro") != 0 || ArchetypeIndex("combo") != 3 || ArchetypeIndex("cedh") != -1 {
 		t.Fatal("ArchetypeIndex is not ARCHETYPES' order")
+	}
+}
+
+// The glossary is the one place a beginner goes to be *told* a word, which
+// makes it the worst place for a technology's name to stand: `sim.seed` once
+// taught "seed" four times over while the Simulator's badge said the same,
+// and relabelling the badge alone would have left the tooltip contradicting
+// it. `web/src/technologycopy.test.ts` sweeps what a component renders; this
+// is the same table over the served prose, derived over every term rather
+// than asserted of the one that was wrong — a test that restates the claim
+// it checks cannot tell you the claim is wrong.
+//
+// The key is not swept: `sim.seed` is the wire's name for the entry and the
+// Simulator pins it (`SIMULATOR_KEYS`), so it is API, not copy.
+func TestNoGlossaryEntryTeachesATechnologyWord(t *testing.T) {
+	t.Parallel()
+	banned := []struct {
+		shape   *regexp.Regexp
+		instead string
+	}{
+		{regexp.MustCompile(`(?i)\bseeds?\b`), `Magic shuffles; say shuffle`},
+		{regexp.MustCompile(`(?i)\b(?:DuckDB|SQLite|Postgres(?:QL)?)\b`), `no database has a name here`},
+		{regexp.MustCompile(`\bclaude-[a-z0-9]+(?:-[a-z0-9]+)*\b|\b(?:Opus|Sonnet|Haiku|Fable)\b`), `Claude, by name only`},
+		{regexp.MustCompile(`\b(?:TypeScript|JavaScript|Golang)\b`), `no language is named to a player`},
+	}
+	var offences []string
+	for _, term := range Words().Terms {
+		for field, value := range map[string]string{"term": term.Term, "short": term.Short, "long": term.Long} {
+			for _, b := range banned {
+				if m := b.shape.FindString(value); m != "" {
+					offences = append(offences, term.Key+"."+field+": "+strconv.Quote(m)+" renders. "+b.instead+".")
+				}
+			}
+		}
+	}
+	sort.Strings(offences)
+	if len(offences) > 0 {
+		t.Fatalf("commandment 10 in the glossary:\n%s", strings.Join(offences, "\n"))
+	}
+	// Anti-vacuity: the table still matches the shape it was built for, and
+	// the two allowed names still pass it.
+	for _, b := range banned {
+		if b.shape.MatchString("Claude and Forge") {
+			t.Fatalf("%v matches an allowed name", b.shape)
+		}
+	}
+	if !banned[0].shape.MatchString("Which seed the games are dealt from") {
+		t.Fatal("the seed row no longer matches the sentence it was built for")
 	}
 }

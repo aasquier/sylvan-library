@@ -42,8 +42,8 @@ jar and `res/`. `MTGLAB_FORGE_HOME` overrides where it lives.
 
 ```bash
 mtglab sim forge arahbo-cats atla-palani-dinos --games 10
-mtglab sim forge tivit-cedh gyome-food --check-only   # pre-flight, no JVM
-mtglab sim forge arahbo-cats goreclaw-stompy --games 1 --narrate
+mtglab sim forge filibuster-on-the-floor gyome-food --check-only   # pre-flight, no JVM
+mtglab sim forge arahbo-cats hylda-s-endless-winter --games 1 --narrate
 ```
 
 Two to four decks. `--check-only` is the card-coverage pre-flight on its own:

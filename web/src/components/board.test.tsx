@@ -108,8 +108,8 @@ it('gives each hand its own place, on its own side of the seam', () => {
 
   // And the sand still carries neither hand. A seat has **three lanes, always
   // the same three**, in the same order, whatever is standing on them — which
-  // is the whole of "the board is one size" as a DOM can state it (Aaron,
-  // 2026-08-27). It used to be five, two of which drew only when they held
+  // is the whole of "the board is one size" as a DOM can state it (Aaron).
+  // It used to be five, two of which drew only when they held
   // something, so a board grew a lane the first time somebody cast a Signet
   // and every card on the *other* half moved to make room for it.
   //
@@ -245,7 +245,7 @@ it('puts power and toughness behind glass rather than over the painting', () => 
   // **It is there before anybody asks.** The glass replaced an always-on
   // black tab and then hid until hovered, which traded the tab's fault for its
   // opposite: a board of forty creatures carrying no numbers at all, learnable
-  // only one hover at a time (Aaron, 2026-08-25: "what I meant is that it
+  // only one hover at a time (Aaron: "what I meant is that it
   // always appeared"). Nothing was touched above this line.
   expect(lens?.className).not.toContain('is-open')
 
@@ -786,8 +786,8 @@ it('gives each zone its whole name, now there is room for one', () => {
 it('puts both players in the trench, each plate against its own half', () => {
   // The names and the life rings were carved into the stone band under the
   // arena — as far from the sand as the page could put them, so finding out
-  // whether somebody was dying meant looking away from the game (Aaron,
-  // 2026-08-27). They are in the seam now, which is the one strip of this
+  // whether somebody was dying meant looking away from the game (Aaron).
+  // They are in the seam now, which is the one strip of this
   // board both players are already looking at.
   //
   // **Two plates and two only.** A third would mean the old band had not
@@ -923,8 +923,8 @@ it('holds a card up clear of the wall it was standing against', () => {
   viewport(1200, 800)
   const { container } = show()
   // The one card the fixture gave a painting to, standing hard against the
-  // left edge of the field — which is where the fault was reported (Aaron,
-  // 2026-08-25: "they get clipped by the black border").
+  // left edge of the field — which is where the fault was reported (Aaron:
+  // "they get clipped by the black border").
   const card = [...container.querySelectorAll('.field-card')]
     .find((c) => c.querySelector('.field-card-art')) as Element
   standing(card, { left: 4, right: 62, width: 58,
@@ -997,7 +997,7 @@ it('steps a preview over or under a tray no flank can hold', () => {
   // beside it fell through to the ordinary placement and landed *on the panel
   // somebody had just opened in order to read it*. On a phone that is every
   // tray there is, and the hands live in the left-hand column at every width
-  // above 62rem, which is exactly where Aaron kept seeing it (2026-08-26:
+  // above 62rem, which is exactly where Aaron kept seeing it (
   // "full hand previews look clipped when they are on the lefthand side").
   viewport(375, 812)
   const { container } = show()
@@ -1073,7 +1073,7 @@ it('opens the hand from its nameplate, and never from the fan', () => {
   // **The handle is a button, and the fan is not part of it.** The tray used
   // to open on `.field-hand:hover`, and the hand includes the fan — so running
   // a pointer along the fan to read one card sprang the whole hand open on top
-  // of the preview that was answering the question (Aaron, 2026-08-25). Two
+  // of the preview that was answering the question (Aaron). Two
   // panels, one gesture, same patch of sand.
   //
   // Driven through the real control rather than by setting a class: a click is
@@ -1174,7 +1174,7 @@ it('lays the skull on the creature, held where it fell', () => {
   // the step that moves the card — there was no instant at which the board
   // held a dead creature still standing, and a mark aimed at the battlefield
   // landed on nothing. The skull went on the *pile* instead, which is where a
-  // headstone goes and not where a death happens (Aaron, 2026-08-25: "it
+  // headstone goes and not where a death happens (Aaron: "it
   // should appear over the card being destroyed itself, like the shield").
   //
   // `foldBoard` holds a card that left the battlefield on the final applied
@@ -1625,7 +1625,7 @@ it('draws every card at one size, and never below it', () => {
   // enchantments and planeswalkers were 42x59 while creatures were 58x81 —
   // and this board draws the whole card face, not an art crop, so at
   // forty-two pixels the printed type became a grey vibration that reads as a
-  // rendering fault (Aaron, 2026-08-26: "all cards should be at least the size
+  // rendering fault (Aaron: "all cards should be at least the size
   // we have been using on creatures so the text doesn't look funny").
   //
   // Held as the absence of a class rather than as a measurement, because
@@ -1640,7 +1640,7 @@ it('draws every card at one size, and never below it', () => {
 it('crowns the commander standing on the sand, and only there', () => {
   // The command zone can say a commander is *home*. Once it is cast it stands
   // in the creature row like any other body, and nothing said which of forty
-  // permanents the whole deck was built around (Aaron, 2026-08-26).
+  // permanents the whole deck was built around (Aaron).
   //
   // `pairing(2)` is the fixture for it: Tymna has gone to the battlefield,
   // Thrasios is still home, and Kaheera has been bought into a hand.
@@ -1674,7 +1674,7 @@ it('crowns the commander standing on the sand, and only there', () => {
 it('puts a hand under its own sign', () => {
   // Four plates on this board open four different things, and the hand's was
   // a deck name over a row of card backs with nothing to say what it held
-  // (Aaron, 2026-08-26: "we need a hand icon to show that is what we are
+  // (Aaron: "we need a hand icon to show that is what we are
   // showing people with the cards in hand"). Beside the label, never instead
   // of it — an icon-only control asks a newcomer to already know the app.
   const { container } = render(
@@ -1704,7 +1704,7 @@ it('puts a hand under its own sign', () => {
 })
 
 it('lets the command zone say only what a command zone can say', () => {
-  // **Aaron, 2026-08-26:** *"hovering on the command zone pops up some things
+  // **Aaron:** *"hovering on the command zone pops up some things
   // I don't understand, like 'Olinda the Oblivious (99)'s effect? I don't get
   // that."* Two faults met there. A Forge EFFECT card was leaking past a
   // server-side filter — fixed where it is made — and the zone was drawn as a
@@ -1738,7 +1738,7 @@ it('lets the command zone say only what a command zone can say', () => {
 
 it('prices each chair rather than the whole zone', () => {
   // **The tax rode outside the group** — a red chip in the gap between the
-  // command zone and the graveyard, belonging to neither (Aaron, 2026-08-26:
+  // command zone and the graveyard, belonging to neither (Aaron:
   // "it is outside the perimeter of the command zone and it makes for awkward
   // styling"). It is on the tile it prices now — standing on the tile's floor
   // rather than on its occupant's face, which is a later correction and is
@@ -1936,7 +1936,7 @@ it('fills the pool beside a hand and then drains it', () => {
 
     // **And then it drains, which is the ask.** All three go — and they are
     // drawn on their way out rather than simply deleted, because watching it
-    // deplete is the entire point (Aaron, 2026-08-26).
+    // deplete is the entire point (Aaron).
     act(() => { vi.advanceTimersByTime(400) })
     expect(poolRow(container, 'far').held,
       'nothing is left floating').toHaveLength(0)
@@ -1981,7 +1981,7 @@ it('gives a seat with no mana somewhere to put it', () => {
 it('flashes the mana that arrived, in the half it arrived for', () => {
   const { container } = pools()
 
-  // The ask, in Aaron's own words (2026-08-26): *"I wanted the mana symbol to
+  // The ask, in Aaron's own words: *"I wanted the mana symbol to
   // maybe just show in the middle like the cast cards do now."*
   const flash = container.querySelector('.stage-mana') as HTMLElement
   expect(flash, 'the mana that arrived is drawn on the sand').toBeTruthy()
@@ -2135,7 +2135,7 @@ it('names the commander that dealt it, from the board dictionary', () => {
   expect(dials).toHaveLength(1)
   expect(dials[0]?.textContent).toBe('5')
   // **The sentence says who was struck before it says by whom.** Aaron read
-  // the dial as his own commander's tally (2026-08-27) — it is the opposite,
+  // the dial as his own commander's tally — it is the opposite,
   // and the wording is half of the fix for that; the broken crown is the other
   // half, and the half that works without a pointer.
   //
@@ -2249,7 +2249,7 @@ it('stops pulsing at a player who is already dead', () => {
  *
  * These three used to stand a committed object on their token for as long as
  * it was on the battlefield. They are marks now, raised by the beat that
- * sacrifices the token (Aaron, 2026-08-27: *"they should only appear as the
+ * sacrifices the token (Aaron: *"they should only appear as the
  * animation when they are being sacrificed. Like how the shield or sword
  * appear"*), and that move is worth a gate rather than a screenshot for two
  * reasons that both bite.
@@ -2404,7 +2404,7 @@ it('hangs every chip on a turned card off the arm, one corner each', () => {
   // stylesheet moves the counters off their corner while a card is turned so
   // they stop landing on the *neighbour's* power and toughness — measured at
   // twelve and eighteen pixels of overlap on a real board, two creatures'
-  // numbers written over each other (Aaron, 2026-08-27).
+  // numbers written over each other (Aaron).
   //
   // The rule that does it is `.field-card.is-tapped .field-card-arm >
   // .field-card-counters`, and the `>` is the part a test can hold: wrap the
@@ -2431,8 +2431,8 @@ it('hangs every chip on a turned card off the arm, one corner each', () => {
 it('gives the near seat its attack mark inside its own half', () => {
   // **The sword points at whoever is being swung at.** The plate is a sword
   // shot upright and the mark lands point-down, which aims at the trench from
-  // the far half and at the near player's own feet from the near one (Aaron,
-  // 2026-08-27). The stylesheet turns the near half's mark a half-turn, keyed
+  // the far half and at the near player's own feet from the near one (Aaron).
+  // The stylesheet turns the near half's mark a half-turn, keyed
   // on `.field-side-near` — the same wrapper the lunge already reads its
   // direction from.
   //
@@ -2457,7 +2457,7 @@ it('gives the near seat its attack mark inside its own half', () => {
 })
 
 it('wears a keyword something else is giving it, and names no giver', () => {
-  // Aaron, 2026-08-27: *"I still don't see an icon being displayed on cards
+  // Aaron: *"I still don't see an icon being displayed on cards
   // for a bestowed ability, like Kaheera gives the other cats vigilance"*.
   // The board drew `card.keywords`, which is the *printing* — the same list
   // for every copy — so a creature standing next to something that grants a
@@ -2494,7 +2494,7 @@ it('wears a keyword something else is giving it, and names no giver', () => {
 it('strikes a lent keyword on the other plate, and still names no giver', () => {
   // **A granted mark used to be the same picture as a printed one.** The board
   // had learned to draw what a creature has *now* and could not then tell you
-  // that half of it was on loan (Aaron, 2026-08-27). `.is-granted` is what
+  // that half of it was on loan (Aaron). `.is-granted` is what
   // separates them, and the stylesheet swaps the plate and the ink under it —
   // brass on dark becomes dark on brass. **jsdom has no layout and no
   // stylesheet** (`index.css?raw` is `""` here), so what a test can hold is
@@ -2505,7 +2505,7 @@ it('strikes a lent keyword on the other plate, and still names no giver', () => 
     ?.closest('.field-card') as HTMLElement
   const marks = [...cat.querySelectorAll('.field-keyword')]
   // **Each mark says what it means, and the lent one says the card is not
-  // wrong.** Aaron, on this exact pair (2026-08-27): *"even if we can't say who
+  // wrong.** Aaron, on this exact pair: *"even if we can't say who
   // bestowed it, we can say what the icon means since it is not native to that
   // card"*. A player who reads the Skyhunter looking for vigilance will not
   // find it, so the mark is the one that has to explain itself.
@@ -2585,7 +2585,7 @@ it('hangs a turned card’s crown and its marks off the same arm', () => {
 it('gives the commander a face for the light to walk round', () => {
   // The living gold border is `.field-card.is-commander .field-card-turn` and
   // a `::before` masked to its edge — a conic gradient whose *angle* is
-  // animated, so the mask itself never moves (Aaron, 2026-08-27: the gold
+  // animated, so the mask itself never moves (Aaron: the gold
   // "doesn't pop... give it a true golden living border of light").
   //
   // **Nothing here can see it.** jsdom has no layout, `index.css?raw` reads as
@@ -2654,7 +2654,7 @@ function carrier(container: HTMLElement) {
 }
 
 it('fans a creature\'s gear out on a hover, with no click anywhere', () => {
-  // **The click is gone, and that was the complaint** (Aaron, 2026-08-28:
+  // **The click is gone, and that was the complaint** (Aaron:
   // *"it requires some awkward clicking. I had envisioned a hover opens the
   // stack of them into an actual live carousel you can thumb left or right
   // through easily"*). Hovering the creature opens the whole assemblage —
@@ -2767,7 +2767,7 @@ it('stands the commander tax on the floor beside the card, as an object', () => 
   // **The price was drawn on the commander's face.** Measured on a live board
   // at 1280 before it moved: the chip came out 21x14 against a card of 19x26,
   // so it was wider than the card it priced and covered its whole lower third
-  // (Aaron, 2026-08-27: *"I can't see their card anymore, it is hidden behind
+  // (Aaron: *"I can't see their card anymore, it is hidden behind
   // the commander tax."*). A seat is a landscape tile with its occupant
   // standing in the right quarter of it, so the bottom-right corner a Magic
   // *card* keeps for what it is worth is, on this tile, the card.
@@ -2865,7 +2865,7 @@ const AIMED: ForgeBoard = {
 
 it('draws an aura on the creature an ability was aimed at, and on no other',
   () => {
-    // Aaron, 2026-08-27: *"Would be nice if an emminence ability like arahbos
+    // Aaron: *"Would be nice if an emminence ability like arahbos
     // +3/+3 looked like an aura on the bestowed card too."*
     //
     // **The card already told half the truth.** Power and toughness on this
@@ -2912,12 +2912,12 @@ it('draws an aura on the creature an ability was aimed at, and on no other',
   })
 
 /**
- * The pall over a fallen seat (Aaron, 2026-09-07).
+ * The pall over a fallen seat (Aaron).
  *
  * A pod's quadrant reads as dead from the moment the tape says so: the room
  * scans its told beats for outcomes the scribe marked as losses (`fallenBy`,
- * tested with the reel — and it read the verb out of the sentence until
- * 2026-09-07, which is why it had never once fired on a real match) and hands
+ * tested with the reel — and it once read the verb out of the sentence,
+ * which is why it had never once fired on a real match) and hands
  * the staged names down; the board answers with
  * `is-fallen`, the word for the eye and a sentence for the ear. The pall
  * itself is a layer above the seat and never a filter — that half is
@@ -3002,7 +3002,7 @@ it('draws no pall while everyone still stands', () => {
  * real four-player game, Atla Palani's life reached nought at beat 495 and the
  * line saying so landed at beat 702. For those two hundred and seven beats the
  * room drew a seat at nought life with an empty everything and said nothing
- * (Aaron, 2026-09-07). `seatIsOut` reads the loss off the state instead, and
+ * (Aaron). `seatIsOut` reads the loss off the state instead, and
  * the room takes the union of the two so whichever knows first answers.
  */
 const POD_DOWN: ForgeBoard = {
