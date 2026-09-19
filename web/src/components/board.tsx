@@ -34,7 +34,7 @@
  * a full quarter-turn reads correctly and costs a card's whole height in
  * width, which on a board of forty permanents is the difference between a row
  * and two rows. Half a turn is unmistakably *turned* and stays inside its own
- * slot (Aaron, 2026-08-25: *"more compact use of space in general"*). What it
+ * slot (Aaron: *"more compact use of space in general"*). What it
  * costs is that a card's corners no longer line up with its slot's, which is
  * what `.field-card-arm` is for.
  *
@@ -172,7 +172,7 @@ function markOf(kind: string, card?: string): Mark | null {
  * cut off *before it was half told*: what a person saw was a shield swinging
  * in and then disappearing, never the block landing, never the settle, never
  * the skull's long hold. Lengthening the CSS changed nothing at all, because
- * the CSS was never what ended it (Aaron, 2026-08-26: the marks "need to
+ * the CSS was never what ended it (Aaron: the marks "need to
  * linger at least 30% longer").
  *
  * So each mark names its own length, and this number is both the animation's
@@ -242,7 +242,7 @@ interface Struckdown {
    *  spelling between them, and the piles they stand in are told apart by
    *  their counters and their Equipment rather than by their names. Matched on
    *  the name alone, every tile sharing the spelling lit up at once —
-   *  including the ones that were not in the fight (Aaron, 2026-08-28).
+   *  including the ones that were not in the fight (Aaron).
    *
    *  Absent on a match played without the scribe, which has no ids to give;
    *  the name is the fallback there, and it is the answer this had before the
@@ -323,7 +323,7 @@ const Struck = createContext<Struckdown | null>(null)
 /**
  * **What an ability was aimed at**, by board id, for the beat being drawn.
  *
- * Aaron, 2026-08-27: *"Would be nice if an emminence ability like arahbos
+ * Aaron: *"Would be nice if an emminence ability like arahbos
  * +3/+3 looked like an aura on the bestowed card too."* It was refused twice
  * for a reason that turned out to be wrong about the bus rather than about the
  * room — Forge's `StackItemView` had `getTargetCards()` all along and was only
@@ -491,8 +491,8 @@ type Leads = 'commander' | 'companion'
  *
  * **The command zone can only say a commander is *home*.** Once it is cast it
  * stands in the creature row like any other body, and until now nothing said
- * which of forty permanents was the one the whole deck is built around (Aaron,
- * 2026-08-26). In Commander that is the single most load-bearing card on the
+ * which of forty permanents was the one the whole deck is built around (Aaron).
+ * In Commander that is the single most load-bearing card on the
  * table: it is what the removal is pointed at, what the tax is counted for,
  * and what the other player is playing around.
  *
@@ -575,7 +575,7 @@ function crownedOn(side: BoardSide): ReadonlyMap<number, Leads> {
  *
  * **Three separate bugs, one cause.** The preview used to be a sibling `span`
  * inside each card, absolutely positioned and centred on it, and that shape
- * fails three ways at once (Aaron, 2026-08-25):
+ * fails three ways at once (Aaron):
  *
  * - a card near the left edge had its preview *"clipped by the black border"* —
  *   the field clips its own overflow, and a 300px panel centred on a card 30px
@@ -604,7 +604,7 @@ function FieldPeek({ card, at, avoid }: {
    *
    *  A hand or a graveyard spread out is a panel somebody opened *in order to
    *  look at it*, and dropping a 300px card into the middle of it covers the
-   *  thing they opened (Aaron, 2026-08-25: the full-hand view "conflicts with
+   *  thing they opened (Aaron: the full-hand view "conflicts with
    *  the individual hover preview on each card"). Given the panel's rectangle
    *  the preview can step out beside it instead of onto it — so the pile stays
    *  readable and the one card being asked about stands next to it, which is
@@ -644,7 +644,7 @@ function FieldPeek({ card, at, avoid }: {
   // fell through to the ordinary placement and landed *on the tray it came out
   // of*. On a phone that is every tray there is, and the hands sit in the left
   // column at every width above 62rem, which is why Aaron only ever saw it on
-  // the left (2026-08-26: "full hand previews look clipped when they are on
+  // the left ("full hand previews look clipped when they are on
   // the lefthand side").
   //
   // Above and below are the two that were missing, and on a narrow viewport
@@ -752,8 +752,8 @@ function FieldPeek({ card, at, avoid }: {
  * artifacts, enchantments and planeswalkers were drawn at 42x59 and only
  * creatures at 58x81, and the board draws the *whole card face* rather than an
  * art crop — so at forty-two pixels the printed type under the painting was a
- * grey smear that reads as a rendering fault rather than as small text (Aaron,
- * 2026-08-26: *"creatures up front are big enough their visible text isn't
+ * grey smear that reads as a rendering fault rather than as small text (Aaron:
+ * *"creatures up front are big enough their visible text isn't
  * distracting... all cards should be at least the size we have been using on
  * creatures so the text doesn't look funny"*).
  *
@@ -941,7 +941,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
    * same list for every copy of the card and, in a format built on standing
    * next to things, routinely not what the creature in front of you has. A
    * Beast standing beside Kaheera has vigilance and its printing does not
-   * mention it, so the board drew nothing (Aaron, 2026-08-27: *"I still don't
+   * mention it, so the board drew nothing (Aaron: *"I still don't
    * see an icon being displayed on cards for a bestowed ability, like Kaheera
    * gives the other cats vigilance"*). `BoardCard.live` is that instance's own
    * set, granted ones included, worked out on the server.
@@ -985,8 +985,8 @@ function FieldCard({ card, count, inPlay = false, ids }: {
     // looking at ten-pixel pictures gets them. **That a keyword was granted,
     // and never by what** — Forge carries no source for one, so
     // `BoardCard.granted` is the whole of what may be said and a giver may not
-    // be implied anywhere: not here, not in a mark, not in a label (Aaron,
-    // 2026-08-27: *"we don't need to say who granted the ability if it is not
+    // be implied anywhere: not here, not in a mark, not in a label (Aaron:
+    // *"we don't need to say who granted the ability if it is not
     // traceable"*). `keywordWords` is the one place that phrasing lives, and
     // the marks below say the same thing on the same words.
     inPlay ? keywordWords(worn, card.granted).join(', ') : '',
@@ -1013,7 +1013,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
                     + (card.leaving ? ' is-leaving' : '')
                     + (mark ? ` is-${mark.mark}` : '')
                     // **Double strike swings twice, so the lunge does**
-                    // (Aaron, 2026-08-28). It is the one keyword whose whole
+                    // (Aaron). It is the one keyword whose whole
                     // meaning is *this happens two times*, and a creature that
                     // deals its damage in two steps bumping once was the board
                     // quietly flattening the difference. Read off `worn`, so a
@@ -1118,7 +1118,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
             was on the battlefield, lit by a slow sweep — which put a museum
             plate over the bottom half of Wizards' own painting on tokens that
             were doing nothing at all, and left the moment one was *used*
-            saying almost nothing by comparison (Aaron, 2026-08-27: *"why do I
+            saying almost nothing by comparison (Aaron: *"why do I
             still see them overlayed on the card statically? They should only
             appear as the animation when they are being sacrificed. Like how
             the shield or sword appear"*).
@@ -1135,7 +1135,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
           belonged to the slot's — three chips pinned to a box that never
           turned, while the card inside it did. At ninety degrees that was
           survivable, because a card turned ninety degrees still fills the
-          corners of its own slot. At forty-five (Aaron, 2026-08-25: *"make
+          corners of its own slot. At forty-five (Aaron: *"make
           sure you get any overlays correct"*) it is not: the card's corners
           swing a fifth of its width clear of the slot's, so a count pinned
           top-right of the box floats over the sand, and the counters pinned
@@ -1169,7 +1169,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
             does not tell you the Dragon flies, and whether it flies is the
             whole question when the other side has ground blockers — so the
             board made you hover forty cards one at a time to find the one
-            that could block (Aaron, 2026-08-25, on Arena's keyword icons).
+            that could block (Aaron, on Arena's keyword icons).
 
             Only on the battlefield, for `inPlay`'s reason one field up: these
             are facts about a fight, and a card in a hand is not in one.
@@ -1226,7 +1226,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
             The glass replaced the tab, and then hid until hovered, which
             traded one fault for its opposite: a board of forty creatures with
             no numbers on it at all unless you went hunting one at a time
-            (Aaron, 2026-08-25: *"what I meant is that it always appeared"*).
+            (Aaron: *"what I meant is that it always appeared"*).
 
             So it is always there and it never turns. It sits where a card's
             own power/toughness box sits, magnifies the painting under it, and
@@ -1300,7 +1300,7 @@ function FieldCard({ card, count, inPlay = false, ids }: {
 
             **And every chip says what it means now**, which is the fourth time
             this room has had to learn that a number is not an explanation
-            (Aaron, 2026-08-28: *"the card counters chip is still a number with
+            (Aaron: *"the card counters chip is still a number with
             no sentence behind it"*). A `+3` on a creature answered one question
             — how many — and left the two a newcomer actually has: what a +1/+1
             counter *is*, and how this creature came by three of them. The
@@ -1522,7 +1522,7 @@ const STARTING_LIFE = 40
 /** A life total, drawn as the thing everyone at the table is actually
  *  watching.
  *
- * **It was a number in a stone bar** (Aaron, 2026-08-25: *"mega basic, like
+ * **It was a number in a stone bar** (Aaron: *"mega basic, like
  * whiteclaw basic"*), and he is right twice over. Once on looks: 1.28rem of
  * bold type is not a treatment, it is a default. And once on *information* —
  * a bare "23" makes you do the arithmetic that matters, because what a player
@@ -1893,7 +1893,7 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
   // the tapped element and does not let go until the next tap lands
   // somewhere else. A boolean could only stop asserting `is-open`, and the
   // latched hover went on holding the panel up: the tray had no way to shut
-  // (Aaron, 2026-08-26, on the live site: *"when I click in a graveyard or
+  // (Aaron, on the live site: *"when I click in a graveyard or
   // command zone and it expands, it is awkward to get it to collapse again.
   // A touch outside the zone or on the same zone itself should easily
   // collapse it."*). `is-shut` is that third state, and every rule that
@@ -1961,8 +1961,8 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
   const empty = kind && !top ? kind : null
   // **The zone, dressed.** These three were three-letter labels on a 26px
   // tile, which is what a scoreboard does and not what a table does — a player
-  // knows the graveyard, exile and the command zone by sight (Aaron,
-  // 2026-08-25: *"icons to represent the graveyard and exile"*, and the
+  // knows the graveyard, exile and the command zone by sight (Aaron:
+  // *"icons to represent the graveyard and exile"*, and the
   // command zone *"its own area of interest"*). The painting is Magic's own,
   // pinned to a printing in checked-in prose, and it sits *under* the pile's
   // top card rather than instead of it: a graveyard with cards in it still
@@ -1976,7 +1976,7 @@ function FieldPile({ label, cards, short, zone, seat: kind, solo,
   // **A seat says what it is, in words a first game can follow.**
   //
   // The command zone was the one place on this board saying things nobody
-  // could act on. Aaron, 2026-08-26: *"hovering on the command zone pops up
+  // could act on. Aaron: *"hovering on the command zone pops up
   // some things I don't understand, like 'Olinda the Oblivious (99)'s effect?
   // I don't get that."* Two separate faults met there — a Forge EFFECT card
   // leaking past a filter on the server, which is being fixed where it is
@@ -2259,8 +2259,8 @@ const TAX_RISE = 900
  * The commander tax: a strongbox standing on the floor of the seat, with the
  * price struck beside it.
  *
- * **It used to stand on the card, and that is the bug this is.** Aaron,
- * 2026-08-27: *"When the commander is sent back to the command zone after a
+ * **It used to stand on the card, and that is the bug this is.** Aaron:
+ * *"When the commander is sent back to the command zone after a
  * death or exile, I can't see their card anymore, it is hidden behind the
  * commander tax."* Measured on a live board at 1280 before anything moved: the
  * chip was **21×14** and the commander's card in its seat is **19×26** — the
@@ -2327,7 +2327,7 @@ function FieldTax({ n }: { n: number }) {
  *
  * **They used to be a band under the arena** — two stone panels holding a
  * name, a life ring and three piles each, sitting below the sand and costing
- * the page their whole height. Aaron, 2026-08-27, having watched real matches:
+ * the page their whole height. Aaron, having watched real matches:
  * *"we should move the command/graveyard/exile zones to be in an inverted L
  * shape in the … corner of each players half of the arena … that is generally
  * unused space."*
@@ -2399,7 +2399,7 @@ function FieldZones({ side, facing }: {
   // The catch-all pile used to draw alongside the seats whenever the zone was
   // holding anything else, and what it actually drew was a Forge EFFECT card —
   // an internal object with a name like "X's effect" that means nothing to
-  // anybody at the table (Aaron, 2026-08-26). The server is closing that leak
+  // anybody at the table (Aaron). The server is closing that leak
   // at its source; this is the other half, and it is a design ruling rather
   // than a patch: *"at most it should just be two slots for partners, one for
   // a singular commander, or a second companion devoted slot for Kaheera, et
@@ -2415,8 +2415,8 @@ function FieldZones({ side, facing }: {
   //
   // **The companion is not a chair and no longer takes a chair's share.** It
   // had an equal tile beside the thrones, edged in its own colour, and an
-  // equal box beside a box is a second zone however it is labelled (Aaron,
-  // 2026-08-26: *"companions shouldn't be in their own mini zone, they should
+  // equal box beside a box is a second zone however it is labelled (Aaron:
+  // *"companions shouldn't be in their own mini zone, they should
   // just be in the main command zone to the side"*). It is in this zone — it
   // really does sit there — so it belongs inside the zone's own frame, at the
   // side, in a slot narrower than the places the commanders keep.
@@ -2500,7 +2500,7 @@ function FieldZones({ side, facing }: {
  * **This is the half of the old rail that was not a zone.** A name and a life
  * ring were carved into a stone panel under the arena, where they were as far
  * from the game as anything on the page could be — you had to look away from
- * the sand to find out whether somebody was dying. Aaron, 2026-08-27: *"Lets
+ * the sand to find out whether somebody was dying. Aaron: *"Lets
  * make the middle band with the turn number, etc a little bigger, then it
  * could hold the deck name and the life total dials and they would be much
  * more visible."*
@@ -2555,7 +2555,7 @@ function FieldPlate({ side, facing, name }: {
  * **A hand is not on the battlefield, and it used to be drawn as though it
  * were** — a full-width row in the same stack as lands and creatures, one per
  * seat. Eight rows for two players, two of them cards nobody has played yet,
- * and the field itself squeezed for the room (Aaron, 2026-08-25: *"maybe it
+ * and the field itself squeezed for the room (Aaron: *"maybe it
  * isn't in the field but is to the side to give more room for cards"*). He is
  * describing a real table: your hand is in your hand, off to one side, and the
  * sand is for what has been committed to it.
@@ -2575,7 +2575,7 @@ function FieldPlate({ side, facing, name }: {
  * **The mana this player has to spend, beside the cards they would spend it
  * on.**
  *
- * Aaron, 2026-08-26: *"by that players hand the symbols should appear as
+ * Aaron: *"by that players hand the symbols should appear as
  * available mana to cast if that is possible, and then should be depleted on
  * the cast itself."* Which is two asks and the second is the one that makes it
  * real — a resting pool is empty nearly every time anybody looks at it (Go's
@@ -2668,8 +2668,8 @@ function FieldHand({ side, name, facing, speed, at }: {
   //
   // The whole hand used to be the hover target, so running the pointer along
   // the fan to read one card sprang the entire hand open underneath it — two
-  // panels answering one gesture, fighting over the same patch of sand (Aaron,
-  // 2026-08-25: the full-hand view "conflicts with the individual hover
+  // panels answering one gesture, fighting over the same patch of sand (Aaron:
+  // the full-hand view "conflicts with the individual hover
   // preview on each card"). They are two different questions: *what is this
   // one card* is the fan's, and the preview answers it; *show me the whole
   // hand* is the nameplate's.
@@ -2717,7 +2717,7 @@ function FieldHand({ side, name, facing, speed, at }: {
 
             Four plates on this board open four different things, and this one
             was a deck's name over a row of card backs with nothing to say that
-            what it holds is a *hand* (Aaron, 2026-08-26: *"we need a hand icon
+            what it holds is a *hand* (Aaron: *"we need a hand icon
             to show that is what we are showing people with the cards in
             hand — maybe a stylized fanned out set of cards like a magic or
             poker hand?"*). The mark was already drawn, for the tarot table's
@@ -2799,8 +2799,8 @@ function FieldSide({ side, facing, active, creatures, zones = true }: {
    *  instead; see `.field-quad-head`. */
   zones?: boolean
 }) {
-  // **Three lanes, always three, the same three every game** (Aaron,
-  // 2026-08-27: *"keep the board the same size universally, enough for three
+  // **Three lanes, always three, the same three every game** (Aaron:
+  // *"keep the board the same size universally, enough for three
   // lanes for each player"*).
   //
   // It was five, two of which drew only when they held something — which was
@@ -2908,7 +2908,7 @@ function FieldTransport({ speed, setSpeed, at, of, seek, turns = [],
    *
    *  **One player's turn, not a round.** Forge alternates seats and prints a
    *  turn line for each, so consecutive marks are one player's turn apart.
-   *  That is the unit somebody studying a game wants (Aaron, 2026-08-26:
+   *  That is the unit somebody studying a game wants (Aaron:
    *  "a player's turn at a time, not a full two player turn"), and this
    *  project has been bitten once already by Forge's two different turn
    *  numbers — `lib/theater.ts` carries that argument in full. */
@@ -3080,7 +3080,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // half is 272px and four of them are 1,088px against 812px of screen — one
   // and a third screens of sand before a hand, a seam or the transport, so a
   // phone would never show the table at all. Aaron called it before the
-  // measurement did (2026-09-06).
+  // measurement did.
   //
   // So the pod is drawn as one table with two behaviours, and the *same* DOM
   // carries both — the seats are always all rendered, and the narrow screen
@@ -3104,7 +3104,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // this is where it arrives.
   //
   // **A seat is its general, and its deck's title only when that will not tell
-  // it apart** (Aaron, 2026-09-07). `seatNames` carries the argument and the
+  // it apart** (Aaron). `seatNames` carries the argument and the
   // measurement; what matters here is that both halves come off things this
   // component already holds — the commander is on the folded side, so nothing
   // new is threaded down from the route to say *Gyome* instead of *Kitchen
@@ -3122,8 +3122,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // and identity is not what governs replay here anyway — every mark is keyed
   // on `beat.key`, so a fresh object with the same key reconciles onto the
   // same element and does *not* restart an animation that is already running.
-  // **A run of identical beats raises one mark, not eight** (Aaron,
-  // 2026-08-28: *"a stack of 8 tokens that is attacking show it 8 times"*).
+  // **A run of identical beats raises one mark, not eight** (Aaron:
+  // *"a stack of 8 tokens that is attacking show it 8 times"*).
   //
   // Forge announces combat one creature at a time, so eight Cat Tokens
   // swinging is eight `attack` beats with the same words — and eight identical
@@ -3177,7 +3177,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // the cluster's column was `auto`, so it was as wide as whatever happened to
   // be in it. A companion adds 0.72 of a tile to the command zone, which at 78
   // pixels is **56**, so a deck running one drew its own lanes 56px narrower
-  // than the deck across the seam (Aaron, 2026-08-27). Nothing was wrong with
+  // than the deck across the seam (Aaron). Nothing was wrong with
   // either half on its own; they simply did not agree, and two creature rows
   // that have to line up across the trench cannot start in different places.
   //
@@ -3197,7 +3197,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // Both creature lanes were packed left, so a blocker four cards along stood
   // opposite an attacker it had nothing to do with — and the seam between them
   // is wide enough to hold the scoreboard, so "who is fighting whom" was a
-  // question you answered by hovering (Aaron, 2026-08-27). `alignLanes` slides
+  // question you answered by hovering (Aaron). `alignLanes` slides
   // each blocker under the attacker it stopped and leaves everything else
   // exactly where it was.
   //
@@ -3225,14 +3225,14 @@ export function MatchBoard({ board, shown, game, name, running, beat,
   // and then all the damage resolves interleaved, so a fight's verdict lands a
   // median of 35 beats after its own blocks — measured over a real ten-game
   // match. That gap is the combat step rather than a fault: somebody watching
-  // the field waits exactly that long at a table (Aaron, 2026-08-28), so the
+  // the field waits exactly that long at a table (Aaron), so the
   // fight simply re-opens when it settles.
   //
   // Null on every other beat, which is nearly all of them.
   const dying = beat?.kind === 'dies' ? beat.id : undefined
   const settling = dying ? fightOf(dying, settled(board, shown)) : null
   // **How it ended, keyed on the attacker**, and the second half of this is
-  // the part a real board had to teach (Aaron, 2026-08-28: *"sometimes that
+  // the part a real board had to teach (Aaron: *"sometimes that
   // will be mixed, like some blockers live, some die, so make sure the right
   // things go in the right fields"*).
   //
@@ -3337,7 +3337,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           seat. On a phone that rail has nowhere to go and becomes a strip at
           the foot, and there both hands ended up under the near player's
           half: the far player's cards stacked below the near player's own,
-          two seats away from the person holding them (Aaron, 2026-08-25, from
+          two seats away from the person holding them (Aaron, from
           his phone). Now each hand is its own grid area and travels with its
           seat at every width — above the far half, below the near one, which
           is where the two players' hands actually are. */}
@@ -3500,7 +3500,7 @@ export function MatchBoard({ board, shown, game, name, running, beat,
       {/* **Everything that is cast, and everything that dies.** The board can
           only draw what stays, and half of Commander never stays — an instant
           is cast, resolves and is in a graveyard inside one beat, and the sand
-          had nothing to say about any of it (Aaron, 2026-08-26). So the middle
+          had nothing to say about any of it (Aaron). So the middle
           of the arena is its own surface: see `stage.tsx`, which owns every
           decision about what goes there and for how long.
 
