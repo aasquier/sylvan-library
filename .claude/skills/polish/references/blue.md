@@ -234,8 +234,12 @@ Work the list:
   long-lived goroutine, lease or worker has to end on the same signal, or the
   window grows and nobody notices until a deploy drops a write.
 - **Cobra hygiene.** `RunE` rather than `Run` so errors return instead of
-  exiting (the tree is already `RunE` throughout, with `os.Exit` confined to
-  `main.go` and an injectable `osExit`); `SilenceUsage` and `SilenceErrors` set
+  exiting (the tree is already `RunE` throughout, and `os.Exit` has exactly
+  two sites, each argued where it stands: `cmd/mtglab/main.go` after the root
+  command returns, and `cmd/mtglab/shim.go`'s idle watchdog, whose clean
+  `os.Exit(0)` is what turns the worker's `restart: no` into `stopped`; the
+  injectable `osExit` that a test once swapped for a recorder is gone —
+  `cmd/mtglab/decks.go` says why); `SilenceUsage` and `SilenceErrors` set
   at the root so an operational failure prints one error rather than a wall of
   usage; `Args:` declared on every command; no orphan flag, and no flag
   described in words the code does not honour.

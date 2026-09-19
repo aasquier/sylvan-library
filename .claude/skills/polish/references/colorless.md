@@ -46,6 +46,20 @@ Cleanup acts on the queue. Colorless audits it and leaves it.
   being answered, since the line leaves and takes the reasoning with it. Look
   for the third hiding place too: a finding written into the document it is
   about (a README, a package comment) and never entered anywhere.
+  **And walk the other direction, which the guard cannot.**
+  `daybreakrecord_test.go` proves every queue line has a record; nothing
+  proves every record has a line, because "queued" in ledger prose carries no
+  marker a test can read. So `grep -n 'Queued for Aaron' docs/polish/LEDGER.md`
+  and, for every block, ask whether the file Aaron reads has ever carried it —
+  `git log -S '<a phrase from the item>' -- docs/polish/DAYBREAK.md` answers
+  "ever" rather than "now". Measured 2026-09-19: **five items had waited in
+  the ledger alone since August**, each re-verified and re-carried by its own
+  colour every run, each called out as a standing gap, none ever in front of
+  him — and two more had been answered by the world without being struck.
+  Both cleanups had untapped the queue and verified it against the ledger,
+  which is the guard's direction, and so missed all seven. Re-file the live
+  ones under one heading that says why they are arriving now; close the
+  answered ones beside their originals.
 - **Corrections outrank overwrites.** When a later run finds an earlier entry
   wrong, the ledger records the correction beside the original rather than
   editing it away. A run that silently rewrote history is a finding.
@@ -83,10 +97,12 @@ run reports green, and the bugs are somewhere the file never looks.
 The developer shelf is artifacts in the plainest sense — and much of it is
 currently an absence: there is no bench suite, and the cache register is
 half-built (`mtglab sim cache` lists the Tier 1 cache's contents and can
-clear them — that register still counts no hits, though the door's ETag memo
-now counts its own, `etagCounts` in `go/internal/door/static.go`), and
-**building the bench suite and the Tier 1 counter half over the Go packages
-is this part's standing item** until it lands. Mutation sampling has left that list — `gremlins` is the tool now, and
+clear them; both caches in the tree count their own use in-process — the
+door's ETag memo through `etagCounts` in `go/internal/door/static.go`, the
+Tier 1 store through `cache.Store.Counts` in `go/internal/sim/cache/store.go`
+— and nothing yet reads either count out of a running instance), and
+**building the bench suite is this part's standing item** until it lands.
+Mutation sampling has left that list — `gremlins` is the tool now, and
 White's testing facet owns it. What else survives is `animist verify` in
 `tools/`, plus the stock Go toolchain the other colors measure with (the
 shelf section in `SKILL.md` lists it). Nothing else in the cycle owns the
@@ -126,13 +142,15 @@ plan for a tool the toolchain made redundant.
   seed and the rate. A rate that moved needs its cause named: new tests, new
   code, or a different draw. Survivors carried forward unread across two runs
   are a finding about the pass, not about the suite.
-- Ask what the shelf is still missing. Three standing items, all queued
-  because each is a dependency or a decision: an off-the-shelf Go mutator for
-  an exhaustive run over one package where the in-repo harness only samples;
-  `benchstat`, which is the difference between a benchmark delta and a
-  benchmark *finding*; and the cache register, whose absence means a cache
-  added today has nothing counting its hits. Anything else proposed here is a
-  new dependency too — queued with the arithmetic, never adopted mid-run.
+- Ask what the shelf is still missing. Two standing items, each a dependency
+  or a decision: `benchstat`, which is the difference between a benchmark
+  delta and a benchmark *finding* (installed on demand, never in the
+  toolchain), and the bench suite itself. The two that used to sit beside
+  them are answered — `gremlins` is the exhaustive mutator, and every cache in
+  the tree counts its hits — so the register's remaining half is *reading*
+  those counts out of a running instance, not producing them. Anything else
+  proposed here is a new dependency too — queued with the arithmetic, never
+  adopted mid-run.
 
 ## Part four — the leftovers
 
@@ -271,11 +289,21 @@ restarting every one.
 
 **The slice budget loses to the tree, measured 2026-09-12**: one slice
 retires ~20 dated lines a cycle while the week added ~50 (go 183 → 235,
-web/src 368 → 426). The sweep keeps its judgment-only shape — it is how the
-keep/cut line gets applied — but the ceiling question (a ratchet test over
-dated comments outside tests, bumped consciously when a date is the fact) is
-queued for Aaron; until he rules, choose the densest untouched family and do
-not present the totals as shrinking.
+web/src 368 → 426). **Aaron ruled the ratchet in (2026-09-13) and it is
+built**: `go/cmd/mtglab/datedcomments_test.go` pins the count outside tests
+— Go's own comment scanner for `go/`, comment-led lines for `web/src` — under
+a ceiling that may not rise unnoticed and is lowered when a sweep banks a
+material gain (slack 10). Two consequences for this part. The greps above are
+still how a *family* is chosen (the ratchet counts the tree, not the file),
+but the number that goes in the ledger is the ratchet's, read with `go test
+-count=1 -v -run TestDatedCommentsDoNotOutgrowTheirCeiling ./cmd/mtglab/` —
+a sweep that quotes its own grep is back to the unreproducible baseline this
+section opened with. And a slice that retires more than the slack **must
+lower the ceiling in the same diff**, which is the test failing on the fall
+side and is the sweep's own mutation check: a slice that did not trip it did
+not bank anything. The sweep keeps its judgment-only shape — it is how the
+keep/cut line gets applied — so choose the densest untouched family, read
+every line, and let the ceiling say whether the totals shrank.
 
 **Five packages are not sweepable, and the reason is ADR 18.**
 `internal/sim`, `internal/sim/tier1`, `internal/mana`, `internal/floats` and
