@@ -197,11 +197,12 @@ one you are running, and only that one; the others are for their own runs.
 
 The shelf is thinner than it looks: there is no `bench` command, and the
 cache register is half-built — `mtglab sim cache` lists what the Tier 1 cache
-holds and can clear it, but **the Tier 1 register still counts no hits** (the
-door's ETag memo now counts its own — `etagCounts` in
-`go/internal/door/static.go` is the pattern to copy), so that cache can still
-be correct, tested, and never once used with no number saying so. **Building
-the bench suite and the Tier 1 counter half is an open ledger item.**
+holds and can clear it, and the caches count their own use in-process (the
+door's ETag memo through `etagCounts` in `go/internal/door/static.go`, the
+Tier 1 store through `cache.Store.Counts` in `go/internal/sim/cache/store.go`
+— that pair is the pattern to copy for the next one), but nothing yet reads
+those counts out of a running instance. **Building the bench suite is an open
+ledger item.**
 Mutation sampling is the exception — `gremlins` is the tool, installed on
 demand, and White's testing facet carries the protocol. Otherwise the stock
 Go toolchain is the instrument set — richer than a purpose-built shelf would
