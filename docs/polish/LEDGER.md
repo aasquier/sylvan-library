@@ -4822,10 +4822,221 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
-  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18 (punch-list item 5,
-  with Blue), and 2026-08-16 (rainbow), the first Red run and the baseline
-  the numbers below are a trend against.
+- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
+  2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
+  first Red run and the baseline the numbers below are a trend against.
+
+### 2026-09-19 (rainbow)
+
+- **Built to a green PR and parked for Aaron's eye (PR #481, commandment
+  16 — it renders): commandment 17's skipped clause, made checkable, and
+  the twenty-one controls it found.** `go/cmd/mtglab/focusstates_test.go`
+  reads every `<button>`, `<a>`, `<Link>` and `<NavLink>` under `web/src`
+  with `barebutton_test.go`'s reader (now `openingTags(src, re)` under the
+  button-specific one) and asks `index.css` two questions per control: does
+  a class it wears answer `:hover`, and if so does any class it wears answer
+  `:focus-visible` (or `:focus` / `:focus-within`)? Tailwind `hover:` /
+  `focus:` utilities count on each side; an inline `outline` inside
+  `style={{…}}` fails on its own, because it outranks the browser's ring and
+  the house's. **It lives in Go, not Vitest, for a measured reason**: the
+  first draft was `web/src/focusstates.test.ts` and it flagged only the two
+  inline-outline tiles — `import css from './index.css?raw'` hands Vitest an
+  empty string (the 08-25 memory, re-proven), so the ten hover-only classes
+  read as an empty wardrobe. The Go side already holds three guards that
+  read `web/src` (`barebutton`, `ghostink`, `cardimagery`), so it went there
+  and reads the file. `readIndexCSS` carries a canary (`.btn:focus-visible`
+  must be present) so an empty or moved sheet fails loudly.
+  **Born red, raw:**
+
+  ```
+  --- FAIL: TestEveryControlThatAnswersHoverAnswersFocus (0.43s)
+      focusstates_test.go:90: 21 control(s) answer the pointer and not the keyboard:
+            web/src/App.tsx:412  answers :hover through [wordmark] and nothing it wears answers :focus-visible
+            web/src/App.tsx:431  answers :hover through [nav-link] and nothing it wears answers :focus-visible
+            web/src/components/artpicker.tsx:127  sets `outline` inline, which outranks every focus ring there is
+            web/src/components/artpicker.tsx:276  sets `outline` inline, which outranks every focus ring there is
+            web/src/components/personagrid.tsx:112  answers :hover through [reader-tile] ...
+            web/src/components/settings.tsx:178  answers :hover through [menu-row] ...
+            web/src/components/settings.tsx:70  answers :hover through [menu-row] ...
+            web/src/components/shelf.tsx:106  answers :hover through [shelf-learn] ...
+            web/src/components/swapboard.tsx:225 / :234 / :529  answers :hover through [card-action] ...
+            web/src/components/ui.tsx:1127  answers :hover through [card-action, card-action-danger, armed] ...
+            web/src/components/wheel.tsx:348  answers :hover through [wheel-folded] ...
+            web/src/components/wheel.tsx:365  answers :hover through [wheel-fold-btn] ...
+            web/src/components/wheel.tsx:598  answers :hover through [wheel-spin-btn] ...
+            web/src/routes/DeckDetail.tsx:245 / :1337 / :1390 / :1713  answers :hover through [card-action] ...
+            web/src/routes/Import.tsx:898  answers :hover through [card-action] ...
+            web/src/routes/NewDeck.tsx:463  answers :hover through [card-action] ...
+  ```
+
+  **Two of the twenty-one were a real silence**: the art picker's printing
+  tiles drew their selection ring with `style={{ outline: on ? … :
+  '1px solid var(--hairline)' }}`, so Tab through the printings changed
+  nothing on screen — the chosen tile stayed ringed, the focused one looked
+  exactly like its neighbours. `ghostink_test.go`'s lesson for the other
+  pseudo-class. The ring is `.art-pick-tile.is-on` now, `.art-pick-tile`
+  owns the hairline, and a chosen tile under focus keeps its blue ring under
+  a 6px vine halo (`box-shadow` spreads from the box edge and the outline
+  paints over its inner band). **The other nineteen wore ten classes** whose
+  hover was designed and whose focus was left to the browser's default ring:
+  `.card-action`, `.menu-row`, `.nav-link`, `.wordmark`, `.shelf-learn`,
+  `.reader-tile`, `.art-pick-tile`, `.wheel-folded`, `.wheel-fold-btn`,
+  `.wheel-spin-btn`. Each now shares its hover reply with `:focus-visible`
+  (the reader tile lifts and its art zooms; the wheel's glint crosses; the
+  nav sprout grows to 55%; the shelf link's arrow walks) and wears
+  `.btn:focus-visible`'s vine ring; the three reduced-motion blocks that
+  named a `:hover` got the `:focus-visible` sibling. 125 lines in
+  `index.css`, 15 in `artpicker.tsx`, no new class vocabulary.
+  **Mutation-verified**: removing `.menu-row`'s two focus rules fails the
+  guard naming `settings.tsx:70` and `:178`; restored, green.
+  `TestTheFocusReaderRecognisesEachShape` pins fourteen shapes on fixtures
+  (template-literal and concatenated classNames, descendant and attribute
+  selectors, `:focus` as an answer, Tailwind utilities, inline
+  `outline`/`outlineOffset`, no class at all). Full gauntlet green: gofmt
+  clean, vet clean, golangci-lint 0 issues, `go test -race -count=1 ./...`
+  exit 0 in 3m0s wall (load peaked at **412** during the build — the
+  every-package `-race` compile saturates this Mac and froze Chrome for the
+  duration; walk after the suite, never during), web check 91 files / 1,615
+  tests, bundle rebuilt (`DeckDetail.js`, `index.css`).
+  **Walked on 8765 through Claude-in-Chrome, Tab only** (Chrome shows
+  `:focus-visible` for the keyboard alone): the wordmark ring + shiver; the
+  active and a non-active nav link; the gear menu's rows; the deck action
+  bar; the commander picker (Arahbo) and the per-card picker (Trostani,
+  Command Tower, chosen tile ringed and haloed under focus); the folded
+  wheel, "Fold away" and "Spin the wheel"; the reader tiles behind
+  "Different reader"; the shelf's "In the Learn room →" link. Every one
+  answered. **Not the deployed instance** — nothing deployed; the walk that
+  matters is Aaron's, and #481's body carries the seven places to look.
+  **Examined and deliberately left**: inputs (`.combo-field`, `.swap-field`,
+  `.field-shell`, `.finder-input`, `.deck-rename-box`, `.bulk-box`,
+  `.cauldron-scratch`, `.field-answer`) all carry a `:focus` face already and
+  are not this guard's business; `.finder-row` is a listbox option whose
+  keyboard state is `is-active`, not focus; `.lab-note` answers through
+  `.lab-note-slot .lab-note:focus-visible`, which the reader credits.
+- **A side effect to know about, not a finding**: starting `mtglab ui` on
+  8765 for the walk rewrote `data/app.db` (mtime Sep 12 08:42 → Sep 19
+  10:05, 458,752 → 483,328 bytes — the boot's session sweep and a WAL
+  checkpoint). It is gitignored and nothing staged it; recorded because the
+  standing check reads the mtime, and the next leg will find it moved.
+- **CI, measured (n=26 successful `ci.yml` runs 2026-09-13T02:34Z →
+  2026-09-19T16:35Z, every one post-floor-gating; per-job medians from
+  `started_at`/`completed_at`):** `go (amd64)` **298.5s** (203–359, was 369
+  pre-gating; the 09-12 forecast said ~285) · `go (arm64)` **223s**
+  (208–304, was 216) · `deploy` **165s** (135–207, n=12, was 149) · `image`
+  **143s** (34–394, was 141.5; the 34–69s runs are full cache replays) ·
+  `frontend` **88s** (66–96, was 85) · `go-lint` **37.5s** (30–97) ·
+  `tools` **33s** (27–69) · `no-secrets-or-card-data` **7s**. amd64 is
+  still the critical path, by ~75s over arm64 (was ~153s). Today's three
+  rainbow deploys: 202s, 154s, 155s, releases v395→v397. Nothing grew 40%;
+  the `deploy` +16s is n=12 noise around a step that mostly waits on Fly.
+  Raw per-job lines are in this run's scratch (`jobs.txt`, 208 rows).
+- **Required contexts, read back: EIGHT** — `frontend`, `image`,
+  `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`, `go
+  (arm64)`, `go-lint`, **`tools`** (flipped by Aaron 2026-09-13, daybreak
+  Answered 9; the 08-24 queued item 9 is closed by it).
+- **Actions hygiene: 27 `uses:` refs, 27 SHA-pinned, five workflow files,
+  `permissions: contents: read` at the top of every one, `concurrency`
+  groups on all four that run per ref, no `pull_request_target`** —
+  unchanged from 09-12. **Three Dependabot PRs are open and waiting** (#475
+  go, #476 frontend, #477 actions, all 09-16): #476 is **red on `frontend`
+  for the known reason** — `##[error]web_dist/ is stale.` (`Coliseum.js`,
+  `DeckDetail.js`, `app.js`, `mtg.js`, 34 lines) — the bundle must be
+  rebuilt and pushed *to its branch*, never recreated (memory: a Dependabot
+  frontend bump cannot pass CI on its own). Not this leg's to land (a
+  dependency change is queue-class at night); handed to Cleanup.
+- **Scanner backlog: CodeQL 0 open · Dependabot 9 open** (the torch
+  cluster, White's dismissal line stands) · secret scanning 0.
+- **The expiry calendar, re-verified from the sources:** **TLS 2026-11-11**
+  (live cert, `notAfter=Nov 11 14:11:46 2026 GMT`, issuer Let's Encrypt
+  `YE2`, `fly certs show`: "Expires 1 month from now" — **53 days, inside
+  the sixty-day line for the first time**; Fly renews ~30 days out, so the
+  turnover is due around **2026-10-12** and the next Red run after that
+  date must read a new `notBefore`. Nothing for Aaron to do; a daybreak
+  line that says "nothing to do" is a chore, so this is the ledger's note
+  and the report's sentence, not a queue item) · **`fly auth login`
+  ~2026-10-14** (a laptop ceiling — the 720h token — not a site outage;
+  memory carries it) · **domain 2027-08-13** (whois: Porkbun, `Registry
+  Expiry Date: 2027-08-13T02:28:05Z`) · **`github-actions-deploy` token
+  2027-08-14** (`fly tokens list`; the `Mtglab API` token runs to 2126) ·
+  **Anthropic key through year-end** (digest `7970b591828c62f6`, unchanged
+  since the 09-12 rotation — the delta rule holds).
+- **Live probe (2026-09-19 ~16:50Z, v397, from this Mac):** `GET /` 200
+  175–240ms, 5,756b · `/signin` `/colors` `/glossary` 200 157–190ms (the
+  shell) · `/api/health` 200 169–268ms, body `pool true, 35,517 oracle /
+  108,583 printings, bulk 2026-09-13 ×2, 25 decks, pool_stale false` ·
+  `/api/decks` **401** 158–166ms · `HEAD /` still **405** (queued 2's
+  monitor caveat, unchanged). Still no `app_db` / `disk_free_mb` /
+  `schema_version` in the health body (queued 3, unchanged).
+- **Alerting posture — unchanged in every line:** fly.toml HTTP check GET
+  `/api/health` 30s/5s/10s grace · restart policy on process exit only ·
+  deploy-job failure email · **external uptime monitoring: none · phone
+  alerting: none** (queued 1, still the biggest gap). Held-awake block
+  still on (`auto_stop_machines = "off"`, `min_machines_running = 1`).
+- **Instance:** app machine `started`, release **v397** after the day's
+  three rainbow deploys (White v395, Blue v396, Black v397 — Red deploys
+  nothing tonight) · image label `GH_SHA=9fa99f9b…` names Black's merge ·
+  `forge-worker` stopped, holding `forge-worker-9fa99f9b…` · volume 3GB
+  encrypted, **5 snapshots, newest 2h, 5-day retention, 1.1 GiB stored**
+  (the 4-day-old one 905MiB, the dailies 59–63MiB). **The restore drill is
+  dated now: 2026-09-13, 4m49s wall, 96s recovery** (daybreak Answered 6;
+  the ledger entry for the drill itself is owed by Cleanup, not written
+  here, per the morning's own note). The drill-versus-retention finding
+  stands as its own daybreak item, already reworded into HOSTING.
+- **Hot-spot patrol — re-measured at the package seam (test-shaped load,
+  not request-shaped; load 2.9 before, 10.5 after, so absolutes are this
+  Mac's), and no alarm shape.** Raw tops, trimmed to the lines that carry
+  the ranking:
+
+  ```
+  internal/api  (33.6s)  CPU: Duration 31.63s, samples 190.19s (601%)
+     140.25s 73.74%  runtime.cgocall          <- the documented blind spot
+      20.62s 10.84%  syscall.rawsyscalln      <- sqlite WAL, app.db
+      16.77s  8.82%  <unknown>
+      11.96s  6.29%  modernc.org/sqlite/lib._sqlite3VdbeExec (cum)
+      75.50s 39.70%  duckdb-go/v2.(*Stmt).execute (cum)
+  internal/api  ALLOC: 1175.65MB total (was 1,112MB on 09-05, ~1,981MB on 08-24)
+      570MB 48.48%  argon2.initBlocks        <- was 51.2%; Black's "legitimate remainder"
+    65.51MB  5.57%  sim/tier1.expandUnits
+    61.52MB  5.23%  sim/tier1.SimulateGame   (226.54MB cum, 19.27%)
+    55.60MB  4.73%  duckdb-go/v2.(*Stmt).bind
+    46.51MB  3.96%  sim/tier1.pickLand.func1
+   145.78MB 12.40%  pool/pooltest.Build (cum) <- fixture, not product
+  internal/sim/tier1  (0.52s)  ALLOC: 161.87MB total
+    36.01MB 22.24%  expandUnits · 33.50MB 20.70% consume · 27.51MB SimulateGame
+     9.00MB  5.56%  mana.CanPay · 8.50MB canPay · 2MB pickLand.func1 (17.5MB cum)
+  internal/deckread  (2.46s)  CPU 80.13% runtime.cgocall · ALLOC 22.7MB, bind 2.56MB top
+  internal/gate      (1.82s)  CPU 74.19% runtime.cgocall · ALLOC 10.5MB, gate.Validate 1.03MB
+  internal/library   (1.98s)  CPU 93.14% syscall.rawsyscalln (sqlite) · ALLOC 32.8MB, argon2 19.5MB 59%
+  ```
+
+  **Ranking versus last patrol: nothing climbed.** argon2 still first in
+  `api` by a factor of nine and *falling* as a share (51.2 → 48.5%) because
+  the suite around it grew; `tier1`'s top three are the same three in the
+  same order; cgo still owns the CPU profile everywhere the pool is touched.
+  The one number worth a next-patrol glance is `api`'s **+63MB total
+  allocation in a week** (1,112 → 1,176MB) — proportionate to the tests
+  added (three rainbow legs landed guards here), not a shape. Handed to
+  Black as a trend to read, not chase.
+- **The two per-test slow-tail facts White and Black recorded** (three
+  `packages.Load` boundary tests at ~28s, Vitest's 91 isolated workers at
+  ~2.8–4.8s startup each — tonight's run printed "at least ~33.41s faster
+  with isolate: false") are Red's CI-runtime facet by rights and are
+  deliberately not acted on: `boundary_test.go` is a security guard beside
+  no reason to touch it, and `isolate: false` changes what a green means
+  for every test in the suite. Both stay recorded, neither is queued.
+- **Controls, re-censused:** **228** `<button>` tags outside tests (was
+  227) · **266** control tags in the new guard's scope (buttons + links) ·
+  912 `style={{` props (unchanged) · `asynccontrols.test.ts` green ·
+  `controlstate.test.tsx` green · `barebutton` / `ghostink` green · the
+  new `focusstates` guard green at **0 silent of 266**.
+- **Queue movement tonight:** queued item **9 (`tools` required) CLOSED**
+  by Aaron's 09-13 flip, read back from the API. **The restore drill's
+  queue line is CLOSED** by the 09-13 walk (Answered 6; ledger entry owed
+  to Cleanup). Items **1, 2, 3, 6, 11** unchanged and still Aaron's. **New
+  daybreak lines from Red: one** — the commandment-16 walk for #481. Not
+  queued, by choice: the TLS sixty-day line (automatic), the Dependabot
+  trio (Cleanup's, with the bundle recipe written above).
 
 ### 2026-09-12 (rainbow)
 

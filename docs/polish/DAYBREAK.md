@@ -61,6 +61,30 @@ re-deriving this paragraph. · **Recommendation:** dismiss all nine as
 "tolerable risk — see tools/pyproject.toml's depth-extra triage" (two
 minutes in the Security tab). Ledger: White, 2026-09-12.
 
+## Open — a walk before a merge (commandment 16)
+
+**Red: PR #481 is green and parked — commandment 17's focus clause made
+checkable, and the twenty-one controls it found dressed.** Two art-picker
+tiles were genuinely silent to the keyboard (an inline `outline` outranks
+every focus ring); ten classes — `.card-action`, `.menu-row`, `.nav-link`,
+`.wordmark`, `.shelf-learn`, `.reader-tile`, `.art-pick-tile`,
+`.wheel-folded`, `.wheel-fold-btn`, `.wheel-spin-btn` — answered hover and
+left focus to the browser's default ring; all now share their hover reply
+with `:focus-visible` and wear `.btn`'s vine ring. · *Cost of leaving it:*
+keyboard users get the OS blue line on this site's dark rooms, and the
+guard sits unmerged so the next inline `outline` lands unnoticed. ·
+**Recommendation:** walk and merge. `mtglab-ui` on 8765, then **Tab, never
+click** (Chrome draws `:focus-visible` for the keyboard only): `/` — Tab
+once (wordmark rings, tree shivers 700ms), Tab on (each nav link rings, its
+underline sprouts); gear → Tab (menu rows ring inset); any deck → Card
+actions bar → Tab across; deck → Change art → Tab into the tiles (lift +
+ring; on Trostani, Card art → Command Tower, the chosen tile keeps its blue
+ring under a vine halo); the folded wheel at the deck's foot → Tab, Enter,
+Tab to Fold away and Spin the wheel (glint crosses, 0.7s); `/new` → Help me
+decide → Different reader → Tab onto a reader tile; `/` → From the shelves →
+Another until "In the Learn room →" shows, Tab to it. Ledger: Red,
+2026-09-19.
+
 ## Open — newly measured, and now worth doing
 
 **Red: the "drill older than the newest migration" rule cannot be satisfied,
