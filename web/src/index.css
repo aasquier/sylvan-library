@@ -1882,16 +1882,24 @@ button:hover .tarot-fan-card {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
-.reader-tile:hover {
+.reader-tile:hover,
+.reader-tile:focus-visible {
   transform: translateY(-4px);
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.26);
+}
+/* A keyboard is a hand (commandment 17): the same lift, plus the house ring
+   outside the tile where `overflow: hidden` cannot clip it. */
+.reader-tile:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 3px;
 }
 
 .reader-tile .reader-tile-art img {
   transition: transform 450ms ease;
 }
 
-.reader-tile:hover .reader-tile-art img {
+.reader-tile:hover .reader-tile-art img,
+.reader-tile:focus-visible .reader-tile-art img {
   transform: scale(1.06);
 }
 
@@ -2269,7 +2277,8 @@ button:hover .tarot-fan-card {
     transition: none;
   }
   .reader-tile,
-  .reader-tile:hover {
+  .reader-tile:hover,
+  .reader-tile:focus-visible {
     transform: none;
   }
   .flask-bubble {
@@ -5729,12 +5738,18 @@ button:hover .tarot-fan-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.wheel-folded:hover {
+.wheel-folded:hover,
+.wheel-folded:focus-visible {
   transform: translateY(-3px) rotate(-1.2deg);
   box-shadow:
     0 8px 22px rgba(0, 0, 0, 0.45),
     0 0 14px rgba(255, 214, 120, 0.35),
     0 0 0 1px rgba(214, 176, 104, 0.5);
+}
+
+.wheel-folded:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 3px;
 }
 
 .wheel-folded img {
@@ -5751,9 +5766,14 @@ button:hover .tarot-fan-card {
   transition: color 0.15s ease, background 0.15s ease;
 }
 
-.wheel-fold-btn:hover {
+.wheel-fold-btn:hover,
+.wheel-fold-btn:focus-visible {
   color: #e8d5a3;
   background: rgba(120, 90, 40, 0.25);
+}
+.wheel-fold-btn:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
 }
 
 .wheel-spin-btn {
@@ -5777,7 +5797,8 @@ button:hover .tarot-fan-card {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.wheel-spin-btn:hover:not(:disabled) {
+.wheel-spin-btn:hover:not(:disabled),
+.wheel-spin-btn:focus-visible:not(:disabled) {
   transform: translateY(-1px);
   box-shadow:
     inset 0 0 0 1px rgba(214, 176, 104, 0.8),
@@ -5798,6 +5819,11 @@ button:hover .tarot-fan-card {
   cursor: default;
 }
 
+.wheel-spin-btn:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+
 /* The glint: one pass of light across the face on hover, the way the
    rim's own highlight walks. */
 .wheel-spin-btn::after {
@@ -5815,7 +5841,8 @@ button:hover .tarot-fan-card {
   transform: translateX(-110%);
 }
 
-.wheel-spin-btn:hover:not(:disabled)::after {
+.wheel-spin-btn:hover:not(:disabled)::after,
+.wheel-spin-btn:focus-visible:not(:disabled)::after {
   transition: transform 0.7s ease;
   transform: translateX(110%);
 }
@@ -5986,9 +6013,17 @@ button:hover .tarot-fan-card {
   color: var(--text-primary);
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.card-action:hover:not(:disabled) {
+.card-action:hover:not(:disabled),
+.card-action:focus-visible:not(:disabled) {
   border-color: var(--text-muted);
   background: var(--gridline);
+}
+/* The keyboard's reply, for the same reason `.btn:focus-visible` has one:
+ * without it the browser's default ring is the only answer, and on a dark
+ * page that is a thin blue line the design never chose. */
+.card-action:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
 }
 /* Same face as `.btn:disabled`, for the same reason: a control that has
  * stopped listening must stop answering the hand — a disabled button whose
@@ -7359,21 +7394,51 @@ button:hover .tarot-fan-card {
 .menu-row {
   transition: background-color 120ms ease;
 }
-.menu-row:hover {
+.menu-row:hover,
+.menu-row:focus-visible {
   background: var(--gridline);
 }
-
-/* The art picker's printing tiles: a lift, since their selection state
- * already owns the outline. */
-.art-pick-tile {
-  transition: transform 120ms ease;
+.menu-row:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: -2px;
 }
-.art-pick-tile:hover:not(:disabled) {
+
+/* The art picker's printing tiles: a lift on hover and focus, and the
+ * selection ring on `.is-on`. The ring used to be an inline `outline`, which
+ * outranks every focus ring there is -- the browser's and this file's -- so
+ * Tab through the printings changed nothing on screen. "Which am I showing"
+ * still has to survive a greyscale screenshot and a colourblind reader,
+ * which is why the chosen tile is ringed rather than merely brighter. */
+.art-pick-tile {
+  outline: 1px solid var(--hairline);
+  outline-offset: 0;
+  transition: transform 120ms ease, outline-color 120ms ease;
+}
+.art-pick-tile.is-on {
+  outline: 2px solid var(--series-1);
+  outline-offset: 1px;
+}
+.art-pick-tile:hover:not(:disabled),
+.art-pick-tile:focus-visible:not(:disabled) {
   transform: translateY(-2px);
+}
+.art-pick-tile:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+}
+/* Focused *and* showing: keep the selection ring and add the vine as a halo
+ * outside it, so neither state hides the other. The shadow spreads from the
+ * box edge and the outline paints over its inner band, so what shows is the
+ * blue ring with three pixels of vine beyond it. */
+.art-pick-tile.is-on:focus-visible {
+  outline-color: var(--series-1);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--vine) 85%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .art-pick-tile,
-  .art-pick-tile:hover:not(:disabled) {
+  .art-pick-tile:hover:not(:disabled),
+  .art-pick-tile:focus-visible:not(:disabled) {
     transform: none;
     transition: none;
   }
@@ -8120,8 +8185,13 @@ button:hover .tarot-fan-card {
   transition: transform 240ms ease;
 }
 
-.nav-link:hover::after {
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
   transform: scaleX(0.55);
+}
+.nav-link:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
 }
 
 .nav-link.is-active::after {
@@ -8263,14 +8333,21 @@ button:hover .tarot-fan-card {
   text-decoration-thickness: 1px;
   transition: text-decoration-thickness 160ms ease;
 }
-.shelf-learn:hover {
+.shelf-learn:hover,
+.shelf-learn:focus-visible {
   text-decoration-thickness: 2px;
+}
+.shelf-learn:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 .shelf-learn-arrow {
   display: inline-block;
   transition: transform 200ms ease;
 }
-.shelf-learn:hover .shelf-learn-arrow {
+.shelf-learn:hover .shelf-learn-arrow,
+.shelf-learn:focus-visible .shelf-learn-arrow {
   transform: translateX(3px);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -8303,10 +8380,17 @@ button:hover .tarot-fan-card {
   -webkit-text-fill-color: transparent;
 }
 
-/* The wordmark's tree answers the pointer with a small shiver of leaves. */
-.wordmark:hover .wordmark-tree {
+/* The wordmark's tree answers the pointer -- and the keyboard -- with a
+   small shiver of leaves. */
+.wordmark:hover .wordmark-tree,
+.wordmark:focus-visible .wordmark-tree {
   display: inline-block;
   animation: tree-shiver 700ms ease-in-out;
+}
+.wordmark:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 @keyframes tree-shiver {
@@ -8489,7 +8573,8 @@ button:hover .tarot-fan-card {
   .scene-sunbeam,
   .scene-lane,
   .whisper-sprout,
-  .wordmark:hover .wordmark-tree {
+  .wordmark:hover .wordmark-tree,
+  .wordmark:focus-visible .wordmark-tree {
     animation: none;
   }
   /* The vine still gets out of the page's way when scrolled -- that is a fix,

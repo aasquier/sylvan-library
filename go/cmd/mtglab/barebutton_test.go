@@ -198,8 +198,15 @@ var (
 // 3}` contains a `>` that does not end anything, and so does `aria-label="a >
 // b"`.
 func openingButtonTags(src string) []buttonTag {
+	return openingTags(src, buttonOpen)
+}
+
+// openingTags is openingButtonTags for any opening-tag pattern -- the
+// focus-state guard reads links (`<a`, `<Link`, `<NavLink`) with the same
+// reader, because a link is a control too and its tag is shaped the same.
+func openingTags(src string, open *regexp.Regexp) []buttonTag {
 	var out []buttonTag
-	for _, loc := range buttonOpen.FindAllStringIndex(src, -1) {
+	for _, loc := range open.FindAllStringIndex(src, -1) {
 		var (
 			b     strings.Builder
 			depth int
