@@ -70,7 +70,13 @@ screen reader or a keyboard.
   `resize_window` *preset* can report success while the hidden pane stays
   0×0, which makes every rect and overflow figure fiction (the 2026-08-24
   run lost its whole phone sweep to this; the 2026-09-05 run got it back by
-  passing explicit `width`/`height` pixels, which do apply).
+  passing explicit `width`/`height` pixels, which do apply). **The trap has a
+  second form in Claude-in-Chrome** — the seat's browser, so the
+  authenticated phone sweep lives there: its `resize_window` reports success
+  while `innerWidth` stays at the window's real width (1440 on 2026-09-19,
+  three attempts), so the read-back is not optional on either rig. And the
+  Browser pane *does* open the live host — a refusal on one run is a fact
+  about that run, not a rule; retry before writing the sweep off.
 - **Accessibility is compatibility with the player, not the device**, and it
   is swept with the same walk and the same tools as the pixels around it:
   - **Keyboard-only** through the changed surfaces: every interactive element

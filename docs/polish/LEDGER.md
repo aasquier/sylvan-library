@@ -6936,7 +6936,11 @@ turned out not to have survived at all, which is this run's first finding.
   that wrote the correction.
 - **Queued for Aaron:**
   1. **The stated compatibility floor is Safari 15; the shipped bundle needs
-     Safari 16.4.** Unchanged and still Aaron's decision. Tailwind v4 emits 56
+     Safari 16.4.** *(Colorless, 2026-09-19: closed — Aaron declared the
+     floor 16.4 on 2026-08-19, and `web/README.md`, `docs/ENGINEERING.md`
+     and `references/green.md` all say so; this item never reached the
+     daybreak file, which is how it outlived its own answer.)* Unchanged and
+     still Aaron's decision. Tailwind v4 emits 56
      `@property` rules and 10 `color-mix(in lab, …)` values (both 16.4); React
      adds `Object.hasOwn`, `structuredClone` and `reportError` (15.4). What it
      costs below the floor is quiet rather than fatal: the `--tw-*` variables
@@ -6996,7 +7000,11 @@ turned out not to have survived at all, which is this run's first finding.
      pseudo-element hit area that moves no pixels), which is why it stays
      queued.
   4. **`env(safe-area-inset-*)` appears nowhere, and adding it alone would be a
-     no-op.** Unchanged. `.library-whisper` (fixed `bottom: 1.25rem`) sits in
+     no-op.** *(Colorless, 2026-09-19: closed — `web/index.html` carries
+     `viewport-fit=cover` and `web/src/index.css` pads with
+     `env(safe-area-inset-*)`, both coupled halves landed without this item
+     being struck; the ledger-only shape again.)* Unchanged.
+     `.library-whisper` (fixed `bottom: 1.25rem`) sits in
      the home-indicator band on a notched iPhone; the fix is *two* coupled
      changes — `viewport-fit=cover` on the viewport meta **and** `env()` insets
      — because iOS reports every inset as 0 without the former, and
@@ -7290,11 +7298,11 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-09-12 (rainbow, night — ran past 04:00 into 09-13).
-  Previous: 2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-21
-  (scoped — the relic sweep only), 2026-08-19 (rainbow, the first colorless
-  run with five colors to audit), 2026-08-19 (the run that created this
-  section).
+- **Last run:** 2026-09-19 (rainbow, daylight). Previous: 2026-09-12
+  (rainbow, night — ran past 04:00 into 09-13), 2026-09-05 (rainbow, night),
+  2026-08-24 (rainbow), 2026-08-21 (scoped — the relic sweep only),
+  2026-08-19 (rainbow, the first colorless run with five colors to audit),
+  2026-08-19 (the run that created this section).
 - **Read everything below the 2026-08-24 block as history, not as state.** It
   is all about the Python app, and its instruments are gone: `mtglab bench`,
   `mtglab bench caches`, `mtglab bench profile`, `mtglab mutate` and
@@ -7303,6 +7311,290 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-09-19 (rainbow)
+
+The sixth leg of the 2026-09-19 rainbow, run in daylight (~10:50 PDT start)
+with Aaron away from the keyboard. Three legs merged and deployed ahead of it
+(#478 White, #479 Blue, #480 Black — the instance is v397), Red's #481 sits
+green and parked for the commandment-16 walk, and Green opened no PR: its
+whole output was commit `4c9df96` on `polish/green-2026-09-19`, cherry-picked
+onto this branch as the first act so it lands with this PR. All five parts
+run; the relic sweep ran all six passes; Cleanup follows.
+
+- **Fixed this run:**
+  1. **Five items had been "queued for Aaron" in the ledger since August with
+     no line in the file he reads — the two-places rule's rarer breach, and
+     the first time it has been found in this direction.** The audit walked
+     every `Queued for Aaron` block (25 across the six sections) against
+     `DAYBREAK.md` and its whole git history (`git log -S` on the item's own
+     words: `Pushover`, `44px`, `cache_creation`, `Safari 15` — none ever
+     appeared). Red's external-uptime/phone-alerting pair, Red's health-body
+     facts, Red's deploy-time snapshot, Green's touch-target floor and Black's
+     cache-write tokens had each been re-verified and re-carried by their own
+     colour's runs — Red's 09-19 entry calls the first "still the biggest
+     gap" — and never once put in front of him. Two more in the same shape
+     turned out to be **already answered without being struck**: Green's
+     Safari-15 floor (Aaron declared 16.4 on 08-19; three documents say so)
+     and Green's `env(safe-area-inset-*)` (both coupled halves are in
+     `web/index.html` and `web/src/index.css`) — closed beside their originals
+     in Green's 08-24 block rather than edited away. The five live ones are on
+     the queue now under their own heading, each with the cost and the
+     recommendation its ledger entry always had; the queue goes **7 → 12** by
+     the file's own grep, and every new line names its ledger section, so
+     `daybreakrecord_test.go` proved the pointers before the push. Why the
+     09-05 and 09-12 cleanups missed them: both untapped *the queue* and
+     verified it against the ledger — the direction the guard reads — and
+     nothing in the cycle read the ledger's queued blocks the other way.
+     **That reading is now a bullet in part one of
+     `references/colorless.md`**: for every `Queued for Aaron` block, is
+     there a line — and `git log -S` on the item's own words is how to know
+     it never had one.
+  2. **The comment sweep, slice `web/src/components/board{,.test}.tsx` — the
+     09-12 deferral's own trigger, and the first slice to trip the ratchet.**
+     Aaron ruled the ratchet in on 09-13 and `datedcomments_test.go` pins the
+     count outside tests; this slice is the first taken under it. Every one
+     of the 34 dated lines in `board.tsx` and the 28 in its test was a date
+     on one of Aaron's rulings (*"Aaron, 2026-08-26: …"* → *"Aaron: …"*, the
+     09-12 precedent) or a when-it-happened clause (*"it read the verb out of
+     the sentence until 2026-09-07"* → *"it once read the verb out of the
+     sentence"*); every argument kept, no validation date found, nothing
+     converted to a bare deletion. **The ratchet fired on the fall side
+     before the ceiling moved** — raw:
+
+     ```
+     datedcomments_test.go:123: web/src carries 259 dated comments outside tests, ceiling is 292 -- lower the ceiling to 259 in this file's const block. A ratchet that is not tightened when the tree improves has given back the ground the sweep just won.
+     --- FAIL: TestDatedCommentsDoNotOutgrowTheirCeiling (0.20s)
+     ```
+
+     — which is the sweep's mutation check, argued into the reference this
+     run: a slice that does not trip the fall side banked nothing.
+     `webDatedCommentCeiling` 292 → 259 with the reason beside it; the Go
+     side stands at 117/117. Comments are not product behaviour and the
+     bundle is proved byte-stable by the rebuild in the gauntlet below.
+     **Slices done:** `internal/sim/{cache,compile,curve,tier3}` (08-24),
+     `internal/api` non-test (09-05), `routes/Coliseum{,.test}.tsx` (09-12),
+     `components/board{,.test}.tsx` (09-19). **Not sweepable:** the five
+     fingerprinted packages, unchanged.
+  3. **Four reference files corrected under the cross-section mandate, each
+     from a leg's own hand-off rather than a re-audit:** `red.md` no longer
+     says a hover-only control is "invisible" to keyboard users — measured by
+     Red, it gets the browser's default ring, and only an inline `outline`
+     silences that (the two art-picker tiles), so the sentence now names the
+     mechanism; its 08-23 census figures (131 buttons, 648 inline styles)
+     carry today's (228, 912) and a pointer to the Red entries as the living
+     count. `blue.md`'s Cobra-hygiene bullet named an `osExit` variable that
+     no longer exists; it now names the two real `os.Exit` sites and their
+     arguments (`main.go` after the root returns; `shim.go`'s idle watchdog,
+     whose clean exit is what makes the worker read `stopped`). `green.md`'s
+     preset trap gains its Claude-in-Chrome form (`resize_window` reports
+     success, `innerWidth` unmoved — three attempts today) and the standing
+     note that the Browser pane *does* open the live host. `colorless.md`
+     part three stopped saying the Tier 1 register "still counts no hits"
+     (Black's #480 landed `cache.Store.Counts`), its three standing shelf
+     items became the two that are still open, and part five's ratchet
+     paragraph went from "queued for Aaron" to "built, and here is how the
+     slice interacts with it". `black.md` and the skill's shelf paragraph
+     were read after Black's own correction and both read right — the bench
+     suite is the register's one open half.
+  4. **Owed entries from the 09-13 Answered list, written here because they
+     are this colour's** (items 2, 3 and 10 at the foot of `DAYBREAK.md`;
+     Cleanup may strike them on the strength of this entry):
+     - *Item 2, the comment ratchet:* Aaron ruled *build it*, and it landed
+       as `go/cmd/mtglab/datedcomments_test.go` with ceilings measured that
+       morning — 114 Go (the language's own comment scanner, `_test.go`
+       excluded) and 292 web (comment-led lines); the definition is pinned in
+       code because three defensible regexes over one tree the same morning
+       returned 114, 154 and 479. Rise side has no slack; the fall side banks
+       a material gain only (slack 10). The Go side has since risen to 117
+       one argued line at a time (its const block says which three), and this
+       run lowered the web side to 259 — the ratchet has now moved in both
+       directions, each time in a diff with its reason beside it.
+     - *Item 3, the stale worktree:* Aaron ruled *remove it*, and it is gone
+       — `git worktree list` answers the main checkout alone, and `find` and
+       `git ls-files` agree at 34 recipe files, which confirmed the phantom-67
+       diagnosis. The empty `.claude/worktrees/` mount point (one
+       `.metadata_never_index` marker, Sep 5) is the harness's own and not a
+       relic.
+     - *Item 10, `fly auth login`:* run 09-13; `fly auth whoami` answers the
+       account without the env-token export (Black and Green both used the
+       plain login this week). Expect it back on the queue ~2026-10-14; a
+       720-hour ceiling, not a fault.
+- **Part one — is the ledger telling the truth?**
+  - **The 09-12 Colorless run's own findings, landing rate: 3 of 3 queued
+    landed** (fly re-login — Answered 10; the ratchet — Answered 2, built;
+    the worktree — Answered 3, removed), **1 of 2 deferred consumed** (the
+    web/src slice, fix 2 above; `guard-git.py`'s inertness test still waits
+    on its trigger — `.claude/hooks/` holds one hook, unchanged). Its five
+    fixes spot-checked against the tree, five hold: `recordkit_test.go` in
+    place with 17 callers; `routes/Coliseum.tsx` still at one dated line (the
+    validation date); the shelf sentence it corrected was corrected *again*
+    by Black this week — the compare-not-rederive habit working as the entry
+    predicted; the three skill lessons (the A/B race rule, "a leg closes its
+    own loop", "watching the deploy honestly") all present in `SKILL.md`; the
+    ladder-17 correction on the daybreak line stood until the drill closed
+    it.
+  - **Today's five legs' claimed fixes, five taken, five hold:**
+    `serialregister_test.go` exists and `CLAUDE.md` names it (#478);
+    `web/src/technologycopy.test.ts` and
+    `TestNoGlossaryEntryTeachesATechnologyWord` both in the tree (#479);
+    `func (s *Store) Counts` in `go/internal/sim/cache/store.go` (#480);
+    `docs/FORGE.md` names `filibuster-on-the-floor` and
+    `hylda-s-endless-winter` and neither dead slug (Green's `4c9df96`);
+    `focusstates_test.go` and the ten `:focus-visible` faces on
+    `polish/red-2026-09-19` (#481, unmerged by design).
+  - **The two-places audit, today's legs: 5 of 5 clean** — White, Blue and
+    Black queued nothing and said so; Red's one line and its entry travel
+    together on #481; Green's two lines both point at its 09-19 entry. The
+    historical breach is fix 1. One pointer repaired in passing: the
+    `LandCount()` ruling's line said "Ledger: Green, 2026-09-14 — entry
+    owed"; Green wrote that record this morning (its Answered-item-11
+    bullet), so the line now points at 2026-09-19.
+  - **Deferred-trigger walk across the six sections:** Red's 09-05 deferral
+    ("a guard for commandment 17 itself … trigger: the inline-style sweep or
+    the first new bespoke control class") — **fired and built**, as #481's
+    `focusstates_test.go`, which is the deferral mechanism working end to end
+    for the first time in Red's section. White's, Blue's and Black's 09-19
+    entries each re-checked their own with triggers stated; Green's 09-12
+    "pool file doubled" deferral closed by its own measurement (−62%).
+    Nothing found with a trigger that arrived unnoticed.
+  - **Corrections outrank overwrites, checked:** every 09-19 entry that
+    disagreed with an earlier one wrote the disagreement beside it (White on
+    the 27-vs-39 serial count; Green on the "expected ~200 MB drop"
+    overshooting; Black on the shelf sentence). No silent rewrite found.
+- **Part two — the checklists, against what today's runs actually found.**
+  Every colour earned it again: White made a CLAUDE.md absolute
+  machine-checked and killed the one real mutant in the rulebreaker cluster;
+  Blue rebuilt the commandment-10 tripwire in both halves; Black closed the
+  shelf's named gap; Red built commandment 17's skipped clause and found two
+  genuinely silent controls with it; Green closed two items by measurement
+  and found nothing new on a surface that had not changed — which is the
+  honest "genuinely healthy" answer its checklist allows. **Reciting-risk
+  verdict:** the relic sweep's passes 1–5 are clean four runs running and
+  stay for the count-habit (it is what caught the phantom worktree). **The
+  one facet that got past every checklist this cycle is the pass's own** —
+  fix 1's five items sat in the ledger for 26 days while both cleanups and
+  two colorless runs verified the queue in the one direction the guard
+  reads. The corollary from part two applies to the guard itself:
+  `daybreakrecord_test.go` proves every queue line has a record and cannot
+  prove every record has a line, because "queued" in ledger prose has no
+  marker a test can read. Deliberately *not* built tonight: the honest
+  mechanism is a marker convention for queued blocks (a test could then
+  read both directions), and a convention that binds every session is
+  Aaron's to set; the standing "one line per item" tension from 09-12 is
+  still unruled and the two questions belong together. Both ride the
+  report. The skill's description line still fires on the words Aaron uses
+  (polish, quality pass, sweep, audit, the colour names, rainbow, daybreak).
+- **Part three — the tooling.**
+  - `animist verify` — **34 recipes tracked, 34 held, exit 0** (flat);
+    `find` sees **34** where 09-12 saw 67 — the phantom is gone with the
+    worktree.
+  - **The record guards, run first with `-count=1`:** `daybreakrecord`,
+    `skillrecord`, `licenserecord`, `datedcomments` (259/259 web after the
+    sweep, 117/117 Go), `serialregister` — all PASS in 6.2s; run again after
+    every prose edit in this diff.
+  - **The hooks guard:** `.claude/hooks/` still holds the one `guard-git.py`;
+    the blanket-add refusal's reason (nine decks in `decks/`) is *gone* this
+    week — `decks/` is empty for the first time since 08-24 — but the rule it
+    enforces is CLAUDE.md's and stays. Inertness test still deferred; trigger
+    unchanged.
+  - **The shelf's live question:** with both counters landed, what the stock
+    toolchain still cannot do is read a counter out of a running instance
+    and keep a benchmark ledger. Nothing about the answer changed this week
+    except that it is shorter; the old shelf's colorless questions remain
+    unanswerable until the bench suite lands — the standing gap line.
+- **Part four — the relic sweep, all six passes run.**
+  - **Pass 1 — clean.** 147 tracked directories (flat); **51 `go/internal`
+    packages, 51 package docs, 0 without** (flat).
+  - **Pass 2 — clean.** The non-source list is the migration ladder, the
+    scribe's GPL boundary, the docker trio, `.env.example`, go.mod/sum, the
+    two toolboxes' Python and the committed media.
+  - **Pass 3 (arrived since 09-12) — clean, 12 files:** six guards in
+    `cmd/mtglab` (`bundlebudget`, `coveragefloor`, `datedcomments`,
+    `devprofiler`, `recordkit`, `serialregister`), the pool rebuild and its
+    owner split, `analyze/twofaced_test.go`, `technologycopy.test.ts` — all
+    reachable from the shape that shipped them.
+  - **Pass 4 — clean, 97 docs by title.** Two duplicate titles, both
+    benign: `# sylvan-library` (CLAUDE.md and README.md) and `# web/public
+    -- provenance` (the source and its committed `web_dist/` copy).
+  - **Pass 5 — clean.** Top level unchanged (cards, claude, data, decks,
+    forge-shim, sim, ui, users + cobra's two); every subcommand read —
+    `data snapshot` (#473) and `sim cache` are the newest, both on live
+    purposes; `ui`'s four flags all name a deployed switch.
+  - **Pass 6 — 15 rows, all the migration ladder** (0007 and 0014 named in
+    ledger text; flat).
+  - **No relic found.** The one thing that looked like one — the empty
+    `.claude/worktrees/` — is the harness's mount point, argued above.
+- **Part four's leftovers.** (a) Blue's Vitest `isolate: false` note was
+  handed to Red and Black; both declined it for the same reason (a green
+  would mean less) — consistent, no owner conflict, recorded and not
+  queued. (b) The `boundary_test.go` trio: White deferred with a trigger,
+  Black concurred with the same trigger — one item, two sections agreeing.
+  (c) Green's hand-off that the mtg-lab skill's trigger list names a deck
+  the instance lacks is Blue's docs sweep and already sits inside the
+  goreclaw daybreak line. (d) The Answered list at the daybreak's foot:
+  Green's four and this section's three are written; **White's item 1 and
+  Red's items 6 and 9 remain owed to Cleanup**, plus the Red record for the
+  drill-versus-retention open item (its line still says "entry owed").
+- **Measurements (2026-09-19, rainbow, daylight):** raw output, not a
+  summary.
+
+      $ cd tools && .venv/bin/animist verify
+      34 recipes printed, 34 held, exit 0        (find: 34; 09-12: 34 tracked / 67 found)
+
+      $ go test -count=1 -v -run TestDatedCommentsDoNotOutgrowTheirCeiling ./cmd/mtglab/
+      before the slice:  go 117/117 · web/src 292/292
+      after the slice:   go 117/117 · web/src 259 (ceiling lowered 292 → 259)
+      by the reference's greps (a different definition, for choosing a family):
+        dated comments, go/**.go                     244   (09-12: 235)
+        dated comments, go/**.go outside _test.go    117   (09-12: 114)
+        dated comments, web/src (ts/tsx/css)         409 → 347   (09-12: 426)
+        slice components/board{,.test}.tsx           34 + 28 → 0 + 0
+        #NNN / vNNN residue, go non-test             14   (flat)
+        densest untouched families now: index.css 93 (wait for #481 — it
+        edits the sheet), lib/stage.ts 21 + lib/board.ts 17
+
+      ledger lines before this entry                9,191
+      queue depth (the file's own grep)             7 → 12  (five re-filed from the ledger)
+      Queued-for-Aaron blocks read across sections  25
+      ledger-only queued items found                7  (5 re-filed, 2 already answered → closed)
+      two-places audit, today's legs                5 of 5 clean
+      09-12 Colorless landing rate                  queued 3/3 · deferred 1/2 · fixes 5/5 hold
+      today's leg claims spot-checked               5 of 5 hold
+      relic pass 1: 147 dirs; 51 packages, 51 docs  (flat)
+      relic pass 6: 15 rows, 0 findings             (flat)
+      .claude/hooks                                 1 hook (trigger unfired)
+      data/app.db                                   Sep 19 10:05 before and after (Red's start; untouched here)
+      decks/                                        empty
+
+- **Queued for Aaron (2026-09-19): nothing of this run's own.** Five items
+  re-filed from other sections (fix 1), each on `DAYBREAK.md` under its own
+  heading with the section that owns it. Two questions ride the report
+  rather than the queue, because together they are one ruling about how the
+  pass writes: whether "one line per item" means "one item per question,
+  headline-first", and whether queued blocks in the ledger should carry a
+  marker a test can read the other direction.
+- **Deferred (2026-09-19), with triggers:**
+  - **A test that fails when `guard-git.py` goes inert.** *Trigger:*
+    unchanged — a second hook in `.claude/hooks/`, or the guard observed
+    allowing a spelling it documents refusing.
+  - **The next comment-sweep slice: `web/src/index.css` (93 dated lines, the
+    densest file in the tree).** *Trigger:* #481 merged — it rewrites 125
+    lines of that sheet, and a sweep beside it would conflict at the merge.
+    Until then, `lib/stage.ts` + `lib/board.ts` (38) is the fallback slice.
+- **Staleness, honestly stated** for the next bare `/polish`: every colour
+  carries a 2026-09-19 tag once #481 merges, and Cleanup runs next, so
+  date-staleness is nil; substance orders the next cycle **Red first** (its
+  three oldest live items are finally visible and all three are alerting
+  and recovery — the facet's own name), then **Green** (the concurrency
+  probe skipped four runs running, the authenticated phone sweep owed, the
+  touch-target ruling now in front of Aaron), then by date. The queue
+  Cleanup inherits: **twelve open items by the file's own grep** — five
+  re-filed today, two from 09-19's Green, one from 09-13's morning (Red's
+  drill-versus-retention), one 09-12 (White's alerts), two deliberately
+  waiting (Blue's torches copy, White's prose guard), one ruling (Green's
+  `LandCount()`) — plus Red's walk line for #481 on its own branch, and the
+  Answered list with seven of eleven records now written.
 
 ### 2026-09-12 (rainbow)
 

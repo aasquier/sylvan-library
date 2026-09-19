@@ -95,8 +95,8 @@ goldens and is deliberately not a thing a session does on its own. ·
 **Recommendation:** rule on whether an MDFC counts toward `land_count`. It
 genuinely is a land drop, so "yes" is the honest answer and the one that makes
 the two arithmetics agree — but it is your call, and it wants its own branch
-with the goldens re-recorded deliberately. Ledger: Green, 2026-09-14 — entry
-owed.
+with the goldens re-recorded deliberately. Ledger: Green, 2026-09-19 (the
+09-13 Answered item 11's record is written there; this half stays open).
 
 **Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
 existed nowhere else, and it is deleted now — the other eight were older
@@ -109,6 +109,64 @@ want it, paste that file through the site's import page and the library owns
 it; if not, this line is its obituary. Either way the mtg-lab skill's trigger
 list still names "mono-green/Goreclaw" as one of your decks, which the
 instance contradicts. Ledger: Green, 2026-09-19.
+
+## Open — found waiting in the ledger alone, on the queue for the first time
+
+*Colorless, 2026-09-19: the two-places audit read every `Queued for Aaron`
+block in the ledger against this file, and these five had been queued in the
+ledger since August with no line here — the rule's rarer breach, in the
+direction nobody reads. Each is unchanged in substance and re-verified
+against the tree today; the ledger entry named carries the full case.*
+
+**Red: nothing off-platform tells you the site is down, and a hung process
+that keeps its port is an outage nothing detects.** Fly's HTTP check stops
+routing on failure and the restart policy fires only on exit, so a wedged
+process is a total outage with no alarm. · *Cost of leaving it:* the first
+person to notice an outage is a friend at breakfast. · **Recommendation:**
+two free minutes first — does fly-metrics.net hold any alert rule at all? —
+then UptimeRobot's free tier on `GET /api/health` (GET, never HEAD: `HEAD /`
+answers 405) wired to Pushover ($5 once) for the phone. Ledger: Red, the
+queued list carried in the 2026-09-05 entry, items 1–2; re-verified
+unchanged 2026-09-19.
+
+**Red: `/api/health` reports the pool and the process, never `app.db` or the
+volume's free space, so a corrupt auth database or a full disk leaves it
+green.** · *Cost of leaving it:* every login can fail behind a passing check.
+· **Recommendation:** add `app_db` (does it open), `disk_free_mb` and
+`schema_version` to the body and keep the status 200 — Fly stops routing on
+a failing check, and with one machine that converts "logins are broken" into
+"the site is down"; let the external monitor decide what wakes somebody.
+Ledger: Red, the queued list carried in the 2026-09-05 entry, item 3.
+
+**Red: a deploy takes no snapshot, and the boot after a merge is the moment
+the volume is most at risk.** Fly snapshots daily on its own clock; the
+ladder is forward-only and applies unwatched, and `deploy.yml` still has no
+snapshot step. · *Cost of leaving it:* the one deploy that needs a rollback
+point is the one guaranteed not to have a fresh one — and the 09-13 drill
+showed a snapshot can only ever rehearse a rung landed in the last five days.
+· **Recommendation:** a `fly volumes snapshots create` step ahead of `flyctl
+deploy` in the deploy job, non-fatal on failure (a failed snapshot logs and
+the deploy proceeds), once the deploy token's scope is checked. Ledger: Red,
+the queued list carried in the 2026-09-05 entry, item 6.
+
+**Green: touch targets under 44px, app-wide — 50 controls on `/` at 1440
+this run, 21 of 23 on `/import` at phone width when first measured.** Nav
+links 32px, "Entomb" 66×28, the filter selects 36px. · *Cost of leaving it:*
+a thumb misses what a pointer never does, and commandment 2's newcomer is the
+one most likely to arrive on a phone. · **Recommendation:** rule on the shape
+— a spacing-scale change (every control grows) or a pseudo-element hit area
+that moves no pixels — or close it as a desktop-first ruling; either answer
+ends a finding that has been re-measured four runs running. Ledger: Green,
+2026-08-24 (the browser facet's queued item 3); re-measured 2026-09-19.
+
+**Black: prompt-cache *writes* are invisible in both usage ledgers, so the
+spend figures are a little under.** `cache_creation_input_tokens` appears
+nowhere in the tree; writes bill at 1.25× input. · *Cost of leaving it:* the
+dollar figure on the Admin panel and in `mtglab claude usage` under-reads by
+the write premium — small against today's ≈$11 all-time, and a schema
+migration to fix. · **Recommendation:** add the column on a day you can watch
+the boot (a migration is your window by standing rule); nothing until then.
+Ledger: Black, 2026-08-24 (the carried list); re-checked 2026-09-19.
 
 ## Open — deliberately waiting, nothing to do yet
 
