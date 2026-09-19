@@ -3303,7 +3303,8 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
+- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night),
   2026-08-24, 2026-08-19, 2026-08-16, plus two un-run entries from that week
   — the targeted performance pass and the measuring shelf — both kept below.
 - **Everything below the 2026-08-24 block is about the Python app.** `bench
@@ -3312,6 +3313,172 @@ applies to each. Ordered by cost:
   hold and several are why this run went where it went; **no number, path or
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
+
+### 2026-09-19 (rainbow)
+
+Leg three behind White's #478 and Blue's #479. The quietest week this facet
+has recorded: neither spend ledger moved by a token, the mode table and
+`converse.go` are byte-untouched since #465, the host set is unchanged, the
+CSS's growth stopped, and every warm route measured at or below its best
+number on file. The one fix closes the gap the measuring shelf names in its
+own first paragraph: the Tier 1 register counts hits now.
+
+- **Fixed this run: the Tier 1 store counts what it answered.** The shelf's
+  standing rule — a cache can be correct, tested, and never once consulted,
+  and only a counter finds that — applied to the one cache in the tree that
+  still had none, and the one the skill itself lists as the open half.
+  `cache.Store` (`go/internal/sim/cache/store.go`) carries `hits, misses
+  atomic.Int64` (the tree's counter idiom: `convoke`, `jobs/registry`), read
+  through a nil-safe `Counts()`, **rendered nowhere** (commandment 10; the
+  door's `etagCounts` precedent exactly). The counting rule is written where
+  it stands: a miss is *the table was asked and did not answer* — `ErrNoRows`
+  and a failed read both — while a nil store and an empty key ask nothing
+  and count nothing, because "caching is off" is not a miss rate.
+  **`internal/sim/cache` is not in `engineSources`** (it is the package that
+  holds the list), so the deployed cache's key does not move and nothing
+  stored is orphaned — checked before touching it, and the instance
+  answered `cached: true` to White this morning on the 09-12 computation.
+  `TestTheStoreCountsWhatItAnswered` derives every expectation from the
+  mechanism: 0/0 before any ask, 0/1 after a miss, still 0/1 after a write
+  (a write is not an ask), 1/1 after a hit, 1/1 after an empty key, a closed
+  handle's read 0/1, a nil store 0/0. Mutation-verified four ways, each on
+  the step that owns it:
+
+  ```
+  == mutation: hit never counted
+      cache_test.go:702: after a hit: 0 hits / 1 misses, want 1 / 1
+  == mutation: ErrNoRows miss never counted
+      cache_test.go:696: after a miss: 0 hits / 0 misses, want 0 / 1
+  == mutation: failed read not counted
+      cache_test.go:715: closed store: 0 hits / 0 misses, want 0 / 1
+  == mutation: empty key counted as a miss
+      cache_test.go:706: an empty key asks nothing: 1 hits / 2 misses, want 1 / 1
+  ```
+
+  The skill's shelf paragraph and this color's reference said the register
+  "still counts no hits"; both now say it counts and name the bench suite as
+  the half still open (a prose edit riding the branch that made it stale).
+- **Measurements (2026-09-19, this Mac — load 2.5–3.4 through the probes,
+  42-day uptime, other sessions live; the race suite itself spiked it to
+  42.9):**
+  - **Claude spend, both ledgers, unchanged to the token from 09-12.**
+    Laptop: `claude-sonnet-5 107 conv / 123 req / 21,906 in / 152,443 out /
+    2,054,694 cached — $2.1150`. Instance (`fly ssh console -C "mtglab
+    claude usage"`, plain login, no token workaround needed since 09-13):
+    `claude-sonnet-5 213 conv / 332 req / 78,590 in / 567,368 out /
+    9,748,735 cached — $9.0034`. Zero rows on either box in seven days;
+    the all-time figure stays ≈$11.12 across both, and the instance's
+    monthly run-rate is therefore *below* the ≈$9/month 09-12 handed
+    Green — a week of no use is a week of no spend. Per-mode split
+    identical to the 09-12 table (dossier 20/54 at 231,013 out still where
+    the money is; `slot-argument` 3 conv / 0 cached, the carried argue
+    exposure, unmoved). **No Claude call was made by this run; $0.00
+    spent.**
+  - **Mode table: ten, counted from `go/internal/claude/data/modes.json`,
+    byte-untouched since #392** (`git log -1 -- …/modes.json` → `18bb998`);
+    knobs as recorded 09-05 (16,384/high searching, 8,192 elsewhere, scan
+    2,048/low, `may_write: []` on all ten). `git diff --stat cb75cf2..HEAD
+    -- go/internal/claude` is **empty**: `converse.go`'s two breakpoints,
+    the personas and every prompt are exactly what 09-12 read, so the craft
+    reading has nothing new to read. The checklist's "deliberate `max_uses`"
+    claim is machine-checked (`modes_test.go:174` asserts the bound on every
+    searching mode's rendered wire) — the standing question, answered for
+    this facet with nothing to fix.
+  - **Roster moved, table unaffected.** The `claude-api` skill's table now
+    carries **Fable 5.1 and Mythos 5.1** at $10/$50 (ten rows; 09-12 read
+    nine). `prices.Table` still holds the nine it knew; an unpriced model
+    is reported by name (`UnpricedModels`), never mispriced, and the
+    instance runs Sonnet 5 on every row, so nothing is owed. Sonnet 5 at
+    $3/$15 is still the right-priced target against Opus 5 at $5/$25 —
+    no model proposal. `Checked = 2026-08-18` again not bumped (contract:
+    a human read the pricing page). **Deferred, with its trigger:**
+    `CacheReadFraction = 0.1` is one constant for every model, and Fable
+    5.1 prices cache reads at $0.25/MTok — 2.5% of input, not a tenth —
+    so the day a model with a different read fraction enters `Table`, the
+    fraction has to move onto `Priced`. Nothing until then.
+  - **Local warm p50×15, port 8791, scratch data dir (a copy of the pool,
+    no `app.db` at start, no credential), full pool:**
+    `/api/health` **15.6ms** (fresh open on a page-cache-warm copy; 34.2
+    on 09-12, 43.3 on 09-05 — the designed refusal-to-hold, not a
+    regression either way) · `/api/lore` 0.9 · `/api/colors` 0.7 ·
+    `/api/glossary` 0.7 · `/api/tarot/reading` 0.7 · `/api/brew/reading`
+    0.7 · `/api/themes` 0.6 · `/api/claude/personas` 0.7 · `/` 0.7 ·
+    **search `q=goblin` 40.8 · no-text 52.8 · `type_line=creature` 52.7 ·
+    `identity=WU` 36.4** — the 08-24 quiet-Mac baseline (40.4 / 53.1 /
+    52.9 / 36.6) reproduced within a millisecond at load 2.7, which is the
+    09-12 race's verdict confirmed from the other side: the 09-05/09-12
+    inflation was the environment, and the code has not moved (search SQL
+    untouched since #442's semi-join; DuckDB v0.10505.0 unchanged).
+  - **Live TTFB p50×7, this Mac → `sjc`, gzip GET:** `/api/health`
+    **196.4ms** (was 240.3) · `/` 183.0 · `/assets/app.js` 168.8 ·
+    `/assets/index.css` 166.0 · `/api/lore` 166.3 — floor is still RTT.
+    Health body: `{"pool":true,"oracle_cards":35517,"printings":108583,
+    "bulk_files":["default_cards-2026-09-13.jsonl.gz","oracle_cards-2026-
+    09-13.jsonl.gz"],"decks":25,"pool_stale":false}` — the 09-13 refresh
+    is what is serving.
+  - **Serving contract, live GET of `app.js`:** `HTTP/2 200` ·
+    `cache-control: no-cache` · `content-encoding: gzip` · `etag:
+    "21ade73c…"` (strong, the content hash) · `last-modified: Sat, 19 Sep
+    2026 16:10:29 GMT` (this morning's #479 deploy) · `vary:
+    Accept-Encoding` · **98,284 bytes on the wire**. The committed chunk at
+    gzip -9 is 97,904 — a 380-byte gap that is the door's gzip level
+    against `-9`, well inside the 128 KiB budget gate either way.
+  - **Bundle (committed `web_dist`, gzip -9):** `charts.js` 399,398 /
+    111,241 — **byte-identical, fifth run running**; `app.js` 316,822 /
+    97,904 (was 316,739 / 97,877: +27 B gz for #468, #479 and the login
+    copy); **`index.css` 346,708 / 62,051 — byte-identical to 09-12.** The
+    fastest-growing thing in the bundle stopped growing this week; the
+    09-05 "if it doubles again" trigger is further away than it was.
+    `web_dist/assets` total 9,612 KB, unchanged.
+  - **Static assets over hotlinks: nothing to classify.** `web_dist` host
+    set: `cards.scryfall.io` 28 (the one fetch), `www.tcgplayer.com` 1 (a
+    click), `cdn.jsdelivr.net` 1 (tesseract's overridden default, inert),
+    `console.anthropic.com` 2 / `fly-metrics.net` 1 (admin-panel links),
+    the rest `www.w3.org` namespaces and library homepages in comments —
+    the same shape as 09-12, and `hotlinkrecord_test.go` still holds the
+    three guards. No CDN script, no `@import`, no absolute `url()`.
+  - **No cache was added since #465** — `git diff cb75cf2..HEAD -- go |
+    grep -iE 'cache|memo|sync.Once|sync.Map|atomic'` returns nothing on
+    the added side; the pool rebuild (#472) and price recording (#473) are
+    refresh-path work, not request-path. The Tier 1 counter above is the
+    only open hit-count in the tree closed.
+  - **Suite wall clock not re-baselined this run** — `go test -race ./...`
+    read 70.5s because Go's cache answered for every untouched package;
+    White's 2m8.1s quiet re-baseline from this morning stands. Web check:
+    91 files / 1,615 tests, 53.6s, exit 0.
+- **Red's 09-05 handoff (the two `packages.Load` walks in
+  `boundary_test.go`), re-read, not touched.** White deferred it this
+  morning with a trigger (the day `internal/claude` becomes the slowest
+  package, or a fourth loader arrives) on the reading that each test's
+  `Load` is part of what it asserts and the package wall (60s) is not the
+  suite's tail (`api`, 63–76s). Black concurs on the numbers: the
+  allocation is real (Red measured 4.7 GB, half the typechecker) but it is
+  not on the critical path, and a `sync.OnceValue` over a load-bearing
+  security guard is a change to make beside a reason. Same trigger.
+- **Carried items, re-checked:** cache-write tokens still invisible
+  (`cache_creation_input_tokens` nowhere in the tree; both usage outputs
+  still print the floor line; still a schema migration, still Aaron's
+  window). Theme's second breakpoint unchanged (converse untouched).
+  Interview/argue cache-or-key: trigger unfired (three argue conversations
+  all-time, unchanged). Long max-age for media: unchanged, still blocked on
+  content-hashing the media names.
+- **Rig hygiene:** the rig ran on 8791 with `MTGLAB_DATA_DIR` pointed at a
+  scratch copy of the pool and `MTGLAB_DECKS_DIR` at an empty scratch dir,
+  under `env -i` so no credential could reach it; **`data/app.db` unmoved
+  (458,752 bytes, `Sep 12 08:42`) and the WAL's `Sep 14 07:05` stamp
+  predates this session** — the visitor ledger wrote to the scratch
+  database this time, not the checkout's. Rig stopped and its port
+  verified free. **For Green:** nothing was listening on 8765 at 09:19
+  this morning (`lsof -nP -i :8765` empty) — the 32-hour server the
+  daybreak line says is holding the nine local decks is gone, so that
+  item's "what would have to be true" has come true; not this leg's
+  section to close.
+- **Not touched, deliberately:** the five fingerprinted packages (no code
+  need; prose there is priced in cache keys); the mode prompts (nothing
+  changed since the last reading, and they are user-audible); no Claude
+  call made.
+- **Queued for Aaron (2026-09-19): nothing new.** The honest queue for this
+  run is empty and `DAYBREAK.md` is not touched.
 
 ### 2026-09-12 (rainbow)
 
