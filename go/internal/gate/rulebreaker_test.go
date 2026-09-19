@@ -476,3 +476,23 @@ func TestARulebreakerWidensTheCardsItNamesAndNotTheDeck(t *testing.T) {
 		t.Fatalf("identity errors on %v, want only the red instant", blamed)
 	}
 }
+
+// Whtz's clause covers no card at all -- it lifts the deck size and nothing
+// else -- so an identity error in a Whtz deck carries the plain tail every
+// other deck gets, never a quoted clause that "does not cover" the card. Why()
+// quotes a clause only when it *grants* something, and Whtz is the one printed
+// Rulebreaker that reads cleanly (`Unsupported` empty) and grants nothing, so
+// this is the boundary that `> 0` there has to hold: a `>=` lived through the
+// whole table above, because every other readable clause grants at least one
+// kind of card.
+func TestAClauseThatGrantsNothingIsNotQuoted(t *testing.T) {
+	t.Parallel()
+	whtz := commanderRec(clauseNamed(t, "Whtz, the Bibliophile"))
+	rs := gate.ReadRulebreakers([]*pool.CardRecord{whtz})
+	if len(rs) != 1 || rs[0].Unsupported != "" || !rs.NoMaximumDeckSize() {
+		t.Fatalf("Whtz did not read as the one clean clause that grants nothing: %+v", rs)
+	}
+	if why := rs.Why(); why != "" {
+		t.Fatalf("Why() quoted a clause that covers no card: %q", why)
+	}
+}

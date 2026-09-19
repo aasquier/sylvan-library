@@ -19,8 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-12 (rainbow). Previous: 2026-09-05 (rainbow, night),
-  2026-08-24, 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -28,6 +28,226 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-19 (rainbow)
+
+- **Fixed this run:**
+  1. **CLAUDE.md's serial-test claim was enforced by nothing, and two
+     censuses a week apart could not even agree what it counted.** The
+     Testing section promises that every top-level test without
+     `t.Parallel()` "says why where it stands — a claim a script can re-check
+     in a second"; the script was never in the tree, the 09-12 run's count
+     was 27, and this run's AST census read **39** over a tree that added no
+     serial test in between — the difference being whether a `t.Parallel()`
+     inside a `t.Run` closure counts for the parent (it does not: a
+     non-parallel parent still takes its turn against every other top-level
+     test, its parallel subtests only run beside each other). A number that
+     changes with the person asking cannot be re-checked. So the definition
+     lives in code now: `go/cmd/mtglab/serialregister_test.go`
+     (`TestEverySerialTestSaysWhyWhereItStands`) walks every `_test.go` under
+     `go/` with the language's own parser, counts a test serial when its own
+     body has no `t.Parallel()` *statement* (TestMain and benchmarks excluded
+     by parameter type), and requires the doc comment or a comment ahead of
+     the first statement to carry "serial" or "parallel" in any case. Not a
+     ceiling — a new argued serial test passes; the ledger keeps the count.
+     **All 39 pass today** (the 39 read in full: 20 reach `t.Setenv`, 13
+     swap a package-level value or share a guarded index, 2 send SIGTERM to
+     the process, 2 start a second process, 1 lowers a package-level floor,
+     1 is a child-process helper that is not a test). **Mutation-verified
+     three ways**: (a) `door_test.go`'s "Serial:" reworded to "Alone:" —
+     **did not fail**, correctly, because the same comment's next line says
+     "a parallel neighbour"; (b) the whole three-line reason deleted — fails
+     naming `TestASlowRequestLeavesARouteShapedWarning`; (c) `t.Parallel()`
+     removed from `TestDatedCommentsDoNotOutgrowTheirCeiling` — fails naming
+     it. All restored. CLAUDE.md's sentence now names the register and
+     carries today's numbers.
+  2. **The rulebreaker.go boundary cluster is read, and one of the four was
+     a real product bug — the 09-12 deferred item closes.** The four BOUND
+     survivors named on 09-12, each read against the code that reaches it:
+     `94:13` (`a.minMV > 0` → `>=`) is unobservable — a mana value is never
+     negative; `120:21` (`len(group) > 0` → `>=`) is unreachable —
+     `readTypeList` never emits an empty group; `276:17` (`len(words) > 0` →
+     `>=`) would append empty groups that `matchesTypes` then ignores. Three
+     are noise and are said so here. **`375:44` is reachable through Whtz,
+     the Bibliophile**: `Why()` quotes a clause when `Unsupported == "" &&
+     len(rb.allow) > 0`, and Whtz is the one printed Rulebreaker that reads
+     cleanly and grants nothing, so under `>=` an identity error in a Whtz
+     deck would render `-- and Whtz, the Bibliophile's Rulebreaker does not
+     cover it: "A deck with this commander has no maximum deck size."` — a
+     newcomer told a deck-size clause is why their card is off-colour.
+     `TestAClauseThatGrantsNothingIsNotQuoted` (`internal/gate/
+     rulebreaker_test.go`) pins it. **Mutation-verified against the exact
+     lived mutant**: `> 0` made `>= 0` at line 375, the test fails quoting
+     that very sentence; restored, re-green.
+  3. **CLAUDE.md's census numbers refreshed** from today's measurement
+     (1,925 of 1,964; 39 serial) beside fix 1 — a claim in prose updated by
+     the run that made it machine-checked.
+- **Verified this run — licensing (triple-check):**
+  - **`animist verify`: 34 recipes, all held** (flat). Committed media **207
+    tracked files** (flat); **no media file changed in the delta**
+    (`e9b2d5f..HEAD`, 12 commits, 38 files: `git diff --name-status`
+    filtered on image/font/media extensions is empty), so nothing new to
+    read per file. The accounting gate and both licence-record guards ran
+    green in this run's suite.
+  - **The licence gate still has no override**, read in the code:
+    `tools/animist/sources.py` raises `LicenceRefused` at lines
+    175/212/272/305 against the three allowlists; a grep of `cli.py` and
+    `sources.py` for force/bypass/skip-licence finds only two doc comments
+    about the Met's boolean. No Wizards image under `git ls-files`.
+    Monetization sweep clean (the hits are Ludevic's "donated material",
+    the tarot's Five of Pentacles note, and the "never checkout" ceiling).
+  - **ADR 6 holds**: ci.yml line 116 still scans
+    `.duckdb`/`.jsonl.gz`/`.json.gz` anywhere; no bulk data tracked.
+  - **Dependency licences, swept 2026-09-19 from the packages themselves.**
+    Go (`go-licenses report ./...`): 32 third-party — 19 MIT, 10
+    BSD-3-Clause, 2 Apache-2.0, `modernc.org/mathutil` Unknown to the
+    classifier and BSD-3-Clause by its LICENSE (ruled 2026-08-24). npm
+    (every `node_modules/*/package.json` the lockfile names): 174 packages
+    with a licence field — 134 MIT, 15 ISC, 10 Apache-2.0, 4 MPL-2.0, 3+3
+    BSD, 2 MIT-0, 1 each BlueOak/CC0/"MIT AND ISC"; the lockfile's other 88
+    entries are workspace links and nested paths with no package.json.
+    **Zero AGPL/GPL/SSPL/UNLICENSED on either side.** Local `node_modules`
+    was **in sync with the lockfile** this time (oxlint 1.81.0, vitest 5.0.0,
+    vite 8.2.2, react 19.2.8 all match) — first run since 08-24 not to find
+    the drift.
+- **Verified this run — security & isolation:**
+  - **Zero routes new since 2026-09-12** (`git diff e9b2d5f..HEAD` shows no
+    added `Pattern:`), zero new `os.Getenv`, zero new string-built SQL, no
+    media. The delta's three security-shaped changes read in full:
+    - **`cmd/mtglab/ui.go`'s dev profiler (#464)** sits *in front of* the
+      door and is installed only under `!requireAuth` — structurally absent
+      with auth on, never a route the sweeps must classify (the argument
+      names gosec G108 and the session-token heap walk it would otherwise
+      be). `devprofiler_test.go` pins both halves against a real boot: index
+      and a goroutine profile served with auth off, and with auth on neither
+      the pprof index text nor a `Content-Disposition` download may come
+      back. Read, agreed, nothing owed.
+    - **`internal/pool/owner_unix.go` / `owner_other.go` (#472)** are
+      build-tagged (`unix` / `!unix`) — the checklist's "platform-tagged
+      file only CI can typecheck" class. Both are five-line stat readers
+      with no input from anyone; the darwin leg compiles the unix half and
+      the `!unix` half is a one-line constant return. Nothing to fix and
+      nothing to queue.
+    - **`internal/door/static.go`'s ETag counters (#465)** are read by
+      `etagCounts()` under the memo's mutex and "rendered nowhere"
+      (commandment 10) — the cache-rule counter half, as the skill's shelf
+      note says to copy.
+  - **Email**: `AsDict(true)` still has exactly one non-test caller
+    (`admin.go:124`); `user.Email` is otherwise read only by `users list`
+    (stdout, an admin's terminal) and `admin.go:471/485` (the reset sender).
+    The one `slog` line carrying an address is `bootstrap.go:166`, which
+    logs `MTGLAB_ADMIN_EMAIL`'s *malformed* value at boot — an operator's
+    own typo back to the operator; noted, not a finding. **Tokens**: no
+    query-string token under `web/src` (the one `token=` is the card-token
+    prop). **Argon2id**: `m=19456,t=2,p=1` (`passwords.go:60/90`),
+    unchanged at OWASP's minimum. `.env` ignore order intact; `fly.toml`
+    opens with its no-secrets rule; no `.env` in the tree.
+  - **CodeQL: 0 open, 11 dismissed** (flat); main's analysis on `e66d6de`
+    green twice (09-14). **Dependabot: 9 open, all `pip/torch`,
+    development scope** (1 critical, 3 medium, 5 low) — the standing
+    daybreak item, not re-litigated. Dependency-review green on all three
+    ecosystems' latest bumps.
+  - **Live posture, riding Aaron's own session** (the `gyome` seat was
+    signed in through Claude-in-Chrome; ridden under the standing
+    you-are-me ruling, reads and the repeat-safe seeded asks only):
+    `/api/health` 200 — `oracle_cards: 35517, printings: 108583`, bulk
+    2026-09-13, `decks: 25`, `pool_stale: false`; `/api/colors` 200
+    (44,193 B), `/api/glossary` 200 (30,883 B), `/api/decks` 200,
+    `/api/nope` → 404 `{"detail":"no such endpoint: /api/nope"}`.
+- **Measurements (2026-09-19, rainbow):** raw output, not a summary.
+  - **Coverage** (floor 90.8, unchanged this run — CI's print on main was
+    not re-read; the ratchet's next click belongs to whichever run reads
+    it):
+
+    ```
+    go test -count=1 -coverpkg=./... ./... ; go tool cover -func  →  total: 91.2%   (flat, third run running)
+    go test -count=1 -coverprofile=own.out ./... ; -func          →  total: 88.9%   (flat vs 09-12)
+    ```
+
+    Own-tests lows: `wire` 67.7, `deckread` 68.1, `deckyaml` 70.8,
+    `shelves` 81.5, `sim` 81.6, `library` 84.1, `pool` 84.6, `auth` 85.5 —
+    the top five unchanged to the decimal.
+  - **Suite wall clock: 2m8.1s — the quiet re-baseline the 09-12 entry asked
+    for.** `go test -count=1 ./...` started at load 4.27 (09-12 ran at 63):
+    `real 2m8.092s user 7m28.330s sys 2m1.234s`, 50 packages, 0 failures.
+    **Flat to the tenth against 09-05's 2m8.1s with 1,962 vs 1,817 top-level
+    tests** — 8% more tests for zero seconds, which is the parallelism
+    sweep still paying. Per-package tail (plain run): `api` 76.0s, `claude`
+    68.2s, `claude/tool` 37.3s, `card` 31.0s, `config` 29.4s, `convoke`
+    28.0s, `door` 27.3s, `deckread` 26.7s. **Per-test slow tail** (`go test
+    -json`, run alone after the coverage passes): `internal/claude`
+    `TestTheGuardCoversThePackagesThatExist` 28.4s,
+    `TestNoIdentifierUnderTheClaudeSurfacesResolvesToAWrite` 27.6s,
+    `TestNothingUnderTheClaudeSurfacesCanReachTheWriteEngine` 27.3s — all
+    three are `packages.Load` over the claude tree (the ADR 14 write
+    boundary), then `cards` `TestEachTierOffersWhatItIsFor` 13.5s, and
+    nothing else above 10s. 1,945 tests passed in the json run.
+  - **`t.Parallel` census: 1,925 of 1,964 parallel, 39 serial, every one
+    argued** — and as of fix 1 that sentence is a test's `t.Logf`, not a
+    script's. The 09-12 "27" was a different rule, not a different tree
+    (fix 1 says which). 53 `t.Setenv` sites (flat). **Skip census: 40
+    `t.Skip` sites** (was 37; +3 in the delta): `bundlebudget_test.go:75`
+    skips on no built bundle (a real absence), `rebuild_test.go:250/283`
+    skip when the frozen fixture carries no priced printing — **run to
+    check rather than read**: both PASS against the 22-card fixture, so the
+    skip is the data-conditional shape and the tests do run. Every one of
+    the 40 is conditional on a real absence.
+  - **Mutation**: no gremlins spin this run — the coverage passes held the
+    machine at load 139–151 for the window a spin would have needed, and
+    the 09-05 lesson is that a loaded spin fabricates a score. The hand
+    protocol did the work instead (fix 2 against the exact 09-12 mutant),
+    and `internal/gate`'s named survivors go 19 → 18 by killing `375:44`;
+    the three noise survivors are argued above so the next spin can skip
+    them.
+  - **The determinism replay — FULL PASS, live, all four surfaces, one
+    correction to the Wheel's record:**
+    - **Tarot live**: `GET /api/tarot/reading?seed=1909` on
+      sylvan-libraries.com — **741 bytes, sha256 `e406f504c05f962cb6c2ccabb7
+      d9d18fead04235997917639ac93c90135a3928`, byte-identical to the
+      2026-08-24 baseline** across 26 days; Three of Wands reversed / Ten of
+      Swords / The Devil.
+    - **Brew live**: `GET /api/brew/reading?seed=1909` — **503 bytes, sha256
+      `54c5036e…bebead8`, identical to the 09-12 first baseline**
+      (Quince/taste/The Base, Storm-rain/temperament/The Heat).
+    - **Wheel live**: two spins of `POST /api/decks/gyome/arahbo-cats/wheel
+      {"seed":1909}` — self-identical (sha256 `1f8945b4…153ced`), `symbol:
+      sword`, `sword_face: edge`, `answered_by: dice`, seed 1909 — **the
+      fate equals the 2026-08-24 record. But the payload is 979 bytes, not
+      09-12's 973**, and the reason is in the response's own caveat: "a
+      fate, then a random legal card in this deck's colours". The card half
+      draws over the *pool*, and the pool refreshed 09-13 (35,393 → 35,517
+      oracle cards), so the card moved with the data while the seeded fate
+      did not. Today's card under seed 1909 is **Thornwatch Scarecrow**,
+      recorded here with the pool date so the next run can tell "the pool
+      refreshed" from "the seed broke": the fate is the promise; the card
+      is a fact about the pool on the day.
+    - **Tier 1 live, stronger than the two-ask form**: `POST /api/sim/mana
+      {"owner":"gyome","slug":"arahbo-cats","seed":1909}` twice — **both
+      answered `cached: true`**: the deployed cache still held the 09-12
+      computation across seven days and twelve deploys, which is the engine
+      fingerprint holding (none of the five fingerprinted packages moved in
+      the delta; `convoke` and `analyze` did and are outside
+      `engineSources`). Results identical minus the cache fields, **7,420
+      bytes, the same size as 09-12**, seed carried on both.
+  - **`data/app.db` untouched by any of it**: mtime `Sep 12 08:42` before
+    and after every suite and the live walk (the WAL's Sep 14 stamp predates
+    this session). No local server was started this run — the replay went
+    to the deployed instance directly.
+- **Queued for Aaron (2026-09-19): nothing new.** The two standing White
+  items (the nine torch alerts' GitHub-side dismissal; the wider prose
+  guard, deliberately waiting) are unchanged. The honest queue for this run
+  is empty and the daybreak file is not touched.
+- **Deferred:**
+  - ~~The rulebreaker.go boundary cluster~~ — **closed this run** (fix 2:
+    one killed, three argued as noise).
+  - **The claude boundary trio at ~28s each.** Three `packages.Load` walks
+    of the same tree in one package; a shared `sync.OnceValue` load would
+    make it one walk, but each test's `Load` is part of what it asserts and
+    the package wall (60s) is not the suite's tail (`api`, 63–76s).
+    *Trigger:* the day `internal/claude` becomes the slowest package, or a
+    fourth loader arrives.
+  - **`repr.go`'s corpus ruling** and **`--version`/build stamp**:
+    standing, triggers unchanged (2026-08-24).
 
 ### 2026-09-12 (rainbow)
 
