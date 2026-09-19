@@ -173,7 +173,10 @@ go build -gcflags=-m ./internal/<pkg>/ 2>&1 | grep escapes
   counter did. The register that used to hold every cache retired with the old
   backend, so until the Go shelf is rebuilt, **a cache added since last run
   with no hit count anywhere is a finding**, and rebuilding the register is
-  the standing proposal.
+  the standing proposal. Both caches in the tree count now — the door's ETag
+  memo (`etagCounts`) and the Tier 1 store (`cache.Store.Counts`, 2026-09-19)
+  — and neither count is read out of a running instance yet, which is the
+  register's remaining half.
 - **Backend numbers** for the routes a session actually hits, on the live
   instance as well as locally — a local measurement cannot see the proxy, TLS,
   or the machine's own contention, and since 2026-08-23 the machine has two

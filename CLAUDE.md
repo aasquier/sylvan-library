@@ -198,9 +198,12 @@ now noise.
 ## Testing
 
 **A new test calls `t.Parallel` unless it is holding something shared.** As of
-2026-08-28 that is 1,485 of 1,523 top-level tests, and **every one of the 38
-that does not says why where it stands** — a claim to re-check, and one a
-script can re-check in a second rather than a claim to trust. Three things
+2026-09-19 that is 1,925 of 1,964 top-level tests, and **every one of the 39
+that does not says why where it stands** — no longer a claim to re-check:
+`go/cmd/mtglab/serialregister_test.go` holds it on every run, failing by name
+on any serial test whose doc comment or first comment says neither "serial"
+nor "parallel" (the definition of *serial* is pinned there too, because two
+hand-rolled censuses a week apart disagreed 27 to 39 over the same tree). Three things
 forbid it, and all three travel through helpers — including methods, in other
 files — so none is visible from the test itself:
 
