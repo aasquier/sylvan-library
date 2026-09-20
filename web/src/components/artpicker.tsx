@@ -131,10 +131,8 @@ export function CardArtPicker({ deck, card, onPicked, onClose }: {
                   onDoubleClick={() => gesture.doubleClick(printing.id)}
                   disabled={!!saving}
                   title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
-                  className="art-pick-tile overflow-hidden rounded-lg text-left"
+                  className={`art-pick-tile overflow-hidden rounded-lg text-left${on ? ' is-on' : ''}`}
                   style={{
-                    outline: on ? '2px solid var(--series-1)' : '1px solid var(--hairline)',
-                    outlineOffset: on ? '1px' : '0',
                     opacity: saving && saving !== printing.id ? 0.5 : 1,
                     background: 'var(--page)',
                   }}
@@ -280,13 +278,12 @@ export function ArtPicker({ deck, onPicked }: {
                       onDoubleClick={() => gesture.doubleClick(printing.id)}
                       disabled={!!saving}
                       title={`${printing.set_name ?? printing.set_code} · #${printing.collector_number ?? '?'}`}
-                      className="art-pick-tile overflow-hidden rounded-lg text-left"
+                      // `.is-on` rings the one showing. The ring is a class
+                      // and never an inline `outline`: an inline outline
+                      // outranks every focus ring, so the tiles were invisible
+                      // to a keyboard (focusstates_test.go).
+                      className={`art-pick-tile overflow-hidden rounded-lg text-left${on ? ' is-on' : ''}`}
                       style={{
-                        // The selected one is ringed rather than merely
-                        // brighter: "which am I showing" has to survive a
-                        // greyscale screenshot and a colourblind reader.
-                        outline: on ? '2px solid var(--series-1)' : '1px solid var(--hairline)',
-                        outlineOffset: on ? '1px' : '0',
                         opacity: saving && saving !== printing.id ? 0.5 : 1,
                         background: 'var(--page)',
                       }}
