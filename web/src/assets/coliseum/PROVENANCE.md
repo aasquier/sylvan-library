@@ -301,3 +301,39 @@ Why committed rather than hotlinked: The seven scenes beside it — drawn on the
 
 Why committed rather than hotlinked: The eight scenes beside it, and more sharply than any of them — this is the most frequently drawn picture in the room, eleven times a game, so a copy fetched from somebody else's host would be the one asset whose latency a player actually learns. At 37 KB the request would also cost more than the bytes.
 <!-- animist:end arva -->
+
+<!-- animist:begin hortus -->
+## daucus.webp, papaver-row.webp, papaver.webp
+
+### from `daucus`
+- **Source**: "Isolated Flowers", <https://stocksnap.io/photo/isolated-flowers-J3VJVBCWXT>, found via Openverse with a license=cc0,pdm filter, searching `flowers isolated`: a spray of Queen Anne's lace photographed on black, the one wild flower in the results with a ground a matte can seed from.
+.
+- **Licence**: cc0. Confirmed through the Openverse record API at fetch time (2026-09-20).
+- **Transformations** (Pillow, scripted -- `animist build hortus.recipe.yaml`):
+  - `crop`: frac_box=[0.12, 0.13, 1.0, 1.0].
+  - `matte_backdrop`: tolerance=30, soft=24, border=2.
+  - `resize`: width=320.
+  - Encoded WEBP, quality 84.
+
+### from `papaver`
+- **Source**: "Isolated Flower", <https://stocksnap.io/photo/isolated-flower-CTZZCEJTMR>, found via Openverse with a license=cc0,pdm filter, searching `poppy flower isolated white background`: three StockSnap plates of Iceland poppies on a white sweep, and this is the one with a single open flower and the buds standing clear of it.
+.
+- **Licence**: cc0. Confirmed through the Openverse record API at fetch time (2026-09-20).
+- **Transformations** (Pillow, scripted -- `animist build hortus.recipe.yaml`):
+  - `crop`: frac_box=[0.04, 0.08, 0.68, 1.0].
+  - `matte_backdrop`: tolerance=22, soft=18, border=2.
+  - `resize`: width=300.
+  - Encoded WEBP, quality 84.
+
+### from `papaver_row`
+- **Source**: "Isolated Flower", <https://stocksnap.io/photo/isolated-flower-1PBQ9YCEV3>, found via The same search: a row of poppies and buds on the same white sweep, which is what the other side of a stone wants — several stems rather than one.
+.
+- **Licence**: cc0. Confirmed through the Openverse record API at fetch time (2026-09-20).
+- **Transformations** (Pillow, scripted -- `animist build hortus.recipe.yaml`):
+  - `crop`: frac_box=[0.12, 0.26, 0.88, 1.0].
+  - `matte_backdrop`: tolerance=26, soft=18, border=2.
+  - `resize`: width=360.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: They stand at a grave that is drawn on the beat a player falls and must be there when the stone comes up; a flower that arrives from somebody else's host a second after the pall has settled is a flower that was not at the funeral. And every one is an individual photographer's CC0 release on an aggregator, which is precisely the category where a third party's copy quietly changes terms or moves. A copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end hortus -->

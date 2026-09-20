@@ -62,6 +62,12 @@ import { ManaPip } from './manasymbol'
 import { producedColors, producedName } from '../lib/mtg'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import aurumArt from '../assets/coliseum/aurum.webp'
+import cippusArt from '../assets/coliseum/cippus.webp'
+import daucusArt from '../assets/coliseum/daucus.webp'
+import papaverArt from '../assets/coliseum/papaver.webp'
+import papaverRowArt from '../assets/coliseum/papaver-row.webp'
+import ivySprig1 from '../assets/ambience/ivy-sprig-1.webp'
+import ivySprig2 from '../assets/ambience/ivy-sprig-2.webp'
 import ensisArt from '../assets/coliseum/ensis.webp'
 import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
@@ -1536,7 +1542,7 @@ const STARTING_LIFE = 40
  *
  * The flash on change stays: a total that changed silently is a total nobody
  * notices changing. */
-function LifeTotal({ life }: { life: number }) {
+function LifeTotal({ life, wound = 0 }: { life: number; wound?: number }) {
   const previous = useRef(life)
   const [hit, setHit] = useState<'up' | 'down' | null>(null)
   useEffect(() => {
@@ -1569,7 +1575,7 @@ function LifeTotal({ life }: { life: number }) {
                note={dire ? 'One good swing from nothing — almost anything on '
                  + 'this board can deal five.' : undefined}
                className={`field-life${hit ? ` is-${hit}` : ''}${
-                 dire ? ' is-dire' : ''}`}
+                 dire ? ' is-dire' : ''}${wound ? ' is-bleeding' : ''}`}
                style={{ '--life-left': left,
                  '--life-spent': spent } as CSSProperties}>
       <svg className="field-life-ring" viewBox="0 0 48 48" aria-hidden="true"
@@ -1578,6 +1584,7 @@ function LifeTotal({ life }: { life: number }) {
         <circle className="field-life-arc" cx="24" cy="24" r="20" />
       </svg>
       <span className="field-life-n tabular">{life}</span>
+      {wound > 0 && <Blood key={wound} />}
     </FieldHint>
   )
 }
@@ -1675,7 +1682,13 @@ function PlayerCounters({ counters }: {
  * two-line caption under a 40px dial, and the one thing a scoreboard has to
  * carry from across the room is *how close*, not *by whom*.
  */
-function GeneralBead({ name, damage }: { name: string; damage: number }) {
+function GeneralBead({ name, damage, wound = 0 }: {
+  name: string
+  damage: number
+  /** The serial of the blow that raised this count, or nought while the dial
+   *  is dry — see `useWounds`. */
+  wound?: number
+}) {
   const full = Math.max(0, Math.min(1, damage / GENERAL_KILLS))
   const gone = `${Math.round(full * 100)}%`
   // Clamped for the arc and not for the class, for the poison bead's reason: a
@@ -1702,7 +1715,7 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
                  + `the life total says.`}
                note={lethal ? 'And this one has.' : undefined}
                className={`field-bead is-general${lethal ? ' is-lethal' : ''}${
-                 dire ? ' is-dire' : ''}`}
+                 dire ? ' is-dire' : ''}${wound ? ' is-bleeding' : ''}`}
                style={{ '--bead-full': full,
                  '--bead-gone': gone } as CSSProperties}>
       <svg className="field-bead-ring" viewBox="0 0 48 48" aria-hidden="true"
@@ -1750,6 +1763,7 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
               transform="rotate(11 18.8 12)" />
       </svg>
       <span className="field-bead-n tabular">{damage}</span>
+      {wound > 0 && <Blood key={wound} />}
     </FieldHint>
   )
 }
@@ -1762,16 +1776,151 @@ function GeneralBead({ name, damage }: { name: string; damage: number }) {
  * to. Empty is the ordinary state and draws nothing, for `PlayerCounters`'
  * reason: a nought here would claim somebody's commander had connected.
  */
-function GeneralDamage({ generals }: {
+function GeneralDamage({ generals, struck }: {
   generals: { id: number; name: string; damage: number }[]
+  /** Which commanders' dials are bleeding, by board id, each with the serial
+   *  of the blow — see `useWounds`. */
+  struck?: ReadonlyMap<number, number>
 }) {
   if (generals.length === 0) return null
   return (
     <>
       {generals.map((one) => (
-        <GeneralBead key={one.id} name={one.name} damage={one.damage} />
+        <GeneralBead key={one.id} name={one.name} damage={one.damage}
+                     wound={struck?.get(one.id) ?? 0} />
       ))}
     </>
+  )
+}
+
+/** How long a wound bleeds, in milliseconds. Longer than the figure's own
+ *  700ms flash on purpose: the flash says *the number changed*, this says
+ *  *somebody got hurt*, and hurt is not over when the arithmetic is. Not
+ *  scaled with the reel's speed, for the flash's reason — a blow landed at
+ *  Fast is still a blow, and a drip that had 150ms to fall would never be
+ *  seen to. A second blow inside the window starts the bleeding over rather
+ *  than queueing behind the first: it is a serial, and a new serial is a new
+ *  drip. */
+const BLEED_MS = 1900
+
+/**
+ * What a blow does to a player's plate: the blood, and where it comes from.
+ *
+ * **The dials could already say a total changed and could not say a player
+ * was hit.** Life's figure swelled for 700ms and went back; commander damage
+ * ticked up in silence. Aaron: *"when a commander takes damage
+ * lets put a red highlight on their main or commander damage health, and it
+ * would be cool if we had some stylized dripping blood too and maybe red
+ * effect on their name too."* So a wound is read here, once, on the plate —
+ * the only element that holds the name and every dial — and handed down: the
+ * name reddens, the dial that took the blow bleeds, and the rest of the plate
+ * stays dry. A blow to the life total and a blow to a commander-damage clock
+ * are usually the same combat damage arriving twice on the wire, so both
+ * dials run at once, which is the truth of it: the commander's blow *is* the
+ * life lost.
+ *
+ * **Read off the fold, never accumulated**, for the combat marks' reason: the
+ * board is a pure function of a count, so a scrub backwards is life going *up*
+ * and no wound at all, and the first render of any seat draws nothing — a
+ * plate arriving already bloody would be claiming a blow nobody watched land.
+ * Only a drop in life or a rise in one commander's tally is a wound; a
+ * lifegain deck going up, and a poison counter (which has its own colour and
+ * is not blood), leave the plate alone.
+ *
+ * Returns a **serial** for each thing that is bleeding rather than a boolean,
+ * because the drip is a CSS animation that has to restart when a second blow
+ * lands inside the first one's window — and the one honest way to restart an
+ * animation from React is a new `key`. Nought is dry.
+ */
+function useWounds(side: BoardSide): {
+  life: number
+  struck: ReadonlyMap<number, number>
+} {
+  // Seeded from the plate's first sight of the seat, both halves: a dial that
+  // already stands at twenty when the plate mounts is a fact, not a blow.
+  // (Seeded empty, the first fold read every standing tally as a hit.)
+  const seen = useRef({
+    life: side.life,
+    generals: new Map(side.generals.map((g) => [g.id, g.damage])),
+  })
+  const serial = useRef(0)
+  const [life, setLife] = useState(0)
+  const [struck, setStruck] = useState<ReadonlyMap<number, number>>(
+    () => new Map())
+  // **The timers outlive the effect that set them, on purpose.** `generals`
+  // is a fresh array off every fold, so this effect runs on every beat — and
+  // an effect that returned its timer's cancel would cancel it on the very
+  // next beat, before the blood had fallen, and a plate that took one hit
+  // would bleed forever. They are cleared together when the plate leaves.
+  const timers = useRef(new Set<number>())
+  useEffect(() => () => {
+    const held = timers.current
+    for (const id of held) window.clearTimeout(id)
+    held.clear()
+  }, [])
+  useEffect(() => {
+    const was = seen.current
+    const hit = { life: false, generals: [] as number[] }
+    if (side.life < was.life) hit.life = true
+    for (const one of side.generals) {
+      if (one.damage > (was.generals.get(one.id) ?? 0)) {
+        hit.generals.push(one.id)
+      }
+    }
+    seen.current = {
+      life: side.life,
+      generals: new Map(side.generals.map((g) => [g.id, g.damage])),
+    }
+    if (!hit.life && hit.generals.length === 0) return
+    const n = ++serial.current
+    if (hit.life) setLife(n)
+    if (hit.generals.length > 0) {
+      setStruck((prior) => {
+        const next = new Map(prior)
+        for (const id of hit.generals) next.set(id, n)
+        return next
+      })
+    }
+    // One timer per blow, and each clears only what it set: a life wound and
+    // a crown wound from different beats each run their own course.
+    const id = window.setTimeout(() => {
+      timers.current.delete(id)
+      setLife((held) => (held === n ? 0 : held))
+      setStruck((prior) => {
+        if (![...prior.values()].includes(n)) return prior
+        const next = new Map(prior)
+        for (const [key, held] of prior) if (held === n) next.delete(key)
+        return next
+      })
+    }, BLEED_MS)
+    timers.current.add(id)
+  }, [side.life, side.generals])
+  return { life, struck }
+}
+
+/**
+ * The blood, running from the rim of a dial that has just been struck.
+ *
+ * **Drawn, not fetched, and the reason is commandment 5 read carefully.**
+ * There is no free photograph of blood running down a Roman bronze that a
+ * decoration could carry, and a red PNG splat is the clip art the
+ * commandment bans; but a drip is a *shape under light* rather than a
+ * picture of one — a column that swells at the foot into a bead, with a
+ * specular line down its lit side — and the stylesheet can draw that with the
+ * same materials it draws the brass. Three of them, unequal, so they read as
+ * something that ran rather than a pattern; the lengths and starts are the
+ * stylesheet's, per drip. It hangs *below* the ring — the dial's containing
+ * box is the ring — so the blood leaves the dial rather than filling it.
+ *
+ * Nothing for the ear: the drip is the eye's copy of a number that already
+ * changed and the panel already reads. */
+function Blood() {
+  return (
+    <span className="field-blood" aria-hidden="true">
+      <i className="field-blood-drip" />
+      <i className="field-blood-drip" />
+      <i className="field-blood-drip" />
+    </span>
   )
 }
 
@@ -2534,14 +2683,21 @@ function FieldPlate({ side, facing, name }: {
   /** Whose plate this is: the deck's name as the room says it. */
   name: string
 }) {
+  // **The plate bleeds as a whole and the dials bleed one at a time.** The
+  // name reddens on any blow, because a name is how a player is found from
+  // across the table and "who just got hit" is the first thing anyone at it
+  // wants to know; which dial runs says what kind of blow it was.
+  const wounds = useWounds(side)
+  const bleeding = wounds.life > 0 || wounds.struck.size > 0
   return (
-    <span className={`field-plate field-plate-${facing}`}>
+    <span className={`field-plate field-plate-${facing}${
+      bleeding ? ' is-bleeding' : ''}`}>
       <span className="field-plate-rule" aria-hidden="true" />
       <span className="field-plate-body">
         <span className="field-plate-name" title={side.name}>{name}</span>
         <span className="field-plate-figures">
-          <LifeTotal life={side.life} />
-          <GeneralDamage generals={side.generals} />
+          <LifeTotal life={side.life} wound={wounds.life} />
+          <GeneralDamage generals={side.generals} struck={wounds.struck} />
           <PlayerCounters counters={side.counters} />
         </span>
       </span>
@@ -3433,11 +3589,60 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                     <FieldZones side={s} facing={facing} />
                   </Crowned.Provider>
                 </div>
-                {/* The word over the pall — the eye's copy of the sr-only
-                    sentence above. */}
+                {/* **The grave, on the sand a fallen player has left empty.**
+
+                    The word was the whole of it, and a word on a dark pall is
+                    a label. Aaron: *"above the FALLEN banner on a
+                    commander there was a photo-real tombstone ... a whole
+                    stylized grave scene."* So the seat is buried: the stone
+                    the verdict panel raises over a losing deck — the Met's
+                    Roman cippus, `cippus.recipe.yaml`, a real marble grave
+                    marker and not a drawing of one (commandment 5) — comes up
+                    out of the seat's own sand, into a mound of turned earth,
+                    with the ground mist and the motes the stylesheet lays
+                    round it, and the word stands at its foot as the
+                    inscription plate. Everything but the stone is drawn:
+                    earth, mist and light are layers of the seat's own, the
+                    way the pall already is (commandment 19's shape, on a
+                    photograph that is ours to keep — CC0 — rather than lent).
+
+                    Below the head on purpose, where the pall's own note says
+                    the sand is empty by rule from the instant a player loses,
+                    and the eye's copy of the sr-only sentence above: the
+                    picture says nothing to a screen reader that the words
+                    have not already said. */}
                 {out && (
-                  <span className="field-quad-fallen" aria-hidden="true">
-                    Fallen
+                  <span className="field-quad-grave" aria-hidden="true">
+                    <span className="field-quad-mist" />
+                    <span className="field-quad-motes" />
+                    <img className="field-quad-stone" src={cippusArt} alt=""
+                         draggable={false} />
+                    <span className="field-quad-mound" />
+                    {/* **What grows at a grave** (Aaron: *"some greenery and
+                        flowers around the tombstone, photo real of course"*).
+                        Photographs of real plants, every one CC0 and cut on
+                        transparency by `hortus.recipe.yaml` — poppies, the
+                        flower graves have worn for a century, and a spray of
+                        Queen Anne's lace, the wild thing that grows where
+                        nobody tends — and the ivy is `ambience`'s own sprigs,
+                        climbing the stone's shoulder. Where each one stands,
+                        and the sway, is the stylesheet's (`.field-quad-hortus`),
+                        so a plate can be swapped without re-drawing the
+                        grave. Behind the plate on purpose: a garden does not
+                        grow in front of the inscription. */}
+                    <span className="field-quad-hortus">
+                      <img className="field-quad-plant is-lace" src={daucusArt}
+                           alt="" draggable={false} />
+                      <img className="field-quad-plant is-row" src={papaverRowArt}
+                           alt="" draggable={false} />
+                      <img className="field-quad-plant is-poppy" src={papaverArt}
+                           alt="" draggable={false} />
+                      <img className="field-quad-plant is-ivy-1" src={ivySprig1}
+                           alt="" draggable={false} />
+                      <img className="field-quad-plant is-ivy-2" src={ivySprig2}
+                           alt="" draggable={false} />
+                    </span>
+                    <span className="field-quad-fallen">Fallen</span>
                   </span>
                 )}
                 <FieldSide side={s} facing={facing}

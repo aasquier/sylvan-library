@@ -658,17 +658,31 @@ func (b *board) sit(seat int, name string, life int) {
 	b.life[seat] = life
 }
 
-// name records a card the first time it is seen, and keeps its type line
-// current after that — a type line changes when a land animates or a creature
-// becomes an artifact, and the land row is read off it.
+// name records a card the first time it is seen, and after that sends any
+// change to its type line as a change on the step it happened.
+//
+// **The dictionary keeps the type line it learned, for the name's reason.**
+// It used to be revised on every line -- "keeps its type line current" -- so
+// the dictionary held a card's *last* type line while holding its *first*
+// name, and the browser seeds every card from the dictionary before folding
+// the steps. A card whose creature type comes and goes -- a Theros god under
+// its devotion, a bestowed creature, a land that animates -- was therefore
+// drawn all game under whatever it happened to be at the end, until the first
+// step that carried a change put it right (Aaron: enchantment
+// creatures "appear in the enchantment swim lane", and some "come back a
+// second time as strictly an enchantment"). A board folded to step three has
+// to show what was true at step three, and the past is not rewritten.
+//
+// The change travels the way the rename does. [board.stats] already stamps a
+// type line that a stats event changed; this stamps one that a zone line
+// changed, which is how an animated land dying arrives, and both read
+// `b.types` so a transition is sent exactly once whichever line saw it first.
 func (b *board) name(id int, card, types string, token bool, seat int) {
 	if id == 0 || card == "" {
 		return
 	}
 	if at, seen := b.known[id]; seen {
-		if types != "" {
-			b.cards[at].Types = types
-		}
+		b.retype(id, types)
 		// The dictionary keeps the name it learned -- see [BoardChange.Name]
 		// for why the past is not rewritten -- and the change carries the new
 		// one. Only when it actually differs, so the ordinary case of a card
@@ -1040,6 +1054,36 @@ func (b *board) tap(id int, tapped bool) {
 	b.change(id).Tapped = &value
 }
 
+// retype sends a card's changed type line as a change on the step it
+// changed, and moves the card between the battlefield and the land row when
+// the change means it — an animated Forest is a creature that is still a
+// land, and a Dryad Arbor that stops being one goes the other way.
+//
+// One road for both the lines that carry a type line: [board.name] sees every
+// line, [board.stats] the ones that also carry power and toughness. It used
+// to live in `stats` alone, with `name` revising the dictionary instead of
+// sending a change — and since every line names its card first, the moment
+// `name` started sending the change too, `stats` found nothing left to send
+// and the land row stopped moving (`TestALandThatAnimatesChangesRows`). The
+// dictionary itself is never revised: see [board.name].
+func (b *board) retype(id int, types string) {
+	if types == "" || b.types[id] == types {
+		return
+	}
+	b.types[id] = types
+	c := b.change(id)
+	if c == nil {
+		return
+	}
+	c.Types = types
+	if zone := b.zone[id]; zone == ZoneBattlefield || zone == ZoneLand {
+		if drawn, ok := drawnZone("Battlefield", types); ok && drawn != zone {
+			b.zone[id] = drawn
+			c.Zone = drawn
+		}
+	}
+}
+
 // stats folds a power/toughness/type change.
 func (b *board) stats(id, power, toughness int, types string) {
 	c := (*BoardChange)(nil)
@@ -1057,22 +1101,11 @@ func (b *board) stats(id, power, toughness int, types string) {
 		value := toughness
 		c.Toughness = &value
 	}
-	if types != "" && b.types[id] != types {
-		b.types[id] = types
-		if c == nil {
-			c = b.change(id)
-		}
-		c.Types = types
-		// A type line changing can move a card between the battlefield and the
-		// land row — an animated Forest is a creature that is still a land, and
-		// a Dryad Arbor that stops being one goes the other way.
-		if zone := b.zone[id]; zone == ZoneBattlefield || zone == ZoneLand {
-			if drawn, ok := drawnZone("Battlefield", types); ok && drawn != zone {
-				b.zone[id] = drawn
-				c.Zone = drawn
-			}
-		}
-	}
+	// Every line names its card before anything else reads it, so by the
+	// time a stats line reaches here [board.name] has already sent the type
+	// line it carries; this call answers nil and costs nothing. It stays for
+	// the stats line that reaches `stats` by some other road.
+	b.retype(id, types)
 }
 
 // counter folds a counter event. The whole set for that card crosses whenever

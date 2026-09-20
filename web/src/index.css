@@ -10377,31 +10377,274 @@ button:hover .tarot-fan-card {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* ---- The grave ------------------------------------------------------ */
+/* **A headstone, not a hole — and now an actual headstone.** The word alone
+   stood on the pall for a fortnight and read as a label on a dark box.
+   Aaron: *"above the FALLEN banner on a commander there was a
+   photo-real tombstone ... it would be really nice if it was a whole
+   stylized grave scene."* So the fallen seat is buried where the word stood:
+   the Met's Roman cippus — the marble grave marker the verdict panel raises
+   over a losing deck, `cippus.recipe.yaml`, a photograph of the real object
+   and not a drawing of one (commandment 5) — comes up out of the seat's own
+   sand into a mound of turned earth, ground mist lies round its foot, motes
+   rise through the pall, and the word stands at the plinth as its
+   inscription plate.
+ *
+ * **Everything but the stone is drawn, as layers of the seat's own.** The
+ * earth is a gradient, the mist is a blurred sheet of its own above the
+ * stone's foot, the motes are a repeating gradient walking upward under a
+ * mask. Nothing here touches a card: a fallen seat's sand is empty by rule
+ * (the word's own note, below), and the stone is a CC0 museum plate that is
+ * ours to keep rather than lent, so the `drop-shadow` planting it is a
+ * shadow cast by the object and not a filter on anybody's painting
+ * (commandment 19; `cardimagery_test.go` allows it by name).
+ *
+ * **It moves the way a grave moves, and no more.** The stone is raised once
+ * and is still — the verdict's own ruling, for the verdict's own reason: a
+ * grave marker that kept moving would be the one thing in the room doing
+ * something a grave marker does not do. What lives is the weather round it:
+ * the mist drifts on a fourteen-second breath and the motes rise, slowly,
+ * for as long as the seat is out (commandment 6). Reduced motion stills the
+ * mist and removes the motes outright rather than freezing them — frozen
+ * weather is a smudge (`web/README.md`).
+ *
+ * **Across the sand, not tagged into the corner.** The word began as a small
+ * pill at the quadrant's top right, which is where the closed-zone tiles
+ * live in a pod — so it landed squarely on the word EXILE and covered it
+ * (measured on a real four-player game, 2026-09-07). Moving it was not just
+ * collision avoidance: a player who has lost takes their permanents with
+ * them, so from the instant this appears that seat's battlefield is **empty
+ * by rule** — the one place on this board guaranteed to have nothing to
+ * obscure, and the size a grave wants. So the whole scene is centred on the
+ * seat's own sand, below the head, which carries the plate and the zones and
+ * stays legible under the pall. */
+.field-quad-grave {
+  position: absolute;
+  left: 50%;
+  top: 57%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 240px;
+  max-width: 92%;
+  pointer-events: none;
+}
+/* The stone: 74 wide for a plate cut at 360, which is twice what any screen
+   draws it at. Raised, then still. */
+.field-quad-stone {
+  position: relative;
+  z-index: 2;
+  width: 74px;
+  height: auto;
+  /* Planted: a shadow thrown back onto the earth, and a little more of it
+     low down where the plinth meets the mound. */
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.72))
+          drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  animation: grave-raise 1500ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+}
+/* Turned earth: an oval of umber the stone stands in, darker at its crown
+   where it was dug and lit along the near rim by the same warm light the
+   sand has. The upper half of the ellipse is behind the plinth, which is
+   what sets the stone *into* the ground rather than on it. */
+.field-quad-mound {
+  position: relative;
+  z-index: 1;
+  width: 204px;
+  height: 36px;
+  margin-top: -19px;
+  border-radius: 50%;
+  background:
+    /* Clods: a scatter of darker and lighter grains over the earth. */
+    repeating-radial-gradient(circle at 30% 40%,
+      rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 7px),
+    repeating-radial-gradient(circle at 70% 60%,
+      rgba(120, 90, 52, 0.16) 0 1px, transparent 1px 5px),
+    radial-gradient(ellipse at 50% 38%,
+      #2a1d12 0%, #3a2a1a 38%, #2b1f14 62%, rgba(24, 17, 11, 0.85) 80%,
+      transparent 100%);
+  box-shadow:
+    inset 0 4px 8px rgba(0, 0, 0, 0.65),
+    inset 0 -2px 3px rgba(150, 112, 62, 0.16),
+    0 6px 16px rgba(0, 0, 0, 0.45);
+  transform-origin: 50% 50%;
+  animation: grave-settle 1500ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+}
+/* **What grows at a grave.** Photographs of real plants on transparency
+   (`hortus.recipe.yaml`: two poppy plates and a spray of Queen Anne's lace,
+   all CC0) and the ivy sprigs `ambience` already carries, planted round the
+   stone's foot. The container is the mound's own box, so every plant is
+   placed against the earth it stands in and moves with it if the grave is
+   ever re-centred; each plant's `bottom` is where its stems meet the soil.
+
+   **Layered like a bed is planted**: the lace and the row behind the stone
+   (under it in z), the single poppy and the ivy in front of the plinth. The
+   plants sway — a breeze, not a dance: a degree or two about the root, on
+   periods a few seconds apart so they never fall into step (commandment 6).
+   The stone itself does not move; the verdict's ruling holds. */
+.field-quad-hortus {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  width: 0;
+  height: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.field-quad-plant {
+  position: absolute;
+  bottom: 0;
+  /* The anchor is a zero-size box, and the reset's `img { max-width: 100% }`
+     measures against it — every plant computed to 0px wide until this. */
+  max-width: none;
+  height: auto;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+  animation:
+    grave-raise 1500ms cubic-bezier(0.16, 1, 0.3, 1) var(--plant-wait, 400ms) both,
+    hortus-sway var(--sway-ms, 7s) ease-in-out var(--plant-wait, 400ms) infinite alternate;
+}
+/* Behind the stone: the lace at its right shoulder, its cut edge tucked
+   under the marble, and the row of poppies rising at its left. */
+.field-quad-plant.is-lace {
+  /* Mirrored, and the reason is the frame: the photograph cuts the spray at
+     its right, so turned round the cut edge is the left one and it sits
+     behind the marble, with the tip of the spray reaching out past the
+     poppy. `scale` rather than a `transform`, because `grave-raise` owns
+     `transform` and would have flipped it back when it settled. */
+  left: -8px;
+  bottom: 14px;
+  width: 128px;
+  scale: -1 1;
+  z-index: 0;
+  --sway-ms: 8.5s;
+  --plant-wait: 520ms;
+  --sway-from: -1.2deg;
+  --sway-to: 1.6deg;
+}
+.field-quad-plant.is-row {
+  left: -112px;
+  bottom: 12px;
+  width: 132px;
+  z-index: 0;
+  --sway-ms: 7.2s;
+  --plant-wait: 460ms;
+  --sway-from: 1.4deg;
+  --sway-to: -1.2deg;
+}
+/* In front of the plinth: the single poppy at the right, leaning in. */
+.field-quad-plant.is-poppy {
+  left: 22px;
+  bottom: -6px;
+  width: 86px;
+  z-index: 3;
+  --sway-ms: 6.4s;
+  --plant-wait: 640ms;
+  --sway-from: -2deg;
+  --sway-to: 1.4deg;
+}
+/* The ivy on the stone's left shoulder, one sprig over another, turned to
+   hang rather than stand: a sprig's root is at its top when it climbs. */
+.field-quad-plant.is-ivy-1,
+.field-quad-plant.is-ivy-2 {
+  width: 40px;
+  z-index: 3;
+  transform-origin: 50% 0;
+}
+.field-quad-plant.is-ivy-1 {
+  left: -46px;
+  bottom: 52px;
+  --sway-ms: 5.8s;
+  --plant-wait: 700ms;
+  --sway-from: -3deg;
+  --sway-to: 2deg;
+}
+.field-quad-plant.is-ivy-2 {
+  left: -40px;
+  bottom: 22px;
+  width: 34px;
+  --sway-ms: 6.9s;
+  --plant-wait: 760ms;
+  --sway-from: 2.5deg;
+  --sway-to: -2deg;
+}
+@keyframes hortus-sway {
+  from { rotate: var(--sway-from, -1.5deg); }
+  to   { rotate: var(--sway-to, 1.5deg); }
+}
+/* Ground mist: two pale sheets, blurred, lying across the stone's foot and
+   the mound and drifting against each other. `screen` so it lightens what is
+   under it the way mist does, and never darkens the stone. The blur is on
+   the sheet — a layer somebody drew — and reaches nothing under it. */
+.field-quad-mist {
+  position: absolute;
+  left: -36px;
+  right: -36px;
+  bottom: 22px;
+  height: 70px;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 58% 52% at 28% 72%,
+      rgba(196, 204, 214, 0.26) 0%, transparent 72%),
+    radial-gradient(ellipse 52% 46% at 72% 64%,
+      rgba(196, 204, 214, 0.2) 0%, transparent 72%),
+    radial-gradient(ellipse 70% 40% at 50% 90%,
+      rgba(180, 190, 200, 0.16) 0%, transparent 70%);
+  filter: blur(7px);
+  mix-blend-mode: screen;
+  animation: grave-mist 14s ease-in-out infinite alternate;
+}
+/* Motes: bone-pale specks rising through the pall, a repeating gradient
+   walking upward under a mask that fades them in at the ground and out
+   above the stone. Two grids at different pitches so the rise has depth. */
+.field-quad-motes {
+  position: absolute;
+  inset: -30px -10px 10px;
+  z-index: 3;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(232, 221, 200, 0.85) 0 0.9px,
+      transparent 1.6px),
+    radial-gradient(circle, rgba(232, 221, 200, 0.55) 0 0.7px,
+      transparent 1.4px);
+  background-size: 74px 118px, 111px 167px;
+  background-position: 12px 0, 47px 60px;
+  -webkit-mask-image: linear-gradient(to top,
+    transparent 0%, #000 22%, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to top,
+    transparent 0%, #000 22%, #000 70%, transparent 100%);
+  opacity: 0.8;
+  animation: grave-motes 11s linear infinite;
+}
+@keyframes grave-raise {
+  0%   { opacity: 0; transform: translateY(38%) scale(0.96); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes grave-settle {
+  0%   { opacity: 0; transform: scaleX(0.35) scaleY(0.6); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes grave-mist {
+  0%   { transform: translateX(-9px) scaleY(1); opacity: 0.85; }
+  50%  { transform: translateX(4px) scaleY(1.08); opacity: 1; }
+  100% { transform: translateX(10px) scaleY(0.96); opacity: 0.9; }
+}
+@keyframes grave-motes {
+  from { background-position: 12px 0, 47px 60px; }
+  to   { background-position: 12px -236px, 47px -274px; }
+}
 /* The word, not an icon: "Fallen" reads at first contact (commandment 2)
    where a glyph would need a legend, and it wears the arena's own
    materials — bone ink on blood-dark ground under the brass hairline
    every plate here carries. Above the pall, so the sentence survives the
-   shade.
- *
- * **Across the sand, not tagged into the corner.** It began as a small pill at
- * the quadrant's top right, which is where the closed-zone tiles live in a pod
- * — so it landed squarely on the word EXILE and covered it (measured on a real
- * four-player game, 2026-09-07). Moving it is not just collision avoidance: a
- * player who has lost takes their permanents with them, so from the instant
- * this appears that seat's battlefield is **empty by rule** — the one place on
- * this board guaranteed to have nothing to obscure, and the size a headstone
- * wants. So it is centred on the seat's own sand and cut large enough to read
- * from across the table, which is what Aaron asked the pall for in the first
- * place. */
+   shade; at the plinth's foot now, as the stone's inscription plate. */
 .field-quad-fallen {
-  position: absolute;
-  /* Centred on the seat, not on the quadrant: the head carries the plate and
-     the zones, which stay legible under the pall — a graveyard gets a
-     headstone, not a hole. Below it is only sand. */
-  left: 50%;
-  top: 58%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
+  position: relative;
+  z-index: 4;
+  margin-top: -2px;
   pointer-events: none;
   padding: 5px 22px;
   border-radius: 6px;
@@ -10421,24 +10664,47 @@ button:hover .tarot-fan-card {
   white-space: nowrap;
   animation: quad-pall 1400ms ease-out both;
 }
-/* Narrow: a collapsed seat is a 57px rail and a plate this size would be
+/* Narrow: a collapsed seat is a 57px rail and a grave would be three times
    taller than the seat it is marking. The rail already dims and carries the
-   sentence for a screen reader; the word shrinks to fit the room it has. */
+   sentence for a screen reader; the scene folds away and the word shrinks to
+   fit the room it has. An open seat on a phone keeps the whole grave — its
+   sand is as tall as a desktop's. */
 @media (max-width: 61.999rem) {
+  .field-quad:not(.is-open) .field-quad-grave { top: 50%; }
+  .field-quad:not(.is-open) .field-quad-stone,
+  .field-quad:not(.is-open) .field-quad-mound,
+  .field-quad:not(.is-open) .field-quad-mist,
+  .field-quad:not(.is-open) .field-quad-hortus,
+  .field-quad:not(.is-open) .field-quad-motes { display: none; }
   .field-quad:not(.is-open) .field-quad-fallen {
-    top: 50%;
+    margin-top: 0;
     padding: 2px 10px;
     font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-indent: 0.12em;
   }
 }
-/* Reduced motion keeps the state and stills the settling. */
+/* **A grave stands on bare sand.** The lanes' own captions — "no creatures",
+   "nothing else in play", "no lands yet" — are for a seat that could still
+   put something there; under a headstone they are three lines of italic
+   through a picture, and the seat's emptiness is the rule, not news
+   (rule 800.4a: a player who leaves takes their permanents with them).
+   Hidden rather than removed, so the lanes keep their height and the grave
+   keeps its place. */
+.field-quad.is-fallen .field-row-empty { visibility: hidden; }
+/* Reduced motion keeps the state and stills the settling: the stone stands
+   raised, the earth lies turned, the mist lies still, and the motes — which
+   are only weather — are gone rather than frozen. */
 @media (prefers-reduced-motion: reduce) {
   .field-quad.is-fallen::after,
-  .field-quad-fallen {
+  .field-quad-fallen,
+  .field-quad-stone,
+  .field-quad-mound,
+  .field-quad-plant,
+  .field-quad-mist {
     animation: none;
   }
+  .field-quad-motes { display: none; }
 }
 
 /* ---- Narrow: one seat open, the rest as rails ---------------------- */
@@ -11595,6 +11861,183 @@ button:hover .tarot-fan-card {
   .field-life-arc { transition: none; }
   .field-life.is-down .field-life-n,
   .field-life.is-up .field-life-n { animation: none; }
+}
+
+/* ---- the wound
+ *
+ * **A dial could say a total changed and could not say a player was hit.**
+ * The figure swelled for 700ms and went back; the crown's clock ticked up
+ * in silence. Aaron: *"when a commander takes damage lets put a
+ * red highlight on their main or commander damage health, and it would be
+ * cool if we had some stylized dripping blood too and maybe red effect on
+ * their name too."* `useWounds` in `components/board.tsx` reads the blow off
+ * the fold and hands it down as three states, which is what these rules
+ * dress: the plate as a whole (`.is-bleeding` on `.field-plate`, and the
+ * name reddens), and the dial that took the blow (`.is-bleeding` on
+ * `.field-life` or the struck `.field-bead`, which flushes and runs).
+ *
+ * **Every part of it is a layer laid on the brass, never a change to it.**
+ * The halo is a `::before` under the ring, the drips are children hung off
+ * the rim, and the name's flush is its own colour on its own text. The ring
+ * itself keeps its arithmetic — the arc still says how much is left — and
+ * when the blood is gone the dial is exactly the dial it was, which is what
+ * `both` at 100% pinning the resting colours is for.
+ *
+ * **The blood is drawn, and that is commandment 5 read carefully rather than
+ * skirted.** There is no free photograph of blood running down Roman bronze
+ * that a decoration could carry, and a red splat PNG is exactly the clip art
+ * the commandment bans. A drip is a *shape under light*: a column that
+ * swells at its foot into a bead, a specular line down its lit side, darker
+ * where it thins — the same materials the plate's brass and the felt's glint
+ * are made of. Three of them, unequal in length, start and pace, so they read
+ * as something that ran rather than as a pattern stamped on. */
+.field-plate.is-bleeding .field-plate-name {
+  animation: name-bleed 1900ms ease-out both;
+}
+@keyframes name-bleed {
+  0% {
+    color: #ffd6cf;
+    text-shadow: 0 0 10px var(--arena-blood-lit), 0 0 24px var(--arena-blood),
+      0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+  30% {
+    color: var(--arena-blood-lit);
+    text-shadow: 0 0 6px var(--arena-blood), 0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+  100% {
+    /* The resting colour, restated: `both` keeps the last frame, so the last
+       frame has to be the name as it was. */
+    color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+}
+/* The flush: a bloom of blood-light under the struck dial, laid as a sheet of
+   its own beneath the ring and above the plate. Under both the life ring and
+   the crown's clock at once, because they are the same construction and one
+   blow usually lands on both. */
+.field-life.is-bleeding::before,
+.field-bead.is-bleeding::before {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--arena-blood-lit) 62%, transparent) 0%,
+    color-mix(in srgb, var(--arena-blood) 34%, transparent) 42%,
+    transparent 70%);
+  animation: dial-bleed 1900ms ease-out both;
+}
+@keyframes dial-bleed {
+  0%   { opacity: 0;   transform: scale(0.6); }
+  14%  { opacity: 1;   transform: scale(1.06); }
+  55%  { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1); }
+}
+/* And the arc itself goes to blood for the blow's own length — over the
+   gradient it is already on, so a player at forty and a player at six both
+   read *hit* rather than one of them reading merely *lower*. */
+.field-life.is-bleeding .field-life-arc,
+.field-bead.is-general.is-bleeding .field-bead-arc {
+  stroke: var(--arena-blood-lit);
+  filter: drop-shadow(0 0 8px var(--arena-blood-lit));
+}
+.field-bead.is-general.is-bleeding .field-bead-crown {
+  fill: var(--arena-blood-lit);
+}
+/* The drips hang off the ring's lower rim and fall past the dial's box onto
+   the trench, which is why the wrapper is `inset: 0` with `overflow` left
+   visible: the blood leaves the dial rather than filling it. Each drip's
+   place on the rim is where a chord of the ring crosses it — the ring is
+   r=20 in a 48 box, so at 52% of the width the rim is at 91.6% of the
+   height, and a little higher either side. Above the figure and the crown,
+   because blood runs over whatever is under it. */
+.field-blood {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+.field-blood-drip {
+  position: absolute;
+  top: var(--drip-top);
+  left: var(--drip-x);
+  width: var(--drip-w, 3px);
+  height: 0;
+  margin-left: calc(var(--drip-w, 3px) / -2);
+  /* Round at the head where it leaves the rim, tapering at the foot. */
+  border-radius: 40% 40% 60% 60% / 20% 20% 70% 70%;
+  background:
+    /* The specular line down the lit side — light on a wet surface. */
+    linear-gradient(90deg,
+      rgba(255, 214, 205, 0.55) 0, rgba(255, 214, 205, 0.55) 1px,
+      transparent 1px),
+    linear-gradient(180deg,
+      var(--arena-blood-lit) 0%, var(--arena-blood) 55%,
+      var(--arena-blood-deep) 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  animation: blood-run var(--drip-ms) cubic-bezier(0.55, 0.05, 0.85, 0.4)
+    var(--drip-wait) both;
+}
+/* The bead at the foot: it swells as the column feeds it, then lets go. A
+   drop that fell in one motion would read as a line being drawn; blood
+   gathers before it falls. */
+.field-blood-drip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: calc(var(--drip-w, 3px) + 3px);
+  height: calc(var(--drip-w, 3px) + 4px);
+  border-radius: 50% 50% 55% 55% / 42% 42% 60% 60%;
+  background: radial-gradient(circle at 36% 30%,
+    #e0625a 0%, var(--arena-blood-lit) 34%, var(--arena-blood-deep) 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, 45%) scale(0.55);
+  animation: blood-bead var(--drip-ms) ease-in var(--drip-wait) both;
+}
+/* Three drips, three tempos. The lengths are in pixels rather than a share of
+   the dial because the trench under the plate is a fixed 40-odd pixels and a
+   drip that reached the far seat's sand would be a drip on somebody else. */
+.field-blood-drip:nth-child(1) {
+  --drip-x: 39%; --drip-top: 89.5%; --drip-len: 24px; --drip-w: 3.5px;
+  --drip-ms: 1500ms; --drip-wait: 80ms;
+}
+.field-blood-drip:nth-child(2) {
+  --drip-x: 52%; --drip-top: 91.6%; --drip-len: 34px; --drip-w: 4.5px;
+  --drip-ms: 1750ms; --drip-wait: 0ms;
+}
+.field-blood-drip:nth-child(3) {
+  --drip-x: 65%; --drip-top: 88.5%; --drip-len: 17px; --drip-w: 3px;
+  --drip-ms: 1250ms; --drip-wait: 240ms;
+}
+@keyframes blood-run {
+  0%   { height: 0;                opacity: 0; }
+  10%  { opacity: 1; }
+  72%  { height: var(--drip-len);  opacity: 1; }
+  100% { height: var(--drip-len);  opacity: 0; }
+}
+@keyframes blood-bead {
+  0%       { transform: translate(-50%, 45%) scale(0.55); opacity: 1; }
+  62%      { transform: translate(-50%, 50%) scale(1.15); opacity: 1; }
+  80%      { transform: translate(-50%, 140%) scale(0.95); opacity: 0.9; }
+  100%     { transform: translate(-50%, 300%) scale(0.8); opacity: 0; }
+}
+/* Reduced motion keeps the fact and stills the running: the name and the
+   dial go to blood for the blow's own length and come back, the drips stand
+   still at full length rather than fall, and the bead does not drop. That a
+   player was hit is information; the fall is only the picture of it. */
+@media (prefers-reduced-motion: reduce) {
+  .field-plate.is-bleeding .field-plate-name {
+    animation: none;
+    color: var(--arena-blood-lit);
+  }
+  .field-life.is-bleeding::before,
+  .field-bead.is-bleeding::before { animation: none; opacity: 0.55; }
+  .field-blood-drip { animation: none; height: var(--drip-len); opacity: 1; }
+  .field-blood-drip::after { animation: none; }
 }
 
 .field-pile {
