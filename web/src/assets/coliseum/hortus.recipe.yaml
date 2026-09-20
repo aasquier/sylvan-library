@@ -1,107 +1,67 @@
-# What grows round the grave.
+# What grows at the grave: the plot itself.
 #
-# Aaron, on seeing the stone raised over a fallen seat: *"I want some greenery
-# and flowers around the tombstone, photo real of course."* Three plates, all
-# photographs of real plants and none of them drawn (commandment 5):
+# Aaron, on seeing the stone raised over a fallen seat: *"I want some
+# greenery and flowers around the tombstone, photo real of course."* The
+# first answer was three studio cut-outs -- poppies on a white sweep, a spray
+# of lace on black -- planted round the plinth, and he chopped it: "only the
+# tombstone is passing". He was right, and the reason is worth writing down
+# so nobody plants cut-outs here again. A cut-out is lit by the studio it was
+# shot in and stands on nothing; laid on dusk sand under a pall it is a
+# sticker, however clean the matte, because the eye reads the *ground* first
+# and a plant with no ground under it has no place in the picture.
 #
-# - **Poppies**, twice — a single Iceland poppy with its buds, and a row of
-#   them. The poppy is the flower graves have worn for a century, and these
-#   are studio plates on a white sweep, which is the one ground the backdrop
-#   matte cuts cleanly.
-# - **Queen Anne's lace**, a spray of white umbels on black: the wild thing
-#   that grows where nobody tends, for the far side of the stone. The same
-#   matte, seeded from a black edge instead of a white one.
-#
-# The ivy that climbs the stone is not here: it is `ambience`'s own sprigs
-# (`ivy-sprig-*.webp`), already gated and already in the bundle.
-#
-# **Cut, not composed.** Each output is one plant on transparency; the
-# arrangement — which side, how tall, the sway — is the stylesheet's
-# (`.field-quad-hortus` in `web/src/index.css`), so a plate can be swapped
-# without re-drawing the grave.
+# So the plant and the ground arrive together, in one photograph: a field of
+# poppies standing in low wheat under a pale sky, shot at knee height. The
+# lower half of that picture *is* a plot -- grass, stems, seed-heads and red
+# flowers at the scale a grave plot has them -- and the stylesheet lays it
+# under the stone as a soft-edged lens, dusks it with a multiply sheet to the
+# pall's light, and stands the stone's plinth *in* it with a second strip of
+# the same band in front (`.field-quad-plot` in `web/src/index.css`). The
+# poppy is the flower graves have worn for a century; the wheat is the
+# harvest that is over. Nothing is composed in the file -- the crop is the
+# only decision made here, and it is measured rather than guessed: the
+# horizon sits at y 0.40, the flower heads between 0.45 and 0.75, and the
+# lower quarter is the wheat the front strip is cut from.
 animist: 1
 
 why_committed: >
-  They stand at a grave that is drawn on the beat a player falls and must be
-  there when the stone comes up; a flower that arrives from somebody else's
-  host a second after the pall has settled is a flower that was not at the
-  funeral. And every one is an individual photographer's CC0 release on an
-  aggregator, which is precisely the category where a third party's copy
-  quietly changes terms or moves. A copy confirmed once and committed is a
-  copy whose provenance stays true.
+  It stands under a stone that is drawn on the beat a player falls and must
+  be there when the stone comes up; ground that arrives from somebody else's
+  host a second after the pall has settled is a stone floating over sand and
+  then, suddenly, a field. And the licence is an individual photographer's
+  CC0 release on an aggregator, mirrored to Commons -- precisely the category
+  where a third party's copy quietly changes terms or moves. A copy confirmed
+  once and committed is a copy whose provenance stays true.
 
 sources:
-  papaver:
-    provider: openverse
-    identifier: 7565b518-4264-447b-9e32-1998a50c780f
-    title: "Isolated Flower"
-    landing: https://stocksnap.io/photo/isolated-flower-CTZZCEJTMR
+  # CC0, confirmed through the Commons API: `LicenseShortName` is `CC0`. One
+  # of the Unsplash photographs Commons mirrored while Unsplash's own licence
+  # was CC0 (before 2017); Commons records the release and the gate reads it.
+  pratum:
+    provider: wikimedia
+    title: "Poppies (Unsplash).jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Poppies_(Unsplash).jpg
     found_via: >
-      Openverse with a license=cc0,pdm filter, searching `poppy flower
-      isolated white background`: three StockSnap plates of Iceland poppies
-      on a white sweep, and this is the one with a single open flower and
-      the buds standing clear of it.
-    licence: CC0-1.0
-  papaver_row:
-    provider: openverse
-    identifier: eeff894b-0828-472e-896b-56b90e97afd0
-    title: "Isolated Flower"
-    landing: https://stocksnap.io/photo/isolated-flower-1PBQ9YCEV3
-    found_via: >
-      The same search: a row of poppies and buds on the same white sweep,
-      which is what the other side of a stone wants — several stems rather
-      than one.
-    licence: CC0-1.0
-  daucus:
-    provider: openverse
-    identifier: 73d4b52f-b263-44ec-941b-83af62560f8d
-    title: "Isolated Flowers"
-    landing: https://stocksnap.io/photo/isolated-flowers-J3VJVBCWXT
-    found_via: >
-      Openverse with a license=cc0,pdm filter, searching `flowers isolated`:
-      a spray of Queen Anne's lace photographed on black, the one wild
-      flower in the results with a ground a matte can seed from.
-    licence: CC0-1.0
+      Commons, searching `Unsplash poppy` and keeping CC0 only: twenty-five
+      free plates, four of them fields. Of those this is the one shot at
+      ground level with the flowers standing *in* something -- the others
+      are a confetti carpet from above (reads as texture at 300px), a macro
+      with three flowers in bokeh (reads as a photograph, not a place), and
+      one with the sun in a blue sky (a sky this room does not have). The
+      wheat-and-poppy palette is the sand's own, which is why it can sit on
+      the arena without a costume.
+    licence: CC0
 
 outputs:
-  # Every plant is cut to stand on the frame's bottom edge, so the stylesheet
-  # can plant it in the mound the way the verdict plants the stone. Sizes are
-  # about twice what a desktop draws them at (a plant beside a 74px stone is
-  # 100-150px tall), which is the same ratio every mark in this directory
-  # takes.
-  #
-  # **`matte_backdrop`, seeded from the edge, on all three** — a white sweep
-  # on the two poppy plates and a black ground on the lace, and the flood
-  # does not care which: it keys on the colour at the frame and follows the
-  # sweep inward. `soft` fades the stems' cast shadows out instead of leaving
-  # grey wedges beside them; the tolerance is set where a proof sheet stops
-  # eating the pale petal edges (poppies) and the finest umbel stalks (lace).
-  - file: papaver.webp
-    from: papaver
+  # 640 wide for a plot drawn at about 300 on a desktop quadrant, which is
+  # the same two-to-one every scene in this directory takes. The band is the
+  # lower sixty percent of the frame: the horizon and a sliver of sky at the
+  # top so the mask has something pale to dissolve into, the flowers through
+  # the middle, the wheat at the foot.
+  - file: pratum.webp
+    from: pratum
     ops:
-      # The open flower and its three buds, the stems running to the bottom
-      # of the frame; the empty right two-thirds of the plate goes.
-      - crop: {frac_box: [0.04, 0.08, 0.68, 1.0]}
-      - matte_backdrop: {tolerance: 22, soft: 18, border: 2}
-      - resize: {width: 300}
-    encode: {format: webp, quality: 84}
-    expect: {width: 300, height: 306, budget_kb: 60, metadata: none}
-  - file: papaver-row.webp
-    from: papaver_row
-    ops:
-      # The whole row, stems to the bottom edge, the sky above them cut.
-      - crop: {frac_box: [0.12, 0.26, 0.88, 1.0]}
-      - matte_backdrop: {tolerance: 26, soft: 18, border: 2}
-      - resize: {width: 360}
-    encode: {format: webp, quality: 84}
-    expect: {width: 360, height: 232, budget_kb: 70, metadata: none}
-  - file: daucus.webp
-    from: daucus
-    ops:
-      # The spray from its tip at the left to where the frame cuts it at the
-      # right; that cut edge is tucked behind the stone by the stylesheet.
-      - crop: {frac_box: [0.12, 0.13, 1.0, 1.0]}
-      - matte_backdrop: {tolerance: 30, soft: 24, border: 2}
-      - resize: {width: 320}
-    encode: {format: webp, quality: 84}
-    expect: {width: 320, height: 211, budget_kb: 70, metadata: none}
+      - crop: {frac_box: [0.0, 0.40, 1.0, 1.0]}
+      - resize: {width: 640}
+    encode: {format: webp, quality: 80}
+    expect: {width: 640, height: 254, budget_kb: 80, metadata: none}

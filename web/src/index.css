@@ -10427,171 +10427,115 @@ button:hover .tarot-fan-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 240px;
-  max-width: 92%;
+  justify-content: flex-end;
+  width: 300px;
+  height: 214px;
+  max-width: 96%;
   pointer-events: none;
 }
+/* The stone's foot sits at the plot's middle, so the front strip can take
+   the plinth: the flex column ends at the plaque, and the stone is lifted
+   off it by the strip's height. */
+.field-quad-stone { margin-bottom: 24px; }
+/* **The plot.** A grave is a piece of ground before it is a stone, and the
+   first cut of this scene forgot that: cut-out flowers pasted round the
+   plinth, lit by the studio they were shot in, standing on a flat oval of
+   gradient. Aaron chopped it — "only the tombstone is passing" — and the
+   fix is the matte painter's: ground and plants arrive in one photograph.
+   `pratum.webp` (`hortus.recipe.yaml`, CC0) is a field of poppies in low
+   wheat at knee height; two copies of it make the plot. The BACK copy is a
+   soft-edged lens laid on the sand behind the stone, the FRONT copy is a
+   thin strip of the same wheat masked to its foot and laid over the plinth,
+   so the stone stands *in* the field rather than on it — the one trick that
+   turns a picture of a thing into a thing in a place.
+
+   **Dusk is a sheet, never a filter.** The photograph is daylight and the
+   seat is under a pall; `.field-quad-plot-dusk` is the same lens filled with
+   the pall's own umber and multiplied over the field, so its colour survives
+   and its light drops to the room's. The mask on both is one rule shared
+   through a custom property, because two masks that drift apart are a halo. */
+.field-quad-plot,
+.field-quad-plot-dusk {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  width: 296px;
+  height: 118px;
+  margin-left: -148px;
+  z-index: 1;
+  pointer-events: none;
+  --plot-mask:
+    radial-gradient(ellipse 50% 56% at 50% 62%,
+      #000 0%, #000 52%, rgba(0, 0, 0, 0.55) 72%, transparent 100%);
+  -webkit-mask-image: var(--plot-mask);
+  mask-image: var(--plot-mask);
+  animation: grave-settle 1500ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+}
+.field-quad-plot {
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 58%;
+}
+.field-quad-plot-dusk {
+  background: radial-gradient(ellipse at 50% 40%,
+    rgba(46, 36, 22, 0.62) 0%, rgba(30, 22, 14, 0.78) 70%, rgba(20, 15, 10, 0.9) 100%);
+  mix-blend-mode: multiply;
+  z-index: 1;
+}
+/* The front strip: the wheat at the foot of the same band, a hand's width
+   high, laid over the plinth. Masked to fade upward so the stone's marble
+   comes out of the stems rather than stopping at a line. */
+.field-quad-plot.is-front,
+.field-quad-plot-dusk.is-front {
+  bottom: 22px;
+  height: 44px;
+  width: 232px;
+  margin-left: -116px;
+  z-index: 3;
+  --plot-mask:
+    linear-gradient(to top, #000 0%, #000 34%, transparent 92%),
+    radial-gradient(ellipse 50% 100% at 50% 100%, #000 0%, #000 60%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.field-quad-plot.is-front { object-position: 50% 100%; }
 /* The stone: 74 wide for a plate cut at 360, which is twice what any screen
-   draws it at. Raised, then still. */
+   draws it at. Raised, then still. Its shadow falls on the field. */
 .field-quad-stone {
   position: relative;
   z-index: 2;
   width: 74px;
   height: auto;
   /* Planted: a shadow thrown back onto the earth, and a little more of it
-     low down where the plinth meets the mound. */
+     low down where the plinth meets the ground. */
   filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.72))
           drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
   animation: grave-raise 1500ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
 }
-/* Turned earth: an oval of umber the stone stands in, darker at its crown
-   where it was dug and lit along the near rim by the same warm light the
-   sand has. The upper half of the ellipse is behind the plinth, which is
-   what sets the stone *into* the ground rather than on it. */
-.field-quad-mound {
-  position: relative;
-  z-index: 1;
-  width: 204px;
-  height: 36px;
-  margin-top: -19px;
-  border-radius: 50%;
-  background:
-    /* Clods: a scatter of darker and lighter grains over the earth. */
-    repeating-radial-gradient(circle at 30% 40%,
-      rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 7px),
-    repeating-radial-gradient(circle at 70% 60%,
-      rgba(120, 90, 52, 0.16) 0 1px, transparent 1px 5px),
-    radial-gradient(ellipse at 50% 38%,
-      #2a1d12 0%, #3a2a1a 38%, #2b1f14 62%, rgba(24, 17, 11, 0.85) 80%,
-      transparent 100%);
-  box-shadow:
-    inset 0 4px 8px rgba(0, 0, 0, 0.65),
-    inset 0 -2px 3px rgba(150, 112, 62, 0.16),
-    0 6px 16px rgba(0, 0, 0, 0.45);
-  transform-origin: 50% 50%;
-  animation: grave-settle 1500ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
-}
-/* **What grows at a grave.** Photographs of real plants on transparency
-   (`hortus.recipe.yaml`: two poppy plates and a spray of Queen Anne's lace,
-   all CC0) and the ivy sprigs `ambience` already carries, planted round the
-   stone's foot. The container is the mound's own box, so every plant is
-   placed against the earth it stands in and moves with it if the grave is
-   ever re-centred; each plant's `bottom` is where its stems meet the soil.
-
-   **Layered like a bed is planted**: the lace and the row behind the stone
-   (under it in z), the single poppy and the ivy in front of the plinth. The
-   plants sway — a breeze, not a dance: a degree or two about the root, on
-   periods a few seconds apart so they never fall into step (commandment 6).
-   The stone itself does not move; the verdict's ruling holds. */
-.field-quad-hortus {
-  position: absolute;
-  left: 50%;
-  bottom: 44px;
-  width: 0;
-  height: 0;
-  z-index: 1;
-  pointer-events: none;
-}
-.field-quad-plant {
-  position: absolute;
-  bottom: 0;
-  /* The anchor is a zero-size box, and the reset's `img { max-width: 100% }`
-     measures against it — every plant computed to 0px wide until this. */
-  max-width: none;
-  height: auto;
-  transform-origin: 50% 100%;
-  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
-  animation:
-    grave-raise 1500ms cubic-bezier(0.16, 1, 0.3, 1) var(--plant-wait, 400ms) both,
-    hortus-sway var(--sway-ms, 7s) ease-in-out var(--plant-wait, 400ms) infinite alternate;
-}
-/* Behind the stone: the lace at its right shoulder, its cut edge tucked
-   under the marble, and the row of poppies rising at its left. */
-.field-quad-plant.is-lace {
-  /* Mirrored, and the reason is the frame: the photograph cuts the spray at
-     its right, so turned round the cut edge is the left one and it sits
-     behind the marble, with the tip of the spray reaching out past the
-     poppy. `scale` rather than a `transform`, because `grave-raise` owns
-     `transform` and would have flipped it back when it settled. */
-  left: -8px;
-  bottom: 14px;
-  width: 128px;
-  scale: -1 1;
-  z-index: 0;
-  --sway-ms: 8.5s;
-  --plant-wait: 520ms;
-  --sway-from: -1.2deg;
-  --sway-to: 1.6deg;
-}
-.field-quad-plant.is-row {
-  left: -112px;
-  bottom: 12px;
-  width: 132px;
-  z-index: 0;
-  --sway-ms: 7.2s;
-  --plant-wait: 460ms;
-  --sway-from: 1.4deg;
-  --sway-to: -1.2deg;
-}
-/* In front of the plinth: the single poppy at the right, leaning in. */
-.field-quad-plant.is-poppy {
-  left: 22px;
-  bottom: -6px;
-  width: 86px;
-  z-index: 3;
-  --sway-ms: 6.4s;
-  --plant-wait: 640ms;
-  --sway-from: -2deg;
-  --sway-to: 1.4deg;
-}
-/* The ivy on the stone's left shoulder, one sprig over another, turned to
-   hang rather than stand: a sprig's root is at its top when it climbs. */
-.field-quad-plant.is-ivy-1,
-.field-quad-plant.is-ivy-2 {
-  width: 40px;
-  z-index: 3;
-  transform-origin: 50% 0;
-}
-.field-quad-plant.is-ivy-1 {
-  left: -46px;
-  bottom: 52px;
-  --sway-ms: 5.8s;
-  --plant-wait: 700ms;
-  --sway-from: -3deg;
-  --sway-to: 2deg;
-}
-.field-quad-plant.is-ivy-2 {
-  left: -40px;
-  bottom: 22px;
-  width: 34px;
-  --sway-ms: 6.9s;
-  --plant-wait: 760ms;
-  --sway-from: 2.5deg;
-  --sway-to: -2deg;
-}
-@keyframes hortus-sway {
-  from { rotate: var(--sway-from, -1.5deg); }
-  to   { rotate: var(--sway-to, 1.5deg); }
-}
+/* **No cut-out plant stands here, and that is a ruling.** Two of
+   `ambience`'s ivy sprigs were tried on the stone's shoulder after the
+   poppies were chopped, and under the dusked field they were the stickers:
+   studio green on a pall. Greenery arrives in the plot's own photograph or
+   not at all. */
 /* Ground mist: two pale sheets, blurred, lying across the stone's foot and
    the mound and drifting against each other. `screen` so it lightens what is
    under it the way mist does, and never darkens the stone. The blur is on
    the sheet — a layer somebody drew — and reaches nothing under it. */
 .field-quad-mist {
   position: absolute;
-  left: -36px;
-  right: -36px;
-  bottom: 22px;
-  height: 70px;
-  z-index: 3;
+  left: -20px;
+  right: -20px;
+  bottom: 26px;
+  height: 64px;
+  z-index: 4;
   pointer-events: none;
   background:
     radial-gradient(ellipse 58% 52% at 28% 72%,
-      rgba(196, 204, 214, 0.26) 0%, transparent 72%),
+      rgba(196, 204, 214, 0.34) 0%, transparent 72%),
     radial-gradient(ellipse 52% 46% at 72% 64%,
-      rgba(196, 204, 214, 0.2) 0%, transparent 72%),
+      rgba(196, 204, 214, 0.26) 0%, transparent 72%),
     radial-gradient(ellipse 70% 40% at 50% 90%,
-      rgba(180, 190, 200, 0.16) 0%, transparent 70%);
+      rgba(180, 190, 200, 0.2) 0%, transparent 70%);
   filter: blur(7px);
   mix-blend-mode: screen;
   animation: grave-mist 14s ease-in-out infinite alternate;
@@ -10644,18 +10588,34 @@ button:hover .tarot-fan-card {
 .field-quad-fallen {
   position: relative;
   z-index: 4;
-  margin-top: -2px;
   pointer-events: none;
-  padding: 5px 22px;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--field-brass) 45%, transparent);
-  background: linear-gradient(180deg,
-    rgba(64, 10, 10, 0.92), rgba(38, 7, 7, 0.92));
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
-  color: #e8ddc8;
-  font-size: 1.05rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
+  padding: 4px 18px 3px;
+  border-radius: 3px;
+  /* **A brass plaque, engraved** — the same metal every plate on this board
+     is bolted with, with a highlight *and* a shadow (a flat brass rectangle
+     is a sticker, commandment 5): a bevel of light along the top edge, a
+     bevel of shade along the foot, the metal itself darker toward its lower
+     corners where it has weathered, and the letters cut *into* it — ink the
+     colour of the shadow inside a groove, with a hair of light on each
+     letter's lower edge where the cut catches the lamp. It replaced a red
+     badge with a hairline, which read as a label on a box. */
+  border: 1px solid #5a4210;
+  background:
+    linear-gradient(170deg,
+      color-mix(in srgb, var(--field-brass) 78%, #fff3c0) 0%,
+      var(--field-brass) 28%,
+      color-mix(in srgb, var(--field-brass) 62%, #3a2a08) 74%,
+      color-mix(in srgb, var(--field-brass) 48%, #2a1d05) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 190, 0.7),
+    inset 0 -1px 0 rgba(40, 26, 4, 0.75),
+    inset 0 0 0 1px rgba(255, 230, 170, 0.12),
+    0 4px 10px rgba(0, 0, 0, 0.55);
+  color: #3a2708;
+  text-shadow: 0 1px 0 rgba(255, 236, 190, 0.55);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
   /* The letter-spacing pushes a phantom gap past the last letter; the padding
      above is even, so this takes it back and the word sits centred in its own
      plate rather than a fifth of a letter left of it. */
@@ -10671,10 +10631,11 @@ button:hover .tarot-fan-card {
    sand is as tall as a desktop's. */
 @media (max-width: 61.999rem) {
   .field-quad:not(.is-open) .field-quad-grave { top: 50%; }
+  .field-quad:not(.is-open) .field-quad-grave { height: auto; }
   .field-quad:not(.is-open) .field-quad-stone,
-  .field-quad:not(.is-open) .field-quad-mound,
+  .field-quad:not(.is-open) .field-quad-plot,
+  .field-quad:not(.is-open) .field-quad-plot-dusk,
   .field-quad:not(.is-open) .field-quad-mist,
-  .field-quad:not(.is-open) .field-quad-hortus,
   .field-quad:not(.is-open) .field-quad-motes { display: none; }
   .field-quad:not(.is-open) .field-quad-fallen {
     margin-top: 0;
@@ -10699,8 +10660,8 @@ button:hover .tarot-fan-card {
   .field-quad.is-fallen::after,
   .field-quad-fallen,
   .field-quad-stone,
-  .field-quad-mound,
-  .field-quad-plant,
+  .field-quad-plot,
+  .field-quad-plot-dusk,
   .field-quad-mist {
     animation: none;
   }
@@ -11902,7 +11863,7 @@ button:hover .tarot-fan-card {
   }
   30% {
     color: var(--arena-blood-lit);
-    text-shadow: 0 0 6px var(--arena-blood), 0 1px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: 0 0 6px var(--arena-blood-deep), 0 1px 3px rgba(0, 0, 0, 0.8);
   }
   100% {
     /* The resting colour, restated: `both` keeps the last frame, so the last
@@ -11923,8 +11884,8 @@ button:hover .tarot-fan-card {
   border-radius: 50%;
   pointer-events: none;
   background: radial-gradient(circle at 50% 50%,
-    color-mix(in srgb, var(--arena-blood-lit) 62%, transparent) 0%,
-    color-mix(in srgb, var(--arena-blood) 34%, transparent) 42%,
+    color-mix(in srgb, var(--arena-blood) 66%, transparent) 0%,
+    color-mix(in srgb, var(--arena-blood-deep) 40%, transparent) 42%,
     transparent 70%);
   animation: dial-bleed 1900ms ease-out both;
 }
@@ -11951,7 +11912,19 @@ button:hover .tarot-fan-card {
    place on the rim is where a chord of the ring crosses it — the ring is
    r=20 in a 48 box, so at 52% of the width the rim is at 91.6% of the
    height, and a little higher either side. Above the figure and the crown,
-   because blood runs over whatever is under it. */
+   because blood runs over whatever is under it.
+
+   **A drop, not a column** (Aaron: *"darker, more drop like"*). The first
+   cut drew three red bars that grew downward with a bead on the end, and at
+   a 66px dial a bar is a bar. What blood actually does on a rim is gather:
+   a bead swells where it clings, stretches, lets go, and falls as a
+   teardrop, leaving a thin dark trail behind it. So each drip is two things
+   — the trail, a 2px thread that lengthens as the drop pulls away and dries
+   to the deep colour, and the drop itself on `::after`, a teardrop that
+   swells, drops, and fades as it lands. The colours are the room's own
+   blood tokens run *dark*: the lit red is the flash on the name, and what
+   falls is `--arena-blood` shading to `--arena-blood-deep`, the colour of
+   blood that has been out of a body for a second. */
 .field-blood {
   position: absolute;
   inset: 0;
@@ -11963,67 +11936,75 @@ button:hover .tarot-fan-card {
   position: absolute;
   top: var(--drip-top);
   left: var(--drip-x);
-  width: var(--drip-w, 3px);
+  width: 2px;
   height: 0;
-  margin-left: calc(var(--drip-w, 3px) / -2);
-  /* Round at the head where it leaves the rim, tapering at the foot. */
-  border-radius: 40% 40% 60% 60% / 20% 20% 70% 70%;
-  background:
-    /* The specular line down the lit side — light on a wet surface. */
-    linear-gradient(90deg,
-      rgba(255, 214, 205, 0.55) 0, rgba(255, 214, 205, 0.55) 1px,
-      transparent 1px),
-    linear-gradient(180deg,
-      var(--arena-blood-lit) 0%, var(--arena-blood) 55%,
-      var(--arena-blood-deep) 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  margin-left: -1px;
+  border-radius: 1px 1px 40% 40%;
+  background: linear-gradient(180deg,
+    var(--arena-blood) 0%, var(--arena-blood-deep) 100%);
   opacity: 0;
-  animation: blood-run var(--drip-ms) cubic-bezier(0.55, 0.05, 0.85, 0.4)
+  animation: blood-trail var(--drip-ms) cubic-bezier(0.4, 0, 0.8, 0.4)
     var(--drip-wait) both;
 }
-/* The bead at the foot: it swells as the column feeds it, then lets go. A
-   drop that fell in one motion would read as a line being drawn; blood
-   gathers before it falls. */
+/* The drop: a teardrop, pointed where it hangs and round where it falls,
+   with one speck of the room's light on its shoulder — a wet thing under a
+   lamp. Drawn as a rotated square with three round corners, which is the
+   classic construction and the only one that stays a teardrop at 8px. */
 .field-blood-drip::after {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: 0;
-  width: calc(var(--drip-w, 3px) + 3px);
-  height: calc(var(--drip-w, 3px) + 4px);
-  border-radius: 50% 50% 55% 55% / 42% 42% 60% 60%;
-  background: radial-gradient(circle at 36% 30%,
-    #e0625a 0%, var(--arena-blood-lit) 34%, var(--arena-blood-deep) 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  transform: translate(-50%, 45%) scale(0.55);
-  animation: blood-bead var(--drip-ms) ease-in var(--drip-wait) both;
+  top: 100%;
+  width: var(--drop, 8px);
+  height: var(--drop, 8px);
+  margin-left: calc(var(--drop, 8px) / -2);
+  margin-top: calc(var(--drop, 8px) / -3);
+  border-radius: 0 50% 50% 50%;
+  background:
+    radial-gradient(circle at 34% 32%,
+      rgba(255, 190, 178, 0.55) 0%, rgba(255, 190, 178, 0) 26%),
+    radial-gradient(circle at 50% 60%,
+      var(--arena-blood) 0%, var(--arena-blood-deep) 78%, #2e0b09 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  transform: rotate(45deg) scale(0.35);
+  transform-origin: 50% 50%;
+  animation: blood-drop var(--drip-ms) cubic-bezier(0.5, 0, 0.9, 0.5)
+    var(--drip-wait) both;
 }
-/* Three drips, three tempos. The lengths are in pixels rather than a share of
-   the dial because the trench under the plate is a fixed 40-odd pixels and a
-   drip that reached the far seat's sand would be a drip on somebody else. */
+/* Three drips, three tempos and three sizes. A drop's travel is in pixels
+   because the trench under the plate is a fixed 40-odd pixels and a drop
+   that reached the far seat's sand would be blood on somebody else. */
 .field-blood-drip:nth-child(1) {
-  --drip-x: 39%; --drip-top: 89.5%; --drip-len: 24px; --drip-w: 3.5px;
-  --drip-ms: 1500ms; --drip-wait: 80ms;
+  --drip-x: 40%; --drip-top: 89.8%; --drip-len: 9px; --fall: 26px;
+  --drop: 7px; --drip-ms: 1600ms; --drip-wait: 120ms;
 }
 .field-blood-drip:nth-child(2) {
-  --drip-x: 52%; --drip-top: 91.6%; --drip-len: 34px; --drip-w: 4.5px;
-  --drip-ms: 1750ms; --drip-wait: 0ms;
+  --drip-x: 52%; --drip-top: 91.6%; --drip-len: 14px; --fall: 36px;
+  --drop: 9px; --drip-ms: 1800ms; --drip-wait: 0ms;
 }
 .field-blood-drip:nth-child(3) {
-  --drip-x: 65%; --drip-top: 88.5%; --drip-len: 17px; --drip-w: 3px;
-  --drip-ms: 1250ms; --drip-wait: 240ms;
+  --drip-x: 63%; --drip-top: 89%; --drip-len: 6px; --fall: 20px;
+  --drop: 6px; --drip-ms: 1400ms; --drip-wait: 300ms;
 }
-@keyframes blood-run {
-  0%   { height: 0;                opacity: 0; }
-  10%  { opacity: 1; }
-  72%  { height: var(--drip-len);  opacity: 1; }
-  100% { height: var(--drip-len);  opacity: 0; }
+/* The trail: nothing while the drop gathers, then it draws out under the
+   falling drop and dries — thin, dark, and gone by the time the blow is
+   over. */
+@keyframes blood-trail {
+  0%   { height: 0; opacity: 0; }
+  30%  { height: 0; opacity: 0.9; }
+  62%  { height: var(--drip-len); opacity: 0.85; }
+  100% { height: var(--drip-len); opacity: 0; }
 }
-@keyframes blood-bead {
-  0%       { transform: translate(-50%, 45%) scale(0.55); opacity: 1; }
-  62%      { transform: translate(-50%, 50%) scale(1.15); opacity: 1; }
-  80%      { transform: translate(-50%, 140%) scale(0.95); opacity: 0.9; }
-  100%     { transform: translate(-50%, 300%) scale(0.8); opacity: 0; }
+/* The drop: swells on the rim (a third of the time — blood gathers before
+   it falls), pulls into a teardrop, drops with gravity's own easing, and
+   fades as it lands. */
+@keyframes blood-drop {
+  0%   { transform: translateY(0) rotate(45deg) scale(0.35); opacity: 0; }
+  12%  { opacity: 1; }
+  34%  { transform: translateY(0) rotate(45deg) scale(1); }
+  46%  { transform: translateY(3px) rotate(45deg) scale(1.02, 1.18); }
+  88%  { transform: translateY(var(--fall)) rotate(45deg) scale(0.95); opacity: 1; }
+  100% { transform: translateY(calc(var(--fall) + 6px)) rotate(45deg) scale(0.9); opacity: 0; }
 }
 /* Reduced motion keeps the fact and stills the running: the name and the
    dial go to blood for the blow's own length and come back, the drips stand
@@ -12036,8 +12017,8 @@ button:hover .tarot-fan-card {
   }
   .field-life.is-bleeding::before,
   .field-bead.is-bleeding::before { animation: none; opacity: 0.55; }
-  .field-blood-drip { animation: none; height: var(--drip-len); opacity: 1; }
-  .field-blood-drip::after { animation: none; }
+  .field-blood-drip { animation: none; height: var(--drip-len); opacity: 0.9; }
+  .field-blood-drip::after { animation: none; transform: rotate(45deg) scale(1); }
 }
 
 .field-pile {

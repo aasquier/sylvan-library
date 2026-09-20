@@ -3133,21 +3133,26 @@ it('raises a stone over the fallen seat and none over the living', () => {
     .toBeTruthy()
   expect(stone?.getAttribute('alt')).toBe('')
   expect(stone?.getAttribute('src')).toContain('cippus')
-  // The earth it stands in, the weather round it, and the word at its foot.
-  expect(grave.querySelector('.field-quad-mound')).toBeTruthy()
+  // The ground it stands in — one photograph of a poppy field, laid behind
+  // the stone and again over its plinth, each copy under a dusk sheet — the
+  // weather round it, and the word at its foot.
+  const plots = [...grave.querySelectorAll('img.field-quad-plot')]
+  expect(plots, 'the plot behind the stone and the strip in front').toHaveLength(2)
+  for (const plot of plots) {
+    expect(plot.getAttribute('alt')).toBe('')
+    expect(plot.getAttribute('src')).toContain('pratum')
+  }
+  expect(plots[1]?.className).toContain('is-front')
+  expect(grave.querySelectorAll('.field-quad-plot-dusk')).toHaveLength(2)
   expect(grave.querySelector('.field-quad-mist')).toBeTruthy()
   expect(grave.querySelector('.field-quad-motes')).toBeTruthy()
   expect(grave.querySelector('.field-quad-fallen')?.textContent).toBe('Fallen')
-  // **And what grows there** (Aaron: "greenery and flowers around the
-  // tombstone, photo real of course"): photographs of real plants, every one
-  // silent to a screen reader because the seat has already said it all.
-  const plants = [...grave.querySelectorAll('img.field-quad-plant')]
-  expect(plants, 'poppies, lace and two sprigs of ivy').toHaveLength(5)
-  for (const plant of plants) expect(plant.getAttribute('alt')).toBe('')
-  const planted = plants.map((p) => p.getAttribute('src') ?? '').join(' ')
-  for (const plate of ['papaver', 'papaver-row', 'daucus', 'ivy-sprig']) {
-    expect(planted, `the ${plate} plate is planted`).toContain(plate)
-  }
+  // **And no cut-out stands in it** (Aaron: "greenery and flowers around
+  // the tombstone, photo real of course" — and then, of the cut-outs, "only
+  // the tombstone is passing"): the flowers and the greenery are the plot's
+  // own photograph, and a plant pasted on it is the sticker that was chopped.
+  expect(grave.querySelector('img.field-quad-plant')).toBeNull()
+  expect(grave.querySelectorAll('img')).toHaveLength(3)
   // And the three seats still playing are unmarked.
   for (const seat of container.querySelectorAll('.field-quad:not(.is-fallen)')) {
     expect(seat.querySelector('.field-quad-stone')).toBeNull()

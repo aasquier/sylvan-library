@@ -63,11 +63,7 @@ import { producedColors, producedName } from '../lib/mtg'
 import aegisArt from '../assets/coliseum/aegis.webp'
 import aurumArt from '../assets/coliseum/aurum.webp'
 import cippusArt from '../assets/coliseum/cippus.webp'
-import daucusArt from '../assets/coliseum/daucus.webp'
-import papaverArt from '../assets/coliseum/papaver.webp'
-import papaverRowArt from '../assets/coliseum/papaver-row.webp'
-import ivySprig1 from '../assets/ambience/ivy-sprig-1.webp'
-import ivySprig2 from '../assets/ambience/ivy-sprig-2.webp'
+import pratumArt from '../assets/coliseum/pratum.webp'
 import ensisArt from '../assets/coliseum/ensis.webp'
 import ferculumArt from '../assets/coliseum/ferculum.webp'
 import lensArt from '../assets/coliseum/lens.webp'
@@ -3598,13 +3594,13 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                     the verdict panel raises over a losing deck — the Met's
                     Roman cippus, `cippus.recipe.yaml`, a real marble grave
                     marker and not a drawing of one (commandment 5) — comes up
-                    out of the seat's own sand, into a mound of turned earth,
-                    with the ground mist and the motes the stylesheet lays
-                    round it, and the word stands at its foot as the
-                    inscription plate. Everything but the stone is drawn:
-                    earth, mist and light are layers of the seat's own, the
-                    way the pall already is (commandment 19's shape, on a
-                    photograph that is ours to keep — CC0 — rather than lent).
+                    out of a plot of real ground, a photograph of poppies in
+                    low wheat laid under it and over its plinth, with the
+                    ground mist and the motes the stylesheet lays round it,
+                    and the word at its foot on an engraved brass plaque.
+                    Light is a layer of the seat's own, the way the pall
+                    already is (commandment 19's shape, on photographs that
+                    are ours to keep — CC0 — rather than lent).
 
                     Below the head on purpose, where the pall's own note says
                     the sand is empty by rule from the instant a player loses,
@@ -3613,35 +3609,26 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                     have not already said. */}
                 {out && (
                   <span className="field-quad-grave" aria-hidden="true">
+                    {/* **The plot, behind and in front.** One photograph of
+                        poppies in low wheat (`hortus.recipe.yaml`, CC0) laid
+                        twice: a soft-edged lens on the sand behind the
+                        stone, and a strip of its wheat over the plinth, so
+                        the stone stands in the field rather than on it. Each
+                        copy wears a dusk sheet of the pall's own umber,
+                        multiplied over it — a layer on the picture, never a
+                        filter through it. The first planting was studio
+                        cut-outs round the plinth and Aaron chopped it:
+                        ground and plants have to arrive together. */}
+                    <img className="field-quad-plot" src={pratumArt} alt=""
+                         draggable={false} />
+                    <span className="field-quad-plot-dusk" />
                     <span className="field-quad-mist" />
                     <span className="field-quad-motes" />
                     <img className="field-quad-stone" src={cippusArt} alt=""
                          draggable={false} />
-                    <span className="field-quad-mound" />
-                    {/* **What grows at a grave** (Aaron: *"some greenery and
-                        flowers around the tombstone, photo real of course"*).
-                        Photographs of real plants, every one CC0 and cut on
-                        transparency by `hortus.recipe.yaml` — poppies, the
-                        flower graves have worn for a century, and a spray of
-                        Queen Anne's lace, the wild thing that grows where
-                        nobody tends — and the ivy is `ambience`'s own sprigs,
-                        climbing the stone's shoulder. Where each one stands,
-                        and the sway, is the stylesheet's (`.field-quad-hortus`),
-                        so a plate can be swapped without re-drawing the
-                        grave. Behind the plate on purpose: a garden does not
-                        grow in front of the inscription. */}
-                    <span className="field-quad-hortus">
-                      <img className="field-quad-plant is-lace" src={daucusArt}
-                           alt="" draggable={false} />
-                      <img className="field-quad-plant is-row" src={papaverRowArt}
-                           alt="" draggable={false} />
-                      <img className="field-quad-plant is-poppy" src={papaverArt}
-                           alt="" draggable={false} />
-                      <img className="field-quad-plant is-ivy-1" src={ivySprig1}
-                           alt="" draggable={false} />
-                      <img className="field-quad-plant is-ivy-2" src={ivySprig2}
-                           alt="" draggable={false} />
-                    </span>
+                    <img className="field-quad-plot is-front" src={pratumArt}
+                         alt="" draggable={false} />
+                    <span className="field-quad-plot-dusk is-front" />
                     <span className="field-quad-fallen">Fallen</span>
                   </span>
                 )}
