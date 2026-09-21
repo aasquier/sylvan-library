@@ -301,3 +301,17 @@ Why committed rather than hotlinked: The seven scenes beside it — drawn on the
 
 Why committed rather than hotlinked: The eight scenes beside it, and more sharply than any of them — this is the most frequently drawn picture in the room, eleven times a game, so a copy fetched from somebody else's host would be the one asset whose latency a player actually learns. At 37 KB the request would also cost more than the bytes.
 <!-- animist:end arva -->
+
+<!-- animist:begin hortus -->
+## pratum.webp
+
+- **Source**: "Poppies (Unsplash).jpg", <https://commons.wikimedia.org/wiki/File:Poppies_(Unsplash).jpg>, found via Commons, searching `Unsplash poppy` and keeping CC0 only: twenty-five free plates, four of them fields. Of those this is the one shot at ground level with the flowers standing *in* something -- the others are a confetti carpet from above (reads as texture at 300px), a macro with three flowers in bokeh (reads as a photograph, not a place), and one with the sun in a blue sky (a sky this room does not have). The wheat-and-poppy palette is the sand's own, which is why it can sit on the arena without a costume.
+.
+- **Licence**: CC0. Confirmed through the Wikimedia Commons API at fetch time (2026-09-20).
+- **Transformations** (Pillow, scripted -- `animist build hortus.recipe.yaml`):
+  - `crop`: frac_box=[0.0, 0.4, 1.0, 1.0].
+  - `resize`: width=640.
+  - Encoded WEBP, quality 80.
+
+Why committed rather than hotlinked: It stands under a stone that is drawn on the beat a player falls and must be there when the stone comes up; ground that arrives from somebody else's host a second after the pall has settled is a stone floating over sand and then, suddenly, a field. And the licence is an individual photographer's CC0 release on an aggregator, mirrored to Commons -- precisely the category where a third party's copy quietly changes terms or moves. A copy confirmed once and committed is a copy whose provenance stays true.
+<!-- animist:end hortus -->

@@ -1,0 +1,67 @@
+# What grows at the grave: the plot itself.
+#
+# Aaron, on seeing the stone raised over a fallen seat: *"I want some
+# greenery and flowers around the tombstone, photo real of course."* The
+# first answer was three studio cut-outs -- poppies on a white sweep, a spray
+# of lace on black -- planted round the plinth, and he chopped it: "only the
+# tombstone is passing". He was right, and the reason is worth writing down
+# so nobody plants cut-outs here again. A cut-out is lit by the studio it was
+# shot in and stands on nothing; laid on dusk sand under a pall it is a
+# sticker, however clean the matte, because the eye reads the *ground* first
+# and a plant with no ground under it has no place in the picture.
+#
+# So the plant and the ground arrive together, in one photograph: a field of
+# poppies standing in low wheat under a pale sky, shot at knee height. The
+# lower half of that picture *is* a plot -- grass, stems, seed-heads and red
+# flowers at the scale a grave plot has them -- and the stylesheet lays it
+# under the stone as a soft-edged lens, dusks it with a multiply sheet to the
+# pall's light, and stands the stone's plinth *in* it with a second strip of
+# the same band in front (`.field-quad-plot` in `web/src/index.css`). The
+# poppy is the flower graves have worn for a century; the wheat is the
+# harvest that is over. Nothing is composed in the file -- the crop is the
+# only decision made here, and it is measured rather than guessed: the
+# horizon sits at y 0.40, the flower heads between 0.45 and 0.75, and the
+# lower quarter is the wheat the front strip is cut from.
+animist: 1
+
+why_committed: >
+  It stands under a stone that is drawn on the beat a player falls and must
+  be there when the stone comes up; ground that arrives from somebody else's
+  host a second after the pall has settled is a stone floating over sand and
+  then, suddenly, a field. And the licence is an individual photographer's
+  CC0 release on an aggregator, mirrored to Commons -- precisely the category
+  where a third party's copy quietly changes terms or moves. A copy confirmed
+  once and committed is a copy whose provenance stays true.
+
+sources:
+  # CC0, confirmed through the Commons API: `LicenseShortName` is `CC0`. One
+  # of the Unsplash photographs Commons mirrored while Unsplash's own licence
+  # was CC0 (before 2017); Commons records the release and the gate reads it.
+  pratum:
+    provider: wikimedia
+    title: "Poppies (Unsplash).jpg"
+    landing: https://commons.wikimedia.org/wiki/File:Poppies_(Unsplash).jpg
+    found_via: >
+      Commons, searching `Unsplash poppy` and keeping CC0 only: twenty-five
+      free plates, four of them fields. Of those this is the one shot at
+      ground level with the flowers standing *in* something -- the others
+      are a confetti carpet from above (reads as texture at 300px), a macro
+      with three flowers in bokeh (reads as a photograph, not a place), and
+      one with the sun in a blue sky (a sky this room does not have). The
+      wheat-and-poppy palette is the sand's own, which is why it can sit on
+      the arena without a costume.
+    licence: CC0
+
+outputs:
+  # 640 wide for a plot drawn at about 300 on a desktop quadrant, which is
+  # the same two-to-one every scene in this directory takes. The band is the
+  # lower sixty percent of the frame: the horizon and a sliver of sky at the
+  # top so the mask has something pale to dissolve into, the flowers through
+  # the middle, the wheat at the foot.
+  - file: pratum.webp
+    from: pratum
+    ops:
+      - crop: {frac_box: [0.0, 0.40, 1.0, 1.0]}
+      - resize: {width: 640}
+    encode: {format: webp, quality: 80}
+    expect: {width: 640, height: 254, budget_kb: 80, metadata: none}

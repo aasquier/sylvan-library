@@ -2243,6 +2243,128 @@ it('stops pulsing at a player who is already dead', () => {
   for (const ring of dying(3)) expect(ring.className).not.toContain('is-dire')
 })
 
+/* ------------------------------------------------------------ the wound
+ *
+ * A dial could say a total changed and could not say a player was hit. Now a
+ * blow reddens the name, flushes the dial it landed on and runs blood off its
+ * rim (Aaron, 2026-09-20). Read off the fold, never accumulated — so a scrub
+ * back is life going *up* and no wound, and a first sight of a total is not a
+ * blow. `useWounds` in `components/board.tsx` is the reader.
+ */
+function plateOf(container: HTMLElement, who: string) {
+  const plate = [...container.querySelectorAll('.field-plate')]
+    .find((p) => p.querySelector('.field-plate-name')?.textContent === who) as
+    HTMLElement
+  return {
+    plate,
+    life: plate.querySelector('.field-life') as HTMLElement,
+    drips: plate.querySelectorAll('.field-blood-drip'),
+    crowns: [...plate.querySelectorAll('.field-bead.is-general')],
+  }
+}
+
+it('bleeds when a life total falls, and only on the plate that was hit', () => {
+  vi.useFakeTimers()
+  try {
+    const at = (shown: number) => (
+      <MatchBoard board={DYING} shown={shown} game={1} running={false}
+                  name={(_slug, fallback) => fallback}
+                  speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                  games={[1]} playing={1} chooseGame={vi.fn()} />)
+    const { container, rerender } = render(at(1))
+    // **A first sight of nine life is not a blow.** The plate arrives dry: a
+    // plate already bloody on mount would be claiming a hit nobody watched.
+    expect(plateOf(container, 'Gyome — Food').plate.className).not.toContain('is-bleeding')
+    expect(plateOf(container, 'Gyome — Food').drips).toHaveLength(0)
+
+    rerender(at(2))
+    // Gyome's seat went from nine to three.
+    const hit = plateOf(container, 'Gyome — Food')
+    expect(hit.plate.className, 'the whole plate says somebody was hit')
+      .toContain('is-bleeding')
+    expect(hit.life.className, 'the life ring is the dial that took it')
+      .toContain('is-bleeding')
+    expect(hit.drips, 'three drips off the rim').toHaveLength(3)
+    // The number's own flash is kept: it still says the total changed.
+    expect(hit.life.className).toContain('is-down')
+    // And the other player's plate is dry.
+    const dry = plateOf(container, 'Goreclaw — Stompy')
+    expect(dry.plate.className).not.toContain('is-bleeding')
+    expect(dry.drips).toHaveLength(0)
+
+    // **The blood runs its course and the dial is the dial it was.**
+    act(() => { vi.advanceTimersByTime(2000) })
+    expect(plateOf(container, 'Gyome — Food').plate.className).not.toContain('is-bleeding')
+    expect(plateOf(container, 'Gyome — Food').drips).toHaveLength(0)
+
+    // **A scrub back is life going up, which is not a wound.**
+    rerender(at(1))
+    expect(plateOf(container, 'Gyome — Food').plate.className).not.toContain('is-bleeding')
+    expect(plateOf(container, 'Gyome — Food').drips).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('starts the blood over when a second blow lands inside the first', () => {
+  vi.useFakeTimers()
+  try {
+    const at = (shown: number) => (
+      <MatchBoard board={DYING} shown={shown} game={1} running={false}
+                  name={(_slug, fallback) => fallback}
+                  speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                  games={[1]} playing={1} chooseGame={vi.fn()} />)
+    const { container, rerender } = render(at(1))
+    rerender(at(2))
+    const first = plateOf(container, 'Gyome — Food').drips[0]
+    act(() => { vi.advanceTimersByTime(1000) })
+    rerender(at(3))
+    // A fresh set of drips — a new key, so the animation restarts rather
+    // than the old one being told to keep going.
+    const again = plateOf(container, 'Gyome — Food')
+    expect(again.plate.className).toContain('is-bleeding')
+    expect(again.drips).toHaveLength(3)
+    expect(again.drips[0], 'the second blow is its own blood').not.toBe(first)
+    // The first blow's timer must not dry the second blow's plate.
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(plateOf(container, 'Gyome — Food').plate.className).toContain('is-bleeding')
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(plateOf(container, 'Gyome — Food').plate.className).not.toContain('is-bleeding')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it("bleeds the crown's clock when a commander connects, and no other", () => {
+  vi.useFakeTimers()
+  try {
+    const at = (shown: number) => (
+      <MatchBoard board={BEATEN} shown={shown} game={1} running={false}
+                  name={(_slug, fallback) => fallback}
+                  speed="play" setSpeed={vi.fn()} of={4} seek={vi.fn()}
+                  games={[1]} playing={1} chooseGame={vi.fn()} />)
+    const { container, rerender } = render(at(3))
+    // Goreclaw's seat is the one being beaten; its one dial stands at twenty, dry.
+    expect(plateOf(container, 'Goreclaw — Stompy').crowns).toHaveLength(1)
+    expect(plateOf(container, 'Goreclaw — Stompy').plate.className).not.toContain('is-bleeding')
+
+    rerender(at(4))
+    // Goreclaw's own commander has now connected for twenty as well: the new
+    // dial bleeds, the old one — unchanged at twenty — does not, and the life
+    // ring, which did not move, stays dry too.
+    const near = plateOf(container, 'Goreclaw — Stompy')
+    expect(near.plate.className).toContain('is-bleeding')
+    expect(near.crowns).toHaveLength(2)
+    const wet = near.crowns.filter((c) => c.className.includes('is-bleeding'))
+    expect(wet, 'only the dial the blow raised').toHaveLength(1)
+    expect(wet[0]?.querySelectorAll('.field-blood-drip')).toHaveLength(3)
+    expect(near.life.className).not.toContain('is-bleeding')
+    expect(near.life.querySelectorAll('.field-blood-drip')).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 /* ---------------------------------------------- the three materials
  *
  * **A Treasure, a Food and a Clue, at the one moment they are worth drawing.**
@@ -2993,6 +3115,48 @@ it('draws no pall while everyone still stands', () => {
   const { container } = showPod()
   expect(container.querySelector('.field-quad.is-fallen')).toBeNull()
   expect(container.textContent).not.toContain('Fallen')
+})
+
+it('raises a stone over the fallen seat and none over the living', () => {
+  // **A headstone, not a hole — and an actual headstone.** The Met's Roman
+  // cippus, the verdict panel's own stone, comes up out of the fallen seat's
+  // sand with the word at its foot (Aaron, 2026-09-20). It is the eye's copy
+  // of the sentence the seat already says, so it says nothing of its own.
+  const { container } = showPod(['Atla Palani — Eggs'])
+  const graves = container.querySelectorAll('.field-quad-grave')
+  expect(graves, 'one grave for one fallen seat').toHaveLength(1)
+  const grave = graves[0] as HTMLElement
+  expect(grave.closest('.field-quad')?.className).toContain('is-fallen')
+  expect(grave.getAttribute('aria-hidden')).toBe('true')
+  const stone = grave.querySelector('img.field-quad-stone')
+  expect(stone, 'a photograph of a real grave marker, not a drawing')
+    .toBeTruthy()
+  expect(stone?.getAttribute('alt')).toBe('')
+  expect(stone?.getAttribute('src')).toContain('cippus')
+  // The ground it stands in — one photograph of a poppy field, laid behind
+  // the stone and again over its plinth, each copy under a dusk sheet — the
+  // weather round it, and the word at its foot.
+  const plots = [...grave.querySelectorAll('img.field-quad-plot')]
+  expect(plots, 'the plot behind the stone and the strip in front').toHaveLength(2)
+  for (const plot of plots) {
+    expect(plot.getAttribute('alt')).toBe('')
+    expect(plot.getAttribute('src')).toContain('pratum')
+  }
+  expect(plots[1]?.className).toContain('is-front')
+  expect(grave.querySelectorAll('.field-quad-plot-dusk')).toHaveLength(2)
+  expect(grave.querySelector('.field-quad-mist')).toBeTruthy()
+  expect(grave.querySelector('.field-quad-motes')).toBeTruthy()
+  expect(grave.querySelector('.field-quad-fallen')?.textContent).toBe('Fallen')
+  // **And no cut-out stands in it** (Aaron: "greenery and flowers around
+  // the tombstone, photo real of course" — and then, of the cut-outs, "only
+  // the tombstone is passing"): the flowers and the greenery are the plot's
+  // own photograph, and a plant pasted on it is the sticker that was chopped.
+  expect(grave.querySelector('img.field-quad-plant')).toBeNull()
+  expect(grave.querySelectorAll('img')).toHaveLength(3)
+  // And the three seats still playing are unmarked.
+  for (const seat of container.querySelectorAll('.field-quad:not(.is-fallen)')) {
+    expect(seat.querySelector('.field-quad-stone')).toBeNull()
+  }
 })
 
 /**
