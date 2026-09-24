@@ -203,10 +203,7 @@ func Resolve(requested any, deck DeckStatused, limit *Stance) (Stance, error) {
 		}
 		asked = parsed
 	}
-	ceil := Ceiling()
-	if limit != nil {
-		ceil = *limit
-	}
+	ceil := ceilingOr(limit)
 	return Clamp(asked, ceil), nil
 }
 

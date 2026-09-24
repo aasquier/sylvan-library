@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -66,33 +65,23 @@ func TestTheTimestampIsTheRecordedFormat(t *testing.T) {
 // each one is dropped in turn and the digest must move. This is the mutation
 // test for the mechanism ADR 18's consequence 2 rests on.
 func TestEveryEngineSourceMovesTheFingerprint(t *testing.T) {
-	// **Serial, and Go will not say so.** `digestOver` swaps three
-	// package-level values -- `engineSources`, `fingerprintVal` and
-	// `fingerprintOnce` -- and puts them back on the way out. Adding
-	// `t.Parallel()` panics at nothing and passes when this test is run alone;
-	// what it would do is let this test and its neighbour swap the same three
-	// while the other is reading them, and let any later test in the package
-	// read a fingerprint computed over a list this one was holding.
-	//
-	// This is the second of the three things CLAUDE.md names, and the one
-	// nothing but a reading catches: `-race` sees it only when the two
-	// actually overlap, which is a coin toss rather than a gate. The reason it
-	// cannot simply be fixed is in this file's own package comment -- both
-	// tests need `engineSources`, and exporting it would publish the one thing
-	// this package's callers must not depend on.
-	//
-	// Snapshotted below, because `digestOver` swaps the list while it works. Ranging over the global and slicing it inside the loop reads the
-	// swapped one, which is a panic on the second pass and would have been a
-	// silently narrower test if the lengths had happened to match.
+	t.Parallel()
+	// The real list is read but never written: `fingerprintOf` is a function of
+	// the list it is handed, so every variation below is a slice of this test's
+	// own and the memo behind [Fingerprint] is never disturbed.
 	real := append([]engineSource{}, engineSources...)
-	full := digestOver(t, real)
+	full := fingerprintOf(real)
 	if full == "" {
 		t.Fatal("the fingerprint is empty over the real source list")
+	}
+	if got := Fingerprint(); got != full {
+		t.Errorf("the memoised fingerprint is %q and the real list hashes to "+
+			"%q -- they are the same list and must be the same digest", got, full)
 	}
 	for i, pkg := range real {
 		without := append([]engineSource{}, real[:i]...)
 		without = append(without, real[i+1:]...)
-		if got := digestOver(t, without); got == full {
+		if got := fingerprintOf(without); got == full {
 			t.Errorf("dropping %s does not change the fingerprint, so its "+
 				"source is not in the key at all", pkg.name)
 		}
@@ -102,34 +91,38 @@ func TestEveryEngineSourceMovesTheFingerprint(t *testing.T) {
 	if len(real) >= 2 {
 		swapped := append([]engineSource{}, real...)
 		swapped[0], swapped[1] = swapped[1], swapped[0]
-		if digestOver(t, swapped) == full {
+		if fingerprintOf(swapped) == full {
 			t.Error("reordering the source list does not change the fingerprint")
 		}
 	}
 }
 
-// digestOver runs `Fingerprint`'s body over an arbitrary list, which is why
-// that body is worth keeping in one loop.
-//
-// It swaps the package's own state and puts it back **before returning**,
-// rather than through `t.Cleanup`: a cleanup runs at the end of the test, so
-// the global would stay swapped for the rest of the body. These subtests
-// therefore cannot run in parallel with anything that reads the real
-// fingerprint -- none of them do, and none of them may.
-func digestOver(t *testing.T, sources []engineSource) string {
-	t.Helper()
-	saved, savedVal := engineSources, fingerprintVal
-	defer func() {
-		engineSources, fingerprintVal = saved, savedVal
-		fingerprintOnce = sync.Once{}
-		// Re-arm the memo on the real list, so a later test in this package
-		// sees the fingerprint this binary really has.
-		Fingerprint()
-	}()
-	engineSources = sources
-	fingerprintVal = ""
-	fingerprintOnce = sync.Once{}
-	return Fingerprint()
+// A source list this process cannot read hashes to the empty string, which
+// disables caching entirely rather than serving a plausible digest over half an
+// engine. The fallback for "I cannot tell which engine this is" is to compute.
+func TestAnUnreadableEngineSourceEmptiesTheFingerprint(t *testing.T) {
+	t.Parallel()
+	// A file whose entry is in the directory listing and whose bytes will not
+	// come back: the glob succeeds and the read is what fails.
+	if got := fingerprintOf([]engineSource{{"pkg", unreadableFS{}}}); got != "" {
+		t.Errorf("an unreadable source hashed to %q, want the empty string "+
+			"that turns the cache off", got)
+	}
+	// An empty list is not a failure: it hashes to the digest of nothing, which
+	// is a real string, because no package named means nothing to refuse.
+	if got := fingerprintOf(nil); got == "" {
+		t.Error("an empty source list read as unreadable rather than as empty")
+	}
+}
+
+// unreadableFS lists one file and refuses to open it.
+type unreadableFS struct{}
+
+func (unreadableFS) Open(name string) (fs.File, error) {
+	if name == "." {
+		return fstest.MapFS{"a.go": &fstest.MapFile{}}.Open(".")
+	}
+	return nil, fs.ErrPermission
 }
 
 // TestTheFingerprintHashesNamesAsWellAsBytes proves the path prefix is doing
@@ -141,16 +134,12 @@ func digestOver(t *testing.T, sources []engineSource) string {
 // synthetic filesystems can, which is why `engineSource.fs` is an `fs.FS`
 // rather than an `embed.FS`.
 func TestTheFingerprintHashesNamesAsWellAsBytes(t *testing.T) {
-	// **Serial**, for `TestEveryEngineSourceMovesTheFingerprint`'s reason:
-	// `digestOver` swaps the package-level source list and the memo behind
-	// `Fingerprint`. Go accepts `t.Parallel()` here and the collision is
-	// silent -- and a fingerprint that came out wrong would not fail this
-	// test, it would fail whichever cache test ran next.
-	first := digestOver(t, []engineSource{{"pkg", fstest.MapFS{
+	t.Parallel()
+	first := fingerprintOf([]engineSource{{"pkg", fstest.MapFS{
 		"a.go": &fstest.MapFile{Data: []byte("alpha")},
 		"b.go": &fstest.MapFile{Data: []byte("beta")},
 	}}})
-	swapped := digestOver(t, []engineSource{{"pkg", fstest.MapFS{
+	swapped := fingerprintOf([]engineSource{{"pkg", fstest.MapFS{
 		"a.go": &fstest.MapFile{Data: []byte("beta")},
 		"b.go": &fstest.MapFile{Data: []byte("alpha")},
 	}}})
@@ -160,7 +149,7 @@ func TestTheFingerprintHashesNamesAsWellAsBytes(t *testing.T) {
 	}
 	// And the package name is in it too, so the same file under two packages
 	// is two different engines.
-	elsewhere := digestOver(t, []engineSource{{"other", fstest.MapFS{
+	elsewhere := fingerprintOf([]engineSource{{"other", fstest.MapFS{
 		"a.go": &fstest.MapFile{Data: []byte("alpha")},
 		"b.go": &fstest.MapFile{Data: []byte("beta")},
 	}}})
@@ -169,7 +158,7 @@ func TestTheFingerprintHashesNamesAsWellAsBytes(t *testing.T) {
 	}
 	// The separator matters as well: without it, `a.go` + "lpha" would hash
 	// the same as `a.gol` + "pha".
-	run := digestOver(t, []engineSource{{"pkg", fstest.MapFS{
+	run := fingerprintOf([]engineSource{{"pkg", fstest.MapFS{
 		"a.go": &fstest.MapFile{Data: []byte("b.goalphabeta")},
 	}}})
 	if run == first {
