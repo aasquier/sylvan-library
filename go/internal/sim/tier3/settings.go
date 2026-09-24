@@ -51,8 +51,20 @@ type Settings struct {
 	// may ever be tracked.
 	Home string
 	// Java is MTGLAB_JAVA: a JVM the operator chose, tried first and still
-	// probed. Empty means "search the bundled JDK, then PATH".
+	// probed. Empty means "search the bundled JDK, then [Settings.PathList]".
 	Java string
+	// PathList is the executable search path the JVM hunt walks last — `PATH`
+	// as [LoadSettingsFrom] read it, carried as a value for the reason every
+	// other field here is one.
+	//
+	// **It is the process's `PATH` said out loud.** The search used to call
+	// [os/exec.LookPath], so the only way to ask what happens on a machine with
+	// no JVM anywhere was to empty the `PATH` of the whole test binary — which
+	// Go refuses inside a parallel test and which, for the seconds it lasts, is
+	// every other test running with no `PATH` either. Empty means "nothing on
+	// the path", which is a machine a test can describe and a deployment never
+	// has.
+	PathList string
 	// Profile is Forge's user data directory, ours rather than the user's own
 	// — MTGLAB_FORGE_PROFILE, or `~/.local/share/mtglab/forge-profile`.
 	//
@@ -114,6 +126,12 @@ type Settings struct {
 	// off-heap share, and the shim process all live beside it. Measured
 	// heads-up games run well inside it.
 	MemoryMB int
+
+	// Index is this machine's card-coverage memory, shared by every copy of
+	// these settings. Nil is legal and means "read the card scripts every
+	// time", which is what a test that asks once wants; [Defaults] makes one,
+	// so a loaded configuration always has it.
+	Index *CardIndex
 }
 
 // Default values for the settings that have one.
@@ -137,10 +155,19 @@ const (
 
 // Defaults are the settings a laptop gets when it exports nothing.
 //
-// Named rather than inlined into [LoadSettings] so a test can start from the
-// same footing a developer's machine has and change the one field it is about.
-func Defaults() Settings {
-	base := filepath.Join(homeDir(), ".local", "share", "mtglab")
+// Named rather than inlined into [LoadSettingsFrom] so a test can start from
+// the same footing a developer's machine has and change the one field it is
+// about.
+func Defaults() Settings { return DefaultsFrom(os.Getenv) }
+
+// DefaultsFrom is [Defaults] against a named lookup rather than the process's.
+//
+// The home directory is the only thing a default reads, and it is read through
+// the lookup for the same reason everything else here is: a test that wants to
+// see the `~/.local/share/mtglab` layout resolved should be able to say where
+// home is instead of being told by the machine it happens to run on.
+func DefaultsFrom(getenv func(string) string) Settings {
+	base := filepath.Join(homeDirFrom(getenv), ".local", "share", "mtglab")
 	return Settings{
 		Home:        filepath.Join(base, "forge"),
 		Profile:     filepath.Join(base, "forge-profile"),
@@ -150,6 +177,7 @@ func Defaults() Settings {
 		IdleSeconds: DefaultIdleSeconds,
 		Machine:     DefaultMachine,
 		MemoryMB:    DefaultMemoryMB,
+		Index:       NewCardIndex(),
 	}
 }
 
@@ -158,33 +186,50 @@ func Defaults() Settings {
 // **This is the only reader of the Forge and Fly variables**, and `cmd/mtglab`
 // calls it once, in `main`. That single reader is what lets a test describe a
 // machine with a struct literal instead of mutating the process it runs in.
-func LoadSettings() Settings {
-	s := Defaults()
-	if v := env("MTGLAB_FORGE_HOME"); v != "" {
+func LoadSettings() Settings { return LoadSettingsFrom(os.Getenv) }
+
+// LoadSettingsFrom is [LoadSettings] against a lookup handed in — the shape
+// ADR 39 gave `config.LoadFrom` and ADR 40 the Claude endpoint, arriving here
+// last because this package's variables were the last to be read where they
+// were wanted.
+//
+// **What it buys is a test that can describe a deployment.** Which of
+// `MTGLAB_FLY_APP` and Fly's own `FLY_APP_NAME` wins, whether a whitespace dial
+// reads as on, what an unparseable port falls back to — every one of those is a
+// question about this function, and the only way to ask it used to be to write
+// the variables onto the process, which Go refuses inside a parallel test. A
+// `map[string]string`'s lookup says the same thing to one caller.
+func LoadSettingsFrom(getenv func(string) string) Settings {
+	s := DefaultsFrom(getenv)
+	if v := env(getenv, "MTGLAB_FORGE_HOME"); v != "" {
 		s.Home = v
 	}
-	s.Java = env("MTGLAB_JAVA")
-	if v := env("MTGLAB_FORGE_PROFILE"); v != "" {
+	s.Java = env(getenv, "MTGLAB_JAVA")
+	if v := env(getenv, "MTGLAB_FORGE_PROFILE"); v != "" {
 		s.Profile = v
 	}
-	if v := env("MTGLAB_FORGE_SHIM_HOST"); v != "" {
+	if v := env(getenv, "MTGLAB_FORGE_SHIM_HOST"); v != "" {
 		s.ShimHost = v
 	}
-	s.ShimPort = envInt("MTGLAB_FORGE_SHIM_PORT", DefaultShimPort)
-	s.ShimToken = env("MTGLAB_FORGE_SHIM_TOKEN")
-	s.IdleSeconds = envInt("MTGLAB_FORGE_IDLE_SECONDS", DefaultIdleSeconds)
-	s.WorkerURL = strings.TrimRight(env("MTGLAB_FORGE_WORKER_URL"), "/")
-	s.WorkerEnabled = env("MTGLAB_FORGE_WORKER") != ""
-	s.FlyAPIToken = env("MTGLAB_FLY_API_TOKEN")
-	s.FlyApp = env("MTGLAB_FLY_APP")
+	s.ShimPort = envInt(getenv, "MTGLAB_FORGE_SHIM_PORT", DefaultShimPort)
+	s.ShimToken = env(getenv, "MTGLAB_FORGE_SHIM_TOKEN")
+	s.IdleSeconds = envInt(getenv, "MTGLAB_FORGE_IDLE_SECONDS", DefaultIdleSeconds)
+	s.WorkerURL = strings.TrimRight(env(getenv, "MTGLAB_FORGE_WORKER_URL"), "/")
+	s.WorkerEnabled = env(getenv, "MTGLAB_FORGE_WORKER") != ""
+	s.FlyAPIToken = env(getenv, "MTGLAB_FLY_API_TOKEN")
+	s.FlyApp = env(getenv, "MTGLAB_FLY_APP")
 	if s.FlyApp == "" {
-		s.FlyApp = env("FLY_APP_NAME")
+		s.FlyApp = env(getenv, "FLY_APP_NAME")
 	}
-	if v := env("MTGLAB_FORGE_MACHINE"); v != "" {
+	if v := env(getenv, "MTGLAB_FORGE_MACHINE"); v != "" {
 		s.Machine = v
 	}
-	s.MemoryMB = envInt("MTGLAB_FORGE_MEMORY_MB", DefaultMemoryMB)
-	s.ScribeClasses = env("MTGLAB_SCRIBE_CLASSES")
+	s.MemoryMB = envInt(getenv, "MTGLAB_FORGE_MEMORY_MB", DefaultMemoryMB)
+	s.ScribeClasses = env(getenv, "MTGLAB_SCRIBE_CLASSES")
+	// Untrimmed and unsplit: `PATH` is a list whose separator is the platform's
+	// and whose entries are paths, and trimming one would be this package
+	// deciding what a directory may be called.
+	s.PathList = getenv("PATH")
 	return s
 }
 
@@ -239,13 +284,15 @@ func (s Settings) WorkerHalfSet() bool {
 // env is the one read, trimmed the one way — the same rule `internal/config`
 // applies, restated rather than imported because nothing else here needs that
 // package and a settings type should not drag one in for a two-line helper.
-func env(name string) string { return strings.TrimSpace(os.Getenv(name)) }
+func env(getenv func(string) string, name string) string {
+	return strings.TrimSpace(getenv(name))
+}
 
 // envInt is [env] for a number, where unparseable is indistinguishable from
 // unset. A port of `banana` is a typo, and falling back to the default is what
 // every previous version of this did.
-func envInt(name string, fallback int) int {
-	if raw := env(name); raw != "" {
+func envInt(getenv func(string) string, name string, fallback int) int {
+	if raw := env(getenv, name); raw != "" {
 		if n, err := strconv.Atoi(raw); err == nil {
 			return n
 		}
@@ -253,10 +300,23 @@ func envInt(name string, fallback int) int {
 	return fallback
 }
 
-// homeDir is the user's home, which is only ever a base for [Defaults].
-func homeDir() string {
+// homeDirFrom is the user's home as this lookup reports it, which is only ever
+// a base for [DefaultsFrom].
+//
+// **`HOME` is asked first, and that is not a change of behaviour.** This used to
+// call [os.UserHomeDir] and fall back to `$HOME`, which on every platform this
+// project runs on is the same question asked twice: `UserHomeDir` *is* `$HOME`
+// there, and fails exactly when it is empty — so the fallback could never fire
+// and nothing could describe a machine's home without writing the process's
+// environment. Asking the lookup first says the same thing and can be said by a
+// test; [os.UserHomeDir] stays underneath it for the platform where the two
+// differ.
+func homeDirFrom(getenv func(string) string) string {
+	if home := getenv("HOME"); home != "" {
+		return home
+	}
 	if home, err := os.UserHomeDir(); err == nil {
 		return home
 	}
-	return os.Getenv("HOME")
+	return ""
 }

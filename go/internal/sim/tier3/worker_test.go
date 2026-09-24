@@ -148,11 +148,7 @@ func testDeck(slug string) *deck.Deck {
 // the same contract `/api/claude` set, where reachability is discovered when
 // work is actually asked for.
 func TestTheWorkerIsConfiguredByTheEnvironmentAlone(t *testing.T) {
-	// **Serial**: it calls `t.Setenv`, which Go panics on inside a parallel
-	// test -- and here that is the subject rather than the scaffolding. What
-	// it asserts is that the worker reads its configuration **from the
-	// environment alone**, so the environment is the input under test and
-	// there is no value-shaped version of this question to ask instead.
+	t.Parallel()
 	for _, c := range []struct {
 		what string
 		s    Settings
@@ -174,11 +170,14 @@ func TestTheWorkerIsConfiguredByTheEnvironmentAlone(t *testing.T) {
 	}
 
 	// Whitespace is not a dial: an empty-looking value must not read as on.
-	// That is a fact about the *reader*, which is what keeps this one serial.
-	t.Setenv("MTGLAB_FORGE_WORKER", "   ")
-	t.Setenv("MTGLAB_FLY_API_TOKEN", "tok")
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "")
-	if LoadSettings().Configured() {
+	// That is a fact about the *reader*, asked of the reader -- and asked with
+	// a map rather than by writing the process, which is what
+	// [LoadSettingsFrom] exists for.
+	whitespace := LoadSettingsFrom(lookup(map[string]string{
+		"MTGLAB_FORGE_WORKER":  "   ",
+		"MTGLAB_FLY_API_TOKEN": "tok",
+	}))
+	if whitespace.Configured() {
 		t.Error("a whitespace dial read as on")
 	}
 }
@@ -754,19 +753,22 @@ func TestTheMachinesAPINeedsATokenAndAnAppName(t *testing.T) {
 // for tests and for talking to the instance from a laptop. Which of the two
 // won is a question about the reader, so it is asked of the reader.
 func TestTheFlyAppOverrideWinsOverFlysOwnInjection(t *testing.T) {
-	// **Serial**: it calls `t.Setenv`, which Go panics on inside a parallel
-	// test -- and here that is the subject rather than the scaffolding. What
-	// it asserts is that the worker reads its configuration **from the
-	// environment alone**, so the environment is the input under test and
-	// there is no value-shaped version of this question to ask instead.
-	t.Setenv("FLY_APP_NAME", "mtglab")
-	t.Setenv("MTGLAB_FLY_APP", "")
-	if got := LoadSettings().FlyApp; got != "mtglab" {
+	t.Parallel()
+	injected := LoadSettingsFrom(lookup(map[string]string{"FLY_APP_NAME": "mtglab"}))
+	if got := injected.FlyApp; got != "mtglab" {
 		t.Errorf("Fly's own injection lost: %q", got)
 	}
-	t.Setenv("MTGLAB_FLY_APP", "somewhere-else")
-	if got := LoadSettings().FlyApp; got != "somewhere-else" {
+	overridden := LoadSettingsFrom(lookup(map[string]string{
+		"FLY_APP_NAME":   "mtglab",
+		"MTGLAB_FLY_APP": "somewhere-else",
+	}))
+	if got := overridden.FlyApp; got != "somewhere-else" {
 		t.Errorf("the override lost: %q", got)
+	}
+	// And a machine that is neither Fly's nor told otherwise names no app at
+	// all, rather than guessing one.
+	if got := LoadSettingsFrom(lookup(nil)).FlyApp; got != "" {
+		t.Errorf("an unconfigured machine named the app %q", got)
 	}
 }
 
