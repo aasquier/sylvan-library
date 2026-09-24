@@ -490,8 +490,8 @@ var (
 	model      Model
 	shelf      RuntimeShelves
 	coliseum   Coliseum
-	byKey      = map[string]*Combination{}
-	byArena    = map[string]*Arena{}
+	byKey      map[string]*Combination
+	byArena    map[string]*Arena
 )
 
 func init() {
@@ -504,9 +504,25 @@ func init() {
 	mustCompact("model.json", modelFile, &model)
 	mustCompact("shelves.json", shelvesFile, &shelf)
 	mustCompact("coliseum.json", coliseumFile, &coliseum)
-	for i := range coliseum.Arenas {
-		a := &coliseum.Arenas[i]
-		if _, dup := byArena[a.Key]; dup {
+	byArena = indexArenas(&coliseum)
+	checkZones(&coliseum)
+	byKey = indexCombinations(&taxonomy)
+}
+
+// indexArenas is the arena lookup, and the two refusals that stand behind it:
+// a key written twice would silently lose one arena, and a fact of a kind the
+// renderer has never heard of would reach a page as nothing at all. Both are
+// damage to a committed file rather than anything a person did, so both are a
+// build that must not ship.
+//
+// It is a function taking the document rather than lines inside `init` for
+// one reason: a panic nothing can reach is a promise, and `coliseumindex_test`
+// hands it the damaged documents the embedded file is not allowed to become.
+func indexArenas(c *Coliseum) map[string]*Arena {
+	out := map[string]*Arena{}
+	for i := range c.Arenas {
+		a := &c.Arenas[i]
+		if _, dup := out[a.Key]; dup {
 			panic(fmt.Sprintf("reference: coliseum.json names %q twice", a.Key))
 		}
 		for _, f := range a.Facts {
@@ -515,15 +531,23 @@ func init() {
 					"unknown kind %q", a.Key, f.Kind))
 			}
 		}
-		byArena[a.Key] = a
+		out[a.Key] = a
 	}
-	seenZone := map[string]bool{}
-	for _, z := range coliseum.Zones {
+	return out
+}
+
+// checkZones holds the dressing to the zones the board actually has, once
+// each, each with a card, a painting and the painter's name -- the last
+// because a credit is not optional (commandment 19) and a zone dressed with
+// an uncredited painting must never reach a page.
+func checkZones(c *Coliseum) {
+	seen := map[string]bool{}
+	for _, z := range c.Zones {
 		if !ZoneKeys[z.Key] {
 			panic(fmt.Sprintf("reference: coliseum.json dresses unknown zone %q",
 				z.Key))
 		}
-		if seenZone[z.Key] {
+		if seen[z.Key] {
 			panic(fmt.Sprintf("reference: coliseum.json dresses zone %q twice",
 				z.Key))
 		}
@@ -531,15 +555,22 @@ func init() {
 			panic(fmt.Sprintf("reference: coliseum.json zone %q needs a card, a "+
 				"painting and a painter", z.Key))
 		}
-		seenZone[z.Key] = true
+		seen[z.Key] = true
 	}
-	for i := range taxonomy.Combinations {
-		c := &taxonomy.Combinations[i]
-		if _, dup := byKey[c.Key]; dup {
+}
+
+// indexCombinations is the colour lookup, keyed by the combination's own key.
+// The pointers are into the taxonomy itself, which is why it takes one.
+func indexCombinations(t *Taxonomy) map[string]*Combination {
+	out := map[string]*Combination{}
+	for i := range t.Combinations {
+		c := &t.Combinations[i]
+		if _, dup := out[c.Key]; dup {
 			panic(fmt.Sprintf("reference: colors.json names %q twice", c.Key))
 		}
-		byKey[c.Key] = c
+		out[c.Key] = c
 	}
+	return out
 }
 
 // mustCompact parses one embedded file into its typed view and returns the

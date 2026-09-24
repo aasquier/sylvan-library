@@ -1,6 +1,8 @@
 package flymetrics
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -69,22 +71,18 @@ func contains(target, name string) bool {
 
 func contains2(s, sub string) bool { return strings.Contains(s, sub) }
 
+// fixedToken is a configured instance described as a value: the credential
+// this panel is handed, rather than one installed on the whole process.
+func fixedToken(secret string) func() string { return func() string { return secret } }
+
 // The whole panel: values in query order, floats in their canonical
 // rendering, the app and org named — and the second ask served from the
 // cache.
 func TestFetchAnswersOnceAndCaches(t *testing.T) {
-	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
-	// panics on inside a parallel test.
-	//
-	// The token is the last piece of configuration in this module that is
-	// still read off the process rather than handed in -- `Panel` already
-	// takes its transport and its clock as fields, and the day it takes the
-	// token too, all four tests in this file become parallel and this comment
-	// goes with them.
-	t.Setenv("FLY_METRICS_TOKEN", "FlyV1 fm2_test")
+	t.Parallel()
 	hits := 0
 	now := time.Unix(1_000_000, 0)
-	p := &Panel{Transport: stub(t, map[string][]byte{
+	p := &Panel{Token: fixedToken("FlyV1 fm2_test"), Transport: stub(t, map[string][]byte{
 		"memory_bytes":       vector("123456789"),
 		"memory_total_bytes": vector("268435456"),
 		"edge_2xx":           vector("1500.5"),
@@ -117,17 +115,10 @@ func TestFetchAnswersOnceAndCaches(t *testing.T) {
 // a real zero, and with the witness absent nothing is known and every
 // counter stays null.
 func TestTheWitnessSettlesTheSilentCounters(t *testing.T) {
-	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
-	// panics on inside a parallel test.
-	//
-	// The token is the last piece of configuration in this module that is
-	// still read off the process rather than handed in -- `Panel` already
-	// takes its transport and its clock as fields, and the day it takes the
-	// token too, all four tests in this file become parallel and this comment
-	// goes with them.
-	t.Setenv("FLY_METRICS_TOKEN", "tok")
+	t.Parallel()
 	hits := 0
-	p := &Panel{Transport: stub(t, map[string][]byte{"edge_2xx": vector("9")}, &hits)}
+	p := &Panel{Token: fixedToken("tok"),
+		Transport: stub(t, map[string][]byte{"edge_2xx": vector("9")}, &hits)}
 	got, _ := wire.MarshalOrdered(p.Fetch())
 	want := `{"configured":true,"ok":true,"values":{"memory_bytes":null,` +
 		`"memory_total_bytes":null,"edge_2xx":9.0,"edge_4xx":0.0,` +
@@ -136,7 +127,7 @@ func TestTheWitnessSettlesTheSilentCounters(t *testing.T) {
 		t.Fatalf("got %s\nwant %s", got, want)
 	}
 
-	blind := &Panel{Transport: stub(t, nil, &hits)}
+	blind := &Panel{Token: fixedToken("tok"), Transport: stub(t, nil, &hits)}
 	got, _ = wire.MarshalOrdered(blind.Fetch())
 	if string(got) != `{"configured":true,"ok":true,"values":{"memory_bytes":null,`+
 		`"memory_total_bytes":null,"edge_2xx":null,"edge_4xx":null,`+
@@ -148,22 +139,18 @@ func TestTheWitnessSettlesTheSilentCounters(t *testing.T) {
 // An unset token is `configured: false` and is NOT cached — configuring it
 // should take effect on the next look, not five minutes later.
 func TestUnconfiguredHidesAndIsNotCached(t *testing.T) {
-	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
-	// panics on inside a parallel test.
-	//
-	// The token is the last piece of configuration in this module that is
-	// still read off the process rather than handed in -- `Panel` already
-	// takes its transport and its clock as fields, and the day it takes the
-	// token too, all four tests in this file become parallel and this comment
-	// goes with them.
-	t.Setenv("FLY_METRICS_TOKEN", "  ")
+	t.Parallel()
+	// The credential this instance is holding, changed under the panel the
+	// way a maintainer changes it: the whole point of Token being a function
+	// is that the next look asks again.
+	secret := "  "
 	hits := 0
-	p := &Panel{Transport: stub(t, nil, &hits)}
+	p := &Panel{Token: func() string { return secret }, Transport: stub(t, nil, &hits)}
 	got, _ := wire.MarshalOrdered(p.Fetch())
 	if string(got) != `{"configured":false,"ok":false,"values":{}}` {
 		t.Fatalf("unconfigured: %s", got)
 	}
-	t.Setenv("FLY_METRICS_TOKEN", "tok")
+	secret = "tok"
 	after, _ := wire.MarshalOrdered(p.Fetch())
 	if string(after) == string(got) {
 		t.Fatal("setting the token did not take effect on the next look")
@@ -173,18 +160,10 @@ func TestUnconfiguredHidesAndIsNotCached(t *testing.T) {
 // A failure is `ok: false` with the reason — and cached, so a broken token
 // is not retried per tile.
 func TestAFailureIsCloudedGlassNotA500(t *testing.T) {
-	// **Serial**: it calls `t.Setenv("FLY_METRICS_TOKEN", ...)`, which Go
-	// panics on inside a parallel test.
-	//
-	// The token is the last piece of configuration in this module that is
-	// still read off the process rather than handed in -- `Panel` already
-	// takes its transport and its clock as fields, and the day it takes the
-	// token too, all four tests in this file become parallel and this comment
-	// goes with them.
-	t.Setenv("FLY_METRICS_TOKEN", "tok")
+	t.Parallel()
 	hits := 0
 	now := time.Unix(2_000_000, 0)
-	p := &Panel{Now: func() time.Time { return now },
+	p := &Panel{Token: fixedToken("tok"), Now: func() time.Time { return now },
 		Transport: func(string, map[string]string) (int, []byte, error) {
 			hits++
 			return 401, nil, nil
@@ -197,12 +176,87 @@ func TestAFailureIsCloudedGlassNotA500(t *testing.T) {
 	if hits != 1 {
 		t.Fatalf("a cached failure was retried (%d hits)", hits)
 	}
-	badJSON := &Panel{Transport: func(string, map[string]string) (int, []byte, error) {
-		return 200, []byte("<html>"), nil
-	}}
+	badJSON := &Panel{Token: fixedToken("tok"),
+		Transport: func(string, map[string]string) (int, []byte, error) {
+			return 200, []byte("<html>"), nil
+		}}
 	got, _ = wire.MarshalOrdered(badJSON.Fetch())
 	if string(got) != fmt.Sprintf(`{"configured":true,"ok":false,"error":%q,"values":{}}`,
 		"Fly's answer was not the JSON this expects") {
 		t.Fatalf("bad JSON shape: %s", got)
+	}
+	// A transport that cannot reach Fly at all is the same clouded glass with
+	// a different sentence behind it — the branch beside the HTTP one, and
+	// the one a dead network actually takes.
+	unreachable := &Panel{Token: fixedToken("tok"),
+		Transport: func(string, map[string]string) (int, []byte, error) {
+			return 0, nil, errors.New("dial: no route to host")
+		}}
+	got, _ = wire.MarshalOrdered(unreachable.Fetch())
+	if string(got) != fmt.Sprintf(`{"configured":true,"ok":false,"error":%q,"values":{}}`,
+		"could not reach Fly: dial: no route to host") {
+		t.Fatalf("unreachable shape: %s", got)
+	}
+}
+
+// The panel is told which instance it is looking at, and only falls back to
+// this app's own names when nobody said — the three sources in order, with
+// the process's own answer left out of it because a test that read the
+// environment would be the thing this seam exists to stop.
+func TestThePanelPrefersTheNamesItWasHandedOverItsDefaults(t *testing.T) {
+	t.Parallel()
+	seen := ""
+	p := &Panel{Token: fixedToken("tok"), App: "other-app", Org: "other-org",
+		Transport: func(target string, _ map[string]string) (int, []byte, error) {
+			seen = target
+			return 200, empty, nil
+		}}
+	got, _ := wire.MarshalOrdered(p.Fetch())
+	if !strings.Contains(string(got), `"app":"other-app"`) ||
+		!strings.Contains(string(got), `"org":"other-org"`) {
+		t.Fatalf("the named instance did not reach the answer: %s", got)
+	}
+	// The org is not decoration: it is a path segment on the URL the queries
+	// go to, so a panel told the wrong one asks the wrong account.
+	if !strings.Contains(seen, "/prometheus/other-org/") {
+		t.Fatalf("the org never reached the URL: %q", seen)
+	}
+	if !strings.Contains(seen, "other-app") {
+		t.Fatalf("the app never reached the query: %q", seen)
+	}
+	if got := valueOr("", "FLY_NOTHING_READS_THIS", "sylvan-library"); got != "sylvan-library" {
+		t.Fatalf("an unnamed instance did not fall back to this app: %q", got)
+	}
+}
+
+// scalar is where an instant-vector answer becomes one number, and every
+// shape that is not one has to come back nil rather than zero: absent and
+// zero are genuinely different answers, and collapsing them is how a broken
+// query gets read as good news.
+func TestAMalformedVectorIsNoNumberRatherThanZero(t *testing.T) {
+	t.Parallel()
+	for name, body := range map[string]string{
+		"no data at all":      `{}`,
+		"an empty result":     `{"data":{"result":[]}}`,
+		"a value pair of one": `{"data":{"result":[{"value":[1724444444.0]}]}}`,
+		"a number where the string should be": `{"data":{"result":[{"value":` +
+			`[1724444444.0,12.5]}]}}`,
+		"a string that is not a number": `{"data":{"result":[{"value":` +
+			`[1724444444.0,"abc"]}]}}`,
+	} {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(body), &payload); err != nil {
+			t.Fatalf("%s: the fixture itself is not JSON: %v", name, err)
+		}
+		if got := scalar(payload); got != nil {
+			t.Errorf("%s: read as %v, want no number at all", name, *got)
+		}
+	}
+	var good map[string]any
+	if err := json.Unmarshal(vector("1500.5"), &good); err != nil {
+		t.Fatal(err)
+	}
+	if got := scalar(good); got == nil || *got != 1500.5 {
+		t.Fatalf("a well-formed vector did not read as its number: %v", got)
 	}
 }
