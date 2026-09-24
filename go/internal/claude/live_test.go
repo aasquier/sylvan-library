@@ -327,7 +327,7 @@ func TestLiveTheSlotArgumentMakesOnlyTheCaseAgainst(t *testing.T) {
 
 // withRealPool is the full Scryfall pool when this machine has one
 // (`data/mtg.duckdb` at the repo root, ~28 minutes of `mtglab data refresh`),
-// and the 21-card test pool otherwise.
+// and the fixture test pool otherwise.
 //
 // The searching modes' live cases want the real one, and the first dossier run
 // against the tiny pool showed why: the model is told to `get_cards` every
@@ -340,7 +340,7 @@ func withRealPool(t *testing.T, fn func(c *pool.Conn)) {
 	t.Helper()
 	real := filepath.Join("..", "..", "..", "data", "mtg.duckdb")
 	if _, err := os.Stat(real); err != nil {
-		t.Logf("no full pool at %s; using the 21-card test pool", real)
+		t.Logf("no full pool at %s; using the fixture test pool", real)
 		withPool(t, fn)
 		return
 	}

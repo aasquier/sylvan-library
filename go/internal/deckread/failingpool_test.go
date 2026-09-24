@@ -58,7 +58,7 @@ func schemalessPool(t *testing.T) *pool.Pool {
 	return p
 }
 
-// bentPool is the 21-card fixture with the given statements run over it: a
+// bentPool is the fixture with the given statements run over it: a
 // real pool that a refresh, a restore or an older binary left in some
 // particular state.
 func bentPool(t *testing.T, statements ...string) *pool.Pool {

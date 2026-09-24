@@ -61,7 +61,7 @@ func scratchDeployment(t *testing.T) deployment {
 	}}
 }
 
-// withPool copies the 21-card fixture pool to `<data>/mtg.duckdb`, which is
+// withPool copies the fixture pool to `<data>/mtg.duckdb`, which is
 // where [config.Config.DBPath] looks.
 func (d deployment) withPool(t *testing.T) deployment {
 	t.Helper()

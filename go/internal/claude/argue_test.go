@@ -17,7 +17,7 @@ import (
 // and becomes code: the first decides what counts as an argument, the second is
 // rule 2 made executable. Both are judged against `testdata/argue.json`, a
 // frozen golden recorded against the real
-// 21-card pool.
+// fixture pool.
 
 type argueCorpus struct {
 	Charges []struct {

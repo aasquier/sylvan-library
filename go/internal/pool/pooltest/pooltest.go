@@ -1,4 +1,4 @@
-// Package pooltest builds the 21-card tiny pool as a real DuckDB file, for
+// Package pooltest builds the tiny pool -- a couple of dozen real cards -- as a real DuckDB file, for
 // any test that wants a pool: the recorded rows in testdata/ --
 // every value read out of the real pool, never typed from memory --
 // loaded through the

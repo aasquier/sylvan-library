@@ -151,15 +151,21 @@ as meaningful to whoever finds it next.
   (`golang.org/x/sys` is already a dependency; platform-specific test code
   nobody has argued for yet) — the single biggest lever left in
   `cmd/mtglab`, at five statements.
-- **Fixture decisions, not patches**: `simShelfCommand`'s `Approximated`
-  tail wants a two-colour card in the 21-card pool; `coliseum.go`'s
-  `rec != nil` arms want `Grand Coliseum` and `Jareth, Leonine Titan` in it;
-  `simMulliganCommand`'s non-flat `BEST:` branch wants a deck the tiny pool
-  cannot express. A hand-added row named after a real card is a claim about
-  Magic nobody looked up (rule 1); adding those rows from the real pool is
-  the honest route.
-- **`gate/rulebreaker.go`** (6) is reachable but needs real ADR 51 clause
-  text off a real card — a session with the pool, not a worktree.
+- **Fixture rows come out of the real pool by machine.** Grand Coliseum,
+  Jareth, Leonine Titan and Lightning Helix went into `tiny_pool.json` on
+  2026-09-24 through a throwaway script over `data/mtg.duckdb`
+  (`tools/.venv/bin/python` has `duckdb`; select the fixture's own
+  `oracle_columns` from `oracle_cards`, a column the pool lacks as `NULL`,
+  and the printing `ORDER BY (digital OR promo), released_at,
+  collector_number LIMIT 1`). Growing the fixture moves any golden recorded
+  over it — `artifact-commander.suggestions.json` gained a candidate — and
+  re-recording that from the tool's own output, deliberately and said so,
+  is the honest answer; hand-editing it is not. `simMulliganCommand`'s
+  non-flat `BEST:` branch still wants a deck the fixture cannot express.
+- **Every printed Rulebreaker clause is a corpus now**
+  (`gate/rulebreakerprinted_test.go`, read out of the pool): eight parse,
+  four ("you may include … regardless of color identity") are named as
+  beyond the check. A card moving between those columns is news.
 - **`deckread/commander.go`**'s seven statements that need `GetCards` to
   succeed and a later `oracle_cards` query to fail: a pool that breaks
   mid-flight, which no fixture yet is.
@@ -339,7 +345,7 @@ and `ci.yml` gated on the other.
   of the *write* has to ask for `false`. This cost a debugging round in
   `internal/library/unwritable_test.go`.
 - **The editor will not scaffold a section that is not there.** Use `rich.yaml`.
-- **`rich.yaml`'s commander is not in the 21-card pool**, so identity resolves
+- **`rich.yaml`'s commander is not in the fixture pool**, so identity resolves
   to colourless.
 - **Fixtures may not assert card facts from memory** (rule 1). Where a test is
   about a mechanism rather than a card, use obviously synthetic names.
@@ -425,13 +431,11 @@ were found by the climb of 2026-09-24 and are queued for a ruling in
   the pool closes it; `TestAWriteWhoseCommitOrRollbackFailsDoesNotPoisonTheHandle`
   probes with a bare ROLLBACK that must be *refused*. `SetPassword` still
   returns a `revoked` count beside an error; the rows are the assertion.
-- **A recorder opens a database it has not checked.** `claude/ledger` and
-  `tier3/ledger`'s `NewRecorder` both `sql.Open` without a ping, so a
-  missing `app.db` is discovered at the first *write* — and the Claude one
-  warns rather than fails, so on an instance whose volume did not mount,
-  conversations happen, cost money and are not recorded.
-  `TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater` holds the one;
-  a sibling in `tier3/ledger` holds the other.
+- **A recorder opens a database it has not checked — half fixed.** The
+  Claude ledger's `NewRecorder` pings at the open now
+  (`TestARecorderOverAMissingDatabaseIsRefusedAtTheOpen`); `tier3/ledger`'s
+  stays lazy on purpose, because a read must never acquire a database, and
+  its test still holds that.
 - **Fixed the same day, kept here for the shape — three sentences a player
   read that were false.** A swap that traded one chosen colour for another
   was refused because `playableCard` read the deck *including* the outgoing
@@ -442,15 +446,14 @@ were found by the climb of 2026-09-24 and are queued for a ruling in
   slot sweep rendered "0 of 2" with nothing said when every call was refused
   (`argue` counts refusals and gives the same sentence the other steps give).
   Each had a test recording the old answer; each test now holds the new one.
-- **`data snapshot` over a pool with none of the pool's tables prints
-  `snapshotted 0 prices for today` and exits 0** — `SnapshotPrices` creates
-  what it needs rather than refusing. Not pinned; the cmd lane dropped the
-  test rather than assert it.
+- **`data snapshot` over a hollow pool — fixed.** `SnapshotPrices` refuses
+  a pool with no printings in `ErrNoPool`'s words
+  (`TestASnapshotOnAFreshMachineRefusesRatherThanReportingZero`).
 
 **`data snapshot` on a machine whose volume did not mount** creates an empty
 pool on the container's own disk and reports `snapshotted 0 prices for today`
 with a green exit.
-`TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero` holds it.
+`TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero` held it until 2026-09-24, when Aaron ruled the snapshot refuses instead (`TestASnapshotOnAFreshMachineRefusesRatherThanReportingZero`).
 
 **`sim cache` and `sim matches` on the same machine** report `rows: 0` and `no
 matches recorded yet`, green. The rule behind it is a good one — a read must

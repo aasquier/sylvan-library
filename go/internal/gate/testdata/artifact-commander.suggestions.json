@@ -24,7 +24,26 @@
    "card": "Forest",
    "code": "color-identity",
    "why": "Basic, untapped, and the only green source this list needs.",
-   "candidates": []
+   "candidates": [
+    {
+     "name": "Grand Coliseum",
+     "mana_cost": "",
+     "cmc": 0,
+     "type_line": "Land",
+     "oracle_text": "This land enters tapped.\n{T}: Add {C}.\n{T}: Add one mana of any color. This land deals 1 damage to you.",
+     "color_identity": [],
+     "image": "https://cards.scryfall.io/normal/front/b/0/b07eb189-559a-4cd5-95ac-f6612fd11cf1.jpg?1783904151",
+     "art_crop": "https://cards.scryfall.io/art_crop/front/b/0/b07eb189-559a-4cd5-95ac-f6612fd11cf1.jpg?1783904151",
+     "edhrec_rank": 4318,
+     "score": 0.5773,
+     "reasons": [
+      "same card type (Land)",
+      "same mana value (0)",
+      "text: add",
+      "EDHREC rank 4,318"
+     ]
+    }
+   ]
   }
  ]
 }

@@ -17,7 +17,7 @@ import (
 )
 
 // The differential cases again: each fixture deck's text beside its
-// recorded stats answer over the 21-card pool, which is exactly what
+// recorded stats answer over the fixture pool, which is exactly what
 // `GET /api/decks/{owner}/{slug}/stats` serves. DeckStats must encode to
 // the same document -- same keys, same order, same numbers.
 

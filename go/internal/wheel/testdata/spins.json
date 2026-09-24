@@ -312,7 +312,7 @@
    "deck": "bare",
    "identity": [],
    "seed": 7,
-   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":null,\"reason\":\"The pool holds no legal card in these colours that answers to this fate. The wheel has spoken; it just had nothing to hand you.\"}"
+   "rendered": "{\"symbol\":\"sword\",\"label\":\"The Sword\",\"meaning\":\"The sword falls edge-first — a card that removes or damages.\",\"seed\":7,\"answered_by\":\"dice\",\"caveat\":\"The wheel is blind dice over the card pool — a fate, then a random legal card in this deck's colours that answers to it. A suggestion to argue with, never a recommendation: the rationale, if it earns one, is yours to write.\",\"sword_face\":\"edge\",\"card\":{\"name\":\"Grand Coliseum\",\"mana_cost\":\"\",\"type_line\":\"Land\",\"oracle_text\":\"This land enters tapped.\\n{T}: Add {C}.\\n{T}: Add one mana of any color. This land deals 1 damage to you.\",\"color_identity\":null,\"image\":\"https://cards.scryfall.io/normal/front/b/0/b07eb189-559a-4cd5-95ac-f6612fd11cf1.jpg?1783904151\",\"art_crop\":\"https://cards.scryfall.io/art_crop/front/b/0/b07eb189-559a-4cd5-95ac-f6612fd11cf1.jpg?1783904151\"}}"
   }
  ]
 }

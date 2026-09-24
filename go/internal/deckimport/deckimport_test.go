@@ -15,7 +15,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/reference"
 )
 
-// The importer's oracle: a paste, resolved against the 21-card pool, beside
+// The importer's oracle: a paste, resolved against the fixture pool, beside
 // the recorded draft `deck.yaml` for it (testdata/imports.json, a frozen
 // golden).
 //
@@ -141,7 +141,7 @@ func checkLines(t *testing.T, what string, got []decklist.Line, want []line) {
 	}
 }
 
-// The companion hint has no card in the 21-card pool to fire on, so it gets a
+// The companion hint has no card in the fixture pool to fire on, so it gets a
 // record of its own. It is a *hint* and never a decision: having a Companion
 // ability is a pool fact, and concluding that this deck runs the card as its
 // companion is a judgement the import does not make.
