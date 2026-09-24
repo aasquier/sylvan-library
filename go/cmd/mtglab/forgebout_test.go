@@ -34,15 +34,22 @@ import (
 // a script proves that this file's printing says what it means to say.
 
 // forgeMachine is a machine with a distribution, a profile of its own, and a
-// `java` that runs `body`. Everything the runner resolves before it spawns
+// `java` that says `body`. Everything the runner resolves before it spawns
 // anything is real: the cardsfolder is a zip, the jar is a file with a version
 // in its name, and the deck files are written where Forge would read them.
 func forgeMachine(t *testing.T, body string) tier3.Settings {
 	t.Helper()
+	home := fakeForgeHome(t, "1.6.50", "Sol Ring", "Forest")
+	// The scripted half lives in this machine's own Forge home, which is the
+	// working directory the runner gives the subprocess -- see `testdata/
+	// fakejava` for why the executable is shared and only the data is not.
+	if err := os.WriteFile(filepath.Join(home, "fakeforge.sh"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	return tier3.Settings{
-		Home:    fakeForgeHome(t, "1.6.50", "Sol Ring", "Forest"),
+		Home:    home,
 		Profile: filepath.Join(t.TempDir(), "profile"),
-		Java:    fakeJavaBinary(t, body),
+		Java:    fakeJavaBinary(t),
 	}
 }
 
@@ -86,25 +93,34 @@ func fakeForgeHome(t *testing.T, version string, cards ...string) string {
 	return home
 }
 
-// fakeJavaBinary is a stand-in for the JVM: it answers the version probe the
-// runner insists on, and then says whatever the test scripted.
+// fakeJavaBinary is the committed stand-in for the JVM, named absolutely so a
+// subprocess whose working directory is somebody's Forge home can still find
+// it.
 //
-// The version probe is not optional scaffolding — a binary that will not
-// answer `-version` is not a candidate at all, which is the rule that keeps
-// this machine's Java 10 from failing Forge in a way that reads like a Forge
-// bug.
-func fakeJavaBinary(t *testing.T, body string) string {
+// **It answers the version probe, and that is not optional scaffolding** — a
+// binary that will not answer `-version` is not a candidate at all, which is
+// the rule that keeps this machine's Java 10 from failing Forge in a way that
+// reads like a Forge bug. `testdata/fakejava` carries the rest of the
+// argument, including why it is one committed file rather than one written
+// per test.
+func fakeJavaBinary(t *testing.T) string {
 	t.Helper()
-	java := filepath.Join(t.TempDir(), "java")
-	script := "#!/bin/sh\n" +
-		"if [ \"$1\" = \"-version\" ]; then\n" +
-		"  echo 'openjdk version \"21.0.1\" 2023-10-17' 1>&2\n" +
-		"  exit 0\n" +
-		"fi\n" + body
-	if err := os.WriteFile(java, []byte(script), 0o700); err != nil { //nolint:gosec // a test's own temp dir, and it has to be executable
+	path, err := filepath.Abs(filepath.Join("testdata", "fakejava"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	return java
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A fixture that lost its executable bit between here and a checkout
+	// would **time the probe out** rather than fail it -- thirty seconds at a
+	// time, and reported as "Java None", which reads like a broken JVM.
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("%s is not executable (%v); no JVM search will consider it",
+			path, info.Mode())
+	}
+	return path
 }
 
 // forgeDeck is one legal deck file, every card of it covered by

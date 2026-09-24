@@ -41,7 +41,7 @@ func TestTheProfilerServesTheLaptopOnly(t *testing.T) {
 	t.Run("auth off mounts it in front of the door", func(t *testing.T) {
 		t.Parallel()
 		d := scratchDeployment(t) // auth off: the laptop shape
-		_, base, done := bootServer(t, d)
+		base, done := bootServer(t, d)
 		resp, err := waitForHealth(t, base+"/api/health", done)
 		if err != nil {
 			t.Fatalf("the server never answered: %v", err)
@@ -75,7 +75,7 @@ func TestTheProfilerServesTheLaptopOnly(t *testing.T) {
 		t.Parallel()
 		d := scratchDeployment(t)
 		d.RequireAuth = true
-		_, base, done := bootServer(t, d)
+		base, done := bootServer(t, d)
 		resp, err := waitForHealth(t, base+"/api/health", done)
 		if err != nil {
 			t.Fatalf("the server never answered: %v", err)

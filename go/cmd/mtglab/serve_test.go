@@ -210,10 +210,10 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 // **`t.Cleanup` rather than a `defer` the caller writes**, because a parent's
 // defer runs before its parallel subtests finish and both callers here are
 // parallel subtests.
-func bootServer(t *testing.T, d deployment) (port, base string, done chan error) {
+func bootServer(t *testing.T, d deployment) (base string, done chan error) {
 	t.Helper()
 	stop := make(chan os.Signal, 1)
-	port, base, done = bootServerUntil(t, d, stop)
+	_, base, done = bootServerUntil(t, d, stop)
 	t.Cleanup(func() {
 		select {
 		case stop <- syscall.SIGTERM:
@@ -225,7 +225,7 @@ func bootServer(t *testing.T, d deployment) (port, base string, done chan error)
 			t.Error("the server never stopped at teardown")
 		}
 	})
-	return port, base, done
+	return base, done
 }
 
 // bootServerUntil starts the boot on a listener this test is **already
