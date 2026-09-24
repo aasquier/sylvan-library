@@ -198,7 +198,7 @@ now noise.
 ## Testing
 
 **Every test calls `t.Parallel()`, and something checks.** As of 2026-09-24
-that is every one of the TOTAL_TESTS top-level tests under `go/` — zero
+that is every one of the 2,488 top-level tests under `go/` — zero
 serial — and `go/cmd/mtglab/serialregister_test.go` fails by name on any
 test whose own body does not call `t.Parallel()` as a statement (a call
 inside a `t.Run` closure does not count for the parent; `TestMain` and

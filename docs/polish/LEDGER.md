@@ -41,7 +41,7 @@ wave two ran; the integrator's own PR closed it. All numbers below are the
 integrator's re-measurement on `main` after the last merge, not a lane's
 claim.
 
-- **Coverage: 91.2% → MEASURED_TOTAL% (`-func`), 1,892 → MISSING_NOW missing
+- **Coverage: 91.2% → 96.6% (`-func`), 1,892 → 742 missing
   statements, floor 90.8 → 95.0.** #488 pool (−101), #489 tier3 (≥ −92),
   #490 deck-libs (−134), #491 claude (−106), #492 api-decks (−183), #493
   api-ops (−116), #494 kernels (−142), #495 auth-door-night (−138), #496 cmd

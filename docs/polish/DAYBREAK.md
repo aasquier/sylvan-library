@@ -90,7 +90,7 @@ read-only account store until restart. · **Recommendation:** on a failed
 rollback or commit, mark the connection bad through `Conn.Raw` (the driver
 supports it) so the pool discards it; return zero beside an error. A
 behaviour change in `internal/auth/writes.go`, one function. Held by
-`clearStaleTransaction` in `halfwritten_test.go`.
+`clearStaleTransaction` in `halfwritten_test.go`. Ledger: White, 2026-09-24.
 
 **Blue: both ledgers' `NewRecorder` open `app.db` without a ping**, so a
 missing file is found at the first write, and the Claude one warns rather
@@ -99,7 +99,8 @@ cost money and are not recorded. · *Cost:* the usage ledger reads empty for a
 night nobody noticed. · **Recommendation:** `auth.PingWritable` at open for
 the Claude recorder (a conversation that cannot be recorded should not
 start); keep the tier3 one lazy, since a read must never acquire a database.
-Held by `TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater`.
+Held by `TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater`. Ledger:
+White, 2026-09-24.
 
 **Green: three sentences a player reads are pinned as wrong.** (1) A swap
 that trades one chosen colour for another is refused because `playableCard`
@@ -112,20 +113,20 @@ nothing said when every call was refused rather than unavailable
 · **Recommendation:** yes to all three — check the swap against the deck
 after the removal; surface the unreadable shelf as a fault; count refusals on
 the sweep line. Each is a few lines and each moves recorded copy, which is
-why no lane took them.
+why no lane took them. Ledger: White, 2026-09-24.
 
 **Blue: `mtglab data snapshot` over a pool with none of the pool's tables
 prints `snapshotted 0 prices for today` and exits 0** — `SnapshotPrices`
 creates what it needs rather than refusing. · *Cost:* the same "did it lie"
 shape the climb closed elsewhere, on the one command a cron runs. ·
 **Recommendation:** refuse when `printings` is absent, in the same words
-`data refresh` uses for a pool it cannot read.
+`data refresh` uses for a pool it cannot read. Ledger: White, 2026-09-24.
 
 **Blue: two things with no caller.** `tier3.Defaults()` — `LoadSettingsFrom`
 uses `DefaultsFrom` now — kept only as the footing `Settings`' doc comment
 points at; and `strictB64Decode`'s all-padding guard (`claude/scan.go`),
 which every string that could reach it is refused before. · *Cost:* nothing
-today; dead API reads as live. · **Recommendation:** delete both.
+today; dead API reads as live. · **Recommendation:** delete both. Ledger: White, 2026-09-24.
 
 **Green: three fixture rows from the real pool.** `coliseum.go`'s arena
 backdrop and champions (`Grand Coliseum`, `Jareth, Leonine Titan` and
@@ -135,7 +136,7 @@ a real card in the 21-card `tiny_pool.json`. · *Cost:* ~15 statements and,
 more to the point, the Coliseum's own room is the one route whose art
 resolution nothing drives. · **Recommendation:** a session with the pool
 copies the rows from it (`cards show`, never from memory) and re-checks the
-tests that count what is in there.
+tests that count what is in there. Ledger: White, 2026-09-24.
 
 **Blue: two `yamlemit` tests call a writer directly rather than through a
 spelling** — `writePlain`'s break handling and `roundTrips`' error answer —
@@ -143,6 +144,7 @@ because the style's analysis never offers plain to a multi-line scalar and
 `Render` folds only strings. Both say so where they stand. · *Cost:* if that
 reads as calling past a guard, seven statements. · **Recommendation:** keep
 them; they are units the package comment names as carrying the style.
+Ledger: White, 2026-09-24.
 
 **Green: `Deck.LandCount()` counts by category alone, so a modal DFC filed as
 a spell is missing from the land count *and* from the opening-hand

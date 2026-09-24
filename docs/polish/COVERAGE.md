@@ -63,8 +63,8 @@ lever and a grind is visible before the work starts.
 | PR #290 | 90.1% | 89.81% |
 | #290's follow-up | 90.4% | 90.40% |
 | #478's pass | 90.8% | 90.82% |
-| the climb of 2026-09-24 (nine lanes, #488–#496) | **MEASURED_TOTAL%** | MERGED_TOTAL% |
-| floor in `ci.yml` | **95.0** (set at a measured MEASURED_TOTAL, 2026-09-24) | |
+| the climb of 2026-09-24 (nine lanes, #488–#496) | **96.6%** | 96.56% |
+| floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
 
 The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
 that pair: a diff can cost a few tenths of honest refactoring without going
@@ -74,7 +74,7 @@ red, and a diff that costs a whole point is what the floor exists to notice.
 handed the baseline's BY FUNCTION table for its files and a share of the
 distance, run in two waves of four or five on this Mac with a dedicated
 merge train landing them one at a time. The tree went from 1,892 missing
-statements to MISSING_NOW in one day, and **not one test asserts less than it
+statements to 742 in one day, and **not one test asserts less than it
 should** — every lane was told a test that runs lines and checks nothing was
 out of scope, and the levers below are what they found instead. The same
 day every serial test in the tree became parallel; the two jobs turned out
