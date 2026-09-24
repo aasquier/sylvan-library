@@ -59,21 +59,14 @@ func TestABuildThatCannotWriteItsArtifactsSaysSoRatherThanListingThem(t *testing
 
 // An artifacts directory that is there and cannot be read.
 //
-// **This records a behaviour rather than approving of it, and the two routes
-// answer differently.** A build refuses, which is right. The shelf answers
+// Both routes refuse it now. The build always did. The shelf used to answer
 // 200 with an empty list and `baseline: "unknown"` -- the same words a deck
 // that has genuinely never been built gets -- because `FileSource.Artifacts`
-// skips a file it cannot `Stat` and `ReadBaseline` reads an unreadable
-// snapshot as an absent one (`internal/library/source.go`, both with comments
-// saying the absence is ordinary, which it is; the permission error is the
-// case those comments do not separate).
-//
-// It is this repo's most-repeated bug shape -- a fallback that reads as a
-// fact -- and it is deliberately not fixed here: the swallow is one layer
-// down, in a function whose ordinary case really is "not there", and telling
-// the two apart is a decision about that tier rather than a patch to this
-// route. Written down so the next reader finds it as a known answer rather
-// than as a surprise, and so it fails the day somebody separates them.
+// skipped a file it could not `Stat` and `ReadBaseline` read an unreadable
+// snapshot as an absent one. This test recorded that as this repo's
+// most-repeated bug shape, a fallback that reads as a fact, and Aaron ruled
+// on 2026-09-24 that the two answers be separated: absent is ordinary and
+// stays `unknown`; anything else is a fault the shelf says out loud.
 func TestAnUnreadableArtifactsDirectoryIsAFaultRatherThanAnUnbuiltDeck(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -95,8 +88,8 @@ func TestAnUnreadableArtifactsDirectoryIsAFaultRatherThanAnUnbuiltDeck(t *testin
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks,
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: db})
 
-	// The build refuses, which is the answer that matters: nothing claims to
-	// have written a shelf it could not write.
+	// The build refuses: nothing claims to have written a shelf it could not
+	// write.
 	status, payload, raw := callAs(t, a, alice, "POST",
 		"/api/decks/alice/kaheera/artifacts", `{}`)
 	if status == http.StatusOK {
@@ -106,26 +99,29 @@ func TestAnUnreadableArtifactsDirectoryIsAFaultRatherThanAnUnbuiltDeck(t *testin
 		t.Errorf("the build answered %d with nothing to read: %s", status, raw)
 	}
 
-	// The shelf does not, and this is the recorded answer.
+	// The shelf refuses too, with a sentence, rather than reading an
+	// unreadable directory as an empty one.
 	status, payload, raw = callAs(t, a, alice, "GET",
 		"/api/decks/alice/kaheera/artifacts", "")
-	if status != http.StatusOK {
-		t.Fatalf("the shelf now refuses an unreadable artifacts directory (%d) "+
-			"-- that is the better answer, and this test recorded the older "+
-			"one: %s", status, raw)
-	}
-	held, _ := payload["artifacts"].([]any)
-	if len(held) != 0 || payload["baseline"] != "unknown" {
-		t.Fatalf("the shelf now reads an unreadable directory as %v / %v -- "+
-			"the recorded answer was an empty list and `unknown`: %s",
+	if status == http.StatusOK {
+		t.Fatalf("the shelf answered 200 over an artifacts directory it could not "+
+			"read -- %v / %v -- which is the same sentence a never-built deck gets: %s",
 			payload["artifacts"], payload["baseline"], raw)
 	}
-	// The one thing that keeps this from being a lie people act on: the deck
-	// page can still tell that a build is possible, so the way out is one
-	// click rather than a shell.
-	if payload["buildable"] != true {
-		t.Errorf("an unreadable shelf reports the deck as unbuildable, which "+
-			"leaves no way out of it: %s", raw)
+	if !saysSomething(payload) {
+		t.Errorf("the shelf answered %d with nothing to read: %s", status, raw)
+	}
+
+	// And a deck with no shelf at all is still the ordinary case: an empty
+	// list and `unknown`, at 200, because absent is not a fault.
+	status, payload, raw = callAs(t, a, alice, "GET",
+		"/api/decks/alice/mono-green/artifacts", "")
+	if status != http.StatusOK {
+		t.Fatalf("a never-built deck's shelf answered %d: %s", status, raw)
+	}
+	if held, _ := payload["artifacts"].([]any); len(held) != 0 || payload["baseline"] != "unknown" {
+		t.Fatalf("a never-built deck no longer reads as unbuilt: %v / %v",
+			payload["artifacts"], payload["baseline"])
 	}
 }
 

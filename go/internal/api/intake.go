@@ -565,7 +565,8 @@ func (run *intakeRun) argue(ctx context.Context) wire.OrderedMap {
 	if len(names) == 0 {
 		return intakeStep(0, 0, "There was nothing outside the mana base to argue about.")
 	}
-	made := 0
+	made, refused := 0, 0
+	var lastRefusal error
 	for _, name := range names {
 		err := run.api.withPool(ctx, func(c *pool.Conn) error {
 			req := run.req
@@ -582,11 +583,30 @@ func (run *intakeRun) argue(ctx context.Context) wire.OrderedMap {
 			return intakeStep(made, len(names),
 				"The sweep stopped part way through and the rest was not attempted.")
 		}
-		if err == nil {
-			made++
+		if err != nil {
+			// Counted, not dropped. A refused call used to be a call not
+			// made, so a run where every slot was refused rendered "0 of 2"
+			// with nothing beside it -- the silent zero the other four steps
+			// each carry a sentence to avoid, and the one a person reads as
+			// "Claude had no opinion about my deck".
+			refused++
+			lastRefusal = err
+			continue
 		}
+		made++
 	}
-	return intakeStep(made, len(names), "")
+	switch {
+	case refused == 0:
+		return intakeStep(made, len(names), "")
+	case made == 0:
+		// Every call was refused, so the sentence is the one the other
+		// steps give for the same refusal -- the diagnosis goes to the log
+		// and what reaches the page names no machinery (commandment 10).
+		return intakeStep(0, len(names), claude.Explain(lastRefusal, run.req.Endpoint.ModelFor("")))
+	default:
+		return intakeStep(made, len(names),
+			fmt.Sprintf("%d of the %d slots could not be argued and were skipped.", refused, len(names)))
+	}
 }
 
 // intakeStep is one action's outcome: what it changed, out of what it looked
