@@ -46,14 +46,32 @@ type Shelves struct {
 	Client  *http.Client
 	Log     *slog.Logger
 
+	// conf is this shelf's copy of the committed table, taken once at
+	// construction rather than read out of `reference` on every ask. It is a
+	// value for the same reason a deployment is (ADR 39): the pins, the cap
+	// and the code's shape are configuration, and the only honest way to
+	// drive the refusals they guard -- an asset over the cap, an asset whose
+	// bytes *match* their pin -- is to hand a test its own table. Reaching
+	// into the shared one instead is a package-level write, which is exactly
+	// what a parallel suite cannot have.
+	conf       reference.RuntimeShelves
+	symbolCode *regexp.Regexp
+
 	mu      sync.Mutex
 	missing map[string]bool // symbol codes Scryfall answered 404 for
 	refused map[string]bool // ocr assets whose bytes did not match their pin
 }
 
-// New is the shelves under dataDir. The client is the network, and a test
-// hands over one pointed at its own server.
+// New is the shelves under dataDir, configured from the committed table. The
+// client is the network, and a test hands over one pointed at its own server.
 func New(dataDir string, client *http.Client, log *slog.Logger) *Shelves {
+	return NewWith(*reference.Runtime(), dataDir, client, log)
+}
+
+// NewWith is New with the shelf configuration handed in. The served app calls
+// New; this is for a test that has to describe a shelf the committed table
+// does not -- a smaller cap, a pin it knows the bytes for.
+func NewWith(conf reference.RuntimeShelves, dataDir string, client *http.Client, log *slog.Logger) *Shelves {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -61,12 +79,11 @@ func New(dataDir string, client *http.Client, log *slog.Logger) *Shelves {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	return &Shelves{DataDir: dataDir, Client: client, Log: log,
+		conf: conf, symbolCode: regexp.MustCompile("^" + conf.Symbols.Code + "$"),
 		missing: map[string]bool{}, refused: map[string]bool{}}
 }
 
 // ---- the mana symbols ---------------------------------------------------
-
-var symbolCode = regexp.MustCompile("^" + reference.Runtime().Symbols.Code + "$")
 
 // SymbolsDir is `symbols.cache_dir`.
 func (s *Shelves) SymbolsDir() string { return filepath.Join(s.DataDir, "cache", "symbols") }
@@ -76,7 +93,7 @@ func (s *Shelves) SymbolsDir() string { return filepath.Join(s.DataDir, "cache",
 // code Scryfall has never heard of, or a cold cache with no network -- the
 // caller answers 404 and the client falls back to its drawn glyphs.
 func (s *Shelves) Symbol(ctx context.Context, code string) string {
-	if !symbolCode.MatchString(code) {
+	if !s.symbolCode.MatchString(code) {
 		return ""
 	}
 	target := filepath.Join(s.SymbolsDir(), code+".svg")
@@ -89,7 +106,7 @@ func (s *Shelves) Symbol(ctx context.Context, code string) string {
 	if known {
 		return ""
 	}
-	cfg := reference.Runtime().Symbols
+	cfg := s.conf.Symbols
 	body, status, err := s.download(ctx, cfg.CDN+"/"+code+".svg", cfg.MaxBytes, 10*time.Second)
 	if err != nil {
 		// Network trouble is transient and must not be remembered as absence.
@@ -128,13 +145,13 @@ func (s *Shelves) Symbol(ctx context.Context, code string) string {
 // OCRDir is `ocr.cache_dir`: versioned, so bumping a pin cannot serve
 // yesterday's bytes off a volume nobody thought to clear.
 func (s *Shelves) OCRDir() string {
-	return filepath.Join(s.DataDir, "cache", "ocr", reference.Runtime().OCR.CacheStamp)
+	return filepath.Join(s.DataDir, "cache", "ocr", s.conf.OCR.CacheStamp)
 }
 
 // OCRAsset is `ocr.ASSETS[name]`, or false: the name must be a key of the
 // table, which is the whole path-traversal story.
-func OCRAsset(name string) (reference.OCRAsset, bool) {
-	a, ok := reference.Runtime().OCR.Assets[name]
+func (s *Shelves) OCRAsset(name string) (reference.OCRAsset, bool) {
+	a, ok := s.conf.OCR.Assets[name]
 	return a, ok
 }
 
@@ -142,7 +159,7 @@ func OCRAsset(name string) (reference.OCRAsset, bool) {
 // the first ask and **refusing, loudly and stickily, bytes that do not
 // match their pinned digest**. "" means not available here today.
 func (s *Shelves) OCR(ctx context.Context, name string) string {
-	asset, ok := OCRAsset(name)
+	asset, ok := s.OCRAsset(name)
 	if !ok {
 		return ""
 	}
@@ -156,7 +173,7 @@ func (s *Shelves) OCR(ctx context.Context, name string) string {
 	if refused {
 		return ""
 	}
-	cfg := reference.Runtime().OCR
+	cfg := s.conf.OCR
 	body, status, err := s.download(ctx, asset.URL, cfg.MaxBytes, 30*time.Second)
 	if err != nil {
 		s.Log.Warn("ocr asset: download failed", "name", name, "error", err)

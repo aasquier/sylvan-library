@@ -191,10 +191,17 @@ type Segment struct {
 //
 // Derived from Table rather than written down beside it, because a second
 // list of the same dates is a second thing to forget when a rate moves.
-func Boundaries() []string {
+func Boundaries() []string { return boundariesIn(Table) }
+
+// boundariesIn is [Boundaries] over a table handed in rather than the
+// committed one. The table is configuration and a test needs its own: the
+// only way to drive the refusal below is a `Until` that is not a date, and
+// the committed table's are all dates -- which is the point of the committed
+// table and not a reason to edit it under the rest of the suite.
+func boundariesIn(table map[string]Priced) []string {
 	seen := map[string]bool{}
 	out := []string{}
-	for _, priced := range Table {
+	for _, priced := range table {
 		if priced.Until == "" || priced.Then == nil {
 			continue
 		}

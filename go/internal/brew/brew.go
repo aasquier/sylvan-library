@@ -117,22 +117,35 @@ var (
 )
 
 func init() {
+	Catalogue, Order, ByCategory, ByKey = loadCauldron(cauldronJSON)
+}
+
+// loadCauldron reads the embedded cauldron and files it, refusing four ways a
+// damaged file could otherwise reach a person mid-conversation.
+//
+// It takes the bytes rather than reading the embed itself so the refusals can
+// be driven: every one of them is a build that must not ship, none is
+// reachable by anything a visitor does, and a panic nobody has ever seen fire
+// is a promise rather than a guard. `cauldronload_test.go` hands it the four
+// documents the committed file is not allowed to become.
+func loadCauldron(raw []byte) (catalogue []Ingredient, order []Position,
+	byCategory map[string][]Ingredient, byKey map[string]Ingredient) {
 	var doc struct {
 		Order       []Position   `json:"order"`
 		Ingredients []Ingredient `json:"ingredients"`
 	}
-	if err := json.Unmarshal(cauldronJSON, &doc); err != nil {
+	if err := json.Unmarshal(raw, &doc); err != nil {
 		panic(fmt.Sprintf("brew: the embedded cauldron is unreadable: %v", err))
 	}
-	Catalogue, Order = doc.Ingredients, doc.Order
-	ByCategory = make(map[string][]Ingredient, len(Order))
-	ByKey = make(map[string]Ingredient, len(Catalogue))
-	for _, in := range Catalogue {
-		if _, dup := ByKey[in.Key]; dup {
+	catalogue, order = doc.Ingredients, doc.Order
+	byCategory = make(map[string][]Ingredient, len(order))
+	byKey = make(map[string]Ingredient, len(catalogue))
+	for _, in := range catalogue {
+		if _, dup := byKey[in.Key]; dup {
 			panic(fmt.Sprintf("brew: cauldron.json names %q twice", in.Key))
 		}
-		ByKey[in.Key] = in
-		ByCategory[in.Category] = append(ByCategory[in.Category], in)
+		byKey[in.Key] = in
+		byCategory[in.Category] = append(byCategory[in.Category], in)
 	}
 	// The checks below are at boot rather than in a test for one reason: the
 	// pick calls RandBelow with a category's length, and RandBelow panics on
@@ -140,15 +153,15 @@ func init() {
 	// panic on somebody's request, four screens into a conversation. Caught
 	// here it is a panic at start -- a build that must not ship, which is
 	// what a damaged embed is.
-	for _, place := range Order {
-		if len(ByCategory[place.Slot]) == 0 {
+	for _, place := range order {
+		if len(byCategory[place.Slot]) == 0 {
 			panic(fmt.Sprintf("brew: nothing in the catalogue is filed under %q, "+
 				"so the pot could never be filled", place.Slot))
 		}
 	}
-	for _, in := range Catalogue {
+	for _, in := range catalogue {
 		var placed bool
-		for _, place := range Order {
+		for _, place := range order {
 			placed = placed || place.Slot == in.Category
 		}
 		if !placed {
@@ -156,6 +169,7 @@ func init() {
 				"in the pot", in.Key, in.Category))
 		}
 	}
+	return catalogue, order, byCategory, byKey
 }
 
 // Chosen is an ingredient and where in the pot it goes.
