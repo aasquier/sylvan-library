@@ -76,6 +76,18 @@ claim.
   sentences a player reads pinned as wrong, `data snapshot`'s zero over a
   hollow pool, two callers-of-nothing, three fixture rows, and whether two
   `yamlemit` unit tests call past a guard.
+- **Answered the same evening — the poisoned connection.** *Aaron: fix it
+  now.* Both transaction shapes in `internal/auth/writes.go` pin a
+  connection, and a COMMIT or ROLLBACK that failed left the driver's
+  transaction open on it while `database/sql` pooled it anyway; with one
+  connection in the pool that was the whole handle. `discard` marks the
+  connection bad through `Conn.Raw` (`driver.ErrBadConn`), so the pool
+  closes it and SQLite rolls back what it held; the next caller gets a
+  fresh one. `inTx` moved onto a pinned connection for the same reason.
+  Held by `TestAWriteWhoseCommitOrRollbackFailsDoesNotPoisonTheHandle`,
+  whose probe is a bare ROLLBACK on the pool that must be refused; it fails
+  on the old code on all four cases. The hand-rollback helper the finding
+  had needed is gone.
 
 ### 2026-09-19 (cleanup)
 

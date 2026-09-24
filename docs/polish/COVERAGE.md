@@ -417,15 +417,14 @@ The first two are the same rule producing the same operational risk; the rest
 were found by the climb of 2026-09-24 and are queued for a ruling in
 `DAYBREAK.md`. Changing any of them is Aaron's call, not a patch.
 
-- **`auth.exclusive` can hand a poisoned connection back to the pool.** It
-  opens with a hand-written `BEGIN IMMEDIATE` on a pinned connection; when
-  the ROLLBACK or the COMMIT also fails it returns that connection with the
-  transaction still open, and the next `BEGIN IMMEDIATE` on it is refused —
-  a handle that keeps answering reads while writing nothing.
-  `clearStaleTransaction` in `internal/auth/halfwritten_test.go` carries the
-  paragraph. Beside it: `SetPassword` assigns `revoked` inside the
-  transaction, so a COMMIT that never lands returns a count about work that
-  was rolled back.
+- **Fixed the same day, kept here for the shape**: `auth.exclusive` and
+  `inTx` used to return their pinned connection to the pool after a failed
+  COMMIT or ROLLBACK with the driver's transaction still open — a handle
+  that answered reads and wrote nothing until restart. `discard` in
+  `internal/auth/writes.go` marks the connection bad through `Conn.Raw` so
+  the pool closes it; `TestAWriteWhoseCommitOrRollbackFailsDoesNotPoisonTheHandle`
+  probes with a bare ROLLBACK that must be *refused*. `SetPassword` still
+  returns a `revoked` count beside an error; the rows are the assertion.
 - **A recorder opens a database it has not checked.** `claude/ledger` and
   `tier3/ledger`'s `NewRecorder` both `sql.Open` without a ping, so a
   missing `app.db` is discovered at the first *write* — and the Claude one

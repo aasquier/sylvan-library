@@ -72,25 +72,11 @@ Cleanup (09-12, 09-19) for the same stated reason.
 
 ## Open — a ruling, one word each
 
-> **2026-09-24, evening: the coverage climb queued nine rulings.** Nine lanes
+> **2026-09-24, evening: the coverage climb queued nine rulings** (eight open — the poisoned-connection one was fixed the same evening on Aaron's word; ledger, White). Nine lanes
 > took the Go tree from 91.2% to over 96 and every serial test to parallel in
 > one day (#488–#496 and the floor PR after them; `COVERAGE.md` is the map).
 > Each lane was told to pin what it found rather than fix it, and the items
 > below are what they pinned. None blocks anything; all are one word.
-
-**Blue: `auth.exclusive` can hand a poisoned connection back to the pool.**
-It opens with a hand-written `BEGIN IMMEDIATE` on a pinned connection; when
-the ROLLBACK or the COMMIT *also* fails it returns that connection with the
-transaction still open, so every later statement on it runs inside a
-transaction nobody will commit and the next `BEGIN IMMEDIATE` is refused — on
-a live instance, a handle that keeps answering reads while writing nothing.
-`SetPassword` beside it returns a `revoked` count about work that was rolled
-back. · *Cost of leaving it:* a volume hiccup mid-write becomes a silently
-read-only account store until restart. · **Recommendation:** on a failed
-rollback or commit, mark the connection bad through `Conn.Raw` (the driver
-supports it) so the pool discards it; return zero beside an error. A
-behaviour change in `internal/auth/writes.go`, one function. Held by
-`clearStaleTransaction` in `halfwritten_test.go`. Ledger: White, 2026-09-24.
 
 **Blue: both ledgers' `NewRecorder` open `app.db` without a ping**, so a
 missing file is found at the first write, and the Claude one warns rather
