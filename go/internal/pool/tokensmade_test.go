@@ -164,6 +164,42 @@ func TestAColumnWithNothingInItIsNotAnAnswer(t *testing.T) {
 	}
 }
 
+// **A token printing this pool has never heard of is still given a picture.**
+// Scryfall prints online-only tokens the library filters out, and a pool a
+// fortnight behind simply does not have the newest set yet -- so the printing
+// a card names may be missing while the token itself is one everybody knows.
+// Grouping falls back to the name there, and so does the painting: the same
+// compromise `TokenArtFor` makes, for the same reason. A Food is a Food.
+func TestATokenPrintingThisPoolLacksIsStillGivenTheNamesPainting(t *testing.T) {
+	t.Parallel()
+	path := pooltest.Build(t)
+	// An invented card naming a printing id that is in no pool anywhere.
+	alter(t, path, `INSERT INTO oracle_cards
+	  (oracle_id, name, all_parts, legalities, layout)
+	  VALUES ('fixture-picnic', 'Fixture Picnic',
+	    '[{"id":"a-printing-this-pool-has-never-seen","component":"token",
+	       "name":"Food","type_line":"Token Artifact — Food"}]'::JSON,
+	    '{"commander": "legal"}'::JSON, 'normal')`)
+
+	sheet := sheetFor(t, path, "Fixture Picnic")
+	if len(sheet.Tokens) != 1 {
+		t.Fatalf("got %+v, want the one Food", sheet.Tokens)
+	}
+	food := sheet.Tokens[0]
+	if food.Name != "Food" {
+		t.Fatalf("the token is %q", food.Name)
+	}
+	if food.Art == nil {
+		t.Fatal("a token whose printing is missing came back with no painting " +
+			"at all, and this pool has four Foods in it")
+	}
+	if food.Art.Set != "TELD" {
+		t.Errorf("the Food was painted for %q, want TELD -- the earliest "+
+			"printing of the name, which is the same ruling the identity path "+
+			"makes", food.Art.Set)
+	}
+}
+
 func alter(t *testing.T, path, statement string) {
 	t.Helper()
 	db, err := pooltest.Writer(path)
