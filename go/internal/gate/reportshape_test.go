@@ -19,7 +19,7 @@ import (
 // the classic place for an off-by-one that nobody notices, because the list
 // still looks about right. This file counts.
 //
-// The other half is the refusals nothing in the 21-card pool can produce: a
+// The other half is the refusals nothing in the fixture pool can produce: a
 // stage that is not a stage, a legacy archetype that is not a class, three
 // commanders, and the one companion that changes how big the deck must be.
 // All four are things a hand-written file can say and the app never writes,

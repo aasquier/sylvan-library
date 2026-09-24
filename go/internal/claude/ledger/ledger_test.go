@@ -466,38 +466,25 @@ func TestTheRollUpAgreesWithTheCorpus(t *testing.T) {
 	}
 }
 
-// **Recorded rather than fixed.** The ledger opens `rw` and never `rwc`, and
-// the package comment says a missing app.db "must say so here rather than at
-// the first roll-up somebody reads". It does not: `sql.Open` only records the
-// DSN, so [NewRecorder] answers a recorder for a path that is not there and
-// the absence is discovered by the first read -- while `Record` itself warns
-// rather than failing, because the ledger never fails the feature.
+// A recorder over a database that is not there is refused at the open.
 //
-// The consequence is narrow and worth knowing: on an instance whose volume
-// did not mount, conversations happen, cost money, and are not recorded, and
-// nothing says so except a line in the log. `internal/auth` has
-// `PingWritable` for exactly this and calling it here would close the gap --
-// but it would also turn an unmounted volume from "no usage recorded" into a
-// failure at the moment a recorder is built, which is the same trade
-// `TestAReaderOnAnUnmountableVolumeReportsEmptinessRatherThanAFault` already
-// settles the other way on the reading side. That is Aaron's call rather than
-// a patch, so this describes what happens instead of approving of it.
-func TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater(t *testing.T) {
+// It used to open: `sql.Open` only records the DSN, so the absence was
+// discovered by the first read -- while `Record` itself warned rather than
+// failing, because the ledger never fails the feature. On an instance whose
+// volume did not mount, conversations happened, cost money and were not
+// recorded, and nothing said so except a line in the log. Aaron ruled on
+// 2026-09-24 that a conversation which cannot be recorded should not start:
+// `NewRecorder` pings the file the way `internal/auth` does, and refuses.
+func TestARecorderOverAMissingDatabaseIsRefusedAtTheOpen(t *testing.T) {
 	t.Parallel()
 	r, err := NewRecorder(filepath.Join(t.TempDir(), "never", "app.db"), nil)
-	if err != nil {
-		t.Fatalf("the open reported the missing file, which this test says it "+
-			"does not -- if that has become the behaviour, this test is the "+
-			"thing to delete: %v", err)
+	if err == nil {
+		_ = r.Close()
+		t.Fatal("a recorder was built over a database that is not there; the " +
+			"first conversation would have cost money and gone unrecorded")
 	}
-	if r == nil {
-		t.Fatal("no recorder and no error")
-	}
-	t.Cleanup(func() { _ = r.Close() })
-	if _, err := r.Summarise(context.Background(), "mode", "", ""); err == nil {
-		t.Error("a roll-up over a database that is not there answered without " +
-			"an error; that is `you have spent nothing` where the truth is " +
-			"`I cannot find your spending`")
+	if r != nil {
+		t.Errorf("a refused open still handed back a recorder: %+v", r)
 	}
 }
 

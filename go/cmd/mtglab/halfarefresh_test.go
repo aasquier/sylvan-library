@@ -107,7 +107,7 @@ func TestTheSwapBoardAndTheCompanionAreLookedUpWithTheRest(t *testing.T) {
 	t.Parallel()
 	d := scratchDeployment(t).withPool(t)
 	// Kaheera is the gate corpus's companion deck; its board and companion are
-	// cards the 21-card pool holds.
+	// cards the fixture pool holds.
 	raw, err := os.ReadFile(filepath.Join("..", "..", "internal", "gate",
 		"testdata", "kaheera.yaml"))
 	if err != nil {

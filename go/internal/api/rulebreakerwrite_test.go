@@ -22,7 +22,7 @@ import (
 // into the file at all. So the check that widens the identity has to be the
 // same check in both places, and this proves it is by driving the real route.
 //
-// The 21-card fixture pool carries no Mystery Booster commander, so three rows
+// The fixture pool carries no Mystery Booster commander, so three rows
 // are doctored into the test's own temp copy of it. That is what
 // `deckread_test.go` and `stale_test.go` already do and it is not a fixture
 // edit: the recorded corpus on disk is untouched.

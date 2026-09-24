@@ -129,7 +129,7 @@ type Settings struct {
 
 	// Index is this machine's card-coverage memory, shared by every copy of
 	// these settings. Nil is legal and means "read the card scripts every
-	// time", which is what a test that asks once wants; [Defaults] makes one,
+	// time", which is what a test that asks once wants; [DefaultsFrom] makes one,
 	// so a loaded configuration always has it.
 	Index *CardIndex
 }
@@ -153,14 +153,14 @@ const (
 	DefaultMemoryMB = 3072
 )
 
-// Defaults are the settings a laptop gets when it exports nothing.
+// DefaultsFrom are the settings a laptop gets when it exports nothing,
+// resolved against a named lookup rather than the process's.
 //
 // Named rather than inlined into [LoadSettingsFrom] so a test can start from
 // the same footing a developer's machine has and change the one field it is
-// about.
-func Defaults() Settings { return DefaultsFrom(os.Getenv) }
-
-// DefaultsFrom is [Defaults] against a named lookup rather than the process's.
+// about. There is deliberately no `Defaults()` over `os.Getenv` beside it:
+// nothing called one, and a reader of the process with no caller is dead
+// API that reads as live.
 //
 // The home directory is the only thing a default reads, and it is read through
 // the lookup for the same reason everything else here is: a test that wants to

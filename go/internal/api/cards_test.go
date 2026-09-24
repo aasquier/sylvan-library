@@ -348,7 +348,7 @@ func TestCombinationResolvesThroughThePoolAndDropsWhatItLacks(t *testing.T) {
 	if body["key"] != "G" || body["pool"] != true || body["exact_total"] == nil {
 		t.Fatalf("G: %s", raw)
 	}
-	// The 21-card pool holds none of Mono-Green's champions or signature
+	// The fixture pool holds none of Mono-Green's champions or signature
 	// cards, so every name drops and is counted.
 	champions, signature := body["champions"].([]any), body["signature"].([]any)
 	if len(champions) != 0 || len(signature) != 0 || body["dropped"].(float64) < 1 {

@@ -203,11 +203,9 @@ func strictB64Decode(s string) ([]byte, error) {
 			return nil, errNotBase64
 		}
 	}
-	// An all-padding string has an empty body and non-zero padding: that
-	// counts as leading padding and is refused.
-	if body == "" && len(s) > 0 {
-		return nil, errNotBase64
-	}
+	// An all-padding string cannot reach here: its length is a multiple of
+	// four and it is nothing but `=`, so it carries at least four of them
+	// and the padding count above has already refused it.
 	return base64.StdEncoding.DecodeString(s)
 }
 

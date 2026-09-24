@@ -102,7 +102,7 @@ func TestAMisspeltCardIsOfferedTheOneItNearlyIs(t *testing.T) {
 	rig := newWriteRig(t, noCredential)
 	defer rig.close()
 
-	// Measured against the 21-card fixture: 0.9184, 0.9046 and 0.9308 -- all
+	// Measured against the fixture pool: 0.9184, 0.9046 and 0.9308 -- all
 	// under the bar the importer resolves at and over the bar this offers at.
 	body := importing(t, rig, pastedLines(
 		"1 Cultvatr Colosus",

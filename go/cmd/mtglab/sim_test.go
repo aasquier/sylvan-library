@@ -4,7 +4,7 @@ package main
 // Execute, and os.Stdout captured through a pipe -- because the commands
 // print plainly, and the tables they print are the product.
 //
-// The fixture is the same one the rest of the suite stands on: the 21-card
+// The fixture is the same one the rest of the suite stands on: the fixture
 // pool (`pooltest`) and the mono-green 99 the gate corpus carries.
 // Everything seeded is asserted
 // deterministic by running it twice, which is the promise `--seed` makes.
@@ -26,8 +26,8 @@ import (
 
 // simHome points MTGLAB_DATA_DIR and MTGLAB_DECKS_DIR at a scratch tree, so
 // no command in this file can see a real library. With `withPool` the
-// 21-card DuckDB lands where `config.DBPath()` will look for it.
-// simHome is a scratch machine, with the 21-card pool on it or without.
+// fixture DuckDB lands where `config.DBPath()` will look for it.
+// simHome is a scratch machine, with the fixture pool on it or without.
 func simHome(t *testing.T, withPool bool) deployment {
 	t.Helper()
 	d := scratchDeployment(t)
@@ -618,5 +618,35 @@ func TestTableTextHelpers(t *testing.T) {
 	}
 	if got := gFormat(4.5); got != "4.5" {
 		t.Errorf("gFormat(4.5) = %q", got)
+	}
+}
+
+// The shelf's last paragraph: the cards whose coloured demand spans two or
+// more colours, where the closed form approximates and reads slightly low.
+//
+// The fixture pool carries one such card since 2026-09-24 -- Lightning Helix,
+// copied out of the real pool by machine -- because the tail was the one part
+// of the shelf's report nothing had ever printed. The deck is the mono-green
+// fixture with the Helix in it; the deck is wrong for its commander and the
+// shelf says so elsewhere, which is the point: an invalid deck is measured,
+// not refused, and the arithmetic about a two-colour card runs either way.
+func TestSimShelfNamesTheCardsItCanOnlyApproximate(t *testing.T) {
+	t.Parallel()
+	d := simHome(t, true)
+	text := strings.Replace(monoGreenText(t), "cards:\n", "cards:\n"+
+		"  - name: Lightning Helix\n"+
+		"    category: interaction\n"+
+		"    why: Two colours at once, which the closed form cannot hold exactly.\n", 1)
+	writeSimDeck(t, d, "helix", text)
+
+	out, err := d.run(t, "sim", "shelf", "helix")
+	if err != nil {
+		t.Fatalf("sim shelf: %v", err)
+	}
+	if !strings.Contains(out, "1 card(s) demand two or more colours, where this method") {
+		t.Errorf("the shelf did not say how many cards it could only approximate:\n%s", out)
+	}
+	if !strings.Contains(out, "approximates and reads slightly low: Lightning Helix") {
+		t.Errorf("the shelf did not name the card it approximated:\n%s", out)
 	}
 }

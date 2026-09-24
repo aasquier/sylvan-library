@@ -102,6 +102,25 @@ claim.
   refused says how many were skipped. The three tests that recorded the old
   answers now hold the new ones (`chosencolour_test.go`,
   `buildfaults_test.go`, `intakefailures_test.go`).
+- **Answered the same evening — the last five, "yes to all."** (1) The
+  Claude ledger's `NewRecorder` pings `app.db` at the open
+  (`auth.PingWritable`) and refuses a file that is not there; the tier3
+  recorder stays lazy, a read never acquiring a database. (2) `data
+  snapshot` refuses a pool with no printings in it, in `ErrNoPool`'s own
+  words, rather than minting an empty file and reporting `snapshotted 0`.
+  (3) `tier3.Defaults()` and `strictB64Decode`'s all-padding guard are
+  deleted; neither had a caller or a path. (4) Three rows copied out of the
+  real pool **by machine** into `tiny_pool.json` — `Grand Coliseum`,
+  `Jareth, Leonine Titan`, `Lightning Helix`, each with its earliest
+  non-promo printing — so the Coliseum room resolves a backdrop and a
+  champion, the shelf prints its approximated tail, and a twelve-clause
+  corpus of every printed Rulebreaker (read out of the pool, never typed)
+  pins which the gate reads and which it names as beyond it. The one
+  golden the growth moved (`artifact-commander.suggestions.json`: Grand
+  Coliseum is now suggested beside Forest) was re-recorded from the
+  suggester's own output, deliberately, and said so in the diff. (5) The
+  two `yamlemit` unit tests stay. The 2026-09-24 block is empty; the queue
+  holds only the 09-19 items again.
 
 ### 2026-09-19 (cleanup)
 

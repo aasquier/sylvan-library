@@ -15,7 +15,7 @@ import (
 )
 
 // The two commanders and the companion: the parts of `createDeck` and
-// `importDeck` the 21-card fixture pool could not reach.
+// `importDeck` the fixture pool could not reach.
 //
 // Both routes take three things off the command zone -- one commander, two
 // commanders, and a companion -- and the recorded fixture holds no pairing

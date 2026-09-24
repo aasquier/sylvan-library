@@ -2,7 +2,7 @@ package main
 
 // The `mtglab decks` family, driven exactly as main wires it -- the same root
 // with the same silences, `decks <cmd>` in argv -- against a scratch library:
-// a [deployment] with its own directories, the 21-card pool copied in when a
+// a [deployment] with its own directories, the fixture pool copied in when a
 // test wants card-level checks, `app.db` seeded through `authtest.Schema`
 // when one wants history.
 //

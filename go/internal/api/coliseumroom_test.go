@@ -41,14 +41,19 @@ func coliseumRoom(t *testing.T, a *API) map[string]any {
 	return body
 }
 
-// With a pool, the room says so and counts what it could not find.
+// With a pool, the room says so, paints what it can, and counts what it
+// could not find.
 //
-// The fixture pool is twenty-one cards and none of them is an arena or a
-// champion, so every name is dropped — which is the case the count exists for
-// and the one a real instance sees whenever a new arena is written before the
-// library is refreshed. The prose still answers whole, because the facts are
-// the point and they are all text.
-func TestTheArenaRoomCountsEveryNameThePoolCouldNotAnswer(t *testing.T) {
+// The fixture pool holds exactly two of the names the arenas file asks for:
+// `Grand Coliseum` (the first arena's backdrop) and `Jareth, Leonine Titan`
+// (one of its champions), both copied out of the real pool by machine on
+// 2026-09-24 so that this route's art resolution -- the one thing the
+// Coliseum's own room does that nothing had driven -- runs against a card
+// that exists. Every other name is dropped and counted, which is the case a
+// real instance sees whenever a new arena is written before the library is
+// refreshed. The prose still answers whole for every arena, because the
+// facts are the point and they are all text.
+func TestTheArenaRoomPaintsWhatThePoolHoldsAndCountsTheRest(t *testing.T) {
 	t.Parallel()
 	a := New(Config{Pool: pooltest.Open(t),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
@@ -61,23 +66,36 @@ func TestTheArenaRoomCountsEveryNameThePoolCouldNotAnswer(t *testing.T) {
 	if len(arenas) < 6 {
 		t.Fatalf("the room holds %d arenas", len(arenas))
 	}
-	dropped, _ := body["dropped"].(float64)
-	if dropped <= 0 {
-		t.Fatalf("every name in the file resolved against a twenty-one card "+
-			"pool, which cannot be true -- dropped reads %v", dropped)
-	}
-	// The count is the names asked for, not a constant: it is at least one
-	// per arena (each names its own backdrop) plus every champion.
-	champions := 0
+	asked, resolved := 0, 0
 	for _, raw := range arenas {
 		arena, _ := raw.(map[string]any)
 		list, _ := arena["champions"].([]any)
-		champions += len(list)
-		// A name the pool could not answer leaves the arena with no backdrop,
-		// which the frontend renders as its palette alone -- a legible state,
-		// and the reason this is a 200 rather than a refusal.
-		if arena["backdrop"] != nil {
-			t.Errorf("%v resolved a backdrop out of the fixture pool", arena["key"])
+		asked += 1 + len(list) // a backdrop each, and the champions it kept
+		if arena["key"] == "grand-coliseum" {
+			backdrop, _ := arena["backdrop"].(map[string]any)
+			if backdrop == nil || backdrop["name"] != "Grand Coliseum" {
+				t.Errorf("the Grand Coliseum did not resolve its own backdrop: %v", arena["backdrop"])
+			} else {
+				resolved++
+			}
+			if len(list) != 1 {
+				t.Errorf("the Grand Coliseum seated %d champions out of a pool holding one: %v", len(list), list)
+			} else if ch, _ := list[0].(map[string]any); ch["name"] != "Jareth, Leonine Titan" {
+				t.Errorf("the champion the pool holds did not take his seat: %v", ch)
+			} else {
+				resolved++
+			}
+		} else {
+			// A name the pool could not answer leaves the arena with no
+			// backdrop, which the frontend renders as its palette alone -- a
+			// legible state, and the reason this is a 200 rather than a
+			// refusal.
+			if arena["backdrop"] != nil {
+				t.Errorf("%v resolved a backdrop out of the fixture pool", arena["key"])
+			}
+			if len(list) != 0 {
+				t.Errorf("%v seated %d champions out of the fixture pool", arena["key"], len(list))
+			}
 		}
 		if arena["palette"] == nil || arena["motion"] == nil || arena["art"] == nil {
 			t.Errorf("%v lost the prose it answers without a pool: %v",
@@ -87,13 +105,23 @@ func TestTheArenaRoomCountsEveryNameThePoolCouldNotAnswer(t *testing.T) {
 			t.Errorf("%v has no facts to rotate", arena["key"])
 		}
 	}
-	if champions != 0 {
-		t.Errorf("%d champions resolved out of the fixture pool", champions)
+	if resolved != 2 {
+		t.Fatalf("%d of the two names the pool holds resolved", resolved)
 	}
+	// The count is the names asked for less the ones found, not a constant:
+	// the arenas file names a backdrop each and champions besides, and the
+	// two the pool holds come off it. `asked` counts only the champions that
+	// were seated, so the dropped champions are the difference.
+	dropped, _ := body["dropped"].(float64)
 	if int(dropped) <= len(arenas) {
 		t.Errorf("dropped reads %v for %d arenas that each name a backdrop and "+
 			"champions besides -- the count has stopped counting champions",
 			dropped, len(arenas))
+	}
+	if int(dropped)+resolved <= asked {
+		t.Errorf("dropped (%v) plus resolved (%d) does not exceed the %d names the "+
+			"answer shows, so a dropped champion is not being counted",
+			dropped, resolved, asked)
 	}
 
 	// The zones are set before the pool is opened and need none at all, so

@@ -618,7 +618,7 @@ func TestWithNoPoolTheBuildAndTheGateAgree(t *testing.T) {
 	// `commit`. This half was nil-correct before the build route was, so on
 	// a pool-less instance two writes to the same deck once disagreed --
 	// a divergence no rigged suite could see, because the rigs always build
-	// the 21-card pool.
+	// the fixture pool.
 	status, body, raw = callAs(t, a, scope, "PATCH", cleanDeck,
 		`{"field":"bracket","value":3}`)
 	if status != 200 {
