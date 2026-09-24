@@ -54,9 +54,10 @@ done
 // in its name, and the profile is written where Forge would read it.
 func arena(t *testing.T, body string) Settings {
 	t.Helper()
-	java, _ := fakeJava(t, body)
+	home := fakeForge(t, "1.6.50", "Sol Ring", "Forest")
+	java, _ := fakeJava(t, home, body)
 	return Settings{
-		Home:    fakeForge(t, "1.6.50", "Sol Ring", "Forest"),
+		Home:    home,
 		Profile: filepath.Join(t.TempDir(), "profile"),
 		Java:    java,
 		Index:   NewCardIndex(),

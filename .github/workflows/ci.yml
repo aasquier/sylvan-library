@@ -243,8 +243,12 @@ jobs:
       # compiled there, and the two folding orders above disagree by a tenth.
       # A floor set at the measurement would go red on the first of those.
       # 89.5 was set at a measured 90.1, 90.0 at a measured 90.4, 90.5 at a
-      # measured 90.8; this is 90.8 at a measured 91.2 (CI's own print on
-      # both legs, 2026-09-12).
+      # measured 90.8, 90.8 at a measured 91.2. **This is 95.0 at a measured
+      # MEASURED_TOTAL** (the arm64 leg's own print, 2026-09-24), and the
+      # wider gap is deliberate rather than slack: Aaron asked for the tree
+      # at 96 and the gate at 95, so a diff can cost a few tenths of honest
+      # refactoring without going red, and a diff that costs a whole point
+      # is the thing this exists to notice.
       #
       # **The arm64 leg computes it alone.** The merged number cannot differ
       # by architecture while every Go file compiles on both legs — and it
@@ -262,9 +266,19 @@ jobs:
       - name: Coverage floor
         if: matrix.arch == 'arm64'
         env:
-          MINIMUM: "90.8"
+          MINIMUM: "95.0"
         run: |
-          go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > /dev/null
+          # The suite's output goes to a file rather than to /dev/null, and
+          # comes back on failure: a test that fails inside THIS run used to
+          # kill the step under `bash -e` before the echo below, and the log
+          # showed only "Process completed with exit code 1" -- no test name,
+          # no package -- which read as a coverage failure and never was one
+          # (2026-08-26 on main, twenty minutes to prove the negative).
+          if ! go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > coverage-run.log 2>&1; then
+            echo "::error::a test failed inside the coverage run -- this is not a coverage failure"
+            grep -E '^(--- FAIL|FAIL|panic:)|_test\.go:[0-9]+:' coverage-run.log | head -n 120
+            exit 1
+          fi
           TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}' | tr -d '%')
           echo "statement coverage: ${TOTAL}% (floor ${MINIMUM}%)"
           awk -v got="$TOTAL" -v want="$MINIMUM" 'BEGIN {
@@ -273,23 +287,21 @@ jobs:
               exit 1
             }
           }'
-      # What the floor cannot reach, named rather than left as a mystery for
-      # whoever next asks why it is not 100. Everything below needs a JVM with
-      # a Forge distribution beside it, or the live Anthropic or Scryfall
-      # network, and CI has none of the three:
-      #
-      #   internal/sim/tier3/run.go   RunGames, spawn -- the subprocess itself
-      #   cmd/mtglab/shim.go          match, matchStreamed, watchdog (os.Exit)
-      #   cmd/mtglab/sim.go           sim forge's own reporting
-      #   cmd/mtglab/data.go          refresh, which downloads from Scryfall
-      #
-      # `claude check` was on that list and is not any more: ADR 40 made the
-      # endpoint an argument, so the command now runs against a stub Anthropic
-      # over real HTTP and only the network is missing.
-      #
-      # Their seams ARE covered: the Forge worker client and its shim door
-      # both run against stubs, `pool.DownloadBulkFrom` runs against a stub
-      # Scryfall, and every refusal path around all of them is driven.
+      # There used to be a list here of what the floor could not reach --
+      # `RunGames` and `spawn`, the shim's `match`, `matchStreamed` and
+      # `watchdog`, `sim forge`'s reporting, `data refresh` -- everything that
+      # needed a JVM with Forge beside it or the live Scryfall network, which
+      # CI has neither of. **The list is empty as of 2026-09-24**, and not
+      # because CI grew a JVM: a JVM is `tier3.Settings.Java`, and a shell
+      # script that answers `-version` and then plays a recorded game is one;
+      # the watchdog's `os.Exit` is a field; Scryfall is
+      # `pool.RefreshOptions.IndexURL`, and an `httptest.Server` serving the
+      # bulk file is Scryfall. `claude check` left the list the same way in
+      # ADR 40. Every seam that used to stand in for the call now stands
+      # beside a test that makes the call. What remains out of reach is
+      # per-function and named in `docs/polish/COVERAGE.md` -- a terminal
+      # prompt that wants a pty, a memo table that evicts at a hundred
+      # thousand entries, `crypto/rand` failing -- none of it a feature.
       # The benchmarks are a local measuring tool, not a CI gate: a shared
       # runner's numbers are noise, and a threshold over them would fail on
       # a neighbour's workload rather than on this diff. What CI *can* hold
