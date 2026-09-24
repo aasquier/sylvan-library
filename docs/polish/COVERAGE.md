@@ -432,17 +432,16 @@ were found by the climb of 2026-09-24 and are queued for a ruling in
   conversations happen, cost money and are not recorded.
   `TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater` holds the one;
   a sibling in `tier3/ledger` holds the other.
-- **A swap that trades one chosen colour for another is refused**
-  (`internal/api/edits.go`, `playableCard` computes `chosenColorReach` over
-  the deck *including* the card on its way out). The deck the swap would
-  produce is legal; the refusal names the order that works.
-- **An unreadable `artifacts/` directory answers `[]` and `baseline:
-  "unknown"`** (`internal/library/source.go`), the same words a never-built
-  deck gets. The build refuses correctly; only the shelf lies.
-- **The intake's slot sweep reports a silent zero when every call was
-  refused** (`internal/api/intake.go`): its one note fires only on the
-  credential going away, so a dead endpoint renders "0 of 2" with nothing
-  said.
+- **Fixed the same day, kept here for the shape — three sentences a player
+  read that were false.** A swap that traded one chosen colour for another
+  was refused because `playableCard` read the deck *including* the outgoing
+  card (`without` in `edits.go` hands it the deck the swap would produce); an
+  unreadable `artifacts/` directory answered `[]` and `baseline: "unknown"`,
+  the words a never-built deck gets (`FileSource.Artifacts` and
+  `ReadBaseline` now read only `fs.ErrNotExist` as absent); and the intake's
+  slot sweep rendered "0 of 2" with nothing said when every call was refused
+  (`argue` counts refusals and gives the same sentence the other steps give).
+  Each had a test recording the old answer; each test now holds the new one.
 - **`data snapshot` over a pool with none of the pool's tables prints
   `snapshotted 0 prices for today` and exits 0** — `SnapshotPrices` creates
   what it needs rather than refusing. Not pinned; the cmd lane dropped the

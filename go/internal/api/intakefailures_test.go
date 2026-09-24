@@ -97,24 +97,12 @@ cards:
 				"everything", action, step["changed"])
 		}
 		note, _ := step["note"].(string)
-		if action == "argue" {
-			// **Recorded rather than fixed, and it is a real gap.** The slot
-			// sweep counts a refused call as a call not made and carries on,
-			// so a run where *every* call was refused renders "0 of 2" with
-			// nothing said -- the silent zero the other four steps each have
-			// a sentence to avoid, and the one a person reads as "Claude had
-			// no opinion about my deck". Its one note fires only on
-			// `claude.ErrUnavailable`, which is the credential going away
-			// mid-sweep rather than the calls failing (`intake.go`'s `argue`).
-			// Changing what a player is told is Aaron's call, not a patch, so
-			// this holds the answer as it is and fails the day it improves.
-			if strings.TrimSpace(note) != "" {
-				t.Errorf("the slot sweep now says something when every call was "+
-					"refused (%q) -- that is the better answer, and this test "+
-					"recorded the older one", note)
-			}
-			continue
-		}
+		// The slot sweep included. It used to count a refused call as a call
+		// not made and carry on, so a run where every call was refused
+		// rendered "0 of 2" with nothing said -- the one a person reads as
+		// "Claude had no opinion about my deck". Since 2026-09-24 it counts
+		// the refusals, and when every call was refused it says so in the
+		// same sentence the other four steps give for the same refusal.
 		if strings.TrimSpace(note) == "" {
 			t.Errorf("%s reported a zero with no sentence beside it, which reads "+
 				"as a step that did nothing rather than one that could not: %v",

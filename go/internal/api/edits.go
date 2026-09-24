@@ -360,7 +360,18 @@ func (a *API) swapCard(w http.ResponseWriter, r *http.Request) {
 	// Run on both doors, deliberately: a board card was checked when it was
 	// staged, but the pool may have moved since -- a refresh can unlearn a
 	// spelling or flip a legality -- and rule 1 does not age out.
-	rec, err := a.playableCard(r.Context(), d, into, "swapping needs the card pool -- run `mtglab data refresh`")
+	//
+	// Checked against the deck the swap would PRODUCE, not the deck as it
+	// stands. The difference is one card -- the one on its way out -- and it
+	// used to make a one-for-one trade of Tolabow's chosen colour refuse a
+	// deck that was legal: the outgoing white instant still counted toward
+	// the reach while the incoming black one was judged, so the door read
+	// {BW} where the swap would leave {B}. The refusal did name the way
+	// through (cut first, then add), but a door that tells a newcomer to do
+	// in two steps what they asked for in one is a small lie about what a
+	// swap is (commandment 2).
+	rec, err := a.playableCard(r.Context(), without(d, entry), into,
+		"swapping needs the card pool -- run `mtglab data refresh`")
 	if a.refuseWrite(w, "swap", err) {
 		return
 	}
@@ -1146,6 +1157,20 @@ func asNames(v any) []string {
 
 // findCard is `service._find_card`: the 99 and the swap board, case-folded.
 // The graveyard is deliberately outside it -- an entombed card is frozen.
+// without is the deck as a swap would leave it: a shallow copy whose 99 no
+// longer hold `leaving`. The board and the command zone are shared with the
+// original, which is fine for a read; nothing here writes through it.
+func without(d *deck.Deck, leaving *deck.CardEntry) *deck.Deck {
+	remaining := *d
+	remaining.Cards = make([]deck.CardEntry, 0, len(d.Cards))
+	for i := range d.Cards {
+		if &d.Cards[i] != leaving {
+			remaining.Cards = append(remaining.Cards, d.Cards[i])
+		}
+	}
+	return &remaining
+}
+
 func findCard(d *deck.Deck, name string) *deck.CardEntry {
 	wanted := strings.ToLower(strings.TrimSpace(name))
 	for i := range d.Cards {

@@ -27,6 +27,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -220,7 +221,22 @@ func (f *FileSource) Artifacts(_ context.Context, slug string) ([]Artifact, erro
 	out := []Artifact{}
 	for _, name := range Deliverables {
 		info, err := os.Stat(filepath.Join(dir, name))
-		if err != nil || !info.Mode().IsRegular() {
+		// Absent is ordinary -- a deck built for the first time has no
+		// shelf at all -- and it is the ONLY error that reads as absent. A
+		// directory that is there and cannot be read used to fall through
+		// the same `continue` and answer an empty list, which is the same
+		// sentence a never-built deck gets and the one sentence that is
+		// false: "you have no artifacts" where the truth was "I cannot read
+		// your artifacts". The build route refused correctly; only the shelf
+		// lied, and a fallback that reads as a fact is this repo's most
+		// repeated bug shape.
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("reading %s's artifacts: %w", slug, err)
+		}
+		if !info.Mode().IsRegular() {
 			continue
 		}
 		out = append(out, Artifact{Name: name, Size: info.Size(), BuiltAt: info.ModTime().UTC()})
@@ -251,8 +267,15 @@ func (f *FileSource) ReadBaseline(_ context.Context, slug string) (string, bool,
 		return "", false, err
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, Snapshot))
+	if errors.Is(err, fs.ErrNotExist) {
+		// Ordinary: a deck built for the first time has no snapshot.
+		return "", false, nil
+	}
 	if err != nil {
-		return "", false, nil //nolint:nilerr // a missing snapshot is ordinary: a deck built for the first time has none
+		// Not ordinary, and not the same answer: `unknown` is what the shelf
+		// says about a deck it has never built, and a snapshot it cannot
+		// read is a shelf it cannot see. `Artifacts` above argues it.
+		return "", false, fmt.Errorf("reading %s's snapshot: %w", slug, err)
 	}
 	return string(raw), true, nil
 }

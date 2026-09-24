@@ -72,7 +72,7 @@ Cleanup (09-12, 09-19) for the same stated reason.
 
 ## Open — a ruling, one word each
 
-> **2026-09-24, evening: the coverage climb queued nine rulings** (eight open — the poisoned-connection one was fixed the same evening on Aaron's word; ledger, White). Nine lanes
+> **2026-09-24, evening: the coverage climb queued nine rulings** (seven open — the poisoned connection and the three player-facing sentences were fixed the same evening on Aaron's word; ledger, White). Nine lanes
 > took the Go tree from 91.2% to over 96 and every serial test to parallel in
 > one day (#488–#496 and the floor PR after them; `COVERAGE.md` is the map).
 > Each lane was told to pin what it found rather than fix it, and the items
@@ -87,19 +87,6 @@ the Claude recorder (a conversation that cannot be recorded should not
 start); keep the tier3 one lazy, since a read must never acquire a database.
 Held by `TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater`. Ledger:
 White, 2026-09-24.
-
-**Green: three sentences a player reads are pinned as wrong.** (1) A swap
-that trades one chosen colour for another is refused because `playableCard`
-checks reach over the deck *including* the outgoing card (`edits.go`); the
-deck it would produce is legal. (2) An unreadable `artifacts/` directory
-answers `[]` and `baseline: "unknown"`, the words a never-built deck gets
-(`library/source.go`). (3) The intake's slot sweep prints "0 of 2" with
-nothing said when every call was refused rather than unavailable
-(`intake.go`). · *Cost:* each is a small lie to a newcomer (commandment 2).
-· **Recommendation:** yes to all three — check the swap against the deck
-after the removal; surface the unreadable shelf as a fault; count refusals on
-the sweep line. Each is a few lines and each moves recorded copy, which is
-why no lane took them. Ledger: White, 2026-09-24.
 
 **Blue: `mtglab data snapshot` over a pool with none of the pool's tables
 prints `snapshotted 0 prices for today` and exits 0** — `SnapshotPrices`

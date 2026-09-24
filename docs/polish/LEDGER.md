@@ -88,6 +88,20 @@ claim.
   whose probe is a bare ROLLBACK on the pool that must be refused; it fails
   on the old code on all four cases. The hand-rollback helper the finding
   had needed is gone.
+- **Answered the same evening — the three player-facing sentences.**
+  *Aaron: fix them.* (1) The swap door resolves the incoming card against
+  the deck the swap would produce (`without`, `internal/api/edits.go`), so
+  a one-for-one trade of Tolabow's chosen colour is one move rather than a
+  cut and an add; a swap that genuinely widens the reach is still refused
+  with both colours and the way through. (2) `FileSource.Artifacts` and
+  `ReadBaseline` read only `fs.ErrNotExist` as "never built"; a directory
+  that is there and cannot be read is a fault the shelf refuses with a
+  sentence, and a never-built deck still answers `[]` and `unknown` at 200.
+  (3) The intake's slot sweep counts refused calls: every call refused gives
+  the same sentence the other four steps give for that refusal, some
+  refused says how many were skipped. The three tests that recorded the old
+  answers now hold the new ones (`chosencolour_test.go`,
+  `buildfaults_test.go`, `intakefailures_test.go`).
 
 ### 2026-09-19 (cleanup)
 

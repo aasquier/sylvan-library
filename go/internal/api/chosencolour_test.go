@@ -169,17 +169,15 @@ func TestTheChosenColourIsSpentByTheFirstOffColourSpellAndReadBackAfterwards(t *
 // the same check for the reason the route argues: a card that was legal when
 // it was staged may not be legal now, and rule 1 does not age out.
 //
-// **The second half of this records a behaviour rather than approving of it.**
-// The check reads the deck as it stands, which includes the card that is on
-// its way out -- so trading one chosen colour for another is refused even
-// though the deck the swap would produce reaches exactly one colour and is
-// legal. Changing that means resolving the incoming card against the deck
-// *after* the removal, which is a different check on a different deck and is
-// Aaron's call, not a patch. It is written down here because the sentence the
-// refusal gives already tells a player the way through -- cut the colour you
-// are not keeping first, then add -- so the door is narrow rather than shut,
-// and this test fails the day the answer changes.
-func TestTheSwapDoorReadsTheChosenColourAsTheDeckStands(t *testing.T) {
+// And it resolves it against the deck the swap would PRODUCE. This test used
+// to record the older answer -- the check read the deck as it stood, outgoing
+// card included, so a one-for-one trade of Tolabow's chosen colour was
+// refused with {BW} even though the deck after the swap reaches exactly one
+// colour and is legal. Aaron ruled on 2026-09-24 that a swap is one move, not
+// a cut followed by an add, and `without` in the route is the change. What
+// still has to be refused is a swap that genuinely widens the reach: trading
+// a colourless rock for the black sorcery while the white instant stays.
+func TestTheSwapDoorReadsTheChosenColourAsTheDeckWillStand(t *testing.T) {
 	t.Parallel()
 	rig, deckURL := tolabowRig(t)
 	defer rig.close()
@@ -191,36 +189,40 @@ func TestTheSwapDoorReadsTheChosenColourAsTheDeckStands(t *testing.T) {
 		t.Fatalf("the swap door refused a card the clause covers: %d %s", status, raw)
 	}
 
+	// The rock goes back in beside the white instant, so there is a
+	// colourless card to trade away.
+	status, _, raw = rig.do(t, alice, "POST", deckURL+"/cards",
+		`{"name":"Sol Ring","category":"ramp","why":"Two mana on turn one."}`)
+	if status != http.StatusOK {
+		t.Fatalf("adding the rock back answered %d: %s", status, raw)
+	}
+
+	// A trade that would widen the reach is still refused -- the white
+	// instant stays, the black sorcery would come in -- and the refusal
+	// still shows both colours and names the way through.
 	status, body, raw := rig.do(t, alice, "POST", deckURL+"/swap",
-		`{"out":"Swords to Plowshares","into":"Fixture Black Sorcery",`+
-			`"why":"Swapping the white one out should leave black as the one colour."}`)
+		`{"out":"Sol Ring","into":"Fixture Black Sorcery",`+
+			`"why":"A second colour past blue, which the clause does not grant."}`)
 	if status != http.StatusUnprocessableEntity {
-		t.Fatalf("a one-for-one trade of the chosen colour now answers %d -- the "+
-			"door reads the deck after the removal, which is a better answer "+
-			"than the one recorded here: %s", status, raw)
+		t.Fatalf("a swap that widens the reach to two colours answered %d: %s", status, raw)
 	}
 	detail := fmtDetail(body)
 	if !strings.Contains(detail, "{BW}") {
 		t.Errorf("the refusal does not show both colours, so it does not say why "+
-			"a one-for-one trade was refused: %q", detail)
+			"the trade was refused: %q", detail)
 	}
-	// The way through, in the refusal itself. Without this sentence the
-	// behaviour above is a dead end rather than an order of operations.
 	if !strings.Contains(detail, "Cut the ones in the colour you are not keeping first") {
 		t.Errorf("the refusal no longer tells the player what to do first: %q", detail)
 	}
 
-	// And the order it names works: cut the white spell, then the black one
-	// goes in.
-	status, _, raw = rig.do(t, alice, "DELETE", deckURL+"/cards/Swords%20to%20Plowshares", "")
+	// The one-for-one trade of the chosen colour: white out, black in, and
+	// the deck the swap produces reaches exactly one colour. One move.
+	status, body, raw = rig.do(t, alice, "POST", deckURL+"/swap",
+		`{"out":"Swords to Plowshares","into":"Fixture Black Sorcery",`+
+			`"why":"Swapping the white one out leaves black as the one colour."}`)
 	if status != http.StatusOK {
-		t.Fatalf("cutting the white instant answered %d: %s", status, raw)
-	}
-	status, body, raw = rig.do(t, alice, "POST", deckURL+"/cards",
-		`{"name":"Fixture Black Sorcery","category":"interaction",`+
-			`"why":"Black is the one colour now, and the clause grants one."}`)
-	if status != http.StatusOK {
-		t.Fatalf("the order the refusal names does not work: %d %s %s",
-			status, fmtDetail(body), raw)
+		t.Fatalf("a one-for-one trade of the chosen colour was refused (%d), so the "+
+			"door is reading the deck as it stands rather than as the swap leaves "+
+			"it: %s %s", status, fmtDetail(body), raw)
 	}
 }
