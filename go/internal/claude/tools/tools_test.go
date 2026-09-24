@@ -211,3 +211,80 @@ func TestArgumentsAreCheckedBeforeDispatch(t *testing.T) {
 func asNotAllowed(err error, target **ErrNotAllowed) bool {
 	return errors.As(err, target)
 }
+
+// The fault names the model reads, asserted as the recorded tokens they are.
+//
+// `converse` hands a recoverable tool failure back as `<WireName>: <message>`,
+// so these strings are part of the conversation rather than Go's business:
+// renaming a Go type must not rename what the model was taught to recover
+// from. `ErrDeckNotFound`'s pairing is the one that carries the argument --
+// the message is the bare slug precisely because the name supplies the rest.
+func TestEveryRecoverableToolFaultCarriesItsRecordedWireName(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		err       error
+		want, msg string
+	}{
+		{&ErrNotAllowed{Msg: "no deck library is reachable"}, "ToolNotAllowed",
+			"no deck library is reachable"},
+		{&ErrArgumentsRejected{Msg: "get_deck: missing required argument(s) slug"},
+			"ToolArgumentsRejected", "get_deck: missing required argument(s) slug"},
+		{&ErrDeckNotFound{Slug: "gyome"}, "DeckNotFound", "gyome"},
+	} {
+		named, ok := tc.err.(interface{ WireName() string })
+		if !ok {
+			t.Errorf("%T declares no WireName, so converse would treat it as fatal", tc.err)
+			continue
+		}
+		if got := named.WireName(); got != tc.want {
+			t.Errorf("%T wears %q on the wire, the recorded name is %q", tc.err, got, tc.want)
+		}
+		if got := tc.err.Error(); got != tc.msg {
+			t.Errorf("%T reads %q, want %q", tc.err, got, tc.msg)
+		}
+	}
+}
+
+// Wiring is a load-time failure, never a request-time surprise.
+//
+// Both panics are reached *before* anything is written, which is what makes
+// them safe to drive here: a name with no schema never lands in the registry,
+// and a second wiring of a live name is refused rather than replacing the
+// handler under it. That ordering is the assertion -- if either panic ever
+// moved below its assignment, this test would leave the registry mangled for
+// every other test in the binary, and the two checks after the loop are what
+// would notice.
+func TestWiringAToolIsALoadTimeFailureRatherThanARequestTimeOne(t *testing.T) {
+	t.Parallel()
+	noop := func(context.Context, map[string]any, Deps) (any, error) { return nil, nil }
+
+	for _, tc := range []struct{ name, contains string }{
+		{"set_card_field", "no schema for"},
+		{"get_cards", "is already wired"},
+	} {
+		func() {
+			defer func() {
+				raised := recover()
+				if raised == nil {
+					t.Errorf("Register(%q) was accepted", tc.name)
+					return
+				}
+				if got, ok := raised.(string); !ok || !strings.Contains(got, tc.contains) {
+					t.Errorf("Register(%q) panicked with %v, want one saying %q",
+						tc.name, raised, tc.contains)
+				}
+			}()
+			Register(tc.name, noop)
+		}()
+	}
+
+	// And the registry is exactly as it was: the panics fire before the write.
+	if _, wired := registry["set_card_field"]; wired {
+		t.Fatal("a schemaless Register left a write tool in the registry")
+	}
+	_, err := Run(context.Background(), "get_cards",
+		map[string]any{"names": []any{"Sol Ring"}}, Deps{}, nil)
+	if err == nil || !strings.Contains(err.Error(), "card pool is not available") {
+		t.Errorf("get_cards's handler was replaced by the refused rewiring: %v", err)
+	}
+}

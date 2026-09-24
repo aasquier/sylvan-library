@@ -465,3 +465,61 @@ func TestTheRollUpAgreesWithTheCorpus(t *testing.T) {
 		}
 	}
 }
+
+// **Recorded rather than fixed.** The ledger opens `rw` and never `rwc`, and
+// the package comment says a missing app.db "must say so here rather than at
+// the first roll-up somebody reads". It does not: `sql.Open` only records the
+// DSN, so [NewRecorder] answers a recorder for a path that is not there and
+// the absence is discovered by the first read -- while `Record` itself warns
+// rather than failing, because the ledger never fails the feature.
+//
+// The consequence is narrow and worth knowing: on an instance whose volume
+// did not mount, conversations happen, cost money, and are not recorded, and
+// nothing says so except a line in the log. `internal/auth` has
+// `PingWritable` for exactly this and calling it here would close the gap --
+// but it would also turn an unmounted volume from "no usage recorded" into a
+// failure at the moment a recorder is built, which is the same trade
+// `TestAReaderOnAnUnmountableVolumeReportsEmptinessRatherThanAFault` already
+// settles the other way on the reading side. That is Aaron's call rather than
+// a patch, so this describes what happens instead of approving of it.
+func TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater(t *testing.T) {
+	t.Parallel()
+	r, err := NewRecorder(filepath.Join(t.TempDir(), "never", "app.db"), nil)
+	if err != nil {
+		t.Fatalf("the open reported the missing file, which this test says it "+
+			"does not -- if that has become the behaviour, this test is the "+
+			"thing to delete: %v", err)
+	}
+	if r == nil {
+		t.Fatal("no recorder and no error")
+	}
+	t.Cleanup(func() { _ = r.Close() })
+	if _, err := r.Summarise(context.Background(), "mode", "", ""); err == nil {
+		t.Error("a roll-up over a database that is not there answered without " +
+			"an error; that is `you have spent nothing` where the truth is " +
+			"`I cannot find your spending`")
+	}
+}
+
+// Closing what was never opened is the no-ledger case rather than a fault: a
+// caller writes `defer r.Close()` before knowing whether there is a ledger at
+// all, and nil is how "no ledger" arrives everywhere else in this package.
+func TestClosingARecorderThatIsNotThereIsNotAFault(t *testing.T) {
+	t.Parallel()
+	var absent *Recorder
+	if err := absent.Close(); err != nil {
+		t.Errorf("closing a nil recorder: %v", err)
+	}
+	if err := (&Recorder{}).Close(); err != nil {
+		t.Errorf("closing a recorder with no handle: %v", err)
+	}
+	// The floor, so the two branches above are a special case rather than the
+	// whole function: a real recorder's Close actually closes.
+	r := scratch(t)
+	if err := r.Close(); err != nil {
+		t.Fatalf("closing a real recorder: %v", err)
+	}
+	if _, err := r.Summarise(context.Background(), "mode", "", ""); err == nil {
+		t.Error("a closed recorder still answered a roll-up")
+	}
+}

@@ -91,10 +91,7 @@ const ScanDefaultPreset = "consultant"
 // answers `off`. See `dialSurfaces`; recorded, not fixed.
 func ScanStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := Ceiling()
-		if limit != nil {
-			ceil = *limit
-		}
+		ceil := ceilingOr(limit)
 		preset, err := Preset(ScanDefaultPreset)
 		if err != nil {
 			return Stance{}, err
