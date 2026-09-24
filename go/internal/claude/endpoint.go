@@ -42,11 +42,30 @@ type Endpoint struct {
 	model string
 }
 
+// The two names the SDK authenticates with. Named rather than inlined so a
+// test's map can be keyed by the same constants the reader uses, and so
+// `configrecord_test.go` -- which counts quoted switch names in shipped
+// source -- still finds them here.
+const (
+	apiKeyEnv    = "ANTHROPIC_API_KEY"    //nolint:gosec // a variable's name, never its value -- see the type's note
+	authTokenEnv = "ANTHROPIC_AUTH_TOKEN" //nolint:gosec // a variable's name, never its value
+)
+
 // EndpointFromEnv is what a serving process uses: the credential question
 // answered from the environment, and nothing held.
 //
 // Read once, at the composition root, rather than per call — ADR 39.
-func EndpointFromEnv() Endpoint {
+func EndpointFromEnv() Endpoint { return EndpointFromLookup(os.Getenv) }
+
+// EndpointFromLookup is [EndpointFromEnv] with the environment as an
+// argument: the three variables this type is made of, read through whatever
+// the caller hands in.
+//
+// The seam exists so that the rows can be *described* rather than installed.
+// A deployment with a blank key and a model override is a two-entry map here
+// and was a pair of `t.Setenv` calls before, and the difference is whether
+// the test may run beside its neighbours.
+func EndpointFromLookup(getenv func(string) string) Endpoint {
 	return Endpoint{
 		// "Set but empty" cannot read as present. Anthropic's own precedence
 		// treats an empty ANTHROPIC_API_KEY as a credential that exists and
@@ -54,8 +73,8 @@ func EndpointFromEnv() Endpoint {
 		// `os.Getenv` returns "" for both unset and blank -- so a blank export
 		// never reaches Present as true, and this agrees with the SDK it is
 		// describing.
-		present: os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != "",
-		model:   os.Getenv(modelEnv),
+		present: getenv(apiKeyEnv) != "" || getenv(authTokenEnv) != "",
+		model:   getenv(modelEnv),
 	}
 }
 
@@ -159,9 +178,24 @@ type Settings struct {
 }
 
 // SettingsFromEnv is what a serving process uses.
-func SettingsFromEnv() Settings {
-	ceiling := Ceiling()
-	return Settings{Endpoint: EndpointFromEnv(), Ceiling: &ceiling}
+func SettingsFromEnv() Settings { return SettingsFromLookup(os.Getenv) }
+
+// SettingsFromLookup is the **only** reader of the environment in this
+// package, which is the whole of ADR 39/40's argument arriving here at last.
+//
+// Everything downstream takes the value: the endpoint travels as a field, and
+// the ceiling travels as `*Stance` through `api.Config` and down every call
+// site's `limit` parameter. So a test that wants to describe a deployment
+// hands this a map instead of writing four variables onto a process it shares
+// with every other test in the binary.
+//
+// The ceiling is always filled, never left nil. Nil is a legitimate value on
+// [Settings] — it is what a test that says nothing about a cap gets, and it
+// means the built-in default — but a serving process should not reach that
+// branch by accident, so the composition root's own path writes one.
+func SettingsFromLookup(getenv func(string) string) Settings {
+	ceiling := CeilingFrom(getenv(CeilingEnv))
+	return Settings{Endpoint: EndpointFromLookup(getenv), Ceiling: &ceiling}
 }
 
 // ceiling is this deployment's cap, or the built-in default.
@@ -169,9 +203,4 @@ func SettingsFromEnv() Settings {
 // The nil case is the one every test takes and the one no serving process
 // does: `cmd/mtglab` builds its Settings with [SettingsFromEnv], which always
 // fills it.
-func (s Settings) ceiling() Stance {
-	if s.Ceiling != nil {
-		return *s.Ceiling
-	}
-	return Collaborator
-}
+func (s Settings) ceiling() Stance { return ceilingOr(s.Ceiling) }

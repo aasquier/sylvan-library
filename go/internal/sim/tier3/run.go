@@ -65,10 +65,36 @@ func javaMajor(binary string) (int, bool) {
 	return n, true
 }
 
+// javaOnPath is the first executable named `java` along a path list, which is
+// what [os/exec.LookPath] does for the process's own `PATH`.
+//
+// Written out rather than delegated because the list is a value here
+// ([Settings.PathList]) and `LookPath` has no form that takes one: it reads the
+// environment, so a test asking "what does a machine with no JVM anywhere say"
+// had to empty the `PATH` of every goroutine in the binary to ask it.
+//
+// The executable bit is checked for the same reason `LookPath` checks it — a
+// directory or a data file called `java` is not a JVM — and the probe one level
+// up still has to agree before anything runs.
+func (s Settings) javaOnPath() (string, bool) {
+	for _, dir := range filepath.SplitList(s.PathList) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, "java")
+		info, err := os.Stat(candidate) //nolint:gosec // an operator's own PATH, never a request value
+		if err == nil && !info.IsDir() && info.Mode().Perm()&0o111 != 0 {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
 // JavaBinary is a JVM new enough to run Forge.
 //
 // `MTGLAB_JAVA` wins, then the JDK unpacked beside the distribution, then
-// whatever is on PATH. The PATH entry is checked rather than trusted.
+// whatever is on [Settings.PathList]. The path entry is checked rather than
+// trusted.
 func (s Settings) JavaBinary() (string, error) {
 	var candidates []string
 	if s.Java != "" {
@@ -77,7 +103,7 @@ func (s Settings) JavaBinary() (string, error) {
 	candidates = append(candidates,
 		filepath.Join(s.BundledJDK, "Contents", "Home", "bin", "java"),
 		filepath.Join(s.BundledJDK, "bin", "java"))
-	if found, err := exec.LookPath("java"); err == nil {
+	if found, ok := s.javaOnPath(); ok {
 		candidates = append(candidates, found)
 	}
 

@@ -124,10 +124,7 @@ func QuestionKey(question string) string {
 // question box. Somebody typing a question has asked for a call.
 func ResearchStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := Ceiling()
-		if limit != nil {
-			ceil = *limit
-		}
+		ceil := ceilingOr(limit)
 		preset, err := Preset(ResearchDefaultPreset)
 		if err != nil {
 			return Stance{}, err
@@ -184,11 +181,11 @@ type ResearchReport struct {
 }
 
 func researchReport(turn *Turn, question string, effective Stance, body any,
-	asked bool, reason string) ResearchReport {
+	asked bool, reason string, clock Clock) ResearchReport {
 	report := ResearchReport{
 		AnsweredBy: "claude", Mode: ModeResearch, Question: question,
 		Asked: asked, Reason: reason, Stance: Describe(effective),
-		Research: body, GeneratedAt: now(), Never: ResearchNever,
+		Research: body, GeneratedAt: clock.stamp(), Never: ResearchNever,
 	}
 	if body == nil {
 		report.Research = emptyObject
@@ -221,7 +218,13 @@ type ResearchPlan struct {
 	// the dossier's plan captures one: a job outlives the request that knew
 	// who was asking, and re-deriving it in the worker would mean the worker
 	// had a way to ask, which it must not.
-	Tier   string
+	Tier string
+	// Clock stamps `generated_at`, and rides on the plan for the same reason
+	// Endpoint and Tier do: the answer may be written minutes later in a
+	// worker, and both halves of a run stamp from the same reading. Nil is
+	// the system clock. Not a deck by any reading, which
+	// `TestTheResearchPlanCannotHoldADeck` sweeps for.
+	Clock  Clock
 	Answer *ResearchReport
 }
 
@@ -233,6 +236,17 @@ func (p *ResearchPlan) NeedsCall() bool { return p.Answer == nil }
 // come back to the caller, which is what keeps their 422 rather than
 // flattening two answers into one job in state `error` minutes later.
 func CheckResearch(raw any, requested any, tier string, limit *Stance, e Endpoint) (*ResearchPlan, error) {
+	return checkResearch(nil, raw, requested, tier, limit, e)
+}
+
+// checkResearch is [CheckResearch] with its clock as an argument, split from
+// it for the same reason [readResearch] is split from [RunResearch]: the
+// corpus's `generated_at` is a frozen byte string, and a refusal is stamped
+// here rather than in the half a test can drive. A nil clock is the system's,
+// which is what the exported entry point passes.
+func checkResearch(clock Clock, raw any, requested any, tier string,
+	limit *Stance, e Endpoint) (*ResearchPlan, error) {
+
 	question, err := CheckQuestion(raw)
 	if err != nil {
 		return nil, err
@@ -242,11 +256,11 @@ func CheckResearch(raw any, requested any, tier string, limit *Stance, e Endpoin
 		return nil, err
 	}
 	plan := &ResearchPlan{Endpoint: e, Question: question, Key: QuestionKey(question),
-		Effective: effective, Tier: tier}
+		Effective: effective, Tier: tier, Clock: clock}
 	if !effective.AllowsCalls() {
 		answer := researchReport(nil, question, effective, nil, false,
 			"The stance is off, so no call was made. Nothing else about the "+
-				"app is affected.")
+				"app is affected.", clock)
 		plan.Answer = &answer
 	}
 	return plan, nil
@@ -300,13 +314,13 @@ func readResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, turn
 	question, effective := plan.Question, plan.Effective
 	if turn.Refused {
 		return researchReport(&turn, question, effective, nil, true,
-			"The model declined to answer this one."), nil
+			"The model declined to answer this one.", plan.Clock), nil
 	}
 	var payload map[string]any
 	if err := turn.Parsed(&payload); err != nil {
 		//nolint:nilerr // an unreadable answer is a reported outcome, not a fault
 		return researchReport(&turn, question, effective, nil, true,
-			fmt.Sprintf("The answer did not parse (stop reason: %s).", turn.StopReason)), nil
+			fmt.Sprintf("The answer did not parse (stop reason: %s).", turn.StopReason), plan.Clock), nil
 	}
 	claimed, _ := payload["sources"].([]any)
 	sources, sourcesDropped := KeepSources(claimed, turn.Searched)
@@ -315,7 +329,7 @@ func readResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, turn
 		// talking about Magic from memory with a search box drawn around it.
 		return researchReport(&turn, question, effective, nil, true,
 			"No source survived checking, so there is nothing to stand behind "+
-				"an answer."+noSourceDetail(turn, sourcesDropped)), nil
+				"an answer."+noSourceDetail(turn, sourcesDropped), plan.Clock), nil
 	}
 	allowed := map[string]bool{}
 	for _, s := range sources {
@@ -343,7 +357,7 @@ func readResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, turn
 		CardsUnresolved: unresolved,
 		Searched:        len(turn.Searched),
 	}
-	return researchReport(&turn, question, effective, body, true, ""), nil
+	return researchReport(&turn, question, effective, body, true, "", plan.Clock), nil
 }
 
 // researchOpening frames the question as the user's rather than as the
