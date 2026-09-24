@@ -46,26 +46,6 @@ func faultyAuth(t *testing.T) (*sql.DB, *authtest.Fault) {
 	return db, fault
 }
 
-// clearStaleTransaction rolls back whatever the pinned connection was left
-// holding.
-//
-// It is here because of something worth writing down rather than hiding:
-// `exclusive` opens its transaction with a hand-written BEGIN IMMEDIATE on a
-// pinned connection, and when the ROLLBACK or the COMMIT *also* fails it
-// returns the connection to the pool with that transaction still open. Every
-// later statement on it then runs inside a transaction nobody will commit,
-// and the next BEGIN IMMEDIATE is refused with "cannot start a transaction
-// within a transaction". On a live instance that is a handle that keeps
-// answering while writing nothing.
-//
-// A test that did not clear it would still be green — reads inside the stale
-// transaction answer perfectly well — which is exactly why this is a named
-// helper with a paragraph rather than a stray line.
-func clearStaleTransaction(t *testing.T, db *sql.DB) {
-	t.Helper()
-	_, _ = db.ExecContext(context.Background(), "ROLLBACK")
-}
-
 // oneAccount seeds a claimed, enabled, non-admin account.
 func oneAccount(t *testing.T, db *sql.DB) *User {
 	t.Helper()
@@ -202,7 +182,6 @@ func TestAnExclusiveWriteThatCannotTakeTheLockChangesNothing(t *testing.T) {
 		fault.After(budget)
 		err := SetAdmin(ctx, db, other.ID, true)
 		fault.Heal()
-		clearStaleTransaction(t, db)
 		if err == nil {
 			t.Fatalf("admin was granted with only %d statements' worth of database", budget)
 		}
@@ -221,14 +200,12 @@ func TestAnExclusiveWriteThatCannotTakeTheLockChangesNothing(t *testing.T) {
 	fault.After(1)
 	tierErr := SetModelTier(ctx, db, other.ID, "")
 	fault.Heal()
-	clearStaleTransaction(t, db)
 	if tierErr == nil {
 		t.Fatal("a tier was chosen over a database that had gone")
 	}
 	fault.After(2)
 	revoked, disableErr := SetDisabled(ctx, db, other.ID, true)
 	fault.Heal()
-	clearStaleTransaction(t, db)
 	if disableErr == nil || revoked != 0 {
 		t.Fatalf("an account was disabled over a database that had gone: %v", disableErr)
 	}
@@ -961,3 +938,75 @@ func TestALadderThatStopsPartwayNamesWhereItStopped(t *testing.T) {
 type countingSender struct{ sent int }
 
 func (c *countingSender) Send(Message) error { c.sent++; return nil }
+
+// A transaction that cannot end cleanly does not poison the handle.
+//
+// Found on 2026-09-24 by the tests above, which had to roll a stale
+// transaction back by hand between cases to stay green: when the COMMIT or
+// the ROLLBACK failed, `exclusive` and `inTx` returned their pinned
+// connection to the pool with the driver's transaction still open. With one
+// connection in the pool that was the whole handle -- reads answered, writes
+// went nowhere, and the next BEGIN IMMEDIATE was refused. `writes.go` argues
+// the fix; this holds it, on both shapes and on both ways of failing.
+//
+// The probe is a bare ROLLBACK on the pool: on a clean handle SQLite refuses
+// it ("no transaction is active"), and on a poisoned one it succeeds -- so
+// the assertion is that the ROLLBACK FAILS. Then the write that follows has
+// to land, because a discarded connection is replaced by a fresh one and
+// nothing about the failure is remembered.
+func TestAWriteWhoseCommitOrRollbackFailsDoesNotPoisonTheHandle(t *testing.T) {
+	t.Parallel()
+	db, fault := faultyAuth(t)
+	ctx := context.Background()
+	keeper := oneAccount(t, db)
+	other, err := Create(ctx, db, "page", "page@example.test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateSession(ctx, db, keeper.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range []struct {
+		what   string
+		budget int
+		write  func() error
+	}{
+		// exclusive: BEGIN IMMEDIATE, the UPDATE, the COMMIT. Budget 2 fails
+		// the COMMIT; budget 1 fails the UPDATE and then the ROLLBACK too.
+		{"an exclusive write whose commit fails", 2,
+			func() error { return SetAdmin(ctx, db, other.ID, true) }},
+		{"an exclusive write whose rollback fails", 1,
+			func() error { return SetAdmin(ctx, db, other.ID, true) }},
+		// inTx: BEGIN, the password UPDATE, the session DELETE, the COMMIT.
+		{"a deferred transaction whose commit fails", 3,
+			func() error { _, err := SetPassword(ctx, db, keeper.ID, "another passphrase"); return err }},
+		{"a deferred transaction whose rollback fails", 1,
+			func() error { _, err := SetPassword(ctx, db, keeper.ID, "another passphrase"); return err }},
+	} {
+		fault.Heal()
+		fault.After(c.budget)
+		err := c.write()
+		fault.Heal()
+		if err == nil {
+			t.Fatalf("%s: the write claimed to land", c.what)
+		}
+		if _, err := db.ExecContext(ctx, "ROLLBACK"); err == nil {
+			t.Fatalf("%s: the pool handed back a connection with the transaction still open",
+				c.what)
+		}
+		if err := SetAdmin(ctx, db, other.ID, true); err != nil {
+			t.Fatalf("%s: the write after it was refused: %v", c.what, err)
+		}
+		fresh, err := GetByID(ctx, db, other.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fresh.IsAdmin {
+			t.Fatalf("%s: the write after it answered nil and changed nothing", c.what)
+		}
+		if err := SetAdmin(ctx, db, other.ID, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
