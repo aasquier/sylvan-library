@@ -95,7 +95,17 @@ func TestThePreviewRunsOutOfTriesWithoutSpendingTheClaims(t *testing.T) {
 	t.Parallel()
 	rig := newAccountRig(t, true)
 	defer rig.close()
-	token := rig.inviteToken(t, "waiting")
+	// Issued here rather than through `accountRig.inviteToken`, which is
+	// `accounts_test.go`'s and whose one argument only ever takes this name.
+	ctx := context.Background()
+	waiting, err := auth.Get(ctx, rig.db, "waiting")
+	if err != nil || waiting == nil {
+		t.Fatalf("no unclaimed fixture account (%v)", err)
+	}
+	token, err := auth.IssueToken(ctx, rig.db, waiting.ID, auth.PurposeInvite)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wrong guesses, until the bucket is empty. The bound is generous on
 	// purpose; the loop is bounded harder so a budget that stopped spending

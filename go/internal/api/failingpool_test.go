@@ -183,33 +183,16 @@ func fillPattern(pattern string) string {
 	return pattern
 }
 
-// A write that needs the pool must not report success over one that cannot
-// answer: an edit reported as landed, against a pool that could not resolve
-// the card, is the answer somebody acts on.
-func TestNoWriteReportsSuccessOverAPoolThatWillNotAnswer(t *testing.T) {
-	t.Parallel()
-	a := failingPoolAPI(t)
-
-	// `mono-green-clean` for the same reason `fillPattern` says `kaheera`: a
-	// slug the library does not hold would 404 before any write was attempted,
-	// and a sweep of refusals that never reached the pool would pass forever.
-	for _, route := range writes() {
-		target := route.path(t, "alice", "mono-green-clean")
-		status, _, raw := callAs(t, a, alice, route.method, target, route.payload)
-		if status == http.StatusNotFound {
-			t.Errorf("%s %s answered 404 against a deck the library holds -- "+
-				"it never reached the pool: %s", route.method, target, raw)
-			continue
-		}
-		if status == http.StatusOK && needsThePool(route.suffix) {
-			t.Errorf("%s %s reported success over a pool that will not answer: %s",
-				route.method, target, raw)
-		}
-		if len(raw) == 0 && status != http.StatusNoContent {
-			t.Errorf("%s %s answered %d with no body", route.method, target, status)
-		}
-	}
-}
+// The write half of this file's question lives in `failingpooldecks_test.go`
+// as `TestNoDeckWriteTreatsAFailedQueryAsAnAnsweredOne`.
+//
+// It used to live here as well, aimed at `alice/gyome` -- a deck this library
+// has never held, so it 404ed before any write was attempted and swept ADR 5's
+// refusal path rather than the pool's. Pointed at a real deck it became word
+// for word the weaker half of the one next door, which asks the same two
+// questions and then asks whether the refusal carries a sentence. Two sweeps
+// of one thing is the shape that rots: the day the route table moves, one of
+// them is updated.
 
 // needsThePool is the half of the write family whose success depends on a card
 // resolving. The rest -- a note, a stage, a share flag, a delete -- are facts
