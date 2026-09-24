@@ -197,52 +197,56 @@ now noise.
 
 ## Testing
 
-**A new test calls `t.Parallel` unless it is holding something shared.** As of
-2026-09-19 that is 1,925 of 1,964 top-level tests, and **every one of the 39
-that does not says why where it stands** — no longer a claim to re-check:
-`go/cmd/mtglab/serialregister_test.go` holds it on every run, failing by name
-on any serial test whose doc comment or first comment says neither "serial"
-nor "parallel" (the definition of *serial* is pinned there too, because two
-hand-rolled censuses a week apart disagreed 27 to 39 over the same tree). Three things
-forbid it, and all three travel through helpers — including methods, in other
-files — so none is visible from the test itself:
+**Every test calls `t.Parallel()`, and something checks.** As of 2026-09-24
+that is every one of the 2,488 top-level tests under `go/` — zero
+serial — and `go/cmd/mtglab/serialregister_test.go` fails by name on any
+test whose own body does not call `t.Parallel()` as a statement (a call
+inside a `t.Run` closure does not count for the parent; `TestMain` and
+benchmarks are not tests). It used to be a register of argued exceptions: 39
+on 2026-09-19, each saying why it stood alone. Read together they were not
+thirty-nine reasons but **ten pieces of shared state**, every one a fact
+about the code rather than the tests, and each became a value the same day:
 
-- **`t.Setenv`**, which Go panics on inside a parallel test. Configuration is a
-  value: `config.Config` from `config.Load`, `tier3.Settings` from
-  `tier3.LoadSettings`, `claude.Endpoint`. Describe a deployment with a struct
-  literal rather than installing one on the process. `cmd/mtglab` tests build a
-  `deployment` (`clitest_test.go`) and call `d.run(t, "decks", "list")`.
-- **Writing anything package-level**, which `-race` reports and nothing else
-  will. `internal/sim/cache` swaps `engineSources` and friends;
-  `internal/sim/tier3`'s coverage index is guarded, so `-race` stays quiet and
-  only a reading catches the collision.
-- **Anything else the whole process shares** — `os.Stdout`, `os.Stdin`, `PATH`,
-  a signal. Commands write through `cmd.OutOrStdout()` and prompt through
-  `cmd.InOrStdin()` for exactly this reason; a test that swaps a process stream
-  is a test that has to run alone.
+- **A reader of the process became a lookup handed in.** `config.LoadFrom`,
+  `tier3.LoadSettingsFrom`, `claude.SettingsFromLookup`, `cmd/mtglab`'s
+  `envOr` — each takes a `func(string) string`, the composition root passes
+  `os.Getenv`, and a test describes a deployment as a map. `t.Setenv` has no
+  remaining reason to exist in this tree.
+- **A package-level value became a field.** The stance ceiling
+  (`claude.Settings.Ceiling`, read through `ceilingOr`), the Fly token
+  (`flymetrics.Panel.Token`), the Scryfall sets feed and the bulk index
+  (`api.Config.SetsFeed`, `api.Config.BulkIndex`), the slow-request floor
+  (`door.Config.SlowRequest`), the Forge card index (`tier3.Settings.Index`,
+  a `*CardIndex` per machine), the `PATH` a JVM is searched along
+  (`tier3.Settings.PathList`), the engine fingerprint (`fingerprintOf` over
+  a list a test can hand in), the clock and the opening angle in
+  `internal/claude`. A test builds its own; nothing swaps a global.
+- **A signal became a channel.** `serveUntil` takes its stop as a value; the
+  real SIGTERM is proved by running the test binary as a child process, with
+  the deployment in the child's `cmd.Env` rather than the parent's.
 
-**To find out which, do not read — measure.** Add `t.Parallel()` and run the
-test alone; Go panics with "can not use t.Parallel" on the genuinely blocked
-ones. That answers *"does Go refuse this"*, which is not the same question as
-*"is this safe"* — `TestTheServerBootsAnswersAndStopsOnASignal` passes alone
-and sends SIGTERM to the whole process. Every serial test says why where it
-stands.
+**A new test that Go refuses is not a candidate for an exception.** Add
+`t.Parallel()` and run it alone: Go panics with "can not use t.Parallel" on a
+`t.Setenv` reached through any helper, and `-race` reports a package-level
+write — but only when two tests happen to overlap, so read for those as well.
+Either answer names the next piece of shared state, and the fix is the one
+above: make it a value and hand it in. The blocker travels through helpers,
+methods and other files, so it is never visible from the test body; the panic
+names the frame, and `go test -race -run '^TestX$'` plus the stack is the
+whole diagnosis. Subtests that share a fixture the parent tears down use
+`t.Cleanup`, never `defer` — a parent's defer runs before its parallel
+subtests finish.
 
-**Measured over 79 undocumented serial tests, Go accepted 59 and refused 20**,
-and both halves carry a lesson. Of the twenty it refused, **seven reached
-`t.Setenv` through a helper and three of those from a different file**, so no
-reading of the test body could have found them — but the panic names the
-frame, so `go test -race -run '^TestX$'` and the stack is the whole diagnosis.
-Of the fifty-nine it accepted, **five were still blocked**: three swap
-`internal/api`'s package-level `scryfallSets` and two swap
-`internal/sim/cache`'s `engineSources`. Nothing but a reading finds those —
-`-race` sees a package-level swap only when two tests actually overlap, which
-is a coin toss rather than a gate. And **serialism outlives its cause**:
-forty-six of the fifty-five that parallelised were waiting on a shared stub
-ADR 39 had already deleted.
-
-Serial and parallel tests never overlap — Go finishes the serial ones before
-resuming the parallel ones — so mixing them in a package is safe.
+**Coverage gates at 95.0 and the tree measures about 96** (`ci.yml`'s
+`Coverage floor` step, arm64 leg; `docs/polish/COVERAGE.md` is the map and
+the list of levers). The floor is a ratchet — raise it when the tree passes
+a higher number, never lower it to make a red check green — and the number
+that gates is `go tool cover -func`'s total over a `-coverpkg=./...` profile,
+which is not quite what a hand merge of the same profile reads. The list of
+what CI cannot reach is empty: a JVM is `tier3.Settings.Java` and a shell
+script is one; Scryfall is `pool.RefreshOptions.IndexURL` and an
+`httptest.Server` is one. What remains uncovered is per-function and named in
+the map.
 
 **Benchmarks** live beside the determinism kernels (`mt19937`, `floats`,
 `textutil`, `sim/compile`) as `*_bench_test.go`. They are a local measuring

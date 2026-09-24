@@ -62,77 +62,107 @@ lever and a grind is visible before the work starts.
 |---|---|---|
 | PR #290 | 90.1% | 89.81% |
 | #290's follow-up | 90.4% | 90.40% |
-| this pass | **90.8%** | 90.82% |
-| floor in `ci.yml` | **90.8** (set at a measured 91.2, 2026-09-12) | |
+| #478's pass | 90.8% | 90.82% |
+| the climb of 2026-09-24 (nine lanes, #488–#496) | **96.6%** | 96.56% |
+| floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
 
-To reach 95%, **752 more statements** out of 17,977. Of what is left, about
-184 needs a JVM or a live network (below), so the reachable remainder is
-around 570.
+The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
+that pair: a diff can cost a few tenths of honest refactoring without going
+red, and a diff that costs a whole point is what the floor exists to notice.
 
-**Budget from what a pass actually moves.** #290's follow-up moved ~145
-statements across nine test files and called that the cheap end; this pass
-moved **105 across eight**, and it was picking the named levers off the list
-below rather than sweeping. At that rate 95% is five or six more passes of
-this size, and every one of them is further into the tail than the last. It is
-reachable and it is not reachable in an afternoon; a session that promises the
-number will deliver tests that assert nothing instead.
+**How the climb was paid for.** Nine lanes, one per package group, each
+handed the baseline's BY FUNCTION table for its files and a share of the
+distance, run in two waves of four or five on this Mac with a dedicated
+merge train landing them one at a time. The tree went from 1,892 missing
+statements to 742 in one day, and **not one test asserts less than it
+should** — every lane was told a test that runs lines and checks nothing was
+out of scope, and the levers below are what they found instead. The same
+day every serial test in the tree became parallel; the two jobs turned out
+to be one, because what blocked `t.Parallel()` (a URL in a package variable,
+a token read off the process, an index every machine shared) was the same
+thing that had kept the code from being driven.
 
-**Coverage is not the question worth asking at this altitude.** A statement
-that ran is not a statement anything checked, and the tail is full of one-line
-error returns where the difference is total. `gremlins unleash
-./internal/floats` answers the other question — whether a test would have
-*noticed* — and a pass spent on a LIVED mutant in code that already reads as
-covered buys more than a pass spent on the next tenth of a point.
+**What is left is genuinely per-function** — the lanes named every branch
+they judged unreachable and why, and those are collected under *Left
+deliberately* below so nobody re-chases them. The two questions still
+worth asking at this altitude are the ones this file has always ended on:
+`gremlins unleash ./internal/floats` answers whether a test would have
+*noticed*, and a LIVED mutant in code that reads as covered is worth more
+than the next tenth.
 
 ## What the floor cannot reach
 
-Named here and in `ci.yml` so nobody has to rediscover it:
+**Nothing, as a feature.** The table that stood here — `RunGames` and
+`spawn`, the shim's `match`/`matchStreamed`/`watchdog`, `sim forge`'s
+reporting, `data refresh` — was ~190 statements that "needed a JVM with
+Forge beside it or the live Scryfall network". It emptied on 2026-09-24 by
+the same move four times over: **the thing the code could not run without
+was already a value, one argument short of being handed in.**
 
-| where | what | statements |
+| what stood in the way | what it is now | what runs |
 |---|---|---|
-| `internal/sim/tier3/run.go` | `RunGames`'s body, `spawn` | ~85 |
-| `cmd/mtglab/shim.go` | `match`, `matchStreamed`, `watchdog` (calls `os.Exit`) | ~45 |
-| `cmd/mtglab/sim.go` | `sim forge`'s own reporting | ~31 |
-| `cmd/mtglab/data.go` | `refresh`, which downloads from Scryfall | ~28 |
+| a JVM | `tier3.Settings.Java` — and a shell script that answers `-version` and `cat`s a frozen game log is one | `RunGames`, `playSegment`, `spawn`, `sim forge`, the shim's `match` and `matchStreamed`, end to end |
+| `os.Exit` in the watchdog | `idleWatch.exit`, a field | the watchdog's whole body |
+| Scryfall | `pool.RefreshOptions.IndexURL`, reached through `api.Config.BulkIndex` and the `data refresh` command — an `httptest.Server` serving a bulk file is Scryfall | the refresh button's job body, the CLI's refresh, the seal, the five progress beats |
+| a second process holding the pool | `writerlock_test.go`'s child — it always could | `OpenWriterWaiting`'s wait, poll and give-up |
 
-**Their seams are covered.** The worker client and the shim door both run
-against stubs over real HTTP; `pool.DownloadBulkFrom` runs against a stub
-Scryfall; every refusal path around all of them is driven. What is missing is
-the call itself.
+`ci.yml`'s comment says the same thing in fewer words, so the next person to
+ask why it is not 100 is sent here rather than to a list that no longer
+exists.
 
-`claude check` **was on this list and is not any more.** It called
-`claude.EndpointFromEnv()` directly, so the only way to run the report was to
-spend a real call. ADR 40 made the endpoint an argument to the command tree;
-`cmd/mtglab/claudecheck_test.go` now drives the whole report — open pipe,
-refused key, `--tools` roster — against a stub over real HTTP.
+## Left deliberately
 
-## The remaining work, biggest first
+Every lane named what it judged unreachable and why, so that a future pass
+reads this list before spending an hour on a branch that cannot be entered
+honestly. **A branch whose comment says it is unreachable is not coverage to
+take**; calling past the guard proves nothing and leaves a test that reads
+as meaningful to whoever finds it next.
 
-By **function**, re-measured this pass. Everything JVM- or network-blocked is
-omitted:
-
-| miss | where | shape of the work |
-|---|---|---|
-| 19 | `internal/api/lifecycle.go:importDeck` | — |
-| 18 | `internal/api/lifecycle.go:createDeck` | both need **a companion or a partner pair in the 21-card pool**, which it does not have. The fixture is `internal/pool/pooltest`'s embedded JSON; adding to it is a decision, not a patch, because other tests count what is in there |
-| 13 | `internal/deckyaml/deckyaml.go:orderedValue` | **do not take this one.** Its two map cases carry a comment saying they are unreachable under `UseOrderedMap` and are kept as a loud failure if the decoder ever stops honouring the option. A test that reached them would have to call the unexported writer directly, and would prove that a branch nothing can enter still works |
-| 12 | `internal/pool/loaders.go:load` | — |
-| 12 | `internal/deckread/commander.go:CommanderDossier` | query-failure branches; `internal/api/failingpool_test.go`'s `schemalessPool` is the lever |
-| 12 | `internal/api/upkeep.go:gatherTheLibrary` | the refresh button's own job body |
-| 11 | `internal/pool/refresh.go:OpenWriterWaiting` | the writer's door: the wait, the poll, the give-up. Needs a second process holding the file — `internal/pool/writerlock_test.go` already builds one |
-| 10 | `internal/pool/tokensmade.go:TokensMade` | — |
-| 10 | `internal/api/adminstats.go:statsActivity` | — |
-| 10 | `internal/api/admin.go:inviteAccount` | invite failures with a stubbed sender |
-| ~9 each | `internal/api/jobruns.go:listJobs`, `internal/gate/validate.go:Validate`, `internal/claude/tools/handlers.go:searchCards`, `internal/api/forge.go:simForge`, `internal/api/coliseum.go:coliseum` | — |
-| ~1,250 | everything else | one to six statements per function; the last four points live here |
-
-Taken off this list by the pass that wrote this table, each with the test that
-did it: `gate:checkCompanion` (19 → `reportshape_test.go`),
-`claude/canonjson.go:writeValue` (12 → `canonjson_test.go`),
-`api/wheel.go:readOptionalBody` (11 → `wheelbody_test.go`),
-`pool/refresh.go:DownloadBulkFrom` (10 → `downloadfaults_test.go`),
-`deck/deck.go:cardFrom` (10 → `coercions_test.go`), and
-`api/lifecycle.go:didYouMean` (14 → `didyoumean_test.go`).
+- `deckyaml.orderedValue`'s map cases and `sortedKeys` (only reachable from
+  them), and `checkCompanion`'s `condition == ""` — the two standing entries,
+  still standing.
+- **Second reads that cannot fail after a first succeeded**: `src.ReadText`
+  in `internal/api/edits.go` after `writeTarget`'s `Get`; the duplicate
+  `library.WriterFor` calls in `lifecycle.go`; `commanderRecords` after the
+  same closure's `GetCards`. Only a race reaches them.
+- **Scans and `rows.Err()` on a still-open handle**, across `library`,
+  `deckread`, `decklog`, `pool` — with one exception: `authtest.Fault.RowsAfter`
+  makes `rows.Err()` reachable, and `internal/auth`, `night` and `traffic`
+  use it. Other packages could, at the price of a faulty connector of their
+  own.
+- **`lib.Mine()` failing** needs `Authenticated && UserID == 0`, which
+  `auth.scopeFor` cannot produce; `myCrypts`/`myWritableLibraries`' empty
+  answer likewise.
+- **Guards over embedded data**: `GetMode`/`Preset(constant)`, `dial`'s
+  self-documented branch, `json.Compact` after `json.Unmarshal` succeeded,
+  `numbers.go`'s two separator guards, `tools.go`'s nil-props/nil-required/
+  nil-handler arms (the data always carries `{}`, `[]` and all seven).
+- **`crypto/rand` failing** (`shelves`, `sim/tier1`, `brew`, `tarot`) and
+  the three `sim/karsten` memo tables that evict at 100,000 entries.
+- **Trailing `return`s no loop can fall past**: `textutil.Head`,
+  `decklist.firstRunes`; `decklist.digitValue`'s eleven-consecutive-Nd
+  fallback; `consume`'s `len(leftovers) < cost.Generic`, arithmetically
+  impossible after pip matching; `sim/tier1`'s branch labelled unreachable
+  in its own comment.
+- **`fs.Glob` swallows its `ReadDir` error**, so `Fingerprint`'s glob-error
+  branch cannot fire with a literal `"*"`; the `fs.ReadFile` branch beside
+  it can and does.
+- **`users.go:prompt.secret`'s terminal branch** wants a real pty
+  (`golang.org/x/sys` is already a dependency; platform-specific test code
+  nobody has argued for yet) — the single biggest lever left in
+  `cmd/mtglab`, at five statements.
+- **Fixture decisions, not patches**: `simShelfCommand`'s `Approximated`
+  tail wants a two-colour card in the 21-card pool; `coliseum.go`'s
+  `rec != nil` arms want `Grand Coliseum` and `Jareth, Leonine Titan` in it;
+  `simMulliganCommand`'s non-flat `BEST:` branch wants a deck the tiny pool
+  cannot express. A hand-added row named after a real card is a claim about
+  Magic nobody looked up (rule 1); adding those rows from the real pool is
+  the honest route.
+- **`gate/rulebreaker.go`** (6) is reachable but needs real ADR 51 clause
+  text off a real card — a session with the pool, not a worktree.
+- **`deckread/commander.go`**'s seven statements that need `GetCards` to
+  succeed and a later `oracle_cards` query to fail: a pool that breaks
+  mid-flight, which no fixture yet is.
 
 ## Levers that worked
 
@@ -186,6 +216,74 @@ from #290; the rest are this pass.
     to reach, they are what commandment 2 actually consists of, and they were
     uncovered almost without exception — `reportshape_test.go` and
     `didyoumean_test.go` are the shape.
+
+The rest are from the climb of 2026-09-24, one lane each, and every one of
+them is reusable:
+
+12. **A scripted JVM.** `tier3.Settings.Java` was already the seam: a shell
+    script that answers `-version` with a real-looking line and then `cat`s
+    a frozen game log is a JVM as far as `spawn` can tell. `RunGames`,
+    `playSegment`, the whole bout, `sim forge` and the shim's `match` all
+    run without Forge (`gameclock_test.go`'s `fakeJava`, `cmd/mtglab`'s
+    `testdata/fakejava`). See the trap below about minting executables.
+13. **The job body behind a URL constant.** A package constant that reaches
+    the network is a whole feature nothing can test. Make it a field whose
+    zero value is the constant (`api.Config.BulkIndex`, `SetsFeed`) and the
+    job body becomes drivable: `gatherTheLibrary` went 24 → 6.
+14. **A database that refuses writes.** Three `BEFORE … RAISE(ABORT)`
+    triggers reach every write-error branch a closed handle cannot, because
+    a closed handle fails at the *first* call and these fail at the one
+    that matters.
+15. **The volume that goes away mid-transaction.** `authtest.OpenFaulty`
+    returns a real migrated `app.db` over a connector that refuses every
+    statement past a budget (`Fault.After`), and `Fault.RowsAfter` fails a
+    result set partway so `rows.Err()` is reachable. It is what took
+    `internal/auth` 96 → 28 and `night` 54 → 14: the branches where a
+    half-finished write decides whether to roll back, whether to say so and
+    whether to claim it did the work.
+16. **A schema older than the binary — one table at a time.** `DROP TABLE`
+    names which read depends on which table where a closed handle only
+    proves "something failed": `statsActivity` 18 → 4 by dropping `users`,
+    `auth_tokens`, `sessions`, `sim_cache`, `deck_log` in turn. The same
+    trick on the pool (`DROP TABLE printings` after `pooltest.Build`) makes
+    every card lookup succeed and only art, prices and printing history
+    fail — stronger than the schema-less pool for anything downstream of
+    `GetCards`. `ALTER TABLE … DROP COLUMN` is refused by the schema's
+    index; rebuild with `CREATE TABLE … AS SELECT`, drop, rename.
+17. **An `app.db` that claims a schema it does not have.** `auth.Migrate`
+    is a no-op when `user_version` already reads `SchemaVersion`, so a file
+    with the pragma and no tables walks straight past the ladder. It is the
+    schema-less pool one layer up (`claimedschema_test.go`; `hollowed(t, d,
+    tables...)` for "the accounts are there, the tables about them are
+    gone").
+18. **Two handles, one taken away.** `library.NewSQLSource(read, write, …)`
+    holds separate handles by design, so closing exactly one asks the read
+    question and the write question separately (`closedhandles_test.go`).
+19. **An in-package `&Conn{db: db, pool: New("", nil)}`** is a full pool
+    connection with no lease and no memo; it is what makes a hand-built
+    DuckDB table with *some* of the pool's columns land the failure on a
+    named read (`tokens_made`, `token_identities`, `card_art`).
+20. **No maintainer configured plus a closed `app.db`.** With `AdminEmail`
+    empty the maintainer lookup is skipped, so `a.library()` succeeds and
+    the failure lands one layer in — the only way to reach the crypt's three
+    routes and the two master switches.
+21. **A crypt you can bury into and cannot read back** — `.trash` at
+    `0o333`: rename in works, `ReadDir` does not. `0o500` is the other half.
+    A shelf the process can read and not write (`0o500` on the decks dir)
+    reaches `Create`, `WriteArtifacts` and `SetShared` failures — and
+    `shared: true` removes the key, so a test of the write asks for `false`.
+22. **A route-table-derived malformed-body sweep.** `readBody` had sixteen
+    call sites and one of them tested.
+23. **The `init` body as a function over a document.** Four packages
+    (`reference`, `brew`, `tarot`, `prices`' table) had boot panics nothing
+    could reach; `loadDeck(raw)`, `loadCauldron(raw)`, `indexArenas(doc)`
+    and friends make the guard drivable without touching the committed
+    data. The guard, not the path — `canonjson_test.go`'s shape.
+24. **A filesystem as a value, for the one write that replaces
+    `deck.yaml`.** `writeAtomically`'s five failure branches each name the
+    deck that would not save and none can fire on a working disk;
+    `writeAtomicallyOn(disk, …)` is a struct of five functions, a value
+    rather than a hook so the package's tests stay parallel.
 
 ## Corrections to this file
 
@@ -275,11 +373,81 @@ and `ci.yml` gated on the other.
   a floor (`if swept < 15`), because a pattern filler that stops matching the
   route table is silent otherwise — and silent is indistinguishable from green.
 
+- **Minting an executable per test races a 30-second probe.** The first
+  execution of a freshly written executable costs seconds on this Mac (6.2s
+  measured idle, inside the test binary), and on Linux a script written by
+  one parallel test can be exec'd by another while a third still holds the
+  write fd open across its own fork — `text file busy`. `javaMajor` gives a
+  candidate 30s; eight of them at once under `go test ./...` reported `Java
+  None`, which reads like a broken JVM. The fix is one committed executable
+  (`testdata/fakejava`) and per-test **data** it reads from the subprocess's
+  cwd, which `spawn` already makes the Forge home.
+- **A test fixture in a non-test package costs coverage.** The first
+  `authtest/faulty.go` wrapped every optional driver interface with a
+  fallback; the driver implements all of them, so 49 fallback statements sat
+  uncovered and ate a third of a lane's gain. Cut to the roads it travels.
+- **`unparam` fires on a test helper's constant argument at the fourth
+  caller.** Adding a caller that passes the same value as the existing
+  three turns a green lint red in a file you did not edit.
+- **An aborted HTTP body must exceed the server's write buffer.**
+  `panic(http.ErrAbortHandler)` after under 2 KB reaches the client as a
+  failed `client.Do`, not as a short `io.Copy` — a different branch.
+- **`sql.Open("duckdb", path)` fails eagerly.** A missing directory or a
+  file of garbage errors at `Open`, not at `Ping`, so `pool.Open`'s ping
+  branch stays unreachable and a corrupt file is `ErrNoPool`
+  (`TestAFileThatIsNotADatabaseIsNoPoolRatherThanAFailingOne` holds it).
+- **`Repeats`' overlap threshold is 0.7 of the shorter fact's vocabulary**,
+  so a "reworded fact" written by eye silently does not reach it; measure
+  the overlap before asserting.
+- **A crypt folder that is not a name.** `safeSegment` sees the folder name
+  in `Empty` and the parsed slug in `Restore`; a stamped folder trims to
+  something non-empty and passes both, a folder named exactly `...` fails
+  both.
+- **The two sweeps in `failingpool_test.go` were asking a 404, not a pool**
+  — `{slug}` was filled with a deck the fixture library does not hold, so
+  every deck-scoped route stopped at ADR 5's 404 and the file read as
+  working because the non-deck routes did reach the pool. A sweep aimed at
+  a deck that exists **fails on a 404** now. A route sweep's filler is part
+  of the assertion.
+
 ## Recorded rather than fixed
 
-Two behaviours pinned by tests that describe them rather than approve of them.
-Both are the same rule producing the same operational risk, and changing either
-is Aaron's call, not a patch.
+Behaviours pinned by tests that describe them rather than approve of them.
+The first two are the same rule producing the same operational risk; the rest
+were found by the climb of 2026-09-24 and are queued for a ruling in
+`DAYBREAK.md`. Changing any of them is Aaron's call, not a patch.
+
+- **`auth.exclusive` can hand a poisoned connection back to the pool.** It
+  opens with a hand-written `BEGIN IMMEDIATE` on a pinned connection; when
+  the ROLLBACK or the COMMIT also fails it returns that connection with the
+  transaction still open, and the next `BEGIN IMMEDIATE` on it is refused —
+  a handle that keeps answering reads while writing nothing.
+  `clearStaleTransaction` in `internal/auth/halfwritten_test.go` carries the
+  paragraph. Beside it: `SetPassword` assigns `revoked` inside the
+  transaction, so a COMMIT that never lands returns a count about work that
+  was rolled back.
+- **A recorder opens a database it has not checked.** `claude/ledger` and
+  `tier3/ledger`'s `NewRecorder` both `sql.Open` without a ping, so a
+  missing `app.db` is discovered at the first *write* — and the Claude one
+  warns rather than fails, so on an instance whose volume did not mount,
+  conversations happen, cost money and are not recorded.
+  `TestARecorderOverAMissingDatabaseOpensAndDiscoversItLater` holds the one;
+  a sibling in `tier3/ledger` holds the other.
+- **A swap that trades one chosen colour for another is refused**
+  (`internal/api/edits.go`, `playableCard` computes `chosenColorReach` over
+  the deck *including* the card on its way out). The deck the swap would
+  produce is legal; the refusal names the order that works.
+- **An unreadable `artifacts/` directory answers `[]` and `baseline:
+  "unknown"`** (`internal/library/source.go`), the same words a never-built
+  deck gets. The build refuses correctly; only the shelf lies.
+- **The intake's slot sweep reports a silent zero when every call was
+  refused** (`internal/api/intake.go`): its one note fires only on the
+  credential going away, so a dead endpoint renders "0 of 2" with nothing
+  said.
+- **`data snapshot` over a pool with none of the pool's tables prints
+  `snapshotted 0 prices for today` and exits 0** — `SnapshotPrices` creates
+  what it needs rather than refusing. Not pinned; the cmd lane dropped the
+  test rather than assert it.
 
 **`data snapshot` on a machine whose volume did not mount** creates an empty
 pool on the container's own disk and reports `snapshotted 0 prices for today`

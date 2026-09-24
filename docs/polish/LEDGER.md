@@ -19,8 +19,9 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
-  2026-09-05 (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-24 (the coverage climb, outside the rainbow).
+  Previous: 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05
+  (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -28,6 +29,53 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-24 (the coverage climb)
+
+Not a rainbow leg — Aaron asked for two things by name, in daylight, and
+they were run as one pass because they turned out to be one job: *get the
+coverage back to 96 and set the PR gate at 95*, and *every Go test runs with
+`t.Parallel()`*. Nine Opus lanes in worktrees, one per package group, two
+waves of four or five with a dedicated merge train landing wave one while
+wave two ran; the integrator's own PR closed it. All numbers below are the
+integrator's re-measurement on `main` after the last merge, not a lane's
+claim.
+
+- **Coverage: 91.2% → 96.6% (`-func`), 1,892 → 742 missing
+  statements, floor 90.8 → 95.0.** #488 pool (−101), #489 tier3 (≥ −92),
+  #490 deck-libs (−134), #491 claude (−106), #492 api-decks (−183), #493
+  api-ops (−116), #494 kernels (−142), #495 auth-door-night (−138), #496 cmd
+  (−154). The `ci.yml` list of what CI cannot reach is empty: the four
+  entries that needed a JVM or Scryfall all fell to a value one argument
+  short of being handed in (`COVERAGE.md`, *What the floor cannot reach*).
+  Not one test was written to run lines and assert nothing; the levers
+  (12–24 in `COVERAGE.md`) are what the lanes found instead.
+- **Parallelism: 39 serial tests → 0, and the register now requires it.**
+  `TestEverySerialTestSaysWhyWhereItStands` became
+  `TestEveryTestRunsBesideItsNeighbours` (same file, same AST definition)
+  and fails by name on any top-level test without a direct `t.Parallel()`.
+  The 39 were ten pieces of shared state, each now a value: the stance
+  ceiling, the Fly token, the sets feed, the coverage index, the `PATH`
+  search, three environment readers (`LoadFrom`, `LoadSettingsFrom`,
+  `SettingsFromLookup`), the engine fingerprint, the slow-request floor, and
+  the process signal. Two latent races nobody had reported went with them:
+  `freezeAngle` swapping a package variable inside an already-parallel
+  test (`internal/claude`), and `shelves` mutating a package-level
+  reference map in place.
+- **The Coverage floor step prints its cause now.** The suite's output goes
+  to a file and comes back on failure, so a test failing inside that run
+  reads as a test failure and not as a coverage regression (the 2026-08-26
+  signature this ledger recorded as "twenty minutes to prove a negative").
+- **A flake fixed before it spread**: a fake JVM minted per test raced
+  `javaMajor`'s thirty-second probe (a first-run scan on the Mac, `text
+  file busy` on Linux) and reported `Java None`; both `tier3` and
+  `cmd/mtglab` now commit one executable under `testdata/` and write only
+  data per test.
+- **Queued, nine rulings** (DAYBREAK, *a ruling, one word each*): a
+  poisoned connection in `auth.exclusive`, two lazy recorders, three
+  sentences a player reads pinned as wrong, `data snapshot`'s zero over a
+  hollow pool, two callers-of-nothing, three fixture rows, and whether two
+  `yamlemit` unit tests call past a guard.
 
 ### 2026-09-19 (cleanup)
 
@@ -65,7 +113,9 @@ state, never checklists.
      test, its parallel subtests only run beside each other). A number that
      changes with the person asking cannot be re-checked. So the definition
      lives in code now: `go/cmd/mtglab/serialregister_test.go`
-     (`TestEverySerialTestSaysWhyWhereItStands`) walks every `_test.go` under
+     (`TestEverySerialTestSaysWhyWhereItStands`; renamed
+     `TestEveryTestRunsBesideItsNeighbours` on 2026-09-24 when the count
+     reached zero and the register began to require it) walks every `_test.go` under
      `go/` with the language's own parser, counts a test serial when its own
      body has no `t.Parallel()` *statement* (TestMain and benchmarks excluded
      by parameter type), and requires the doc comment or a comment ahead of

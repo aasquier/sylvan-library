@@ -210,40 +210,32 @@ func TestGamesArrivingUnderTheCeilingAreNeverCut(t *testing.T) {
 // fakeJava is a stand-in for the JVM that answers the version probe and then
 // plays whatever the test scripted for *this* invocation.
 //
+// The executable is `testdata/fakejava`, committed once, and its doc says why
+// a test must never mint one of its own. What a test varies is data: the
+// segments are written into `home`, which [spawn] makes the subprocess's
+// working directory, and the run counter lives beside them.
+//
 // The invocation count is the point: a bout that clocks out a game runs a
 // second subprocess, and nothing else in this file can tell one JVM from two.
-func fakeJava(t *testing.T, segments ...string) (java string, runs func() int) {
+//
+// The command line is handed on to the segment, because a real JVM is given
+// one and a segment that wants to answer Forge's own `-n` has to be able to
+// read it. A segment that ignores its arguments is unaffected.
+func fakeJava(t *testing.T, home string, segments ...string) (java string, runs func() int) {
 	t.Helper()
-	dir := t.TempDir()
 	for i, body := range segments {
-		path := filepath.Join(dir, fmt.Sprintf("segment%d.sh", i+1))
+		path := filepath.Join(home, fmt.Sprintf("fakejava.segment%d.sh", i+1))
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	counted := filepath.Join(dir, "runs")
-	java = filepath.Join(dir, "java")
-	// The trailing `:` keeps this shell alive behind the segment it started,
-	// which is the deployed shape [wedge] argues for: the thing playing the
-	// games is a grandchild of the process `spawn` holds.
-	//
-	// The command line is handed on to the segment, because a real JVM is given
-	// one and a segment that wants to answer Forge's own `-n` has to be able to
-	// read it. A segment that ignores its arguments is unaffected.
-	body := "#!/bin/sh\n" +
-		"if [ \"$1\" = \"-version\" ]; then\n" +
-		"  echo 'openjdk version \"21.0.1\" 2023-10-17' 1>&2\n" +
-		"  exit 0\n" +
-		"fi\n" +
-		"n=1\n" +
-		"if [ -f " + counted + " ]; then n=$(( $(cat " + counted + ") + 1 )); fi\n" +
-		"echo $n > " + counted + "\n" +
-		"/bin/sh " + dir + "/segment$n.sh \"$@\" ; :\n"
-	if err := os.WriteFile(java, []byte(body), 0o700); err != nil { //nolint:gosec // a test's own temp dir, and it has to be executable
+	java, err := filepath.Abs(filepath.Join("testdata", "fakejava"))
+	if err != nil {
 		t.Fatal(err)
 	}
+	counted := filepath.Join(home, "fakejava.runs")
 	return java, func() int {
-		raw, err := os.ReadFile(counted) //nolint:gosec // the path this helper just wrote
+		raw, err := os.ReadFile(counted) //nolint:gosec // the path this helper just chose
 		if err != nil {
 			return 0
 		}
@@ -268,11 +260,11 @@ func TestABoutPlaysOnAfterAGameIsClockedOut(t *testing.T) {
 	t.Parallel()
 	// The second segment numbers its own games 1 and 2, because a fresh JVM
 	// starts counting again. They have to come back as 4 and 5.
-	java, runs := fakeJava(t,
+	home := fakeForge(t, "2.0.14", "Sol Ring", "Forest")
+	java, runs := fakeJava(t, home,
 		strings.Join(wedge(won(1, 1, 1200) + won(2, 2, 1400))[2:], ""),
 		won(1, 2, 900)+won(2, 1, 1100)+":")
-	forge := Settings{Home: fakeForge(t, "2.0.14", "Sol Ring", "Forest"),
-		Profile: t.TempDir(), Java: java}
+	forge := Settings{Home: home, Profile: t.TempDir(), Java: java}
 
 	var ticks []int
 	run, err := forge.RunGames(
@@ -332,9 +324,9 @@ func TestABoutPlaysOnAfterAGameIsClockedOut(t *testing.T) {
 // pinned separately: one subprocess, the games asked for, no clock-out row.
 func TestAnUncutBoutStillRunsAsOneMatch(t *testing.T) {
 	t.Parallel()
-	java, runs := fakeJava(t, won(1, 1, 900)+won(2, 2, 1100)+":")
-	forge := Settings{Home: fakeForge(t, "2.0.14", "Sol Ring", "Forest"),
-		Profile: t.TempDir(), Java: java}
+	home := fakeForge(t, "2.0.14", "Sol Ring", "Forest")
+	java, runs := fakeJava(t, home, won(1, 1, 900)+won(2, 2, 1100)+":")
+	forge := Settings{Home: home, Profile: t.TempDir(), Java: java}
 
 	run, err := forge.RunGames(
 		[]*deck.Deck{testDeck("alpha"), testDeck("beta")},
@@ -359,9 +351,9 @@ func TestAnUncutBoutStillRunsAsOneMatch(t *testing.T) {
 // swallow that, which it would if an empty segment were simply retried.
 func TestASilentForgeIsStillReportedRatherThanRetried(t *testing.T) {
 	t.Parallel()
-	java, runs := fakeJava(t, `echo "Could not load deck - alpha, match cannot start" ; :`)
-	forge := Settings{Home: fakeForge(t, "2.0.14", "Sol Ring", "Forest"),
-		Profile: t.TempDir(), Java: java}
+	home := fakeForge(t, "2.0.14", "Sol Ring", "Forest")
+	java, runs := fakeJava(t, home, `echo "Could not load deck - alpha, match cannot start" ; :`)
+	forge := Settings{Home: home, Profile: t.TempDir(), Java: java}
 
 	_, err := forge.RunGames([]*deck.Deck{testDeck("alpha"), testDeck("beta")},
 		RunOptions{Games: 5, Timeout: time.Minute, GameCeiling: time.Minute})
