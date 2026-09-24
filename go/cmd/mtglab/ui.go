@@ -45,9 +45,10 @@ func uiCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&host, "host", "127.0.0.1", "address to listen on")
 	f.StringVar(&port, "port", "8765", "port to listen on")
-	f.StringVar(&webDist, "web-dist", envOr("MTGLAB_WEB_DIST", "web_dist"),
+	f.StringVar(&webDist, "web-dist", envOr(os.Getenv, "MTGLAB_WEB_DIST", "web_dist"),
 		"the built frontend (MTGLAB_WEB_DIST)")
-	f.StringVar(&tarot, "tarot", envOr("MTGLAB_TAROT_DIR", filepath.Join("assets", "tarot")),
+	f.StringVar(&tarot, "tarot",
+		envOr(os.Getenv, "MTGLAB_TAROT_DIR", filepath.Join("assets", "tarot")),
 		"the packaged tarot art (MTGLAB_TAROT_DIR)")
 	// There is deliberately no `--no-open`. It existed here, parsed into a
 	// variable and thrown away with `_ = noOpen`, while its help text promised
@@ -58,8 +59,24 @@ func uiCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
 	return cmd
 }
 
-func envOr(name, fallback string) string {
-	if v := os.Getenv(name); v != "" {
+// envOr is the fallback the two boot flags read through, and **the lookup is
+// an argument** — the shape ADR 39 gave [config.LoadFrom] and ADR 40 the
+// Claude endpoint, arriving here last because these two are the last
+// environment reads left in the command tree.
+//
+// They are read here rather than passed down from [config.Config] for Cobra's
+// sake: a flag's default is fixed while the tree is being assembled, and
+// `--web-dist` and `--tarot` are the only two whose default is a deployment's
+// business. ADR 39 named that exception and ADR 40 left it standing.
+//
+// What the lookup being a parameter buys is the rule itself: **an environment
+// variable set to the empty string is how a container spells "not set"**, and
+// taking it literally would override a working default with nothing. That is a
+// question about this function, and the only way to ask it used to be to write
+// the process — one [testing.T.Setenv], and the last serial test in this
+// package.
+func envOr(getenv func(string) string, name, fallback string) string {
+	if v := getenv(name); v != "" {
 		return v
 	}
 	return fallback
@@ -228,26 +245,22 @@ func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot s
 // already holding has no window and needs no clock: the connection is accepted
 // into the backlog the moment it is made, and the probe waits for the boot
 // instead of racing it.
+//
+// **The stop is armed here and the boot is one call below it**, which is the
+// split [serveUntil] exists for. Arming the process's signals is three lines
+// and one ordering; the boot is forty and seven. A test that wants to prove
+// what a stop does to a boot has no business sending the whole test binary a
+// SIGTERM to do it — there is only one process and every other `serve` in it
+// hears the same signal — so the boot takes its stop as a value and the two
+// tests that used to run alone now close their own channel. What is left here
+// is the ordering, and that is what the child process in `serve_test.go`
+// proves, on a machine of its own, with a real signal.
 func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	listen func() (net.Listener, error)) error {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-
-	// The night's switches, resolved first and allowed to refuse — the one
-	// exception to `configComplaints`' warnings-never-refusal rule, argued at
-	// [night.SettingsFromConfig]: those complaints are about settings the
-	// site does not need to serve an anonymous page, while a misconfigured
-	// night is a scheduler that would quietly run on the wrong clock at an
-	// hour nobody is watching. Before the ladder and the signal handler,
-	// because nothing has been touched yet and the sentence is the fix.
-	nightSet, err := night.SettingsFromConfig(cfg)
-	if err != nil {
-		return err
-	}
-
-	// **The stop is armed before anything it could have to interrupt** — the
-	// one ordering in this function that is not about the boot.
+	// **Armed before anything it could have to interrupt**, which is to say
+	// before the call below and everything in it.
 	//
-	// This call used to sit at the bottom, three statements below
+	// This call used to sit at the bottom of the boot, three statements below
 	// `server.Serve`, and everything above it therefore ran unguarded: the
 	// ladder, the reconciliation, the door, the bind, and the first requests
 	// answered over that listener. [signal.Notify] is the only thing that
@@ -255,7 +268,7 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	// process where it stands, so a stop arriving in that window was not
 	// *delayed*, it was **gone**. The boot test hung on it four times in one
 	// day on CI, and the goroutine dump was unambiguous: `serveOn` parked in
-	// the select below, `Serve` still accepting, nothing inside `Shutdown`.
+	// its select, `Serve` still accepting, nothing inside `Shutdown`.
 	//
 	// The buffered channel is the other half. A signal taken during the boot
 	// is **held**, so `auth.Migrate` — a forward-only ladder that runs on
@@ -274,14 +287,43 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	// Ctrl-C is a worse bug than this one.
 	//
 	// Stopped on the way out: the registration is process-wide, and un-stopped
-	// every call left a channel registered for the life of the process. That
-	// does mean the two tests driving `serve` into an early refusal now touch
-	// a process-global; they stay parallel, because delivery is a broadcast to
-	// every registered channel rather than a handoff to one, so no
-	// registration can take a signal away from another.
+	// every call left a channel registered for the life of the process.
+	// Delivery is a broadcast to every registered channel rather than a
+	// handoff to one, so no registration can take a signal away from another —
+	// which is why the tests that drive `serve` into an early refusal are
+	// parallel despite touching a process global.
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signals)
+	return serveUntil(cfg, forge, webDist, tarot, listen, signals)
+}
+
+// serveUntil is the boot itself, stopping when `stop` speaks.
+//
+// **The stop is a value for the reason every other setting in this tree is
+// one.** It was [signal.Notify] on the process, so the only way to ask this
+// function what a stop does was to send SIGTERM to the whole test binary — a
+// broadcast every other `serve` alive in it would also hear, which meant the
+// two tests about the boot ran alone and any failure they caused landed on
+// somebody else's test. A channel handed in is the same boot with the same
+// ordering: `stop` is already armed and already buffered when this is called
+// from [serveOn], so a stop taken during the ladder is found waiting at the
+// select below exactly as a signal is.
+func serveUntil(cfg config.Config, forge tier3.Settings, webDist, tarot string,
+	listen func() (net.Listener, error), stop <-chan os.Signal) error {
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+	// The night's switches, resolved first and allowed to refuse — the one
+	// exception to `configComplaints`' warnings-never-refusal rule, argued at
+	// [night.SettingsFromConfig]: those complaints are about settings the
+	// site does not need to serve an anonymous page, while a misconfigured
+	// night is a scheduler that would quietly run on the wrong clock at an
+	// hour nobody is watching. Before the ladder and the signal handler,
+	// because nothing has been touched yet and the sentence is the fix.
+	nightSet, err := night.SettingsFromConfig(cfg)
+	if err != nil {
+		return err
+	}
 
 	// The schema ladder, before anything opens the file: creating `app.db`
 	// and bringing it to `auth.SchemaVersion` is this command's job, and a
@@ -377,12 +419,12 @@ func serveOn(cfg config.Config, forge tier3.Settings, webDist, tarot string,
 	errs := make(chan error, 1)
 	go func() { errs <- server.Serve(listener) }()
 
-	// Whichever comes first, and the signal channel above may already be
-	// holding one from during the boot — which is the point of arming it up
-	// there rather than here.
+	// Whichever comes first, and `stop` may already be holding one from during
+	// the boot — which is the point of arming it in [serveOn] rather than
+	// here.
 	var serveErr error
 	select {
-	case sig := <-signals:
+	case sig := <-stop:
 		log.Info("stopping", "signal", sig.String())
 	case err := <-errs:
 		if !errors.Is(err, http.ErrServerClosed) {

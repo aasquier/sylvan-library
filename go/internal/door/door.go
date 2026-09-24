@@ -108,6 +108,16 @@ type Config struct {
 	// nothing; admin-triggered sample runs still work, which is how the
 	// first real window gets measured before it gets set.
 	Night night.Settings
+	// SlowRequest is how long an answered request may take before it earns a
+	// warning in the log. Zero is [DefaultSlowRequest], which is what a real
+	// process wants.
+	//
+	// A field rather than a package-level knob, and the reason is the test
+	// that proves the warning fires at all: lowering a shared floor makes
+	// every request in the package cross it, so that test had to run with
+	// nothing else running. A door that carries its own floor can be built
+	// beside a dozen others, each answering to its own patience.
+	SlowRequest time.Duration
 	// Logger, or slog.Default().
 	Logger *slog.Logger
 }
@@ -139,6 +149,9 @@ type Door struct {
 	// then daily, from the door and stopped with it. Nil on an instance with
 	// no app.db, for the night runner's reason -- no rows, nothing to sweep.
 	sweeper *auth.Sweeper
+	// slowRequest is Config.SlowRequest resolved: the floor this door's own
+	// answers are measured against.
+	slowRequest time.Duration
 }
 
 // New builds a door. It opens `app.db` read-only when auth is required (and
@@ -149,7 +162,10 @@ func New(cfg Config) (*Door, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	d := &Door{cfg: cfg, log: cfg.Logger}
+	if cfg.SlowRequest <= 0 {
+		cfg.SlowRequest = DefaultSlowRequest
+	}
+	d := &Door{cfg: cfg, log: cfg.Logger, slowRequest: cfg.SlowRequest}
 	if cfg.RequireAuth {
 		db, err := auth.Open(cfg.AppDB)
 		if err != nil {
@@ -376,7 +392,7 @@ func (d *Door) Handler() http.Handler {
 		// door answers quickly is quiet; a line here is a request that was
 		// genuinely slow for whoever was waiting on it, and the log is where
 		// "the site felt sluggish for a minute" stops being unfalsifiable.
-		if elapsed := time.Since(start); elapsed >= slowRequest {
+		if elapsed := time.Since(start); elapsed >= d.slowRequest {
 			d.log.Warn("slow request", "route", t.template,
 				"method", r.Method, "status", status,
 				"ms", elapsed.Milliseconds())
@@ -384,16 +400,14 @@ func (d *Door) Handler() http.Handler {
 	})
 }
 
-// slowRequest is where an answered request earns a log line. Reads on this
-// app measure in tens of milliseconds and anything long-running is a job,
-// so half a second is not a tuning judgment about handlers — it is the
-// signature of contention: a starved core, a drained CPU-burst balance, a
-// lock held too long. Those are exactly the stalls a person feels and a
-// later reading cannot reconstruct without a timestamped name.
-//
-// A var only so the one serial test that proves the warning fires can
-// lower the floor; nothing else assigns it.
-var slowRequest = 500 * time.Millisecond
+// DefaultSlowRequest is where an answered request earns a log line when a
+// door was not told otherwise. Reads on this app measure in tens of
+// milliseconds and anything long-running is a job, so half a second is not a
+// tuning judgment about handlers — it is the signature of contention: a
+// starved core, a drained CPU-burst balance, a lock held too long. Those are
+// exactly the stalls a person feels and a later reading cannot reconstruct
+// without a timestamped name.
+const DefaultSlowRequest = 500 * time.Millisecond
 
 // tally carries the matched template from dispatch back out to the counting
 // layer — never the concrete path: a path can carry a slug and a slug can

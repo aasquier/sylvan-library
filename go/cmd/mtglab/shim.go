@@ -497,7 +497,13 @@ func serveShimOn(ctx context.Context, forge tier3.Settings,
 	handler := &shim{state: state, log: log.Default(), forge: forge}
 
 	if limit > 0 {
-		go watchdog(state, time.Duration(limit)*time.Second)
+		go idleWatch{
+			state: state,
+			limit: time.Duration(limit) * time.Second,
+			every: watchdogTick,
+			say:   os.Stdout,
+			exit:  os.Exit,
+		}.run()
 	}
 	// Warm the coverage index while nobody is waiting: the first `/coverage`
 	// after a cold boot would otherwise pay the ~2s zip scan inside somebody's
@@ -528,15 +534,45 @@ func serveShimOn(ctx context.Context, forge tier3.Settings,
 	return nil
 }
 
-func watchdog(state *shimState, limit time.Duration) {
+// watchdogTick is how often the idle watch looks. Fifteen seconds against an
+// idle limit measured in minutes: the machine's own stop is not a deadline
+// anybody times, and a quarter-minute of imprecision on a three-minute silence
+// costs a fraction of a cent.
+const watchdogTick = 15 * time.Second
+
+// idleWatch is the thing that stops the machine, described rather than done.
+//
+// **Three of its four fields exist because it ends a process.** Fly's proxy
+// never sees private-network traffic, so idleness is judged here and the
+// verdict is [os.Exit] — which is the one verdict a test cannot survive
+// watching. So how often it looks, what it says, and what it does about a
+// machine that has gone quiet are all values, and the composition root below
+// supplies the real three. What is left to test is the judgement itself: that
+// the clock is read rather than assumed, that a watch under work in flight
+// never fires, and that the sentence an operator finds in `fly logs` names the
+// limit it gave up on.
+type idleWatch struct {
+	state *shimState
+	// limit is quiet before the machine stops; every is how often that is
+	// looked at.
+	limit, every time.Duration
+	// say is where the last line goes — [os.Stdout] on the worker, a buffer
+	// in a test.
+	say io.Writer
+	// exit ends the process. [os.Exit] on the worker.
+	exit func(int)
+}
+
+func (w idleWatch) run() {
 	for {
-		time.Sleep(15 * time.Second)
-		if state.idleFor() > limit {
-			fmt.Printf("forge shim: idle for %ds, stopping the machine\n",
-				int(limit.Seconds()))
+		time.Sleep(w.every)
+		if w.state.idleFor() > w.limit {
+			fmt.Fprintf(w.say, "forge shim: idle for %ds, stopping the machine\n",
+				int(w.limit.Seconds()))
 			// Abrupt on purpose: there is nothing to flush, no state to keep,
 			// and a clean exit is what turns `restart: no` into `stopped`.
-			os.Exit(0)
+			w.exit(0)
+			return
 		}
 	}
 }

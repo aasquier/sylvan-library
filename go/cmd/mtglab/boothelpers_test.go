@@ -10,6 +10,7 @@ import (
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/config"
+	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
 // The small pieces the boot sequence and the runbook rest on: the maintainer
@@ -105,29 +106,80 @@ func TestAMissingDatabaseFailsTheReconciliation(t *testing.T) {
 	}
 }
 
-// envOr is the fallback every boot flag reads through, and an empty value is
-// an absent one. **Serial, and the last environment reader in this package on
-// purpose**: Cobra needs `--web-dist` and `--tarot` to have defaults while it
-// is building the command tree, before a [config.Load] could have run, so
-// these two are read here rather than passed. ADR 39 named the exception and
-// ADR 40 left it standing -- an environment variable set to the empty string is how a
-// container spells "not set", and taking it literally would override a
+// envOr is the fallback the two boot flags read through, and an empty value is
+// an absent one -- because an environment variable set to the empty string is
+// how a container spells "not set", and taking it literally would override a
 // working default with nothing.
+//
+// **The deployment is a map here**, which is the whole of what ADR 39's shape
+// bought this function: it used to read [os.Getenv], so the only way to
+// describe a machine that had set the variable was [testing.T.Setenv] -- a
+// write to the process, and the last serial test in this package. The lookup is
+// an argument now, so four machines can be described in one parallel test and
+// none of them is this one.
 func TestEnvOrTreatsAnEmptyValueAsAbsent(t *testing.T) {
-	t.Setenv("MTGLAB_TEST_ENVOR", "")
-	if got := envOr("MTGLAB_TEST_ENVOR", "the default"); got != "the default" {
-		t.Errorf("an empty value gave %q", got)
+	t.Parallel()
+	machine := func(pairs map[string]string) func(string) string {
+		return func(name string) string { return pairs[name] }
 	}
-	t.Setenv("MTGLAB_TEST_ENVOR", "explicit")
-	if got := envOr("MTGLAB_TEST_ENVOR", "the default"); got != "explicit" {
-		t.Errorf("an explicit value gave %q", got)
+	for _, tc := range []struct {
+		what     string
+		env      map[string]string
+		fallback string
+		want     string
+	}{
+		{"an empty value", map[string]string{"MTGLAB_WEB_DIST": ""}, "the default", "the default"},
+		{"an explicit value", map[string]string{"MTGLAB_WEB_DIST": "explicit"}, "the default", "explicit"},
+		{"an unset variable", map[string]string{}, "the default", "the default"},
+		// An empty fallback is still a legitimate answer.
+		{"an empty fallback", map[string]string{}, "", ""},
+		// Whitespace is a value somebody meant: a path can begin with a space
+		// and this is not the place to second-guess one.
+		{"a value that is only a space", map[string]string{"MTGLAB_WEB_DIST": " "}, "the default", " "},
+	} {
+		if got := envOr(machine(tc.env), "MTGLAB_WEB_DIST", tc.fallback); got != tc.want {
+			t.Errorf("%s gave %q, want %q", tc.what, got, tc.want)
+		}
 	}
-	if got := envOr("MTGLAB_TEST_ENVOR_UNSET_ENTIRELY", "the default"); got != "the default" {
-		t.Errorf("an unset variable gave %q", got)
+	// And the name is read rather than ignored: a machine that set the other
+	// flag's variable has said nothing about this one.
+	elsewhere := machine(map[string]string{"MTGLAB_TAROT_DIR": "somewhere else"})
+	if got := envOr(elsewhere, "MTGLAB_WEB_DIST", "the default"); got != "the default" {
+		t.Errorf("a variable set under another name gave %q", got)
 	}
-	// An empty fallback is still a legitimate answer.
-	if got := envOr("MTGLAB_TEST_ENVOR_UNSET_ENTIRELY", ""); got != "" {
-		t.Errorf("an empty fallback gave %q", got)
+}
+
+// And the flags themselves carry it: `--web-dist` and `--tarot` are the two
+// defaults [envOr] exists for, so a `ui` command built with nothing said about
+// them offers the built-in pair rather than an empty string.
+//
+// The assertion is the *help*, which is what an operator actually reads: a
+// flag whose default vanished would still parse, still serve nothing, and say
+// so nowhere.
+func TestTheBootFlagsOfferTheBuiltInPathsWhenNobodySaysOtherwise(t *testing.T) {
+	t.Parallel()
+	cmd := uiCommand(config.Config{}, tier3.Settings{})
+	for flag, want := range map[string]string{
+		"web-dist": "web_dist",
+		"tarot":    filepath.Join("assets", "tarot"),
+	} {
+		f := cmd.Flags().Lookup(flag)
+		if f == nil {
+			t.Errorf("`mtglab ui` has no --%s", flag)
+			continue
+		}
+		// An operator's machine may have said otherwise, and this test is not
+		// about that machine -- what it holds is that the default is a path
+		// rather than nothing at all.
+		if f.DefValue == "" {
+			t.Errorf("--%s defaults to nothing; the built-in is %q", flag, want)
+		}
+	}
+	// The flag that describes an action this command has never taken stays
+	// gone: `--no-open` was parsed into a variable and thrown away while its
+	// help promised "serve without opening a browser".
+	if cmd.Flags().Lookup("no-open") != nil {
+		t.Error("`--no-open` is back, and nothing in this process opens anything")
 	}
 }
 

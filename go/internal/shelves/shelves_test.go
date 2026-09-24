@@ -92,13 +92,12 @@ func TestOCRAssetsArePinnedByDigest(t *testing.T) {
 	t.Parallel()
 	good := []byte("/*! worker */ console.log('hi')")
 	sum := sha256.Sum256(good)
-	// The real table, with its pins, is what the code reads; the fake CDN
-	// answers the real URLs. One asset's bytes are made to match a fake pin
-	// by pointing the table at... no: the pins are the real ones, so the
-	// only honest test of a *match* is a file whose digest we can set. The
-	// shelves read the table from reference; this test therefore checks
-	// the mismatch path on a real asset and the match path through a table
-	// entry whose digest is this body's.
+	// The real table, with its pins, is what the served app reads, and the
+	// fake CDN answers the real URLs. The mismatch is tested against those
+	// real pins; the *match* needs a pin nobody can compute in advance, so
+	// the second half hands the shelves their own table with this body's
+	// digest in it (`NewWith`) rather than editing the committed one under
+	// every other test in the suite.
 	srv := cdn(t, map[string][]byte{
 		"/npm/tesseract.js@7.0.0/dist/worker.min.js":             good,
 		"/npm/tesseract.js@7.0.0/dist/worker.min.js.LICENSE.txt": []byte("MIT"),
@@ -119,21 +118,29 @@ func TestOCRAssetsArePinnedByDigest(t *testing.T) {
 	if s.OCR(ctx, "../../etc/passwd") != "" || s.OCR(ctx, "nope") != "" {
 		t.Fatal("an unknown asset was answered")
 	}
-	// The match path: pretend the pin is this body's digest.
-	asset := reference.Runtime().OCR.Assets["worker.min.js"]
+	// A refusal is sticky: the second ask is answered from memory and the
+	// digest is never recomputed.
+	if s.OCR(ctx, "worker.min.js") != "" {
+		t.Fatal("a refused asset was served on the second ask")
+	}
+	// The match path: a table of this test's own, whose pin is this body's
+	// digest.
+	conf := ownTable(t)
+	asset := conf.OCR.Assets["worker.min.js"]
 	asset.Digest = hex.EncodeToString(sum[:])
-	reference.Runtime().OCR.Assets["worker.min.js"] = asset
-	t.Cleanup(func() {
-		asset.Digest = "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d"
-		reference.Runtime().OCR.Assets["worker.min.js"] = asset
-	})
-	s2 := New(t.TempDir(), redirecting(srv), nil)
+	conf.OCR.Assets["worker.min.js"] = asset
+	s2 := NewWith(conf, t.TempDir(), redirecting(srv), nil)
 	path := s2.OCR(ctx, "worker.min.js")
 	if path == "" || !strings.Contains(path, reference.Runtime().OCR.CacheStamp) {
 		t.Fatalf("a matching asset was not cached under the versioned stamp: %q", path)
 	}
 	if body, _ := os.ReadFile(path); string(body) != string(good) {
 		t.Fatal("cached bytes differ")
+	}
+	// And a warm shelf answers off the disk: the second ask returns the same
+	// path without asking the host again.
+	if again := s2.OCR(ctx, "worker.min.js"); again != path {
+		t.Fatalf("a cached asset was re-fetched: %q then %q", path, again)
 	}
 }
 
