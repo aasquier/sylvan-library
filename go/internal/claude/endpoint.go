@@ -47,8 +47,8 @@ type Endpoint struct {
 // `configrecord_test.go` -- which counts quoted switch names in shipped
 // source -- still finds them here.
 const (
-	apiKeyEnv    = "ANTHROPIC_API_KEY"
-	authTokenEnv = "ANTHROPIC_AUTH_TOKEN"
+	apiKeyEnv    = "ANTHROPIC_API_KEY"    //nolint:gosec // a variable's name, never its value -- see the type's note
+	authTokenEnv = "ANTHROPIC_AUTH_TOKEN" //nolint:gosec // a variable's name, never its value
 )
 
 // EndpointFromEnv is what a serving process uses: the credential question
