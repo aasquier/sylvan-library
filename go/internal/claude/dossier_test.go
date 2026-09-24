@@ -100,15 +100,17 @@ func (r turnRecord) turn(mode string) Turn {
 }
 
 // frozenNow is the corpus's clock: every recorded stamp carries it, so a
-// report compares as bytes only while the test clock reads the same.
+// report compares as bytes only while the clock handed down reads the same.
 const frozenNow = "2026-08-23T04:05:06.789012+00:00"
 
-func freezeClock(t *testing.T) {
-	t.Helper()
-	was := now
-	now = func() string { return frozenNow }
-	t.Cleanup(func() { now = was })
-}
+// frozenClock is that reading as a [Clock] — a value a test hands to the
+// request, the plan or the store it is about.
+//
+// It used to be `freezeClock(t)`, which swapped a package-level `var now` and
+// put it back in a `t.Cleanup`. That is a write to state the whole binary
+// shares, so the four tests that wanted a still clock had to run alone, and
+// `-race` would have reported them the moment one of them said `t.Parallel`.
+var frozenClock Clock = func() string { return frozenNow }
 
 // miniDeck is the corpus's deck: Gyome in front of ninety-nine Swamps.
 const miniDeck = `slug: mini
@@ -159,11 +161,11 @@ func loadDossierCorpus(t *testing.T) dossierCorpus {
 }
 
 // scratchStore is a dossier store over a throwaway app.db built by the real
-// schema ladder.
+// schema ladder, stamping its rows from the corpus's frozen clock.
 func scratchStore(t *testing.T) *DossierStore {
 	t.Helper()
 	rec, _ := scratchLedger(t)
-	return NewDossierStore(rec.DB(), nil)
+	return NewDossierStore(rec.DB(), nil).WithClock(frozenClock)
 }
 
 // noOverrides is the configuration the corpus was written under: no model
@@ -175,19 +177,15 @@ func scratchStore(t *testing.T) *DossierStore {
 // neither set.
 var noOverrides = Endpoint{}
 
-// noEnvOverrides blanks the one setting still read from the environment: the
-// stance ceiling, which `Ceiling` consults whenever a caller passes a nil
-// limit.
+// The ceiling followed the model override out of this file. Nothing in
+// `internal/claude` reads the environment any more except
+// [SettingsFromLookup], so "the configuration the corpus was written under"
+// is now entirely said by the two zero values above: an [Endpoint] that
+// overrides nothing, and a nil `limit` that means the built-in ceiling.
 //
-// The model override left this helper when [Endpoint] took it over. The
-// ceiling has not, deliberately: making the nil-limit fallback unconditional
-// would mean a deployment whose ceiling somehow failed to be threaded stopped
-// capping stances silently, which is the wrong way for that mistake to fail.
-// A test that calls this is serial, and that is the remaining cost.
-func noEnvOverrides(t *testing.T) {
-	t.Helper()
-	t.Setenv(CeilingEnv, "")
-}
+// What used to stand here was `noEnvOverrides`, a `t.Setenv(CeilingEnv, "")`
+// that twelve tests in this package called to describe an unconfigured
+// deployment — and paid for by running alone.
 
 // ------------------------------------------------------------------ the key
 
@@ -221,19 +219,7 @@ func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
 // prompt bytes (data in modes.json), the schema's sorted-key canonical
 // rendering (canonjson.go), and the model id.
 func TestTheFingerprintsPartsAreEachTheRecordedOnes(t *testing.T) {
-	// **Serial, and measured rather than read**: `noEnvOverrides` calls
-	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and the helper is the first line of this test --
-	// which is why the audit adds the line and runs the test rather than
-	// reading for a reason.
-	//
-	// The blocker is `claude.Ceiling`, the last reader of
-	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
-	// deployment still means installing one on the process here. When the
-	// ceiling becomes a value the way the model override already did (ADR
-	// 39/40), this test and its eight neighbours parallelise with nothing to
-	// change but the deletion of this comment.
-	noEnvOverrides(t)
+	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	mode, err := GetMode(ModeCommanderDossier)
 	if err != nil {
@@ -293,25 +279,11 @@ func TestTheBriefsOpeningMessageMatchesTheGoldenBytes(t *testing.T) {
 
 // --------------------------------------------------------------- the GET
 
+// The store stamps from [frozenClock] (`scratchStore` hands it one), which is
+// what makes a stored row's `created_at` comparable to the corpus's bytes
+// without anything being installed on the process.
 func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
-	// **Serial, and measured rather than read**: `noEnvOverrides` calls
-	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and the helper is the first line of this test --
-	// which is why the audit adds the line and runs the test rather than
-	// reading for a reason.
-	//
-	// The blocker is `claude.Ceiling`, the last reader of
-	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
-	// deployment still means installing one on the process here. When the
-	// ceiling becomes a value the way the model override already did (ADR
-	// 39/40), this test and its eight neighbours parallelise with nothing to
-	// change but the deletion of this comment.
-	//
-	// `freezeClock` on the next line is a second, independent blocker: it
-	// swaps the package-level `now` and puts it back in a `t.Cleanup`, which
-	// `-race` would report and Go would not.
-	noEnvOverrides(t)
-	freezeClock(t)
+	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	mini, headless := miniDecks(t)
 	store := scratchStore(t)
@@ -378,20 +350,7 @@ func TestTheHeadlessGetHasFiveKeysAndNoAnsweredBy(t *testing.T) {
 // compared as bytes. The order is the corpus's, because "served
 // from the store" can only follow "a whole dossier" having stored one.
 func TestEveryDossierOutcomeAgreesWithTheCorpus(t *testing.T) {
-	// **Serial, and measured rather than read**: `noEnvOverrides` calls
-	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and the helper is the first line of this test --
-	// which is why the audit adds the line and runs the test rather than
-	// reading for a reason.
-	//
-	// The blocker is `claude.Ceiling`, the last reader of
-	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
-	// deployment still means installing one on the process here. When the
-	// ceiling becomes a value the way the model override already did (ADR
-	// 39/40), this test and its eight neighbours parallelise with nothing to
-	// change but the deletion of this comment.
-	noEnvOverrides(t)
-	freezeClock(t)
+	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	mini, _ := miniDecks(t)
 	store := scratchStore(t)
@@ -400,7 +359,8 @@ func TestEveryDossierOutcomeAgreesWithTheCorpus(t *testing.T) {
 		ctx := context.Background()
 		for _, row := range corpus.Reports {
 			plan, err := CheckDossier(ctx, c, "mini", mini, DossierRequest{
-				Requested: row.Requested, Refresh: row.Refresh, Store: store})
+				Requested: row.Requested, Refresh: row.Refresh, Store: store,
+				Clock: frozenClock})
 			if err != nil {
 				t.Fatalf("%s: check: %v", row.Note, err)
 			}
@@ -449,20 +409,7 @@ func TestEveryDossierOutcomeAgreesWithTheCorpus(t *testing.T) {
 // and the corpus covers each -- which is asserted here on its own because
 // the store is the one side effect the report bytes cannot show.
 func TestOnlyAWholeDossierIsStored(t *testing.T) {
-	// **Serial, and measured rather than read**: `noEnvOverrides` calls
-	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and the helper is the first line of this test --
-	// which is why the audit adds the line and runs the test rather than
-	// reading for a reason.
-	//
-	// The blocker is `claude.Ceiling`, the last reader of
-	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
-	// deployment still means installing one on the process here. When the
-	// ceiling becomes a value the way the model override already did (ADR
-	// 39/40), this test and its eight neighbours parallelise with nothing to
-	// change but the deletion of this comment.
-	noEnvOverrides(t)
-	freezeClock(t)
+	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	mini, _ := miniDecks(t)
 	withPool(t, func(c *pool.Conn) {
@@ -473,7 +420,8 @@ func TestOnlyAWholeDossierIsStored(t *testing.T) {
 			}
 			store := scratchStore(t)
 			plan, err := CheckDossier(ctx, c, "mini", mini, DossierRequest{
-				Requested: row.Requested, Refresh: true, Store: store})
+				Requested: row.Requested, Refresh: true, Store: store,
+				Clock: frozenClock})
 			if err != nil {
 				t.Fatal(err)
 			}

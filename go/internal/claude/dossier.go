@@ -182,6 +182,8 @@ func CacheKey(e Endpoint, oracleID, tier string) (string, error) {
 type DossierStore struct {
 	db  *sql.DB
 	log *slog.Logger
+	// clock stamps `created_at`. Nil is the system clock; see [Clock].
+	clock Clock
 }
 
 // NewDossierStore is a store over an app.db handle somebody else opened, or
@@ -191,6 +193,21 @@ func NewDossierStore(db *sql.DB, logger *slog.Logger) *DossierStore {
 		logger = slog.Default()
 	}
 	return &DossierStore{db: db, log: logger}
+}
+
+// WithClock is this store stamping its rows from the clock handed in.
+//
+// A copy rather than a mutation, so a store already in somebody's hand cannot
+// have its clock changed underneath them -- the same reason [Stance] is a
+// value type. It exists for the corpus, whose stored `created_at` is a frozen
+// byte string, and it is the whole of what used to be a package-level swap.
+func (s *DossierStore) WithClock(c Clock) *DossierStore {
+	if s == nil {
+		return nil
+	}
+	out := *s
+	out.clock = c
+	return &out
 }
 
 // DossierHit is one stored dossier: the body as it was stored and when.
@@ -244,7 +261,7 @@ func (s *DossierStore) Put(ctx context.Context, key, oracleID, commander string,
 		"INSERT INTO dossier_cache (key, oracle_id, commander, result_json, "+
 			"created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET "+
 			"result_json = excluded.result_json, created_at = excluded.created_at",
-		key, oracleID, commander, string(blob), now()); err != nil {
+		key, oracleID, commander, string(blob), s.clock.stamp()); err != nil {
 		s.log.Warn("dossier cache write failed", "err", err)
 	}
 }
@@ -320,7 +337,7 @@ type DossierReport struct {
 }
 
 func dossierReport(turn *Turn, slug, commander string, effective Stance,
-	body any, asked bool, reason, cachedAt string) DossierReport {
+	body any, asked bool, reason, cachedAt string, clock Clock) DossierReport {
 	report := DossierReport{
 		AnsweredBy: "claude", Mode: ModeCommanderDossier, Slug: slug,
 		Commander: commander, Asked: asked, Reason: reason,
@@ -331,7 +348,7 @@ func dossierReport(turn *Turn, slug, commander string, effective Stance,
 		report.Dossier = emptyObject
 	}
 	if cachedAt == "" {
-		report.GeneratedAt = now()
+		report.GeneratedAt = clock.stamp()
 	}
 	if turn != nil {
 		report.Model = turn.Model
@@ -360,6 +377,8 @@ type DossierRequest struct {
 	Endpoint Endpoint
 	// Store is the `dossier_cache` table; nil caches nothing.
 	Store *DossierStore
+	// Clock stamps `generated_at` on the report; nil is the system clock.
+	Clock Clock
 }
 
 // DossierPlan is what `CheckDossier` settled and
@@ -388,7 +407,11 @@ type DossierPlan struct {
 	Effective Stance
 	Tier      string
 	Store     *DossierStore
-	Answer    *DossierReport
+	// Clock rides on the plan for the same reason Endpoint does: a background
+	// job outlives the request that planned it, and both halves of a dossier
+	// have to stamp from the same reading.
+	Clock  Clock
+	Answer *DossierReport
 }
 
 // NeedsCall reports whether anything still has to be asked of Anthropic.
@@ -419,7 +442,7 @@ func CheckDossier(ctx context.Context, conn *pool.Conn, slug string, d *deck.Dec
 		return nil, err
 	}
 	plan := &DossierPlan{Endpoint: req.Endpoint, Slug: slug, Facts: facts, Commander: name, OracleID: oracleID,
-		Key: key, Effective: effective, Tier: req.Tier, Store: req.Store}
+		Key: key, Effective: effective, Tier: req.Tier, Store: req.Store, Clock: req.Clock}
 
 	if !req.Refresh {
 		if hit := req.Store.Get(ctx, key); hit != nil {
@@ -429,7 +452,7 @@ func CheckDossier(ctx context.Context, conn *pool.Conn, slug string, d *deck.Dec
 			// quoting a cached simulation as fresh (ADR 18).
 			answer := dossierReport(nil, slug, name, effective, hit.Result, false,
 				"Served from the store; no call was made. Regenerate to write it again.",
-				hit.CreatedAt)
+				hit.CreatedAt, req.Clock)
 			plan.Answer = &answer
 			return plan, nil
 		}
@@ -437,7 +460,7 @@ func CheckDossier(ctx context.Context, conn *pool.Conn, slug string, d *deck.Dec
 	if !effective.AllowsCalls() {
 		answer := dossierReport(nil, slug, name, effective, nil, false,
 			"The stance is off, so no call was made. Nothing else about this "+
-				"deck is affected.", "")
+				"deck is affected.", "", req.Clock)
 		plan.Answer = &answer
 	}
 	return plan, nil
@@ -489,14 +512,14 @@ func readDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, turn T
 	slug, name, effective := plan.Slug, plan.Commander, plan.Effective
 	if turn.Refused {
 		return dossierReport(&turn, slug, name, effective, nil, true,
-			"The model declined to write this one.", ""), nil
+			"The model declined to write this one.", "", plan.Clock), nil
 	}
 	var payload map[string]any
 	if err := turn.Parsed(&payload); err != nil {
 		//nolint:nilerr // an unreadable answer is a reported outcome, not a fault
 		return dossierReport(&turn, slug, name, effective, nil, true,
 			fmt.Sprintf("The answer did not parse (stop reason: %s). Nothing was stored.",
-				turn.StopReason), ""), nil
+				turn.StopReason), "", plan.Clock), nil
 	}
 
 	claimed, _ := payload["sources"].([]any)
@@ -507,7 +530,7 @@ func readDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, turn T
 		// answer that keeps the seams meaningful.
 		return dossierReport(&turn, slug, name, effective, nil, true,
 			"No source survived checking, so there is nothing to stand behind "+
-				"the claims."+noSourceDetail(turn, dropped), ""), nil
+				"the claims."+noSourceDetail(turn, dropped), "", plan.Clock), nil
 	}
 	allowed := map[string]bool{}
 	for _, s := range sources {
@@ -537,7 +560,7 @@ func readDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, turn T
 		Searched:           len(turn.Searched),
 	}
 	plan.Store.Put(ctx, plan.Key, plan.OracleID, name, body)
-	return dossierReport(&turn, slug, name, effective, body, true, "", ""), nil
+	return dossierReport(&turn, slug, name, effective, body, true, "", "", plan.Clock), nil
 }
 
 // noSourceDetail is the tail both searching modes add to a no-source refusal:

@@ -361,10 +361,7 @@ const IntakeDefaultPreset = "consultant"
 // the same bug.
 func IntakeStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := Ceiling()
-		if limit != nil {
-			ceil = *limit
-		}
+		ceil := ceilingOr(limit)
 		preset, err := Preset(IntakeDefaultPreset)
 		if err != nil {
 			return Stance{}, err

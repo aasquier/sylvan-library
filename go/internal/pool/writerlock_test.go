@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,16 +46,19 @@ const helperEnv = "MTGLAB_TEST_HOLD_POOL"
 // the pool read-only and sits on it, which is exactly what a running `mtglab
 // ui` does between requests.
 func TestAHolderIsASecondProcess(t *testing.T) {
-	// **No `t.Parallel()`, and it is not a serial test either** -- it is not a
-	// test. In the parent run it skips immediately; in the child it *is* the
-	// second process, and it sits on the pool file for thirty seconds on
-	// purpose. Parallelising it would mean a thirty-second sleep running
-	// alongside the package's real tests in every ordinary run, which is a
-	// suite that takes half a minute longer for nothing.
+	// **Parallel, and it costs an ordinary run nothing** -- because in an
+	// ordinary run this is not a test at all. `helperEnv` is unset, so the
+	// first thing it does is skip, and the thirty-second sit happens only in
+	// the child process a lock test started, where `-test.run` has selected
+	// this one function and there is nothing for it to run alongside. The
+	// reason to say `t.Parallel()` anyway is the register: every test in the
+	// tree calls it, so the one function that is a fixture wearing a test's
+	// name must not be the exception nobody can explain.
 	//
 	// It is spelled `TestX` because that is Go's only way to reach a function
 	// in a test binary from outside it; `-test.run` picks it out and
 	// `helperEnv` tells it which role it is playing.
+	t.Parallel()
 	path := os.Getenv(helperEnv)
 	if path == "" {
 		t.Skip("not the holder")
@@ -70,18 +74,22 @@ func TestAHolderIsASecondProcess(t *testing.T) {
 	time.Sleep(30 * time.Second)
 }
 
-func TestLockedRecognisesARealConflict(t *testing.T) {
-	// **Not parallel**, and the reason is not shared state in this package: it
-	// starts a second process that opens a database file, and a machine
-	// running several of those alongside a sixteen-way suite is a machine
-	// measuring its own load. It is also over in about a second.
-	// **A copy, at a path this process has never opened.** DuckDB caches its
-	// instance per file *inside* a process, so a parent that had already built
-	// the fixture here would meet its own cached handle rather than the child's
-	// lock, and the error would be a different one entirely ("Can't open a
-	// connection to same database file with a different configuration",
-	// measured). Copying the built file out to a path only the child ever opens
-	// is what makes this a genuine cross-process conflict.
+// heldByAnotherProcess builds a pool file, hands it to a second process to sit
+// on read-only, and returns the path once that process says it has it.
+//
+// **A copy, at a path this process has never opened.** DuckDB caches its
+// instance per file *inside* a process, so a parent that had already built the
+// fixture here would meet its own cached handle rather than the child's lock,
+// and the error would be a different one entirely ("Can't open a connection to
+// same database file with a different configuration", measured). Copying the
+// built file out to a path only the child ever opens is what makes this a
+// genuine cross-process conflict.
+//
+// Everything it touches belongs to the calling test -- its own temp dir, its
+// own child, torn down by its own `t.Cleanup` -- so the tests that use it are
+// parallel like everything else. It is about a second each.
+func heldByAnotherProcess(t *testing.T) string {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "conflict.duckdb")
 	built, err := os.ReadFile(pooltest.Build(t))
 	if err != nil {
@@ -109,8 +117,14 @@ func TestLockedRecognisesARealConflict(t *testing.T) {
 	if line, err := bufio.NewReader(out).ReadString('\n'); err != nil {
 		t.Fatalf("the holder never took the file: %v (%q)", err, line)
 	}
+	return path
+}
 
-	_, err = pool.OpenWriter(context.Background(), path)
+func TestLockedRecognisesARealConflict(t *testing.T) {
+	t.Parallel()
+	path := heldByAnotherProcess(t)
+
+	_, err := pool.OpenWriter(context.Background(), path)
 	if err == nil {
 		t.Fatal("a writer opened a file another process is holding read-only")
 	}
@@ -172,6 +186,90 @@ func TestOpenWriterWaitingTakesTheFileWhenItIsFree(t *testing.T) {
 	// every time would teach an operator to ignore it.
 	if said != 0 {
 		t.Fatal("announced a wait for a door that was already open")
+	}
+}
+
+// **The door that stays shut**, which is the half the three tests above cannot
+// reach: a lock that never lifts, and an operator standing in front of it.
+//
+// Three things have to be true and none of them is true of a door that opens.
+// The line is said **once** -- a refresh that printed "waiting" every quarter
+// of a second would teach an operator to ignore it. The budget is honoured
+// rather than approximated: patience is the whole reason this exists, and a
+// version that gave up on the first poll would look identical in every other
+// test. And the refusal at the end has to say *why*, in an operator's words --
+// that somebody is reading the library, and roughly how long after their last
+// page it lets go -- because the sentence DuckDB gives ("Could not set lock on
+// file ...") reads like a broken database, which is how this was reported
+// twice as a fault it never was.
+func TestARefreshWaitsOutALockedPoolAndThenSaysWhoHasIt(t *testing.T) {
+	t.Parallel()
+	path := heldByAnotherProcess(t)
+
+	said := 0
+	// Three polls' worth: long enough that the loop really loops, short enough
+	// that a suite is not held up by a door nobody is going to open.
+	const budget = 750 * time.Millisecond
+	start := time.Now()
+	db, err := pool.OpenWriterWaiting(context.Background(), path, budget,
+		func() { said++ })
+	if err == nil {
+		_ = db.Close()
+		t.Fatal("a writer opened a pool another process is holding read-only")
+	}
+	if said != 1 {
+		t.Errorf("the wait was announced %d times, want exactly once", said)
+	}
+	if took := time.Since(start); took < budget {
+		t.Errorf("gave up after %s, inside its own %s budget", took, budget)
+	}
+	for _, want := range []string{"held by another process", budget.String(),
+		pool.IdleLease.String()} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not say %q; an operator reads this one "+
+				"and has to be able to tell a busy instance from a broken "+
+				"pool: %v", want, err)
+		}
+	}
+	// And the whole diagnosis is still in there for a log to carry.
+	if !pool.Locked(err) {
+		t.Errorf("the refusal no longer wraps the lock itself: %v", err)
+	}
+}
+
+// An operator who gives up first is answered at once rather than after the
+// rest of the budget. The admin page's refresh button is a request with a
+// context on it, and a cancelled request that kept a writer standing at the
+// door for another fifty seconds would hold the pool shut for a caller who had
+// already walked away.
+func TestACancelledRefreshStopsWaitingImmediately(t *testing.T) {
+	t.Parallel()
+	path := heldByAnotherProcess(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// The callback fires the instant the door is found shut and before the
+	// first poll, so this is the one moment that is certain to be inside the
+	// wait -- no clock, and nothing to lose a race against.
+	waiting := make(chan struct{})
+	answered := make(chan error, 1)
+	go func() {
+		db, err := pool.OpenWriterWaiting(ctx, path, time.Hour,
+			func() { close(waiting) })
+		if db != nil {
+			_ = db.Close()
+		}
+		answered <- err
+	}()
+	<-waiting
+	cancel()
+
+	select {
+	case err := <-answered:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("a cancelled wait answered %v, want the cancellation", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("a cancelled wait was still standing at the door")
 	}
 }
 
