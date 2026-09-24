@@ -150,11 +150,22 @@ func TestEveryPoolRouteSaysSomethingWhenTheQueryFails(t *testing.T) {
 // The deck parameters resolve to a real deck in a real library, so the route
 // reaches the pool rather than stopping at a 404 -- which would sweep the
 // refusal path a second time instead of the one this file is about.
+//
+// **The slug said `gyome` until 2026-09-24 and there is no such deck here.**
+// The fixture library is the gate's own testdata (`decksDir`), and none of its
+// nine decks is named that -- so every deck-scoped route in both sweeps below,
+// and in `closeddb_test.go`'s sweep which shares this filler, stopped at ADR
+// 5's 404 and never reached the pool or the database at all. The sweeps were
+// honest about what they asserted and were re-driving the refusal path; the
+// non-deck routes (the card doors, the colour rooms) do reach it, which is why
+// the files read as working. `kaheera` is a deck the library holds, and it is
+// the one whose YAML `slug:` matches its directory, so the artifact route
+// resolves too.
 func fillPattern(pattern string) string {
 	switch {
 	case strings.Contains(pattern, "{owner}"):
 		pattern = strings.ReplaceAll(pattern, "{owner}", "alice")
-		pattern = strings.ReplaceAll(pattern, "{slug}", "gyome")
+		pattern = strings.ReplaceAll(pattern, "{slug}", "kaheera")
 		pattern = strings.ReplaceAll(pattern, "{name}", "primer-quick.md")
 	case strings.Contains(pattern, "{key}"):
 		pattern = strings.ReplaceAll(pattern, "{key}", "G")
@@ -179,9 +190,17 @@ func TestNoWriteReportsSuccessOverAPoolThatWillNotAnswer(t *testing.T) {
 	t.Parallel()
 	a := failingPoolAPI(t)
 
+	// `mono-green-clean` for the same reason `fillPattern` says `kaheera`: a
+	// slug the library does not hold would 404 before any write was attempted,
+	// and a sweep of refusals that never reached the pool would pass forever.
 	for _, route := range writes() {
-		target := route.path(t, "alice", "gyome")
+		target := route.path(t, "alice", "mono-green-clean")
 		status, _, raw := callAs(t, a, alice, route.method, target, route.payload)
+		if status == http.StatusNotFound {
+			t.Errorf("%s %s answered 404 against a deck the library holds -- "+
+				"it never reached the pool: %s", route.method, target, raw)
+			continue
+		}
 		if status == http.StatusOK && needsThePool(route.suffix) {
 			t.Errorf("%s %s reported success over a pool that will not answer: %s",
 				route.method, target, raw)
