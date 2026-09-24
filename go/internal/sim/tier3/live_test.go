@@ -66,12 +66,13 @@ func liveDecks(t *testing.T) []*deck.Deck {
 // TestTheRealIndexIsReadFromTheRealZip checks the pre-flight against Forge's
 // own card scripts — the data the engine itself loads at startup, which is
 // what makes agreeing with it agreeing with Forge.
-// **Serial**: it clears the package-level index and then asserts on its hit
-// counters, which any other test reading the index concurrently would move.
+//
+// Every [tier3.LoadSettings] builds its own card index, so the hit counters
+// below are this test's own reads and nobody else's -- which is what the
+// package-level index and its `ClearIndex` could never promise.
 func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
 	t.Parallel()
 	forge := liveForge(t)
-	tier3.ClearIndex()
 	started := time.Now()
 	index, err := forge.ImplementedNames()
 	if err != nil {
@@ -94,11 +95,11 @@ func TestTheRealIndexIsReadFromTheRealZip(t *testing.T) {
 	}
 	// And it is cached on (path, mtime, size): a second ask must not re-read
 	// 33,587 files.
-	hits, misses := tier3.IndexStats()
+	hits, misses := forge.Index.Stats()
 	if _, err := forge.ImplementedNames(); err != nil {
 		t.Fatal(err)
 	}
-	hits2, misses2 := tier3.IndexStats()
+	hits2, misses2 := forge.Index.Stats()
 	if hits2 != hits+1 || misses2 != misses {
 		t.Errorf("the second ask was a miss: hits %d->%d, misses %d->%d",
 			hits, hits2, misses, misses2)

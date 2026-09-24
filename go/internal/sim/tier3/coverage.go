@@ -142,34 +142,81 @@ type indexKey struct {
 	size  int64
 }
 
-var (
-	indexMu    sync.Mutex
-	indexCache = map[indexKey]map[string]bool{}
+// CardIndex is what one machine's distributions implement, remembered so the
+// two-second scan of thirty-odd thousand card scripts is paid once rather than
+// once per pre-flight.
+//
+// **A value rather than a package-level map, and the reason is a test.** It was
+// a global behind a mutex with a `ClearIndex` for the suite to call, and the hit
+// counters are the only evidence a cache is a cache — so every test that asked
+// what the cache had done needed the whole process to itself, and six of them
+// were serial for that and nothing else. An index is a fact about the machine
+// whose card scripts it read; carrying one on [Settings] says so, and a test
+// builds its own with [NewCardIndex].
+//
+// **A nil index remembers nothing**, which is exactly right for the [Settings]
+// literal that asks once and is thrown away. [Defaults] makes one, so the
+// settings the composition root loads carry an index and every copy of them
+// downstream shares it — a [Settings] is copied by value all over this package
+// and the pointer is what keeps one machine's answer one answer.
+type CardIndex struct {
+	mu    sync.Mutex
+	names map[indexKey]map[string]bool
 	// Hits and misses, because the measuring shelf's whole argument is that
 	// a cache can be correct, tested and never once hit. There is no
 	// central cache register yet -- a known, deliberate gap -- so the
 	// counters live here and a test reads them.
-	indexHits, indexMisses int
-)
-
-// IndexStats reports the coverage index's hit and miss counts.
-func IndexStats() (hits, misses int) {
-	indexMu.Lock()
-	defer indexMu.Unlock()
-	return indexHits, indexMisses
+	hits, misses int
 }
 
-// ClearIndex empties the coverage index. For tests, and for the same reason
-// every registered cache has a `clear`.
-func ClearIndex() {
-	indexMu.Lock()
-	defer indexMu.Unlock()
-	indexCache = map[indexKey]map[string]bool{}
-	indexHits, indexMisses = 0, 0
+// NewCardIndex is an empty index, ready to remember one machine's card scripts.
+func NewCardIndex() *CardIndex {
+	return &CardIndex{names: map[indexKey]map[string]bool{}}
+}
+
+// Stats reports the index's hit and miss counts. A nil index has never done
+// either, which is the truth about one that remembers nothing.
+func (x *CardIndex) Stats() (hits, misses int) {
+	if x == nil {
+		return 0, 0
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.hits, x.misses
+}
+
+// lookup answers from memory, counting the miss on its way past. The counting
+// belongs here rather than at the call site so that the two numbers can never
+// disagree about what a single read was.
+func (x *CardIndex) lookup(key indexKey) (map[string]bool, bool) {
+	if x == nil {
+		return nil, false
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if names, ok := x.names[key]; ok {
+		x.hits++
+		return names, true
+	}
+	x.misses++
+	return nil, false
+}
+
+// remember files a freshly read index under its key.
+func (x *CardIndex) remember(key indexKey, names map[string]bool) {
+	if x == nil {
+		return
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.names == nil {
+		x.names = map[indexKey]map[string]bool{}
+	}
+	x.names[key] = names
 }
 
 // ImplementedNames is every card name Forge implements, read from its own card
-// scripts.
+// scripts — from [Settings.Index] when it has been read before on this machine.
 func (s Settings) ImplementedNames() (map[string]bool, error) {
 	path, err := s.CardsfolderPath()
 	if err != nil {
@@ -182,23 +229,14 @@ func (s Settings) ImplementedNames() (map[string]bool, error) {
 	}
 	key := indexKey{path: path, mtime: info.ModTime().Unix(), size: info.Size()}
 
-	indexMu.Lock()
-	if cached, ok := indexCache[key]; ok {
-		indexHits++
-		indexMu.Unlock()
+	if cached, ok := s.Index.lookup(key); ok {
 		return cached, nil
 	}
-	indexMisses++
-	indexMu.Unlock()
-
 	names, err := readNames(path)
 	if err != nil {
 		return nil, err
 	}
-
-	indexMu.Lock()
-	indexCache[key] = names
-	indexMu.Unlock()
+	s.Index.remember(key, names)
 	return names, nil
 }
 

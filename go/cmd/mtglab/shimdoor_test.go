@@ -205,11 +205,11 @@ func TestAnUnreadableBodyIsRefusedRatherThanGuessedAt(t *testing.T) {
 
 // A worker with no Forge answers 503 rather than 500, because the app turns
 // exactly that into "Forge is not available here" instead of a red job.
-// **Serial**: it clears the package-level coverage index, which every other
-// test reading a cardsfolder shares.
 func TestAWorkerWithNoForgeAnswers503(t *testing.T) {
-	tier3.ClearIndex()
-	// A Forge home that is present, and empty.
+	t.Parallel()
+	// A Forge home that is present, and empty. The settings carry no card
+	// index, so nothing here is remembered for anybody else -- which is what
+	// used to make this the one serial test in the file.
 	srv := newShimFor(t, tier3.Settings{Home: t.TempDir()})
 
 	resp := post(t, srv, "/coverage", "", `{"decks":[]}`)

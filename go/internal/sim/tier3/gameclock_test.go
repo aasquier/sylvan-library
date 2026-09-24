@@ -226,6 +226,10 @@ func fakeJava(t *testing.T, segments ...string) (java string, runs func() int) {
 	// The trailing `:` keeps this shell alive behind the segment it started,
 	// which is the deployed shape [wedge] argues for: the thing playing the
 	// games is a grandchild of the process `spawn` holds.
+	//
+	// The command line is handed on to the segment, because a real JVM is given
+	// one and a segment that wants to answer Forge's own `-n` has to be able to
+	// read it. A segment that ignores its arguments is unaffected.
 	body := "#!/bin/sh\n" +
 		"if [ \"$1\" = \"-version\" ]; then\n" +
 		"  echo 'openjdk version \"21.0.1\" 2023-10-17' 1>&2\n" +
@@ -234,7 +238,7 @@ func fakeJava(t *testing.T, segments ...string) (java string, runs func() int) {
 		"n=1\n" +
 		"if [ -f " + counted + " ]; then n=$(( $(cat " + counted + ") + 1 )); fi\n" +
 		"echo $n > " + counted + "\n" +
-		"/bin/sh " + dir + "/segment$n.sh ; :\n"
+		"/bin/sh " + dir + "/segment$n.sh \"$@\" ; :\n"
 	if err := os.WriteFile(java, []byte(body), 0o700); err != nil { //nolint:gosec // a test's own temp dir, and it has to be executable
 		t.Fatal(err)
 	}
