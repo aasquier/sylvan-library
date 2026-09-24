@@ -48,6 +48,37 @@ func TestOnlyADraftedRationaleWearsItsMark(t *testing.T) {
 	}
 }
 
+// The mark travels the comparison as well as the file.
+//
+// `Payload` is the mapping the dump serialises, without the serialising, and
+// the build's baseline check asks whether two of them are equal. A mark that
+// reached the file and not the payload would make a deck whose rationales
+// were just drafted compare equal to the deck before the intake ran -- and
+// the artifacts would be reported up to date over a deck that changed.
+func TestTheMarkTravelsTheComparisonAsWellAsTheFile(t *testing.T) {
+	t.Parallel()
+	drafted := aDeck(CardEntry{Name: "Fixture Signet", Category: "ramp", Qty: 1,
+		Why: "It makes mana.", WhyBy: "claude"})
+	byHand := aDeck(CardEntry{Name: "Fixture Signet", Category: "ramp", Qty: 1,
+		Why: "It makes mana."})
+
+	cards, ok := drafted.Payload()["cards"].([]map[string]any)
+	if !ok || len(cards) != 1 {
+		t.Fatalf("the payload's cards are %#v", drafted.Payload()["cards"])
+	}
+	if cards[0]["why_by"] != "claude" {
+		t.Errorf("the payload's card is %#v and carries no mark", cards[0])
+	}
+
+	plain, ok := byHand.Payload()["cards"].([]map[string]any)
+	if !ok || len(plain) != 1 {
+		t.Fatalf("the payload's cards are %#v", byHand.Payload()["cards"])
+	}
+	if _, marked := plain[0]["why_by"]; marked {
+		t.Errorf("a rationale a person wrote carries a mark: %#v", plain[0])
+	}
+}
+
 // A note holding something the file cannot carry is refused, and the refusal
 // says **which** entry -- a deck's notes are a person's prose and a failure
 // that named nothing would leave them hunting through it.

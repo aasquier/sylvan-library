@@ -89,6 +89,13 @@ func TestTheSQLTierReportsAFaultRatherThanAnEmptyShelfWhenItCannotRead(t *testin
 			return text, err
 		}},
 		{"Entombed", func() (any, error) { return src.Entombed(ctx) }},
+		// A restore reads the crypt before it writes anything, so a read it
+		// cannot make must stop it rather than aiming an UPDATE at a row
+		// nobody looked at.
+		{"Restore", func() (any, error) { return src.Restore(ctx, "anything") }},
+		{"SetColiseumAtNight", func() (any, error) {
+			return nil, src.SetColiseumAtNight(ctx, "gyome", true)
+		}},
 	} {
 		got, err := tc.run()
 		if err == nil {
@@ -254,6 +261,15 @@ func TestSomebodyElsesShelfIsNotSomebodyElsesCrypt(t *testing.T) {
 		if _, err := tc.src.Empty(ctx); !library.IsReadOnly(err) {
 			t.Errorf("%s accepted an emptying with %v", tc.what, err)
 		}
+	}
+
+	// The night gate is the owner's call alone, and a tier handed over
+	// read-only refuses it before it looks at anything -- the same guard
+	// `SetShared` keeps, because entering a deck for the night games is a
+	// change to somebody's deck like any other.
+	readOnly := library.NewSQLSource(read, nil, 1, false, false)
+	if err := readOnly.SetColiseumAtNight(ctx, "gyome", true); !library.IsReadOnly(err) {
+		t.Errorf("a read-only tier entered a deck for the night games with %v", err)
 	}
 }
 

@@ -221,6 +221,70 @@ func TestTheArtAndPriceReadsRefuseAPoolWhosePrintingsAreGone(t *testing.T) {
 	})
 }
 
+// A deck page whose cards chose printings, and whose commander did not,
+// fails on the cards' own read -- the second of the two art paths, and the
+// one a deck that never picked a hero image still takes.
+func TestACardsChosenPrintingRefusesOnItsOwn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &deck.Deck{
+		Slug: "cards", Name: "Cards", Status: "theoretical", Stage: "draft",
+		Commander: []string{"Gyome, Master Chef"},
+		Cards: []deck.CardEntry{
+			{Name: "Sol Ring", Why: "ramp", Art: solRingPrintingB},
+			{Name: "Forest", Why: "a land"},
+		},
+	}
+	withBrokenPool(t, bentPool(t, "DROP TABLE printings"), func(c *pool.Conn) {
+		if got, err := DeckPayload(ctx, c, d, true, "alice"); err == nil {
+			t.Errorf("the deck page answered %v over a printing it could not read", got)
+		}
+	})
+}
+
+// The shelf's picture falls back rather than going blank.
+//
+// A tile's art comes from the commander's crop, and a card in the pool may
+// have a picture without one -- an older refresh, a printing Scryfall has not
+// cropped. The whole card is the fallback, and it is the difference between a
+// shelf and a row of grey rectangles. The same holds one step further along:
+// a *chosen* printing whose picture yields no crop is still a picture.
+func TestTheShelfsPictureFallsBackRatherThanGoingBlank(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	// The commander's crop removed, and one printing given a picture whose
+	// address no crop can be derived from.
+	p := bentPool(t,
+		"UPDATE oracle_cards SET image_art_crop = NULL WHERE name = 'Gyome, Master Chef'",
+		"UPDATE printings SET image_normal = 'https://example.invalid/a-picture.jpg'"+
+			" WHERE id = '"+solRingPrintingA+"'")
+
+	plain := &deck.Deck{Slug: "plain", Name: "Plain", Status: "theoretical", Stage: "draft",
+		Commander: []string{"Gyome, Master Chef"},
+		Cards:     []deck.CardEntry{{Name: "Forest", Why: "a land"}}}
+	chosen := &deck.Deck{Slug: "chosen", Name: "Chosen", Status: "theoretical", Stage: "draft",
+		Commander: []string{"Gyome, Master Chef"}, CommanderArt: solRingPrintingA,
+		Cards: []deck.CardEntry{{Name: "Forest", Why: "a land"}}}
+
+	withBrokenPool(t, p, func(c *pool.Conn) {
+		tiles, err := Tiles(ctx, c, []*deck.Deck{plain, chosen}, true, "alice")
+		if err != nil {
+			t.Fatalf("the shelf: %v", err)
+		}
+		if len(tiles) != 2 {
+			t.Fatalf("two decks made %d tiles", len(tiles))
+		}
+		if tiles[0].ArtCrop == nil {
+			t.Error("a commander with a picture and no crop left its tile blank")
+		}
+		if tiles[1].ArtCrop == nil {
+			t.Error("a chosen printing with a picture and no crop left its tile blank")
+		} else if *tiles[1].ArtCrop != "https://example.invalid/a-picture.jpg" {
+			t.Errorf("the chosen printing's tile shows %q", *tiles[1].ArtCrop)
+		}
+	})
+}
+
 // A deck page whose commander alone chose a printing fails on that alone --
 // the card-level override is not what refuses here, so the commander's own
 // path is the one being driven.

@@ -233,6 +233,29 @@ func TestADeleteThatCannotReachTheCryptLeavesTheDeckWhereItIs(t *testing.T) {
 	}
 }
 
+// A deliverable asked for on a deck that is not there is a missing **deck**,
+// not a missing artifact -- the two refusals send a reader to different
+// places, and "this deck has no primer" about a deck nobody has is the wrong
+// one.
+func TestADeliverableOnADeckThatIsNotThereIsAMissingDeck(t *testing.T) {
+	t.Parallel()
+	src, _ := writableTier(t, "gyome")
+	ctx := context.Background()
+
+	_, err := src.ReadArtifact(ctx, "no-such-deck", "primer-quick.md")
+	if !library.IsNotFound(err) {
+		t.Errorf("a deliverable on an absent deck answered %v", err)
+	}
+	if _, err := src.Artifacts(ctx, "no-such-deck"); !library.IsNotFound(err) {
+		t.Errorf("the deliverable list for an absent deck answered %v", err)
+	}
+	// And a name that is not a deliverable never becomes a path at all, so
+	// it is refused before the deck is even looked for.
+	if _, err := src.ReadArtifact(ctx, "gyome", "../deck.yaml"); library.IsNotFound(err) {
+		t.Error("a name that is not a deliverable was answered as a missing deck")
+	}
+}
+
 // A machine with no accounts database answers "no such person" for every
 // owner but its own, rather than reaching for a handle it has not got.
 //
