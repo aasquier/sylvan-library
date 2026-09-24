@@ -13,6 +13,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -61,17 +62,30 @@ func newRoot(cfg config.Config, forge tier3.Settings, pipe claude.Endpoint) *cob
 
 func main() {
 	err := newRoot(config.Load(), tier3.LoadSettings(), claude.EndpointFromEnv()).Execute()
+	if code := exitCode(err, os.Stderr); code != 0 {
+		os.Exit(code)
+	}
+}
+
+// exitCode is what the process leaves behind, and what it says on the way —
+// the two halves of how a script reads this binary, separated from [main] so
+// they can be read by something other than a shell.
+//
+// **A refused gate is a status and not a sentence.** `decks validate` has
+// already printed the report and its counts, so a line saying so again is
+// noise in a script that only wanted the code — and a script that wanted the
+// report already has it on stdout. Everything else is a failure the caller has
+// not been told about yet, so it is named: `mtglab: <err>`, on the error
+// stream, where it does not contaminate output somebody is piping.
+func exitCode(err error, stderr io.Writer) int {
 	switch {
 	case err == nil:
-		return
+		return 0
 	case errors.Is(err, errFailedGate):
-		// The verdict is the status, not a sentence: `decks validate` has
-		// already printed the report and its counts, and a line saying so
-		// again is noise in a script that only wanted the code.
-		os.Exit(1)
+		return 1
 	default:
-		fmt.Fprintln(os.Stderr, "mtglab:", err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, "mtglab:", err)
+		return 1
 	}
 }
 

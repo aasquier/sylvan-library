@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strconv"
@@ -129,22 +130,22 @@ func portOf(t *testing.T, l net.Listener) string {
 }
 
 // The whole boot: ladder, door, listener, a real request over TCP, and a
-// clean stop on SIGTERM.
+// clean stop.
+//
+// **Parallel, and the stop is a channel rather than a signal.** It used to
+// send SIGTERM to the whole process, which is a broadcast: every other `serve`
+// alive in this binary would have stopped too, and the failure would have
+// landed on somebody else's test reading as a flake there. [serveUntil] takes
+// its stop as a value, so this test owns one and nothing outside it hears a
+// thing. What a *real* signal does to `serveOn` is
+// [TestTheProcessSignalIsArmedBeforeTheLadderRuns], one process over.
 func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
-	// **Serial**, and the audit cannot see why: it passes alone, but it sends
-	// SIGTERM to the whole process. A second `serve` running beside it would
-	// take the same signal and stop too, so the failure would land on the
-	// other test and read as a flake there.
+	t.Parallel()
 	d := scratchDeployment(t)
 
-	// Ours first: the runtime's default for SIGTERM is to exit, and this
-	// keeps the test binary alive whatever `serve` does with its own.
-	guard := make(chan os.Signal, 1)
-	signal.Notify(guard, syscall.SIGTERM)
-	defer signal.Stop(guard)
-
 	// The ladder ran on the way up, which is the first thing the boot owes.
-	port, base, done := bootServer(t, d)
+	stop := make(chan os.Signal, 1)
+	port, base, done := bootServerUntil(t, d, stop)
 	resp, err := waitForHealth(t, base+"/api/health", done)
 	if err != nil {
 		t.Fatalf("the server never answered on %s: %v", base, err)
@@ -164,11 +165,9 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 		t.Errorf("the health probe failed against a healthy server: %v", err)
 	}
 
-	// SIGTERM stops it, and the stop is clean: `serve` returns nil rather
-	// than reporting the shutdown as a failure.
-	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
-		t.Fatal(err)
-	}
+	// The stop, and it is clean: `serve` returns nil rather than reporting the
+	// shutdown as a failure.
+	stop <- syscall.SIGTERM
 	select {
 	case err := <-done:
 		if err != nil {
@@ -203,11 +202,41 @@ func TestTheServerBootsAnswersAndStopsOnASignal(t *testing.T) {
 	}
 }
 
-// bootServer starts `serve` on a listener this test is **already holding**
-// (see [heldPort]) and returns straight away: there is no port to lose between
-// here and the bind, so there is nothing to poll for and nothing to retry. The
-// caller waits for health, and [waitForHealth] is what watches the boot.
-func bootServer(t *testing.T, d deployment) (port, base string, done chan error) {
+// bootServer is [bootServerUntil] for a test that only wants a server up: the
+// stop is this helper's own, and it is spoken at cleanup so the boot ends the
+// way a deployment's does rather than by having its listener pulled out from
+// under it.
+//
+// **`t.Cleanup` rather than a `defer` the caller writes**, because a parent's
+// defer runs before its parallel subtests finish and both callers here are
+// parallel subtests.
+func bootServer(t *testing.T, d deployment) (base string, done chan error) {
+	t.Helper()
+	stop := make(chan os.Signal, 1)
+	_, base, done = bootServerUntil(t, d, stop)
+	t.Cleanup(func() {
+		select {
+		case stop <- syscall.SIGTERM:
+		default: // the boot has already ended; nothing is listening for it
+		}
+		select {
+		case <-done:
+		case <-time.After(2 * shutdownGrace):
+			t.Error("the server never stopped at teardown")
+		}
+	})
+	return base, done
+}
+
+// bootServerUntil starts the boot on a listener this test is **already
+// holding** (see [heldPort]) and returns straight away: there is no port to
+// lose between here and the bind, so there is nothing to poll for and nothing
+// to retry. The caller waits for health, and [waitForHealth] is what watches
+// the boot.
+//
+// The stop is the caller's own channel rather than the process's signals, for
+// the reason [serveUntil] takes one.
+func bootServerUntil(t *testing.T, d deployment, stop <-chan os.Signal) (port, base string, done chan error) {
 	t.Helper()
 	l := heldPort(t)
 	port = portOf(t, l)
@@ -216,8 +245,8 @@ func bootServer(t *testing.T, d deployment) (port, base string, done chan error)
 	webDist, tarot := t.TempDir(), t.TempDir()
 	done = make(chan error, 1)
 	go func() {
-		done <- serveOn(d.Config, tier3.Settings{}, webDist, tarot,
-			func() (net.Listener, error) { return l, nil })
+		done <- serveUntil(d.Config, d.Forge, webDist, tarot,
+			func() (net.Listener, error) { return l, nil }, stop)
 	}()
 	return port, "http://127.0.0.1:" + port, done
 }
@@ -310,43 +339,165 @@ func TestAHeldPortIsHeld(t *testing.T) {
 
 // **The stop half's fix, in one assertion**, and the sibling of
 // [TestAHeldPortIsHeld] above: a stop that arrives while the process is still
-// coming up is heard, because the handler is armed before the boot rather than
-// after it.
+// coming up is heard, because the channel carrying it is **buffered** and
+// [serveOn] arms it before the boot rather than after.
 //
-// This is not a timing test and it does not want a loaded machine. The seam it
-// uses is the listener callback — the instant `serveOn` reaches for the port —
-// and it does two things there. It sends the process a SIGTERM, and then it
-// **waits on the test's own guard channel** before returning the listener.
-// That second half is what makes this a fact rather than a race: the runtime
-// hands a signal to every channel registered at the moment it dispatches, so
-// once the guard has it, dispatch has happened, and a `signal.Notify` that has
-// not run by then has missed the signal for good.
+// The stop is put in the buffer before the boot is even started, which is what
+// a signal taken during the ladder looks like from inside [serveUntil] — the
+// runtime's delivery is the only difference, and that half is
+// [TestTheProcessSignalIsArmedBeforeTheLadderRuns]'s to prove. So the whole
+// boot runs with a stop already waiting for it, and what this holds is that
+// the boot **finishes** rather than dying halfway (the forward-only ladder,
+// ADR 23) and then finds the stop at the select.
 //
-// So the two orderings give two different outcomes with nothing in between.
-// Armed before the bind, `serveOn` already holds the stop in its buffer, and
-// finds it waiting the moment it reaches the select. Armed after, as it was,
-// the stop is gone: measured 3 of 3 against the old shape, where the server
-// went on serving until this test's own cleanup pulled the listener out from
-// under it — which is precisely the shape CI kept failing in.
+// Against the old shape — the handler armed three statements *after* the
+// server started serving — the stop was not delayed but gone: the runtime's
+// default action for SIGTERM is to kill the process, and on CI this hung four
+// times in one day, with a goroutine dump that read `serveOn` parked in its
+// select and `Serve` still accepting.
 //
-// The budget below is not racing anything. The signal is delivered before the
-// ladder even runs, so what is being waited for is a boot and an immediate
-// shutdown with no connection open to drain.
+// The budget below is not racing anything. The stop is there before the ladder
+// runs, so what is being waited for is a boot and an immediate shutdown with
+// no connection open to drain.
 func TestAStopArrivingDuringTheBootIsNotLost(t *testing.T) {
-	// **Serial**, for [TestTheServerBootsAnswersAndStopsOnASignal]'s reason:
-	// the SIGTERM goes to the whole process, so any other `serve` alive beside
-	// it would stop too and the failure would land on that test instead.
+	t.Parallel()
 	d := scratchDeployment(t)
-
-	// Ours first, as ever -- without it the runtime's default action ends the
-	// test binary, which is the production behaviour this test is about.
-	guard := make(chan os.Signal, 1)
-	signal.Notify(guard, syscall.SIGTERM)
-	defer signal.Stop(guard)
 
 	l := heldPort(t)
 	// Taken here rather than in the goroutine: `t.TempDir` belongs to the test.
 	webDist, tarot := t.TempDir(), t.TempDir()
+	// Buffered and already holding the stop, which is exactly the state
+	// [serveOn] hands over after a signal lands during the boot.
+	stop := make(chan os.Signal, 1)
+	stop <- syscall.SIGTERM
+
+	reached := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- serveUntil(d.Config, tier3.Settings{}, webDist, tarot,
+			func() (net.Listener, error) {
+				close(reached)
+				return l, nil
+			}, stop)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("a stop taken during the boot reported %v", err)
+		}
+	case <-time.After(2 * shutdownGrace):
+		buf := make([]byte, 1<<20)
+		n := runtime.Stack(buf, true)
+		t.Logf("every goroutine at the moment the stop was given up on:\n%s", buf[:n])
+		t.Fatal("a stop that arrived while the process was binding was never heard")
+	}
+	// The boot ran to the end rather than being cut short by the stop it was
+	// already holding: the ladder is forward-only and a half-applied one is
+	// the failure this ordering exists to prevent.
+	select {
+	case <-reached:
+	default:
+		t.Error("the boot stopped before it reached the listener, so the " +
+			"ladder it had already started was left halfway")
+	}
+	if _, err := os.Stat(d.AppDBPath()); err != nil {
+		t.Errorf("the boot did not finish its ladder: %v", err)
+	}
+}
+
+// childEnv is how the parent tells a re-run of this binary that it is the
+// child half of a test, and which half. Read rather than written by the test
+// that sees it, so nothing here is a write to the process.
+const childEnv = "MTGLAB_TEST_SERVE_CHILD"
+
+// **The real signal, in a process of its own.**
+//
+// [serveUntil] takes its stop as a value and is driven above with a plain
+// channel, which leaves exactly one thing a channel cannot show: that
+// [serveOn] arms [signal.Notify] *before* the ladder, so a SIGTERM landing in
+// that window is held rather than taken by the runtime's default action, which
+// is to kill the process where it stands.
+//
+// It cannot be asked in this process. A signal is a broadcast to every
+// registered channel, so a test binary that SIGTERMs itself stops every other
+// `serve` alive beside it — which is why the two tests above ran alone for a
+// year, and why a failure they caused landed on somebody else's test. A child
+// running one test has no such neighbours, and it is the honest shape besides:
+// the deployed article is a process being stopped, not a channel being written
+// to.
+//
+// The child is the whole assertion. A regression that moved the arming back
+// below the bind does not fail a comparison here — it **kills the child**, and
+// the exit status says so.
+func TestTheProcessSignalIsArmedBeforeTheLadderRuns(t *testing.T) {
+	t.Parallel()
+	out, err := runServeChild(t, "^TestTheServeChildHoldsAStopTakenDuringItsBoot$")
+	if err != nil {
+		t.Fatalf("the child boot did not survive a stop taken while it was "+
+			"coming up: %v\n%s", err, out)
+	}
+}
+
+// And the same for a stop that arrives once the server is up and answering:
+// the process hears its own SIGTERM, drains, and exits cleanly.
+func TestTheProcessStopsOnARealSignalOnceItIsServing(t *testing.T) {
+	t.Parallel()
+	out, err := runServeChild(t, "^TestTheServeChildStopsOnItsOwnSignal$")
+	if err != nil {
+		t.Fatalf("the child never stopped on a real SIGTERM: %v\n%s", err, out)
+	}
+}
+
+// runServeChild re-runs this test binary with one test selected and the child
+// marker in **its own** environment -- `exec.Cmd.Env`, never
+// [testing.T.Setenv], so nothing about this process changes and the caller
+// stays parallel.
+func runServeChild(t *testing.T, only string) (string, error) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 4*shutdownGrace)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run="+only, "-test.v")
+	cmd.Env = append(os.Environ(), childEnv+"=1")
+	out, err := cmd.CombinedOutput()
+	text := string(out)
+	// **A child that skipped is a child that proved nothing**, and it exits
+	// zero doing it -- the marker is read from the environment, and an
+	// environment that did not cross would make this whole pair a green that
+	// tests the parent's ability to start a process.
+	if err == nil && !strings.Contains(text, "--- PASS") {
+		return text, errors.New("the child ran no test; it skipped or matched nothing")
+	}
+	return text, err
+}
+
+// The child half of [TestTheProcessSignalIsArmedBeforeTheLadderRuns]: it
+// SIGTERMs itself from inside the listener callback -- the instant [serveOn]
+// reaches for the port, and therefore after the arming and after the ladder --
+// and then **waits on its own guard channel** before handing the listener
+// over.
+//
+// That second half is what makes this a fact rather than a race: the runtime
+// hands a signal to every channel registered at the moment it dispatches, so
+// once the guard has it, dispatch has happened. A `signal.Notify` that had not
+// run by then would have missed the signal for good, and this process would be
+// dead instead of failing.
+func TestTheServeChildHoldsAStopTakenDuringItsBoot(t *testing.T) {
+	t.Parallel()
+	if os.Getenv(childEnv) == "" {
+		t.Skip("the child half of TestTheProcessSignalIsArmedBeforeTheLadderRuns")
+	}
+	d := scratchDeployment(t)
+	l := heldPort(t)
+	webDist, tarot := t.TempDir(), t.TempDir()
+
+	// The child's own registration, so the moment of dispatch is observable
+	// from here. It takes nothing away from `serveOn`'s: delivery is a
+	// broadcast to every registered channel rather than a handoff to one.
+	guard := make(chan os.Signal, 1)
+	signal.Notify(guard, syscall.SIGTERM)
+	defer signal.Stop(guard)
+
 	done := make(chan error, 1)
 	go func() {
 		done <- serveOn(d.Config, tier3.Settings{}, webDist, tarot,
@@ -369,6 +520,46 @@ func TestAStopArrivingDuringTheBootIsNotLost(t *testing.T) {
 		n := runtime.Stack(buf, true)
 		t.Logf("every goroutine at the moment the stop was given up on:\n%s", buf[:n])
 		t.Fatal("a stop that arrived while the process was binding was never heard")
+	}
+}
+
+// The child half of [TestTheProcessStopsOnARealSignalOnceItIsServing]: a
+// server that is up and answering is sent the signal the deployed one gets,
+// and stops cleanly.
+func TestTheServeChildStopsOnItsOwnSignal(t *testing.T) {
+	t.Parallel()
+	if os.Getenv(childEnv) == "" {
+		t.Skip("the child half of TestTheProcessStopsOnARealSignalOnceItIsServing")
+	}
+	d := scratchDeployment(t)
+	l := heldPort(t)
+	webDist, tarot := t.TempDir(), t.TempDir()
+	base := "http://127.0.0.1:" + portOf(t, l)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- serveOn(d.Config, tier3.Settings{}, webDist, tarot,
+			func() (net.Listener, error) { return l, nil })
+	}()
+	resp, err := waitForHealth(t, base+"/api/health", done)
+	if err != nil {
+		t.Fatalf("the server never answered on %s: %v", base, err)
+	}
+	_ = resp.Body.Close()
+
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("a clean shutdown reported %v", err)
+		}
+	case <-time.After(2 * shutdownGrace):
+		buf := make([]byte, 1<<20)
+		n := runtime.Stack(buf, true)
+		t.Logf("every goroutine at the moment the stop was given up on:\n%s", buf[:n])
+		t.Fatal("the server did not stop on SIGTERM")
 	}
 }
 
