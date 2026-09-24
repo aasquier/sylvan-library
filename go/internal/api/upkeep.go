@@ -286,6 +286,7 @@ func (a *API) gatherTheLibrary(rep jobs.Progress) (any, error) {
 	counts, err := pool.Refresh(ctx, pool.RefreshOptions{
 		DBPath:      a.poolPath,
 		ScryfallDir: a.scryfallDir,
+		IndexURL:    a.bulkIndex,
 	}, pool.RefreshWatcher{
 		Gathering: func(kind string) {
 			if kind == pool.OracleBulk {

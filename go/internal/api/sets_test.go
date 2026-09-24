@@ -3,9 +3,13 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -54,20 +58,7 @@ func TestTheSetFilterMatchesTheGolden(t *testing.T) {
 // same bytes and no second request -- the standing behaviour
 // that keeps a dashboard from asking Scryfall once per render.
 func TestASecondAskIsTheCacheNotAFetch(t *testing.T) {
-	// **Serial, and Go will not tell you why.** The three tests in this file
-	// point `scryfallSets` -- a package-level variable -- at their own stub
-	// and put it back on the way out. Adding `t.Parallel()` panics at
-	// nothing and passes when the test is run alone; what it does is let two
-	// of them swap the same variable at once, so one test's assertions run
-	// against the other's server. The race detector sees it only when they
-	// actually overlap, which is why the reason is written down rather than
-	// left to be rediscovered.
-	//
-	// The fix is not a comment: it is the one `internal/claude` already made
-	// (ADR 39) -- the URL becomes a field on `Config`, the way
-	// `RefreshOptions.IndexURL` is a field for exactly this reason, and all
-	// three become parallel with nothing to restore. It is a change to
-	// `sets.go` rather than to its tests, so it is not this pass's to make.
+	t.Parallel()
 	var hits atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
@@ -79,11 +70,8 @@ func TestASecondAskIsTheCacheNotAFetch(t *testing.T) {
 			`"icon_svg_uri":"u","set_type":"expansion"}]}`))
 	}))
 	defer server.Close()
-	old := scryfallSets
-	scryfallSets = server.URL
-	defer func() { scryfallSets = old }()
 
-	a := New(Config{})
+	a := New(Config{SetsFeed: server.URL})
 	first := httptest.NewRecorder()
 	a.upcomingSets(first, httptest.NewRequest(http.MethodGet, "/api/sets/upcoming", nil))
 	second := httptest.NewRecorder()
@@ -103,18 +91,13 @@ func TestASecondAskIsTheCacheNotAFetch(t *testing.T) {
 // error status is the same refusal -- the recorded contract folds both
 // into "could not reach Scryfall".
 func TestScryfallDownIsA503ThatSaysSo(t *testing.T) {
-	// **Serial**: it swaps the package-level `scryfallSets`, exactly as
-	// `TestASecondAskIsTheCacheNotAFetch` does and for the reason argued
-	// there. Go accepts `t.Parallel()` here and the collision is silent.
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer server.Close()
-	old := scryfallSets
-	scryfallSets = server.URL
-	defer func() { scryfallSets = old }()
 
-	a := New(Config{})
+	a := New(Config{SetsFeed: server.URL})
 	rec := httptest.NewRecorder()
 	a.upcomingSets(rec, httptest.NewRequest(http.MethodGet, "/api/sets/upcoming", nil))
 	if rec.Code != http.StatusServiceUnavailable {
@@ -134,17 +117,14 @@ func TestScryfallDownIsA503ThatSaysSo(t *testing.T) {
 // transport-failure branch, so it is the recorded uncaught 500:
 // plain-text three words, nothing about the cause.
 func TestAMalformedFeedIsTheRecordedUncaught500(t *testing.T) {
-	// **Serial**: the third of the three that swap `scryfallSets`. See
-	// `TestASecondAskIsTheCacheNotAFetch` for the argument and the fix.
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("<html>not json</html>"))
 	}))
 	defer server.Close()
-	old := scryfallSets
-	scryfallSets = server.URL
-	defer func() { scryfallSets = old }()
 
-	a := New(Config{})
+	a := New(Config{SetsFeed: server.URL,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	rec := httptest.NewRecorder()
 	a.upcomingSets(rec, httptest.NewRequest(http.MethodGet, "/api/sets/upcoming", nil))
 	if rec.Code != http.StatusInternalServerError {
@@ -155,5 +135,109 @@ func TestAMalformedFeedIsTheRecordedUncaught500(t *testing.T) {
 	}
 	if rec.Body.String() != "Internal Server Error" {
 		t.Fatalf("body %q", rec.Body.String())
+	}
+}
+
+// The seam's own guard: an instance nobody told where the feed lives asks
+// Scryfall, and the three tests above prove nothing at all if that stops
+// being true. The zero value is the whole reason the URL could stop being a
+// package variable -- every caller that used to get the constant for free
+// still gets it -- so it is asserted rather than assumed.
+func TestAnInstanceToldNothingAsksScryfall(t *testing.T) {
+	t.Parallel()
+	if got := New(Config{}).setsFeed; got != ScryfallSets {
+		t.Fatalf("an unconfigured instance asks %q, not Scryfall", got)
+	}
+	if got := New(Config{SetsFeed: "https://elsewhere.example/sets"}).setsFeed; got == ScryfallSets {
+		t.Fatal("a configured feed was overwritten by the default")
+	}
+}
+
+// A feed that is not a URL fails before a single byte goes out, and it fails
+// as the library's own 500 rather than as a transport sentence -- "could not
+// reach Scryfall" would be a lie about a request that was never made.
+func TestAFeedThatIsNotAURLFailsBeforeAnythingIsAsked(t *testing.T) {
+	t.Parallel()
+	a := New(Config{SetsFeed: "://not a url",
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	rec := httptest.NewRecorder()
+	a.upcomingSets(rec, httptest.NewRequest(http.MethodGet, "/api/sets/upcoming", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("%d: %s", rec.Code, rec.Body)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	detail, _ := body["detail"].(string)
+	if strings.Contains(detail, "Scryfall") {
+		t.Fatalf("a request that was never sent was blamed on Scryfall: %q", detail)
+	}
+	if strings.TrimSpace(detail) == "" {
+		t.Fatalf("the 500 carries nothing a person could read: %s", rec.Body)
+	}
+}
+
+// A feed that answers and then goes away mid-sentence is the transport
+// refusal, not the malformed-payload 500: the bytes never arrived, so there
+// is nothing to have been malformed. The two branches are four lines apart in
+// the handler and they answer differently on purpose.
+func TestAFeedThatStopsMidBodyIsTheTransportRefusal(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A length promised and not delivered: the read fails rather than
+		// completing short, which is what makes this the transport's fault.
+		w.Header().Set("Content-Length", "4096")
+		_, _ = w.Write([]byte(`{"data":[`))
+		panic(http.ErrAbortHandler)
+	}))
+	server.Config.ErrorLog = log.New(io.Discard, "", 0)
+	defer server.Close()
+
+	a := New(Config{SetsFeed: server.URL,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	rec := httptest.NewRecorder()
+	a.upcomingSets(rec, httptest.NewRequest(http.MethodGet, "/api/sets/upcoming", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("%d: %s", rec.Code, rec.Body)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if detail, _ := body["detail"].(string); !strings.HasPrefix(detail, "could not reach Scryfall: ") {
+		t.Fatalf("detail %q", detail)
+	}
+}
+
+// A day-old answer is not today's cache: the key is the date the answer was
+// fetched on, so the first ask of a new day fetches again. Nothing else
+// asserts the `==` in that condition, and a cache that never expired would
+// serve a whole spoiler season out of yesterday.
+func TestYesterdaysAnswerIsNotTodaysCache(t *testing.T) {
+	t.Parallel()
+	var hits atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	a := New(Config{SetsFeed: server.URL})
+	a.setsDay, a.setsBody = "2000-01-01", []byte(`{"sets":[],"as_of":"2000-01-01"}`)
+
+	rec := httptest.NewRecorder()
+	a.upcomingSets(rec, httptest.NewRequest(http.MethodGet, "/api/sets/upcoming", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%d: %s", rec.Code, rec.Body)
+	}
+	if hits.Load() != 1 {
+		t.Fatalf("%d fetches: yesterday's answer was served as today's", hits.Load())
+	}
+	if strings.Contains(rec.Body.String(), "2000-01-01") {
+		t.Fatalf("the answer is still stamped with the stale day: %s", rec.Body)
+	}
+	if a.setsDay == "2000-01-01" {
+		t.Fatal("the cache kept the stale day after a fresh fetch")
 	}
 }
