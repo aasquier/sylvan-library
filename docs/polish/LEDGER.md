@@ -6280,6 +6280,99 @@ morning — the volume restore drill (Answered 6), `tools` as a required check
 inserting this section's 2026-09-19 (rainbow) entry at its head at the same
 hour. Read that entry beside #481's.*
 
+### 2026-09-26 (rainbow) — the gleaming edge, on the whole `.btn` family
+
+*The Queen's ball, run beside three Go lanes. One PR: the branch
+`the-gleaming-edge`. Walked in Aaron's own Chrome at 1440x900 in both themes,
+and in the app pane at 375.*
+
+**What landed.** A light that walks the rim of a control, faintly and forever,
+and flares when a hand arrives. Aaron's ask, verbatim, was *"Buttons still are
+basic, like I want a gleaming edge that circles around the button, blood, fire,
+whatever is appropriate."* One block in `web/src/index.css`, sitting between
+`.btn-felt` and the hut's copper, dresses every plate in the app:
+
+- **The mechanism is the board's, not a new one.** `.field-card.is-commander`
+  walks a crown around a commander and `.field-quad.is-on-turn` walks one
+  around a seat; this is that device at a button's scale — a short arc of a
+  conic gradient, two masks subtracting the content box out of the border box,
+  and the *gradient* turning rather than the element, driven by a registered
+  `@property --btn-gleam`.
+- **Two selectors carry the whole family** (`.btn:not(.arena-gate)::before` and
+  `.wheel-spin-btn::before`) and a voice opts in by declaring a hot centre in
+  the material table. A voice that declares nothing has an inert transparent
+  pseudo-element and a paused lap, which costs no frames.
+- **Two tiers.** A *plate* voice (the one action a surface is for) orbits at a
+  low light before anybody arrives; a *quiet* voice is dark until the hand
+  comes and the lap **starts** then. Thirty rims orbiting at once is a page
+  that fidgets, not one that breathes.
+- **`.btn-accent-brass`**, and the chop that earned it: the fortune-teller's
+  *Turn them over* and *Begin the reading* were `btn-accent-1` — a chart blue —
+  on a candlelit table, two feet from three `.btn-felt` controls that warm to
+  brass. `components/tarot.tsx:1029,1040`. This is the séance-primary
+  suggestion left unruled in #450 and #461, taken live rather than inherited.
+
+**Numbers, measured rather than declared.**
+
+- Plate lap **7.49s** against a declared 7.5s (`--gleam-cycle`), read off the
+  animated angle over 1614ms on the real page. Lit lap **2.6s**; the Wheel's
+  own **6s / 2.2s**, the shortest in the app because it stays the loud one.
+- Rest opacity 0.5–0.7 by voice, 1.0 lit, `calc(--gleam-lit * 0.42)` pressed.
+  Ring 1.5px at rest, 2px lit — `padding` on the pseudo, so it contributes
+  nothing to layout: a `.btn-primary` measures 145×36 at a 375px viewport with
+  the ring on, exactly as it did without it.
+- `:focus-visible` gets every word of the hover reply (opacity 1, 2px, 2.6s)
+  **and** keeps `.btn`'s vine outline, which sits outside the gleam at
+  `outline-offset: 2px`. Verified on the page with the Tab key.
+- 13 voices in the material table; `.btn-ghost` deliberately not among them and
+  the reason is written beside it.
+
+**The guard, and why it needed writing.** `go/cmd/mtglab/buttongleam_test.go`
+pins three promises against the **committed bundle**: the lap is arrested under
+`prefers-reduced-motion`, a disabled control does not gleam, and the angle is
+registered with a `var()` fallback behind an `@supports` for `mask-composite`.
+All four mutants fail it (guard removed, disabled left gleaming, `@property`
+deleted, `@supports` loosened) and the tree is green with it.
+
+It exists because **`reducedmotion_test.go` cannot see this case**, proven
+rather than assumed: the reduced-motion rule was deleted, the bundle rebuilt,
+and `TestEveryAnimationInTheBundleCanBeArrested` stayed **green**. Its rule is
+"a rule is covered when any class in its selector appears inside a
+reduced-motion block", and `.btn` appears in one several hundred lines away
+where it turns off *transitions*. That is the sweep behaving exactly as its own
+doc comment says ("a tripwire, not a rendering engine") — but it means any
+future `animation` on a `.btn` pseudo-element reads as covered by a guard that
+never touches it. **Queued for Red or Colorless: that gap is general.**
+
+`webDatedCommentCeiling` 259 → 260, argued in the const block: the added line
+is Aaron's ask, attributed and dated the way `.btn-accent-vine`'s
+"(Aaron, 2026-09-07: …)" already is.
+
+**Two rig traps bought this session**, both worth the next lane's time:
+
+- **`/tarot` on the dev door (5173) is not the reading room.** `vite.config.ts`
+  proxies `/tarot` to 8765 for the deck's art, so the route renders an empty
+  `#root` and reads as a broken page. The reading room is the fortune-teller
+  tile inside `/new`; there is no `/tarot` route in `App.tsx` at all.
+- **`claude-in-chrome`'s `resize_window` reports success and does nothing on a
+  maximised window** — `innerWidth` stayed 1440 through a resize to 430 and a
+  reload. The phone pass ran in the app pane's mobile preset instead. This
+  extends the trap already recorded in `the-grand-ball-pr`.
+
+**Corrected in passing.** The `.ink-word` comment claimed "@property
+registration is off the table on this site's Safari floor". It is not:
+registered properties arrived in Safari 16.4 and 16.4 *is* the floor
+(`web/README.md`), which is why the board's crown, the pod's turn rim and now
+the buttons' gleam all animate one. A comment that would have talked the next
+session out of the right mechanism.
+
+**Read live and left as suggestions in the PR body** (not built): `.btn`'s
+36px height against the house's own 44px touch floor, site-wide and
+structural; the Coliseum lore carousel still not stopping under reduced motion
+(re-seen, unchanged since #450); `#c9a227` written as a literal in eight places
+where every other material in this file is a named token.
+
+
 ## Green — Growth & Resilience
 
 *Browser, mobile & accessibility · cloud resource watch · scalability &

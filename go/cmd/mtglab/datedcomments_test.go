@@ -94,7 +94,17 @@ const (
 	// Aaron's rulings, whose argument is the sentence and not the day, so all
 	// of them went and no ceiling was raised beside them. This is what the
 	// fall side is for -- the test failed on the sweep before this line moved.
-	webDatedCommentCeiling = 259
+	//
+	// 259 → 260 on the branch that put a travelling gleam on the button
+	// family. The one added line is the ask itself, attributed and dated the
+	// way `.btn-accent-vine`'s "(Aaron, 2026-09-07: ...)" three hundred lines
+	// above it already is: a quotation whose speaker and day are the fact,
+	// because the whole shape of that block -- blood, fire, per-surface
+	// materials -- is an answer to it, and a future session weighing whether
+	// to change the materials needs to know whose request it is arguing with.
+	// The same branch's `.btn-accent-brass` note dates its own walk in prose
+	// this guard does not count; it is left as written for the same reason.
+	webDatedCommentCeiling = 260
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a
