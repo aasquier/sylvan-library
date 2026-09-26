@@ -31,30 +31,6 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ---
 
-## Open — a walk before a merge (commandment 16)
-
-**Red: PR #481 is green and parked — commandment 17's focus clause made
-checkable, and the twenty-one controls it found dressed.** Two art-picker
-tiles were genuinely silent to the keyboard (an inline `outline` outranks
-every focus ring); ten classes — `.card-action`, `.menu-row`, `.nav-link`,
-`.wordmark`, `.shelf-learn`, `.reader-tile`, `.art-pick-tile`,
-`.wheel-folded`, `.wheel-fold-btn`, `.wheel-spin-btn` — answered hover and
-left focus to the browser's default ring; all now share their hover reply
-with `:focus-visible` and wear `.btn`'s vine ring. · *Cost of leaving it:*
-keyboard users get the OS blue line on this site's dark rooms, and the guard
-sits unmerged so the next inline `outline` lands unnoticed. ·
-**Recommendation:** walk and merge. `mtglab-ui` on 8765, then **Tab, never
-click** (Chrome draws `:focus-visible` for the keyboard only): `/` — Tab once
-(wordmark rings, tree shivers 700ms), Tab on (each nav link rings, its
-underline sprouts); gear → Tab (menu rows ring inset); any deck → Card actions
-bar → Tab across; deck → Change art → Tab into the tiles (lift + ring; on
-Trostani, Card art → Command Tower, the chosen tile keeps its blue ring under
-a vine halo); the folded wheel at the deck's foot → Tab, Enter, Tab to Fold
-away and Spin the wheel (glint crosses, 0.7s); `/new` → Help me decide →
-Different reader → Tab onto a reader tile; `/` → From the shelves → Another
-until "In the Learn room →" shows, Tab to it. Ledger: Red, 2026-09-19 (the
-entry rides #481 itself).
-
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and
@@ -109,18 +85,6 @@ that moves no pixels — or close it as a desktop-first ruling; either answer
 ends a finding re-measured four runs running. Ledger: Green, 2026-08-24 (the
 browser facet's queued item 3); re-measured 2026-09-19.
 
-**Red: `/api/health` reports the pool and the process, never `app.db` or the
-volume's free space, so a corrupt auth database or a full disk leaves it
-green.** · *Cost of leaving it:* every login can fail behind a passing check.
-· **Recommendation:** "yes" — add `app_db` (does it open), `disk_free_mb` and
-`schema_version` to the body and keep the status 200 (Fly stops routing on a
-failing check, and with one machine that turns "logins are broken" into "the
-site is down"), and it becomes the next Red run's first fix rather than a
-queued idea; it is a ruling only because the free-space read is
-platform-shaped and the arm64 leg of CI is the only full proof, so it lands
-as its own watched PR. Ledger: Red, the queued list carried in the 2026-09-05
-entry, item 3; re-verified 2026-09-19.
-
 **Red: the "drill older than the newest migration" rule cannot be satisfied,
 and the drill that proved it is walked and recorded.** Snapshot retention is
 five days; a snapshot can only ever rehearse a rung landed in the last five
@@ -133,30 +97,25 @@ refuse; say "checklist" instead if you want the five-day drill named beside
 2026-09-19 (the drill and the retention finding are recorded there as Red
 records carried by Cleanup).
 
-**Red: a merge queue — its ledger trigger ("the next time more than two PRs
-are open at once") fired today, with three Dependabot PRs and #481 open
-together.** Protection is `strict`, so every merge invalidates the others and
-costs each a branch update and a full re-run (~7 minutes of CI apiece,
-which is what landing the Dependabot trio one at a time costs). · *Cost of
-leaving it:* about
-twenty CI minutes on the one morning a month Dependabot batches, and nothing
-otherwise — serial rainbows never collide. · **Recommendation:** "close" —
-a merge queue changes the contributor workflow to save a monthly twenty
-minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
-list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
-
 ## Open — a dollar and an account
 
 **Red: nothing off-platform tells you the site is down, and a hung process
 that keeps its port is an outage nothing detects.** Fly's HTTP check stops
 routing on failure and the restart policy fires only on exit, so a wedged
 process is a total outage with no alarm. · *Cost of leaving it:* the first
-person to notice an outage is a friend at breakfast. · **Recommendation:**
-two free minutes first — does fly-metrics.net hold any alert rule at all? —
-then UptimeRobot's free tier on `GET /api/health` (GET, never HEAD: `HEAD /`
-answers 405) wired to Pushover ($5 once) for the phone. Ledger: Red, the
-queued list carried in the 2026-09-05 entry, items 1–2; on the queue since
-09-19 only, in the ledger since 08-16.
+person to notice an outage is a friend at breakfast. · **The two free minutes
+are spent and they end at your login:** `fly` has no alert-rule subcommand at
+all, fly-metrics.net answers 401 unauthenticated, and `FLY_METRICS_TOKEN` is a
+read-only Prometheus credential rather than a Grafana one — so *whether any
+alert rule exists* is two clicks in your own Fly session and nothing a run can
+find out. (`fly synthetics` is new and is not the answer: the agent runs on
+Fly, so it cannot report that Fly is down.) · **Recommendation:** look once
+while you are in there, then UptimeRobot's free tier on `GET /api/health`
+(GET, never HEAD: `HEAD /` answers 405, and a Go guard asserts the GET now)
+wired to Pushover ($5 once) for the phone. The health body reports `app_db`,
+`disk_free_mb` and `schema_version` as of 2026-09-26, so the monitor has
+something to read besides 200. Ledger: Red, the queued list carried in the
+2026-09-05 entry, items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
 

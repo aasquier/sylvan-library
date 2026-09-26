@@ -4958,10 +4958,262 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+  2026-09-12 (rainbow),
   2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
   2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
   first Red run and the baseline the numbers below are a trend against.
+
+### 2026-09-26 (rainbow)
+
+*Two PRs, both backend-only: **#502** carries everything below except the
+deploy retry, which is **#505** — a `deploy`-job change, and a `deploy` job runs
+on a push to `main` alone, so it could only ever be watched rather than proven.*
+
+- **Landed: `/api/health` reports sickness as well as liveness — queued item
+  3, ruled yes on the daybreak queue and closed here.** `app_db`,
+  `disk_free_mb` and `schema_version` are in the body, in both shapes, and
+  the status stays 200 for every one of them (Fly stops routing to a machine
+  whose check fails, and with one machine that turns "logins are broken" into
+  "the site is down"). Three readings, each with a shape that does not lie:
+  - `app_db` is **three-valued on purpose** — `null` for an instance with no
+    auth database, `false` for a file that is there and will not answer,
+    `true` for one that opened. Only the middle one is an alarm, and the
+    distinction is the whole reason it is not a bare boolean.
+  - `disk_free_mb` is `null` rather than `0` when the read fails.
+    `diskUsage` reports a failed statfs as three zeros, and a monitor reading
+    `disk_free_mb: 0` would page somebody for a full volume that is really a
+    question nobody asked (the `?? false` trap in its Go form). `total <= 0`
+    is how the failure is told from a reading.
+  - `schema_version` and `app_db` are **one read**: `appDBReading` in
+    `adminstats.go` opens `app.db` read-only once and answers both, and
+    `schemaApplied` — the admin panel's existing caller — is now two lines
+    over it. It is a header read and not `PRAGMA integrity_check`, which
+    walks the whole database and is not what a thirty-second probe runs.
+  - **The queued entry's premise was already half solved and nobody had
+    looked.** It called the free-space read platform-shaped and said only
+    CI's arm64 leg could prove it; `api.diskUsage` has existed in
+    `system_darwin.go` / `system_linux.go` since the admin storage view, so
+    there was no new platform code to write and no build tag involved. Worth
+    recording because the queue line is what a future session would have
+    budgeted from.
+  - Four tests in `health_test.go` (the degraded shape's byte-exact record
+    updated; a real `app.db` reporting the rung read back from
+    `auth.SchemaVersion` rather than typed; a garbage file reading `false`
+    with the status still 200; `diskFreeMB` absent rather than zero).
+    **Mutation-verified three ways**: dropping `total <= 0` fails the free-space
+    test naming "a path that names nothing reports 0 free"; returning `nil`
+    instead of `false` on the pragma error fails the unreadable-database test
+    by name; dropping `append(body, sickness...)` fails two tests at once.
+- **Landed: the platform's own health check is machine-checked now — the
+  standing question's answer for this run.** `fly.toml`'s
+  `[[http_service.checks]]` and the `Dockerfile`'s `HEALTHCHECK` both name
+  `/api/health` as a string and both assert *in prose* that it is on
+  `PublicPaths`. Nothing held either claim to the code, and the drift is the
+  most expensive in the repository while being silent in both directions: a
+  renamed or re-methoded route leaves Fly polling a 404, the proxy stops
+  routing, and with one machine that is the whole site dark with every test
+  green — the container's own check fails the same way and restarts the
+  process in a loop. `TestThePlatformsHealthCheckNamesAServedPublicRoute`
+  (`go/cmd/mtglab/healthchecktarget_test.go`) reads the method and path out
+  of `fly.toml`'s check block, the second copy out of the `Dockerfile`'s
+  probe *URL*, and holds them equal to each other, to
+  `api.API.Routes()` and to `door.PublicPaths` — nothing typed. The GET
+  assertion carries queued item 2's caveat where a reader will meet it.
+  **Mutation-verified four ways in one run**: `path = "/api/healthz"` and
+  `method = "HEAD"` in `fly.toml` fire all four messages
+  (Dockerfile mismatch, no such served route, not public, wrong method), and
+  deleting `"/api/health"` from `door.PublicPaths` alone fires exactly the
+  public one.
+- **Hot-spot patrol: `internal/door`, which Red had never profiled, and it
+  found the largest object in the request path being built and thrown away
+  per response.** The door is on the path of *every* request (auth
+  middleware, router, session touch, gzip, static tiers, the visitor
+  ledger) and the five packages previous patrols profiled — `api`,
+  `sim/tier1`, `deckread`, `gate`, `library` — are all inside or behind it.
+  Raw tops (test-shaped load, load 2.17 before):
+
+  ```
+  internal/door  (2.24s)  CPU: Duration 403.30ms, samples 830ms (205.80%)
+     450ms 54.22%  syscall.rawsyscalln        <- sqlite WAL, app.db
+     240ms 28.92%  runtime.cgocall            <- the documented blind spot
+      20ms  2.41%  regexp.(*Regexp).doOnePass
+      10ms  1.20%  compress/flate.(*compressor).deflate
+  internal/door  ALLOC: 48,060.92kB total
+    19456.00kB 40.48%  argon2.initBlocks            <- the legitimate remainder
+     6318.10kB 13.15%  compress/flate.NewWriter (7960.45kB cum, 16.56%)
+     3039.81kB  6.32%  libc/netdb.init.0
+     2564.25kB  5.34%  runtime.mallocgc
+     1642.35kB  3.42%  compress/flate.(*compressor).initDeflate
+     1542.01kB  3.21%  bufio.NewReaderSize
+      517.33kB  1.08%  door.newRouteTable
+      513.69kB  1.07%  door.servedPaths
+  ```
+
+  CPU is 83% syscall and cgo — both standing blind spots, and nothing to read
+  there. **The allocation profile is where the finding was**, exactly as the
+  shelf says it would be: `flate.NewWriter` is second only to password
+  hashing, and `gzip.go` built one `gzip.Writer` at
+  `BestCompression` per compressed response and dropped it.
+- **And the fix, with the discipline attached (`gzip.go`, a `sync.Pool`).**
+  Per compressed response, `gzip_bench_test.go` (new, this branch — the
+  instrument the claim rests on):
+
+  ```
+  before  BenchmarkOneGzippedResponse-8   5013   234524 ns/op   836848 B/op   31 allocs/op
+  after   BenchmarkOneGzippedResponse-8  16735    65666 ns/op    23435 B/op   14 allocs/op
+  control BenchmarkOnePlainResponse-8   161048     7286 ns/op    22704 B/op   10 allocs/op  (load 2.2)
+  control BenchmarkOnePlainResponse-8   161049     8195 ns/op    22704 B/op   10 allocs/op  (load 147)
+  ```
+
+  **−813 kB and −17 allocations per compressed response**, landing the
+  compressed path within a kilobyte of the uncompressed one — every asset and
+  every JSON body over `gzipFloor` was paying it. `-count=6`, spread under
+  190 B/op either side.
+  **The wall clock in that table is not the finding and the control says why**:
+  the plain path never touches the compressor and its `B/op` is 22,704 to the
+  byte in both runs, while its `ns/op` moved 6.1µs → 14µs on ambient load
+  alone (2.17 → 147.28 between the two). That is the cross-night rule holding
+  inside one session; the allocation figures are the load-independent half.
+  **The one hazard is a writer lent out twice**, which would write one
+  response's bytes into another's, so: `Reset` before a byte is written, `Put`
+  only in `finish` and only after `Close` has written the trailer, and the
+  field cleared in the same breath so a second `finish` cannot return the same
+  writer. `TestBorrowedCompressorsNeverBleedOneResponseIntoAnother` (three
+  responses through one pool, each read back on its own) and
+  `TestAPooledCompressorWritesItsTrailerBeforeItGoesBack`.
+  **Mutation-verified two ways**: no `Reset` panics on the *first* compressed
+  response (a writer out of `New` points at nothing), and `Put` without
+  `Close` fails both with `unexpected EOF` — a stream whose CRC never arrived.
+- **CI, measured (n=37 successful `ci.yml` runs, the window ending
+  2026-09-24T22:17Z — main has not run since; per-job medians from
+  `started_at`/`completed_at`, raw rows in this run's scratch `jobs.txt`,
+  296 lines):** `go (amd64)` **316s** (204–356, was 298.5) · `go (arm64)`
+  **270s** (200–325, **was 223**) · `image` **184s** (63–328, was 143) ·
+  `deploy` **171.5s** (153–211, n=14, was 165) · `frontend` **87s** (61–94,
+  was 88) · `go-lint` **40s** (21–125, was 37.5) · `tools` **33s** (27–41,
+  unchanged) · `no-secrets-or-card-data` **6s** (4–9, was 7).
+  **Two movers with one named cause between them.** arm64 **+21%** and amd64
+  **+6%**: the coverage climb of 09-24 (#488–#497) grew the suite and raised
+  the floor to 95.0, and the arm64 leg is the one that computes coverage
+  (#466 gated the step to that leg alone). So the leg carrying the extra work
+  grew three times as fast as the one that does not — which is the shape the
+  cause predicts, and it is also **the critical path narrowing to 46s** from
+  ~75s. If arm64 ever passes amd64, the floor step is where the time is and
+  the 09-12 reasoning for putting it on one leg gets re-read, not undone.
+  `image` +41s is inside its own 63–328 spread (cache replays versus cold).
+  **Last five `tests` runs on `main`, wall clock:** 470s (0e3ef833) · 542s
+  (11f154dc) · 549s (48f569d4) · 711s (1048e635) · **945s FAILED**
+  (36b0aee3) · 808s (a4277721). The trend is down, and the failure is its own
+  entry below.
+- **A red `main` run whose deploy had fully landed — for the third recorded
+  time, and this one has a cause worth fixing.** Run 36055012220 (09-24,
+  sha 36b0aee3, `deploy` failed at 15m45s) died in **Point the forge-worker
+  machine at it** with `curl: (35) Recv failure: Connection reset by peer`,
+  exit 35, under `set -euo pipefail`. **Release v413 completed at 20:42 and
+  the curl died at 20:43:22** — the app deploy had fully landed and was
+  serving; the step runs *after* the smoke test by
+  design, so a red worker sync is feedback about the worker rather than a
+  rollback of the app — but the run reads `failure`, which is the
+  read-the-image-tag lesson arriving a third way. **Every Fly Machines API
+  call in that step is a bare `curl -fsS` with no retry** — the machine list,
+  the update, the state polls in `wake`, the start, the stop — so any single
+  transport hiccup against `api.machines.dev` fails the deploy job. That is
+  **two unretried transients in one week**: a 409 on #477 (09-19, memory
+  `the-rainbow-of-2026-09-19`) and this reset. Both self-healed on the next
+  deploy, and the worker holds `forge-worker-0e3ef833` today, so the standing
+  cost is a red check that is not about the code. **Fixed in #505**, its own
+  small PR because that is the only way a deploy-job change can be watched:
+  all seven calls take `--retry 5 --retry-delay 2 --retry-all-errors
+  --max-time 30`, and `--retry-all-errors` rather than `--retry` alone is the
+  whole point — curl's own "transient" list is timeouts plus a handful of
+  status codes, so plain `--retry` would have retried *neither* of the two real
+  failures. `TestEveryMachinesAPICallInTheDeployRetries` holds it by indent
+  inside that one step (three other jobs run curls under different rules) and
+  refuses a block with fewer than six calls in it, so a parser that found the
+  wrong step cannot pass. **Mutation-verified both ways**; `bash -n` clean over
+  the extracted 127-line step; the flag set retried and gave up in **10.0s**
+  against a closed port.
+- **Required contexts, read back: EIGHT, unchanged** — `frontend`, `image`,
+  `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`,
+  `go (arm64)`, `go-lint`, `tools`.
+- **The "two free minutes" on queued item 1, answered as far as it can be
+  from here — and it cannot be finished without Aaron's browser.** `fly` has
+  **no alert-rule subcommand at all** (`fly help` under "Monitoring &
+  managing things" lists exactly one entry, and it is not alerting);
+  fly-metrics.net's Grafana provisioning API answers **401** to an
+  unauthenticated request and its root **302**s to a login; and
+  `FLY_METRICS_TOKEN` is a **read-only Prometheus credential** —
+  `flymetrics.go` queries `https://api.fly.io/prometheus/<org>/api/v1/query`
+  with it — not a Grafana one, so it cannot list rules even if it were to
+  hand. The repository holds no alert configuration of any kind: `fly.toml`'s
+  only watcher is the HTTP check. **So the answer is two clicks in Aaron's
+  own Fly session, and nothing a run can do.** The daybreak line is sharpened
+  to say so rather than to ask again.
+- **Free-tier / platform feature audit: one new thing, and it does not close
+  queued item 1.** `fly synthetics` exists in the CLI now (`fly synthetics
+  agent`, "Runs the Synthetics agent") — Fly's own synthetic monitoring,
+  which runs an **agent on Fly**. That is the fate-sharing objection the
+  ledger already made about managed Grafana and about self-hosting ntfy, in a
+  first-party wrapper: a checker that cannot report when the platform it runs
+  on is down is not the liveness half. Recorded so a future run does not
+  mistake it for the answer; the off-platform probe is still off-platform.
+- **The expiry calendar, re-verified from the sources:** **TLS 2026-11-11**
+  (live cert, `notAfter=Nov 11 14:11:46 2026 GMT`, `notBefore=Aug 13`, issuer
+  Let's Encrypt `YE2` — **the same certificate as 09-19, unturned; 46 days
+  out**. Fly renews ~30 days ahead, so the turnover is due around
+  **2026-10-12** and the next Red run after that date reads a new
+  `notBefore`. Automatic, nothing for Aaron) · **domain 2027-08-13** (whois:
+  Porkbun, `Registry Expiry Date: 2027-08-13T02:28:05Z`) ·
+  **`github-actions-deploy` token 2027-08-14**, `Mtglab API` 2126-07-27
+  (`fly tokens list`, neither revoked) · **`fly auth login` ~2026-10-14** (a
+  laptop ceiling, not a site outage; `fly` answered every call this run) ·
+  **Anthropic key through year-end** (not re-read this run: reading the
+  digest needs `fly secrets list`, and the delta rule only wants it when
+  something suggests a rotation).
+- **Live probe (2026-09-26 ~20:47Z, release v417, from this Mac):** `GET /`
+  200 **183ms**, 5,756b · `/api/health` 200 **267ms**, body `pool true,
+  35,517 oracle / 108,583 printings, bulk 2026-09-13 ×2, 25 decks,
+  pool_stale false` — **identical to 09-19's counts**, so no refresh since,
+  which matches Green's 10-05 plan · `/api/decks` **401** · `HEAD /` still
+  **405** (queued item 2's monitor caveat, and now asserted in Go).
+- **Alerting posture — unchanged in every line:** `fly.toml` HTTP check GET
+  `/api/health` 30s/5s/10s grace (stops routing on failure, restarts
+  nothing) · machine restart policy on process exit only · deploy-job failure
+  email · **external uptime monitoring: none · phone alerting: none** (queued
+  item 1, still the biggest gap, and now the only one on the queue that costs
+  money). Held-awake block still on.
+- **Instance:** app machine `84e19ef25041e8` **started**, 1/1 checks passing,
+  release **v417**, image `deployment-01M3AQSAE17XB60HFC8A3SXHBE`, last
+  updated 2026-09-24T22:16:41Z · `forge-worker` **stopped**,
+  `performance-4x:8192MB`, holding
+  `forge-worker-0e3ef8332784cd58d08c775c509b8b9bfb5670a5` — the newest sha,
+  which is the 09-24 failure having self-healed · volume `mtglab_data` 3GB
+  encrypted, **5 snapshots, newest 6h, 5-day retention, 1.1 GiB stored** (the
+  4-day-old one 905 MiB, the dailies 56–87 MiB). Restore drill still dated
+  2026-09-13.
+- **Controls: not touched, by arrangement.** Red's controls facet was held by
+  the Queen lane this run (she owns `web/src/index.css` and every `.tsx`), so
+  no census was taken here and nothing in `web/src` moved on this branch. The
+  09-19 numbers stand as the last reading.
+- **Queue movement tonight — three items leave the queue and one arrives.**
+  - **Queued item 3 (the health endpoint) CLOSED** — ruled yes, landed above.
+  - **The #481 walk line CLOSED**: PR #481 **merged 2026-09-20**. The
+    daybreak line is deleted; nothing else is owed.
+  - **Queued item 5 (a merge queue) CLOSED at its own recommendation.** The
+    trigger was a threshold rather than a pain, and the evidence has grown
+    since: the coverage climb of 09-24 ran ten lanes through this repository
+    in one evening and landed them with the merge-train pattern instead, so
+    the case for changing the contributor workflow is weaker now than when
+    the trigger fired.
+  - **New and already answered: the deploy job's unretried Machines API
+    calls** — found and fixed in the same run (#505), so it never became a
+    question. The daybreak queue gains **nothing** from Red tonight.
+  - Unchanged and still Aaron's: items **1** (off-platform uptime + phone,
+    the dollar), **2** (GET not HEAD, now half-asserted in Go and kept as the
+    monitor's configuration note), **6** (a snapshot before a deploy), **11**
+    (the drill-versus-retention wording, whose own daybreak line recommends
+    "close").
 
 ### 2026-09-19 (rainbow)
 

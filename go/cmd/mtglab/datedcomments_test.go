@@ -88,7 +88,18 @@ const (
 	// sweep's arithmetic problem in a new costume. The next Colorless run
 	// should spend its slice retiring dated comments rather than counting
 	// them, and lower this by more than it raises.
-	goDatedCommentCeiling = 117
+	//
+	// 117 → 118 on 2026-09-26, for the pooled compressor in
+	// `internal/door/gzip.go`. The date is the fact twice over there: the
+	// comment carries the allocation figures the pool exists for (836,848 B
+	// per compressed response before, 23,435 after) and the machine they were
+	// taken on, and a reader who cannot see when they were measured cannot
+	// tell whether the pool still earns its hazard. That file already dates
+	// its other measurement — the 2026-08-14 comparison against the edge's
+	// own gzip — so the two read as one record rather than as residue. Still
+	// the fourth rise with no fall; the note above stands and Colorless owes
+	// the sweep.
+	goDatedCommentCeiling = 118
 	// 292 → 259 on the branch that swept the Coliseum board family
 	// (`web/src/components/board.tsx`): every date there sat on one of
 	// Aaron's rulings, whose argument is the sentence and not the day, so all
