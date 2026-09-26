@@ -72,22 +72,35 @@ Cleanup (09-12, 09-19) for the same stated reason.
 
 ## Open — a ruling, one word each
 
-**Green: `Deck.LandCount()` counts by category alone, so a modal DFC filed as
-a spell is missing from the land count *and* from the opening-hand
-arithmetic.** The deck wire's `land_count`, and `analyze.OpeningHand` which
-reads it, both ask only "is the category 'land'"; `analyze.CurveOf` and
-`PipRequirements` ask `IsLand()` instead. So a card like Stump Stomp //
-Burnwillow Clearing filed under 'interaction' falls between them — too
-land-like for the curve, not land-like enough for the land count — and the
-opening-hand land probabilities are computed one land short. · *Cost of
-leaving it:* three cards across two decks today; the numbers are quietly a
-little pessimistic, and nothing says so. · **What would have to be true:**
-`land_count` is on the wire and the opening-hand table is recorded in
-`gate/testdata/*.stats.json`, so changing the rule moves frozen goldens and is
-deliberately not a thing a session does on its own. · **Recommendation:**
-rule that an MDFC counts toward `land_count` — it genuinely is a land drop,
-and "yes" makes the two arithmetics agree — on its own branch with the
-goldens re-recorded deliberately. Ledger: Green, 2026-09-19.
+**Green: the land-count ruling is BUILT AND GREEN in PR #506, parked for your
+word — and it is one word, on a question slightly wider than this line used to
+ask.** `land_count` counted the category a card was filed under, so a modal
+DFC like Stump Stomp // Burnwillow Clearing filed under 'interaction' was a
+land to the curve and a spell to the count, and the opening-hand odds were one
+land short. #506 makes the land count the exact complement of the curve's
+skip. **The widening:** that necessarily also counts a *plain* land filed
+under a spell slot, which is what moves the one golden — and #506's body
+offers the narrow "modal DFCs only" variant if you want it instead. · *Cost of
+leaving it:* two decks read a land low (`one-blade-many-blessings` by one,
+`school-of-hard-knocks` by two, re-confirmed off the volume today); the other
+23 are unaffected either way. · **What it costs to say yes:** eleven numbers
+in one frozen golden, every one listed old → new in the PR, all consequences
+of `messy`'s `land_count` going 96 → 97; no fingerprinted package and so no
+Tier 1 cache discarded. · **Recommendation:** read §3 and §4 of #506 and
+answer **"union"** (merge it) or **"MDFC only"** (and no golden moves at all).
+Ledger: Green, 2026-09-26.
+
+**Green: nothing reports how old the card pool is, and this is the fourth run
+to say so.** `pool_stale` asks whether the pool predates the *columns* the app
+reads, so it answers `false` for a pool of any age; the only age signal in the
+product is a date inside a bulk filename that a person has to go and read.
+Today: 13 days old, `pool_stale: false`. · *Cost of leaving it:* legality and
+prices answer out of date silently, and the one number that would have said so
+is the one nothing reports. · **Recommendation:** "yes" — add `pool_age_days`
+to the health body beside the `disk_free_mb` that #502 adds, as a small
+follow-on once #502 lands. Deliberately not built today: two lanes editing
+`health.go` on one afternoon is a merge conflict for nothing. Ledger: Green,
+2026-09-26.
 
 **Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
 existed nowhere else, and it is deleted now.** It survives in git history
@@ -201,11 +214,14 @@ whether a night is scheduled off the wire. · **Recommendation:** unchanged —
 the copy becomes a fact the server owns when the shelf gives it something to
 read. This line is the reminder. Ledger: Blue, 2026-09-05.
 
-**Green: the pool is six days old and fine; the next refresh has a date
-rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the `frc`
-commander decks) releases 2026-10-02, and until a refresh runs after that day
-the shelves cannot resolve a released product. · *Cost of leaving it:* nothing
-until 10-02, then names from a new set fail on import and search. ·
+**Green: the pool is thirteen days old and still fine; the next refresh has a
+date rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the
+`frc` commander decks) releases 2026-10-02, and until a refresh runs after that
+day the shelves cannot resolve a released product. Re-read 2026-09-26: bulk
+files still `2026-09-13`, 35,517 oracle / 108,583 printings, byte-identical to
+09-19 — the premise has not moved, only the age, and the trigger is the release
+rather than the age. · *Cost of leaving it:* nothing until 10-02, then names
+from a new set fail on import and search. ·
 **Recommendation:** "Gather the library again" on the Admin Upkeep tab in the
 week of 10-05 — a deployed button now, no ssh — then read the pool file's
 size back once; the #472 rebuild took it 224 MB → 81 MB on 09-13 and it should

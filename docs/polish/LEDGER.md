@@ -6285,9 +6285,242 @@ hour. Read that entry beside #481's.*
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
-  2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
-  2026-08-16 (rainbow).
+- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+  2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24 (rainbow),
+  2026-08-19 (rainbow), 2026-08-16 (rainbow).
+
+### 2026-09-26 (rainbow) — PRs #508 (mergeable) and #506 (PARKED)
+
+One of four lanes run in daylight beside a merge train; **no browser this
+run** (the Queen's second ball owns the one Browser pane, and Green's
+phone/44px facet went with it), so the browser-and-accessibility facet here is
+the guards plus the public API, and every authenticated reading is owed.
+Ambient load moved between **8 and 439** across the run, so a wall clock below
+is quoted only where it was taken at a load this entry names.
+
+- **The MDFC ruling is built and parked — #506, and its premise turned out to
+  be wrong in an interesting direction.** The daybreak item said changing the
+  land-count rule "moves frozen goldens" and would need the corpus
+  re-recorded. It does move one — but **not for the reason the item gave**. The
+  stats goldens are computed over `pooltest`'s tiny pool, which holds **no
+  `modal_dfc` card at all** (25 oracle rows: two `transform`, the rest
+  `normal`), so no modal DFC can reach a recording. What moves the golden is
+  `messy`'s **`Llanowar Reborn`** — a plain `Land` filed under `ramp`, with the
+  rationale "A land under ramp." — because making `land_count` agree with
+  `CurveOf` necessarily counts *any* land filed elsewhere, not only a
+  two-faced one. **So the ruling asked for is broader than the line's
+  wording**, deliberately, and #506's body offers the narrow
+  `layout == "modal_dfc"` variant as the alternative if Aaron wants it.
+  - `analyze.LandCountOf(d, cards)` is the one land count in the tree now,
+    written as the exact complement of the curve's skip
+    (`category == "land" || isLand(rec)`, the union). **`deck.Deck.LandCount`
+    is deleted** rather than left beside it — the package cannot see a card, so
+    the only count it could offer is the wrong one, and a method there would be
+    the easy wrong answer for every future caller. The compiler is the guard.
+  - **Eleven numbers moved, in one file**, all consequences of one integer:
+    `messy.stats.json`'s `land_count` and `opening.lands.count` 96 → **97**,
+    the eight `distribution[].chance` rows, and `keepable`
+    `0.017635942728070703` → `0.01272916671983982`. `categories[land].count`
+    and `types.Land` stay 96, correctly — those are category and type tallies.
+  - **That it is the only file is proved rather than asserted.** A throwaway
+    re-recorded all nine `*.stats.json` through the same encoder and diffed:
+    eight byte-identical, one the table above. The re-encoder was first run
+    with the *old* file as both inputs and reproduced all nine byte-for-byte,
+    so it is an identity on anything the rule does not touch. Worth writing
+    down for the next session that has to move a golden here: **these
+    recordings are still in the Python tree's float style** (`0.0` where Go
+    writes `0`, `9.297689710060844e-06` where Go writes
+    `0.000009297689710060844`), so a naive Go re-record rewrites all nine and
+    the real change disappears into the noise. The merge keeps a number's
+    recorded *type* wherever its value is unchanged.
+  - **No fingerprinted package is touched**: `internal/analyze` is not in
+    `sim/cache`'s `engineSources`, so the ADR 18 key does not move and nothing
+    on the volume is discarded. `sim/compile` already asked `rec.IsLand()`, so
+    the lane's stop condition ("if this touches the compiled input, STOP") was
+    checked first and does not apply.
+  - **What a user will see, off the deployed volume:** all 25 decks validated
+    over `fly ssh console`, and the only land/category mismatches in the whole
+    library are the daybreak line's three cards in two decks, re-confirmed —
+    `one-blade-many-blessings` (*Strength of the Harvest // Haven of the
+    Harvest* under `engine`) and `school-of-hard-knocks` (*Legion Leadership //
+    Legion Stronghold* under `utility`, *Stump Stomp // Burnwillow Clearing*
+    under `interaction`). So: **+1 land on one deck, +2 on another, 23
+    unchanged**, and **zero** decks have the other direction of mismatch, so no
+    deck loses a land. `0 error(s)` on all 25.
+  - The invariant is the part worth keeping:
+    **`land_count + curve.nonland_cards == total_cards`**, held both as a unit
+    test and — the stronger form — read off all nine frozen documents, so any
+    future recording whose two counts disagree fails by name. Three mutations,
+    all killed (the golden reverted to 96 fails the corpus test by name:
+    *"96 lands + 9 nonland cards = 105, but the deck holds 106"*).
+- **The standing question answered — ADR 30's rule was enforced by
+  `.gitignore` and by nothing that fails (#508).** "Decks do not live in git"
+  is one of this project's absolutes. What held it: a `.gitignore` line, which
+  a `git add -f` walks past and which no check would ever go red over. The
+  `image` job refuses a deck *inside the container*, so a **tracked** deck that
+  `.dockerignore` excludes would sit in git forever with every check green —
+  and a deck in git is a second standing copy of app data, the exact shape that
+  silently lost two rounds of deck labels and created the hosted-first facet.
+  `ci.yml`'s tracked-file scan now carries `^decks/|(^|/)deck\.yaml$`, and
+  `go/cmd/mtglab/deckdatanevertracked_test.go` **reads the pattern out of the
+  workflow and executes it** rather than restating it, so the guard fails on
+  both Go legs without waiting for a workflow run. The separator is
+  load-bearing: `deckyaml/testdata/rich-deck.yaml` is a tracked parser fixture
+  and a bare `deck\.yaml$` fails the build on it — which is mutation two, and
+  it was caught by both new tests independently. The step was also **run
+  verbatim** over all **1,367** tracked files: `clean`.
+- **The concurrency probe ran, after four runs of being skipped — and it is
+  the first one this project has ever taken against the DEPLOYED instance.**
+  Taken at ambient load **8.03**, two rounds, raw output below. Read it as a
+  measurement of the *public* surface: `/api/health` and `/api/auth/*` are the
+  whole of `door.PublicPaths`, so **the reference shelf the lane asked for
+  cannot be probed without the login**, and that half is owed.
+  - **Zero non-200 at every level, both rounds, all three targets.** No 429,
+    no 503, no timeout. `soft_limit = 20` is a Fly load-balancing hint rather
+    than a rejection, which is the right behaviour with one machine, and N=32
+    is 60% over it and 80% of `hard_limit = 40`.
+  - **32 concurrent requests complete in under 2× the time one takes**, on
+    both rounds, on both the pool-touching route and the static shell
+    (health 1.87× / 1.26×, shell 1.72× / 1.95× of the n=1 wall). At **3.2× the
+    design point** the instance does not meaningfully degrade.
+  - **The pool lease is not a bottleneck at this N**: `/api/health` opens a
+    lease and answers within noise of the static shell at every level
+    (round 2, n=32: health p50 190.6ms, shell p50 188.6ms).
+  - **The asset tier is the slowest and the most variable** —
+    `/assets/app.js` p50 380.7 / 408.1ms at n=32 against a serial that read
+    236.3ms in round 1 and 466.8ms in round 2. That 2× spread on a single
+    serial sample is the methodological finding beside the numbers: **one
+    serial reading is not a datum here**, which is also why `health` n=1 read
+    240.8ms and then 151.9ms four seconds apart.
+  - **Not comparable to the 08-24 curve**, and the honest statement is worth
+    keeping: that probe was a *local* `mtglab ui` against `/api/decks` with a
+    scratch library (10 concurrent = 3.8× one request, 30 = 10.3×). Different
+    endpoint, different host, different machine. The deck shelf's concurrency
+    behaviour is still measured only by that reading, which is now **five runs
+    old**, and it stays that way until either the shelf becomes probeable from
+    outside or a run has the seat.
+- **Measurements (2026-09-26, rainbow):**
+  - **`/api/health`** (public, from outside): HTTP 200 in **0.192s** —
+    `{"pool":true,"oracle_cards":35517,"printings":108583,"bulk_files":["default_cards-2026-09-13.jsonl.gz","oracle_cards-2026-09-13.jsonl.gz"],"decks":25,"pool_stale":false}`.
+    **Pool staleness: 13 days** — at the two-week line for the first time since
+    the rebuild, and `pool_stale` still reads schema rather than age. Counts
+    **identical** to 09-19 and to Red's probe earlier today: no refresh has
+    run. The premise of the queued refresh line has not moved — the trigger is
+    *Reality Fracture*'s 2026-10-02 release, not the age — so the line stands
+    at its recommendation.
+  - **`disk_free_mb` is not on the wire yet**: polled for and absent, because
+    the machine is still on **v417** (`2026-09-24T22:16:41Z`) and Red's #502 has
+    not been merged or deployed. The volume figure below is `df` over ssh
+    instead, which is what that key is meant to replace.
+  - **Volume: 202M of 2.9G (8%), 2.6G free** — up 3M from 199M on 09-19.
+    Breakdown: `/data/scryfall` **99M** (two files, the #420 prune holding);
+    `mtg.duckdb` **84,684,800 B**, mtime `Sep 14 04:34`, **byte-identical to
+    09-19** (no refresh, as above); `/data/cache` 18M; `/data/decks` 812K /
+    **25** decks; `app.db` **950,272 B** (+24,576 B over 7 days, ≈3.5 KB/day —
+    the ≈1 KB/day of last week has trebled with use, still nothing);
+    `app.db-wal` **4,120,032 B**, up from 337,872 B on 09-19. That last one is
+    worth a sentence so nobody chases it: 4.1 MB is where SQLite's default
+    1000-page autocheckpoint sits, so a WAL at that size is a WAL about to
+    checkpoint, not a WAL that has stopped.
+  - **Machine `84e19ef25041e8`, shared-cpu-2x / 1024MB, iad, v417**, image
+    `deployment-01M3AQSAE17XB60HFC8A3SXHBE`, 1/1 checks passing, last updated
+    **2026-09-24T22:16:41Z** — which is itself a reading: **`main` has not
+    deployed in two days**, so this run measured the instance the 09-24
+    coverage climb left. `forge-worker` `080e90dec3d918`
+    (`performance-4x:8192MB`) **stopped**, holding
+    `forge-worker-0e3ef833…` — the newest sha, costing nothing stopped, and no
+    bout was running, which is what made the probe safe to take.
+  - **Snapshots: five, 5-day retention, newest 7h, 1.1 GiB stored** — one
+    905 MiB full (4 days) + 60/67/87/56 MiB dailies. Newest snapshot (today)
+    newer than newest migration (0017, 09-06): healthy.
+  - **Held-awake trigger: not arrived**, and it now *agrees with the runbook
+    in both places* — `fly.toml` reads `auto_stop_machines = "off"`,
+    `auto_start_machines = true`, `min_machines_running = 1`, with the
+    scale-to-zero block commented beneath it, and `docs/HOSTING.md` says the
+    same in the two bullets that once contradicted each other. A merge train is
+    landing PRs today; primary development is visibly on.
+  - **Design point unchanged** (100 accounts / 10 concurrent):
+    `soft_limit = 20` / `hard_limit = 40` in `fly.toml`, unmoved, and the probe
+    above is the first evidence about what those numbers actually buy.
+  - **Guards, `-race -count=1`, all eight PASS in 4.8s:**
+    `TestTheBundleStaysWithinTheDeclaredFloor`,
+    `TestTheFloorSettingFeaturesAreStillWhatHoldsIt`,
+    `TestTheCameraDoorStillHoldsTheFloorIndependently`,
+    `TestEveryAnimationInTheBundleCanBeArrested`,
+    `TestNoInlineStyleFilterShipsInTheBundle`,
+    `TestEveryArtBearingClassIsStillInTheBundle`,
+    `TestEveryOverlayClassIsStillInTheBundle`,
+    `TestTheBundleReachesForNobodyElsesCodeOrFonts`.
+  - **Hosted-first: the one-copy rule holds for the second run running** —
+    `ls -A` on the main checkout's `decks/` is empty and this worktree has no
+    `decks/` at all. It is now held by a test rather than by a habit (#508).
+    The library on the volume is **25 decks, every one 99 cards**, and **no
+    mono-green Goreclaw deck** — Blue's premise for the obituary line,
+    re-confirmed from the instance.
+  - **`data/app.db` on the laptop: rewritten 13:37 today** by another lane's
+    `mtglab ui` (491,520 B, gitignored, unstaged, in the *main* tree; this
+    worktree has no `data/`). Recorded because the protocol asks; not this
+    lane's doing and in no diff.
+  - **The pool population the MDFC rule reaches**, read off `data/mtg.duckdb`
+    through a throwaway `cmd/poolq` (deleted; `git status` clean afterwards):
+    **100** `modal_dfc` rows, **60** with a land face, **50** whose front face
+    is not a land. `Stump Stomp // Burnwillow Clearing` is `Sorcery // Land`,
+    layout `modal_dfc` — read, never remembered.
+  - **Expiry calendar: shared from Red's reading today rather than
+    re-derived** (TLS 2026-11-11, watch date ~2026-10-12; `fly auth login`
+    ~2026-10-14). `fly` answered every call in this run without an env token.
+- **Raw probe output** (ambient load `8.03 121.65 121.09` at the start,
+  `8.34 117.97 119.79` at the end; times are `curl`'s `time_total`, so TLS and
+  the trip from this laptop are in every figure):
+
+  ```
+  ---- round 1  22:00:59Z ----
+  health-r1-n1    n=1   wall=291.2ms  p50=240.8  p95=240.8  max=240.8  min=240.8  non200=0
+  health-r1-n8    n=8   wall=335.6ms  p50=191.0  p95=273.1  max=273.1  min=172.2  non200=0
+  health-r1-n32   n=32  wall=366.1ms  p50=208.7  p95=257.9  max=268.3  min=182.0  non200=0
+  shell-r1-n1     n=1   wall=204.8ms  p50=156.0  p95=156.0  max=156.0  min=156.0  non200=0
+  shell-r1-n8     n=8   wall=253.6ms  p50=173.5  p95=194.0  max=194.0  min=164.0  non200=0
+  shell-r1-n32    n=32  wall=400.1ms  p50=189.7  p95=219.6  max=274.6  min=161.2  non200=0
+  asset-r1-n1     n=1   wall=283.9ms  p50=236.3  p95=236.3  max=236.3  min=236.3  non200=0
+  asset-r1-n8     n=8   wall=557.2ms  p50=434.5  p95=495.7  max=495.7  min=240.9  non200=0
+  asset-r1-n32    n=32  wall=832.5ms  p50=380.7  p95=658.9  max=713.7  min=262.3  non200=0
+  ---- round 2  22:01:03Z ----
+  health-r2-n1    n=1   wall=197.2ms  p50=151.9  p95=151.9  max=151.9  min=151.9  non200=0
+  health-r2-n8    n=8   wall=235.3ms  p50=159.9  p95=170.9  max=170.9  min=151.3  non200=0
+  health-r2-n32   n=32  wall=369.7ms  p50=190.6  p95=216.2  max=237.8  min=157.9  non200=0
+  shell-r2-n1     n=1   wall=196.3ms  p50=149.3  p95=149.3  max=149.3  min=149.3  non200=0
+  shell-r2-n8     n=8   wall=232.4ms  p50=158.6  p95=167.8  max=167.8  min=149.4  non200=0
+  shell-r2-n32    n=32  wall=337.8ms  p50=188.6  p95=225.4  max=227.7  min=159.5  non200=0
+  asset-r2-n1     n=1   wall=513.9ms  p50=466.8  p95=466.8  max=466.8  min=466.8  non200=0
+  asset-r2-n8     n=8   wall=536.1ms  p50=264.6  p95=466.7  max=466.7  min=256.4  non200=0
+  asset-r2-n32    n=32  wall=607.6ms  p50=408.1  p95=470.8  max=471.5  min=246.1  non200=0
+  ```
+
+- **Owed, and owed for one reason: this lane had no browser.** The
+  authenticated census, the phone sweep, the 44px touch-target re-measure, the
+  contrast readings in both themes and the Admin edge counters all need the
+  signed-in seat or a viewport, and the single Browser pane belonged to the
+  Queen's ball. The 09-19 readings stand unrefreshed; nothing on the public
+  door has changed since that walk found it honest, and the deployed instance
+  is still v417, the same build 09-19's successor measured.
+- **Queued for Aaron (2026-09-26), one new line on `DAYBREAK.md`** — the
+  MDFC line is rewritten to point at #506 rather than re-argued, and:
+  1. **Pool age is measured by nothing, and this is the fourth run to say so.**
+     `pool_stale` answers whether the pool predates the *columns* the app
+     reads, so it says `false` for a pool of any age; the only age signal is a
+     date inside a bulk filename that a person has to read. Today's pool is 13
+     days old and `pool_stale` is `false`. *Cost of leaving:* legality answers
+     age silently, and the one number that would have told you is the one
+     nothing reports. **Recommendation:** add `pool_age_days` (or
+     `bulk_newest`) to the health body beside the `disk_free_mb` Red added in
+     #502 — deliberately NOT built here, because #502 rewrites the same handler
+     and two lanes editing `health.go` on one afternoon is a conflict for
+     nothing. It is a twenty-line follow-on to #502 once that lands.
+- **Checklist corrections: none applied.** Two facts for Colorless to fold in
+  if it agrees they are stable: **the stats goldens are Python-encoded** (the
+  re-record trap above, which would have silently rewritten all nine), and
+  **`fly status --app mtglab` does not exist** — the Fly app is
+  `sylvan-library` (Red met the same thing today, so it is two lanes now).
 
 ### 2026-09-19 (rainbow) — no PR of its own; ledger carried by the next leg
 
