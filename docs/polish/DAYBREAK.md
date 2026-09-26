@@ -145,6 +145,44 @@ a merge queue changes the contributor workflow to save a monthly twenty
 minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
 list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
 
+**White: the coverage floor's 1.6-point gap — should it track the tree, or stay
+anchored at 95?** You asked on 2026-09-24 for "the tree at 96 and the gate at
+95" and `ci.yml` records that as a deliberate margin, so a diff can cost a few
+tenths of honest refactoring without going red. The tree now measures 96.7 and
+both readings of your ruling are defensible: hold 95.0 as a number, or keep the
+~1.6 gap as the tree climbs. · *Cost of leaving it:* nothing today — the gate
+works either way; it only matters the day the tree passes 97 and nobody knows
+whether a click is owed. · **Recommendation:** "margin" — leave 95.0 alone
+until the tree reaches 97.0, then click to 95.5 and keep the gap, because what
+you asked for was slack for refactoring and slack does not shrink as a
+codebase grows. Say "anchor" if you meant 95 as a floor the tree simply grows
+away from. Ledger: White, 2026-09-26.
+
+**White: two named coverage levers should be closed as argued rather than left
+open — `ApplyBulk`'s four fold branches and `prompt.secret`'s terminal arm.**
+Both were worked this run and both are honestly unreachable: `PlanBulk` refuses
+the same file through the same lookup, so `ApplyBulk`'s folds are defensive
+depth behind a guard and reaching them needs a `BulkPlan` the planner would
+never build; and the password prompt's terminal branch would need its terminal
+read handed in as a value, which moves the five uncovered statements into the
+seam's own default rather than removing them. · *Cost of leaving it:* one hour
+per future coverage leg, spent rediscovering this — `COVERAGE.md` currently
+advertises the password one as "the single biggest lever left in `cmd/mtglab`".
+· **Recommendation:** "yes to both" — move both into `COVERAGE.md`'s *Left
+deliberately* with the reasons above, so the list keeps its promise of being
+the thing you read before spending an hour on a branch that cannot be entered
+honestly. Ledger: White, 2026-09-26, queued items 2 and 3.
+
+**White: the determinism replay is owed** — tarot, brew, wheel and Tier 1
+against the live instance, which this run could not do (a worktree lane with no
+browser; the pane belonged to another lane). · *Cost of leaving it:* the
+once-a-cycle check that a seed is still a promise where users live slips a
+week; the local goldens are unaffected and green. · **Recommendation:** no
+ruling wanted — it is work, and the next White or Green run with browser access
+takes it, using 09-19's recorded baselines (tarot seed 1909 → 741 bytes, sha256
+`e406f504…`; brew → 503 bytes, sha256 `54c5036e…`; Tier 1 in the two-ask
+cached form). Ledger: White, 2026-09-26.
+
 ## Open — a dollar and an account
 
 **Red: nothing off-platform tells you the site is down, and a hung process
