@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/aasquier/sylvan-library/go/internal/artifacts"
-	"github.com/aasquier/sylvan-library/go/internal/pool"
+	"github.com/aasquier/sylvan-library/go/internal/sim/compile"
 )
 
 // A card pool that **opens and then cannot answer**, and what the runbook
@@ -16,12 +16,12 @@ import (
 //
 // This is `internal/api`'s schema-less pool at the CLI, and the distinction it
 // rests on is the one that is easy to lose. A machine with **no** pool is a
-// fresh checkout before `mtglab data refresh`: [pool.ErrNoPool], a documented
+// fresh checkout before `mtglab data refresh`: `pool.ErrNoPool`, a documented
 // degraded answer, and every command here has a sentence for it. A file that
 // DuckDB opens happily and then fails a `SELECT` against is a half-written
 // refresh, a truncated restore, or a schema older than the binary — a real
 // error, carrying DuckDB's own words, on a path nothing in this package had
-// ever driven. A *corrupt* file is neither: [pool.Pool.Use] cannot open it and
+// ever driven. A *corrupt* file is neither: `pool.Pool.Use` cannot open it and
 // answers `ErrNoPool`, which re-drives the degraded path.
 //
 // Every command below has to **say something** and must not answer as though
@@ -256,17 +256,27 @@ func TestADeckFileThatCannotBeReadIsNotReportedAsMissing(t *testing.T) {
 // A pool whose absence is genuine still reads as absence, which is the
 // sentence the whole degraded mode rests on — and the guard that keeps the
 // fixture above from having quietly redefined it.
+//
+// **The expectation comes off the refusal's own type rather than being typed.**
+// What stood here matched the fragment `"mtglab data refresh"` and then, after
+// that assertion had already passed, skipped the test if `pool.ErrNoPool`'s
+// wording had changed — a conditional with no assertion in it, whose only
+// possible effect was to relabel a green test as one that never ran. It was
+// also aimed at the wrong sentence: `sim mana` does not surface
+// `pool.ErrNoPool` at all. The compiler refuses first, with
+// [compile.PoolRequired]'s own words, because mana production cannot be
+// inferred from a deck file and a guess would look authoritative. Taking the
+// sentence off that type is what the dead half was reaching for: a rewording
+// moves this test with it instead of leaving it matching a fragment that used
+// to be in there.
 func TestAnAbsentPoolStillSaysToRefreshIt(t *testing.T) {
 	t.Parallel()
 	d := scratchDeployment(t)
 	writeDeck(t, d.DecksDir, "gyome", monoGreenText(t))
 	_, err := d.run(t, "sim", "mana", "gyome")
-	if err == nil || !strings.Contains(err.Error(), "mtglab data refresh") {
-		t.Fatalf("an absent pool answered %v", err)
-	}
-	// The pool's own sentinel is what the command is reading, rather than a
-	// string it happens to match on.
-	if !strings.Contains(pool.ErrNoPool.Error(), "no card pool") {
-		t.Skip("the degraded sentinel has been reworded; this guard needs rewriting")
+	want := (&compile.PoolRequired{}).Error()
+	if err == nil || err.Error() != want {
+		t.Fatalf("an absent pool answered %v, want the simulator's own refusal (%q)",
+			err, want)
 	}
 }
