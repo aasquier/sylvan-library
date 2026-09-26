@@ -21,10 +21,14 @@ have fallen behind.
   merely names its contents is a finding; the standard is the determinism
   kernels' docs (`internal/mt19937`, `internal/floats`), which say what
   would break and why the code is shaped as it is.
-- The layering is checkable: `internal/door` owns HTTP concerns and auth
-  sweeps; `internal/api` never reaches around the door; DuckDB stays behind
-  `internal/pool`; the determinism kernels import nothing above them. Grep,
-  don't trust.
+- The layering is checkable, and since 2026-09-26 it is **checked**:
+  `go/cmd/mtglab/layering_test.go` holds all three claims — DuckDB stays
+  behind `internal/pool`, `internal/door` sits above `internal/api` and
+  nothing below mounts a door, the determinism kernels import nothing above
+  them. It parses rather than asking `go list`, so a `_linux.go` file's
+  imports are in scope on this darwin laptop. Three runs' worth of hand-greps
+  live in that file now; re-grep only to *extend* the claims, not to re-verify
+  them.
 - **The corpora under `testdata/` are frozen goldens** — a diff touching one
   is a finding in itself, whatever the tests say.
 - Exact-arithmetic discipline: served float sums go through `floats.Fsum`,
