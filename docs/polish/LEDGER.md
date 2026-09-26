@@ -19,9 +19,9 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-24 (the coverage climb, outside the rainbow).
-  Previous: 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05
-  (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-24 (the coverage
+  climb, outside the rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -29,6 +29,267 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-26 (rainbow)
+
+Leg two of the coverage climb, run as one of four parallel lanes. The honest
+headline is that **the climb is over and the standing question was worth more
+than the grind**: two days after nine lanes took the tree from 91.2 to 96.6,
+what remains is 734 missing statements spread over 419 functions — a mean of
+1.8 each — and the biggest single lever in the tree is 13 statements inside a
+branch `COVERAGE.md` already argues is unreachable. So this leg spent its
+budget the other way round: one machine-checked claim, three real refusals, one
+ADR-shaped guard, and a dead test found while counting.
+
+- **Fixed this run:**
+  1. **CLAUDE.md rule 5's address rule was enforced by a grep, and the grep
+     was written into the checklist as a chore.** `references/white.md` has
+     instructed every White run to "grep for every call site each run — a
+     third one is the finding" and four consecutive runs duly reported one
+     non-test caller; `internal/api/admin.go`'s own doc comment goes further
+     and says *"no other module may acquire the habit"* and even calls the
+     rule "still checkable". Nothing checked it.
+     `go/cmd/mtglab/addressreach_test.go` is both halves of it now, and the
+     two halves needed different proofs:
+     - **The register** (`TestOnlyTheArguedFunctionsReadAnAddress`) walks
+       every non-test `.go` file under `go/` for a selector named `Email` or
+       an `AsDict(true)`, attributes each to its enclosing declaration, and
+       holds the result equal to `addressReaders` **in both directions** — an
+       unargued reader fails, and an argued entry that stopped reading fails
+       too, because a register naming functions that no longer matter reads
+       wider than the tree is. **Seven, and every one carries its reason**:
+       `auth.User.AsDict` (the withholding itself), `auth.scanUser` (the
+       column becoming the field), `auth.SendInvite` and `auth.SendReset`
+       (addressing a letter), `cmd/mtglab.usersListCommand` (an operator's
+       own terminal, never a response), `api.accountBody` and
+       `api.API.sendAccountReset` (ADR 17, ADR 16). Anti-vacuity floor at
+       four, since the withholding and both mailers are always there.
+     - **The reachability rule**
+       (`TestEveryRouteThatCanReachAnAddressChecksForAnAdmin`) is the half a
+       register structurally cannot state, and it is the reason this is a
+       finding rather than a formality. Inside `internal/api` no handler
+       reads an address: `accountBody` does, three routes deep, and what
+       makes those routes safe is `requireAdmin` at the top of each. So the
+       test builds the package's own call graph from the AST, closes it
+       upward from the direct readers, and requires that every **entry
+       point** — a closure member nothing else in the package calls, so only
+       the router can — calls `requireAdmin`. Five functions can reach an
+       address today; every way in checks. The graph is keyed by function
+       name, which merges same-named methods and therefore *widens* the
+       closure — the safe direction for a guard, and why a name is enough
+       and `packages.Load` (28s a test in `internal/claude`) is not needed.
+     **Mutation-verified three ways, and the third is the one that earns the
+     test its place.** (a) An address read planted in `api.API.refuse`: the
+     register names it by file and line, and the reachability sweep reports
+     the whole package, correctly. (b) `requireAdmin` deleted from
+     `sendAccountReset`: the reachability sweep names it alone. (c) **The
+     public `login` route made to answer `accountBody`** — a real leak, the
+     admin body with an address in it returned from an unauthenticated
+     endpoint — and the **register stays green** while the reachability rule
+     names `internal/api.login`. A roster could never have seen that, because
+     `login` reads no address itself. All three restored.
+  2. **Three refusals a person reads, taken at the mapper**
+     (`go/internal/api/refusalwords_test.go`, new). `refuseTheme` had six of
+     its seventeen statements unrun — including the arm that fires when the
+     cause is something nobody predicted, which is the arm a player meets on
+     the worst day. The assertion is not the coverage: it is that the 500
+     answers in the room's own words while the cause goes to the log
+     (commandment 10 — a raw error is machinery wearing a sentence's
+     clothes). Beside it `refuseAdminWrite`'s non-ADR-17 arm, and
+     `unknownSentence`'s **plural** shape, which is what somebody pasting a
+     decklist's commander line meets and which had never run; the table also
+     holds that the sentence does not scold (commandment 2, made checkable
+     against the five words a scolding interface reaches for).
+     **Mutation-verified three ways**: the theme 500 made to interpolate
+     `err.Error()` — fails naming the leak; the unknown-tier status moved
+     422 → 409 — fails; the plural sentence reworded to "are invalid" — fails
+     on the scold. All restored.
+  3. **ADR 12's class had no fixture: a deck file that parses perfectly and
+     still cannot be edited.** `internal/deckedit/malformed_test.go` swept
+     nine broken shapes and every one of them fails at the *parse*, so an
+     operation refuses before it has looked at anything. The dangerous class
+     is the opposite — valid YAML, a real deck, the right cards in the parsed
+     list, and only the **text** scanner comes up empty, because it
+     recognises a card entry by the literal line `- name: …`. `locateCard`
+     notices the two counts disagree and refuses, which is exactly right: with
+     N parsed entries and no spans, an edit that guessed would rewrite the
+     wrong lines of a hand-written file, and since ADR 30 there is no revision
+     to restore it from. Five shapes now drive it — a flow mapping, a bare
+     string entry, `why` before `name`, a quoted `name` key, an anchor and its
+     alias — against seven card operations including `PlanBulk`, whose
+     presence in the list is the useful discovery: **the plan is read through
+     the same lookup, so a file like this is refused while it is still a
+     screen of proposed changes rather than after the button.** The test also
+     pins the one write that legitimately succeeds: `AddToBoard` writes to
+     `swap_board`, a list of its own, and the unreadable lines must come
+     through byte-identical or the exemption is a hole rather than a
+     distinction. **Mutation-verified with the exact degradation the code's
+     comment warns about** — the refusal replaced by `continue` — and what it
+     produces is a *player-facing lie*: `"no card entry named 'Sol Ring'"`
+     about a deck that plainly holds Sol Ring. Restored.
+  4. **A test that skipped itself, found by counting.** The skip census read
+     59 call sites against 09-19's 40, and reading the 19 new ones sorted
+     them cleanly — 16 are `os.Geteuid() == 0` (root really does make
+     chmod-based fault injection impossible), two are the frozen fixture's
+     priced-printing condition, one is the absent bundle, two are
+     child-process halves — except one:
+     `cmd/mtglab/halfarefresh_test.go`'s
+     `t.Skip("the degraded sentinel has been reworded; this guard needs
+     rewriting")`. It sat **after** the test's real assertion had already
+     passed, inside an `if` with no assertion in it, so its only possible
+     effect was to relabel a green test as one that never ran. And it was
+     aimed at the wrong sentence: the test matched the fragment
+     `"mtglab data refresh"` by hand, and `sim mana` **never surfaces
+     `pool.ErrNoPool` at all** — measured, not assumed: asserting against the
+     sentinel fails with *simulation needs the card pool -- run `mtglab data
+     refresh` first*, which is `compile.PoolRequired`'s own
+     words. So the comment claiming "the pool's own sentinel is what the
+     command is reading" was simply false, and the dead conditional was what
+     kept anyone from noticing. All four sites in `cmd/mtglab` that restated
+     that sentence by hand now take it off `(&compile.PoolRequired{}).Error()`
+     — the skill's own rule, that an expectation is derived from the source of
+     truth and never a restatement. **Mutation-verified on the production
+     side** (the refusal wrapped as `fmt.Errorf("sim: %w", err)` in
+     `cmd/mtglab/sim.go`): all three fail together; restored. Nothing in the
+     fingerprinted `internal/sim/compile` was edited — the type is only read.
+- **The floor did NOT move, and that is a ruling being respected rather than
+  a click skipped.** This lane's brief said to ratchet to about half a point
+  below the measurement, which at 96.7 would be ~96.2. `ci.yml`'s own comment
+  records why that is wrong: *"Aaron asked for the tree at 96 and the gate at
+  95, so a diff can cost a few tenths of honest refactoring without going
+  red"* — the 1.6-point gap is a deliberate margin, not slack, set two days
+  ago at this very measurement. The ratchet's own instruction is to raise
+  MINIMUM **when the tree passes a higher number**, and 96.7 against 96.6 is
+  a tenth from eleven statements, not a new number to stand on. Queued for
+  Aaron as a question about the *shape* of the pair rather than acted on.
+- **Verified this run — licensing (triple-check):** 34 commits since 09-19's
+  audit anchor (`e9b2d5f`). Tracked media **207 → 209**, and the delta holds
+  exactly one new source-side asset plus its bundle copy:
+  **`web/src/assets/coliseum/pratum.webp`**, read in full against the primary
+  sources. CC0, *"Poppies (Unsplash).jpg"*, confirmed through the Wikimedia
+  Commons API at fetch time (2026-09-20), recipe `hortus.recipe.yaml` records
+  the crop (`frac_box [0, 0.40, 1, 1]`) and the resize (640) and the WEBP
+  encode, and the committed-vs-hotlinked argument is made twice. The subtlety
+  that matters is caught in the record itself and is the reason this one is
+  sound: it is a Commons mirror **from before 2017, while Unsplash's own
+  licence was still CC0** — Unsplash relicensed to a custom non-CC0 licence
+  that year, so a later mirror would not be usable, and the recipe says so.
+  CC0 waives attribution, so the missing in-room credit is not an obligation
+  here (unlike card art, commandment 19). **Dependencies: zero new package
+  names on either side** — Go is four version bumps (anthropic-sdk-go
+  1.71→1.72, x/crypto .56→.57, x/term .45→.46, x/tools .49→.50) plus three
+  indirect, npm is seven bumps of packages already counted; so 09-19's census
+  composition stands and no new licence entered the graph. The per-version
+  re-read of npm licence fields is **owed to a lane with `node_modules`
+  installed** — this was a worktree lane and the brief forbids `npm ci`.
+- **Verified this run — security & isolation:**
+  - **Zero new routes** since 09-19 (`git diff e9b2d5f..HEAD` on
+    `go/internal/api/` adds no `Pattern:`), so the 403/404 law has nothing
+    new to be read against and the door's derived sweeps are unchanged.
+  - **Zero new `os.Getenv` outside the composition root.** Every added hit is
+    the 09-24 climb's own shape — `envOr(os.Getenv, …)` at the root,
+    `EndpointFromEnv`/`SettingsFromEnv` as the one-line production wrappers,
+    and `childEnv` in the run-the-test-binary-as-a-child fixture.
+  - **`t.Setenv`: zero call sites.** A bare grep reads **8** and every one is
+    prose explaining why it is gone — the same comments-counted-as-code trap
+    `COVERAGE.md` records for `t.Parallel()`, hit in the other direction.
+    Recording the number and the trap together so the next census does not
+    report a regression that is not there. (09-19 recorded 53 call sites;
+    the climb took them to 0.)
+  - **String-built SQL in the delta: three hits, all clean.**
+    `pool/loaders.go`'s `"DELETE FROM "+qualified` and `rebuild.go`'s two
+    `"DETACH "+rebuildCatalog` — `rebuildCatalog` is a package constant
+    (`= "rebuild"`), and `qualified` is built from `catalog` plus `table`
+    whose every non-test call site passes a string literal (`"oracle_cards"`,
+    `"printings"`) with `catalog` either `""` or that same constant. Nothing
+    caller-tainted reaches a statement.
+  - **Argon2id unchanged at OWASP's minimum**: `m=19_456` KiB, `t=2`, `p=1`,
+    salt 16, digest 32 (`passwords.go:19-23`). `.env` ignored (`.env`,
+    `.env.*`, `!.env.example`), zero tracked; `fly.toml` still opens with its
+    no-secrets rule; no query-string token under `web/src` (the one `token=`
+    is the card-token React prop, as recorded four runs running).
+  - **CodeQL: 0 open, 11 dismissed, 4 fixed** (dismissals flat vs 09-19).
+    **Dependabot: 9 open, all `pip/torch`, all development scope** — the
+    standing daybreak item, not re-litigated.
+  - **No live walk this run.** A worktree lane with no browser (the pane is
+    one pane and belongs to the Queen's lane today), and the diff is tests
+    only. The determinism replay is **owed** and goes to daybreak.
+- **Measurements (2026-09-26, rainbow):** raw output, not a summary.
+
+  ```
+  go test -count=1 -coverpkg=./... ./... ; go tool cover -func
+    before  →  total: 96.6%      419 functions uncovered, 734 missing statements
+    after   →  total: 96.7%      416 functions uncovered, 723 missing statements
+  ```
+
+  Floor unchanged at **95.0**. Missing statements by package, before:
+  `api` 256 over 125 functions, `sim/tier3` 67/41, `pool` 58/27,
+  `cmd/mtglab` 46/27, `deckedit` 44/22, `claude` 42/32, `auth` 28/23,
+  `library` 22/12, `deckread` 19/7, `deckyaml` 19/3. **Read the api row
+  twice**: 256 over 125 functions is two statements each, and the uncovered
+  source lines are `if err != nil {` ×67, a bare `return` ×69 and a closing
+  brace ×173 — there is no lever left in that package, only a grind, and the
+  five biggest single functions in the whole tree (`orderedValue` 13,
+  `CommanderDossier` 10, `inviteAccount` 7, `refuseTheme` 6 — taken this
+  run — `rebuild.finish` 6) are four *Left deliberately* entries and one fix.
+  **Census**: 59 `t.Skip` call sites (09-19: 40; the 19 new ones sorted in
+  fix 4), 0 `t.Setenv` call sites, ~2,497 top-level tests by the grep proxy.
+  The by-function tool was rewritten from scratch as the map instructs
+  (parse the profile, OR the counts per block key, attribute each block to
+  its enclosing declaration); it took about fifteen minutes and is the right
+  first move for any future leg.
+  **No mutation spin**: the machine carried load averages of 285–485 with
+  four lanes on it, and the 09-05 lesson is that a loaded `gremlins` run
+  fabricates a score. The hand protocol did the work instead — ten
+  mutations across the four fixes, every one watched to fail and restored.
+- **Queued for Aaron (2026-09-26): three, all in DAYBREAK.**
+  1. **The floor's gap: should the 1.6 points track the tree, or stay
+     anchored at 95?** Both readings of the ruling are defensible and they
+     diverge as the tree climbs. *Recommendation:* leave 95.0 alone until the
+     tree reaches 97.0, then click to 95.5 and keep the gap — the margin was
+     asked for as a margin, not as a fixed number.
+  2. **`ApplyBulk`'s four fold-error branches are unreachable and should
+     join *Left deliberately*.** Probed rather than assumed: `PlanBulk`
+     refuses the same file through the same lookup, so the folds are
+     defensive depth behind a guard, and reaching them needs a hand-built
+     `BulkPlan` the planner would never produce — which the map's own rule
+     forbids ("a branch whose comment says it is unreachable is not coverage
+     to take"). *Recommendation:* add them to the list and stop counting them.
+  3. **`prompt.secret`'s terminal branch: close it as argued rather than
+     leave it open.** `COVERAGE.md` names it the biggest lever left in
+     `cmd/mtglab` at five statements and wants a pty. The seam version was
+     designed and **rejected**: handing the terminal read in as a value would
+     move the uncovered statements into the seam's own default rather than
+     remove them (net ~4), and restructuring a password-reading path to buy
+     four statements is the wrong trade at any coverage number.
+     *Recommendation:* move the entry from "open lever" to
+     *Left deliberately* with that reason.
+- **Deferred:**
+  - **`internal/pool/rebuild.go`'s twelve statements want a faulty DuckDB
+     connector.** `startRebuild` (6) and `finish` (6) are all "an operation
+     that succeeded on the way in fails on the way out" — a failing `DETACH`,
+     a failing `Close`. `authtest.OpenFaulty` is the shape and it is
+     SQLite-only; a DuckDB equivalent is a real fixture, not a surgical fix.
+     *Trigger:* the next time `internal/pool` is opened for its own reasons,
+     or the day a rebuild fails in production and nobody can reproduce it.
+  - **`internal/auth`'s remaining 28 statements are one budget number each.**
+    `authtest.Fault.After` reaches them, but each wants its own count — the
+    grind the map predicted. *Trigger:* a lane with `internal/auth` as its
+    only job.
+  - **The claude boundary trio at ~28s each**, **`repr.go`'s corpus ruling**
+    and **`--version`/build stamp**: standing, triggers unchanged.
+- **One checklist correction owed, recorded here for Colorless.**
+  `.claude/skills/polish/references/white.md`'s testing facet still opens on
+  *"The 95% floor is a claim no gate enforces"* and still quotes **80.3%**,
+  **831 test functions across 115 files and not one `t.Parallel()` call**, and
+  a `1m13s` suite where `internal/api` is 86% of the wall. Every one of those
+  is a 2026-08-23 fact and all four are now false — the floor is a gate
+  (`ci.yml`, 95.0), the tree measures 96.7, every one of ~2,497 tests is
+  parallel and a register requires it, and `api` is no longer the whole wall.
+  A checklist that recites stale numbers sends the next run to re-derive
+  things the ledger already knows. The address-grep chore fix 1 replaced is
+  in the same file and the same paragraph family. **Not fixed here** because
+  the skill is Colorless's territory by the pass's own rules.
 
 ### 2026-09-24 (the coverage climb)
 
