@@ -104,7 +104,17 @@ const (
 	// to change the materials needs to know whose request it is arguing with.
 	// The same branch's `.btn-accent-brass` note dates its own walk in prose
 	// this guard does not count; it is left as written for the same reason.
-	webDatedCommentCeiling = 260
+	//
+	// 260 → 261 on the branch that named the house's lantern brass. The one
+	// added line is `.prose-link`'s, and the date is doing the same work a
+	// ruling's does: it carries a **count** — twelve inline `--series-1`s in
+	// `web/src` on that day — and a count is the one kind of fact in this
+	// repo that is explicitly a claim to re-check rather than a fact to
+	// inherit (CLAUDE.md says so by name). Undated, the next session reads
+	// "twelve" as the number that is true now; dated, it reads it as the
+	// number somebody measured, which is what it is. The `--lantern-brass`
+	// token's own note dates the sweep in prose this guard does not count.
+	webDatedCommentCeiling = 261
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a
