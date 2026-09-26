@@ -145,6 +145,27 @@ a merge queue changes the contributor workflow to save a monthly twenty
 minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
 list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
 
+**Black: nine of the ten Claude mode prompts have drifted from the code around
+them, and the drift is in what the model is told.** Three runs of this reading
+ended "the prompts are byte-untouched, so there is nothing to read" — true of
+the prompts and false of the reading, because a prompt goes stale when its code
+moves. The worst three: the intake, draft and description modes all promise the
+model "the counts and the curve ... were given to you" when the brief carries
+neither and the two tools that do are granted but never named; nine of ten
+modes end on a scope paragraph about a card, a deck or a gate that is not there
+(`scan` — a two-string transcription — is told not to range into the rest of the
+deck); and `theme-conversation` is told a re-stated slot set *replaces* the
+previous one when the code unions them. Six smaller ones behind those. · *Cost
+of leaving it:* every one of these is a sentence a model is currently believing,
+on the surfaces a newcomer actually talks to, and the tarot table is one of
+them. · **Recommendation:** "yes" — one branch, one PR, one walk; brief
+sentences first, the scope paragraphs through each mode's own `ScopeNotes`
+field (which exists for exactly this), and two of them — the interview's "three
+to five questions" against a cap of six, and the theme's replace-versus-union
+rule — put to you rather than guessed. Queued rather than landed because it is
+all model-facing text and the dossier's instructions are hash-frozen in a
+corpus. Ledger: Black, 2026-09-26.
+
 ## Open — a dollar and an account
 
 **Red: nothing off-platform tells you the site is down, and a hung process
@@ -172,14 +193,35 @@ scope is checked — a workflow change only CI can prove, so it lands as its
 own PR on a morning you can watch the deploy. Ledger: Red, the queued list
 carried in the 2026-09-05 entry, item 6.
 
+**Black: every visit to the deck shelf re-reads and re-parses the whole
+library — ~42 ms of CPU and 27 MB of allocation for 25 decks of 100 cards, on
+a machine with two shared cores.** `/api/decks` builds a fresh `FileSource`
+per request, so nothing memoises anything; ~90% of the cost is inside the YAML
+library, so the only lever that pays where it ships is not parsing a file that
+has not changed (fanning the reads out with `convoke` was measured and
+rejected — its worker rule runs the serial loop on two cores). · *Cost of
+leaving it:* the home page's shelf call spends 42 ms of server CPU per visit
+for an answer that was identical last time, forever. · **What makes it a
+question:** the memo needs an owner that outlives a request — the long-lived
+`*API`, handed down through `Resolver` into `NewFileSource`, five to eight
+files — and its invalidation is the pool's file-stamp guarantee applied to
+live user data. · **Recommendation:** "yes" — its own PR on a morning you can
+watch the deploy, with hit and miss counters in from the start and rendered
+nowhere. Ledger: Black, 2026-09-26.
+
 ## Open — a migration window
 
 **Black: prompt-cache *writes* are invisible in both usage ledgers, so the
 spend figures are a little under.** `cache_creation_input_tokens` appears
 nowhere outside two test fixtures; writes bill at 1.25× input. · *Cost of
 leaving it:* the dollar figure on the Admin panel and in `mtglab claude
-usage` under-reads by the write premium — small against today's ≈$11
-all-time, and a schema migration to fix. · **Recommendation:** add the
+usage` under-reads by the write premium, and 09-26 put a floor under it
+rather than calling it small: every mode's cacheable prefix was measured, and
+the instance's 213 conversations wrote **at least ≈490,000 cache tokens**,
+billing at 1.25× input — **$1.22–$1.84 unrecorded against a recorded $9.0034,
+a 14–20% under-read** — with a provable ceiling of $24–37 because writes can
+never exceed reads. A 20×-wide bracket is what the column collapses. ·
+**Recommendation:** add the
 column on a day you can watch the boot (a migration is your window by
 standing rule); nothing until then. The theme mode's unreadable second cache
 breakpoint (Black, 2026-08-24, item 2 — worth at most ~0.8% of that mode's
@@ -210,6 +252,21 @@ until 10-02, then names from a new set fail on import and search. ·
 week of 10-05 — a deployed button now, no ssh — then read the pool file's
 size back once; the #472 rebuild took it 224 MB → 81 MB on 09-13 and it should
 hold near there. Ledger: Green, 2026-09-19.
+
+**Black: the cache-read price is one constant for the whole family, and the
+family stopped agreeing — but nothing is mispriced yet.** `prices.CacheReadFraction`
+is 0.1 for every model on the argument that the ratio is the same across the
+family; Claude Fable 5.1 prices cache reads at $0.25/MTok, which is 0.025× its
+input. `claude-fable-5-1` is not in `Table`, and the instance runs Sonnet 5 on
+every row, so today this is a trigger rather than an error. · *Cost of leaving
+it:* nothing until a model with a different read fraction is added to `Table`,
+at which point its cache reads are priced 4× high, silently. · **What would
+have to be true:** the fraction moves onto `Priced` beside the rate, which
+means extending `testdata/prices.json` — a frozen golden, and not a thing a
+polish run extends on its own. · **Recommendation:** land it in the same branch
+that adds such a model; meanwhile the cheap half is a guard that every model in
+`Table` is on a recorded list of "cache reads really are a tenth here", so the
+next one has to say. Ledger: Black, 2026-09-26 (deferred 2026-09-19).
 
 **White: `NOTICE.md` is held and the skills are held; the rest of the tree's
 prose is still unguarded.** `licenserecord_test.go` holds every repository
