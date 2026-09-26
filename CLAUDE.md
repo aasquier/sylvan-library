@@ -197,9 +197,12 @@ now noise.
 
 ## Testing
 
-**Every test calls `t.Parallel()`, and something checks.** As of 2026-09-24
-that is every one of the 2,488 top-level tests under `go/` — zero
-serial — and `go/cmd/mtglab/serialregister_test.go` fails by name on any
+**Every test calls `t.Parallel()`, and something checks.** Since 2026-09-24
+that is every top-level test under `go/` — zero serial — and the count is
+deliberately not written here: the register logs the number it walked (`go
+test -v -run TestEveryTestRunsBesideItsNeighbours ./cmd/mtglab/`), and the
+figure this sentence used to carry had rotted by three within two days.
+`go/cmd/mtglab/serialregister_test.go` fails by name on any
 test whose own body does not call `t.Parallel()` as a statement (a call
 inside a `t.Run` closure does not count for the parent; `TestMain` and
 benchmarks are not tests). It used to be a register of argued exceptions: 39
