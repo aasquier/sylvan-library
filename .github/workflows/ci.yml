@@ -110,10 +110,30 @@ jobs:
       # tracked -- so it stays pinned to `data/`, where a JSON file is Scryfall's
       # and nothing else. Checked against all 418 tracked files: the widened
       # pattern matches exactly what the old one did, which is nothing.
-      - name: Reject committed card data, collections, or credentials
+      #
+      # Deck data joined this list on 2026-09-26, and it is the one entry here
+      # that is not about a leak. ADR 30 moved the library out of git and
+      # CLAUDE.md states the rule ("Decks do not live in git and not on this
+      # laptop"), and until now that rule was held by `.gitignore` alone --
+      # which a `git add -f` walks straight past and which no check would ever
+      # fail for. The `image` job refuses a deck *inside the container*, so a
+      # tracked deck that `.dockerignore` excludes would sit in git forever
+      # with every check green. A deck in git is a second standing copy of app
+      # data, which is exactly the shape that silently lost two rounds of deck
+      # labels (the hosted-first facet exists because of it).
+      #
+      # `^decks/` covers the whole directory, because ADR 30 says the whole
+      # directory is app data -- deck.yaml, swaps.md, the generated primer, all
+      # of it. `(^|/)deck\.yaml$` catches one dropped somewhere else, the same
+      # reasoning that unanchored the pool patterns above. The separator is
+      # what keeps it honest: `deckyaml/testdata/rich-deck.yaml` is a tracked
+      # parser fixture and a bare `deck\.yaml$` would have failed the build on
+      # it. Checked against all 1,367 tracked files: the added alternatives
+      # match exactly nothing.
+      - name: Reject committed card data, collections, credentials, or decks
         run: |
           bad=$(git ls-files | grep -Ei \
-            '(^data/.*\.(json|duckdb)$|\.duckdb$|\.jsonl\.gz$|\.json\.gz$|app\.db|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json)' \
+            '(^data/.*\.(json|duckdb)$|\.duckdb$|\.jsonl\.gz$|\.json\.gz$|app\.db|collection|wishlist|inventory|purchases|orders|\.env$|cookies\.json|^decks/|(^|/)deck\.yaml$)' \
             || true)
           if [ -n "$bad" ]; then
             echo "These files must not be committed:"; echo "$bad"; exit 1
