@@ -153,11 +153,13 @@
      `transparent` is transparent **black**, so a gradient's far stop would
      fade brass through grey instead of out. The three zero-alpha stops in the
      board's plate rules therefore stay `rgba(201, 162, 39, 0)` — not a site
-     the sweep missed, a site where the conversion is wrong. The keyframe in
-     `verdict-gild` keeps its literal too, for a different reason: its
-     `drop-shadow` sits in a filter list whose other entries are already
-     `var()`-driven, and that block's own comment explains why nothing there
-     is to be rearranged casually. */
+     the sweep missed, a site where the conversion is wrong. They are the
+     only three left: `verdict-gild`'s `drop-shadow` was the fourth and has
+     since been converted, its keyframe having been holding the one spelling
+     that *proved* a `var()` works there — the entries either side of it are
+     already `var()`-driven and that block's own comment says why they have
+     to be. `--lantern-brass` is declared once and never re-declared per
+     theme, so the mix is the same colour the literal was, in both. */
   --lantern-brass: #c9a227;
 }
 
@@ -952,6 +954,13 @@ body {
  * places before three pictures arrive in them, which is commandment 2 — the
  * table explains its own shape without a sentence of instruction.
  *
+ * **That sentence was false for a while and is true again**, which is worth
+ * recording because neither change that broke it was wrong. The frame gave up
+ * its own name (below) because the caption under the card said the same three
+ * words; then the caption moved onto hover. A claim in a comment survived both
+ * and nothing failed. The legend block near the foot of this section is where
+ * it is held now, gated on `.tarot-slot:has(.is-face-up)`.
+ *
  * Printed square, and the cards lie square in them (Aaron, 2026-08-18). The
  * place used to be turned to face the ball and the card turned a further
  * degree or two off it, so the cloth read as printed and the deal as a hand.
@@ -1014,6 +1023,19 @@ body {
 
 button.tarot-hinge {
   cursor: pointer;
+}
+
+/* A keyboard is a hand (commandment 17), and until now this element's only
+   reply to it was the browser's own outline on a dark table. The house ring,
+   `.reader-tile`'s two rooms over, sits OUTSIDE the card — a card is a
+   painting and nothing gets drawn on top of one — and follows the same 9px
+   the faces are cut to so it reads as the card's edge rather than as a box
+   around it. Both states wear it: the button you may turn, and the picture
+   you may look closer at. */
+.tarot-hinge:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 3px;
+  border-radius: 9px;
 }
 
 /* A turned card leans in under the pointer (Aaron, 2026-08-17). At 168px on
@@ -1132,6 +1154,118 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   box-shadow:
     0 10px 26px rgb(0 0 0 / 0.55),
     0 0 0 1px rgb(255 255 255 / 0.12);
+}
+
+/* ── the room's light, ON the card ──────────────────────────────────────────
+ *
+ * The table is a photograph of a real one, and every object in it obeys one
+ * light: forty candles standing in banks to the left, the right and the back,
+ * with the cards lying at the near edge — the furthest point from all of
+ * them. Every object except the cards, which arrived as flat scans lit from
+ * nowhere and were therefore the *brightest* things in a candlelit room. A
+ * card that does not take the room's light is not lying on the table; it is
+ * pasted on top of the photograph.
+ *
+ * So two layers, and they are layers on purpose. **Commandment 19 is the
+ * whole reason this is a pseudo-element**: a crossover's face is a Scryfall
+ * painting (`.tarot-rws-art`), and light goes *on* a card as a sheet of its
+ * own, never as a `filter` that re-renders the art on its way to the screen.
+ * `.field-card-leaf::after` is the same device on the board, and
+ * `go/cmd/mtglab/cardimagery_test.go` is the rule with a gate under it.
+ *
+ * **The lamp** (`::after`) is warm at the far edge and shaded at the near
+ * one, and the middle of the card is left alone — which is also the rule the
+ * ageing block below already keeps in its own words: *shadow yes, colour
+ * casts no*. Nothing here moves a hue across the picture; it puts light above
+ * part of it and shade above another part.
+ *
+ * **The glint** (`::before`) is the specular a piece of cardstock throws as
+ * it turns past the candles, and it rides the flip's own 760ms. Its ancestor
+ * is foil, which is the game's own answer to this: a sheen that is not there
+ * until the card *moves*. Both faces run it together, so the band crosses the
+ * back through the first half of the turn and the face through the second —
+ * which is one light travelling across one card, seen from the side that
+ * happens to be toward you.
+ *
+ * Two facts worth keeping if this is ever tuned. A restored table (the stash
+ * brings three face-up cards back on load) glints once as the page opens,
+ * because `is-face-up` is already on at mount — that is the room's light
+ * finding the cards and it happens once, never on a still page. And the
+ * band is inset *wider* than the card so it enters and leaves off-frame;
+ * `.tarot-face` clips it to the corner radius. */
+.tarot-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    /* the candles, over the table and past the far edge */
+    linear-gradient(
+      to bottom,
+      rgba(255, 201, 130, 0.2) 0%,
+      rgba(255, 201, 130, 0.06) 30%,
+      rgba(255, 201, 130, 0) 52%),
+    /* the table's own shade, where the card lies nearest the room's dark */
+    linear-gradient(
+      to top,
+      rgba(18, 10, 3, 0.4) 0%,
+      rgba(18, 10, 3, 0.16) 22%,
+      rgba(18, 10, 3, 0) 50%);
+  transition: opacity 180ms ease;
+}
+
+/* A card lifted toward the ball is a card lifted toward the candles, so the
+   shade eases off as it rises — light added on hover, never removed, which is
+   this house's whole grammar for a hand reaching toward something. The zoom
+   is already gated on `(hover: hover)` and on the card being face up; this
+   rides the same gate so a phone, where `:hover` latches, never strands one
+   card brighter than the two beside it. Keyboard focus keeps its own rule
+   below for the reason the zoom does — a keyboard is a hand, and it is not
+   a pointer. */
+@media (hover: hover) {
+  .tarot-hinge:has(.is-face-up):hover .tarot-face::after {
+    opacity: 0.4;
+  }
+}
+
+.tarot-hinge:has(.is-face-up):focus-visible .tarot-face::after {
+  opacity: 0.4;
+}
+
+.tarot-face::before {
+  content: '';
+  position: absolute;
+  inset: -18% -55%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 247, 228, 0) 42%,
+    rgba(255, 247, 228, 0.42) 50%,
+    rgba(255, 247, 228, 0) 58%);
+}
+
+.tarot-card.is-face-up .tarot-face::before {
+  animation: tarot-turn-glint 760ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes tarot-turn-glint {
+  0% {
+    opacity: 0;
+    transform: translateX(-42%);
+  }
+  26% {
+    opacity: 1;
+  }
+  74% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(42%);
+  }
 }
 
 .tarot-face-front {
@@ -1336,9 +1470,31 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
  * phone who cannot find out what the cards are. And the hinge's
  * `aria-label` already speaks the position, the name and the reversal, so
  * nothing here is a screen reader's only copy.
+ *
+ * **And a third, which was missing and is why every rule here is gated on
+ * `.tarot-slot:has(.is-face-up)`.** Two correct fixes composed into a
+ * hole. The place printed on the cloth gave up its name because the caption
+ * under the card already said it (the block above says so); then the caption
+ * moved onto hover. Between them, a table with three cards face down on it
+ * named **nothing at all** on a pointer device — the `.tarot-place` comment
+ * went on promising "a newcomer sees three named places before three
+ * pictures arrive in them" while the rendered table promised a mouse.
+ *
+ * So the slip is for a card that has a picture on it, and a place with
+ * nothing in it yet keeps its printed name in flow under the back: one line,
+ * which is the cloth's own printing rather than the twelve-line sprawl Aaron
+ * cut. A name goes as its own card turns — the place is being filled, and
+ * the picture is the thing that fills it — and from then on it is a hover or
+ * a Tab away. The sprawl cannot come back through this door: the three extra
+ * lines (the card's name, the reversal, the crossover's credit) are rendered
+ * only for a card that is face up, which is exactly the case the slip covers.
+ *
+ * It costs no reflow until the last card turns, and that is a fact about the
+ * spread rather than luck: `align-items: flex-start` makes the felt as tall
+ * as its tallest slot, and a slot with a name in flow is the tall one.
  */
 @media (hover: hover) {
-  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend {
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up) .tarot-legend {
     position: absolute;
     left: 50%;
     /* ABOVE the card, and that is a bug fix rather than a preference. Below
@@ -1347,8 +1503,23 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
        `overflow: hidden` for its rounded corners, so the whole thing was
        painted and then cut away. It rendered, it had opacity 1, and nobody
        could see it. Over the table there is nothing to clip against, and
-       it lands where the eye already is. */
-    bottom: calc(100% + 0.5rem);
+       it lands where the eye already is.
+
+       Measured off a card that has GROWN, which is a different height from
+       the card that has not (Aaron, 2026-08-24: "the reminder text appears
+       awkwardly on the desktop clipping the top of the card"). The two rules
+       that make that necessary are a few lines apart and neither is wrong:
+       the slip stands at the top of the slot, and a turned card scales from
+       `center bottom`, so its top rises by (zoom - 1) of the slot's height
+       and swallows the slip whole. At 1280px that is 205px of card growing
+       72px upward into a slip standing 8px clear of it — painted, opaque,
+       and over the picture somebody hovered in order to look at. `100%` here
+       is the slot's height, which is the card's, so `100% * zoom + 0.5rem`
+       is the same 8px of clearance measured off the top of the card as it
+       is actually drawn. It needs no gate of its own any more: the slip now
+       exists only on a slot whose card is face up, and a face-up card is a
+       card that grows. */
+    bottom: calc(100% * var(--tarot-zoom, 1.35) + 0.5rem);
     width: max-content;
     min-width: 9rem;
     max-width: 15rem;
@@ -1380,39 +1551,30 @@ button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
   /* Ink on paper. Set on the slip rather than on each line, because the
      markup underneath is shared with the folded strip, which is still on
      green baize and still wants the felt's tokens. */
-  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-legend-name {
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up) .tarot-legend
+    .tarot-legend-name {
     color: #2b1e13;
   }
 
-  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-legend-aside {
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up) .tarot-legend
+    .tarot-legend-aside {
     color: #6b4f2a;
   }
 
-  .tarot-ceremony .tarot-slot:not(.is-small) .tarot-legend .tarot-caption {
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up) .tarot-legend
+    .tarot-caption {
     margin-top: 0;
     color: #6b4f2a;
   }
 
-  /* Above a card that has GROWN, which is a different height from the card
-     that has not (Aaron, 2026-08-24: "the reminder text appears awkwardly on
-     the desktop clipping the top of the card").
-     The two rules that make this necessary are three lines apart and neither
-     is wrong: the slip stands at the top of the slot, and a turned card
-     scales from `center bottom`, so its top rises by (zoom - 1) of the
-     slot's height and swallows the slip whole. At 1280px that is 205px of
-     card growing 72px upward into a slip standing 8px clear of it — painted,
-     opaque, and over the picture somebody hovered in order to look at.
-     `100%` here is the slot's height, which is the card's, so
-     `100% * zoom + 0.5rem` is the same 8px of clearance measured off the top
-     of the card as it is actually drawn. Only where a card is face up, since
-     a face-down card does not grow and a slip floating 72px over one would
-     be this bug with the sign flipped. */
-  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up) .tarot-legend {
-    bottom: calc(100% * var(--tarot-zoom, 1.35) + 0.5rem);
-  }
-
-  .tarot-ceremony .tarot-slot:hover .tarot-legend,
-  .tarot-ceremony .tarot-slot:focus-within .tarot-legend {
+  /* `:not(.is-small)` is carried here too, and it is arithmetic rather than
+     tidiness: the rule above it wears that negation, which counts a class,
+     so a reveal without it is one point lighter and loses to `opacity: 0`
+     for ever. A hover that computes to 0 is not a subtle hover. */
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up):hover
+    .tarot-legend,
+  .tarot-ceremony .tarot-slot:not(.is-small):has(.is-face-up):focus-within
+    .tarot-legend {
     opacity: 1;
     translate: -50% 0;
   }
@@ -2319,6 +2481,22 @@ button:hover .tarot-fan-card {
   .tarot-deck-card {
     animation: none;
   }
+  /* The specular a card throws as it turns is an event, and an event that
+     does not happen is the honest reduced version of it — the band is
+     removed rather than parked mid-sweep, which would be a white stripe
+     printed across a picture. **The lamp above it is not motion and stays**:
+     the card goes on taking the room's light, because "this object is lying
+     on that table" is information about the room and not ceremony. */
+  .tarot-card.is-face-up .tarot-face::before {
+    animation: none;
+    opacity: 0;
+  }
+  /* The lamp's own hover reply snaps rather than eases, for the reason the
+     hinge's zoom does two rules down: the state is still reached, and the
+     ramp to it is the part somebody asked not to see. */
+  .tarot-face::after {
+    transition: none;
+  }
   button.tarot-hinge:hover .tarot-card:not(.is-face-up),
   button.tarot-hinge:focus-visible .tarot-card:not(.is-face-up) {
     transform: none;
@@ -2326,8 +2504,8 @@ button:hover .tarot-fan-card {
   /* The room itself is a `VideoBackdrop` in `art` mode, so it swaps itself
      for the still in JS and needs no rule here. What is left to arrest is
      the card surfacing in the glass — and the vision's 0% keyframe is
-     invisible, so it needs the resting state
-     so it needs the resting state spelled out rather than merely stilled. */
+     invisible, so it needs the resting state spelled out rather than merely
+     stilled. */
   .seance-vision {
     animation: none;
     opacity: 0.92;
@@ -16784,7 +16962,8 @@ button:hover .tarot-fan-card {
             brightness(var(--gild-lit, 1)) saturate(var(--gild-sat, 1));
   }
   50% {
-    filter: drop-shadow(0 4px 22px rgb(201 162 39 / 0.34))
+    filter: drop-shadow(0 4px 22px
+              color-mix(in srgb, var(--lantern-brass) 34%, transparent))
             brightness(calc(var(--gild-lit, 1) * 1.07))
             saturate(var(--gild-sat, 1));
   }

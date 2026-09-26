@@ -113,6 +113,35 @@ doors and emphasis across five files, where a `:hover` can never reach it. ·
 and records any it deliberately leaves, with the reason. Ledger: Red,
 2026-09-26 (rainbow).
 
+**Green: the reading room takes the room's light, and a keyboard can finally
+reach a turned card.** `the-third-ball` (stacked on `the-second-ball`) lays the
+candlelight on the cards as a layer of its own — commandment 19's shape, never
+a filter — gives the flip the specular a piece of cardstock throws as it turns,
+puts the three position names back on the cloth under the face-down cards (the
+stylesheet had been claiming that since 2026-08-18 and the page stopped doing
+it), and gives the turned card a tab stop so the `:focus-visible` rules it has
+always carried stop being dead code. · *Cost of leaving it:* those rules could
+never fire, so a keyboard at a desk lost the zoom, the card's name and the
+**artist credit** on a Magic crossover — which Scryfall's guidelines ask be
+findable "somehow". · **Recommendation:** walk it and merge; it is the room
+commandment 15 rations last. `mtglab-ui` on 8765, `/new` → Help me decide → the
+table. Turn one card at a time and watch the light cross it (**760ms**, the
+flip's own); the other two keep their printed names until their own card turns.
+Then Tab to a turned card. Ledger: Green, 2026-09-26 (rainbow).
+
+**Green: the reading room's Magic crossovers were outside commandment 19's
+gate, and are inside it now.** `cardimagery_test.go`'s `artBearing` knew only
+`seance-vision` — the card *reflected* in the crystal ball — while the cards on
+the table themselves render `cards.scryfall.io/art_crop` URLs through
+`.tarot-rws-art`. Seven classes added on `the-third-ball`, mutation-verified. ·
+*Cost of leaving it:* index.css records that the first cut of that surface put
+"a desaturating filter, a cream screen and a honey wash" over exactly that
+element; it came off for being ugly, and nothing would have said it was
+forbidden. · **Recommendation:** nothing to decide — noted so the next sweep
+knows the covered list is kept by walking JSX, not by waiting for a violation.
+Worth one Colorless slice asking which *other* rooms render card art with no
+entry. Ledger: Green, 2026-09-26 (rainbow).
+
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and

@@ -7901,6 +7901,109 @@ none.
   are now split on top-level commas and negations stripped.
 
 
+### 2026-09-26 (rainbow) — the third ball: the reading room takes the room's light
+
+*The Queen's third ball (`the-third-ball`, stacked on `the-second-ball`).
+Commandment 15 at full strength: the fortune-teller's table inside `/new` →
+Help me decide, walked on 8765 (the committed bundle, before) and 5173 (after),
+dark then light, at 1280×900 and at the 375×812 mobile preset, mouse and then
+real Tab keys.*
+
+**The read that started it.** The table is a photograph of a real one: forty
+candles in banks to the left, the right and the back, and the cards lying at
+the near edge, which is the furthest point from every one of them. Every object
+in that picture obeyed one light except the three that matter — the cards were
+flat scans lit from nowhere, and were therefore the **brightest things in a
+candlelit room**. Not a card lying on a table; a card pasted onto a photograph
+of one.
+
+**The lamp, and it is a layer.** `.tarot-face::after` carries two gradients —
+the candles over the far edge, the table's own shade at the near one — with the
+middle of the card left alone, which is the rule the ageing block below it
+already keeps in its own words: *shadow yes, colour casts no*. It is a
+pseudo-element because **half the cards in this deck are Scryfall paintings**: a
+Magic crossover wears the drawn 1909 frame with `<img class="tarot-rws-art"
+src={card.image}>` inside it, and `card.image` is a `cards.scryfall.io/art_crop`
+URL. Commandment 19's whole shape is light *on* a card, never a `filter`
+through it.
+
+- **And the room was not covered.** `cardimagery_test.go`'s `artBearing` named
+  `seance-vision` — the card surfacing in the crystal ball, which is the
+  *reflection* — and nothing else in the reading room. Seven classes added
+  (`tarot-rws-art`, `tarot-rws-canvas`, `tarot-rws`, `tarot-face-front`,
+  `tarot-face`, `tarot-card`, `tarot-hinge`), and index.css's own ageing
+  comment records that the first cut of this surface put *"a desaturating
+  filter, a cream screen and a honey wash"* over exactly that element. It came
+  off for being ugly rather than for being forbidden, and nothing would have
+  said so. Mutation-verified: `filter: sepia(.5)` on `.tarot-rws-art` now
+  fails by name.
+- **On hover and on focus the shade eases to 0.4** — a card lifted toward the
+  ball is lifted toward the candles. Light added, never removed.
+
+**The turn is cardstock now, not a rotate.** `.tarot-face::before` is the
+specular a piece of card throws as it passes the candles, riding the flip's own
+**760ms** — a 16%-wide band at `#fff7e4` / 0.42, entering and leaving off-frame
+and clipped to the card's 9px corner. Its ancestor is foil, which is the game's
+own answer: a sheen that is not there until the card *moves*. Both faces run it
+together, so the band crosses the back through the first half of the turn and
+the face through the second — one light travelling across one card, seen from
+whichever side is toward you. Under reduced motion it is **removed**, not
+parked: a band halfway across a picture is a smudge. The lamp under it stays,
+because "this object is lying on that table" is information about the room.
+
+**The table names its places again, and the stylesheet had been claiming it
+since 2026-08-18.** Two correct changes composed into a hole: the printed frame
+gave up its own name because the caption under the card already said it, and
+then the caption moved onto hover. Between them, a pointer-device table with
+three cards face down on it named **nothing at all** — measured live, all three
+legends at `opacity: 0`. The slip is now gated on `.tarot-slot:has(.is-face-up)`,
+so a place with no picture in it keeps its printed name in flow — one line,
+which is the cloth's printing, not the twelve-line sprawl Aaron cut in August
+(those three extra lines only render for a card that is face **up**). It costs
+no reflow until the last card turns: `align-items: flex-start` makes the felt as
+tall as its tallest slot, and a slot with a name in flow is the tall one.
+
+- **The specificity trap inside that fix, and it computed to zero.** Adding
+  `:has(.is-face-up)` to the base slip rule gave it six classes; the
+  `:hover` / `:focus-within` reveal beside it had five, because the base also
+  carries `:not(.is-small)` and a negation's argument counts. The reveal lost
+  to its own base rule and the slip could not be shown at all. Both carry the
+  negation now.
+
+**The chop: a turned card could not be reached by a keyboard at all.** The
+`:focus-visible` rules index.css carries for this element were **dead code**.
+They are gated on `:has(.is-face-up)`; the only focusable hinge is the
+`<button>`; and that button exists only while the card is face **down**. Three
+things were lost with them, on desktop, for anyone not holding a mouse: the
+1.35× zoom that is the only way to actually look at a 136px plate, the slip
+carrying the card's name, and — on a Magic crossover — the line crediting the
+painting's artist, which Scryfall's guidelines ask be findable *"somehow"*. A
+phone was always fine: `(hover: hover)` is false there and every line stands in
+flow, so the loss was desktop-and-keyboard exactly. `tabIndex={0}` on the
+turned card (it stays `role="img"` — it is a picture, and a button here would
+be a control that does nothing), plus the house vine ring on
+`.tarot-hinge:focus-visible`, outside the card because nothing is drawn on top
+of a painting. Verified with real Tab presses: ring, zoom, lamp lift and the
+full slip, credit included.
+
+**What is proved.** `go/cmd/mtglab/tarotlamp_test.go`, four tests against the
+committed bundle, six mutations run and six failures seen: the lamp deleted,
+the glint's reduced-motion arrest deleted, the lamp put out *inside* that same
+block, the slip rule un-gated, the tab stop removed, and a sepia on the
+crossover's art. The third test is written as the invariant rather than as a
+list — *every* rule that lifts `.tarot-legend` out of flow must ask whether
+there is a picture in that place — so a fourth slip rule cannot quietly opt out.
+
+**Also on this branch, and it closes the last one.** `verdict-gild`'s
+`rgb(201 162 39 / 0.34)` is `color-mix(in srgb, var(--lantern-brass) 34%,
+transparent)` — pixel-equal, because the token is declared once and never
+re-declared per theme. The eight `rgba(201, 162, 39, α)` spellings this ball
+was handed as an open item were **already converted** by the second ball; the
+three that remain are the zero-alpha gradient stops, where `color-mix(… 0%,
+transparent)` is transparent *black* and the conversion is wrong. A claim
+re-checked rather than inherited.
+
+
 ## Colorless — The Artifacts
 
 *The pass auditing itself: last cycle's findings · are the checklists still
