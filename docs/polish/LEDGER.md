@@ -3419,8 +3419,8 @@ applies to each. Ordered by cost:
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
-  2026-09-05 (rainbow, night),
+- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+  2026-09-19 (cleanup), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
   2026-08-24, 2026-08-19, 2026-08-16, plus two un-run entries from that week
   — the targeted performance pass and the measuring shelf — both kept below.
 - **Everything below the 2026-08-24 block is about the Python app.** `bench
@@ -3429,6 +3429,437 @@ applies to each. Ordered by cost:
   hold and several are why this run went where it went; **no number, path or
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
+
+### 2026-09-26 (rainbow)
+
+A daylight leg, run in parallel with four other lanes (Red's gzip-writer pool
+in #502 is this facet's work done by another hand — `internal/door`'s gzip was
+deliberately not touched here). Two things landed and one was rejected on its
+own measurement. **Neither spend ledger has moved by a token in a fortnight**,
+so the money half of this facet is a re-verification; the run's substance is
+the shelf route the 2026-08-24 entry recorded as *"unmeasured this run and that
+is a gap, not a fact"*, which now has a number, a profile, and a benchmark that
+will notice it moving.
+
+- **Fixed this run: 1. The deck shelf has a measuring instrument.**
+  `go/internal/library/library_bench_test.go` is the first benchmark outside
+  the four determinism kernels, and it measures what a visit to `/api/decks`
+  actually costs: `FileSource.All` over **25 decks of 100 cards** — the
+  deployed library's shape — plus `deck.FromText` alone, so the split between
+  syscalls and parsing is a measurement rather than an inference. Raw, this
+  Mac, `-benchmem -count=10`, load 3–6 with four lanes live:
+
+  ```
+  goos: darwin · goarch: amd64 · cpu: Intel(R) Core(TM) i7-4870HQ CPU @ 2.50GHz
+  BenchmarkShelfAll-8         27  41814583 ns/op  27132989 B/op  438066 allocs/op
+  BenchmarkShelfAll-8         27  42513057 ns/op  27146599 B/op  438076 allocs/op
+  BenchmarkShelfAll-8         27  42097301 ns/op  27133142 B/op  438067 allocs/op
+  BenchmarkShelfAll-8         27  42160519 ns/op  27151791 B/op  438082 allocs/op
+  BenchmarkShelfAll-8         27  42026580 ns/op  27136598 B/op  438070 allocs/op
+  BenchmarkShelfAll-8         27  42066422 ns/op  27146027 B/op  438079 allocs/op
+  BenchmarkShelfAll-8         28  42111361 ns/op  27134410 B/op  438067 allocs/op
+  BenchmarkShelfAll-8         27  42178655 ns/op  27135586 B/op  438070 allocs/op
+  BenchmarkShelfAll-8         27  41799296 ns/op  27143212 B/op  438074 allocs/op
+  BenchmarkShelfAll-8         26  42297281 ns/op  27172260 B/op  438097 allocs/op
+  BenchmarkDeckFromText-8    724   1655485 ns/op   1058574 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    718   1653802 ns/op   1058441 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    718   1653770 ns/op   1058427 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    718   1654427 ns/op   1058797 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    723   1665442 ns/op   1058676 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    712   1653168 ns/op   1058433 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    724   1647156 ns/op   1058415 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    726   1652079 ns/op   1058338 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    721   1665313 ns/op   1058872 B/op   17513 allocs/op
+  BenchmarkDeckFromText-8    724   1651621 ns/op   1058700 B/op   17513 allocs/op
+  ```
+
+  **One shelf visit is ~42 ms of CPU, 27 MB of allocation and 438,000
+  allocations, and 25 × 1.65 ms of it is the YAML parse** — the ReadDir, the 25
+  Stats and the 25 ReadFiles are inside the noise. A hundred-card deck file is
+  about 15 kB and costs 1.06 MB and 17,513 allocations to parse: 70× the file
+  in garbage, 175 allocations per card. The route builds a fresh
+  `library.Resolver` and `FileSource` per request (`api/decks.go:62`), so
+  **nothing memoises any of it** and every visit to the shelf pays the whole
+  bill again.
+- **The profile says the cost is the YAML library, not our traversals** — which
+  is why nothing was optimised inside `deckyaml`. CPU profile of
+  `BenchmarkDeckFromText` is featureless and GC-shaped (`runtime.kevent`,
+  `pthread_cond_signal`, `madvise`, `mallocgcSmallScanNoHeader` — no application
+  frame above 2%), which is the allocation profile's cue, exactly as the shelf's
+  rules say. `-sample_index=alloc_space`, 300 iterations, top by flat:
+
+  ```
+  Showing nodes accounting for 260.50MB, 80.51% of 323.55MB total
+   32.51MB 10.05%  goccy/go-yaml/scanner.(*Scanner).scanSingleQuote
+      20MB  6.18%  goccy/go-yaml/token.String (inline)
+      19MB  5.87%  golang.org/x/crypto/argon2.initBlocks      <- boot, not the parse
+   16.20MB  5.01%  internal/deck.FromText            (cum 293.78MB, 90.80%)
+   12.50MB  3.86%  internal/deckyaml.Map.Plain       (cum 13MB)
+   12.50MB  3.86%  goccy/go-yaml/ast.MappingValue (inline)
+      11MB  3.40%  goccy/go-yaml.(*Decoder).nodeToValue
+    9.02MB  2.79%  goccy/go-yaml/parser.newTokens (inline)
+    8.06MB  2.49%  goccy/go-yaml/parser.newParser    (cum 56.80MB, 17.56%)
+       8MB  2.47%  strconv.syntaxError (inline)      <- goccy probing every scalar
+    5.50MB  1.70%  internal/deckyaml.orderedValue    (cum 7MB)
+  ```
+
+  `Map.Plain` + `orderedValue` together are **20 MB of 293 MB — 6.8%**, so the
+  package's argued double traversal (one parse, one ordered walk, one flatten)
+  is not the bill; `parser.newParser` alone is 17.6%, and a fresh scanner and
+  token table per file is goccy's shape rather than ours. The single largest
+  line is `scanSingleQuote`, which is the emitter's own doing and correct:
+  `yamlemit` writes every `why` as a single-quoted scalar folded at width 100,
+  so a deck file is mostly single-quoted prose. **There is no surgical win
+  inside `deckyaml`**, and the argued alternative — a second parse entry point
+  that skips the ordered form — is refused by that package's own file comment
+  ("no second set of rules about what a value may be"), which is the right
+  refusal: it would buy under 7%.
+- **Rejected on measurement, written down because the next run will have the
+  same idea: `convoke.Indexed` over `FileSource.All`.** Twenty-five independent
+  file reads and parses in sequence is textbook fan-out, `convoke` is the
+  tree's own primitive for it, and it would be about ten lines. It is still a
+  no-op where it ships: `convoke.Indexed`'s own rule is
+  `workers = GOMAXPROCS-1` floored at one, and its doc says so in as many
+  words — *"a machine with two cores runs exactly the serial loop it always
+  ran"*. The instance has two shared cores. So the change would show a ~4×
+  win on this 8-core laptop and change nothing at all on the deployed
+  instance, which is this facet's standing caution word for word. **The only
+  lever that pays on two cores is not parsing at all** — see the queued item.
+- **Fixed this run: 2. Black's "a cache, a key, or a written argument" is a
+  gate now** (the standing question, answered for this facet). The rule —
+  *every mode is covered by either a cache, an in-flight dedupe key, or a
+  written argument for neither* — was enforced by a person re-deriving it once
+  a week, and it has already been missed from the other end: ADR 41 landed
+  three modes in one PR and each one's posture was verified in a night run's
+  prose rather than by anything that could fail.
+  `go/cmd/mtglab/spendrecord_test.go` records all ten postures and holds two
+  halves — completeness **derived from `claude.ModeNames()` in both
+  directions**, so a new mode fails by name until somebody answers the caching
+  question about it; and an anchor per entry naming the file and the token that
+  carries the cover, so a posture whose mechanism moved fails too. The record
+  as it stands: `commander-dossier` cache (`dossier_cache`); `research`,
+  `slot-argument` (the sweep), `scan`, `rationale-draft` and `intake-filing`
+  keyed; `rationale-interview`, `theme-conversation`, `theme-proposal` and
+  `deck-description` argued at their call sites. Mutation-verified both ways:
+
+  ```
+  == mutation: the scan's posture removed from the record
+      spendrecord_test.go:125: the spend posture record covers
+            [... research slot-argument theme-conversation theme-proposal]
+          and the mode table holds
+            [... research scan slot-argument theme-conversation theme-proposal]
+  == mutation: the scan's key anchor moved
+      spendrecord_test.go:158: mode "scan" is recorded as covered by a key,
+          anchored on key := "scan:" + hex.EncodeToStringZZ in
+          go/internal/api/scan.go -- and that text is no longer there.
+  ```
+
+  One correction to this section's own prose while the routes were open: the
+  carried deferral has said since 08-24 that *"interview and single-card argue
+  still have neither a cache nor an in-flight dedupe key"*, which reads as a
+  gap. Both are **argued** — `api/interview.go` ("no job, no cache, nothing
+  stored", with the ~4,900-token measurement) and `api/argue.go`
+  ("synchronous, and that is a measured claim") — and the argue *sweep* has
+  carried a key (`slug` + sha256 of the casefolded, sorted selection) all
+  along. The deferral is a live question about whether the argument still
+  holds, not an uncovered surface; its trigger is unchanged and unfired.
+- **The cache-write premium, measured as far as it can be without the column —
+  and the daybreak line understates it.** That line calls the under-read
+  "small against today's ≈$11 all-time". The floor says otherwise. Every mode's
+  cacheable prefix was rendered and measured (bytes: system block, as
+  `mode.System(stance)`, plus the rendered tools JSON, at
+  `on-request/adjacent/none`):
+
+  | mode | system B | tools B | prefix B |
+  |---|---:|---:|---:|
+  | `theme-proposal` | 13,912 | 3,659 | **17,571** |
+  | `theme-conversation` | 14,753 | 65 | 14,818 |
+  | `slot-argument` | 3,121 | 5,535 | 8,656 |
+  | `commander-dossier` | 4,780 | 1,474 | 6,254 |
+  | `rationale-interview` | 3,061 | 3,133 | 6,194 |
+  | `rationale-draft` | 3,497 | 2,554 | 6,051 |
+  | `research` | 3,930 | 1,474 | 5,404 |
+  | `deck-description` | 2,538 | 2,554 | 5,092 |
+  | `intake-filing` | 2,247 | 2,554 | 4,801 |
+  | `scan` | 1,595 | 0 | **1,595** |
+
+  At the tree's one recorded `count_tokens` calibration point — `scan` at
+  1,595 B ↔ 478 tokens, the figure `converse.go` records and the only mode
+  whose prompt has not moved since it was taken — that is 3.34 bytes per
+  token, so the ten prefixes run **478 tokens (scan) to ≈5,260 (theme
+  proposal)**, mean ≈2,300. **Floor:** each distinct prefix is written at
+  least once per conversation outside a five-minute window, so the instance's
+  213 conversations wrote **≈490,000 tokens** of cache at minimum, billing at
+  1.25× input = **$1.22–$1.84** unrecorded against a recorded $9.0034 — a
+  **14–20% under-read**, and a floor because it counts the system block only
+  and ignores every write the moving tool-result marker makes inside a
+  multi-turn conversation (the dossier is 54 requests over 20 conversations;
+  research 16 over 4). **Ceiling:** writes can never exceed reads in count, so
+  the premium is provably below 9,748,735 × 1.25 × $2–3/MTok = **$24–37**, a
+  bound worth stating only because it is the one arithmetic that needs no
+  assumption. The column is what collapses a 20×-wide bracket to a figure. The
+  daybreak line's cost-of-leaving is updated to the floor.
+- **Measurements (2026-09-26, this Mac — four lanes live, load 3–6 through the
+  benchmarks; no local server was started and no Claude call was made, so
+  $0.00 was spent by this run):**
+  - **Claude spend, both ledgers, unchanged to the token from 09-19.** Laptop
+    (read through `mtglab claude usage` over a read-only *copy* of
+    `data/app.db` in a scratch dir — the checkout's database was never
+    opened): `claude-sonnet-5 107 conv / 123 req / 21,906 in / 152,443 out /
+    2,054,694 cached — $2.1150`. Instance (`fly ssh console -C "mtglab claude
+    usage"`, plain login, no token workaround): `claude-sonnet-5 213 conv /
+    332 req / 78,590 in / 567,368 out / 9,748,735 cached — $9.0034`.
+    **Fourteen days with zero rows on either box**; all-time ≈$11.12, and the
+    instance's run-rate is a fortnight of nothing. Per-mode split identical to
+    09-19, dossier still where the money is (20 conv / 54 req / 231,013 out),
+    `slot-argument` still 3 conv / 0 cached on the instance.
+  - **The recorded cache-*read* charge, for scale:** 2,054,694 tokens on the
+    laptop ≈ $0.41–0.62 of its $2.1150 (20–29%), and 9,748,735 on the
+    instance ≈ $1.95–2.92 of its $9.0034 (22–32%). The cache is doing its job;
+    what is missing is only its price tag's other half.
+  - **Mode table: ten, counted from `ModeNames()`**, knobs as recorded 09-05
+    and `may_write: []` on all ten (held by `TestNoModeDeclaresAWrite`).
+    `git diff cb75cf2..HEAD -- go/internal/claude` is still empty of prompt
+    changes: `data/modes.json` is byte-untouched since #392 and `converse.go`
+    since #465, so both cache breakpoints stand where 09-12 read them.
+  - **Sonnet 5's minimum cacheable prefix re-verified against the
+    `claude-api` skill: 1,024 tokens**, and `converse.go`'s comment is right
+    about it — the nine conversational modes clear it and `scan` does not,
+    which is the prompt being short rather than a bug. The docs add the detail
+    that matters here: below the minimum the marker is inert with **no error,
+    just `cache_creation_input_tokens: 0`** — a column this app does not
+    record, so the app is structurally blind to an inert breakpoint. The
+    instrument that *does* exist is per-mode `cache_read_tokens` in the
+    ledger, and it reads zero on exactly the rows it should (`scan`, and the
+    theme personas with one conversation each).
+  - **Roster re-read, table unaffected, and the deferral's trigger is still
+    unfired.** The skill's current table carries ten models; `prices.Table`
+    holds nine and reports an unknown one by name (`UnpricedModels`) rather
+    than mispricing it. The deferral is `CacheReadFraction = 0.1` as one
+    constant for the whole family, and the model that breaks it is **Claude
+    Fable 5.1, whose cache reads are $0.25/MTok — 0.025× input, not a
+    tenth**. `claude-fable-5-1` is **not** in `Table` (only `claude-fable-5`
+    is), and the instance runs Sonnet 5 on every row, so nothing is mispriced
+    today and the trigger — *a model with a different read fraction entering
+    `Table`* — has not fired. `Checked = 2026-08-18` again deliberately not
+    bumped: its contract is a human reading the pricing page, and this was the
+    skill's cached table.
+  - **Bundle (committed `web_dist`, gzip -9):** `charts.js` 399,398 / 111,241
+    — **byte-identical, sixth run running**; `index.css` 355,973 / 63,714
+    (was 346,708 / 62,051: +1.7 kB gz); **`app.js` 345,454 / 106,302, up from
+    316,822 / 97,904 — +8.4 kB gzipped in a week, the largest weekly jump this
+    facet has recorded** (prior weeks ran +27 B to +1.1 kB). Against
+    `bundlebudget_test.go`'s 128 KiB that leaves **24.2 kB of headroom, down
+    from ~30 kB**, and the gate is what will say so first. One week of a
+    five-PR rainbow is not a trend line, and next week's number decides
+    whether it is: at +8.4 kB/week the budget is three weeks away, at
+    +1 kB/week it is six months. Recorded rather than queued for exactly that
+    reason. `web_dist/assets` total 9,684 kB (was 9,612).
+  - **Static assets over hotlinks: nothing to classify, same shape as 09-19.**
+    `web_dist` host set: `cards.scryfall.io` 28 (the one runtime fetch, the
+    one `preconnect`, White's licensing verdict), `www.tcgplayer.com` 1 (a
+    link a person clicks), `console.anthropic.com` 2 / `fly-metrics.net` 1
+    (admin-panel links), `cdn.jsdelivr.net` 1 (tesseract's overridden
+    default, inert), and the rest library homepages in comments
+    (`github.com`, `react.dev`, `reactrouter.com`, `redux.js.org`,
+    `tailwindcss.com`, `rolldown.rs`, `opencollective.com`, one `bit.ly` in a
+    vendor comment). No CDN script, no `@import`, no absolute `url()`; the
+    three `hotlinkrecord_test.go` guards stand.
+  - **`/api/decks` still cannot be probed live, and that is now a stated
+    limit rather than a gap.** It answers **401** to an unauthenticated GET
+    (0.15–0.22 s, seven samples — the refusal, not the shelf), and Claude
+    never signs in. So the 42 ms above is the only honest number for it until
+    somebody rides the `claude` seat through Claude-in-Chrome; the benchmark
+    is the durable half either way, because it measures the work rather than
+    the round trip.
+  - **No cache was added to the tree since #500** other than Red's pooled gzip
+    writer in #502, which is that lane's to count. The two hit counters in the
+    tree (`etagCounts`, `cache.Store.Counts`) are unmoved, and the pool's own
+    `MemoCards`/`MemoColumns`/`MemoStale` counters remain readable only
+    through `pool/export_test.go` — the register's remaining half, unchanged.
+- **The modes' craft reading, ten modes, one pass — and it is the first one
+  that found drift.** Three runs running this reading has ended "the prompts
+  are byte-untouched, so there is nothing new to read", which was true of the
+  *prompts* and false of the reading: a prompt goes stale when the **code
+  around it** moves, and the code has moved a great deal since #392. Read this
+  time against each mode's own Go file — the brief it assembles, the struct
+  that reads the answer back, the caps that truncate, and the scope paragraph
+  `Mode.System` appends. Character counts and `additionalProperties: false`
+  on every schema and every nested object in it; zero dated-model cruft in any
+  of the ten (no chain-of-thought prodding, no `<thinking>`, no JSON-only
+  nagging against a live response schema, no prefill assumption) — the only
+  formatting instruction is the theme pair's "no markdown, no headings", which
+  is load-bearing because those fields are read aloud to a newcomer.
+  - **`rationale-interview` (2,829 ch).** Says the gate "is deterministic
+    **Python** and it has already run" — it is Go (`internal/gate/validate.go`,
+    reached at `interview.go:163`). Says three to five questions; the cap that
+    actually truncates is `MaxQuestions = 6` (`interview.go:73`). Granted
+    `get_deck`, `deck_stats`, `validate_deck` and names only `get_cards`.
+    Everything it claims about the brief checks out.
+  - **`slot-argument` (2,889 ch).** "deterministic Python" twice, for the gate
+    and for the alternatives check (`argue.go:193`, both Go). Says the
+    alternatives are filtered "against the pool, the ban list and the deck's
+    colour identity" — four filters run and already-in-deck is reported first
+    (`argue.go:261`), and **the schema's own description already says four**,
+    so the prompt is the stale copy. Says "this deck file records rationales
+    the user wrote", which ADR 41 ended. `MaxCharges = 5` and
+    `MaxAlternatives = 6` agree with the prompt.
+  - **`commander-dossier` (4,548 ch).** `allies` is a required, source-bearing
+    section added by `DossierVersion = 3` and is missing from the prompt's
+    enumeration of what to search for, **and from `dossierOpening`'s brief**
+    (`dossier.go:131`); a later bullet does cover it, so the drift is one
+    enumeration in two places. This is the one mode whose prompt is
+    hash-frozen (`testdata/dossier.json`'s `instructions_sha256`).
+  - **`research` (3,670 ch).** Says of a rationale that "this tool refuses to
+    compose it anywhere" — `rationale-draft` composes them (ADR 41). Says
+    "List every card you name"; `ResolveCards` truncates at
+    `MaxResearchCards = 12` silently (`sources.go:194`). `MaxFindings = 6`
+    matches "two to six". **The only mode that supplies its own
+    `ScopeNotes`**, and its table reads correctly.
+  - **`theme-conversation` (14,521 ch, of which 9,367 is the reference-data
+    blob).** "One of three" fact kinds is now four: `KeepFact` has a
+    `cauldron:<id>` arm (`theme.go:512`) and the runtime hands that id out,
+    while the prompt describes only the fortune-teller's table. And "this
+    replaces the previous set rather than adding to it" is the behaviour the
+    code deliberately stopped — `Carry` unions (`theme.go:333`), and its own
+    comment says the re-state rule "is a rule enforced by nothing, and it
+    drifts". `max_uses: 1` matches "once"; the slot kinds match `SlotKinds`.
+  - **`theme-proposal` (13,680 ch, same blob).** Search budget: the prompt's
+    "at least once for each combination" × 2 fits `max_uses: 3`, but the
+    runner's own comment says the 226-second measurement was taken "with four
+    searches" — code comment and data disagree by one. Everything else holds:
+    three commanders per combination (`resolveCommanders`), the
+    `identity_exact` subset rule (`sameIdentity`), the whole-combination drop,
+    `price_max`, both tools granted.
+  - **`scan` (1,364 ch).** Prompt versus schema is clean — two strings, both
+    required. The drift is the scope paragraph, below, and a **code** comment
+    that was stale and is fixed on this branch.
+  - **`rationale-draft` (3,265 ch).** "The brief gives you the category
+    counts, the curve, the commander, and the rationales already written" —
+    it gives two of the four. `intakeDeckFacts` (`intake.go:442`) carries
+    name/slug/stage/status, commander, declared themes and at most six prior
+    rationales, and **its own comment says the counts and the curve are the
+    tools' job** (`get_deck`, `deck_stats`) — which are granted and unnamed in
+    the prompt. So the prompt promises facts it does not have and does not
+    mention the two doors that hold them.
+  - **`intake-filing` (2,015 ch).** The same stale sentence about the brief
+    ("the commander, the counts so far, and the other cards"), the same two
+    unnamed tools. The twelve-category enum matches the schema and the code
+    correctly leans on the enum rather than re-checking.
+  - **`deck-description` (2,306 ch).** "The counts and the curve are computed
+    and were given to you. Do not re-derive them" — they were not given; and
+    that sentence also carries "It comes from what is actually in the list",
+    which is the claim the whole description rests on. Also "Someone has just
+    imported a deck", now one of two callers (the deck page's description
+    editor runs the same mode on an existing deck).
+  - **The cross-cutting one, and the mechanism is documented in the code that
+    fails to use it.** `Mode.System` always appends a scope paragraph, and
+    `Mode.ScopeNotes` exists precisely so a mode with no card and no deck can
+    say what its own scope axis widens — its doc says the alternative is that
+    "the prompt tells it to stay on something that does not exist". **Exactly
+    one of the ten supplies a table.** So `scan` ends a two-string
+    transcription prompt with "stay on the card you were asked about, and on
+    anything the gate flagged about it. Do not range into the rest of the
+    deck" (there is no gate, no deck and no tool on that surface); both theme
+    modes end "you are not looking at a decklist and there isn't one" with
+    `adjacent`'s paragraph about cards that interact with each other; the
+    dossier gets `flagged`'s gate sentence; and the two intake modes get "Do
+    not range into the rest of the deck" against prompts whose rule is to use
+    the deck's other contents. Nine of ten modes carry a closing paragraph
+    about a thing that is not there.
+  - **Fixed this run: 3. `scan.go`'s own comment about the dial, which said
+    the opposite of the truth.** It claimed `/api/claude` does not ask
+    `ScanStanceFor` because "the dial's surface table names `theme` and
+    `research` and was never extended when ADR 34 landed, so `?surface=scan`
+    answers `off` ... recorded, not fixed". It *was* fixed: `dialSurfaces`
+    names `scan` and `intake`, and `surfaceStanceFor` dispatches here. The
+    corrected comment now points at
+    `TestEveryDecklessSurfaceResolvesToItsOwnDefault`, which already holds it
+    true — so no new test, and the comment names the thing that would fail.
+    Comment-only, in a package outside `engineSources`, so no cache key moves.
+- **Not touched, deliberately:** the five fingerprinted packages (no code need,
+  and prose there is priced in cache keys); `internal/door`'s gzip (Red's
+  #502 this wave); `web/` and `web_dist/` (QUEEN-2's); **every mode prompt**
+  — the drift above is real and all of it is text that reaches a model and
+  thence a newcomer, several items are a judgment call about which side is
+  stale (is the interview's cap six or is the prompt's "three to five"
+  right?), and one of the ten is hash-frozen, so it goes to the queue as one
+  branch rather than into a fix set beside two test files;
+  `testdata/prices.json` (a frozen golden, which is why the per-model cache
+  fraction is queued rather than landed).
+- **Queued for Aaron (2026-09-26): three, each with a daybreak line.** The deck
+  shelf's memo needs an owner that outlives a request; the per-model cache-read
+  fraction needs the frozen price corpus extended; the mode prompts' drift is
+  text a newcomer eventually reads and wants one branch and one eye. All three
+  below.
+
+- **Queued (new, 2026-09-26): nine of the ten mode prompts have drifted from
+  the code around them, and the drift is in what the model is told.** The full
+  reading is above; the shape of it is that a prompt goes stale when the code
+  moves, and three runs of "the prompts are byte-untouched" read the wrong
+  half. The list, roughly by what it costs: the three intake modes promise the
+  model facts their brief does not carry and do not name the two tools that
+  hold them; nine of ten modes end on a scope paragraph about a card, a deck or
+  a gate that is not there, through a `Mode.ScopeNotes` mechanism whose own doc
+  comment describes this exact failure; `theme-conversation` describes three
+  fact kinds where the code takes four and tells the model that a re-stated
+  slot set replaces rather than unions, which is backwards; `research` says
+  rationales are composed nowhere, which ADR 41 ended; two prompts call the
+  gate "deterministic Python"; the interview says three to five questions
+  against a cap of six; the dossier's search enumeration is missing `allies`;
+  the description says somebody has just imported a deck when the deck page is
+  now a second caller. · **Why it is not landed here:** every line of it is
+  text that reaches a model and thence a newcomer's screen (commandment 16's
+  spirit, and Nightbound's standing hold on prompt text), several are a
+  judgment call about which side is stale rather than a typo, and the dossier's
+  instructions are hash-frozen in `testdata/dossier.json` so one of the ten
+  moves a golden. **Recommendation:** "yes" — one branch, one PR, ordered as
+  above, the three intake brief sentences first because they are the ones
+  actively costing answer quality; give the nine modes their own `ScopeNotes`
+  rather than reworded instructions, since that is the field's purpose; and
+  take the interview's cap and the theme's union rule as questions for Aaron
+  rather than assuming the prompt is the stale side.
+
+- **Queued (new, 2026-09-26): the deck shelf parses the whole library on every
+  visit, and the only lever that pays on two cores needs an owner for a
+  cache.** Numbers above: ~42 ms and 27 MB per visit at 25×100, ~90% of it
+  inside goccy. The fix is not to parse a deck whose file has not changed —
+  the pool's own idiom, a memo keyed on the file's stamp (mtime in nanoseconds
+  plus size), with hit and miss counters like `etagCounts` and
+  `cache.Store.Counts` and rendered nowhere. What makes it a question rather
+  than a fix is **where it lives**: `listDecks` builds a fresh
+  `library.Resolver` and `FileSource` per request, so a memo on the
+  `FileSource` would be the ledger's own cautionary tale — correct, tested,
+  and never once consulted, because every request opens its own. The owner has
+  to be the long-lived `*API` (which already lazily holds `app.db` behind a
+  mutex, the precedent), handed down through `Resolver` into
+  `NewFileSource` — `library/source.go`, `library/library.go`, `api/app.go`
+  and every other `NewFileSource` call site, five to eight files. And the
+  invalidation is a correctness question on live user data: a deck edit
+  rewrites the file and moves both halves of the stamp, so the guarantee is
+  the pool's exactly, including the pool's own stated hazard (a file replaced
+  by a different one with an identical nanosecond mtime *and* identical size
+  would be served from memory). **Recommendation:** yes, as its own PR on a
+  morning the deploy can be watched, with the counters in from the start —
+  a cache added without them is the finding this facet writes down every run.
+- **Queued (new, 2026-09-26): `CacheReadFraction` is one constant for the whole
+  family and the family stopped agreeing.** `prices.go` says so in as many
+  words — *"it is the same ratio across the family, and a copy per model would
+  be that many chances to mistype a tenth"* — and Claude Fable 5.1 prices cache
+  reads at $0.25/MTok, 0.025× input. Nothing is mispriced today (that model is
+  not in `Table`; the instance runs Sonnet 5 on every row), so this is the
+  09-19 deferral with its trigger now named precisely rather than a live
+  error. **Why it is not landed:** the fraction belongs on `Priced` beside the
+  rate, and `testdata/prices.json` is a frozen golden that holds `Table`
+  field-for-field, including a top-level `cache_read_fraction`. Moving the
+  fraction onto the model means extending that corpus, which is not a thing a
+  polish run does on its own. **Recommendation:** land it the day a model with
+  a different read fraction is added to `Table` — one branch, corpus extended
+  deliberately, the arithmetic tested per model — and until then leave the
+  constant and correct the comment's "same ratio across the family" claim in
+  the same breath. A guard is possible in the meantime and is the cheaper half:
+  a test that every model in `Table` is on a recorded list of models whose
+  cache reads really are a tenth, so the next one added has to say.
 
 ### 2026-09-19 (cleanup)
 
