@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aasquier/sylvan-library/go/internal/analyze"
 	"github.com/aasquier/sylvan-library/go/internal/cards"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	"github.com/aasquier/sylvan-library/go/internal/deckedit"
@@ -431,6 +432,10 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 	var verdict *gate.Report
 	var nearby []suggestion
 	var over int
+	// The built deck's cards, kept past the lease so the answer's `land_count`
+	// can be the same number the deck page will show (`analyze.LandCountOf`
+	// needs the records to see a modal DFC filed under a spell).
+	var known map[string]*pool.CardRecord
 	err = a.usePool(r.Context(), func(c *pool.Conn) error {
 		wanted := deckimport.NamesIn(parsed, commander, companion)
 		found, err := c.GetCards(r.Context(), wanted)
@@ -468,7 +473,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		known, err := deckread.PoolFor(r.Context(), c, built.Deck)
+		known, err = deckread.PoolFor(r.Context(), c, built.Deck)
 		if err != nil {
 			return err
 		}
@@ -505,7 +510,7 @@ func (a *API) importDeck(w http.ResponseWriter, r *http.Request) {
 		"slug": slug, "owner": lib.MyOwner(), "name": d.Name,
 		"stage": d.Stage, "status": d.Status, "created": !dryRun,
 		"commander": orEmpty(d.Commander), "companion": companionOrNil(d.Companion),
-		"total_cards": d.TotalCards(), "land_count": d.LandCount(),
+		"total_cards": d.TotalCards(), "land_count": analyze.LandCountOf(d, known),
 		"swap_board": orEmpty(swaps), "needs_rationale": report.NeedsRationale(),
 		// How many reasons the paste carried in its own quoted column,
 		// beside how many are still owed. Two numbers rather than one
