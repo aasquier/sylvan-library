@@ -1026,7 +1026,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 {!allTurned && (
                   <>
                     <button onClick={turnAll}
-                            className="btn btn-primary btn-accent-1">
+                            className="btn btn-primary btn-accent-brass">
                       Turn them over
                     </button>
                     <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
@@ -1037,7 +1037,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 {lingering && (
                   <>
                     <button onClick={takeReading}
-                            className="btn btn-primary btn-accent-1">
+                            className="btn btn-primary btn-accent-brass">
                       Begin the reading
                     </button>
                     <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>

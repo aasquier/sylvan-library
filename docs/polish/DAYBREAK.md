@@ -55,6 +55,48 @@ Different reader → Tab onto a reader tile; `/` → From the shelves → Anothe
 until "In the Learn room →" shows, Tab to it. Ledger: Red, 2026-09-19 (the
 entry rides #481 itself).
 
+**Red: PR (the Queen's ball) is green and parked — every plate in the app now
+carries a light that walks its rim.** Aaron asked for "a gleaming edge that
+circles around the button, blood, fire, whatever is appropriate"; one block in
+`index.css` gives the whole `.btn` family a masked conic arc driven by a
+registered `@property`, with a material per voice, and the fortune-teller's
+primary finally leaves the chart blue for the table's brass. · *Cost of
+leaving it:* the controls stay the thing Aaron called basic, and the séance
+blue keeps outliving two PRs' worth of suggestions. · **Recommendation:** walk
+and merge. `mtglab-ui` on 8765 (no dev server needed — the bundle is in the
+diff): `/` — watch the green *Import a decklist* for one **7.5s** lap, hover
+it (the light brightens and the lap drops to **2.6s**), press it (it settles);
+Tab to it and the vine ring sits outside the gleam. Then `/new` → **Help me
+decide** → the fortune-teller → the table: *Turn them over* is brass now, not
+blue, and *Shuffle again* beside it lights only when you reach for it. Then
+any deck → the folded Wheel at the foot → unfold → **Spin the wheel** wears
+the ember, at **6s** a lap, the loudest in the app. Both themes. Ledger: Red,
+2026-09-26 (rainbow).
+
+**Red: `reducedmotion_test.go` cannot see an animation added to a `.btn`
+pseudo-element, and that gap is general.** Its rule is "covered when any class
+in the selector appears inside a reduced-motion block", and `.btn` appears in
+one that only kills *transitions* — so the gleam's orbit read as guarded with
+its guard deleted (proven: rule removed, bundle rebuilt, test green).
+`buttongleam_test.go` pins this one animation by name, which is a patch rather
+than a fix. · *Cost of leaving it:* the next animation on a widely-guarded
+class ships unarrested and the sweep says nothing. · **Recommendation:** a
+Colorless or Red slice teaches the sweep to require the guard to name a
+property the animating rule actually sets, or to record `.btn`-family
+pseudo-elements as their own cover. Ledger: Red, 2026-09-26 (rainbow).
+
+**Green: `.btn` is 36px tall and the house's own floor is 44px on a phone.**
+Measured at a 375px viewport on the library: `.btn-primary` renders 145×36
+(38 with its border), and `.btn-sm`/`.btn-xs` are smaller again; the gleam
+changed nothing about it either way. · *Cost of leaving it:* every primary
+action in the app is under the touch floor this skill and `categories.md` both
+name, on the hand most newcomers arrive with. · **Recommendation:** not a
+style pass — it is a padding change in one named place with a layout
+consequence on every toolbar, so it wants its own branch and its own walk.
+Raise `.btn`'s block padding to `0.6rem` behind a `@media (pointer: coarse)`
+so the desk keeps its density, and measure three toolbars before and after.
+Ledger: Red, 2026-09-26 (rainbow).
+
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and
