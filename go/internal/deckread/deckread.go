@@ -208,7 +208,7 @@ func Tiles(ctx context.Context, c *pool.Conn, decks []*deck.Deck, writable bool,
 			Pilot:           d.Pilot, Status: d.Status, Stage: d.Stage, NeedsRationale: len(d.Unjustified()),
 			Commander: append([]string{}, d.Commander...), Companion: d.Companion, Bracket: d.Bracket,
 			Archetype: d.Archetype(), Themes: append([]string{}, d.Themes...),
-			TotalCards: d.TotalCards(), LandCount: d.LandCount(), Strategy: d.Strategy,
+			TotalCards: d.TotalCards(), LandCount: analyze.LandCountOf(d, cards), Strategy: d.Strategy,
 			ColorIdentity: []string{}}
 		if c != nil {
 			rep := gate.Validate(d, cards, gate.DefaultSize)
@@ -580,7 +580,7 @@ func DeckPayload(ctx context.Context, c *pool.Conn, d *deck.Deck, writable bool,
 		{Key: "needs_rationale", Value: len(d.Unjustified())}, {Key: "commander", Value: d.Commander},
 		{Key: "companion", Value: d.Companion}, {Key: "bracket", Value: d.Bracket}, {Key: "archetype", Value: d.Archetype()},
 		{Key: "themes", Value: d.Themes}, {Key: "strategy", Value: d.Strategy}, {Key: "notes", Value: d.Notes},
-		{Key: "total_cards", Value: d.TotalCards()}, {Key: "land_count", Value: d.LandCount()},
+		{Key: "total_cards", Value: d.TotalCards()}, {Key: "land_count", Value: analyze.LandCountOf(d, cards)},
 		{Key: "color_identity", Value: identity}, {Key: "commander_card", Value: commanderCard},
 		{Key: "cards", Value: rows(d.Cards)}, {Key: "swap_board", Value: rows(d.SwapBoard)}, {Key: "graveyard", Value: rows(d.Graveyard)},
 		// After the three lists of cards, because a combo is a reading of them

@@ -69,8 +69,9 @@ func TestFromTextReadsTheRichFixtureAsRecorded(t *testing.T) {
 	if d.Cards[2].Name != "Æther Vial" || d.Cards[2].ManaCost == nil || *d.Cards[2].ManaCost != "{1}" || d.Cards[2].Art == "" { //nolint:misspell // the card is spelled Æther
 		t.Fatalf("aether %+v", d.Cards[2])
 	}
-	if d.TotalCards() != 8+12+13 || d.LandCount() != 25 || len(d.Unjustified()) != 0 {
-		t.Fatalf("counts %d %d", d.TotalCards(), d.LandCount())
+	counts, _ := d.CategoryCounts()
+	if d.TotalCards() != 8+12+13 || counts["land"] != 25 || len(d.Unjustified()) != 0 {
+		t.Fatalf("counts %d %d", d.TotalCards(), counts["land"])
 	}
 	names := d.CardNames(true)
 	if names[0] != "Syr Gwyn, Hero of Ashvale" || len(names) != 34 {

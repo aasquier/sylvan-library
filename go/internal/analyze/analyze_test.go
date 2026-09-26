@@ -173,3 +173,63 @@ func TestTheStatsCorpusSeparatesFsumFromARunningTotal(t *testing.T) {
 	}
 	t.Logf("%d of %d decks separate fsum from a running total", differs, checked)
 }
+
+// TestEveryRecordingPartitionsItsDeckIntoLandsAndSpells reads the invariant
+// off the frozen documents themselves, so it holds over every recording made
+// from here on and not merely over this package's unit fixtures.
+//
+// `land_count` and `curve.nonland_cards` come from two different expressions
+// and must add up to `total_cards`: every card is either a land drop or a card
+// with a mana value. They disagreed while `land_count` was a category tally and
+// the curve asked `pool.CardRecord.IsLand` — `messy`, whose Llanowar Reborn is
+// filed under `ramp`, recorded 96 + 9 against 106 and nothing said so. Its
+// `land_count` is 97 now and the sum closes.
+//
+// This is the guard against the whole class, not against the one card: any
+// future arithmetic that counts lands one way and spells another fails here on
+// the next recording, whatever the cause.
+func TestEveryRecordingPartitionsItsDeckIntoLandsAndSpells(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join("..", "gate", "testdata")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := 0
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".stats.json") {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			TotalCards int `json:"total_cards"`
+			LandCount  int `json:"land_count"`
+			Curve      struct {
+				NonlandCards int `json:"nonland_cards"`
+			} `json:"curve"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		// An all-zero document would satisfy the sum and prove nothing, so a
+		// deck with no cards in it is not one of the cases.
+		if doc.TotalCards == 0 {
+			continue
+		}
+		checked++
+		if doc.LandCount+doc.Curve.NonlandCards != doc.TotalCards {
+			t.Errorf("%s: %d lands + %d nonland cards = %d, but the deck holds "+
+				"%d -- a card counted by neither is a card the land odds and the "+
+				"curve disagree about", e.Name(), doc.LandCount,
+				doc.Curve.NonlandCards, doc.LandCount+doc.Curve.NonlandCards,
+				doc.TotalCards)
+		}
+	}
+	if checked < 5 {
+		t.Fatalf("only %d recordings carried a deck to check; the gate's "+
+			"testdata goldens have thinned", checked)
+	}
+}

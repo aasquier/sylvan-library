@@ -483,11 +483,16 @@ func (d *Deck) CategoryCounts() (map[string]int, []string) {
 	return counts, order
 }
 
-// LandCount is `Deck.land_count`.
-func (d *Deck) LandCount() int {
-	counts, _ := d.CategoryCounts()
-	return counts["land"]
-}
+// There is deliberately no `LandCount` here, and its absence is the guard.
+//
+// This package cannot see a card, only what the file says about one, so the
+// only land count it could offer is `CategoryCounts()["land"]` — and that
+// number is wrong for a modal DFC filed under a spell category, which is a
+// land drop the file's own category does not admit to.
+// [analyze.LandCountOf] is the one land count in the tree and argues the rule;
+// it needs the card records, which is exactly why it cannot live here. A
+// method on `Deck` would be the easy wrong answer for every future caller,
+// so there is not one.
 
 // Unjustified is the cards with no `why` yet -- the work a draft still owes.
 func (d *Deck) Unjustified() []CardEntry {
