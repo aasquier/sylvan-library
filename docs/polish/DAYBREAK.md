@@ -145,6 +145,34 @@ a merge queue changes the contributor workflow to save a monthly twenty
 minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
 list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
 
+**White (leg two): the ratchet trigger you named has arrived — does the floor
+click?** The grind took the tree 96.6 → **96.9**, and the day's first leg (PR
+#504) is another tenth, so merged `main` should print **97.0** on the arm64
+leg. 97.0 is the exact number leg one's own recommendation set as the
+condition: *hold 95.0 until the tree reaches 97.0, then click to 95.5 and keep
+the gap.* · *Cost of leaving it:* nothing this week; the gap grows to two full
+points, and at two points a diff can lose a whole point of honest coverage
+without a check going red — which is the one thing the floor exists to
+notice. · **Recommendation:** **"ratchet"** — 95.5, and only once a merged
+`main` actually prints 97.0 or better in the `Coverage floor` step (read it off
+the run, not off this file). The floor did not move on this branch on purpose:
+`ci.yml` records the gap as your own 2026-09-24 ruling, and a lane does not
+overwrite a ruling with its own arithmetic. Ledger: White, 2026-09-26
+(rainbow, leg two).
+
+**White (leg two): the next grind is a fixture, not a sweep.** What is left
+after this is `internal/pool` (58 statements), `internal/sim/tier3` (67) and
+`cmd/mtglab` (46), and the pool's share wants **a faulty DuckDB connector** —
+`authtest.OpenFaulty` is SQLite-only, and `rebuild.go`'s `startRebuild` and
+`finish` are the same "a statement failed in the middle of a long write" shape
+this leg closed everywhere else. · *Cost of leaving it:* the refresh's own
+failure arms stay undriven, and the refresh is the one job that can leave the
+card pool half-written on the deployed volume. · **Recommendation:** **"go"** —
+a `pooltest.OpenFaulty` built the same way (borrow the registered driver off a
+throwaway handle, wrap the three context forms, count statements) is a day's
+work and reusable, and it is the last named fixture gap in the tree. Ledger:
+White, 2026-09-26 (rainbow, leg two).
+
 ## Open — a dollar and an account
 
 **Red: nothing off-platform tells you the site is down, and a hung process

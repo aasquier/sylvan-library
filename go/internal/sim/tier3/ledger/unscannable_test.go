@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"database/sql"
 	"math/big"
 	"path/filepath"
 	"testing"
@@ -200,14 +199,14 @@ func TestAFeatRowThatWillNotScanFailsItsOwnBoardAndTheWholeBoardWithIt(t *testin
 
 // faulty is a recorder over a real migrated `app.db` reached through a handle
 // that will stop answering after a set number of statements.
-func faulty(t *testing.T) (*Recorder, *authtest.Fault, *sql.DB) {
+func faulty(t *testing.T) (*Recorder, *authtest.Fault) {
 	t.Helper()
 	db, fault, err := authtest.OpenFaulty(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return FromDB(db, quiet()), fault, db
+	return FromDB(db, quiet()), fault
 }
 
 // The commit is the statement whose failure decides whether a match was
@@ -221,7 +220,7 @@ func faulty(t *testing.T) (*Recorder, *authtest.Fault, *sql.DB) {
 // there is worse than no id: it is a receipt.
 func TestAMatchWhoseCommitFailsIsRecordedNowhereAndReturnsNoID(t *testing.T) {
 	t.Parallel()
-	rec, fault, _ := faulty(t)
+	rec, fault := faulty(t)
 	decks := []*deck.Deck{deckOf(t, catText), deckOf(t, dinoText)}
 	m := matchOf(big.NewInt(5), []tier3.GameResult{
 		game(1, 1000, intp(1), intp(8), false, false)}, decks)
@@ -256,7 +255,7 @@ func TestAMatchWhoseCommitFailsIsRecordedNowhereAndReturnsNoID(t *testing.T) {
 // because a short list reads as a complete one.
 func TestAHistoryCutShortMidIterationFailsRatherThanAnsweringPartOfIt(t *testing.T) {
 	t.Parallel()
-	rec, fault, _ := faulty(t)
+	rec, fault := faulty(t)
 	decks := []*deck.Deck{deckOf(t, catText), deckOf(t, dinoText)}
 	for i := 1; i <= 3; i++ {
 		if id := rec.Record(t.Context(), matchOf(big.NewInt(int64(i)),

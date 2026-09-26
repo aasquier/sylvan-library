@@ -246,7 +246,7 @@ func TestNoSQLReadHandsBackAShortListWhenTheIterationFails(t *testing.T) {
 	// rather than at its end.
 	for _, slug := range []string{"cats", "dinos", "stompy"} {
 		if err := src.Create(ctx, slug,
-			strings.Replace(sqlDeck, "gyome", slug, -1)); err != nil {
+			strings.ReplaceAll(sqlDeck, "gyome", slug)); err != nil {
 			t.Fatal(err)
 		}
 	}
