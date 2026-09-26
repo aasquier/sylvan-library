@@ -330,8 +330,8 @@ type RunOptions struct {
 	// read loop ends the way it does on the whole-subprocess timeout.
 	//
 	// **This exists because nobody could stop a match once it started**, and
-	// that is how a worker became a zombie on the deployed instance
-	// (2026-08-30). The app's side of a bout was cancelled mid-match; the shim
+	// that is how a worker became a zombie on the deployed instance.
+	// The app's side of a bout was cancelled mid-match; the shim
 	// went on playing for whoever was no longer listening, counted itself busy
 	// the whole time, and so its idle watchdog never stopped the machine —
 	// every bout after it queued behind a match with no audience. The only
@@ -375,7 +375,7 @@ const bootAllowance = 60 * time.Second
 // wait ends, the game plays on, and because the executor's thread is not a
 // daemon it also keeps the JVM alive after `main` has returned.
 //
-// That is the hole this closes, and it was live: on 2026-08-31 a game of a
+// That is the hole this closes, and it was live: a game of a
 // ten-game bout on the deployed arena ran fifteen minutes past a three-hundred
 // second clock. Nothing cut it. The app's silence budget was right not to — the
 // game narrated the whole way, and [StallBudget] bounds silence — and every
@@ -483,7 +483,7 @@ func (e *timedOut) Is(target error) bool { return target == ErrTimedOut }
 // playing what remains. The bout that comes back is whole: `Games` rows, one of
 // them a clock-out. Nine finished games are not thrown away to report the tenth
 // — which is what every ceiling in this package did before, and what a bout on
-// the deployed arena came within minutes of on 2026-08-31.
+// the deployed arena came within minutes of.
 func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 	if len(decks) < 2 {
 		return nil, errors.New("a game needs at least two decks")

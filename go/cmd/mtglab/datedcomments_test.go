@@ -68,27 +68,44 @@ var ceilings = map[string]int{
 }
 
 const (
-	// 114 → 115 on the branch that landed the pool rebuild. The one added
-	// comment dates the measurement that argues for the whole change ("On
-	// 2026-09-13 the served pool was 261,894,144 bytes"), and a reader who
-	// cannot see when that was measured cannot tell a live number from a
-	// rotted one -- which is the doc comment's own test for keeping a date.
-	// This is what raising the ceiling is supposed to look like: one line, in
-	// the diff, with the reason beside it.
-	// 114 → 117 over 2026-09-13/14, one at a time across three branches: the
-	// pool-bloat measurement, the two-days-seventeen-days-apart measurement,
-	// and the count of `transform` cards the analyzer was mis-reading. All
-	// three are counts taken against a pool that keeps growing, so a reader
-	// who cannot see when they were taken cannot tell a live number from a
-	// rotted one — which is this file's own test for keeping a date.
+	// 114 → 117 over 2026-09-13/14, one argued line at a time across three
+	// branches: the pool-bloat measurement, the two-days-seventeen-days-apart
+	// measurement, and the count of `transform` cards the analyzer was
+	// mis-reading. All three are counts taken against a pool that keeps
+	// growing, so a reader who cannot see when they were taken cannot tell a
+	// live number from a rotted one — which is this file's own test for
+	// keeping a date. That is what raising the ceiling is supposed to look
+	// like: one line, in the diff, with the reason beside it.
 	//
-	// **Worth saying plainly, though: that day added three and retired none.**
-	// The ratchet is doing its job — every one of those was a visible, argued
-	// line rather than drift — but a ceiling that only ever rises is the
-	// sweep's arithmetic problem in a new costume. The next Colorless run
-	// should spend its slice retiring dated comments rather than counting
-	// them, and lower this by more than it raises.
-	goDatedCommentCeiling = 117
+	// **117 → 93: the first fall on this side, and the rule it establishes.**
+	// Four rises with no fall is the sweep's arithmetic problem in a new
+	// costume, and this const block asked the next Colorless run to retire
+	// rather than count. It did: `internal/sim/tier3` -- the Coliseum's
+	// reader, deliberately *not* one of the five fingerprinted packages, so no
+	// cache key moves -- carried 29 dated lines and 24 of them were a date on
+	// one of Aaron's rulings. The sweep's whole rule, now that it has run
+	// twice on each side, is one question and three answers:
+	//
+	//   *Would a fresh session act differently for knowing the day?*
+	//
+	//   - A **ruling** keeps its argument and loses its date: "(Aaron,
+	//     2026-08-26: …)" → "(Aaron: …)". The sentence is the ruling; the day
+	//     he said it changes nothing anyone does, and `git blame` has it.
+	//   - A **when-it-happened** clause keeps the fact that it happened and
+	//     loses the day: "it was live: on 2026-08-31 a game ran fifteen
+	//     minutes past its clock" → "it was live: a game ran …". That it was
+	//     observed rather than reasoned about is the whole point; the date is
+	//     the diary.
+	//   - A **validation measurement** keeps the date, because the date is
+	//     how a reader chooses between trusting the number and re-measuring
+	//     it: five survived here, each a count taken against Forge or the
+	//     card pool, both of which move. Strip those dates and the sentences
+	//     quietly claim to be current forever.
+	//
+	// A family re-accumulates: tier3 was swept once on 2026-08-24 and the
+	// Coliseum's own fortnight refilled it, which is why the sweep is a
+	// standing job rather than a finished one.
+	goDatedCommentCeiling = 93
 	// 292 → 259 on the branch that swept the Coliseum board family
 	// (`web/src/components/board.tsx`): every date there sat on one of
 	// Aaron's rulings, whose argument is the sentence and not the day, so all

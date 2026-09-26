@@ -60,6 +60,20 @@ Cleanup acts on the queue. Colorless audits it and leaves it.
   which is the guard's direction, and so missed all seven. Re-file the live
   ones under one heading that says why they are arriving now; close the
   answered ones beside their originals.
+- **The fourth hiding place is "it rides the report", and this run invented
+  it.** Measured 2026-09-26: the two questions the 09-19 Colorless run raised
+  about how the pass writes were recorded in the ledger with the words *"Both
+  ride the report"*, the Cleanup run behind it wrote the same choice under its
+  own heading, and `git log -S` on either question's own words against
+  `DAYBREAK.md` returns **nothing, ever**. So the run that discovered the
+  ledger-only breach created two more of exactly that class the same afternoon,
+  and they sat for a week — which is the strongest available evidence that the
+  failure is structural rather than careless. A report is read once and then it
+  is gone; a question in one has no second copy and no address. **When this run
+  finds a question it wants Aaron to answer, the line goes in `DAYBREAK.md`
+  before the report is written, not after** — and when sweeping part one, grep
+  the ledger for `ride the report` and its cousins alongside the
+  `Queued for Aaron` blocks.
 - **Corrections outrank overwrites.** When a later run finds an earlier entry
   wrong, the ledger records the correction beside the original rather than
   editing it away. A run that silently rewrote history is a finding.
@@ -81,6 +95,18 @@ run reports green, and the bugs are somewhere the file never looks.
   this skill were written, and every one of them started as "the checklist
   said record the number, and the number was recorded, and the bug was inside
   it".
+- **The skill's own citations are held now, and that is the third leg of
+  `skillrecord_test.go`.** It held every *path* and every `mtglab` and
+  `animist` *verb* a skill names; what it did not hold — while its own doc
+  comment named that rot as one of the three it was built for — was a **test
+  cited by name**, which is the strongest claim the pass makes ("this rule is
+  enforced, and here is the thing that enforces it"). A renamed or deleted test
+  left the skill promising enforcement that was gone, silently, which is this
+  section's own "silent permission" failure one level up.
+  `TestTheSkillsNameOnlyTestsThatExist` closes it. So when you make a claim in
+  a reference file machine-checked, **point at the guard by test name** — the
+  citation is now itself checked, which makes naming the test strictly better
+  than describing it.
 - **A rule enforced by nothing drifts** — the pass's own lasting lesson, and
   since 2026-08-19 it is a standing question in `SKILL.md` step 2, because
   three colors found it independently in one rainbow while the lesson sat in
@@ -94,14 +120,25 @@ run reports green, and the bugs are somewhere the file never looks.
 
 ## Part three — the tooling
 
-The developer shelf is artifacts in the plainest sense — and much of it is
-currently an absence: there is no bench suite, and the cache register is
-half-built (`mtglab sim cache` lists the Tier 1 cache's contents and can
-clear them; both caches in the tree count their own use in-process — the
-door's ETag memo through `etagCounts` in `go/internal/door/static.go`, the
-Tier 1 store through `cache.Store.Counts` in `go/internal/sim/cache/store.go`
-— and nothing yet reads either count out of a running instance), and
-**building the bench suite is this part's standing item** until it lands.
+The developer shelf is artifacts in the plainest sense — and part of it is
+still an absence. The cache register is half-built (`mtglab sim cache` lists
+the Tier 1 cache's contents and can clear them; both caches in the tree count
+their own use in-process — the door's ETag memo through `etagCounts` in
+`go/internal/door/static.go`, the Tier 1 store through `cache.Store.Counts` in
+`go/internal/sim/cache/store.go` — and nothing yet reads either count out of a
+running instance).
+
+**"There is no bench suite" stopped being true on 2026-09-26 and the standing
+item is narrower now.** Benchmarks live beside the code as `*_bench_test.go`;
+for a month that meant only the four determinism kernels, and that day two
+landed outside them — the deck shelf's read-and-parse and the door's compressor
+— each written by the colour that needed the number, and one of them produced
+the run's biggest measured win. So a `Benchmark…` outside the kernels is now
+ordinary rather than a finding. What is **still** missing is the two things a
+*suite* is: **one command that runs them all**, and **a recorded ledger of
+results**, which is the difference between a benchmark delta and a benchmark
+trend. Re-scope this item to the runner and the ledger; do not carry it as
+"write the first benchmark", which is answered.
 Mutation sampling has left that list — `gremlins` is the tool now, and
 White's testing facet owns it. What else survives is `animist verify` in
 `tools/`, plus the stock Go toolchain the other colors measure with (the
@@ -142,15 +179,18 @@ plan for a tool the toolchain made redundant.
   seed and the rate. A rate that moved needs its cause named: new tests, new
   code, or a different draw. Survivors carried forward unread across two runs
   are a finding about the pass, not about the suite.
-- Ask what the shelf is still missing. Two standing items, each a dependency
-  or a decision: `benchstat`, which is the difference between a benchmark
+- Ask what the shelf is still missing, and notice how the list keeps
+  shortening: `gremlins` answered the exhaustive-mutator item, every cache in
+  the tree counts its hits, and benchmarks now exist outside the kernels. So
+  three standing items remain and each is a *runner* or a *record* rather than
+  a first instance: `benchstat`, which is the difference between a benchmark
   delta and a benchmark *finding* (installed on demand, never in the
-  toolchain), and the bench suite itself. The two that used to sit beside
-  them are answered — `gremlins` is the exhaustive mutator, and every cache in
-  the tree counts its hits — so the register's remaining half is *reading*
-  those counts out of a running instance, not producing them. Anything else
-  proposed here is a new dependency too — queued with the arithmetic, never
-  adopted mid-run.
+  toolchain); the bench suite's one command and its results ledger; and reading
+  a cache's counts out of a running instance. **Every one of the three is
+  plumbing over an instrument that already exists**, which is a real fact about
+  the shape of the rebuild and worth saying out loud each run rather than
+  re-deriving. Anything else proposed here is a new dependency — queued with
+  the arithmetic, never adopted mid-run.
 
 ## Part four — the leftovers
 
@@ -301,7 +341,23 @@ a sweep that quotes its own grep is back to the unreproducible baseline this
 section opened with. And a slice that retires more than the slack **must
 lower the ceiling in the same diff**, which is the test failing on the fall
 side and is the sweep's own mutation check: a slice that did not trip it did
-not bank anything. The sweep keeps its judgment-only shape — it is how the
+not bank anything.
+
+**The keep/cut rule itself now lives in `datedcomments_test.go`'s const block
+rather than here**, written there on 2026-09-26 after the ratchet had moved
+twice on each side: one question (*would a fresh session act differently for
+knowing the day?*) and three answers (a ruling loses its date, a
+when-it-happened clause loses its date, a validation measurement keeps it).
+Read it there, because that is where a session raising or lowering a ceiling is
+already looking. Two facts about choosing a family that belong here instead:
+**a swept family re-accumulates** — `internal/sim/tier3` was swept on
+2026-08-24 and the Coliseum's next fortnight refilled it to 29, which is why
+this is a standing job rather than a finishable one — and **the fingerprint is
+the only hard exclusion**, so a package that merely *sounds* like the engine
+(`sim/tier3`, `textutil`) is fair game; check the list in
+`internal/sim/cache`'s `engineSources` rather than guessing from the name.
+
+The sweep keeps its judgment-only shape — it is how the
 keep/cut line gets applied — so choose the densest untouched family, read
 every line, and let the ceiling say whether the totals shrank.
 

@@ -148,7 +148,7 @@ type DeckRecord struct {
 	Matches   int      `json:"matches"`
 	Record    Record   `json:"record"`
 	// Duel and Pod are the same games split by the size of the table they
-	// were played at (Aaron, 2026-09-06), and the split is not cosmetic: a
+	// were played at (Aaron), and the split is not cosmetic: a
 	// deck's win rate heads-up and its win rate in a four-player pod are
 	// answers to different questions, and pooling them hides both.
 	//

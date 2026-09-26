@@ -143,14 +143,31 @@ Work the list:
     | cut -d: -f1 | sort | uniq -c | sort -rn
   ```
 
-  Measured 2026-08-23: **33 reads outside tests in 8 files — 9 of them inside
-  `internal/config` and 24 outside it**, with `internal/sim/tier3/worker.go`
-  holding ten on its own, plus a **second local reader**, `envOr`, in
-  `cmd/mtglab/ui.go`. Not every outside read is a bug (a worker process that
-  is configured entirely by its environment is a reasonable shape), but every
-  one is a question: **does this switch have exactly one place that decides
-  its default?** Two readers mean two defaults, and the second one is
-  discovered in production.
+  **That grep is one command answering three questions, and the trend line it
+  fed was therefore not measuring one thing.** Every entry in this section from
+  2026-08-23 onward quoted its single number, and the 09-24 parallel work made
+  the number *rise* while the doctrine got strictly better — because it turned
+  reads into hand-ins. So report **two numbers, always, and say which is
+  which**:
+
+  1. **Process reads** — `os.Getenv(...)` actually called to decide something.
+     This is the number that matters and the one that should trend to zero
+     outside `internal/config`.
+  2. **Composition-root hand-ins** — `os.Getenv` passed as a *value* into a
+     `func(string) string` parameter (`config.LoadFrom`, `claude.SettingsFrom…`,
+     `tier3.LoadSettings…`, `cmd/mtglab`'s `envOr`). Each of these is the
+     doctrine *working*: the reader is a lookup the caller owns, so a test
+     describes a deployment as a map. More of these is better, not worse.
+
+  Doc-comment mentions (`[os.Getenv]` in a package comment) are the third thing
+  the grep counts and are neither; filter them out by eye. Measured
+  2026-09-26: **2 real process reads outside tests**, both argued fallbacks in
+  `internal/flymetrics`, and **6 composition-root hand-ins** — against a naive
+  grep of 15 in 7 files. Not every outside read is a bug (a worker process
+  configured entirely by its environment is a reasonable shape), but every one
+  is a question: **does this switch have exactly one place that decides its
+  default?** Two readers mean two defaults, and the second one is discovered in
+  production.
 - **Documented, or it does not exist.** CLAUDE.md says `.env.example`
   documents the names. That is an absolute claim; check it rather than
   inheriting it:
