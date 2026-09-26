@@ -1838,9 +1838,11 @@ kill rate is bad enough to want every mutant rather than a sample.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
-  2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
-  2026-08-18.
+- **Last run:** 2026-09-26 (rainbow) — **its entry is at the END of this
+  section, not the top**: four lanes ran in parallel that day and each
+  appended at its own section's foot so the colours could not conflict.
+  Previous: 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
+  night), 2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -3414,6 +3416,247 @@ applies to each. Ordered by cost:
    remaining generic ones are the simulator's "Wasted"/"No land" table columns,
    which are Magic concepts (mana burn's descendant, the missed land drop)
    wearing spreadsheet labels.
+
+### 2026-09-26 (rainbow)
+
+**This entry is out of chronological place on purpose.** Four lanes ran in
+parallel today rather than serially, so every leg appended at the *end* of its
+own colour section: the top of a section abuts the previous colour's and
+conflicts with whichever lane owns it. The 2026-09-19 block above is the run
+before this one.
+
+The whole of this leg's build went to the standing question, and the honest
+answer was that **three of Blue's own absolutes were enforced by nothing** —
+two of them documented as such, in writing, by the tree itself.
+
+- **Fixed: the layering claims are a test now, not a habit.**
+  `go/cmd/mtglab/layering_test.go` holds the three claims blue.md states and
+  then tells the reader to "grep, don't trust": DuckDB stays behind
+  `internal/pool`; `internal/door` sits above `internal/api` and nothing below
+  mounts a door; the determinism kernels import nothing above them. The tell
+  that this was owed is in this section's own history — 09-12, 09-19 and today
+  each re-ran the same greps by hand and wrote the answers here, which is a
+  claim with a date on it rather than a claim that is held.
+  - **It parses rather than asking the toolchain, and that is worth more than
+    convenience.** `go list` and `packages.Load` answer for the platform they
+    run on, so a `_linux.go` file's imports are invisible to every build and
+    every grep on this darwin laptop. Proven rather than asserted: with a
+    throwaway package whose only import sat in `mutant_linux.go`,
+    `go list -f '{{join .Imports " "}}'` printed **`IMPORTS:` and nothing
+    else**, while the `parser.ImportsOnly` walk failed the guard by name. That
+    is blue.md's platform-tag warning turned into coverage instead of a
+    caveat, and it costs no subprocess, no module cache and no network.
+  - **One claim was found to be already enforced — by the compiler — and the
+    test says so instead of taking credit.** While `internal/door` imports
+    `internal/api`, *any* path back from api to door closes an import cycle
+    and the build stops; nothing a test adds improves on that. So the pair of
+    assertions is aimed at the failure Go is happy with — an **inversion**,
+    the route table moved above the middleware — and the live edge is the
+    third assertion: nothing but the composition root imports the door, which
+    no cycle prevents.
+  - **Mutation-verified three ways, all in the real tree, all restored:** a
+    throwaway package importing the DuckDB driver (claim 1 fails, naming it);
+    the same package importing `internal/door` (claim 2's third assertion
+    fails); `internal/textutil` given a blank import of `internal/config`
+    (claim 3 fails, naming the kernel and the dependency). `git status` clean
+    afterwards.
+  - Measured facts the test rests on, all raw: the DuckDB driver has exactly
+    one direct importer (`internal/pool`) and 18 transitive ones;
+    `internal/api`'s in-module closure contains no `internal/door`;
+    `internal/door` has exactly one non-test importer (`cmd/mtglab/ui.go`);
+    `mt19937`, `floats` and `textutil` have **zero** in-module dependencies,
+    and `yamlemit`'s only one is `internal/deckyaml` — which the guard holds
+    to zero of its own, so the kernels' floor is genuinely a floor.
+- **Fixed: the glossary keys are pinned to the served table — the queued item
+  `web/README.md` had been carrying in prose.** That file said it outright:
+  *"a typo'd key fails silently… The check that failed when a simulator
+  control had no entry is gone; rebuilding it over the Go table is a queued
+  item."* `go/cmd/mtglab/glossarykeys_test.go` is the rebuild, and the reason
+  it is a Go test about TypeScript is that the authority is the **served**
+  table: it reads `reference.Words()` rather than re-parsing
+  `glossary.json`, so it asserts against the answer and not a copy of it
+  (`datedcomments_test.go` already sweeps `web/src` from that package).
+  - The silence is the whole fault. A missing key renders as plain text with
+    no affordance — deliberately, so a word can be marked up before its entry
+    is written (`components/term.tsx` argues it) — which makes a typo
+    indistinguishable from a choice. Commandment 2 is why it matters: the
+    glossary is how this site gets to use Magic's own word instead of a
+    flatter one without shutting a newcomer out (blue.md's own squaring of
+    commandments 2 and 3).
+  - **Both shapes a key is written in are read, and the sweep's completeness
+    is itself asserted.** `name="…"` on the element, and the one-line
+    `help('…')` helper `routes/Simulator.tsx` and `routes/Coliseum.tsx` each
+    define. The only two sites that pass a key the extractor cannot follow are
+    those two helpers, listed by file with the exact line that earns the
+    exemption; a third `name={…}` anywhere fails rather than quietly shrinking
+    the guard's reach, and a stale exemption fails too.
+  - **Mutation-verified three ways, restored:** `help('sim.seed')` →
+    `help('sim.seeds')` in `Simulator.tsx` (failed at `Simulator.tsx:454`);
+    `<HelpTip name="stat.card_lag" />` → `stat.card_lagg` in
+    `components/closedform.tsx` (failed twice, at `:104` and `:242`);
+    `<Term name="combo">` → `<Term name={"combo"} />` in
+    `components/combos.tsx` (the completeness assertion failed naming the
+    file). The guard logs what it walked rather than leaving it to prose, the
+    way the parallel register does: **48 marks naming 37 distinct terms over a
+    served table of 55**, every one resolving.
+- **Fixed: CLAUDE.md's test count had rotted, and it is de-numbered rather
+  than corrected.** The Testing section said "every one of the 2,488
+  top-level tests"; `origin/main` held **2,491** (2,483 distinct names — eight
+  repeat across packages), and this branch's six new guards take the register's
+  own log line to **2,497**. Two days between the number being written and
+  being wrong, which is the shortest rot this ledger has recorded — and the
+  reason the replacement carries no figure at all. The sentence now points at the
+  register's own log line (`go test -v -run
+  TestEveryTestRunsBesideItsNeighbours ./cmd/mtglab/`), the same move ROADMAP's
+  "seven modes" got on 09-12: drop the figure, name the thing that counts.
+- **Docs updated on this branch, no doc-only PR:** `web/README.md`'s glossary
+  bullet names the new guard instead of promising one; blue.md's layering
+  bullet says the greps are a test and tells the next run to re-grep only to
+  *extend* the claims.
+- **Four other absolutes checked and found held, so a later run need not
+  re-derive them:** CLAUDE.md's coverage floor (`ci.yml` gates **95.0**, read
+  back from the workflow); "the repo's only other `.py`" (`find` returns
+  exactly `.claude/hooks/guard-git.py`) and "`scribe/` is the one piece of
+  Java" (zero `.java` outside it); `.env.example` held equal to the code both
+  ways by `configrecord_test.go`; and `web/README.md`'s "**Routes are lazy**
+  … three are deliberately eager — `Library`, `Login`, `Claim`" — exactly
+  thirteen `lazy(() => import(…))` lines and exactly those three eager
+  imports in `App.tsx`. That last one looked like a fifth unenforced claim
+  and is not: a route that stops being lazy lands in the entry chunk, which
+  `bundlebudget_test.go` already gates. Recorded so it is not built twice.
+- **The register itself re-read, not inherited.** `serialregister_test.go`
+  still fails by name on any test whose own body omits `t.Parallel()`, still
+  refuses a zero total, and still logs what it walked. The claim in CLAUDE.md
+  is held; only its number was not.
+- **Boot and config, re-measured — and the ledger's own metric was wrong all
+  along.** Every previous entry counted `grep -c 'os.Getenv\|os.LookupEnv'`
+  and reported "12 reads in 7 files". That grep counts three different things:
+  actual calls, `os.Getenv` **handed in as a value** at a composition root,
+  and doc-comment mentions like `[os.Getenv]`. Counted apart, today:
+  - **2 real process reads outside tests, both in `internal/flymetrics`** —
+    `token()`'s fallback when `Panel.Token` is nil, and `valueOr`'s middle
+    tier. Both are argued fallbacks behind a field or an argument, which is
+    the doctrine holding, not drifting.
+  - **6 composition-root hand-ins** (`config.Load`, `claude.EndpointFromEnv`,
+    `claude.SettingsFromEnv`, `tier3.LoadSettings`, and `ui.go`'s two
+    `envOr(os.Getenv, …)` flag defaults) — which is the 09-24 parallel work's
+    shape, and the reason the old number stopped meaning anything.
+  - The naive grep now reads 15 in 7 files. **It is not a regression and a
+    future run should not read it as one**; use the two counts above.
+  - Local env readers still three: `ui.go`'s `envOr`, `tier3`'s `envInt`, and
+    `flymetrics`' — renamed `valueOr` since 09-19. Deferred trigger (a
+    fourth, or a whitespace bug) has not arrived.
+  - `.env.example` vs code: **both `comm` directions empty** for shipping
+    names (35 documented, 42 in code). The seven outside the file —
+    `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`, `MTGLAB_OLD_SHIM_URL`,
+    `MTGLAB_TEST_HOLD_POOL`, `MTGLAB_TEST_POOL`, `MTGLAB_TEST_SERVE_CHILD`,
+    `MTGLAB_X` — each have **0 non-test readers**, verified one at a time.
+    `MTGLAB_TEST_SERVE_CHILD` is new (#496's child-process SIGTERM proof) and
+    `configrecord_test.go` already holds it on the right side of the boundary;
+    the two `MTGLAB_TEST_ENVOR*` names from 09-19 are gone with `envOr`'s
+    lookup parameter.
+- **Blue's daybreak line re-verified and left standing.** `fly` answered on a
+  plain call and `fly secrets list` shows seven secrets, **none of them
+  `MTGLAB_NIGHT_*`** — so "the torches are not lit yet" is still a fact and
+  `routes/Settings.tsx` is still telling the truth. Premise unmoved; the line
+  stays as the reminder it was written to be.
+- **Green's Goreclaw line: premise confirmed, and it needs one word from
+  Aaron, not a session's guess.** `fly ssh console -C "mtglab decks list"`
+  answered **25 decks**, every one 99 cards, and no mono-green Goreclaw among
+  them — so the `mtg-lab` skill's trigger list does name a deck the library
+  does not have. Not touched, because the daybreak recommendation forks on
+  Aaron's answer: re-import and the trigger becomes right again; "obituary"
+  and it comes out. Deleting it on the wrong branch of that fork is a trigger
+  that has to be put back.
+- **The spirit of Magic — shelf fact-check, four claims, all held, zero wrong
+  facts.** Lighter than 09-19's nine on purpose; the budget went to the two
+  guards. Sample seeded over `lore.json`/`colors.json`, every card through
+  `cards show` against the borrowed pool (rule 1, nothing recalled):
+  Shahrazad "makes both players set their decks aside and play a whole
+  separate sub-game" ✓ (*"Players play a Magic subgame, using their libraries
+  as their decks"*); "'Ramp' … is named after one specific two-mana sorcery:
+  Rampant Growth" ✓ (`{1}{G}`, Sorcery, and it does search a basic land);
+  Black Lotus in the Alpha-price entry ✓ (`{0}`, three mana of one colour);
+  and the combat-damage-on-the-stack entry, a rules-history claim the pool
+  cannot answer and which is correct as written. **The sweep half found
+  nothing new to flavour**: the only rendered string `web/src` gained since
+  09-19 is board.tsx's `Fallen`, which is the game's own word.
+- **Memory audit: whole and quiet.** 183 files (177 on 09-19); every file the
+  index names exists and every file on disk is indexed — both directions
+  scripted, both empty. One relative-date hit (`many-lanes-saturate-this-mac`'s
+  "a timeout that was fine this morning") is a rule's phrasing, not a dated
+  claim. Nothing changed.
+- **Toolchain audit: go.dev read today — still go1.27.1 / go1.26.8, nothing
+  shipped since 2026-09-01.** Local sdk stays go1.26.7; `go.mod` stays
+  `go 1.26.0` behind the macOS 12 ceiling. Reopening trigger unchanged:
+  Go 1.28, ~Feb 2027.
+- **Modern-Go inventory (non-test), and the sweep's honest answer is "nothing
+  new":** `interface{}` 0 · `ioutil` 0 · `rand.Seed` 0 · `strings.Title` 0 ·
+  `sort.Slice` 2 (both `internal/jobs`, ruled 2026-08-24, ruling carried) ·
+  `sort.SliceStable` 20 · `sort.Strings` 63 · `sort.Ints` 4 · `sync.RWMutex`
+  0 · `sync.Mutex` 22 · `errgroup` 0 · `wg.Add(` **0 non-test** (6 in
+  `internal/jobs/fuzz_test.go` and `shimdoor_test.go`) · `sync.Once` 2
+  (`shim.go`'s watchdog, `sim/cache`'s fingerprint — the latter inside a
+  fingerprinted package, so `OnceValue` there costs every stored Tier 1
+  result and is not worth a spelling). Non-test goroutine sites: 3
+  (`ui.go`'s listener, `shim.go`'s watchdog, `tier3/run.go`), none added
+  since 09-19. C-style counting loops convertible to range-over-int: **20**,
+  a new row — and ruled the same way `sort.Strings` was: eight are inside the
+  five fingerprinted packages where a prose-or-spelling edit discards the
+  cache (ADR 18, Aaron's 2026-09-05 ruling), several are byte scans over a
+  string where the index is load-bearing, and the rest are a spelling change
+  in files nobody is touching. **Convert as the file is touched for a real
+  reason; do not open a sweep.**
+- **TS craft (audit only this leg, by lane assignment):** zero regex
+  lookbehind, zero `forwardRef`/`React.memo`/`defaultProps` across 116
+  non-test `.ts`/`.tsx` files; `web/src` moved only in `board.tsx`,
+  `board.test.tsx`, `index.css` and one asset since 09-19, so no bundle
+  rebuild is owed by this branch and `web_dist/` is untouched.
+- **Queued for Aaron: nothing new.** No design decision, no spend, no
+  dependency, no security question; `DAYBREAK.md` is untouched by this leg and
+  the two lines it already carries for Blue's and Green's premises were
+  re-verified above rather than re-asked.
+- **Deferred (re-checked, triggers unchanged):** the "Shuffling up…" flavour
+  pair on `App.tsx`'s two spinner labels — still waiting on a bundle-carrying
+  PR outside a rainbow, and today's four-lane shape makes that sharper, not
+  softer, since the Queen's leg owns `web_dist/`; the three local env readers;
+  the dropped-name counter; pprof's live half (b); `claude plugin eval` /
+  `/skill-doctor` (Colorless's question). **Left standing by ruling:**
+  `internal/jobs`' two `sort.Slice`, the 63 `sort.Strings`, and now the 20
+  counting loops.
+- **Measured (2026-09-26, this Mac, 13:46–13:55, four lanes at once — read
+  every wall-clock number here as a fact about a saturated machine and compare
+  none of it to a quiet night):** load **2.3/7.9/15.8** at the gauntlet's
+  start, **112** when the suite finished, **517/262/143** by the time the
+  linter did.
+  - Go gauntlet: `gofmt -l .` prints nothing; `go vet ./...` clean;
+    `go test -race ./...` **50 ok, 2 load failures in `cmd/mtglab`**
+    (diagnosed below, both green alone), **346.3s wall / 1005.2s user**;
+    `golangci-lint run ./...` **0 issues**.
+  - `go test -race -count=1 ./cmd/mtglab/` after the warm-up: **ok, 55.7s**,
+    both new guards included.
+  - The three layering guards cost **0.09–0.10s each**; the three glossary
+    guards **0.08–0.14s**. Six new top-level tests, all parallel.
+  - `web/src` untouched by this branch, so **no bundle rebuild owed** and
+    `web_dist/` is not in the diff. No `data/` exists in this worktree, so
+    there is no `app.db` for a running app to have dirtied.
+- **One trap met, worth the next lane's minute.** The first `go test -race
+  ./...` in this worktree failed twice in `cmd/mtglab` —
+  `TestAMatchIsReportedEvenWhenItCannotBeRecorded` and
+  `TestTheLedgerKeepsTheLabelsTheDecksWore`, both at a flat **~30.0s**, both
+  reporting `Java None` against the committed `testdata/fakejava`. Both passed
+  alone immediately after. It is the 09-24 minted-executable trap in a new
+  guise: **Gatekeeper's scan is per file, and a fresh worktree checkout is a
+  fresh file**, so "the fake JVM is committed once" buys nothing until
+  something has exec'd *this* copy. Load was 112 at the time and 517 by the
+  end of the gauntlet. One line before the first gauntlet in a new worktree
+  pays it outside any probe's clock: `go/cmd/mtglab/testdata/fakejava
+  -version`. Nothing was loosened and no timeout was touched; the memory file
+  now carries the worktree half.
+- **Handed forward:** to **Colorless**, the ledger-metric correction above —
+  every Blue entry from 08-23 onward quotes an `os.Getenv` count that conflates
+  calls with hand-ins, so the *trend line* in this section is not measuring one
+  thing; the two-number form is the replacement.
 
 ## Black — Ruthless Efficiency
 
