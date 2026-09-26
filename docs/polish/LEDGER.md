@@ -6373,6 +6373,71 @@ structural; the Coliseum lore carousel still not stopping under reduced motion
 where every other material in this file is a named token.
 
 
+### 2026-09-26 (rainbow) — the second ball: the brass gets its name, and a room gets a painting
+
+*The Queen's second ball of the day, stacked on `the-gleaming-edge`. One PR:
+the branch `the-second-ball`, opened against that one. Walked on the committed
+bundle at 8765 in both themes, at 1280 and at 375x812 with a coarse pointer.*
+
+**`--lantern-brass`, and the sweep that follows it.** `#c9a227` was written out
+by hand in **fourteen** places in `index.css`, with another **eight** spellings
+of the same colour as `rgba(201, 162, 39, a)` — while the felt beside them said
+`var(--felt-base)` and the anvil said `var(--anvil-brass)`. It had even grown
+*two* local aliases independently (`--recall-rule` on the Recall panel,
+`--field-brass` on the board), which is a material telling you twice that it
+wants a name. It has one now, on `:root`, with its argument beside it, and
+twenty-one sites point at it. Zero pixel change, proven at the pixel: the
+fortune-teller's *Turn them over* still computes `rgb(201, 162, 39)`.
+
+- **Three sites keep the literal and that is the interesting part.** An alpha
+  of a token is `color-mix(in srgb, var(--lantern-brass) 28%, transparent)`,
+  which is *exactly* `rgba(201, 162, 39, 0.28)`. At **zero** it stops being
+  exact — `color-mix(… 0%, transparent)` is `transparent`, which is transparent
+  **black** — so the three zero-alpha far stops in the board's plate rules
+  would have faded brass through grey. Not sites the sweep missed; sites where
+  the conversion is wrong, and the token's comment says so.
+- The `.card-flip` comment that argued *for* the literal — "`--field-brass` is
+  scoped to the board, and an undefined custom property inherits rather than
+  falls back" — was **answered rather than overruled**: a `:root` token is
+  defined everywhere, and `--field-brass` now points at it.
+- Classified `wash` in `palettecontrast_test.go`, which refused the token until
+  it carried a decision in writing. 3.66:1 on paper; never a sentence's ink.
+
+**The 404 stopped being a stub.** It was one grey sentence in a box, and it is
+the surface a beginner is most likely to meet by accident. It is a room now:
+*Misleading Signpost*, Wilds of Eldraine Commander **#47** — the extended-art
+printing, whose crop is 745x460 against the ordinary frame's 626x457, so the
+mist survives on both sides of the post — hotlinked, painter and printing
+credited in words in the same room, in `FirstRun`'s credit grammar exactly.
+Object-position measured rather than guessed: 22% at 1230x368, because 34% took
+the post's finial off the top and 12% cost three boards at the bottom. The way
+out is still one `<Link>` and still underlined, because it really does go
+somewhere — it has stopped being drawn in `--series-1`.
+
+- **The art was chosen by looking, and the obvious card lost.** *Lost in the
+  Woods* is the name anybody would reach for; the painting is two frightened
+  people under a torch looking up at something. A newcomer who mistyped a URL
+  is not met with a horror card (commandment 2).
+- **`.prose-link`** is the new named place for the other half of commandment
+  20 — a real `<a>` in prose, in the house's vine, with an underline that
+  thickens under the hand and a focus ring. `grep -rn "color: 'var(--series-1)'"
+  web/src` counted **12** inline on 2026-09-26; this room is the first tenant
+  and the remaining eleven are the sweep to follow.
+
+**Item five was already built, and it is a ten.** The colours tour's build
+button (`routes/ColorPage.tsx:292`) is `.btn-sigil` with `--sigil-a` and
+`--sigil-b` handed in from the room's own colours: Azorius renders white into
+blue, Rakdos black into red, without forking the class. That is the
+`--btn-accent` / `--btn-ink` idea worn in thirty-two colours. Nothing to build.
+
+**Left as suggestions**, not built: the eleven remaining inline `--series-1`
+links; the eight `rgba(201, 162, 39, a)` spellings of the brass (an alpha
+conversion with a different failure mode — a dropped declaration rather than a
+wrong colour — and it wants its own walk of the board); the `verdict-gild`
+keyframe's literal, inside a filter list whose own comment warns against
+casual rearrangement.
+
+
 ## Green — Growth & Resilience
 
 *Browser, mobile & accessibility · cloud resource watch · scalability &
@@ -7739,6 +7804,102 @@ test failure reads exactly like a successful kill", one layer out.
 Still open after this: the volume's pool is stale until the refresh actually
 runs, so three decks show a set name with no painter. That is #195's designed
 degradation, not a new fault.
+
+### 2026-09-26 (rainbow) — the phone's hand: the 44px floor, and two clocks stopped
+
+*The Queen's second ball; the same PR as the Red entry above
+(`the-second-ball`, stacked on `the-gleaming-edge`). Measured in a real
+browser at 375x812 with `(pointer: coarse)` true, on the committed bundle.*
+
+**The floor, and the numbers it was built on.** This item had been
+re-measured four runs running and never built. Before:
+
+| route | controls | under 44px |
+| --- | --- | --- |
+| `/` | 21 | **20** |
+| `/import` | 25 | **23** |
+| `/coliseum` | 14 | **13** |
+
+Ten `.nav-link`s at **32** tall on every route. `.btn` at **38**; `.btn-sm` at
+42 by **28** — the Back and Next that walk an arena's thirteen slides. Five
+`.field-shell` fields at **36**. After: `/import` is **3 of 25**, and two of
+those three are the wordmark (halo, below) and an inline link inside a
+sentence. A thumb's contact patch is about nine millimetres; a 28-pixel
+control is under three.
+
+Two things the house already knew and nobody had joined up: `.whisper-sprout`
+is **44x44** and `.chip-toggle` is **197x44**. The number was never in doubt,
+only the reach.
+
+- **The shape was settled by the stylesheet, not by taste.** The alternative
+  was a pseudo-element halo with a negative `inset` — `.card-flip::before {
+  inset: -6px }` does exactly that for a 13px mark on a 64px painting. It
+  cannot work on `.btn`, which is `overflow: hidden` on purpose so the glint
+  and the gleam's ring stay on the plate. A halo on a clipping box is a halo
+  that is not there. So the plates **grow**, and the halo went to the one
+  control that may not move a pixel: `.wordmark`, a signature, 153x26 to the
+  eye and **153x44** to the thumb (verified with `elementFromPoint` 7px above
+  and below the visible box). Tighter at the sides than the top, because the
+  row's `gap-x-6` is all that separates it from the nav and a halo that
+  reaches into a neighbour steals its taps.
+- **`(pointer: coarse)` rather than a width**, so a tablet gets the floor and
+  a narrow window on a desk does not — and the desktop composition is
+  untouched by construction: `.btn-sigil` still measures 169x38 and
+  `min-height: auto` at 1280.
+- **`min-height` rather than padding**, because these families do not own
+  their padding — the routes write it as utilities at the same specificity,
+  settled by source order. Nothing competes for `min-height`, and it beats
+  `.field-shell`'s `h-9` outright.
+- **Almost nothing needed a centring rule**: a `<button>` and a `<select>`
+  centre their own contents by UA stylesheet. `.nav-link` is an `<a>` and gets
+  nothing of the sort, so it is the one family told how to hold what is in it.
+
+**The cost, stated rather than buried, and it wants Aaron's ruling.** The
+phone's header goes **201px → 265px** at 375x812 — from 24.8% of the screen to
+**32.6%** — because ten nav entries wrap onto four rows and each row grew 12px.
+It furls on the first scroll (`useCanopyScroll`), so the cost is bounded, and
+the file's own comment already called 201px "a quarter of the phone spent on
+chrome nobody is looking at". If that is too much the answer is **fewer nav
+entries on a phone, not smaller targets** — an affordance is not traded for a
+look.
+
+**The lore carousel stops for somebody who asked it to.** Two component
+timers in `routes/Coliseum.tsx` — a slide every 24s, the whole room every 90s
+— walked the Coliseum regardless of `prefers-reduced-motion`, and no
+stylesheet guard could ever have reached them because there is no animation
+in the sheet to find. They are guarded now, and the lore is **not** removed
+with them: the room holds its first slide, the counter still reads "1 of 13",
+and Back and Next page it by hand. Proven twice — by two tests in
+`Coliseum.test.tsx` that count the clocks rather than restating 24 and 90
+(mutation-verified), and live on the real page, where stubbing `matchMedia`
+and clicking Next re-ran both effects and laid **no** clocks while the slides
+still moved 1 → 2 → 1 under the hand.
+
+**And the sweep that could not see any of it learned to.**
+`reducedmotion_test.go` called a rule covered when any class in its selector
+appeared in a reduced-motion block — so an animation on `.btn::before` read as
+covered by a guard several hundred lines away that turns off `.btn`'s
+*transitions*. Proven green under that mutation this morning; it now fails by
+name. The key is the pair, `class::pseudo`, with `display: none` still
+covering both pseudo-elements because an element that is not rendered draws
+none.
+
+- **It found a real one immediately.** `.entombing::after` — the black wash
+  that closes over a card being sent to the graveyard — animated its full
+  340ms under reduced motion, because the guard beside it only ever named
+  `.entombing`. It is the one frame of that effect that is actually *over a
+  painting*. Both boxes now, and both at `1ms` rather than `none`: `forwards`
+  is what holds the sunken frame until the refreshed list arrives, so removing
+  the animation would spring the row back to full brightness and leave it
+  looking untouched.
+- **Two traps inside the fix, and the first nearly ate it.** A lookbehind
+  written as "not preceded by a word character" matched **nothing** —
+  `.btn:before` has an `n` before the colon — and a class name cannot contain
+  a colon, so the guard was never needed. And `:not(.arena-gate)` leaked
+  `arena-gate` into the class list; `.arena-gate::before` *is* separately
+  guarded, so the negation excused the very rule that excludes it. Selectors
+  are now split on top-level commas and negations stripped.
+
 
 ## Colorless — The Artifacts
 

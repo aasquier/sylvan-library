@@ -29,8 +29,29 @@ import (
 // # What "covered" means here, and what this file can and cannot see
 //
 // A rule is covered when any class in its selector appears inside a
-// `prefers-reduced-motion: reduce` block. Most guards are that direct. Two
-// mechanisms are not, and both are real:
+// `prefers-reduced-motion: reduce` block **wearing the same pseudo-element**.
+// A bare `.btn` in a guard covers `.btn`; it does not cover `.btn::before`.
+//
+// **That second sentence was bought.** It used to be one class, no pseudo, and
+// the hole was proven by mutation on 2026-09-26: a travelling light was added
+// to `.btn::before`, its own guard was deleted, the bundle was rebuilt, and
+// this sweep stayed **green**. `.btn` appears in a reduced-motion block several
+// hundred lines away — where it turns off *transitions* — and that was enough
+// to excuse an animation on a pseudo-element the guard has never touched. The
+// two are different boxes: a rule that stops the plate moving says nothing
+// about the ring drawn around it, and every voice in the `.btn` family draws
+// its glint on one pseudo-element or the other. So the key is the pair, and
+// `buttongleam_test.go` — which had to pin that one animation by name because
+// this file could not see it — is now the belt to this file's braces rather
+// than the only strap.
+//
+// One escape stays, and it is the honest one: a guard that sets `display:
+// none` on a class removes the element, and an element that is not rendered
+// draws no `::before`. So a removal covers the class **and** both of its
+// pseudo-elements, which is the same reasoning `coveredBy`'s ancestor entries
+// already rest on.
+//
+// Most guards are direct. Two mechanisms are not, and both are real:
 //
 //   - **A base class on the same element.** `.lab-bubble-2` only sets a delay;
 //     the element is `class="lab-bubble lab-bubble-2"` and `.lab-bubble` is
@@ -115,11 +136,117 @@ var (
 	cssRule        = regexp.MustCompile(`([^{}@;]+)\{([^{}]*)\}`)
 	cssClass       = regexp.MustCompile(`\.([A-Za-z0-9_-]+)`)
 	reducedMotion  = regexp.MustCompile(`@media[^{]*prefers-reduced-motion[^{]*\{`)
+	// One or two colons, because the minifier writes `::before` as `:before`
+	// and both are the same box. No lookbehind is wanted and an early draft's
+	// cost the whole fix: a class name cannot contain a colon (`cssClass` says
+	// so), so `.fade-after` can never be read as a pseudo-element -- while
+	// `.btn:before` is preceded by a perfectly ordinary word character and a
+	// "not preceded by a word character" guard silently dropped every
+	// pseudo-element in the sheet.
+	cssPseudoEl = regexp.MustCompile(`::?(before|after)\b`)
+	// A guard that removes the element removes everything it draws with it.
+	cssRemoves = regexp.MustCompile(`(^|[;{\s])display\s*:\s*none`)
 )
 
-// animatingRule is one rule that moves, and the classes its selector names.
+// boxesIn is every (class, pseudo-element) pair a selector names -- the unit
+// of coverage. A selector with no `::before`/`::after` names each class's own
+// box; one with them names the pseudo-elements, because that is the box the
+// declarations in it actually paint.
+//
+// Two pieces of selector grammar have to be honoured or the answer is wrong in
+// the direction that excuses things, and the second one is what let a
+// travelling light past this sweep on 2026-09-26:
+//
+//   - **A comma is a new selector.** `.a::before,.b` is two, and the boxes are
+//     `a::before` and `b` -- not the four a cross-product would give.
+//   - **A class inside `:not()` is not a target, it is an exclusion.** The
+//     gleam's ring is `.btn:not(.arena-gate)::before`, which paints on every
+//     button *except* the gate; `.arena-gate::before` is separately guarded
+//     because the shut portcullis is its own animation, and reading the
+//     negation as a target made that guard excuse the ring it explicitly
+//     excludes. Only `:not()` is stripped: `:is()` and `:where()` really do
+//     name their contents.
+func boxesIn(selector string) []string {
+	var out []string
+	for _, one := range splitSelectorList(selector) {
+		one = stripNegations(one)
+		classes := classesIn(one)
+		var pseudos []string
+		for _, m := range cssPseudoEl.FindAllStringSubmatch(one, -1) {
+			pseudos = append(pseudos, m[1])
+		}
+		for _, c := range classes {
+			if len(pseudos) == 0 {
+				out = append(out, c)
+				continue
+			}
+			// A descendant selector may name a pseudo-element only at its end,
+			// so every class in it is read against that one -- which over-covers
+			// the ancestors and never under-covers the subject. Over-covering an
+			// ancestor is the safe direction: the thing actually painted is
+			// always in the list.
+			for _, p := range pseudos {
+				out = append(out, c+"::"+p)
+			}
+		}
+	}
+	return out
+}
+
+// splitSelectorList splits on top-level commas: a comma inside `:not(…)` or
+// `:is(…)` belongs to that function, not to the list.
+func splitSelectorList(selector string) []string {
+	var out []string
+	depth, start := 0, 0
+	for i, r := range selector {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				out = append(out, selector[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(out, selector[start:])
+}
+
+// stripNegations removes every `:not(…)`, parenthesis-counted so a nested one
+// (`:not(:hover:not(.x))`) comes out whole.
+func stripNegations(selector string) string {
+	var b strings.Builder
+	for i := 0; i < len(selector); {
+		rest := selector[i:]
+		if !strings.HasPrefix(rest, ":not(") {
+			b.WriteByte(selector[i])
+			i++
+			continue
+		}
+		j, depth := i+len(":not("), 1
+		for j < len(selector) && depth > 0 {
+			switch selector[j] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			j++
+		}
+		i = j
+	}
+	return b.String()
+}
+
+// animatingRule is one rule that moves, the boxes its selector paints, and the
+// bare classes it names. `boxes` is what has to be guarded; `classes` is what
+// `coveredBy` is keyed on, because that table's claims are about elements
+// (a base class on the same one, or an ancestor removed outright).
 type animatingRule struct {
 	selector string
+	boxes    []string
 	classes  []string
 }
 
@@ -144,7 +271,13 @@ func guardSpans(css string) [][2]int {
 	return spans
 }
 
-// splitSheet is (the rules that animate, the classes any guard mentions).
+// splitSheet is (the rules that animate, the boxes any guard reaches).
+//
+// The guarded set is keyed by box -- `btn` and `btn::before` are two entries,
+// and a guard earns whichever ones its own selector names. The one exception
+// is a guard that hides the element: `display: none` on `.x` earns `x`,
+// `x::before` and `x::after` together, because an element that is not rendered
+// draws no pseudo-elements.
 func splitSheet(css string) (animating []animatingRule, guarded map[string]bool, guards int) {
 	spans := guardSpans(css)
 	guarded = map[string]bool{}
@@ -158,16 +291,26 @@ func splitSheet(css string) (animating []animatingRule, guarded map[string]bool,
 				break
 			}
 		}
-		classes := classesIn(selector)
 		if inside {
-			for _, c := range classes {
-				guarded[c] = true
+			for _, b := range boxesIn(selector) {
+				guarded[b] = true
+			}
+			if cssRemoves.MatchString(body) {
+				for _, c := range targetClasses(selector) {
+					guarded[c] = true
+					guarded[c+"::before"] = true
+					guarded[c+"::after"] = true
+				}
 			}
 			continue
 		}
 		trimmed := strings.TrimSpace(body)
 		if motionDeclares.MatchString(body) && !motionArrests.MatchString(trimmed) {
-			animating = append(animating, animatingRule{selector, classes})
+			animating = append(animating, animatingRule{
+				selector: selector,
+				boxes:    boxesIn(selector),
+				classes:  targetClasses(selector),
+			})
 		}
 	}
 	return animating, guarded, len(spans)
@@ -177,6 +320,17 @@ func classesIn(selector string) []string {
 	var out []string
 	for _, m := range cssClass.FindAllStringSubmatch(selector, -1) {
 		out = append(out, m[1])
+	}
+	return out
+}
+
+// targetClasses is classesIn with the negations taken out -- the classes a
+// selector is *about*, rather than every class name that appears in it. See
+// boxesIn for why the difference is load-bearing.
+func targetClasses(selector string) []string {
+	var out []string
+	for _, one := range splitSelectorList(selector) {
+		out = append(out, classesIn(stripNegations(one))...)
 	}
 	return out
 }
@@ -216,10 +370,22 @@ func TestEveryAnimationInTheBundleCanBeArrested(t *testing.T) {
 	loose := map[string]bool{}
 	for _, rule := range animating {
 		reached := false
-		for _, c := range rule.classes {
-			if guarded[c] || covers[c] {
+		// The box first: `.x::before` wants a guard that says `::before`.
+		for _, b := range rule.boxes {
+			if guarded[b] {
 				reached = true
 				break
+			}
+		}
+		// Then the element, because `coveredBy`'s claims are about elements --
+		// a guarded base class on the same one, or a guarded ancestor removed
+		// outright. Either takes the pseudo-element with it.
+		if !reached {
+			for _, c := range rule.classes {
+				if covers[c] {
+					reached = true
+					break
+				}
 			}
 		}
 		if !reached {
@@ -231,9 +397,12 @@ func TestEveryAnimationInTheBundleCanBeArrested(t *testing.T) {
 			"block reaches them:\n  %s\n\nAdd a guard in web/src/index.css and "+
 			"rebuild the bundle, or -- if the element already carries a guarded "+
 			"base class or sits inside a guarded ancestor -- record that in "+
-			"coveredBy with the component it was read from. Reduced, not "+
-			"necessarily removed: a status indicator that stops turning says "+
-			"the wrong thing.", strings.Join(sortedSet(loose), "\n  "))
+			"coveredBy with the component it was read from. **A guard on a "+
+			"`::before` or `::after` has to name that pseudo-element**: the "+
+			"plate and the ring drawn around it are two boxes, and a rule that "+
+			"stops one says nothing about the other. Reduced, not necessarily "+
+			"removed: a status indicator that stops turning says the wrong "+
+			"thing.", strings.Join(sortedSet(loose), "\n  "))
 	}
 }
 

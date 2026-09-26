@@ -356,6 +356,18 @@ var paletteRoles = map[string]paletteRole{
 	"--mtg-c": wash("a mana pip's wash; the game's own fixed semantics, never type"),
 
 	"--vine": ink("the forest's green: the help pip's mark, and its focus ring"),
+
+	// The house's other metal, named on 2026-09-26 after fourteen years of
+	// being written out by hand. Deliberately a wash and deliberately one
+	// value in both themes: it is a *material* rather than a step in a ramp,
+	// and it measures 3.66:1 on the light page -- the shelf's own comment says
+	// so, and every site that uses it keeps its own ink. The one place it
+	// touches type at all is `.wordmark-title`'s gradient, where it is the
+	// **118%** stop: past the end of the run, so it tints the tail of the last
+	// letter and carries nothing. If a sentence is ever drawn in this, the
+	// sentence is the bug, and check (4) above will say so.
+	"--lantern-brass": wash("the house's lantern brass: hairlines, plate " +
+		"edges, a spine, a hover's warm border. Never a sentence"),
 }
 
 // The three blocks the palette is written in. Each is matched by its selector
