@@ -152,9 +152,21 @@ The failure Aaron named: the database fills, nobody noticed, service
 degrades. Proactive means the numbers are recorded *every run* and the
 trend is read.
 
-- Volume: `bash -lc 'fly ssh console -C "df -h /data"'` — used, available,
-  percent. Then the breakdown: `app.db` size, `mtg.duckdb` size, decks
-  tree, anything unexpected growing. Record all of it.
+**Two facts about the platform CLI before any of the readings below, each met
+by two separate lanes on 2026-09-26 and each costing them minutes.** First:
+**the Fly app is `sylvan-library`, not `mtglab`** — `fly status --app mtglab`
+answers *not found*, because `mtglab` is the binary and the CLI, and CLAUDE.md
+says that mismatch is deliberate. Every `--app` flag in `docs/HOSTING.md`
+spells it `sylvan-library`; copy it from there. Second: **a volume id in an old
+ledger entry has rotted** — `fly volumes snapshots list` wants an id, and the
+one recorded in August is *not found* today, so read it out of `fly volumes
+list` every time rather than from any document. `fly` itself resolves on a
+plain call; the `bash -lc` wrapper older entries here use is noise now, and the
+one real expiry is the 720-hour login (`fly auth login`, about monthly).
+
+- Volume: `fly ssh console -C "df -h /data"` — used, available, percent. Then
+  the breakdown: `app.db` size, `mtg.duckdb` size, decks tree, anything
+  unexpected growing. Record all of it.
 - Machine: memory and CPU headroom (`fly status`, machine metrics), OOM
   events since last run, restart count.
 - Snapshots: retention and recency — is the newest snapshot newer than the

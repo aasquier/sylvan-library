@@ -126,15 +126,30 @@ four commits to get green. The lessons are worth more than the fix:
 Aaron's bar is the *right* tests, not coverage tests — and a suite that stays
 fast enough that adding tests never feels expensive.
 
-**The 95% floor is a claim no gate enforces, and saying so is this facet's
-own medicine.** It was a real gate once; today CI runs `go test -race
--count=1 -cover ./...`, which prints a number and gates on nothing, and no
-threshold lives in `ci.yml`, `.golangci.yml` or any doc. A rule enforced by
-nothing had drifted, and only this file still asserted it. Measured
-2026-08-23: **80.3%** of statements covered by the whole suite, **74.1%**
-counting each package's own tests only. Until Aaron rules (it is in
-`docs/polish/DAYBREAK.md`), treat coverage as a **watched number, not a
-gate**: record both figures every run and treat a fall as a finding.
+**The coverage floor is a gate now, and this paragraph is the record of how a
+claim becomes one.** For a month this file opened on *"the 95% floor is a
+claim no gate enforces"* — true when it was written, and the pass's own
+favourite example of a rule enforced by nothing. It is answered: `ci.yml`'s
+**`Coverage floor`** step runs `go test -count=1 -coverprofile
+-coverpkg=./...` on the arm64 leg and fails the build under `MINIMUM`, which
+stands at **95.0**. Two guards hold the shape of that number rather than the
+number itself, and they are what you check rather than re-deriving the
+history: `go/cmd/mtglab/coveragefloor_test.go`
+(`TestEveryGoFileCompilesOnBothCILegs` — one leg may compute the total only
+while every Go file compiles on both, so an arch-tagged file fails by name
+instead of quietly narrowing the measurement), and `docs/polish/COVERAGE.md`,
+which is the per-function map and the list of levers.
+
+So coverage is **a gate with a watched margin**, and the two jobs are
+different. The gate is CI's. The watched number is this facet's: read the
+total with `go tool cover -func` over a `-coverpkg=./...` profile — the same
+arithmetic the step uses, which is *not* what a hand merge of the same
+profile reads — record it in the ledger every run, and treat a fall as a
+finding even when it clears 95.0. **The floor is a ratchet: raise it when the
+tree passes a higher number, never lower it to make a red check green.** The
+size of the margin between the tree and the floor is Aaron's ruling of
+2026-09-24 rather than a number to optimise, so a run that wants to click the
+floor up reads `ci.yml`'s own comment first.
 
 Two traps in the measuring itself, one of which caught this run:
 
@@ -182,23 +197,29 @@ tail. Two whole-suite facts to hold on to before optimising a single test:
 - **Go already runs different packages in parallel.** So the suite's wall time
   is roughly its *slowest package*, not its total — which means the only work
   that shortens the run is work on the tail. Optimising a fast package is
-  effort spent for zero seconds, and the tree makes the point unusually
-  starkly. Measured 2026-08-23 on this Mac, `go test -count=1 ./...`:
+  effort spent for zero seconds.
 
-  | | |
-  |---|---|
-  | whole suite, wall clock | **1m13s** |
-  | `internal/api` | **63.1s** |
-  | `internal/claude` | 33.9s |
-  | `internal/gate` | 13.2s |
-  | everything else | under 11s each |
+  **Take the table yourself; do not read one from this file.** A frozen table
+  lived here for a month (1m13s wall, `internal/api` 63.1s = 86% of it) and
+  every figure in it had rotted: the tree is thousands of tests bigger, every
+  one of them parallel, and the wall clock on this Mac now moves by a factor of
+  five with the number of sessions running beside you. A suite time quoted
+  without the load beside it is a measurement of the laptop's mood. So:
 
-  Read that table twice. `internal/api` alone is **86% of the wall clock**, so
-  the suite's time is that one package's time and nothing else is worth a
-  minute of anyone's attention until it moves. The user column says 3m12s
-  against 1m13s wall — the machine is already three-way busy, which is the
-  package-level parallelism working and the reason within-package
-  serialisation is the whole remaining cost.
+  ```bash
+  uptime                                   # before, and again after
+  go test -count=1 ./... 2>&1 | tail       # the wall clock
+  go test -json ./... | <sort by elapsed>  # the per-package tail
+  ```
+
+  The numbers go in the ledger, dated, with the load — that is what makes them
+  comparable to the next run's. The *shape* is the lasting fact and the reason
+  to take the table at all: find the one or two packages that are the wall
+  clock, and spend nothing on the rest. For a number that is genuinely
+  comparable across weeks, read CI's per-job medians instead of this laptop's
+  wall clock (Red's facet records them every run, n≈40 runs a window) — the
+  runners are the same machine every time, which is the whole reason that trend
+  line is honest and this one is not.
 - **`-count=1` deliberately defeats the test cache**, and CI passes it. That
   is correct for a gate and wrong for a working loop: leaving it off locally
   lets an untouched package answer instantly, so use it when you need the
@@ -214,31 +235,35 @@ Then the levers, in the order that pays:
   `TestMain` plus a package-level handle (or `sync.OnceValue`) pays once.
   Look for the same shape in database migrations and any golden that is parsed
   per case rather than per package.
-- **`t.Parallel()`, from a standing start of zero.** Measured 2026-08-23:
-  **831 test functions across 115 files and not one call.** Within a package
-  every test waits its turn, and the slow packages here are one package each,
-  so this is the lever that acts directly on the tail:
-  - **The default is parallel; the exception is what needs arguing.** A test
-    earns its serial place by touching real shared state — the process
-    environment (`t.Setenv` makes a test un-parallelisable and the compiler
-    enforces it), the working directory, a fixed port, a shared database
-    handle written by more than one test, or a global the subject mutates.
-    Everything reading a `t.TempDir`, a fresh in-memory database, or a
-    `httptest.Server` of its own is parallel-safe by construction.
-  - **Subtests need it twice.** `t.Parallel()` in the parent starts the
-    package's other parallel tests; `t.Parallel()` inside each `t.Run` body is
-    what makes the table's rows run together. A table with one and not the
-    other is the common half-done case — and remember a parallel subtest's
-    body runs *after* the parent function returns, so anything the parent
-    deferred has already happened.
-  - **Prove it, do not assume it.** `go test -race -count=2 ./internal/<pkg>/`
-    on the packages touched: the race detector is the whole reason this is a
-    safe fix rather than a queued one, and `-count=2` catches state left
-    behind between runs. A conversion that cannot be proven green this way is
-    a finding *about the test*, not a reason to skip the conversion.
-  - Record in the ledger how many functions were converted, the package's wall
-    time before and after, and — the part that makes the next run cheaper —
-    **which tests were examined and left serial, with the reason.**
+- **`t.Parallel()` is spent as a lever and is a gate instead.** This bullet
+  used to open on *"from a standing start of zero — 831 test functions across
+  115 files and not one call"*, and both halves are gone: as of **2026-09-24**
+  every top-level test under `go/` calls it, zero are serial, and
+  `go/cmd/mtglab/serialregister_test.go` fails **by name** on any test whose
+  own body does not (a call inside a `t.Run` closure does not count for the
+  parent; `TestMain` and benchmarks are not tests). It also logs the total, so
+  the count is read off the register rather than written down anywhere —
+  including here. The register used to be a list of argued exceptions; the
+  thirty-nine it held on 09-19 turned out to be **ten pieces of shared state**,
+  each a fact about the code rather than the tests, and CLAUDE.md's Testing
+  section carries the three shapes they became.
+
+  What is left for this facet is therefore not conversion but the two things
+  that keep it true:
+  - **A new test Go refuses is a finding about the code.** `t.Setenv` reached
+    through *any* helper panics with "can not use t.Parallel"; `-race` reports
+    a package-level write, but only when two tests happen to overlap, so read
+    for those as well. Either answer names a piece of shared state, and the fix
+    is always the same: make it a value and hand it in — a reader of the
+    process becomes a `func(string) string`, a package-level variable becomes a
+    field, a signal becomes a channel. **Never add a serial exception**; there
+    is no register to add it to any more.
+  - **Subtests that share a fixture use `t.Cleanup`, never `defer`.** A parallel
+    subtest's body runs *after* the parent function returns, so a parent's
+    `defer` has already fired by the time the subtest touches the thing.
+  - **Prove it with `go test -race -count=2 ./internal/<pkg>/`.** `-count=2`
+    catches state left behind between runs, and the race detector is the whole
+    reason this class of change is a safe fix rather than a queued one.
 - **Sleeps are the other half of the tail.** Every `time.Sleep` in a test is
   wall time bought to avoid thinking about synchronisation, and it is both slow
   *and* flaky — too short and it fails on a loaded runner, too long and

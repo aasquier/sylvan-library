@@ -100,7 +100,7 @@ type GameResult struct {
 }
 
 // KillingBlow is the last damage a player took before their life reached
-// zero, on the game's final kill (Aaron, 2026-09-06). The *final* one: a pod
+// zero, on the game's final kill (Aaron). The *final* one: a pod
 // kills three players and only the last of them ends the game, so this
 // records the blow that closed it rather than the first one that landed.
 //
@@ -139,7 +139,7 @@ type KillingBlow struct {
 }
 
 // BigCreature is the largest thing that stood on a battlefield in one game
-// (Aaron, 2026-09-06).
+// (Aaron).
 //
 // **Ranked on power, and that is a judgement.** A Magic player says "a 15/15"
 // and means the first number: power is what kills, and a wall with enormous

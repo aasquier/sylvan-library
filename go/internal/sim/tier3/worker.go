@@ -67,8 +67,8 @@ const MachinesAPI = "https://api.machines.dev/v1"
 // to be pulled and unpacked before anything in it runs — which does not finish
 // in sixty seconds. So the sequence a person met was: a change lands, the first
 // person to send two decks in is told the match failed, and the second attempt
-// works because the first one warmed the machine (2026-08-25, found by playing
-// a real match on the deployed instance; Aaron asked for it fixed 2026-08-28).
+// works because the first one warmed the machine (found by playing a real match
+// on the deployed instance; Aaron asked for it fixed).
 //
 // **A 408 from Fly's wait is "not yet", not "no".** The machine is still
 // coming up and asking again costs nothing — so `BaseURL` now asks repeatedly

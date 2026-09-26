@@ -7652,7 +7652,8 @@ degradation, not a new fault.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-09-19 (rainbow, daylight). Previous: 2026-09-12
+- **Last run:** 2026-09-26 (rainbow, daylight — one lane of a parallel wave;
+  entry directly below). Previous: 2026-09-19 (rainbow, daylight), 2026-09-12
   (rainbow, night — ran past 04:00 into 09-13), 2026-09-05 (rainbow, night),
   2026-08-24 (rainbow), 2026-08-21 (scoped — the relic sweep only),
   2026-08-19 (rainbow, the first colorless run with five colors to audit),
@@ -7665,6 +7666,374 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-09-26 (rainbow)
+
+The colourless lane of a **parallel** wave — the shape the skill forbade until
+this entry. Four colour lanes plus the Queen's two design passes ran at the same
+time in seven worktrees off the same `origin/main` (`0e3ef83`), each closing its
+own CI loop, with a merge train at the end; nothing had merged when this lane
+cut its branch, so every claim below about another colour's work is a claim
+about a *green unmerged PR* and says so. All five parts run; the relic sweep ran
+all six passes.
+
+- **Fixed this run:**
+  1. **`references/white.md` opened on four facts that were all false, and the
+     oldest of them was the pass's own favourite example of itself.** The
+     testing facet began *"The 95% floor is a claim no gate enforces"* and went
+     on to quote **80.3%** coverage, **831 test functions and not one
+     `t.Parallel()` call**, and a **1m13s** suite in which `internal/api` was
+     **86% of the wall clock**. Every one was a 2026-08-23 measurement and every
+     one had been answered — the floor gates at **95.0** in `ci.yml`'s
+     `Coverage floor` step, the tree measures about **96.7**, zero tests are
+     serial and `serialregister_test.go` fails by name on any that is, and the
+     suite is thousands of tests bigger on a laptop whose wall clock now moves
+     by a factor of five with the load beside it. Rewritten three ways rather
+     than re-numbered: the coverage paragraph now describes **a gate with a
+     watched margin** and points at the two things that hold its *shape*
+     (`coveragefloor_test.go`'s `TestEveryGoFileCompilesOnBothCILegs`, and
+     `docs/polish/COVERAGE.md`); the `t.Parallel()` bullet says the lever is
+     **spent** and teaches the two things that keep it true instead (a new test
+     Go refuses names a piece of shared state — hand it in, never add a serial
+     exception; `t.Cleanup` not `defer` for a shared fixture); and **the wall-
+     clock table is gone entirely, replaced by the command that takes it**, with
+     `uptime` either side, because a frozen table is what rotted and a
+     cross-week comparison belongs to CI's per-job medians rather than to this
+     Mac. Handed over by White's own lane, which found it and left it: the skill
+     is this colour's territory by the pass's own rules.
+  2. **`skillrecord_test.go` gained its third leg — a skill may no longer cite
+     a test that does not exist.** It held every *path* and every `mtglab` and
+     `animist` *verb*, and its own doc comment names the rot it did not hold:
+     *"a test cited as the model of good practice that had been deleted"*. A
+     citation by test name is the strongest claim the pass makes — *this rule is
+     enforced, and here is the thing that enforces it* — and it is the one most
+     likely to go quietly wrong, because a rename lands in work that never opens
+     a skill file. `TestTheSkillsNameOnlyTestsThatExist` reads every
+     `func Test…(` declaration under `go/` and holds every `Test`-shaped token
+     in `.claude/skills/**.md` against it, with two argued stand-ins excluded
+     (`TestMain`, the language's own entry point, which the skills mention to
+     say it is *not* a test; `TestX`, the substitute-your-own-name in the
+     `-run '^TestX$'` diagnosis recipe). **Mutation-verified three ways**: a
+     fabricated citation added to `colorless.md` failed by file and name; the
+     declaration scan pointed at `_zzz.go` failed the 100-function inertness
+     floor rather than passing on an empty lookup; and emptying the stand-in map
+     failed four times, naming `TestX` in `SKILL.md` and `black.md` and
+     `TestMain` twice in `white.md` — which also settled that there is **no
+     `TestMain` anywhere under `go/`**. Four real citations exist today and all
+     four resolve; the guard's value is the next rename, and it makes *naming*
+     the guard strictly better than describing it.
+  3. **The comment sweep, slice `internal/sim/tier3` — and the first fall on
+     the Go side of the ratchet, which the const block had asked for by name.**
+     Four rises and no fall (114 → 115 → 117 → Red's 118 today) is the sweep's
+     arithmetic problem in a new costume, and `datedcomments_test.go`'s own
+     comment said so: *"the next Colorless run should spend its slice retiring
+     dated comments rather than counting them."* tier3 is the Coliseum's reader,
+     was swept once on **2026-08-24**, and the Coliseum's next fortnight refilled
+     it to **29 dated lines** — the re-accumulation fact that makes this a
+     standing job rather than a finishable one. It is deliberately **not** one of
+     the five fingerprinted packages (checked against `engineSources`, which is
+     tier1/mana/sim/floats/mt19937), so no Tier 1 cache key moves. **24 retired,
+     5 kept, 8 files.** The ratchet fired on the fall side before the ceiling
+     moved, which is this sweep's own mutation check — raw:
+
+     ```
+     datedcomments_test.go:128: go carries 93 dated comments outside tests, ceiling is 117 -- lower the ceiling to 93 in this file's const block. A ratchet that is not tightened when the tree improves has given back the ground the sweep just won.
+     --- FAIL: TestDatedCommentsDoNotOutgrowTheirCeiling (0.22s)
+     ```
+
+     `goDatedCommentCeiling` **117 → 93**, and the const block's own residue
+     went with it: a superseded "114 → 115" paragraph sat above the "114 → 117"
+     one that replaced it. In its place, **the sweep's rule, written down for
+     the first time** now that the ratchet has moved twice on each side — one
+     question (*would a fresh session act differently for knowing the day?*) and
+     three answers: a **ruling** keeps its argument and loses its date
+     (`(Aaron, 2026-08-26: …)` → `(Aaron: …)`, 20 of the 24); a
+     **when-it-happened** clause keeps that it happened and loses the day
+     (*"it was live: on 2026-08-31 a game …"* → *"it was live: a game …"*, 4);
+     a **validation measurement** keeps its date, because the date is how a
+     reader chooses between trusting the number and re-measuring it (all 5
+     keeps — Forge's clock spread over six four-seat games, the 48 two-faced
+     cards counted over the pool, the `-q` timing against Forge 2.0.14, and two
+     sequences read off seeded match number 11). Every argument survives; nothing
+     became a bare deletion. **Slices done:**
+     `internal/sim/{cache,compile,curve,tier3}` (08-24), `internal/api` non-test
+     (09-05), `routes/Coliseum{,.test}.tsx` (09-12), `components/board{,.test}.tsx`
+     (09-19), `internal/sim/tier3` again (09-26). **Not sweepable:** the five
+     fingerprinted packages, unchanged.
+  4. **Three cross-section reference corrections, each from a lane's own
+     hand-off rather than a re-audit** (the reference files, not the ledger
+     sections — this lane touched no other colour's ledger text, to keep the
+     merge train cheap): `white.md` is fix 1. `blue.md`'s one-reader-per-switch
+     bullet now **asks for two numbers instead of one** — real process reads,
+     and composition-root hand-ins — because the single `grep -c` every Blue
+     entry has quoted since 08-23 counts calls, `os.Getenv` passed as a *value*
+     into a `func(string) string`, and `[os.Getenv]` in doc comments, all
+     together; the 09-24 parallel work turned almost all of them into hand-ins,
+     so **the number rose while the doctrine got strictly better**, which is a
+     trend line measuring the wrong thing. Blue's 2026-09-26 replacement is in
+     the bullet: **2 real reads outside tests** (both argued fallbacks in
+     `internal/flymetrics`) and **6 hand-ins**, against a naive 15. `green.md`'s
+     cloud facet gains the two platform-CLI facts **two separate lanes each lost
+     minutes to today**: the Fly app is **`sylvan-library`, not `mtglab`**, so
+     `fly status --app mtglab` answers *not found* (the binary/repo mismatch
+     CLAUDE.md calls deliberate, biting at the CLI), and a **volume id recorded
+     in an August entry has rotted**, so `fly volumes snapshots list` reads its
+     id out of `fly volumes list` every time. Its stale `bash -lc` wrapper went
+     with them — CLAUDE.md retired that on 08-24 and it is noise now.
+  5. **The shelf's "there is no bench suite" is answered in part, and the
+     standing item is narrower.** Black's lane landed the first benchmark
+     outside the four determinism kernels (the deck shelf's read-and-parse) and
+     Red's landed a second (the door's compressor, which produced that lane's
+     biggest measured win: 836,848 → 23,435 B/op). Both `SKILL.md`'s shelf
+     paragraph and `colorless.md` part three said the flat absence. They now say
+     what exists — a `Benchmark…` outside the kernels is ordinary, not a finding
+     — and what is **still** missing, which is the two things a *suite* is and a
+     scattering of functions is not: **one command that runs them all**, and **a
+     recorded results ledger** that makes a delta comparable to last month's
+     rather than to this laptop's mood. Part three's standing list is re-scoped
+     to three items — `benchstat`, the runner-plus-ledger, and reading a cache's
+     counts out of a running instance — with the observation that **all three are
+     now plumbing over an instrument that already exists**, which is a real fact
+     about the rebuild's shape rather than a to-do.
+  6. **`SKILL.md`'s rainbow orchestration said "serial, because parallel
+     churns" while Aaron ran it in parallel three times.** The ten-lane coverage
+     climb of 09-24 and both of today's waves were simultaneous worktree lanes
+     with a written lane file each and a merge train at the end; the skill said
+     *never* and also said, in its own preamble, that a checklist losing to
+     practice is a finding about the checklist. So serial stays the default and
+     the right shape for an unattended night with one agent, and **a new
+     subsection makes the parallel shape legitimate with the rules it actually
+     needs**: a lane file per colour naming owned and forbidden files (exactly
+     one lane holds `web_dist/`, exactly one holds the Browser pane, which is a
+     single shared resource a second driver simply loses); append at the END of
+     your own ledger section and touch nobody else's; **the ratchets are shared
+     state and will collide**, which is a *good* conflict as long as the lane
+     reports the arithmetic so the integrator resolves it in seconds; the load
+     goes past 400, so decide assertion-versus-resource before chasing anything
+     and never loosen a timeout or drop a `t.Parallel()`; a fresh worktree is
+     cold in three ways and macOS scans a *committed* executable per file, so
+     exec `testdata/fakejava -version` once before the first gauntlet; and the
+     git guard's four refused shapes with the wrapper-script and `until`-loop
+     fixes. Every bullet is a thing a lane paid for today.
+  7. **The two questions the 09-19 run sent to "the report" are on the queue,
+     and the mechanism that swallowed them is closed** — see part one.
+- **Part one — is the ledger telling the truth? The finding of this run is
+  against this colour.**
+  - **A fourth hiding place exists and this colour invented it: "it rides the
+    report".** The 09-19 Colorless entry ends *"Both ride the report"* over two
+    questions about how the pass writes (whether "one line per item" means one
+    item per *question*, headline first; and whether queued ledger blocks should
+    carry a marker a test can read, so `daybreakrecord_test.go` could read both
+    directions). The Cleanup run behind it wrote the same choice under its own
+    heading, in its own words. **`git log -S 'one line per item'` and
+    `git log -S 'headline-first'` against `DAYBREAK.md` both return nothing,
+    ever.** So the run whose headline finding was *five items waited in the
+    ledger alone since August* created two more of exactly that class the same
+    afternoon, and a week later they had never been in front of him. That is the
+    strongest available evidence that the breach is **structural, not careless**
+    — a report is read once, over coffee, and then it has no address. Repaired
+    rather than reported, as part one requires: both are on `DAYBREAK.md` under
+    *a ruling, one word each*, each with the recommendation its ledger text
+    always implied ("headline", and "marker"), each saying why it is arriving a
+    week late. The rule is now in two places a future run reads — `SKILL.md`
+    step 3 (*"it rides the report" is not a third place — it is the ledger-only
+    failure wearing a better suit*) and `colorless.md` part one, which adds
+    `ride the report` to the phrases this walk greps for.
+  - **Today's six lanes, two-places audit: 6 of 6 clean, on their branches.**
+    White's three lines and Black's four each name `Ledger: <colour>,
+    2026-09-26` and each colour wrote a 09-26 block on the same branch; Blue and
+    the Green mergeable half queued nothing and said so; Red **closed three**
+    inherited items (health, the #481 walk, the merge queue) and rewrote a
+    fourth; Green rewrote two and added one; the Queen's two passes wrote their
+    lines under Red's and Green's groups with their records appended to those
+    sections. Nothing had merged when this was read, so this is an audit of six
+    green PRs rather than of `main` — stated rather than glossed, because the
+    09-12 entry's open-branch precedent is the only honest way to read a
+    parallel wave.
+  - **09-19 Colorless's own findings, landing rate: queued 0 of its own (5
+    re-filed for other colours, and 3 of those 5 were acted on this cycle —
+    Red closed the health body and the merge queue, the Queen built the 44px
+    floor); deferred 1 of 2 consumed.** The `guard-git.py` inertness test's
+    trigger is **unfired** — `.claude/hooks/` still holds exactly one hook. The
+    `web/src/index.css` slice's trigger **fired** (#481 merged 2026-09-20) and
+    was immediately replaced by a better blocker: the Queen's two passes rewrite
+    that sheet today, and its own fallback (`lib/stage.ts` + `lib/board.ts`) is
+    in the same lane's territory. Recorded as a trigger that arrived and a new
+    reason, which is what the deferral field is for; the Go side was swept
+    instead.
+  - **Fix spot-checks, 4 of 4 hold:** `components/board.tsx` still carries **0**
+    dated lines; `red.md` still names the default-ring mechanism rather than
+    calling a hover-only control invisible; `blue.md` still names the two real
+    `os.Exit` sites; `green.md` still carries the `resize_window`-reports-success
+    trap. Nothing reverted by a later merge.
+  - **Corrections outrank overwrites, checked:** every correction above is
+    written beside what it corrects, and fix 1 quotes the sentence it replaced
+    so the wrong reason cannot be re-derived. The retired const-block paragraph
+    is the one deletion, and it was *superseded prose inside a comment* rather
+    than a record — the record of that rise is the paragraph that survived.
+- **Part two — the checklists, against what today's lanes actually found.**
+  Every colour earned it again, and three earned it *through* the standing
+  question rather than beside it: White made CLAUDE.md's address rule
+  machine-checked, Blue turned three "grep, don't trust" layering claims into a
+  test, Green made ADR 30's "decks do not live in git" a CI refusal instead of a
+  `.gitignore` line a `git add -f` walks past, Red made the platform's own
+  health-check target read off the served route table, Black turned its "a
+  cache, a key, or a written argument" rule into a gate, and the Queen taught
+  `reducedmotion_test.go` a selector shape it could not see and found a live
+  violation with it inside a minute. **Reciting-risk verdict:** the relic
+  sweep's passes 1–6 are clean five runs running and stay for the count-habit;
+  the facet that keeps producing is the standing question, which is now the
+  visible engine of the whole pass. **What got past every checklist this cycle
+  is the pass's own surface again, and worse than last week:** `white.md` had
+  been wrong in four places for a month — including about the very claim the
+  pass cites as its proudest find — and the run that would have caught it is the
+  one that reads the skill, which goes sixth. The structural answer is in fix 2:
+  a reference file that points at a guard **by test name** is now held by
+  `TestTheSkillsNameOnlyTestsThatExist`, so the class of rot that says "this is
+  enforced by X" when X is gone cannot survive a gauntlet. What is still
+  unheld is a reference file's *numbers*, and nothing can hold those — which is
+  why fix 1 deleted a table instead of correcting it. The skill's description
+  line still fires on the words Aaron uses.
+- **Part three — the tooling.**
+  - **`animist verify` not run from this lane, and the reason is itself a
+    finding about the tool in a parallel wave:** `tools/.venv` hard-points at
+    the main checkout, which today has another lane's branch checked out, so
+    running it here would verify *that* branch's assets and report them as this
+    one's. Recipe count read from this worktree instead: **34 tracked, 34 found
+    by `find`** — flat against 09-19, and the phantom-67 stays gone. The honest
+    statement is that the asset gate went unrun this cycle for a structural
+    reason, and the fix is a lane file assigning it to whichever lane holds
+    `tools/`.
+  - **The record guards, `-count=1`, all PASS:** `daybreakrecord`,
+    `skillrecord` (now three tests), `licenserecord`, `datedcomments` (93/93 Go
+    after the sweep, 259/259 web untouched), `serialregister`, `coveragefloor`.
+    Re-run after every prose edit in this diff.
+  - **The hooks guard:** one hook, unchanged; the inertness deferral's trigger
+    has not arrived. Its blanket-add refusal's stated reason (`decks/` holding
+    real decks) is absent again this week — `decks/` is empty — and the rule it
+    enforces is CLAUDE.md's, so it stays.
+  - **The shelf's live question, answered differently for the first time:** what
+    the stock toolchain cannot do is now **run a set of benchmarks as one thing
+    and remember the answers**, plus read a counter out of a running instance.
+    All three remaining items are plumbing over instruments that exist (fix 5).
+- **Part four — the relic sweep, all six passes run.**
+  - **Pass 1 — clean.** **148** tracked directories (09-19: 147; the one new is
+    `go/cmd/mtglab/testdata/fakejava`'s home, #497's committed fake JVM).
+    **51 `go/internal` packages, 51 package docs, 0 without** (flat).
+  - **Pass 2 — clean.** 332 non-source files: the migration ladder, the tarot
+    deck's 78 plates, the scribe's GPL boundary, the docker trio,
+    `.env.example`, go.mod/sum, the two toolboxes' Python, the committed media,
+    and the one committed executable (`testdata/fakejava`).
+  - **Pass 3 (arrived since 09-19) — clean, and the list is enormous:** ~60 new
+    `_test.go` files, which is the 09-24 coverage climb and nothing else, plus
+    `internal/auth/authtest/faulty.go` (a fault-injecting connector, named by
+    its own tests) and the fake JVM. Every one reachable from the shape that
+    shipped it.
+  - **Pass 4 — clean, 97 docs by title** (flat). The two duplicate titles are
+    the same two benign pairs.
+  - **Pass 5 — clean.** Top level unchanged: cards, claude, data, decks,
+    forge-shim, probe, sim, ui, users + cobra's two. Every subcommand read;
+    `data backup` and `data snapshot` both serve the HOSTING drill, `sim cache`
+    the ADR 18 store. Nothing runs on a dead purpose.
+  - **Pass 6 — 15 rows, all the migration ladder** (flat).
+  - **No relic found.** The one thing that looks like one is the **eight live
+    worktrees** under `.claude/worktrees/` — today's lanes, every one in use,
+    and the 09-13 phantom's opposite: a clean worktree list is not the check,
+    *matching the lanes actually running* is.
+- **Part four's leftovers.** (a) The `os.Getenv` metric is Blue's and is fixed
+  in Blue's reference, not Blue's ledger section — recorded here so it is not
+  fixed twice. (b) The `fly status --app mtglab` trap belongs to Green's cloud
+  facet by ownership and was met by Red as well; filed once, in `green.md`, with
+  Red named — the two-owners shape handled by giving it one home and one
+  pointer. (c) White's owed determinism replay and its owed per-version npm
+  licence re-read both need something a worktree lane lacks (a browser, and
+  `node_modules`); they are White's, carried, and the parallel shape is the
+  cause, which fix 6's lane-file rule now addresses. (d) No contradiction found
+  between the six lanes; the one near-collision was two lanes wanting
+  `health.go` on the same afternoon and Green standing down in writing, which is
+  ownership working.
+- **Measurements (2026-09-26, rainbow, daylight, parallel):** raw output, not a
+  summary. Every timing on this Mac with several lanes live — **compare none of
+  it to a quiet night.**
+
+      $ go test -count=1 -v -run TestDatedCommentsDoNotOutgrowTheirCeiling ./cmd/mtglab/
+      before the slice:  go 117/117 · web/src 259/259
+      after the slice:   go 93 (ceiling lowered 117 → 93) · web/src 259/259
+      by the reference's greps (a different definition, for choosing a family):
+        dated lines, go/**.go outside _test.go      117 → 93
+        internal/sim/tier3 non-test                 29 → 5
+          run.go 4→1 · board.go 9→1 · events.go 6→2 · scribe.go 3→1
+          dck.go 2→0 · worker.go 2→0 · parse.go 2→0 · ledger/standings.go 1→0
+        densest untouched families now: internal/prices/prices.go 10,
+          internal/claude (dial 6 + converse 3 + theme 2 + ledger 2) 13,
+          internal/deckimport 5, internal/night 9
+        web/src: untouched by this lane on purpose (the Queen's two passes own
+          the sheet and the bundle today)
+
+      $ uptime; /usr/bin/time -p go test -count=1 -json ./...; uptime
+      load 16.36 before, 89.38 after       real 112.94  user 471.02  sys 110.50
+      the slow tail, 51 packages:
+        internal/api 62.9s · internal/claude 42.6 · claude/tools 25.9 ·
+        internal/cards 25.8 · internal/convoke 23.0 · internal/config 22.9 ·
+        internal/deck 22.3 · internal/door 21.4 · internal/deckread 19.9 ·
+        claude/ledger 18.6
+      Read against `white.md`'s retired table (1m13s wall, api 63.1s = 86% of
+      it): the wall clock is HALF AGAIN as long on a tree thousands of tests
+      bigger, api's own time is unmoved at 62.9s, and it is now 56% of the wall
+      rather than 86% -- because the other fifty packages grew around it and
+      every test in them is parallel. The 08-23 conclusion ("nothing else is
+      worth a minute of anyone's attention until api moves") is the part that
+      rotted, not the arithmetic. This is why fix 1 deleted the table: the
+      numbers were reproducible and the inference was not.
+
+      recipes tracked / found                       34 / 34   (flat; animist verify unrun, see part three)
+      relic pass 1: 148 dirs; 51 packages, 51 docs  (147 on 09-19)
+      relic pass 4: 97 docs by title                (flat)
+      relic pass 6: 15 rows, 0 findings             (flat)
+      .claude/hooks                                 1 hook (trigger unfired)
+      live worktrees                                8, all today's lanes
+      Queued-for-Aaron blocks in the ledger         25 across six sections
+        (`grep -cE '^[-*] *\*\*Queued for Aaron'` -- a bare `grep -c` on the
+        phrase reads 30, because five are prose about the blocks)
+      ledger-only questions found                   2 (both "ride the report", both re-filed)
+      two-places audit, today's lanes               6 of 6 clean (on branches)
+      09-19 Colorless landing rate                  queued 0 own / 5 re-filed (3 acted on) · deferred 1 of 2 · fixes 4/4 hold
+      queue depth (the file's own grep)             14 → 16 from this lane alone
+      skill test citations held                     4, all resolve (new guard)
+      Test functions discovered under go/           the guard's inertness floor is 100; the real count is four figures
+      data/app.db                                   this worktree has no data/ at all; no server started
+
+- **Queued for Aaron (2026-09-26): two, and they are the 09-19 pair finally
+  arriving.** Both on `DAYBREAK.md` under *a ruling, one word each*, each
+  answerable with one word — **"headline"** (the daybreak rule means one item
+  per question, headline first) and **"marker"** (queued ledger blocks that are
+  still open carry a literal `(open)`, so the guard can read both directions).
+  Nothing of this run's own beyond them: no design decision, no spend, no
+  dependency, no migration.
+- **Deferred (2026-09-26), with triggers:**
+  - **A test that fails when `guard-git.py` goes inert.** *Trigger:* unchanged
+    — a second hook in `.claude/hooks/`, or the guard observed allowing a
+    spelling it documents refusing.
+  - **The reverse half of `daybreakrecord_test.go`** — every *open* queued
+    ledger block must have a queue line. *Trigger:* Aaron answers "marker". The
+    convention is the whole blocker; the test is twenty lines once a block can
+    say it is open.
+  - **`web/src/index.css` as a comment slice** (the densest file in the tree).
+    *Trigger:* the Queen's two passes merged. Both rewrite that sheet.
+  - **Assigning `animist verify` to a lane in a parallel wave.** *Trigger:* the
+    next parallel run; the fix is one line in a lane file, and it costs nothing
+    to state until there is a lane file to put it in.
+- **Staleness, honestly stated** for the next bare `/polish`: every colour
+  carries a 2026-09-26 tag once the train lands, so date-staleness is nil and
+  substance orders the next cycle **Red first** (its two oldest live items are
+  both alerting — off-platform uptime and the deploy-time snapshot — and both
+  now need only Aaron's word and a watched morning), then **Green** (the
+  authenticated phone sweep still owed, the pool refresh due the week of 10-05
+  after *Reality Fracture*), then **White** (the determinism replay owed two
+  cycles running for want of a browser). Cleanup has not run in this wave; the
+  queue it would inherit is the 09-19 remainder minus Red's three closures plus
+  what the six lanes added, which the file's own grep answers and this entry
+  deliberately does not.
 
 ### 2026-09-19 (rainbow)
 
