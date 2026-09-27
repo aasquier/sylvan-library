@@ -17,43 +17,27 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > migration window — and the last group needs nothing today. The 09-13
 > Answered list that used to sit at the foot of this file is gone: all eleven
 > records are in the ledger now (White, Green, Red-carried-by-Cleanup and
-> Colorless; the Cleanup section's 2026-09-19 entry says where each went).
-> **Fourteen items are open as this file is written**, twelve inherited and
-> two surfaced by the untap — Red's #481 walk line, which had lived only on
-> its parked branch, and a merge-queue item whose ledger trigger fired today
-> with four PRs open at once. Count them with the colour, never the bold:
->
-> ```
-> grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):' docs/polish/DAYBREAK.md
-> ```
->
-> A count is a claim to re-check, and so is the recipe for checking it.
+> Colorless; the Cleanup section's 2026-09-19 entry says where each went). The
+> regrouping left **fourteen** items open — twelve inherited and two surfaced by
+> the untap: Red's #481 walk line, which had lived only on its parked branch,
+> and a merge-queue item whose ledger trigger fired that day with four PRs open
+> at once.
+
+**How many are open right now is a question for the file, not for this
+paragraph.** Count them with the colour, never with the bold:
+
+```
+grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):' docs/polish/DAYBREAK.md
+```
+
+A count written into prose is a claim that rots the next time anyone adds a
+line — this one said "fourteen" through a week in which five colour lanes and
+two design passes added and closed items — and so is the recipe for checking
+it. Run the recipe; re-read the recipe.
 
 ---
 
 ## Open — a walk before a merge (commandment 16)
-
-**Red: PR #481 is green and parked — commandment 17's focus clause made
-checkable, and the twenty-one controls it found dressed.** Two art-picker
-tiles were genuinely silent to the keyboard (an inline `outline` outranks
-every focus ring); ten classes — `.card-action`, `.menu-row`, `.nav-link`,
-`.wordmark`, `.shelf-learn`, `.reader-tile`, `.art-pick-tile`,
-`.wheel-folded`, `.wheel-fold-btn`, `.wheel-spin-btn` — answered hover and
-left focus to the browser's default ring; all now share their hover reply
-with `:focus-visible` and wear `.btn`'s vine ring. · *Cost of leaving it:*
-keyboard users get the OS blue line on this site's dark rooms, and the guard
-sits unmerged so the next inline `outline` lands unnoticed. ·
-**Recommendation:** walk and merge. `mtglab-ui` on 8765, then **Tab, never
-click** (Chrome draws `:focus-visible` for the keyboard only): `/` — Tab once
-(wordmark rings, tree shivers 700ms), Tab on (each nav link rings, its
-underline sprouts); gear → Tab (menu rows ring inset); any deck → Card actions
-bar → Tab across; deck → Change art → Tab into the tiles (lift + ring; on
-Trostani, Card art → Command Tower, the chosen tile keeps its blue ring under
-a vine halo); the folded wheel at the deck's foot → Tab, Enter, Tab to Fold
-away and Spin the wheel (glint crosses, 0.7s); `/new` → Help me decide →
-Different reader → Tab onto a reader tile; `/` → From the shelves → Another
-until "In the Learn room →" shows, Tab to it. Ledger: Red, 2026-09-19 (the
-entry rides #481 itself).
 
 **Red: PR (the Queen's ball) is green and parked — every plate in the app now
 carries a light that walks its rim.** Aaron asked for "a gleaming edge that
@@ -114,22 +98,35 @@ Cleanup (09-12, 09-19) for the same stated reason.
 
 ## Open — a ruling, one word each
 
-**Green: `Deck.LandCount()` counts by category alone, so a modal DFC filed as
-a spell is missing from the land count *and* from the opening-hand
-arithmetic.** The deck wire's `land_count`, and `analyze.OpeningHand` which
-reads it, both ask only "is the category 'land'"; `analyze.CurveOf` and
-`PipRequirements` ask `IsLand()` instead. So a card like Stump Stomp //
-Burnwillow Clearing filed under 'interaction' falls between them — too
-land-like for the curve, not land-like enough for the land count — and the
-opening-hand land probabilities are computed one land short. · *Cost of
-leaving it:* three cards across two decks today; the numbers are quietly a
-little pessimistic, and nothing says so. · **What would have to be true:**
-`land_count` is on the wire and the opening-hand table is recorded in
-`gate/testdata/*.stats.json`, so changing the rule moves frozen goldens and is
-deliberately not a thing a session does on its own. · **Recommendation:**
-rule that an MDFC counts toward `land_count` — it genuinely is a land drop,
-and "yes" makes the two arithmetics agree — on its own branch with the
-goldens re-recorded deliberately. Ledger: Green, 2026-09-19.
+**Green: the land-count ruling is BUILT AND GREEN in PR #506, parked for your
+word — and it is one word, on a question slightly wider than this line used to
+ask.** `land_count` counted the category a card was filed under, so a modal
+DFC like Stump Stomp // Burnwillow Clearing filed under 'interaction' was a
+land to the curve and a spell to the count, and the opening-hand odds were one
+land short. #506 makes the land count the exact complement of the curve's
+skip. **The widening:** that necessarily also counts a *plain* land filed
+under a spell slot, which is what moves the one golden — and #506's body
+offers the narrow "modal DFCs only" variant if you want it instead. · *Cost of
+leaving it:* two decks read a land low (`one-blade-many-blessings` by one,
+`school-of-hard-knocks` by two, re-confirmed off the volume today); the other
+23 are unaffected either way. · **What it costs to say yes:** eleven numbers
+in one frozen golden, every one listed old → new in the PR, all consequences
+of `messy`'s `land_count` going 96 → 97; no fingerprinted package and so no
+Tier 1 cache discarded. · **Recommendation:** read §3 and §4 of #506 and
+answer **"union"** (merge it) or **"MDFC only"** (and no golden moves at all).
+Ledger: Green, 2026-09-26.
+
+**Green: nothing reports how old the card pool is, and this is the fourth run
+to say so.** `pool_stale` asks whether the pool predates the *columns* the app
+reads, so it answers `false` for a pool of any age; the only age signal in the
+product is a date inside a bulk filename that a person has to go and read.
+Today: 13 days old, `pool_stale: false`. · *Cost of leaving it:* legality and
+prices answer out of date silently, and the one number that would have said so
+is the one nothing reports. · **Recommendation:** "yes" — add `pool_age_days`
+to the health body beside the `disk_free_mb` that #502 adds, as a small
+follow-on once #502 lands. Deliberately not built today: two lanes editing
+`health.go` on one afternoon is a merge conflict for nothing. Ledger: Green,
+2026-09-26.
 
 **Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
 existed nowhere else, and it is deleted now.** It survives in git history
@@ -151,18 +148,6 @@ that moves no pixels — or close it as a desktop-first ruling; either answer
 ends a finding re-measured four runs running. Ledger: Green, 2026-08-24 (the
 browser facet's queued item 3); re-measured 2026-09-19.
 
-**Red: `/api/health` reports the pool and the process, never `app.db` or the
-volume's free space, so a corrupt auth database or a full disk leaves it
-green.** · *Cost of leaving it:* every login can fail behind a passing check.
-· **Recommendation:** "yes" — add `app_db` (does it open), `disk_free_mb` and
-`schema_version` to the body and keep the status 200 (Fly stops routing on a
-failing check, and with one machine that turns "logins are broken" into "the
-site is down"), and it becomes the next Red run's first fix rather than a
-queued idea; it is a ruling only because the free-space read is
-platform-shaped and the arm64 leg of CI is the only full proof, so it lands
-as its own watched PR. Ledger: Red, the queued list carried in the 2026-09-05
-entry, item 3; re-verified 2026-09-19.
-
 **Red: the "drill older than the newest migration" rule cannot be satisfied,
 and the drill that proved it is walked and recorded.** Snapshot retention is
 five days; a snapshot can only ever rehearse a rung landed in the last five
@@ -175,17 +160,124 @@ refuse; say "checklist" instead if you want the five-day drill named beside
 2026-09-19 (the drill and the retention finding are recorded there as Red
 records carried by Cleanup).
 
-**Red: a merge queue — its ledger trigger ("the next time more than two PRs
-are open at once") fired today, with three Dependabot PRs and #481 open
-together.** Protection is `strict`, so every merge invalidates the others and
-costs each a branch update and a full re-run (~7 minutes of CI apiece,
-which is what landing the Dependabot trio one at a time costs). · *Cost of
-leaving it:* about
-twenty CI minutes on the one morning a month Dependabot batches, and nothing
-otherwise — serial rainbows never collide. · **Recommendation:** "close" —
-a merge queue changes the contributor workflow to save a monthly twenty
-minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
-list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
+**White: the coverage floor's 1.6-point gap — should it track the tree, or stay
+anchored at 95?** You asked on 2026-09-24 for "the tree at 96 and the gate at
+95" and `ci.yml` records that as a deliberate margin, so a diff can cost a few
+tenths of honest refactoring without going red. The tree now measures 96.7 and
+both readings of your ruling are defensible: hold 95.0 as a number, or keep the
+~1.6 gap as the tree climbs. · *Cost of leaving it:* nothing today — the gate
+works either way; it only matters the day the tree passes 97 and nobody knows
+whether a click is owed. · **Recommendation:** "margin" — leave 95.0 alone
+until the tree reaches 97.0, then click to 95.5 and keep the gap, because what
+you asked for was slack for refactoring and slack does not shrink as a
+codebase grows. Say "anchor" if you meant 95 as a floor the tree simply grows
+away from. Ledger: White, 2026-09-26.
+
+**White: two named coverage levers should be closed as argued rather than left
+open — `ApplyBulk`'s four fold branches and `prompt.secret`'s terminal arm.**
+Both were worked this run and both are honestly unreachable: `PlanBulk` refuses
+the same file through the same lookup, so `ApplyBulk`'s folds are defensive
+depth behind a guard and reaching them needs a `BulkPlan` the planner would
+never build; and the password prompt's terminal branch would need its terminal
+read handed in as a value, which moves the five uncovered statements into the
+seam's own default rather than removing them. · *Cost of leaving it:* one hour
+per future coverage leg, spent rediscovering this — `COVERAGE.md` currently
+advertises the password one as "the single biggest lever left in `cmd/mtglab`".
+· **Recommendation:** "yes to both" — move both into `COVERAGE.md`'s *Left
+deliberately* with the reasons above, so the list keeps its promise of being
+the thing you read before spending an hour on a branch that cannot be entered
+honestly. Ledger: White, 2026-09-26, queued items 2 and 3.
+
+**White: the determinism replay is owed** — tarot, brew, wheel and Tier 1
+against the live instance, which this run could not do (a worktree lane with no
+browser; the pane belonged to another lane). · *Cost of leaving it:* the
+once-a-cycle check that a seed is still a promise where users live slips a
+week; the local goldens are unaffected and green. · **Recommendation:** no
+ruling wanted — it is work, and the next White or Green run with browser access
+takes it, using 09-19's recorded baselines (tarot seed 1909 → 741 bytes, sha256
+`e406f504…`; brew → 503 bytes, sha256 `54c5036e…`; Tier 1 in the two-ask
+cached form). Ledger: White, 2026-09-26.
+
+**Black: nine of the ten Claude mode prompts have drifted from the code around
+them, and the drift is in what the model is told.** Three runs of this reading
+ended "the prompts are byte-untouched, so there is nothing to read" — true of
+the prompts and false of the reading, because a prompt goes stale when its code
+moves. The worst three: the intake, draft and description modes all promise the
+model "the counts and the curve ... were given to you" when the brief carries
+neither and the two tools that do are granted but never named; nine of ten
+modes end on a scope paragraph about a card, a deck or a gate that is not there
+(`scan` — a two-string transcription — is told not to range into the rest of the
+deck); and `theme-conversation` is told a re-stated slot set *replaces* the
+previous one when the code unions them. Six smaller ones behind those. · *Cost
+of leaving it:* every one of these is a sentence a model is currently believing,
+on the surfaces a newcomer actually talks to, and the tarot table is one of
+them. · **Recommendation:** "yes" — one branch, one PR, one walk; brief
+sentences first, the scope paragraphs through each mode's own `ScopeNotes`
+field (which exists for exactly this), and two of them — the interview's "three
+to five questions" against a cap of six, and the theme's replace-versus-union
+rule — put to you rather than guessed. Queued rather than landed because it is
+all model-facing text and the dossier's instructions are hash-frozen in a
+corpus. Ledger: Black, 2026-09-26.
+
+**Colorless: this file's own rule says "one line per item" and not one item has
+obeyed it for a month — is the rule wrong, or is the file?** Every item here is
+a paragraph, and you have answered the file happily in that shape (25 in one
+morning on 09-05). A line-count gate would fail the file you blessed, and
+rewording a rule to match drift is the move the pass forbids, so nobody has
+touched either side. This question was raised on 2026-09-19 and sent to "the
+report" instead of here, which is why you are seeing it a week late. · *Cost of
+leaving it:* nothing today; the risk is the file growing into the
+three-thousand-line thing the queue exists to replace, with no rule anyone can
+point at. · **Recommendation:** "headline" — the rule means *one item per
+question, headline first, context after*, which is what the good items already
+do; say the word and the sentence gets rewritten once and then held by the
+shape of every new item. Ledger: Colorless, 2026-09-19, and 2026-09-26 for why
+it is arriving now.
+
+**Colorless: the guard on this file reads one direction only, and the missing
+direction is how five items hid for 26 days.**
+`daybreakrecord_test.go` proves every line here names a ledger record; nothing
+proves every *waiting* ledger record has a line, because "queued" in ledger
+prose carries no marker a test can read — and an answered item correctly
+*leaves* this file, so a naive reverse check would demand a line for every
+historical block ever written. The missing piece is one convention: a marker on
+a queued ledger block that says *still open*. A convention binds every future
+session, which makes it yours rather than a run's. · *Cost of leaving it:* the
+breach recurs in the only direction nothing watches — it has happened twice
+that we know of, most recently to this very question. · **Recommendation:**
+"marker" — queued blocks that are still open get a literal `(open)` after the
+heading, struck when you answer, and the next Colorless run extends the guard
+to read both ways; say "no" and the reverse walk stays a `git log -S` recipe in
+`references/colorless.md`, which is honest but only runs when somebody
+remembers. Ledger: Colorless, 2026-09-19, re-filed 2026-09-26.
+
+**White (leg two): the ratchet trigger you named has arrived — does the floor
+click?** The grind took the tree 96.6 → **96.9**, and the day's first leg (PR
+#504) is another tenth, so merged `main` should print **97.0** on the arm64
+leg. 97.0 is the exact number leg one's own recommendation set as the
+condition: *hold 95.0 until the tree reaches 97.0, then click to 95.5 and keep
+the gap.* · *Cost of leaving it:* nothing this week; the gap grows to two full
+points, and at two points a diff can lose a whole point of honest coverage
+without a check going red — which is the one thing the floor exists to
+notice. · **Recommendation:** **"ratchet"** — 95.5, and only once a merged
+`main` actually prints 97.0 or better in the `Coverage floor` step (read it off
+the run, not off this file). The floor did not move on this branch on purpose:
+`ci.yml` records the gap as your own 2026-09-24 ruling, and a lane does not
+overwrite a ruling with its own arithmetic. Ledger: White, 2026-09-26
+(rainbow, leg two).
+
+**White (leg two): the next grind is a fixture, not a sweep.** What is left
+after this is `internal/pool` (58 statements), `internal/sim/tier3` (67) and
+`cmd/mtglab` (46), and the pool's share wants **a faulty DuckDB connector** —
+`authtest.OpenFaulty` is SQLite-only, and `rebuild.go`'s `startRebuild` and
+`finish` are the same "a statement failed in the middle of a long write" shape
+this leg closed everywhere else. · *Cost of leaving it:* the refresh's own
+failure arms stay undriven, and the refresh is the one job that can leave the
+card pool half-written on the deployed volume. · **Recommendation:** **"go"** —
+a `pooltest.OpenFaulty` built the same way (borrow the registered driver off a
+throwaway handle, wrap the three context forms, count statements) is a day's
+work and reusable, and it is the last named fixture gap in the tree. Ledger:
+White, 2026-09-26 (rainbow, leg two).
 
 ## Open — a dollar and an account
 
@@ -193,12 +285,19 @@ list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
 that keeps its port is an outage nothing detects.** Fly's HTTP check stops
 routing on failure and the restart policy fires only on exit, so a wedged
 process is a total outage with no alarm. · *Cost of leaving it:* the first
-person to notice an outage is a friend at breakfast. · **Recommendation:**
-two free minutes first — does fly-metrics.net hold any alert rule at all? —
-then UptimeRobot's free tier on `GET /api/health` (GET, never HEAD: `HEAD /`
-answers 405) wired to Pushover ($5 once) for the phone. Ledger: Red, the
-queued list carried in the 2026-09-05 entry, items 1–2; on the queue since
-09-19 only, in the ledger since 08-16.
+person to notice an outage is a friend at breakfast. · **The two free minutes
+are spent and they end at your login:** `fly` has no alert-rule subcommand at
+all, fly-metrics.net answers 401 unauthenticated, and `FLY_METRICS_TOKEN` is a
+read-only Prometheus credential rather than a Grafana one — so *whether any
+alert rule exists* is two clicks in your own Fly session and nothing a run can
+find out. (`fly synthetics` is new and is not the answer: the agent runs on
+Fly, so it cannot report that Fly is down.) · **Recommendation:** look once
+while you are in there, then UptimeRobot's free tier on `GET /api/health`
+(GET, never HEAD: `HEAD /` answers 405, and a Go guard asserts the GET now)
+wired to Pushover ($5 once) for the phone. The health body reports `app_db`,
+`disk_free_mb` and `schema_version` as of 2026-09-26, so the monitor has
+something to read besides 200. Ledger: Red, the queued list carried in the
+2026-09-05 entry, items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
 
@@ -214,14 +313,35 @@ scope is checked — a workflow change only CI can prove, so it lands as its
 own PR on a morning you can watch the deploy. Ledger: Red, the queued list
 carried in the 2026-09-05 entry, item 6.
 
+**Black: every visit to the deck shelf re-reads and re-parses the whole
+library — ~42 ms of CPU and 27 MB of allocation for 25 decks of 100 cards, on
+a machine with two shared cores.** `/api/decks` builds a fresh `FileSource`
+per request, so nothing memoises anything; ~90% of the cost is inside the YAML
+library, so the only lever that pays where it ships is not parsing a file that
+has not changed (fanning the reads out with `convoke` was measured and
+rejected — its worker rule runs the serial loop on two cores). · *Cost of
+leaving it:* the home page's shelf call spends 42 ms of server CPU per visit
+for an answer that was identical last time, forever. · **What makes it a
+question:** the memo needs an owner that outlives a request — the long-lived
+`*API`, handed down through `Resolver` into `NewFileSource`, five to eight
+files — and its invalidation is the pool's file-stamp guarantee applied to
+live user data. · **Recommendation:** "yes" — its own PR on a morning you can
+watch the deploy, with hit and miss counters in from the start and rendered
+nowhere. Ledger: Black, 2026-09-26.
+
 ## Open — a migration window
 
 **Black: prompt-cache *writes* are invisible in both usage ledgers, so the
 spend figures are a little under.** `cache_creation_input_tokens` appears
 nowhere outside two test fixtures; writes bill at 1.25× input. · *Cost of
 leaving it:* the dollar figure on the Admin panel and in `mtglab claude
-usage` under-reads by the write premium — small against today's ≈$11
-all-time, and a schema migration to fix. · **Recommendation:** add the
+usage` under-reads by the write premium, and 09-26 put a floor under it
+rather than calling it small: every mode's cacheable prefix was measured, and
+the instance's 213 conversations wrote **at least ≈490,000 cache tokens**,
+billing at 1.25× input — **$1.22–$1.84 unrecorded against a recorded $9.0034,
+a 14–20% under-read** — with a provable ceiling of $24–37 because writes can
+never exceed reads. A 20×-wide bracket is what the column collapses. ·
+**Recommendation:** add the
 column on a day you can watch the boot (a migration is your window by
 standing rule); nothing until then. The theme mode's unreadable second cache
 breakpoint (Black, 2026-08-24, item 2 — worth at most ~0.8% of that mode's
@@ -243,15 +363,33 @@ whether a night is scheduled off the wire. · **Recommendation:** unchanged —
 the copy becomes a fact the server owns when the shelf gives it something to
 read. This line is the reminder. Ledger: Blue, 2026-09-05.
 
-**Green: the pool is six days old and fine; the next refresh has a date
-rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the `frc`
-commander decks) releases 2026-10-02, and until a refresh runs after that day
-the shelves cannot resolve a released product. · *Cost of leaving it:* nothing
-until 10-02, then names from a new set fail on import and search. ·
+**Green: the pool is thirteen days old and still fine; the next refresh has a
+date rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the
+`frc` commander decks) releases 2026-10-02, and until a refresh runs after that
+day the shelves cannot resolve a released product. Re-read 2026-09-26: bulk
+files still `2026-09-13`, 35,517 oracle / 108,583 printings, byte-identical to
+09-19 — the premise has not moved, only the age, and the trigger is the release
+rather than the age. · *Cost of leaving it:* nothing until 10-02, then names
+from a new set fail on import and search. ·
 **Recommendation:** "Gather the library again" on the Admin Upkeep tab in the
 week of 10-05 — a deployed button now, no ssh — then read the pool file's
 size back once; the #472 rebuild took it 224 MB → 81 MB on 09-13 and it should
 hold near there. Ledger: Green, 2026-09-19.
+
+**Black: the cache-read price is one constant for the whole family, and the
+family stopped agreeing — but nothing is mispriced yet.** `prices.CacheReadFraction`
+is 0.1 for every model on the argument that the ratio is the same across the
+family; Claude Fable 5.1 prices cache reads at $0.25/MTok, which is 0.025× its
+input. `claude-fable-5-1` is not in `Table`, and the instance runs Sonnet 5 on
+every row, so today this is a trigger rather than an error. · *Cost of leaving
+it:* nothing until a model with a different read fraction is added to `Table`,
+at which point its cache reads are priced 4× high, silently. · **What would
+have to be true:** the fraction moves onto `Priced` beside the rate, which
+means extending `testdata/prices.json` — a frozen golden, and not a thing a
+polish run extends on its own. · **Recommendation:** land it in the same branch
+that adds such a model; meanwhile the cheap half is a guard that every model in
+`Table` is on a recorded list of "cache reads really are a tenth here", so the
+next one has to say. Ledger: Black, 2026-09-26 (deferred 2026-09-19).
 
 **White: `NOTICE.md` is held and the skills are held; the rest of the tree's
 prose is still unguarded.** `licenserecord_test.go` holds every repository
