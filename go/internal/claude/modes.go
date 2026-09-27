@@ -15,7 +15,7 @@ import (
 // live as **recorded data** rather than as string literals -- the same
 // split `tools` makes, for the same reason at greater scale. A prompt is prose
 // whose bytes reach a model; `theme-proposal`'s alone runs to thousands of
-// words. Hand-copying seven of them into source code is the drift the
+// words. Hand-copying every one of them into source code is the drift the
 // embed exists to prevent, and unlike a persona's voice a mistyped
 // instruction here changes what the model is *allowed to do* rather than how
 // it sounds.
@@ -27,16 +27,18 @@ import (
 // no field for a card name. Those **absences are the features**, and an
 // absence is precisely what a hand-copy drops with nothing looking wrong.
 //
-// All seven definitions load. The definition is data; the code that
+// Every definition in the file loads. The definition is data; the code that
 // assembles a brief and reads an answer back is the mode's own.
 //
-// **Seven, and this comment said six until 2026-08-23.** The file's first
-// builder worked from a hand list and silently lost the scan mode, whose
-// definition is spelled differently from its siblings; #257 rebuilt it to
-// discover modes by type, and the prose describing it kept the old number. A
-// count in a comment is a claim
-// to re-check against the data, which is why `ModeNames` is derived and no
-// number is written down anywhere a test cannot read it.
+// **This comment used to carry the count, and it was wrong twice.** It said
+// six when there were seven: the file's first builder worked from a hand list
+// and silently lost the scan mode, whose definition is spelled differently
+// from its siblings, and #257 rebuilt it to discover modes by type while the
+// prose kept the old number. Then it said seven once there were ten, which is
+// the same failure with nobody's bug behind it -- the modes arrived and the
+// sentence did not move. So the number is gone from here entirely: a count in
+// a comment is a claim to re-check against the data, `ModeNames` is derived,
+// and nothing is written down anywhere a test cannot read it.
 
 //go:embed data/modes.json
 var modesJSON []byte
